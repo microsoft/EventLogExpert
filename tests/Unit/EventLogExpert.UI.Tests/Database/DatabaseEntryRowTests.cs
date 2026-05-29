@@ -2,7 +2,9 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.UI.Database;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -14,6 +16,53 @@ public sealed class DatabaseEntryRowTests : BunitContext
     public DatabaseEntryRowTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
+    }
+
+    [Fact]
+    public async Task CancelButton_Click_InvokesProgressCancelDelegate()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+        int cancelCount = 0;
+        var progress = MakeProgress(currentEntryName: "a.db", cancel: () => cancelCount++);
+
+        var component = RenderRow(entry, upgradeProgress: progress);
+        await component.Find(".db-entry-cancel-btn").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(1, cancelCount);
+    }
+
+    [Fact]
+    public void RemoveButton_AriaDisabled_DuringBackgroundUpgrade()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+        var progress = MakeProgress(currentEntryName: "a.db", scope: UpgradeProgressScope.Background);
+
+        var component = RenderRow(entry, upgradeProgress: progress);
+
+        var button = component.Find(".db-entry-remove-btn");
+        Assert.Equal("true", button.GetAttribute("aria-disabled"));
+    }
+
+    [Fact]
+    public void RemoveButton_AriaDisabled_DuringManageUpgrade()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+
+        var component = RenderRow(entry, isUpgrading: true);
+
+        var button = component.Find(".db-entry-remove-btn");
+        Assert.Equal("true", button.GetAttribute("aria-disabled"));
+    }
+
+    [Fact]
+    public void RemoveButton_NotAriaDisabled_WhenIdle()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        var component = RenderRow(entry);
+
+        var button = component.Find(".db-entry-remove-btn");
+        Assert.False(button.HasAttribute("aria-disabled"));
     }
 
     [Fact]
@@ -31,6 +80,65 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         // Assert
         Assert.Equal(1, invocationCount);
+    }
+
+    [Fact]
+    public async Task RemoveButtonClick_WhenIsUpgrading_DoesNotInvokeOnRemove()
+    {
+        // Defense-in-depth: DatabaseRegistry.ReserveFileOperation is the corruption mutex;
+        // this UI guard prevents the confusing "Failed to Remove Database" banner that would
+        // otherwise surface from a Remove click during an in-flight upgrade.
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+        int invocationCount = 0;
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.IsUpgrading, true)
+            .Add(p => p.OnRemove, () => invocationCount++));
+
+        await component.Find(".db-entry-remove-btn").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(0, invocationCount);
+    }
+
+    [Fact]
+    public async Task RemoveButtonClick_WhenUpgradeProgressNotNull_DoesNotInvokeOnRemove()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+        var progress = MakeProgress(currentEntryName: "a.db", scope: UpgradeProgressScope.Background);
+        int invocationCount = 0;
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.UpgradeProgress, progress)
+            .Add(p => p.OnRemove, () => invocationCount++));
+
+        await component.Find(".db-entry-remove-btn").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(0, invocationCount);
+    }
+
+    [Fact]
+    public void Render_BackgroundUpgrade_UpgradeFailed_NoDoubleRenderBadgeAndSpinner()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeFailed);
+        var progress = MakeProgress(currentEntryName: "a.db", scope: UpgradeProgressScope.Background);
+
+        var component = RenderRow(entry, upgradeProgress: progress);
+
+        Assert.Single(component.FindAll(".db-entry-spinner"));
+        Assert.Empty(component.FindAll(".db-entry-badge"));
+    }
+
+    [Fact]
+    public void Render_BackupExists_AND_BackgroundUpgrade_StillShowsBadge()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired, backupExists: true);
+        var progress = MakeProgress(currentEntryName: "a.db", scope: UpgradeProgressScope.Background);
+
+        var component = RenderRow(entry, upgradeProgress: progress);
+
+        Assert.Single(component.FindAll(".db-entry-badge"));
+        Assert.Single(component.FindAll(".db-entry-restore-btn"));
+        Assert.Empty(component.FindAll(".db-entry-spinner"));
     }
 
     [Fact]
@@ -244,9 +352,20 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
         Assert.Empty(component.FindAll(".db-entry-badge"));
 
-        // Trash is rendered even during an in-flight upgrade; RemoveAsync coordinates
-        // with the per-file reservation so the user-initiated delete is safe to expose.
         Assert.Single(component.FindAll(".db-entry-remove-btn"));
+    }
+
+    [Fact]
+    public void Render_ManageUpgrade_TransitionalWindow_RoleStatusPresent()
+    {
+        // IsUpgrading=true, UpgradeProgress=null: Manage path between batch start and first per-file progress event.
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+
+        var component = RenderRow(entry, isUpgrading: true);
+
+        var upgrading = component.Find(".db-entry-upgrading");
+        Assert.Equal("status", upgrading.GetAttribute("role"));
+        Assert.Contains("Upgrading", upgrading.TextContent);
     }
 
     [Fact]
@@ -472,6 +591,106 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
+    public void Render_UpgradeProgress_EmptyEntryName_DoesNotEmitFilenameSrSuffix()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+        var progress = MakeProgress(currentEntryName: string.Empty, currentBatchSize: 2);
+
+        var component = RenderRow(entry, upgradeProgress: progress);
+
+        Assert.Empty(component.FindAll(".db-entry-upgrading .visually-hidden"));
+    }
+
+    [Fact]
+    public void Render_UpgradeProgress_EmptyEntryName_RendersPreparingMessage()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+        var progress = MakeProgress(
+            currentEntryName: string.Empty,
+            currentBatchSize: 3);
+
+        var component = RenderRow(entry, upgradeProgress: progress);
+
+        var text = component.Find(".db-entry-upgrading-text");
+        Assert.Contains("Preparing upgrade of 3 databases", text.TextContent);
+    }
+
+    [Fact]
+    public void Render_UpgradeProgress_EmptyEntryName_SingleDb_UsesSingularLabel()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+        var progress = MakeProgress(currentEntryName: string.Empty, currentBatchSize: 1);
+
+        var component = RenderRow(entry, upgradeProgress: progress);
+
+        var text = component.Find(".db-entry-upgrading-text");
+        Assert.Contains("Preparing upgrade of 1 database", text.TextContent);
+        Assert.DoesNotContain("databases", text.TextContent);
+    }
+
+    [Fact]
+    public void Render_UpgradeProgress_RendersRichProgressMarkupWithVerbAndPosition()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+        var progress = MakeProgress(
+            currentEntryName: "a.db",
+            currentPhase: UpgradePhase.MigratingSchema,
+            currentBatchPosition: 2,
+            currentBatchSize: 5);
+
+        var component = RenderRow(entry, upgradeProgress: progress);
+
+        var text = component.Find(".db-entry-upgrading-text");
+        Assert.Equal("Migrating schema 2 of 5", text.TextContent);
+    }
+
+    [Fact]
+    public void Render_UpgradeProgress_RoleStatusOnInnerSpan_WithFilenameSrSuffix()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired, "MyProvider.db");
+        var progress = MakeProgress(currentEntryName: "MyProvider.db");
+
+        var component = RenderRow(entry, upgradeProgress: progress);
+
+        var statusSpan = component.Find(".db-entry-upgrading-status");
+        Assert.Equal("status", statusSpan.GetAttribute("role"));
+
+        var srSuffix = component.Find(".db-entry-upgrading .visually-hidden");
+        Assert.Contains("MyProvider.db", srSuffix.TextContent);
+    }
+
+    [Fact]
+    public void Render_UpgradeProgress_SingleFileBatch_OmitsBatchPosition()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+        var progress = MakeProgress(
+            currentEntryName: "a.db",
+            currentPhase: UpgradePhase.Verifying,
+            currentBatchPosition: 1,
+            currentBatchSize: 1);
+
+        var component = RenderRow(entry, upgradeProgress: progress);
+
+        var text = component.Find(".db-entry-upgrading-text");
+        Assert.Equal("Verifying", text.TextContent);
+    }
+
+    [Theory]
+    [InlineData(UpgradePhase.BackingUp, "Backing up")]
+    [InlineData(UpgradePhase.MigratingSchema, "Migrating schema")]
+    [InlineData(UpgradePhase.Verifying, "Verifying")]
+    public void Render_UpgradeProgress_VerbPerPhase(UpgradePhase phase, string expectedVerb)
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+        var progress = MakeProgress(currentEntryName: "a.db", currentPhase: phase);
+
+        var component = RenderRow(entry, upgradeProgress: progress);
+
+        var text = component.Find(".db-entry-upgrading-text");
+        Assert.Contains(expectedVerb, text.TextContent);
+    }
+
+    [Fact]
     public void Render_UpgradeRequiredEntry_ShowsTrashButton()
     {
         // Arrange — UpgradeRequired now renders the trash like every other status; the
@@ -635,18 +854,38 @@ public sealed class DatabaseEntryRowTests : BunitContext
         bool backupExists = false) =>
         new(fileName, $@"C:\dbs\{fileName}", isEnabled, status, backupExists);
 
+    private static BannerProgressEntry MakeProgress(
+        string currentEntryName = "a.db",
+        UpgradePhase currentPhase = UpgradePhase.MigratingSchema,
+        int currentBatchPosition = 1,
+        int currentBatchSize = 1,
+        int queuedBatchesAfter = 0,
+        UpgradeProgressScope scope = UpgradeProgressScope.ManageDatabasesTriggered,
+        Action? cancel = null) =>
+        new(
+            UpgradeBatchId.Create(),
+            scope,
+            currentBatchPosition,
+            currentBatchSize,
+            currentEntryName,
+            currentPhase,
+            queuedBatchesAfter,
+            cancel ?? (() => { }));
+
     private IRenderedComponent<DatabaseEntryRow> RenderRow(
         DatabaseEntry entry,
         bool isClassificationPending = false,
         bool isUpgrading = false,
         bool isUpgradeBlocked = false,
         bool effectiveEnabled = false,
-        bool isTogglePending = false) =>
+        bool isTogglePending = false,
+        BannerProgressEntry? upgradeProgress = null) =>
         Render<DatabaseEntryRow>(parameters => parameters
             .Add(p => p.Entry, entry)
             .Add(p => p.IsClassificationPending, isClassificationPending)
             .Add(p => p.IsUpgrading, isUpgrading)
             .Add(p => p.IsUpgradeBlocked, isUpgradeBlocked)
             .Add(p => p.EffectiveEnabled, effectiveEnabled)
-            .Add(p => p.IsTogglePending, isTogglePending));
+            .Add(p => p.IsTogglePending, isTogglePending)
+            .Add(p => p.UpgradeProgress, upgradeProgress));
 }

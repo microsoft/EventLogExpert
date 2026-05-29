@@ -245,6 +245,17 @@ public sealed class ManageDatabasesTabTests : BunitContext
     }
 
     [Fact]
+    public void Render_DoesNotRenderRemovedSharedProgressBanner()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired)];
+        _progressBannerService.ManageDatabasesProgress.Returns(MakeProgress(currentEntryName: "a.db"));
+
+        var component = Render<ManageDatabasesTab>();
+
+        Assert.Empty(component.FindAll("aside.manage-databases-upgrade-banner"));
+    }
+
+    [Fact]
     public void Render_EmptyState_WhenNoEntries_AndClassificationComplete()
     {
         _databaseService.Entries = [];
@@ -324,6 +335,74 @@ public sealed class ManageDatabasesTabTests : BunitContext
         _announcementService.Received(1).Announce(Arg.Is<string>(s => s.Contains("Cannot restore")));
     }
 
+    [Fact]
+    public void RowReceivesNullUpgradeProgress_WhenNeitherSlotMatchesFileName()
+    {
+        var entry = Entry("a.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired);
+        _databaseService.Entries = [entry];
+        _progressBannerService.ManageDatabasesProgress.Returns(MakeProgress(currentEntryName: "different.db"));
+        _progressBannerService.BackgroundProgress.Returns(MakeProgress(
+            currentEntryName: "another.db",
+            scope: UpgradeProgressScope.Background));
+
+        var component = Render<ManageDatabasesTab>();
+
+        Assert.Empty(component.FindAll(".db-entry-upgrading-text"));
+        Assert.Empty(component.FindAll(".db-entry-cancel-btn"));
+    }
+
+    [Fact]
+    public void RowReceivesUpgradeProgress_WhenBackgroundSlotMatches()
+    {
+        var entry = Entry("b.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired);
+        _databaseService.Entries = [entry];
+        _progressBannerService.BackgroundProgress.Returns(MakeProgress(
+            currentEntryName: "b.db",
+            currentBatchSize: 3,
+            currentBatchPosition: 2,
+            scope: UpgradeProgressScope.Background));
+        _coordinator.IsUpgradeInFlight("b.db").Returns(false);
+
+        var component = Render<ManageDatabasesTab>();
+
+        var text = component.Find(".db-entry-upgrading-text");
+        Assert.Contains("Migrating schema 2 of 3", text.TextContent);
+    }
+
+    [Fact]
+    public void RowReceivesUpgradeProgress_WhenManageDatabasesSlotMatches()
+    {
+        var entry = Entry("a.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired);
+        _databaseService.Entries = [entry];
+        _progressBannerService.ManageDatabasesProgress.Returns(MakeProgress(
+            currentEntryName: "a.db",
+            currentBatchSize: 2,
+            currentBatchPosition: 1));
+        _coordinator.IsUpgradeInFlight("a.db").Returns(true);
+
+        var component = Render<ManageDatabasesTab>();
+
+        var text = component.Find(".db-entry-upgrading-text");
+        Assert.Contains("Migrating schema 1 of 2", text.TextContent);
+    }
+
     private static DatabaseEntry Entry(string fileName, bool isEnabled, DatabaseStatus status, bool backupExists = false) =>
         new(fileName, $@"C:\dbs\{fileName}", isEnabled, status, backupExists);
+
+    private static BannerProgressEntry MakeProgress(
+        string currentEntryName = "a.db",
+        UpgradePhase currentPhase = UpgradePhase.MigratingSchema,
+        int currentBatchPosition = 1,
+        int currentBatchSize = 1,
+        int queuedBatchesAfter = 0,
+        UpgradeProgressScope scope = UpgradeProgressScope.ManageDatabasesTriggered) =>
+        new(
+            UpgradeBatchId.Create(),
+            scope,
+            currentBatchPosition,
+            currentBatchSize,
+            currentEntryName,
+            currentPhase,
+            queuedBatchesAfter,
+            () => { });
 }
