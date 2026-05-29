@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
+using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DatabaseTools.Tabs;
 using Microsoft.AspNetCore.Components;
@@ -24,16 +25,19 @@ public sealed class ManageDatabasesTabTests : BunitContext
     private readonly IAnnouncementService _announcementService = Substitute.For<IAnnouncementService>();
     private readonly IDatabaseOperationCoordinator _coordinator = Substitute.For<IDatabaseOperationCoordinator>();
     private readonly FakeDatabaseService _databaseService = new();
+    private readonly ILogReloadCoordinator _logReloadCoordinator = Substitute.For<ILogReloadCoordinator>();
     private readonly IProgressBannerService _progressBannerService = Substitute.For<IProgressBannerService>();
     private readonly ITraceLogger _traceLogger = Substitute.For<ITraceLogger>();
 
     public ManageDatabasesTabTests()
     {
         _progressBannerService.ManageDatabasesProgress.Returns((BannerProgressEntry?)null);
+        _logReloadCoordinator.HasActiveLogs.Returns(false);
 
         Services.AddSingleton(_announcementService);
         Services.AddSingleton(_coordinator);
         Services.AddSingleton<IDatabaseService>(_databaseService);
+        Services.AddSingleton(_logReloadCoordinator);
         Services.AddSingleton(_progressBannerService);
         Services.AddSingleton(_traceLogger);
 
@@ -173,6 +177,29 @@ public sealed class ManageDatabasesTabTests : BunitContext
     }
 
     [Fact]
+    public async Task BulkRemove_PerFileFailure_LogsToTraceLoggerAndAnnouncesFirstFailureDetail()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        _coordinator.RemoveDatabaseAsync("a.db", Arg.Any<Func<bool, CancellationToken, Task<bool>>>(), Arg.Any<CancellationToken>())
+            .Returns<RemoveOutcome>(_ => throw new InvalidOperationException("disk full"));
+        _coordinator.RemoveDatabaseAsync("b.db", Arg.Any<Func<bool, CancellationToken, Task<bool>>>(), Arg.Any<CancellationToken>())
+            .Returns(new RemoveOutcome(RemoveOutcomeStatus.Confirmed, true, false));
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(true, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
+        await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
+        await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
+
+        var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
+        await component.InvokeAsync(() => bulkRemove.Click());
+
+        _announcementService.Received().Announce(Arg.Is<string>(s => s.Contains("a.db") && s.Contains("disk full")));
+    }
+
+    [Fact]
     public async Task ClearSelection_EmptiesSet_HidesBulkStrip()
     {
         _databaseService.Entries = [
@@ -207,6 +234,54 @@ public sealed class ManageDatabasesTabTests : BunitContext
 
         liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
         Assert.DoesNotContain("selected", liveRegion.TextContent, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ConfirmationMessage_WhenNoActiveLogs_DoesNotIncludeCloseReopenWarning()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: true, status: DatabaseStatus.Ready)];
+        _logReloadCoordinator.HasActiveLogs.Returns(false);
+
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        var removeBtn = component.Find(".db-entry-row .db-entry-remove-btn");
+        await component.InvokeAsync(() => removeBtn.Click());
+
+        var captured = Assert.Single(alertSurface.Requests);
+        Assert.DoesNotContain("close and reopen", captured.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ConfirmationMessage_WhenRemovingActiveDbWithOpenLogs_IncludesCloseReopenWarning()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: true, status: DatabaseStatus.Ready)];
+        _logReloadCoordinator.HasActiveLogs.Returns(true);
+
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        var removeBtn = component.Find(".db-entry-row .db-entry-remove-btn");
+        await component.InvokeAsync(() => removeBtn.Click());
+
+        var captured = Assert.Single(alertSurface.Requests);
+        Assert.Contains("close and reopen", captured.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ConfirmationMessage_WhenRemovingDisabledDb_DoesNotIncludeCloseReopenWarning()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        _logReloadCoordinator.HasActiveLogs.Returns(true);
+
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        var removeBtn = component.Find(".db-entry-row .db-entry-remove-btn");
+        await component.InvokeAsync(() => removeBtn.Click());
+
+        var captured = Assert.Single(alertSurface.Requests);
+        Assert.DoesNotContain("close and reopen", captured.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
