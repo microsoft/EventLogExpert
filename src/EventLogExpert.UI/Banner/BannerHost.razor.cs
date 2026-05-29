@@ -3,6 +3,8 @@
 
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.Modal;
+using EventLogExpert.UI.DatabaseTools;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.Banner;
@@ -21,6 +23,8 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
     [Inject] private IErrorBannerService ErrorBannerService { get; init; } = null!;
 
     [Inject] private IInfoBannerService InfoBannerService { get; init; } = null!;
+
+    [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
 
     [Inject] private IProgressBannerService ProgressBannerService { get; init; } = null!;
 
@@ -46,6 +50,9 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
     private void HandleFallbackErrorPosted(BannerCycleItem newCycleItem) =>
         _selectedItem = newCycleItem;
 
+    private bool IsAttentionSuppressedByModalContext() =>
+        ModalCoordinator.ActiveSession?.ComponentType == typeof(DatabaseToolsModal);
+
     private void OnCycleNext()
     {
         if (_displayedIndex >= _items.Count - 1) { return; }
@@ -69,6 +76,7 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
         IReadOnlyList<ErrorBannerEntry> errors,
         IReadOnlyList<DatabaseEntry> attentionEntries,
         bool attentionDismissed,
+        bool attentionSuppressedByModalContext,
         BannerProgressEntry? backgroundProgress,
         IReadOnlyList<BannerInfoEntry> infos)
     {
@@ -77,6 +85,7 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
             errors,
             attentionEntries,
             attentionDismissed,
+            attentionSuppressedByModalContext,
             backgroundProgress,
             infos);
 
@@ -115,6 +124,7 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
         CriticalErrorService.StateChanged += OnStateChanged;
         ErrorBannerService.StateChanged += OnStateChanged;
         InfoBannerService.StateChanged += OnStateChanged;
+        ModalCoordinator.StateChanged += OnStateChanged;
     }
 
     private void UnsubscribeAll()
@@ -124,5 +134,6 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
         CriticalErrorService.StateChanged -= OnStateChanged;
         ErrorBannerService.StateChanged -= OnStateChanged;
         InfoBannerService.StateChanged -= OnStateChanged;
+        ModalCoordinator.StateChanged -= OnStateChanged;
     }
 }
