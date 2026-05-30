@@ -115,6 +115,13 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
 
     protected override async Task<bool> OnRequestCloseAsync(ModalCloseRequest request)
     {
+        // 0. Manage tab in selection mode consumes the close request.
+        if (_activeTab == DatabaseToolsTab.Manage && _manageTab is { IsInSelectionMode: true } manageTab)
+        {
+            await manageTab.ExitSelectionModeWithFocusAsync();
+            return false;
+        }
+
         // 1. Hard-block while Manage-tab-initiated upgrade is in flight.
         if (_manageTab is { IsUpgradeInFlight: true }) { return false; }
 

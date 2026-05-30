@@ -1,6 +1,6 @@
 @namespace EventLogExpert.UI.DatabaseTools.Tabs
 
-<div class="manage-databases-tab" @onkeydown="HandleKeyDown" tabindex="-1">
+<div class="manage-databases-tab">
     @if (IsClassificationPending)
     {
         <div class="manage-status-banner manage-status-banner--info" role="status">
@@ -107,7 +107,7 @@
                 @onclick="OnBulkRemoveClickAsync"
                 @ref="_bulkRemoveButtonRef"
                 type="button">
-                Delete @_selectedForBulk.Count
+                Remove @_selectedForBulk.Count
             </button>
             <span aria-live="polite" class="visually-hidden" id="@_upgradeBlockedHelpId">
                 @(IsUpgradeBlocked
