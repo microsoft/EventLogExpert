@@ -64,6 +64,8 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     public bool HasPendingChanges => _pendingToggles.Count > 0;
 
+    public bool IsInSelectionMode => _isSelectionModeActive;
+
     public bool IsUpgradeInFlight => Coordinator.IsAnyUpgradeInFlight;
 
     [CascadingParameter] internal IInlineAlertSurface? AlertSurface { get; set; }
@@ -529,6 +531,18 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         _pendingToggles.Clear();
     }
 
+    public async Task ExitSelectionModeWithFocusAsync()
+    {
+        if (!_isSelectionModeActive) { return; }
+
+        ExitSelectionMode();
+        StateHasChanged();
+
+        try { await _selectButtonRef.FocusAsync(preventScroll: true); }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
+    }
+
     private void ExitSelectionMode()
     {
         _isSelectionModeActive = false;
@@ -629,20 +643,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         }
 
         return null;
-    }
-
-    private async Task HandleKeyDown(KeyboardEventArgs args)
-    {
-        if (!_isSelectionModeActive) { return; }
-
-        if (args.Key == "Escape")
-        {
-            ExitSelectionMode();
-
-            try { await _selectButtonRef.FocusAsync(preventScroll: true); }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
-        }
     }
 
     private async Task ImportDatabase()

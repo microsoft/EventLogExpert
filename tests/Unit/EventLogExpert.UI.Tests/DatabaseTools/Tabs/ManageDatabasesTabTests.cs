@@ -706,29 +706,28 @@ public sealed class ManageDatabasesTabTests : BunitContext
     }
 
     [Fact]
-    public async Task Escape_InNormalMode_NoOp()
+    public async Task ExitSelectionModeWithFocusAsync_WhenNotInSelectionMode_IsNoOp()
     {
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
 
-        await component.InvokeAsync(() => component.Find(".manage-databases-tab")
-            .KeyDown(new KeyboardEventArgs { Key = "Escape" }));
+        await component.InvokeAsync(() => component.Instance.ExitSelectionModeWithFocusAsync());
 
         Assert.Equal("false", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
     }
 
     [Fact]
-    public async Task Escape_InSelectionMode_ExitsAndClearsSelection()
+    public async Task ExitSelectionModeWithFocusAsync_WhenInSelectionMode_ExitsAndClearsSelection()
     {
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
+
         await EnterSelectionModeAsync(component);
         await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']")
             .ChangeAsync(new ChangeEventArgs { Value = true }));
         Assert.True(component.Instance.HasBulkSelection);
 
-        await component.InvokeAsync(() => component.Find(".manage-databases-tab")
-            .KeyDown(new KeyboardEventArgs { Key = "Escape" }));
+        await component.InvokeAsync(() => component.Instance.ExitSelectionModeWithFocusAsync());
 
         Assert.False(component.Instance.HasBulkSelection);
         Assert.Equal("false", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
