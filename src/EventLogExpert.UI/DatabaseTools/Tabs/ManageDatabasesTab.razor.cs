@@ -10,8 +10,10 @@ using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.UI.Database;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
+using System.Text;
 
 namespace EventLogExpert.UI.DatabaseTools.Tabs;
 
@@ -20,26 +22,35 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     private static readonly TimeSpan s_cancelTimeout = TimeSpan.FromSeconds(30);
 
     private readonly Dictionary<string, bool> _pendingToggles = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, DatabaseEntryRow?> _removeButtonRefs = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DatabaseEntryRow?> _rowRefs = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _saveBlockedHelpId = $"manage-save-blocked-{Guid.NewGuid():N}";
-    private readonly HashSet<string> _selectedForRemoval = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _selectedForBulk = new(StringComparer.OrdinalIgnoreCase);
+    private readonly string _upgradeBlockedHelpId = $"manage-upgrade-blocked-{Guid.NewGuid():N}";
 
     private ElementReference _bulkRemoveButtonRef;
+    private ElementReference _bulkUpgradeButtonRef;
     private CancellationTokenSource? _classificationObservationCts;
     private volatile bool _disposed;
+    private int _eligibleUpgradeCount;
     private (string FileName, FocusTarget Target)? _focusRestorationTarget;
     private ElementReference _importButtonRef;
     private ImmutableHashSet<string> _initialActiveSnapshot = ImmutableHashSet<string>.Empty;
+    private bool _isSelectionModeActive;
+    private ElementReference _masterCheckboxRef;
     private bool _restorationOccurred;
     private bool _schemaUpgradeOccurred;
+    private ElementReference _selectButtonRef;
     private string _selectionAnnouncement = string.Empty;
 
     private enum FocusTarget
     {
-        SameRowRemove,
+        SameRowName,
         BulkRemoveButton,
+        SelectButton,
         ImportButton
     }
+
+    public bool HasBulkSelection => _selectedForBulk.Count > 0;
 
     public bool HasDatabaseStateChanged
     {
@@ -52,8 +63,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     }
 
     public bool HasPendingChanges => _pendingToggles.Count > 0;
-
-    public bool HasSelectedForRemoval => _selectedForRemoval.Count > 0;
 
     public bool IsUpgradeInFlight => Coordinator.IsAnyUpgradeInFlight;
 
@@ -70,6 +79,21 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     private bool IsUpgradeBlocked => IsUpgradeInFlight;
 
     [Inject] private ILogReloadCoordinator LogReloadCoordinator { get; init; } = null!;
+
+    private string MasterCheckboxAriaChecked =>
+        _selectedForBulk.Count == 0 ? "false"
+        : _selectedForBulk.Count >= DatabaseService.Entries.Count ? "true"
+        : "mixed";
+
+    private string MasterCheckboxAriaLabel =>
+        _selectedForBulk.Count >= DatabaseService.Entries.Count && _selectedForBulk.Count > 0
+            ? "Clear selection"
+            : "Select all";
+
+    private string MasterCheckboxIconClass =>
+        _selectedForBulk.Count == 0 ? "bi-square"
+        : _selectedForBulk.Count >= DatabaseService.Entries.Count ? "bi-check-square-fill"
+        : "bi-dash-square-fill";
 
     [Inject] private IProgressBannerService ProgressBannerService { get; init; } = null!;
 
@@ -140,10 +164,12 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             {
                 await (target.Target switch
                 {
-                    FocusTarget.SameRowRemove =>
-                        _removeButtonRefs.GetValueOrDefault(target.FileName)?.FocusRemoveButtonAsync() ?? _importButtonRef.FocusAsync(preventScroll: true),
-                    FocusTarget.BulkRemoveButton when HasSelectedForRemoval =>
+                    FocusTarget.SameRowName when !string.IsNullOrEmpty(target.FileName) =>
+                        FocusEntryRowNameAsync(target.FileName),
+                    FocusTarget.BulkRemoveButton when HasBulkSelection =>
                         _bulkRemoveButtonRef.FocusAsync(preventScroll: true),
+                    FocusTarget.SelectButton when _isSelectionModeActive =>
+                        _selectButtonRef.FocusAsync(preventScroll: true),
                     FocusTarget.ImportButton =>
                         _importButtonRef.FocusAsync(preventScroll: true),
                     _ => ValueTask.CompletedTask
@@ -183,6 +209,78 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         return $"Are you sure you want to remove these {fileNames.Count} databases? ({list}{more})";
     }
 
+    private static string GetSkipReason(DatabaseEntry entry, bool isUpgrading)
+    {
+        if (entry.BackupExists) { return "Restore from backup required"; }
+        if (isUpgrading) { return "Upgrade in progress"; }
+        return entry.Status switch
+        {
+            DatabaseStatus.Ready => "Already up to date",
+            DatabaseStatus.NotClassified => "Classification pending",
+            DatabaseStatus.UnrecognizedSchema => "Unrecognized schema",
+            DatabaseStatus.ObsoleteSchema => "Obsolete schema",
+            DatabaseStatus.ClassificationFailed => "Classification failed",
+            _ => "Not eligible"
+        };
+    }
+
+    private async Task AnnounceBulkUpgradeOutcomeAsync(UpgradeBatchResult? result, int attempted)
+    {
+        // Gate-denied (singleton upgrade gate held by another caller).
+        if (result is null)
+        {
+            if (AlertSurface is null) { return; }
+            try
+            {
+                _ = await AlertSurface.ShowInlineAlertAsync(
+                    new InlineAlertRequest(
+                        Title: "Upgrade not started",
+                        Message: "Another upgrade is already in progress.",
+                        AcceptLabel: null,
+                        CancelLabel: "OK",
+                        IsPrompt: false,
+                        PromptInitialValue: null),
+                    CancellationToken.None);
+            }
+            catch (ObjectDisposedException) { }
+            return;
+        }
+
+        // Exception-fallback: coordinator's RunOperationAsync<T> returns an empty
+        // result on a thrown exception. The error banner already fired upstream;
+        // suppress the success-shaped announcement that would otherwise read
+        // "Upgraded 0 databases" alongside it.
+        if (attempted > 0
+            && result.Succeeded.Count == 0
+            && result.Failed.Count == 0
+            && result.Cancelled.Count == 0)
+        {
+            return;
+        }
+
+        if (result.Cancelled.Count > 0 && result.Failed.Count == 0)
+        {
+            AnnouncementService.Announce(
+                $"Upgraded {result.Succeeded.Count} database{(result.Succeeded.Count == 1 ? "" : "s")}; "
+                + $"{result.Cancelled.Count} cancelled.");
+            return;
+        }
+
+        if (result.Failed.Count > 0)
+        {
+            var first = result.Failed[0];
+            var summary = result.Failed.Count == 1
+                ? $"Upgrade of '{first.FileName}' failed: {first.Message}"
+                : $"Upgraded {result.Succeeded.Count} of {attempted} databases; "
+                    + $"{result.Failed.Count} failed. First failure: '{first.FileName}' \u2014 {first.Message}";
+            AnnouncementService.Announce(summary);
+            return;
+        }
+
+        AnnouncementService.Announce(
+            $"Upgraded {result.Succeeded.Count} database{(result.Succeeded.Count == 1 ? "" : "s")}.");
+    }
+
     private string AppendCloseReopenWarningIfNeeded(string baseMessage, IReadOnlyList<string> fileNames)
     {
         if (!LogReloadCoordinator.HasActiveLogs) { return baseMessage; }
@@ -190,8 +288,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         bool anyRemovalAffectsActiveLog = fileNames.Any(f =>
             DatabaseService.Entries.Any(e =>
                 string.Equals(e.FileName, f, StringComparison.OrdinalIgnoreCase) &&
-                e.IsEnabled &&
-                e.Status == DatabaseStatus.Ready));
+                e is { IsEnabled: true, Status: DatabaseStatus.Ready }));
 
         if (!anyRemovalAffectsActiveLog) { return baseMessage; }
 
@@ -357,8 +454,10 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private void ClearSelection()
     {
-        if (_selectedForRemoval.Count == 0) { return; }
-        _selectedForRemoval.Clear();
+        if (_selectedForBulk.Count == 0) { return; }
+
+        _selectedForBulk.Clear();
+        RecomputeEligibleCount();
         UpdateSelectionAnnouncement();
     }
 
@@ -439,17 +538,68 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         _pendingToggles.Clear();
     }
 
+    private void ExitSelectionMode()
+    {
+        _isSelectionModeActive = false;
+        _selectedForBulk.Clear();
+        RecomputeEligibleCount();
+        UpdateSelectionAnnouncement();
+    }
+
+    private async Task FocusAfterBulkUpgradeAsync()
+    {
+        // After clean-success auto-exit, the bulk strip is gone; focus the Select
+        // button so keyboard users have a stable anchor.
+        if (!_isSelectionModeActive)
+        {
+            try { await _selectButtonRef.FocusAsync(preventScroll: true); }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            return;
+        }
+
+        if (_selectedForBulk.Count > 0)
+        {
+            try { await _masterCheckboxRef.FocusAsync(preventScroll: true); }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            return;
+        }
+
+        try { await _selectButtonRef.FocusAsync(preventScroll: true); }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
+    }
+
+    private async ValueTask FocusEntryRowNameAsync(string fileName)
+    {
+        if (_rowRefs.TryGetValue(fileName, out var rowRef) && rowRef is not null)
+        {
+            try { await rowRef.FocusNameAsync(); }
+            catch (ObjectDisposedException) { }
+            catch (JSException) { }
+
+            return;
+        }
+
+        try { await _importButtonRef.FocusAsync(preventScroll: true); }
+        catch (ObjectDisposedException) { }
+        catch (JSException) { }
+    }
+
     // Lookup by batch membership (active + queued) for the cancel-then-remove flow. Distinct from
     // GetUpgradeProgressForEntry, which matches by CurrentEntryName for per-row display only.
     private CancellableBatch? GetCancellableBatchForFile(string fileName)
     {
         var manage = ProgressBannerService.ManageDatabasesProgress;
+
         if (manage is not null && manage.BatchFileNames.Contains(fileName))
         {
             return new CancellableBatch(manage.BatchId, manage.Cancel);
         }
 
         var background = ProgressBannerService.BackgroundProgress;
+
         if (background is not null && background.BatchFileNames.Contains(fileName))
         {
             return new CancellableBatch(background.BatchId, background.Cancel);
@@ -472,6 +622,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     private BannerProgressEntry? GetUpgradeProgressForEntry(DatabaseEntry entry)
     {
         var manage = ProgressBannerService.ManageDatabasesProgress;
+
         if (manage is not null &&
             string.Equals(manage.CurrentEntryName, entry.FileName, StringComparison.OrdinalIgnoreCase))
         {
@@ -479,6 +630,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         }
 
         var background = ProgressBannerService.BackgroundProgress;
+
         if (background is not null &&
             string.Equals(background.CurrentEntryName, entry.FileName, StringComparison.OrdinalIgnoreCase))
         {
@@ -486,6 +638,20 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         }
 
         return null;
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs args)
+    {
+        if (!_isSelectionModeActive) { return; }
+
+        if (args.Key == "Escape")
+        {
+            ExitSelectionMode();
+
+            try { await _selectButtonRef.FocusAsync(preventScroll: true); }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+        }
     }
 
     private async Task ImportDatabase()
@@ -504,6 +670,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     private async Task InvokeAsyncSafe()
     {
         if (_disposed) { return; }
+
         try { await InvokeAsync(StateHasChanged); }
         catch (ObjectDisposedException) { }
     }
@@ -533,6 +700,20 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     private bool IsFileInAnyKnownBatch(string fileName) =>
         GetCancellableBatchForFile(fileName) is not null;
 
+    private bool IsUpgradeEligibleForSelected(string fileName)
+    {
+        var entry = DatabaseService.Entries.FirstOrDefault(
+            e => string.Equals(e.FileName, fileName, StringComparison.OrdinalIgnoreCase));
+
+        if (entry is null) { return false; }
+
+        bool upgrading = Coordinator.IsUpgradeInFlight(entry.FileName) ||
+            GetUpgradeProgressForEntry(entry) is not null ||
+            IsFileInAnyKnownBatch(entry.FileName);
+
+        return DatabaseEntryEligibility.IsUpgradeEligible(entry, upgrading);
+    }
+
     private async Task ObserveClassificationCompletionAsync(CancellationToken cancellationToken)
     {
         try
@@ -559,20 +740,91 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     {
         if (_disposed) { return; }
 
+        RecomputeEligibleCount();
         _ = InvokeAsyncSafe();
     }
 
     private async Task OnBulkRemoveClickAsync()
     {
-        var snapshot = _selectedForRemoval.ToArray();
+        var snapshot = _selectedForBulk.ToArray();
 
-        await ConfirmAndRemoveAsync(snapshot, FocusTarget.BulkRemoveButton, FocusTarget.SameRowRemove);
+        await ConfirmAndRemoveAsync(snapshot, FocusTarget.BulkRemoveButton, FocusTarget.SameRowName);
+    }
+
+    private async Task OnBulkUpgradeClickAsync()
+    {
+        if (_eligibleUpgradeCount == 0 || IsUpgradeBlocked) { return; }
+
+        var eligible = new List<string>();
+        var skipped = new List<(string FileName, string Reason)>();
+
+        foreach (var fileName in _selectedForBulk)
+        {
+            if (IsUpgradeEligibleForSelected(fileName))
+            {
+                eligible.Add(fileName);
+            }
+            else
+            {
+                var entry = DatabaseService.Entries.FirstOrDefault(
+                    e => string.Equals(e.FileName, fileName, StringComparison.OrdinalIgnoreCase));
+
+                if (entry is null) { continue; }
+
+                bool upgrading = Coordinator.IsUpgradeInFlight(entry.FileName) ||
+                    GetUpgradeProgressForEntry(entry) is not null ||
+                    IsFileInAnyKnownBatch(entry.FileName);
+                skipped.Add((fileName, GetSkipReason(entry, upgrading)));
+            }
+        }
+
+        if (eligible.Count == 0) { return; }
+
+        if (skipped.Count > 0)
+        {
+            var confirmed = await PromptSubsetConfirmAsync(eligible, skipped, CancellationToken.None);
+
+            if (!confirmed)
+            {
+                if (_disposed) { return; }
+
+                try { await _bulkUpgradeButtonRef.FocusAsync(preventScroll: true); }
+                catch (JSDisconnectedException) { }
+                catch (JSException) { }
+
+                return;
+            }
+        }
+
+        var result = await Coordinator.UpgradeDatabasesAsync(
+            eligible,
+            UpgradeProgressScope.ManageDatabasesTriggered,
+            CancellationToken.None);
+
+        if (_disposed) { return; }
+
+        await AnnounceBulkUpgradeOutcomeAsync(result, eligible.Count);
+
+        // Auto-exit only on a fully-clean batch: any partial-failure/cancellation
+        // leaves the relevant rows selected so the user can retry or inspect.
+        bool cleanSuccess = result is not null
+            && result.Failed.Count == 0
+            && result.Cancelled.Count == 0
+            && result.Succeeded.Count > 0;
+
+        if (cleanSuccess)
+        {
+            ExitSelectionMode();
+        }
+
+        await FocusAfterBulkUpgradeAsync();
     }
 
     private void OnCoordinatorStateChanged()
     {
         if (_disposed) { return; }
 
+        RecomputeEligibleCount();
         _ = InvokeAsyncSafe();
     }
 
@@ -584,20 +836,56 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             DatabaseService.Entries.Select(entry => entry.FileName),
             StringComparer.OrdinalIgnoreCase);
 
-        var orphans = _selectedForRemoval.Where(name => !currentNames.Contains(name)).ToArray();
+        var orphans = _selectedForBulk.Where(name => !currentNames.Contains(name)).ToArray();
 
-        foreach (var orphan in orphans) { _selectedForRemoval.Remove(orphan); }
-        
-        if (orphans.Length > 0) { UpdateSelectionAnnouncement(); }
+        foreach (var orphan in orphans) { _selectedForBulk.Remove(orphan); }
 
-        var deadRefs = _removeButtonRefs
+        if (orphans.Length > 0)
+        {
+            UpdateSelectionAnnouncement();
+        }
+
+        // Always recompute when any selection exists: a row's status / backup /
+        // upgrade state can change in-place (classification completion, backup
+        // restore, upgrade finished) without changing the entry list itself.
+        if (_selectedForBulk.Count > 0)
+        {
+            RecomputeEligibleCount();
+        }
+
+        var deadRefs = _rowRefs
             .Where(kvp => !currentNames.Contains(kvp.Key) || kvp.Value is null)
             .Select(kvp => kvp.Key)
             .ToArray();
-        
-        foreach (var key in deadRefs) { _removeButtonRefs.Remove(key); }
+
+        foreach (var key in deadRefs) { _rowRefs.Remove(key); }
+
+        // Auto-exit selection mode if the entries list collapses while selecting;
+        // the bulk strip would render above an empty-state placeholder otherwise.
+        if (_isSelectionModeActive && currentNames.Count == 0)
+        {
+            _isSelectionModeActive = false;
+        }
 
         _ = InvokeAsyncSafe();
+    }
+
+    private async Task OnMasterCheckboxClickAsync()
+    {
+        if (_selectedForBulk.Count >= DatabaseService.Entries.Count && _selectedForBulk.Count > 0)
+        {
+            _selectedForBulk.Clear();
+            RecomputeEligibleCount();
+            UpdateSelectionAnnouncement();
+        }
+        else
+        {
+            SelectAll();
+        }
+
+        try { await _masterCheckboxRef.FocusAsync(preventScroll: true); }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
     }
 
     private async Task OnSaveClickAsync()
@@ -629,8 +917,62 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         _ = InvokeAsyncSafe();
     }
 
+    private async Task<bool> PromptSubsetConfirmAsync(
+        IReadOnlyList<string> eligible,
+        IReadOnlyList<(string FileName, string Reason)> skipped,
+        CancellationToken cancellationToken)
+    {
+        if (AlertSurface is null) { return true; }
+
+        var sb = new StringBuilder();
+        sb.Append(eligible.Count);
+        sb.Append(" of ");
+        sb.Append(eligible.Count + skipped.Count);
+        sb.AppendLine(" selected databases will be upgraded.");
+        sb.AppendLine();
+        sb.Append("The following ");
+        sb.Append(skipped.Count);
+        sb.Append(skipped.Count == 1 ? " database will be skipped:" : " databases will be skipped:");
+
+        foreach (var (fileName, reason) in skipped)
+        {
+            sb.Append("\n  \u2022 ");
+            sb.Append(fileName);
+            sb.Append(" (");
+            sb.Append(reason);
+            sb.Append(')');
+        }
+
+        InlineAlertResult response;
+        try
+        {
+            response = await AlertSurface.ShowInlineAlertAsync(
+                new InlineAlertRequest(
+                    Title: "Upgrade selected databases",
+                    Message: sb.ToString(),
+                    AcceptLabel: $"Upgrade {eligible.Count}",
+                    CancelLabel: "Cancel",
+                    IsPrompt: false,
+                    PromptInitialValue: null),
+                cancellationToken);
+        }
+        catch (ObjectDisposedException) { return false; }
+
+        return response.Accepted;
+    }
+
+    private void RecomputeEligibleCount()
+    {
+        int count = 0;
+        foreach (var fileName in _selectedForBulk)
+        {
+            if (IsUpgradeEligibleForSelected(fileName)) { count++; }
+        }
+        _eligibleUpgradeCount = count;
+    }
+
     private async Task RemoveDatabase(DatabaseEntry entry) =>
-        await ConfirmAndRemoveAsync([entry.FileName], FocusTarget.SameRowRemove, FocusTarget.SameRowRemove);
+        await ConfirmAndRemoveAsync([entry.FileName], FocusTarget.SameRowName, FocusTarget.SameRowName);
 
     private async Task RemoveDatabasesAsync(IReadOnlyList<string> fileNames, FocusTarget completeTarget)
     {
@@ -679,8 +1021,10 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         foreach (var fileName in fileNames)
         {
-            _selectedForRemoval.Remove(fileName);
+            _selectedForBulk.Remove(fileName);
         }
+
+        RecomputeEligibleCount();
         UpdateSelectionAnnouncement();
 
         if (anyLogsReopened)
@@ -712,6 +1056,13 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             int clampedIdx = Math.Clamp(anchorIdx, 0, remainingEntries.Count - 1);
             string anchorFileName = remainingEntries[clampedIdx].FileName;
             _focusRestorationTarget = (anchorFileName, completeTarget);
+        }
+
+        // Bulk delete: auto-exit selection mode on any success. The mode existed
+        // to perform the delete; with rows gone, selection has no remaining target.
+        if (_isSelectionModeActive && succeeded.Count > 0)
+        {
+            ExitSelectionMode();
         }
     }
 
@@ -769,6 +1120,17 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         }
     }
 
+    private void SelectAll()
+    {
+        foreach (var entry in DatabaseService.Entries)
+        {
+            _selectedForBulk.Add(entry.FileName);
+        }
+
+        RecomputeEligibleCount();
+        UpdateSelectionAnnouncement();
+    }
+
     private void ToggleDatabase(string fileName)
     {
         var entry = DatabaseService.Entries.FirstOrDefault(e =>
@@ -790,16 +1152,29 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private void ToggleSelection(string fileName)
     {
-        bool added = _selectedForRemoval.Add(fileName);
+        bool added = _selectedForBulk.Add(fileName);
 
-        if (!added) { _selectedForRemoval.Remove(fileName); }
+        if (!added) { _selectedForBulk.Remove(fileName); }
 
+        RecomputeEligibleCount();
         UpdateSelectionAnnouncement();
+    }
+
+    private void ToggleSelectionMode()
+    {
+        if (_isSelectionModeActive)
+        {
+            ExitSelectionMode();
+        }
+        else
+        {
+            _isSelectionModeActive = true;
+        }
     }
 
     private void UpdateSelectionAnnouncement()
     {
-        int count = _selectedForRemoval.Count;
+        int count = _selectedForBulk.Count;
         _selectionAnnouncement = count == 0
             ? "Selection cleared."
             : $"{count} database{(count == 1 ? "" : "s")} selected.";

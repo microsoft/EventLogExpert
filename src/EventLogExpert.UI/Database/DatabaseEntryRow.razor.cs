@@ -5,18 +5,22 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
+using EventLogExpert.Runtime.Menu;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Database;
 
 public sealed partial class DatabaseEntryRow : ComponentBase
 {
+    private static readonly IReadOnlyDictionary<string, object> s_ariaHiddenTrueAttributes =
+        new Dictionary<string, object>(StringComparer.Ordinal) { ["aria-hidden"] = "true" };
+
     private readonly string _nameButtonId = $"db-row-{Guid.NewGuid():N}-name";
     private readonly string _pendingStatusId = $"db-row-{Guid.NewGuid():N}-pending";
 
     private ElementReference _nameButtonRef;
-    private ElementReference _removeButtonRef;
     private bool _shouldFocusNameAfterRender;
 
     private enum ActionKind
@@ -38,6 +42,8 @@ public sealed partial class DatabaseEntryRow : ComponentBase
     [Parameter] public bool IsClassificationPending { get; set; }
 
     [Parameter] public bool IsSelected { get; set; }
+
+    [Parameter] public bool IsSelectionModeActive { get; set; }
 
     [Parameter] public bool IsTogglePending { get; set; }
 
@@ -63,7 +69,12 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private string BadgeLabel => DatabaseStatusLabels.GetRowBadgeLabel(Entry);
 
+    private IReadOnlyDictionary<string, object>? CheckboxHiddenAttributes =>
+        IsSelectionModeActive ? null : s_ariaHiddenTrueAttributes;
+
     private bool IsRestoreBlocked => IsUpgradeBlocked || IsUpgrading || UpgradeProgress is not null;
+
+    [Inject] private IMenuService MenuService { get; init; } = null!;
 
     private ActionKind PrimaryAction
     {
@@ -98,7 +109,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
-    public ValueTask FocusRemoveButtonAsync() => _removeButtonRef.FocusAsync(preventScroll: true);
+    public ValueTask FocusNameAsync() => _nameButtonRef.FocusAsync(preventScroll: true);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -119,6 +130,19 @@ public sealed partial class DatabaseEntryRow : ComponentBase
         _ => "Upgrading"
     };
 
+    private void HandleContextMenuAsync(MouseEventArgs args)
+    {
+        // Suppressed in selection mode — bulk strip is the action surface.
+        if (IsSelectionModeActive) { return; }
+
+        var items = new List<MenuItem>
+        {
+            MenuItem.Item("Remove", () => OnRemove.InvokeAsync()),
+        };
+
+        MenuService.OpenAt(args.ClientX, args.ClientY, items);
+    }
+
     private void OnCancelClick()
     {
         _shouldFocusNameAfterRender = true;
@@ -131,6 +155,4 @@ public sealed partial class DatabaseEntryRow : ComponentBase
                 $"{nameof(DatabaseEntryRow)}.{nameof(OnCancelClick)}: cancel threw: {ex}");
         }
     }
-
-    private async Task OnRemoveClick() => await OnRemove.InvokeAsync();
 }

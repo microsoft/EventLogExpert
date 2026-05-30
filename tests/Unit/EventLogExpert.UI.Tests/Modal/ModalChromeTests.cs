@@ -15,6 +15,7 @@ public sealed class ModalChromeTests : BunitContext
     public ModalChromeTests()
     {
         Services.AddBannerHostDependencies();
+        Services.AddMenuMocks();
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }

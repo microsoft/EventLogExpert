@@ -11,6 +11,7 @@ using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DatabaseTools.Tabs;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,6 +42,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         Services.AddSingleton(_logReloadCoordinator);
         Services.AddSingleton(_progressBannerService);
         Services.AddSingleton(_traceLogger);
+        Services.AddMenuServiceMock();
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
@@ -82,11 +84,33 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
         var component = RenderWithAlertSurface(alertSurface);
 
-        await component.InvokeAsync(() => component.Find(".db-entry-remove-btn").Click());
+        await InvokeRemoveDatabaseAsync(component, entry);
 
         var captured = Assert.Single(alertSurface.Requests);
         Assert.Contains("Cancel", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("upgrade", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BulkDelete_AnySucceeded_AutoExitsSelectionMode()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        _coordinator.RemoveDatabaseAsync(
+                Arg.Any<string>(),
+                Arg.Any<Func<bool, CancellationToken, Task<bool>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new RemoveOutcome(RemoveOutcomeStatus.Confirmed, true, false));
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(true, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        await EnterSelectionModeAsync(component);
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']")
+            .ChangeAsync(new ChangeEventArgs { Value = true }));
+
+        var deleteBtn = component.Find(".manage-databases-bulk-strip .button-red");
+        await component.InvokeAsync(() => deleteBtn.Click());
+
+        Assert.Equal("false", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
     }
 
     [Fact]
@@ -102,12 +126,13 @@ public sealed class ManageDatabasesTabTests : BunitContext
             .Returns(new RemoveOutcome(RemoveOutcomeStatus.Confirmed, true, false));
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(true, null) };
         var component = RenderWithAlertSurface(alertSurface);
-
+
+        await EnterSelectionModeAsync(component);
         var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
         await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
         await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
 
-        var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
+        var bulkRemove = component.Find(".manage-databases-bulk-strip .button-red");
         await component.InvokeAsync(() => bulkRemove.Click());
 
         await _coordinator.Received(1).RemoveDatabaseAsync(
@@ -128,12 +153,13 @@ public sealed class ManageDatabasesTabTests : BunitContext
             Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
         var component = RenderWithAlertSurface(alertSurface);
-
+
+        await EnterSelectionModeAsync(component);
         var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
         await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
         await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
 
-        var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
+        var bulkRemove = component.Find(".manage-databases-bulk-strip .button-red");
         await component.InvokeAsync(() => bulkRemove.Click());
 
         await _coordinator.DidNotReceive().RemoveDatabaseAsync(
@@ -155,9 +181,10 @@ public sealed class ManageDatabasesTabTests : BunitContext
 
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
         var component = RenderWithAlertSurface(alertSurface);
-
+
+        await EnterSelectionModeAsync(component);
         await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
-        var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
+        var bulkRemove = component.Find(".manage-databases-bulk-strip .button-red");
         await component.InvokeAsync(() => bulkRemove.Click());
 
         var captured = Assert.Single(alertSurface.Requests);
@@ -188,11 +215,12 @@ public sealed class ManageDatabasesTabTests : BunitContext
                 wasCancelled: false));
         Assert.True(component.Instance.HasDatabaseStateChanged);
 
+        await EnterSelectionModeAsync(component);
         var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
         await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
         await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
 
-        var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
+        var bulkRemove = component.Find(".manage-databases-bulk-strip .button-red");
         await component.InvokeAsync(() => bulkRemove.Click());
 
         Assert.False(component.Instance.HasDatabaseStateChanged);
@@ -210,15 +238,228 @@ public sealed class ManageDatabasesTabTests : BunitContext
             .Returns(new RemoveOutcome(RemoveOutcomeStatus.Confirmed, true, false));
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(true, null) };
         var component = RenderWithAlertSurface(alertSurface);
-
+
+        await EnterSelectionModeAsync(component);
         var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
         await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
         await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
 
-        var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
+        var bulkRemove = component.Find(".manage-databases-bulk-strip .button-red");
         await component.InvokeAsync(() => bulkRemove.Click());
 
         _announcementService.Received().Announce(Arg.Is<string>(s => s.Contains("a.db") && s.Contains("disk full")));
+    }
+
+    [Fact]
+    public async Task BulkUpgrade_AllEligible_CallsCoordinatorWithEntireBatch()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.UpgradeFailed)];
+        _coordinator.UpgradeDatabasesAsync(
+                Arg.Any<IReadOnlyList<string>>(),
+                Arg.Any<UpgradeProgressScope>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new UpgradeBatchResult(Succeeded: ["a.db", "b.db"], Cancelled: [], Failed: []));
+
+        var component = Render<ManageDatabasesTab>();
+        await EnterSelectionModeAsync(component);
+        var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
+        await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
+        await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
+
+        var upgradeBtn = component.Find(".manage-databases-bulk-strip .button-green");
+        await component.InvokeAsync(() => upgradeBtn.Click());
+
+        await _coordinator.Received(1).UpgradeDatabasesAsync(
+            Arg.Is<IReadOnlyList<string>>(l => l.Count == 2 && l.Contains("a.db") && l.Contains("b.db")),
+            UpgradeProgressScope.ManageDatabasesTriggered,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BulkUpgrade_ButtonAppears_OnlyWhenEligibleRowSelected()
+    {
+        _databaseService.Entries = [
+            Entry("ready.db", isEnabled: true, status: DatabaseStatus.Ready),
+            Entry("needs.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired)];
+        var component = Render<ManageDatabasesTab>();
+        await EnterSelectionModeAsync(component);
+
+        var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
+        await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
+        Assert.Empty(component.FindAll(".manage-databases-bulk-strip .button-green"));
+
+        await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
+        var upgradeBtn = component.Find(".manage-databases-bulk-strip .button-green");
+        Assert.Contains("Upgrade 1", upgradeBtn.TextContent);
+    }
+
+    [Fact]
+    public async Task BulkUpgrade_CleanSuccess_AutoExitsSelectionMode()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired)];
+        _coordinator.UpgradeDatabasesAsync(
+                Arg.Any<IReadOnlyList<string>>(),
+                Arg.Any<UpgradeProgressScope>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new UpgradeBatchResult(Succeeded: ["a.db"], Cancelled: [], Failed: []));
+
+        var component = Render<ManageDatabasesTab>();
+        await EnterSelectionModeAsync(component);
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']")
+            .ChangeAsync(new ChangeEventArgs { Value = true }));
+
+        var upgradeBtn = component.Find(".manage-databases-bulk-strip .button-green");
+        await component.InvokeAsync(() => upgradeBtn.Click());
+
+        Assert.False(component.Instance.HasBulkSelection);
+        Assert.Equal("false", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
+    }
+
+    [Fact]
+    public async Task BulkUpgrade_GateDenied_CoordinatorReturnsNull_ShowsInfoAlert()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired)];
+        _coordinator.UpgradeDatabasesAsync(
+                Arg.Any<IReadOnlyList<string>>(),
+                Arg.Any<UpgradeProgressScope>(),
+                Arg.Any<CancellationToken>())
+            .Returns((UpgradeBatchResult?)null);
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(true, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        await EnterSelectionModeAsync(component);
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']")
+            .ChangeAsync(new ChangeEventArgs { Value = true }));
+
+        var upgradeBtn = component.Find(".manage-databases-bulk-strip .button-green");
+        await component.InvokeAsync(() => upgradeBtn.Click());
+
+        var captured = Assert.Single(alertSurface.Requests);
+        Assert.Equal("Upgrade not started", captured.Title);
+        Assert.Contains("already in progress", captured.Message);
+    }
+
+    [Fact]
+    public async Task BulkUpgrade_GateDenied_StaysInSelectionMode()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired)];
+        _coordinator.UpgradeDatabasesAsync(
+                Arg.Any<IReadOnlyList<string>>(),
+                Arg.Any<UpgradeProgressScope>(),
+                Arg.Any<CancellationToken>())
+            .Returns((UpgradeBatchResult?)null);
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(true, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        await EnterSelectionModeAsync(component);
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']")
+            .ChangeAsync(new ChangeEventArgs { Value = true }));
+
+        await component.InvokeAsync(() => component.Find(".manage-databases-bulk-strip .button-green").Click());
+
+        Assert.True(component.Instance.HasBulkSelection);
+    }
+
+    [Fact]
+    public async Task BulkUpgrade_MixedSelection_CancelledPrompt_DoesNotCallCoordinator()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        await EnterSelectionModeAsync(component);
+        var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
+        await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
+        await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
+
+        var upgradeBtn = component.Find(".manage-databases-bulk-strip .button-green");
+        await component.InvokeAsync(() => upgradeBtn.Click());
+
+        await _coordinator.DidNotReceive().UpgradeDatabasesAsync(
+            Arg.Any<IReadOnlyList<string>>(),
+            Arg.Any<UpgradeProgressScope>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BulkUpgrade_MixedSelection_ShowsSubsetConfirm_AcceptedRunsBatchWithEligibleOnly()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        _coordinator.UpgradeDatabasesAsync(
+                Arg.Any<IReadOnlyList<string>>(),
+                Arg.Any<UpgradeProgressScope>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new UpgradeBatchResult(Succeeded: ["a.db"], Cancelled: [], Failed: []));
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(true, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        await EnterSelectionModeAsync(component);
+        var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
+        await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
+        await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
+
+        var upgradeBtn = component.Find(".manage-databases-bulk-strip .button-green");
+        await component.InvokeAsync(() => upgradeBtn.Click());
+
+        var prompt = Assert.Single(alertSurface.Requests);
+        Assert.Contains("1 of 2", prompt.Message);
+        Assert.Contains("b.db", prompt.Message);
+        Assert.Contains("Already up to date", prompt.Message);
+        Assert.Equal("Upgrade 1", prompt.AcceptLabel);
+
+        await _coordinator.Received(1).UpgradeDatabasesAsync(
+            Arg.Is<IReadOnlyList<string>>(l => l.Count == 1 && l.Contains("a.db")),
+            UpgradeProgressScope.ManageDatabasesTriggered,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BulkUpgrade_PartialFailure_StaysInSelectionMode()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired)];
+        _coordinator.UpgradeDatabasesAsync(
+                Arg.Any<IReadOnlyList<string>>(),
+                Arg.Any<UpgradeProgressScope>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new UpgradeBatchResult(
+                Succeeded: ["a.db"],
+                Cancelled: [],
+                Failed: [new UpgradeFailure("b.db", "boom")]));
+
+        var component = Render<ManageDatabasesTab>();
+        await EnterSelectionModeAsync(component);
+        await component.InvokeAsync(() => component.Find(".manage-databases-master-btn").Click());
+
+        var upgradeBtn = component.Find(".manage-databases-bulk-strip .button-green");
+        await component.InvokeAsync(() => upgradeBtn.Click());
+
+        Assert.True(component.Instance.HasBulkSelection);
+        Assert.Equal("true", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
+    }
+
+    [Fact]
+    public async Task BulkUpgrade_ZeroEligible_UpgradeButtonHidden()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: true, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+        await EnterSelectionModeAsync(component);
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']")
+            .ChangeAsync(new ChangeEventArgs { Value = true }));
+
+        Assert.Empty(component.FindAll(".manage-databases-bulk-strip .button-green"));
+
+        await _coordinator.DidNotReceive().UpgradeDatabasesAsync(
+            Arg.Any<IReadOnlyList<string>>(),
+            Arg.Any<UpgradeProgressScope>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -357,15 +598,17 @@ public sealed class ManageDatabasesTabTests : BunitContext
             Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
 
+        await EnterSelectionModeAsync(component);
         var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
         await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
         await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
         Assert.Contains("2 selected", component.Find(".manage-databases-bulk-count").TextContent);
 
-        var clearBtn = component.FindAll(".manage-databases-bulk-strip button")[0];
-        await component.InvokeAsync(() => clearBtn.Click());
+        // Master checkbox in the selection header clears when all are selected.
+        var masterBtn = component.Find(".manage-databases-master-btn");
+        await component.InvokeAsync(() => masterBtn.Click());
 
-        Assert.False(component.Instance.HasSelectedForRemoval);
+        Assert.False(component.Instance.HasBulkSelection);
         Assert.Empty(component.FindAll(".manage-databases-bulk-strip"));
     }
 
@@ -375,12 +618,14 @@ public sealed class ManageDatabasesTabTests : BunitContext
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
 
+        await EnterSelectionModeAsync(component);
         await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
         var liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
         Assert.NotEqual(string.Empty, liveRegion.TextContent.Trim());
 
-        var clearBtn = component.FindAll(".manage-databases-bulk-strip button")[0];
-        await component.InvokeAsync(() => clearBtn.Click());
+        // With 1 of 1 selected, master is "all"; clicking clears.
+        var masterBtn = component.Find(".manage-databases-master-btn");
+        await component.InvokeAsync(() => masterBtn.Click());
 
         liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
         Assert.DoesNotContain("selected", liveRegion.TextContent, StringComparison.OrdinalIgnoreCase);
@@ -395,8 +640,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
         var component = RenderWithAlertSurface(alertSurface);
 
-        var removeBtn = component.Find(".db-entry-row .db-entry-remove-btn");
-        await component.InvokeAsync(() => removeBtn.Click());
+        await InvokeRemoveDatabaseAsync(component, _databaseService.Entries[0]);
 
         var captured = Assert.Single(alertSurface.Requests);
         Assert.DoesNotContain("close and reopen", captured.Message, StringComparison.OrdinalIgnoreCase);
@@ -411,8 +655,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
         var component = RenderWithAlertSurface(alertSurface);
 
-        var removeBtn = component.Find(".db-entry-row .db-entry-remove-btn");
-        await component.InvokeAsync(() => removeBtn.Click());
+        await InvokeRemoveDatabaseAsync(component, _databaseService.Entries[0]);
 
         var captured = Assert.Single(alertSurface.Requests);
         Assert.Contains("close and reopen", captured.Message, StringComparison.OrdinalIgnoreCase);
@@ -427,8 +670,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
         var component = RenderWithAlertSurface(alertSurface);
 
-        var removeBtn = component.Find(".db-entry-row .db-entry-remove-btn");
-        await component.InvokeAsync(() => removeBtn.Click());
+        await InvokeRemoveDatabaseAsync(component, _databaseService.Entries[0]);
 
         var captured = Assert.Single(alertSurface.Requests);
         Assert.DoesNotContain("close and reopen", captured.Message, StringComparison.OrdinalIgnoreCase);
@@ -446,6 +688,50 @@ public sealed class ManageDatabasesTabTests : BunitContext
 
         Assert.Equal(0, _databaseService.EntriesChangedHandlerCount);
         Assert.Equal(0, _databaseService.UpgradeBatchCompletedHandlerCount);
+    }
+
+    [Fact]
+    public async Task EntriesChanged_DuringSelection_EmptyList_AutoExitsSelectionMode()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+        await EnterSelectionModeAsync(component);
+        Assert.Equal("true", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
+
+        _databaseService.Entries = [];
+        _databaseService.RaiseEntriesChanged();
+        await component.InvokeAsync(() => { });
+
+        Assert.Equal("false", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
+    }
+
+    [Fact]
+    public async Task Escape_InNormalMode_NoOp()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+
+        await component.InvokeAsync(() => component.Find(".manage-databases-tab")
+            .KeyDown(new KeyboardEventArgs { Key = "Escape" }));
+
+        Assert.Equal("false", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
+    }
+
+    [Fact]
+    public async Task Escape_InSelectionMode_ExitsAndClearsSelection()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+        await EnterSelectionModeAsync(component);
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']")
+            .ChangeAsync(new ChangeEventArgs { Value = true }));
+        Assert.True(component.Instance.HasBulkSelection);
+
+        await component.InvokeAsync(() => component.Find(".manage-databases-tab")
+            .KeyDown(new KeyboardEventArgs { Key = "Escape" }));
+
+        Assert.False(component.Instance.HasBulkSelection);
+        Assert.Equal("false", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
     }
 
     [Fact]
@@ -602,6 +888,52 @@ public sealed class ManageDatabasesTabTests : BunitContext
     }
 
     [Fact]
+    public async Task MasterCheckbox_AllSelected_ShowsCheckedIconAndClearLabel()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+        await EnterSelectionModeAsync(component);
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']")
+            .ChangeAsync(new ChangeEventArgs { Value = true }));
+
+        var btn = component.Find(".manage-databases-master-btn");
+        var icon = component.Find(".manage-databases-master-btn i");
+        Assert.Contains("bi-check-square-fill", icon.GetAttribute("class") ?? string.Empty);
+        Assert.Equal("Clear selection", btn.GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public async Task MasterCheckbox_Indeterminate_WhenSomeButNotAllSelected()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+        await EnterSelectionModeAsync(component);
+        await component.InvokeAsync(() => component.FindAll(".db-entry-row input[type='checkbox']")[0]
+            .ChangeAsync(new ChangeEventArgs { Value = true }));
+
+        var icon = component.Find(".manage-databases-master-btn i");
+        Assert.Contains("bi-dash-square-fill", icon.GetAttribute("class") ?? string.Empty);
+        Assert.Equal("Select all", component.Find(".manage-databases-master-btn").GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public async Task MasterCheckbox_ShowsAfterEnteringSelectionMode_BeforeAnySelection()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+
+        Assert.Empty(component.FindAll(".manage-databases-selection-header"));
+
+        await EnterSelectionModeAsync(component);
+
+        var icon = component.Find(".manage-databases-master-btn i");
+        Assert.Contains("bi-square", icon.GetAttribute("class") ?? string.Empty);
+        Assert.Contains("0 of 1 selected", component.Find(".manage-databases-selection-count").TextContent);
+    }
+
+    [Fact]
     public async Task RebaselineActiveSnapshotOnly_PreservesStickyFlags()
     {
         // Modal opens mid-classification (empty snapshot), user-initiated upgrade succeeds during the
@@ -637,7 +969,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
         var component = RenderWithAlertSurface(alertSurface);
 
-        await component.InvokeAsync(() => component.Find(".db-entry-remove-btn").Click());
+        await InvokeRemoveDatabaseAsync(component, entry);
 
         var captured = Assert.Single(alertSurface.Requests);
         Assert.Contains("Cancel", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
@@ -652,7 +984,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var component = Render<ManageDatabasesTab>();
 
         Assert.Empty(component.FindAll(".manage-databases-bulk-strip"));
-        Assert.False(component.Instance.HasSelectedForRemoval);
+        Assert.False(component.Instance.HasBulkSelection);
     }
 
     [Fact]
@@ -715,6 +1047,31 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var statusRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
         Assert.NotNull(statusRegion);
         Assert.Equal("true", statusRegion.GetAttribute("aria-atomic"));
+    }
+
+    [Fact]
+    public void Render_SelectButton_PresentByDefaultWithSelectLabel()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+
+        var component = Render<ManageDatabasesTab>();
+
+        var selectBtn = component.Find("#manage-select-button");
+        Assert.Equal("false", selectBtn.GetAttribute("aria-pressed"));
+        Assert.Contains("Select", selectBtn.TextContent);
+        Assert.DoesNotContain("Done", selectBtn.TextContent);
+    }
+
+    [Fact]
+    public void Render_TrashButton_NotPresentInAnyRow()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: true, status: DatabaseStatus.Ready),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired)];
+
+        var component = Render<ManageDatabasesTab>();
+
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -822,6 +1179,24 @@ public sealed class ManageDatabasesTabTests : BunitContext
     }
 
     [Fact]
+    public async Task SelectAll_AddsEveryEntryToSelection()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready),
+            Entry("c.db", isEnabled: false, status: DatabaseStatus.UpgradeFailed)];
+        var component = Render<ManageDatabasesTab>();
+        await EnterSelectionModeAsync(component);
+
+        // Master checkbox: 0 selected → click selects all.
+        var masterBtn = component.Find(".manage-databases-master-btn");
+        await component.InvokeAsync(() => masterBtn.Click());
+
+        Assert.Contains("3 selected", component.Find(".manage-databases-bulk-count").TextContent);
+        Assert.Contains("Upgrade 2", component.Find(".manage-databases-bulk-strip .button-green").TextContent);
+    }
+
+    [Fact]
     public async Task SingleRowRemove_DuringCoordinatorUpgrade_DualSignal_AcceptanceLabelMentionsCancel()
     {
         var entry = Entry("a.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired);
@@ -835,7 +1210,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
         var component = RenderWithAlertSurface(alertSurface);
 
-        await component.InvokeAsync(() => component.Find(".db-entry-remove-btn").Click());
+        await InvokeRemoveDatabaseAsync(component, entry);
 
         var captured = Assert.Single(alertSurface.Requests);
         Assert.Contains("Cancel", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
@@ -847,10 +1222,11 @@ public sealed class ManageDatabasesTabTests : BunitContext
     {
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
-
+
+        await EnterSelectionModeAsync(component);
         await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
 
-        Assert.True(component.Instance.HasSelectedForRemoval);
+        Assert.True(component.Instance.HasBulkSelection);
         Assert.Single(component.FindAll(".manage-databases-bulk-strip"));
         Assert.Contains("1 selected", component.Find(".manage-databases-bulk-count").TextContent);
     }
@@ -862,7 +1238,8 @@ public sealed class ManageDatabasesTabTests : BunitContext
             Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready),
             Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
-
+
+        await EnterSelectionModeAsync(component);
         var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
         await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
         await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
@@ -872,7 +1249,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         _databaseService.RaiseEntriesChanged();
         await component.InvokeAsync(() => { });
 
-        Assert.True(component.Instance.HasSelectedForRemoval);
+        Assert.True(component.Instance.HasBulkSelection);
         Assert.Contains("1 selected", component.Find(".manage-databases-bulk-count").TextContent);
     }
 
@@ -881,13 +1258,14 @@ public sealed class ManageDatabasesTabTests : BunitContext
     {
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
+
+        await EnterSelectionModeAsync(component);
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
+        Assert.True(component.Instance.HasBulkSelection);
 
         await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
-        Assert.True(component.Instance.HasSelectedForRemoval);
 
-        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
-
-        Assert.False(component.Instance.HasSelectedForRemoval);
+        Assert.False(component.Instance.HasBulkSelection);
         Assert.Empty(component.FindAll(".manage-databases-bulk-strip"));
     }
 
@@ -902,6 +1280,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
         Assert.Equal(string.Empty, liveRegion.TextContent.Trim());
 
+        await EnterSelectionModeAsync(component);
         var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
         await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
         liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
@@ -911,6 +1290,48 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
         liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
         Assert.Contains("2", liveRegion.TextContent);
+    }
+
+    [Fact]
+    public async Task ToggleSelectionMode_EntersMode_RevealsCheckboxes_ChangesLabelToDone()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+
+        var wrapper = component.Find(".db-entry-checkbox");
+        Assert.DoesNotContain("db-entry-checkbox--visible", wrapper.GetAttribute("class") ?? string.Empty);
+
+        await EnterSelectionModeAsync(component);
+
+        var selectBtn = component.Find("#manage-select-button");
+        Assert.Equal("true", selectBtn.GetAttribute("aria-pressed"));
+        Assert.Contains("Done", selectBtn.TextContent);
+
+        wrapper = component.Find(".db-entry-checkbox");
+        Assert.Contains("db-entry-checkbox--visible", wrapper.GetAttribute("class") ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task ToggleSelectionMode_Exits_ClearsSelection()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+
+        await EnterSelectionModeAsync(component);
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']")
+            .ChangeAsync(new ChangeEventArgs { Value = true }));
+        Assert.True(component.Instance.HasBulkSelection);
+
+        await EnterSelectionModeAsync(component);
+
+        Assert.False(component.Instance.HasBulkSelection);
+        var selectBtn = component.Find("#manage-select-button");
+        Assert.Equal("false", selectBtn.GetAttribute("aria-pressed"));
+    }
+
+    private static async Task EnterSelectionModeAsync(IRenderedComponent<ManageDatabasesTab> component)
+    {
+        await component.InvokeAsync(() => component.Find("#manage-select-button").Click());
     }
 
     private static DatabaseEntry Entry(string fileName, bool isEnabled, DatabaseStatus status, bool backupExists = false) =>
@@ -927,6 +1348,19 @@ public sealed class ManageDatabasesTabTests : BunitContext
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         return (Task)method!.Invoke(component.Instance, [fileNames])!;
+    }
+
+    private static Task InvokeRemoveDatabaseAsync(
+        IRenderedComponent<ManageDatabasesTab> component,
+        DatabaseEntry entry)
+    {
+        // Single-row remove is now triggered via the right-click context menu; invoke
+        // the private path directly to keep tests focused on remove semantics.
+        var method = typeof(ManageDatabasesTab).GetMethod(
+            "RemoveDatabase",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return component.InvokeAsync(() => (Task)method!.Invoke(component.Instance, [entry])!);
     }
 
     private static BannerProgressEntry MakeProgress(

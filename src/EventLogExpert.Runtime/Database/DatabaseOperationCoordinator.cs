@@ -216,6 +216,64 @@ internal sealed class DatabaseOperationCoordinator(
         }
     }
 
+    public async Task<UpgradeBatchResult?> UpgradeDatabasesAsync(
+        IReadOnlyList<string> fileNames,
+        UpgradeProgressScope scope = UpgradeProgressScope.ManageDatabasesTriggered,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(fileNames);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (fileNames.Count == 0)
+        {
+            return new UpgradeBatchResult(Succeeded: [], Cancelled: [], Failed: []);
+        }
+
+        using (_upgradeGate.EnterScope())
+        {
+            // Gate-denied: another upgrade is in flight. Null distinguishes
+            // this from a batch that ran but had every file cancelled per-file.
+            if (_upgradesInFlight.Count > 0) { return null; }
+
+            foreach (var fileName in fileNames) { _upgradesInFlight.Add(fileName); }
+        }
+
+        try
+        {
+            RaiseUpgradeStateChangedSafely();
+
+            var fallback = new UpgradeBatchResult(Succeeded: [], Cancelled: [], Failed: []);
+
+            return await RunOperationAsync(
+                operationName: "upgrade",
+                failureTitle: "Database Upgrade Failed",
+                operationNoun: $"upgrading {fileNames.Count} database{(fileNames.Count == 1 ? string.Empty : "s")}",
+                fallbackOutcome: fallback,
+                body: async () =>
+                {
+                    var batchResult = await _databases.UpgradeBatchAsync(fileNames, scope, cancellationToken);
+
+                    foreach (var failure in batchResult.Failed)
+                    {
+                        _errorBanners.ReportError(
+                            "Database Upgrade Failed",
+                            $"Failed to upgrade '{failure.FileName}': {failure.Message}");
+                    }
+
+                    return batchResult;
+                });
+        }
+        finally
+        {
+            using (_upgradeGate.EnterScope())
+            {
+                foreach (var fileName in fileNames) { _upgradesInFlight.Remove(fileName); }
+            }
+
+            RaiseUpgradeStateChangedSafely();
+        }
+    }
+
     internal static (string Title, string Message, ResultSeverity Severity) BuildImportSummary(ImportResult importResult)
     {
         ArgumentNullException.ThrowIfNull(importResult);

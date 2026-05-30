@@ -35,7 +35,11 @@ internal sealed class FakeDatabaseService : IDatabaseService
 
     public int RetryClassificationCalls { get; private set; }
 
+    public IList<IReadOnlyList<string>> UpgradeBatchCalls { get; } = [];
+
     public int UpgradeBatchCompletedHandlerCount => UpgradeBatchCompleted?.GetInvocationList().Length ?? 0;
+
+    public UpgradeBatchResult UpgradeBatchReturnValue { get; set; } = new(Succeeded: [], Cancelled: [], Failed: []);
 
     public Task ClassifyEntriesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
@@ -100,8 +104,11 @@ internal sealed class FakeDatabaseService : IDatabaseService
     public Task<UpgradeBatchResult> UpgradeBatchAsync(
         IReadOnlyList<string> fileNames,
         UpgradeProgressScope scope,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(new UpgradeBatchResult([], [], []));
+        CancellationToken cancellationToken = default)
+    {
+        UpgradeBatchCalls.Add(fileNames);
+        return Task.FromResult(UpgradeBatchReturnValue);
+    }
 
 #pragma warning disable CS0067 // Events not raised in test fakes; declared only to satisfy the interface.
     public event EventHandler<UpgradeBatchProgressEventArgs>? UpgradeBatchProgress;

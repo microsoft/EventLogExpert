@@ -103,6 +103,7 @@ public static class MauiProgram
         // UI Services
         builder.Services.AddEventLogFiltering();
         builder.Services.AddEventLogRuntime();
+        builder.Services.AddEventLogUiServices();
 
         builder.Services.AddSingleton<IBannerCycleStateService, BannerCycleStateService>();
 

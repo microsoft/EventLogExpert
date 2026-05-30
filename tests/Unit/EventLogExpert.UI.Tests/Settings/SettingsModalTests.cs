@@ -25,6 +25,7 @@ public sealed class SettingsModalTests : BunitContext
     public SettingsModalTests()
     {
         Services.AddBannerHostDependencies();
+        Services.AddMenuMocks();
 
         _modalService.ActiveModalId.Returns(new ModalId(1L));
 

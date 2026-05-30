@@ -11,8 +11,12 @@ namespace EventLogExpert.UI.Menu;
 
 public sealed partial class MenuHost : IAsyncDisposable
 {
+    private bool _disposed;
     private long _focusedMenuId;
+    private bool _ownedViewportListeners;
     private ElementReference _popupElement;
+
+    private bool IsActive => ReferenceEquals(Registry.ActiveHost, this);
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
@@ -23,18 +27,49 @@ public sealed partial class MenuHost : IAsyncDisposable
             CultureInfo.InvariantCulture,
             $"left: {MenuService.PositionX}px; top: {MenuService.PositionY}px;");
 
+    [Inject] private IMenuHostRegistry Registry { get; init; } = null!;
+
     public async ValueTask DisposeAsync()
     {
+        if (_disposed) { return; }
+
+        _disposed = true;
+
+        // Unsubscribe BEFORE Close() — Close() synchronously raises StateChanged,
+        // which would re-enter OnStateChanged and queue an InvokeAsync that runs
+        // after dispose completes.
         MenuService.StateChanged -= OnStateChanged;
+        Registry.ActiveHostChanged -= OnActiveHostChanged;
 
-        try { await JSRuntime.InvokeVoidAsync("detachMenuViewportListeners"); }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
+        // Close on live MenuService state, not on the queued-lambda-mutated
+        // _focusedMenuId — that mirror can lag the singleton when dispose
+        // races a fresh OpenAt.
+        if (IsActive && MenuService.ActiveItems is not null)
+        {
+            MenuService.Close();
+        }
 
-        await ReleaseFocusReturnAsync();
+        Registry.Unregister(this);
+
+        if (_focusedMenuId != 0 || _ownedViewportListeners)
+        {
+            try { await JSRuntime.InvokeVoidAsync("detachMenuViewportListeners"); }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
+
+            await ReleaseFocusReturnAsync();
+            _ownedViewportListeners = false;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_disposed || !IsActive)
+        {
+            await base.OnAfterRenderAsync(firstRender);
+
+            return;
+        }
+
         // Re-clamp every render — popup is hidden until clampMenuPopup reveals it within the viewport.
         if (MenuService.ActiveItems is not null)
         {
@@ -47,6 +82,8 @@ public sealed partial class MenuHost : IAsyncDisposable
 
     protected override void OnInitialized()
     {
+        Registry.Register(this);
+        Registry.ActiveHostChanged += OnActiveHostChanged;
         MenuService.StateChanged += OnStateChanged;
         base.OnInitialized();
     }
@@ -63,11 +100,29 @@ public sealed partial class MenuHost : IAsyncDisposable
 
     private void HandleOverlayClick() => MenuService.Close();
 
+    private void OnActiveHostChanged()
+    {
+        if (_disposed) { return; }
+
+        _ = InvokeAsync(() =>
+        {
+            if (_disposed) { return; }
+
+            StateHasChanged();
+        });
+    }
+
     private void OnStateChanged()
     {
+        // Inactive hosts stay subscribed but skip render + JS interop so the
+        // active topmost host owns the menu lifecycle.
+        if (_disposed || !IsActive) { return; }
+
         // StateChanged may fire from arbitrary threads — marshal through the renderer dispatcher.
         _ = InvokeAsync(async () =>
         {
+            if (_disposed || !IsActive) { return; }
+
             var nowOpen = MenuService.ActiveItems is not null;
             var wasOpen = _focusedMenuId != 0;
 
@@ -87,7 +142,11 @@ public sealed partial class MenuHost : IAsyncDisposable
 
                 if (!wasOpen)
                 {
-                    try { await JSRuntime.InvokeVoidAsync("attachMenuViewportListeners"); }
+                    try
+                    {
+                        await JSRuntime.InvokeVoidAsync("attachMenuViewportListeners");
+                        _ownedViewportListeners = true;
+                    }
                     catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
                 }
             }
@@ -95,7 +154,11 @@ public sealed partial class MenuHost : IAsyncDisposable
             {
                 _focusedMenuId = 0;
 
-                try { await JSRuntime.InvokeVoidAsync("detachMenuViewportListeners"); }
+                try
+                {
+                    await JSRuntime.InvokeVoidAsync("detachMenuViewportListeners");
+                    _ownedViewportListeners = false;
+                }
                 catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
 
                 await ReleaseFocusReturnAsync();
