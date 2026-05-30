@@ -227,6 +227,32 @@ public sealed class ManageDatabasesTabTests : BunitContext
     }
 
     [Fact]
+    public async Task BulkRemove_PartialFailure_KeepsFailedSelected_StaysInSelectionMode()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        _coordinator.RemoveDatabaseAsync("a.db", Arg.Any<Func<bool, CancellationToken, Task<bool>>>(), Arg.Any<CancellationToken>())
+            .Returns<RemoveOutcome>(_ => throw new InvalidOperationException("disk full"));
+        _coordinator.RemoveDatabaseAsync("b.db", Arg.Any<Func<bool, CancellationToken, Task<bool>>>(), Arg.Any<CancellationToken>())
+            .Returns(new RemoveOutcome(RemoveOutcomeStatus.Confirmed, true, false));
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(true, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        await EnterSelectionModeAsync(component);
+        var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
+        await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
+        await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
+
+        var bulkRemove = component.Find(".manage-databases-bulk-strip .button-red");
+        await component.InvokeAsync(() => bulkRemove.Click());
+
+        Assert.True(component.Instance.IsInSelectionMode);
+        Assert.True(component.Instance.HasBulkSelection);
+        Assert.Equal("true", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
+    }
+
+    [Fact]
     public async Task BulkRemove_PerFileFailure_AnnouncesFirstFailureDetail()
     {
         _databaseService.Entries = [
@@ -706,17 +732,6 @@ public sealed class ManageDatabasesTabTests : BunitContext
     }
 
     [Fact]
-    public async Task ExitSelectionModeWithFocusAsync_WhenNotInSelectionMode_IsNoOp()
-    {
-        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
-        var component = Render<ManageDatabasesTab>();
-
-        await component.InvokeAsync(() => component.Instance.ExitSelectionModeWithFocusAsync());
-
-        Assert.Equal("false", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
-    }
-
-    [Fact]
     public async Task ExitSelectionModeWithFocusAsync_WhenInSelectionMode_ExitsAndClearsSelection()
     {
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
@@ -730,6 +745,17 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await component.InvokeAsync(() => component.Instance.ExitSelectionModeWithFocusAsync());
 
         Assert.False(component.Instance.HasBulkSelection);
+        Assert.Equal("false", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
+    }
+
+    [Fact]
+    public async Task ExitSelectionModeWithFocusAsync_WhenNotInSelectionMode_IsNoOp()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+
+        await component.InvokeAsync(() => component.Instance.ExitSelectionModeWithFocusAsync());
+
         Assert.Equal("false", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
     }
 
