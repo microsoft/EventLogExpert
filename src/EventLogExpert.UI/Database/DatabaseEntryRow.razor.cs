@@ -119,6 +119,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
         try { await _nameButtonRef.FocusAsync(preventScroll: true); }
         catch (ObjectDisposedException) { }
+        catch (JSDisconnectedException) { }
         catch (JSException) { }
     }
 

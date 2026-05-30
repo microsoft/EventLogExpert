@@ -578,6 +578,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         {
             try { await rowRef.FocusNameAsync(); }
             catch (ObjectDisposedException) { }
+            catch (JSDisconnectedException) { }
             catch (JSException) { }
 
             return;
@@ -585,6 +586,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         try { await _importButtonRef.FocusAsync(preventScroll: true); }
         catch (ObjectDisposedException) { }
+        catch (JSDisconnectedException) { }
         catch (JSException) { }
     }
 
@@ -728,7 +730,10 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private async Task OnBulkRemoveClickAsync()
     {
-        var snapshot = _selectedForBulk.ToArray();
+        var snapshot = DatabaseService.Entries
+            .Where(entry => _selectedForBulk.Contains(entry.FileName))
+            .Select(entry => entry.FileName)
+            .ToArray();
 
         await ConfirmAndRemoveAsync(snapshot, FocusTarget.BulkRemoveButton, FocusTarget.SameRowName);
     }
@@ -737,23 +742,22 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     {
         if (_eligibleUpgradeCount == 0 || IsUpgradeBlocked) { return; }
 
-        var entriesByFileName = SnapshotEntriesByFileName();
         var eligible = new List<string>();
         var skipped = new List<(string FileName, string Reason)>();
 
-        foreach (var fileName in _selectedForBulk)
+        foreach (var entry in DatabaseService.Entries.ToList())
         {
-            if (!entriesByFileName.TryGetValue(fileName, out var entry)) { continue; }
+            if (!_selectedForBulk.Contains(entry.FileName)) { continue; }
 
             var (isEligible, isUpgrading) = GetEntryUpgradeState(entry);
 
             if (isEligible)
             {
-                eligible.Add(fileName);
+                eligible.Add(entry.FileName);
             }
             else
             {
-                skipped.Add((fileName, GetSkipReason(entry, isUpgrading)));
+                skipped.Add((entry.FileName, GetSkipReason(entry, isUpgrading)));
             }
         }
 
