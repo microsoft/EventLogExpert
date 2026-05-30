@@ -130,7 +130,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
         _ => "Upgrading"
     };
 
-    private void HandleContextMenuAsync(MouseEventArgs args)
+    private void HandleContextMenu(MouseEventArgs args)
     {
         // Suppressed in selection mode — bulk strip is the action surface.
         if (IsSelectionModeActive) { return; }
