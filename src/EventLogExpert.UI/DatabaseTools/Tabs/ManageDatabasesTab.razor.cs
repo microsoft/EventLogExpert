@@ -942,6 +942,12 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private void RecomputeEligibleCount()
     {
+        if (_selectedForBulk.Count == 0)
+        {
+            _eligibleUpgradeCount = 0;
+            return;
+        }
+
         var entriesByFileName = SnapshotEntriesByFileName();
         int count = 0;
 
