@@ -106,7 +106,7 @@ internal sealed class FakeDatabaseService : IDatabaseService
         UpgradeProgressScope scope,
         CancellationToken cancellationToken = default)
     {
-        UpgradeBatchCalls.Add(fileNames);
+        UpgradeBatchCalls.Add(fileNames.ToList());
         return Task.FromResult(UpgradeBatchReturnValue);
     }
 

@@ -10,7 +10,6 @@ using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.UI.Database;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
 using System.Text;
@@ -118,6 +117,18 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         DatabaseService.UpgradeBatchCompleted -= OnUpgradeBatchCompleted;
         ProgressBannerService.StateChanged -= OnBannerStateChanged;
         Coordinator.UpgradeStateChanged -= OnCoordinatorStateChanged;
+    }
+
+    public async Task ExitSelectionModeWithFocusAsync()
+    {
+        if (!_isSelectionModeActive) { return; }
+
+        ExitSelectionMode();
+        StateHasChanged();
+
+        try { await _selectButtonRef.FocusAsync(preventScroll: true); }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
     }
 
     /// <summary>
@@ -531,18 +542,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         _pendingToggles.Clear();
     }
 
-    public async Task ExitSelectionModeWithFocusAsync()
-    {
-        if (!_isSelectionModeActive) { return; }
-
-        ExitSelectionMode();
-        StateHasChanged();
-
-        try { await _selectButtonRef.FocusAsync(preventScroll: true); }
-        catch (JSDisconnectedException) { }
-        catch (JSException) { }
-    }
-
     private void ExitSelectionMode()
     {
         _isSelectionModeActive = false;
@@ -624,6 +623,15 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     private bool GetEffectiveEnabled(DatabaseEntry entry) =>
         _pendingToggles.TryGetValue(entry.FileName, out var pending) ? pending : entry.IsEnabled;
 
+    private (bool IsEligible, bool IsUpgrading) GetEntryUpgradeState(DatabaseEntry entry)
+    {
+        bool upgrading = Coordinator.IsUpgradeInFlight(entry.FileName) ||
+            GetUpgradeProgressForEntry(entry) is not null ||
+            IsFileInAnyKnownBatch(entry.FileName);
+
+        return (DatabaseEntryEligibility.IsUpgradeEligible(entry, upgrading), upgrading);
+    }
+
     private BannerProgressEntry? GetUpgradeProgressForEntry(DatabaseEntry entry)
     {
         var manage = ProgressBannerService.ManageDatabasesProgress;
@@ -691,20 +699,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     private bool IsFileInAnyKnownBatch(string fileName) =>
         GetCancellableBatchForFile(fileName) is not null;
 
-    private bool IsUpgradeEligibleForSelected(string fileName)
-    {
-        var entry = DatabaseService.Entries.FirstOrDefault(
-            e => string.Equals(e.FileName, fileName, StringComparison.OrdinalIgnoreCase));
-
-        if (entry is null) { return false; }
-
-        bool upgrading = Coordinator.IsUpgradeInFlight(entry.FileName) ||
-            GetUpgradeProgressForEntry(entry) is not null ||
-            IsFileInAnyKnownBatch(entry.FileName);
-
-        return DatabaseEntryEligibility.IsUpgradeEligible(entry, upgrading);
-    }
-
     private async Task ObserveClassificationCompletionAsync(CancellationToken cancellationToken)
     {
         try
@@ -746,26 +740,23 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     {
         if (_eligibleUpgradeCount == 0 || IsUpgradeBlocked) { return; }
 
+        var entriesByFileName = SnapshotEntriesByFileName();
         var eligible = new List<string>();
         var skipped = new List<(string FileName, string Reason)>();
 
         foreach (var fileName in _selectedForBulk)
         {
-            if (IsUpgradeEligibleForSelected(fileName))
+            if (!entriesByFileName.TryGetValue(fileName, out var entry)) { continue; }
+
+            var (isEligible, isUpgrading) = GetEntryUpgradeState(entry);
+
+            if (isEligible)
             {
                 eligible.Add(fileName);
             }
             else
             {
-                var entry = DatabaseService.Entries.FirstOrDefault(
-                    e => string.Equals(e.FileName, fileName, StringComparison.OrdinalIgnoreCase));
-
-                if (entry is null) { continue; }
-
-                bool upgrading = Coordinator.IsUpgradeInFlight(entry.FileName) ||
-                    GetUpgradeProgressForEntry(entry) is not null ||
-                    IsFileInAnyKnownBatch(entry.FileName);
-                skipped.Add((fileName, GetSkipReason(entry, upgrading)));
+                skipped.Add((fileName, GetSkipReason(entry, isUpgrading)));
             }
         }
 
@@ -954,11 +945,18 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private void RecomputeEligibleCount()
     {
+        var entriesByFileName = SnapshotEntriesByFileName();
         int count = 0;
+
         foreach (var fileName in _selectedForBulk)
         {
-            if (IsUpgradeEligibleForSelected(fileName)) { count++; }
+            if (entriesByFileName.TryGetValue(fileName, out var entry) &&
+                GetEntryUpgradeState(entry).IsEligible)
+            {
+                count++;
+            }
         }
+
         _eligibleUpgradeCount = count;
     }
 
@@ -1121,6 +1119,11 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         RecomputeEligibleCount();
         UpdateSelectionAnnouncement();
     }
+
+    private Dictionary<string, DatabaseEntry> SnapshotEntriesByFileName() =>
+        DatabaseService.Entries.ToDictionary(
+            e => e.FileName,
+            StringComparer.OrdinalIgnoreCase);
 
     private void ToggleDatabase(string fileName)
     {

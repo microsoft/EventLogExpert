@@ -129,8 +129,8 @@
                 Discard
             </button>
             <button aria-describedby="@(IsUpgradeBlocked ? _saveBlockedHelpId : null)"
-                aria-disabled="@(IsUpgradeBlocked ? "true" : "false")"
                 class="button button-green"
+                disabled="@IsUpgradeBlocked"
                 id="manage-save"
                 @onclick="OnSaveClickAsync"
                 type="button">
