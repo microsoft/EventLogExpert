@@ -45,7 +45,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     {
         SameRowName,
         BulkRemoveButton,
-        SelectButton,
         ImportButton
     }
 
@@ -181,8 +180,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
                         FocusEntryRowNameAsync(target.FileName),
                     FocusTarget.BulkRemoveButton when HasBulkSelection =>
                         _bulkRemoveButtonRef.FocusAsync(preventScroll: true),
-                    FocusTarget.SelectButton when _isSelectionModeActive =>
-                        _selectButtonRef.FocusAsync(preventScroll: true),
                     FocusTarget.ImportButton =>
                         _importButtonRef.FocusAsync(preventScroll: true),
                     _ => ValueTask.CompletedTask

@@ -7,10 +7,13 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 public static class UiServiceCollectionExtensions
 {
-    public static IServiceCollection AddEventLogUiServices(this IServiceCollection services)
+    extension(IServiceCollection services)
     {
-        services.AddSingleton<IMenuHostRegistry, MenuHostRegistry>();
+        public IServiceCollection AddEventLogUiServices()
+        {
+            services.AddSingleton<IMenuHostRegistry, MenuHostRegistry>();
 
-        return services;
+            return services;
+        }
     }
 }
