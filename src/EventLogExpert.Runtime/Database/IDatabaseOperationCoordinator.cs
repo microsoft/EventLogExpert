@@ -30,4 +30,9 @@ public interface IDatabaseOperationCoordinator
         string fileName,
         UpgradeProgressScope scope = UpgradeProgressScope.ManageDatabasesTriggered,
         CancellationToken cancellationToken = default);
+
+    Task<UpgradeBatchResult?> UpgradeDatabasesAsync(
+        IReadOnlyList<string> fileNames,
+        UpgradeProgressScope scope = UpgradeProgressScope.ManageDatabasesTriggered,
+        CancellationToken cancellationToken = default);
 }

@@ -6,6 +6,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
+using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Database;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -16,10 +17,13 @@ namespace EventLogExpert.UI.Tests.Database;
 
 public sealed class DatabaseEntryRowTests : BunitContext
 {
+    private readonly IMenuService _menuService = Substitute.For<IMenuService>();
+
     public DatabaseEntryRowTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddSingleton(Substitute.For<ITraceLogger>());
+        Services.AddSingleton(_menuService);
     }
 
     [Fact]
@@ -36,6 +40,43 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
+    public void Checkbox_InNormalMode_IsCollapsedAndAriaHidden()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        var component = RenderRow(entry);
+
+        var wrapper = component.Find(".db-entry-checkbox");
+        Assert.DoesNotContain("db-entry-checkbox--visible", wrapper.GetAttribute("class") ?? string.Empty);
+        Assert.Equal("true", wrapper.GetAttribute("aria-hidden"));
+    }
+
+    [Fact]
+    public void Checkbox_InNormalMode_IsDisabled()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        var component = RenderRow(entry);
+
+        var checkbox = component.Find(".db-entry-row input[type='checkbox']");
+        Assert.True(checkbox.HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public void Checkbox_InSelectionMode_IsVisible_NoAriaHidden()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.IsSelectionModeActive, true));
+
+        var wrapper = component.Find(".db-entry-checkbox");
+        Assert.Contains("db-entry-checkbox--visible", wrapper.GetAttribute("class") ?? string.Empty);
+        Assert.False(wrapper.HasAttribute("aria-hidden"));
+    }
+
+    [Fact]
     public void Checkbox_RenderedWithAriaLabelInRow()
     {
         var entry = MakeEntry(DatabaseStatus.Ready, "MyDb.evtx");
@@ -47,12 +88,13 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public async Task CheckboxChange_InvokesOnSelectionToggle()
+    public async Task CheckboxChange_InSelectionMode_InvokesOnSelectionToggle()
     {
         var entry = MakeEntry(DatabaseStatus.Ready);
         int invocationCount = 0;
         var component = Render<DatabaseEntryRow>(parameters => parameters
             .Add(p => p.Entry, entry)
+            .Add(p => p.IsSelectionModeActive, true)
             .Add(p => p.OnSelectionToggle, () => invocationCount++));
 
         await component.Find(".db-entry-row input[type='checkbox']")
@@ -62,55 +104,52 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void RemoveButton_AlwaysVisible_RowDoesNotHaveSlideRevealClass()
+    public async Task ContextMenu_InNormalMode_OpensMenuWithRemoveItem()
     {
         var entry = MakeEntry(DatabaseStatus.Ready);
 
         var component = RenderRow(entry);
 
-        var row = component.Find(".db-entry-row");
-        Assert.DoesNotContain("db-entry-row--revealed", row.GetAttribute("class") ?? string.Empty);
-        Assert.Single(component.FindAll(".db-entry-remove-btn"));
+        await component.Find(".db-entry-row").TriggerEventAsync("oncontextmenu",
+            new MouseEventArgs { ClientX = 100, ClientY = 200 });
+
+        _menuService.Received(1).OpenAt(100, 200, Arg.Is<IReadOnlyList<MenuItem>>(items => items.Count == 1));
     }
 
     [Fact]
-    public void RemoveButton_DuringBackgroundUpgrade_NotAriaDisabled()
+    public async Task ContextMenu_InSelectionMode_DoesNotOpenMenu()
     {
-        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
-        var progress = MakeProgress(currentEntryName: "a.db", scope: UpgradeProgressScope.Background);
-
-        var component = RenderRow(entry, upgradeProgress: progress);
-
-        var button = component.Find(".db-entry-remove-btn");
-        Assert.False(button.HasAttribute("aria-disabled"));
-    }
-
-    [Fact]
-    public void RemoveButton_DuringManageUpgrade_NotAriaDisabled()
-    {
-        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
-
-        var component = RenderRow(entry, isUpgrading: true);
-
-        var button = component.Find(".db-entry-remove-btn");
-        Assert.False(button.HasAttribute("aria-disabled"));
-    }
-
-    [Fact]
-    public async Task RemoveButtonClick_InvokesOnRemove()
-    {
-        // Arrange
         var entry = MakeEntry(DatabaseStatus.Ready);
-        int invocationCount = 0;
+
         var component = Render<DatabaseEntryRow>(parameters => parameters
             .Add(p => p.Entry, entry)
-            .Add(p => p.OnRemove, () => invocationCount++));
+            .Add(p => p.IsSelectionModeActive, true));
 
-        // Act
-        await component.Find(".db-entry-remove-btn").ClickAsync(new MouseEventArgs());
+        await component.Find(".db-entry-row").TriggerEventAsync("oncontextmenu",
+            new MouseEventArgs { ClientX = 50, ClientY = 50 });
 
-        // Assert
-        Assert.Equal(1, invocationCount);
+        _menuService.DidNotReceive().OpenAt(
+            Arg.Any<double>(),
+            Arg.Any<double>(),
+            Arg.Any<IReadOnlyList<MenuItem>>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task ContextMenu_RemoveItem_HasRemoveLabel()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready, "MyProvider.db");
+        IReadOnlyList<MenuItem>? capturedItems = null;
+        _menuService.When(s => s.OpenAt(Arg.Any<double>(), Arg.Any<double>(), Arg.Any<IReadOnlyList<MenuItem>>(), Arg.Any<bool>(), Arg.Any<bool>()))
+            .Do(call => capturedItems = call.Arg<IReadOnlyList<MenuItem>>());
+
+        var component = RenderRow(entry);
+        await component.Find(".db-entry-row").TriggerEventAsync("oncontextmenu", new MouseEventArgs());
+
+        Assert.NotNull(capturedItems);
+        var item = Assert.Single(capturedItems!);
+        Assert.Equal("Remove", item.Label);
     }
 
     [Fact]
@@ -155,10 +194,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Empty(component.FindAll(".db-entry-upgrading"));
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
         Assert.Empty(component.FindAll(".option-select"));
-
-        // Trash is unconditionally rendered now; visibility is governed by the CSS
-        // hover/focus reveal animation, not by markup.
-        Assert.Single(component.FindAll(".db-entry-remove-btn"));
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -174,7 +210,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var badge = component.Find(".db-entry-badge");
         Assert.Equal("Recovery required", badge.TextContent);
         Assert.Empty(component.FindAll(".option-select"));
-        Assert.Single(component.FindAll(".db-entry-remove-btn"));
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -193,14 +229,10 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_BackupExistsEntry_ShowsRecoveryRequiredBadge_AndShowsTrash()
+    public void Render_BackupExistsEntry_ShowsRecoveryRequiredBadge_NoTrash()
     {
-        // Arrange — BackupExists routes the user to the recovery dialog as the primary
-        // action, but the trash is still rendered (revealed by hover/focus) so a user
-        // who wants to abandon the entry entirely can do so.
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired, backupExists: true);
 
-        // Act
         var component = RenderRow(entry);
 
         // Assert
@@ -212,7 +244,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Empty(component.FindAll(".option-select"));
         Assert.Empty(component.FindAll(".db-entry-upgrading"));
 
-        Assert.Single(component.FindAll(".db-entry-remove-btn"));
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -257,7 +289,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_DisabledEntries_ShowTrashButton()
+    public void Render_DisabledEntries_NoTrashButton()
     {
         foreach (var status in Enum.GetValues<DatabaseStatus>())
         {
@@ -266,10 +298,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
             // Act
             var component = RenderRow(entry);
-
-            // Assert — every status renders the trash; visibility is governed by the
-            // CSS hover/focus reveal animation, not by markup.
-            Assert.Single(component.FindAll(".db-entry-remove-btn"));
+            Assert.Empty(component.FindAll(".db-entry-remove-btn"));
         }
     }
 
@@ -287,7 +316,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_IsSelectedTrue_CheckboxCheckedAndRowHasSelectedClass()
+    public void Render_IsSelectedTrue_CheckboxChecked()
     {
         var entry = MakeEntry(DatabaseStatus.Ready);
 
@@ -295,9 +324,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         var checkbox = component.Find(".db-entry-row input[type='checkbox']");
         Assert.True(checkbox.HasAttribute("checked"));
-
-        var row = component.Find(".db-entry-row");
-        Assert.Contains("db-entry-row--selected", row.GetAttribute("class") ?? string.Empty);
     }
 
     [Fact]
@@ -347,7 +373,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
         Assert.Empty(component.FindAll(".db-entry-badge"));
 
-        Assert.Single(component.FindAll(".db-entry-remove-btn"));
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -364,7 +390,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_NonReadyEnabledEntry_ShowsTrashButton()
+    public void Render_NonReadyEnabledEntry_NoTrashButton()
     {
         // Arrange — non-Ready entries are not loaded by the resolver regardless of IsEnabled,
         // so the file is not locked and removal is safe.
@@ -374,7 +400,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry);
 
         // Assert
-        Assert.Single(component.FindAll(".db-entry-remove-btn"));
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -452,9 +478,23 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_ReadyEnabledEntry_OptimisticToggleOff_StillRendersTrashButton()
+    public void Render_ReadyEnabledEntry_NoTrashButton()
     {
-        // Arrange — toggle change is optimistic and not yet committed; trash is in the DOM
+        // Arrange — Ready+Enabled is now safe to delete because RemoveAsync coordinates
+        // 
+
+        var entry = MakeEntry(DatabaseStatus.Ready, isEnabled: true);
+
+        // Act
+        var component = RenderRow(entry, effectiveEnabled: true);
+
+        // Assert
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
+    }
+
+    [Fact]
+    public void Render_ReadyEnabledEntry_OptimisticToggleOff_NoTrashButton()
+    {
         // either way under the new contract.
         var entry = MakeEntry(DatabaseStatus.Ready, isEnabled: true);
 
@@ -462,22 +502,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry, effectiveEnabled: false);
 
         // Assert
-        Assert.Single(component.FindAll(".db-entry-remove-btn"));
-    }
-
-    [Fact]
-    public void Render_ReadyEnabledEntry_RendersTrashButton()
-    {
-        // Arrange — Ready+Enabled is now safe to delete because RemoveAsync coordinates
-        // closing and reopening any open log views around the file delete. The trash is
-        // rendered (just visually faded by CSS until the row is hovered or focused).
-        var entry = MakeEntry(DatabaseStatus.Ready, isEnabled: true);
-
-        // Act
-        var component = RenderRow(entry, effectiveEnabled: true);
-
-        // Assert
-        Assert.Single(component.FindAll(".db-entry-remove-btn"));
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -511,24 +536,10 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.All(radios, r => Assert.True(r.HasAttribute("disabled")));
     }
 
-    [Fact]
-    public void Render_RemoveButton_HasAriaLabel()
-    {
-        // Arrange
-        var entry = MakeEntry(DatabaseStatus.Ready, "MyProvider.db");
-
-        // Act
-        var component = RenderRow(entry);
-
-        // Assert
-        var button = component.Find(".db-entry-remove-btn");
-        Assert.Equal("Remove database MyProvider.db", button.GetAttribute("aria-label"));
-    }
-
     [Theory]
     [InlineData(DatabaseStatus.UnrecognizedSchema, "Unrecognized")]
     [InlineData(DatabaseStatus.ObsoleteSchema, "Obsolete")]
-    public void Render_TerminalStatus_ShowsBadge_AndOnlyTrash(DatabaseStatus status, string expectedLabel)
+    public void Render_TerminalStatus_ShowsBadge_NoTrash(DatabaseStatus status, string expectedLabel)
     {
         // ClassificationFailed intentionally excluded: it now renders the Retry classification button.
         var entry = MakeEntry(status);
@@ -543,7 +554,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
         Assert.Empty(component.FindAll(".option-select"));
-        Assert.Single(component.FindAll(".db-entry-remove-btn"));
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -686,10 +697,10 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_UpgradeRequiredEntry_ShowsTrashButton()
+    public void Render_UpgradeRequiredEntry_NoTrashButton()
     {
-        // Arrange — UpgradeRequired now renders the trash like every other status; the
-        // user is no longer forced to either Upgrade or transition through UpgradeFailed
+        // 
+
         // before being able to remove the entry.
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
 
@@ -697,7 +708,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry);
 
         // Assert
-        Assert.Single(component.FindAll(".db-entry-remove-btn"));
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -847,6 +858,16 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         // Assert
         Assert.Equal(1, invocationCount);
+    }
+
+    [Fact]
+    public void TrashButton_NotRendered_InNormalMode()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        var component = RenderRow(entry);
+
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]

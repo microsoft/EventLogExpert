@@ -1,4 +1,4 @@
-@if (MenuService.ActiveItems is not null)
+@if (IsActive && MenuService.ActiveItems is not null)
 {
     <div class="menu-host-overlay"
         @onclick="HandleOverlayClick"
@@ -15,9 +15,9 @@
             tabindex="-1">
             <MenuRenderer InitialFocusIndex="@(MenuService.ActiveFocusFirst ? 0 : -1)"
                 Items="MenuService.ActiveItems"
+                @key="MenuService.ActiveMenuId"
                 OnActivated="HandleActivated"
-                OnNavigateBar="HandleNavigateBar"
-                @key="MenuService.ActiveMenuId" />
+                OnNavigateBar="HandleNavigateBar" />
         </div>
     </div>
 }

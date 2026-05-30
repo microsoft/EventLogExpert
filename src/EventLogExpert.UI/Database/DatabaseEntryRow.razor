@@ -1,7 +1,13 @@
-<div class="db-entry-row @(IsSelected ? "db-entry-row--selected" : null)">
-    <Checkbox AriaLabel="@($"Select {Entry.FileName}")"
-        Value="IsSelected"
-        ValueChanged="@(_ => OnSelectionToggle.InvokeAsync())" />
+<div class="db-entry-row"
+    @oncontextmenu="HandleContextMenuAsync"
+    @oncontextmenu:preventDefault="true">
+    <div @attributes="CheckboxHiddenAttributes"
+        class="db-entry-checkbox @(IsSelectionModeActive ? "db-entry-checkbox--visible" : null)">
+        <Checkbox AriaLabel="@($"Select {Entry.FileName}")"
+            Disabled="@(!IsSelectionModeActive)"
+            Value="IsSelected"
+            ValueChanged="@(_ => OnSelectionToggle.InvokeAsync())" />
+    </div>
 
     <div class="db-entry-row-content">
         <div class="db-entry-info">
@@ -114,14 +120,6 @@
                     </button>
                     break;
             }
-
-            <button aria-label="@($"Remove database {Entry.FileName}")"
-                class="button button-red db-entry-remove-btn"
-                @onclick="OnRemoveClick"
-                @ref="_removeButtonRef"
-                type="button">
-                <i aria-hidden="true" class="bi bi-trash"></i>
-            </button>
         </div>
     </div>
 </div>

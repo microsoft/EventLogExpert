@@ -719,6 +719,128 @@ public sealed class DatabaseOperationCoordinatorTests
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task UpgradeDatabasesAsync_EmptyInput_ReturnsEmptyResult_DoesNotCallService()
+    {
+        var sut = CreateSut();
+
+        var result = await sut.UpgradeDatabasesAsync([], UpgradeProgressScope.ManageDatabasesTriggered, Ct);
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Succeeded);
+        Assert.Empty(result.Cancelled);
+        Assert.Empty(result.Failed);
+        await _databases.DidNotReceiveWithAnyArgs().UpgradeBatchAsync(default!, default, Ct);
+    }
+
+    [Fact]
+    public async Task UpgradeDatabasesAsync_GateDenied_AnotherUpgradeInFlight_ReturnsNull()
+    {
+        var blocker = new TaskCompletionSource<UpgradeBatchResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _databases.UpgradeBatchAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<UpgradeProgressScope>(), Arg.Any<CancellationToken>())
+            .Returns(_ => blocker.Task);
+
+        var sut = CreateSut();
+
+        var firstUpgrade = sut.UpgradeDatabaseAsync("a.db", cancellationToken: Ct);
+        await Task.Yield();
+
+        Assert.True(sut.IsAnyUpgradeInFlight);
+
+        var result = await sut.UpgradeDatabasesAsync(["b.db", "c.db"], UpgradeProgressScope.ManageDatabasesTriggered, Ct);
+
+        Assert.Null(result);
+
+        blocker.SetResult(new UpgradeBatchResult([], [], []));
+        await firstUpgrade;
+    }
+
+    [Fact]
+    public async Task UpgradeDatabasesAsync_HappyPath_ReturnsServiceResult_AndFiresStateChangedTwice()
+    {
+        var expected = new UpgradeBatchResult(Succeeded: ["a.db", "b.db"], Cancelled: [], Failed: []);
+        _databases.UpgradeBatchAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<UpgradeProgressScope>(), Arg.Any<CancellationToken>())
+            .Returns(expected);
+
+        var sut = CreateSut();
+        int stateChangedCount = 0;
+        sut.UpgradeStateChanged += () => stateChangedCount++;
+
+        var result = await sut.UpgradeDatabasesAsync(["a.db", "b.db"], UpgradeProgressScope.ManageDatabasesTriggered, Ct);
+
+        Assert.Same(expected, result);
+        Assert.Equal(2, stateChangedCount);
+        Assert.False(sut.IsAnyUpgradeInFlight);
+    }
+
+    [Fact]
+    public async Task UpgradeDatabasesAsync_PartialFailure_SurfacesEachFailureToErrorBanner()
+    {
+        var result = new UpgradeBatchResult(
+            Succeeded: ["a.db"],
+            Cancelled: [],
+            Failed: [new UpgradeFailure("b.db", "schema mismatch"), new UpgradeFailure("c.db", "io error")]);
+        _databases.UpgradeBatchAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<UpgradeProgressScope>(), Arg.Any<CancellationToken>())
+            .Returns(result);
+
+        var sut = CreateSut();
+        var actual = await sut.UpgradeDatabasesAsync(["a.db", "b.db", "c.db"], UpgradeProgressScope.ManageDatabasesTriggered, Ct);
+
+        Assert.Same(result, actual);
+        _errorBanners.Received(1).ReportError("Database Upgrade Failed", Arg.Is<string>(s => s.Contains("b.db") && s.Contains("schema mismatch")));
+        _errorBanners.Received(1).ReportError("Database Upgrade Failed", Arg.Is<string>(s => s.Contains("c.db") && s.Contains("io error")));
+    }
+
+    [Fact]
+    public async Task UpgradeDatabasesAsync_PerFileTracking_AllFilesInFlightDuringCall()
+    {
+        DatabaseOperationCoordinator? sutRef = null;
+        bool aSeen = false, bSeen = false;
+        _databases.UpgradeBatchAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<UpgradeProgressScope>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                aSeen = sutRef!.IsUpgradeInFlight("a.db");
+                bSeen = sutRef!.IsUpgradeInFlight("b.db");
+                return new UpgradeBatchResult([], [], []);
+            });
+
+        sutRef = CreateSut();
+        await sutRef.UpgradeDatabasesAsync(["a.db", "b.db"], UpgradeProgressScope.ManageDatabasesTriggered, Ct);
+
+        Assert.True(aSeen);
+        Assert.True(bSeen);
+        Assert.False(sutRef.IsUpgradeInFlight("a.db"));
+        Assert.False(sutRef.IsUpgradeInFlight("b.db"));
+    }
+
+    [Fact]
+    public async Task UpgradeDatabasesAsync_PreCancelledToken_Throws()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var sut = CreateSut();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            sut.UpgradeDatabasesAsync(["a.db"], UpgradeProgressScope.ManageDatabasesTriggered, cts.Token));
+
+        Assert.False(sut.IsAnyUpgradeInFlight);
+    }
+
+    [Fact]
+    public async Task UpgradeDatabasesAsync_ServiceThrows_FallbackReturnedAndInFlightCleared()
+    {
+        _databases.UpgradeBatchAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<UpgradeProgressScope>(), Arg.Any<CancellationToken>())
+            .Returns<UpgradeBatchResult>(_ => throw new InvalidOperationException("disk full"));
+
+        var sut = CreateSut();
+        var result = await sut.UpgradeDatabasesAsync(["a.db"], UpgradeProgressScope.ManageDatabasesTriggered, Ct);
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Succeeded);
+        Assert.False(sut.IsAnyUpgradeInFlight);
+        _errorBanners.Received(1).ReportError("Database Upgrade Failed", Arg.Is<string>(s => s.Contains("disk full")));
+    }
+
     private static DatabaseEntry CreateEntry(
         string fileName,
         bool isEnabled = true,

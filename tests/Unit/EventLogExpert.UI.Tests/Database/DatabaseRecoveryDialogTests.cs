@@ -32,6 +32,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     public DatabaseRecoveryDialogTests()
     {
         Services.AddBannerHostDependencies();
+        Services.AddMenuMocks();
 
         _databaseService.Entries.Returns([]);
         _modalService.ActiveModalId.Returns(_modalId);
