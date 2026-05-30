@@ -452,15 +452,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         }
     }
 
-    private void ClearSelection()
-    {
-        if (_selectedForBulk.Count == 0) { return; }
-
-        _selectedForBulk.Clear();
-        RecomputeEligibleCount();
-        UpdateSelectionAnnouncement();
-    }
-
     private ImmutableHashSet<string> ComputeActiveSet() =>
         DatabaseService.Entries
             .Where(entry => entry is { IsEnabled: true, Status: DatabaseStatus.Ready })
