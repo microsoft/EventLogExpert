@@ -843,7 +843,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         // the bulk strip would render above an empty-state placeholder otherwise.
         if (_isSelectionModeActive && currentNames.Count == 0)
         {
-            _isSelectionModeActive = false;
+            ExitSelectionMode();
         }
 
         _ = InvokeAsyncSafe();
@@ -1005,7 +1005,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             }
         }
 
-        foreach (var fileName in fileNames)
+        foreach (var fileName in succeeded)
         {
             _selectedForBulk.Remove(fileName);
         }
@@ -1044,9 +1044,9 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             _focusRestorationTarget = (anchorFileName, completeTarget);
         }
 
-        // Bulk delete: auto-exit selection mode on any success. The mode existed
-        // to perform the delete; with rows gone, selection has no remaining target.
-        if (_isSelectionModeActive && succeeded.Count > 0)
+        // Auto-exit on a fully-clean bulk delete only: any failure leaves the
+        // failed rows selected so the user can retry without re-selecting them.
+        if (_isSelectionModeActive && succeeded.Count > 0 && failed.Count == 0)
         {
             ExitSelectionMode();
         }
