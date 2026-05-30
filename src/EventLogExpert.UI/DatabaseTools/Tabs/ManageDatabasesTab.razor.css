@@ -48,6 +48,14 @@
     line-height: 1;
 }
 
+.manage-databases-master-checkbox {
+    display: flex;
+    align-items: center;
+    max-width: 3rem;
+    padding-right: .5rem;
+    overflow: hidden;
+}
+
 .manage-databases-master-btn:focus-visible {
     outline: 2px solid var(--clr-lightblue);
     outline-offset: 2px;

@@ -30,11 +30,6 @@ public sealed class DatabaseToolsModalTests : BunitContext
     [Fact]
     public async Task DisposingActiveHost_ViaMenuHostDisposeAsync_UnregistersFromRegistry()
     {
-        // Verifies the (b) half of the registration contract — that
-        // MenuHost.DisposeAsync runs Registry.Unregister. The component-level
-        // bunit Dispose() does not always pump async child disposal, so we
-        // reach the inner MenuHost via reflection through the renderer and
-        // call DisposeAsync directly.
         var registry = Services.GetRequiredService<IMenuHostRegistry>();
         var component = Render<ModalChrome>(parameters => parameters
             .Add(p => p.Title, "DatabaseTools-stand-in")
