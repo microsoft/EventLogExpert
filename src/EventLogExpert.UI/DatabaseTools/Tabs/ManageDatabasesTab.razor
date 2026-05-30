@@ -109,7 +109,7 @@
                 type="button">
                 Remove @_selectedForBulk.Count
             </button>
-            <span aria-live="polite" class="visually-hidden" id="@_upgradeBlockedHelpId">
+            <span class="visually-hidden" id="@_upgradeBlockedHelpId">
                 @(IsUpgradeBlocked
                     ? "Cannot upgrade: another upgrade is already in progress."
                     : string.Empty)
@@ -136,7 +136,7 @@
                 type="button">
                 Save changes
             </button>
-            <span aria-live="polite" class="visually-hidden" id="@_saveBlockedHelpId">
+            <span class="visually-hidden" id="@_saveBlockedHelpId">
                 @(IsUpgradeBlocked ? "Cannot save: a database upgrade is in progress." : string.Empty)
             </span>
         </div>
