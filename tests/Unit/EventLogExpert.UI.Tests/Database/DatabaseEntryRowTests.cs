@@ -214,7 +214,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_BackupExistsEntry_RestoreButton_AriaDisabledWhenBlocked()
+    public void Render_BackupExistsEntry_RestoreButton_DisabledWhenBlocked()
     {
         // Arrange
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired, backupExists: true);
@@ -224,8 +224,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         // Assert
         var restoreBtn = component.Find(".db-entry-restore-btn");
-        Assert.Equal("true", restoreBtn.GetAttribute("aria-disabled"));
-        Assert.False(restoreBtn.HasAttribute("disabled"));
+        Assert.True(restoreBtn.HasAttribute("disabled"));
     }
 
     [Fact]
@@ -327,7 +326,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_IsUpgradeBlocked_AriaDisablesRetryUpgradeButton()
+    public void Render_IsUpgradeBlocked_DisablesRetryUpgradeButton()
     {
         // Arrange
         var entry = MakeEntry(DatabaseStatus.UpgradeFailed);
@@ -337,12 +336,11 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         // Assert
         var button = component.Find(".db-entry-upgrade-btn");
-        Assert.Equal("true", button.GetAttribute("aria-disabled"));
-        Assert.False(button.HasAttribute("disabled"));
+        Assert.True(button.HasAttribute("disabled"));
     }
 
     [Fact]
-    public void Render_IsUpgradeBlocked_AriaDisablesUpgradeButton()
+    public void Render_IsUpgradeBlocked_DisablesUpgradeButton()
     {
         // Arrange
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
@@ -352,8 +350,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         // Assert
         var button = component.Find(".db-entry-upgrade-btn");
-        Assert.Equal("true", button.GetAttribute("aria-disabled"));
-        Assert.False(button.HasAttribute("disabled"));
+        Assert.True(button.HasAttribute("disabled"));
     }
 
     [Fact]
@@ -480,9 +477,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     [Fact]
     public void Render_ReadyEnabledEntry_NoTrashButton()
     {
-        // Arrange — Ready+Enabled is now safe to delete because RemoveAsync coordinates
-        // 
-
         var entry = MakeEntry(DatabaseStatus.Ready, isEnabled: true);
 
         // Act
@@ -495,7 +489,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     [Fact]
     public void Render_ReadyEnabledEntry_OptimisticToggleOff_NoTrashButton()
     {
-        // either way under the new contract.
         var entry = MakeEntry(DatabaseStatus.Ready, isEnabled: true);
 
         // Act
@@ -699,9 +692,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     [Fact]
     public void Render_UpgradeRequiredEntry_NoTrashButton()
     {
-        // 
-
-        // before being able to remove the entry.
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
 
         // Act
@@ -789,7 +779,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
             .Add(p => p.OnRestoreFromBackup, () => invocationCount++));
 
         var restoreBtn = component.Find(".db-entry-restore-btn");
-        Assert.Equal("true", restoreBtn.GetAttribute("aria-disabled"));
+        Assert.True(restoreBtn.HasAttribute("disabled"));
 
         await restoreBtn.ClickAsync(new MouseEventArgs());
 
@@ -888,7 +878,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public async Task UpgradeButtonClick_WhenAriaDisabled_DoesNotInvokeOnUpgrade()
+    public async Task UpgradeButtonClick_WhenDisabled_DoesNotInvokeOnUpgrade()
     {
         // Arrange
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired);

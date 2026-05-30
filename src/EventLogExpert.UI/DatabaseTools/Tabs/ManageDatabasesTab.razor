@@ -33,7 +33,7 @@
     @if (_isSelectionModeActive && DatabaseService.Entries.Count > 0)
     {
         <div class="manage-databases-selection-header">
-            <div class="db-entry-checkbox db-entry-checkbox--visible">
+            <div class="manage-databases-master-checkbox">
                 <button aria-checked="@MasterCheckboxAriaChecked"
                     aria-label="@MasterCheckboxAriaLabel"
                     class="manage-databases-master-btn"
@@ -95,8 +95,8 @@
             @if (_eligibleUpgradeCount > 0)
             {
                 <button aria-describedby="@(IsUpgradeBlocked ? _upgradeBlockedHelpId : null)"
-                    aria-disabled="@(IsUpgradeBlocked ? "true" : "false")"
                     class="button button-green"
+                    disabled="@IsUpgradeBlocked"
                     @onclick="OnBulkUpgradeClickAsync"
                     @ref="_bulkUpgradeButtonRef"
                     type="button">
