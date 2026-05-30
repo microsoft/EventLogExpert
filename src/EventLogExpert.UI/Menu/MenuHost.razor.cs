@@ -85,6 +85,7 @@ public sealed partial class MenuHost : IAsyncDisposable
         Registry.Register(this);
         Registry.ActiveHostChanged += OnActiveHostChanged;
         MenuService.StateChanged += OnStateChanged;
+        SyncMenuOwnershipMirror();
         base.OnInitialized();
     }
 
@@ -108,6 +109,7 @@ public sealed partial class MenuHost : IAsyncDisposable
         {
             if (_disposed) { return; }
 
+            SyncMenuOwnershipMirror();
             StateHasChanged();
         });
     }
@@ -172,5 +174,21 @@ public sealed partial class MenuHost : IAsyncDisposable
     {
         try { await JSRuntime.InvokeVoidAsync("restoreMenuOpenerFocus"); }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
+    }
+
+    private void SyncMenuOwnershipMirror()
+    {
+        if (MenuService.ActiveItems is null) { return; }
+
+        if (IsActive && _focusedMenuId == 0)
+        {
+            _focusedMenuId = MenuService.ActiveMenuId;
+            _ownedViewportListeners = true;
+        }
+        else if (!IsActive && _focusedMenuId != 0)
+        {
+            _focusedMenuId = 0;
+            _ownedViewportListeners = false;
+        }
     }
 }
