@@ -10,7 +10,7 @@
                     @onclick="@(() => OnExclusionChanged.InvokeAsync(!filter.IsExcluded))"
                     title="@(filter.IsExcluded ? "Excluded \u2014 click to include" : "Included \u2014 click to exclude")"
                     type="button">
-                    <i aria-hidden="true" class="bi bi-slash-circle"></i>
+                    <i aria-hidden="true" class="@(filter.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"></i>
                 </button>
 
                 <div class="color-picker-wrapper"

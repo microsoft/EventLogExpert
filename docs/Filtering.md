@@ -46,7 +46,7 @@ Pick a category, pick an evaluator, then enter or pick a comparison value. Optio
 | `Not Contains` | Negated `Contains` (case-insensitive). |
 | `Multi Select` | Matches any value in the supplied set. The category determines which set is offered (e.g., `Level` → checkboxes for the five level values; `Source` → the providers seen in the active logs). |
 
-Sub-filters live underneath the parent and can be combined freely. `AND` requires the predicate to also match; `OR` matches if either the parent or the predicate matches.
+Predicates live underneath the parent and can be combined freely. `AND` requires the predicate to also match; `OR` matches if either the parent or the predicate matches.
 
 ### Date filter
 
