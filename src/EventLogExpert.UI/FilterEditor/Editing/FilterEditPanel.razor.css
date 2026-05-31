@@ -61,14 +61,6 @@
     outline-offset: 2px;
 }
 
-.filter-edit-panel-subfilters {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-
-    padding-left: 1rem;
-}
-
 /* Leftmost icon toggle for include/exclude. Slash-circle icon = excluded state;
    muted gray = included. Uses aria-pressed for SR + visible color cue. */
 .filter-exclude-toggle {

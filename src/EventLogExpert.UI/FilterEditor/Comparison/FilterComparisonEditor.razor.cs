@@ -20,6 +20,14 @@ public sealed partial class FilterComparisonEditor : ComponentBase
 
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 
+    /// <summary>
+    ///     Fired whenever any sub-control mutates <see cref="Comparison" /> (property, operator/match-mode, or value).
+    ///     Parents subscribe to re-evaluate completeness-derived UI state (e.g.,
+    ///     <see cref="EventLogExpert.Filtering.Drafts.FilterPredicateDraft.IsComplete" />) which Blazor doesn't otherwise
+    ///     re-render automatically because the mutated <see cref="Comparison" /> is a reference-stable record bag.
+    /// </summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
     [Parameter] public string? PropertyAriaLabelledBy { get; set; }
 
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
@@ -55,21 +63,34 @@ public sealed partial class FilterComparisonEditor : ComponentBase
         {
             Comparison.ChangeProperty(value);
 
-            if (!IsTextOnlyProperty(value) || Comparison.MatchMode != MatchMode.Many)
+            if (IsTextOnlyProperty(value) && Comparison.MatchMode == MatchMode.Many)
             {
-                return;
+                Comparison.Operator = ComparisonOperator.Contains;
+                Comparison.MatchMode = MatchMode.Single;
             }
 
-            Comparison.Operator = ComparisonOperator.Contains;
-            Comparison.MatchMode = MatchMode.Single;
+            _ = OnChanged.InvokeAsync();
         }
     }
 
     private static bool IsTextOnlyProperty(EventProperty property) => FilterPropertyConstraints.IsTextOnly(property);
 
-    private void HandleOperatorChanged((ComparisonOperator Op, MatchMode Mode) value)
+    private async Task HandleOperatorChanged((ComparisonOperator Op, MatchMode Mode) value)
     {
         Comparison.Operator = value.Op;
         Comparison.MatchMode = value.Mode;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task HandleValueChanged(string? value)
+    {
+        Comparison.Value = value;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task HandleValuesChanged(List<string> values)
+    {
+        Comparison.Values = values;
+        await OnChanged.InvokeAsync();
     }
 }

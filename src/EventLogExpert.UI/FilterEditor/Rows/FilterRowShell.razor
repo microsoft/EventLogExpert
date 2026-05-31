@@ -26,16 +26,14 @@ else
         @<text>
              @if (Filter is not null)
              {
-                 <FilterEditPanel ExtraActions="ExtraActions"
-                     Filter="Filter"
+                 <FilterEditPanel Filter="Filter"
                      IsPending="IsPending"
                      MainContent="MainContent"
                      ModeSelector="ModeSelector"
                      OnCancel="OnCancel"
                      OnExclusionChanged="OnExclusionChanged"
                      OnRemove="OnRemove"
-                     OnSave="OnSave"
-                     SubFiltersContent="SubFiltersContent" />
+                     OnSave="OnSave" />
              }
              else if (Value is { } savedFilter)
              {

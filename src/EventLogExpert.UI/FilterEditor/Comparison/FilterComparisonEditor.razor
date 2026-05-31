@@ -1,9 +1,9 @@
 <ValueSelect AriaLabel="@(PropertyAriaLabelledBy is null ? "Property" : null)"
     AriaLabelledBy="@PropertyAriaLabelledBy"
+    @bind-Value="PropertyBinding"
     CssClass="input filter-dropdown"
     T="EventProperty"
-    ToStringFunc="x => x.ToFullString()"
-    @bind-Value="PropertyBinding">
+    ToStringFunc="x => x.ToFullString()">
     @foreach (var item in Enum.GetValues<EventProperty>())
     {
         <ValueSelectItem T="EventProperty" Value="item" />
@@ -20,7 +20,10 @@
 <label class="visually-hidden" id="@($"{Id}_Value")">Value</label>
 @if (IsTextOnlyProperty(Comparison.Property))
 {
-    <TextInput AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-description" @bind-Value="@Comparison.Value" />
+    <TextInput AriaLabelledBy="@($"{Id}_Value")"
+        CssClass="input filter-description"
+        Value="@Comparison.Value"
+        ValueChanged="HandleValueChanged" />
 }
 else if (Comparison.MatchMode == MatchMode.Many)
 {
@@ -30,7 +33,8 @@ else if (Comparison.MatchMode == MatchMode.Many)
         IsMultiSelect
         T="string"
         ToStringFunc="@(x => string.IsNullOrWhiteSpace(x) ? "All" : x)"
-        @bind-Values="Comparison.Values">
+        Values="Comparison.Values"
+        ValuesChanged="HandleValuesChanged">
         <ValueSelectItem ClearItem T="string">All</ValueSelectItem>
         @foreach (var item in Items)
         {
@@ -40,7 +44,12 @@ else if (Comparison.MatchMode == MatchMode.Many)
 }
 else
 {
-    <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-value-dropdown" IsInput T="string" @bind-Value="Comparison.Value">
+    <ValueSelect AriaLabelledBy="@($"{Id}_Value")"
+        CssClass="input filter-value-dropdown"
+        IsInput
+        T="string"
+        Value="Comparison.Value"
+        ValueChanged="HandleValueChanged">
         <ValueSelectItem ClearItem T="string">All</ValueSelectItem>
         @foreach (var item in FilteredItems)
         {

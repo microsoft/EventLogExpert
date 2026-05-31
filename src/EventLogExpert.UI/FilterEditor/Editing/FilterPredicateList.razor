@@ -4,9 +4,11 @@
         {
             <FilterPredicateEditor IsEditing="@(_editingPredicateId == predicate.Id)"
                 @key="predicate.Id"
+                OnChanged="StateHasChanged"
                 OnDone="CollapseEditor"
                 OnEdit="@(() => StartEditing(predicate.Id))"
                 OnRemove="@(() => RemovePredicate(predicate.Id))"
+                @ref="_editorRefs[predicate.Id]"
                 Value="predicate" />
         }
 
@@ -14,6 +16,7 @@
             class="add-filter-predicate-button button icon-button"
             disabled="@(!CanAddPredicate)"
             @onclick="AddPredicate"
+            @ref="_addButtonRef"
             title="@(CanAddPredicate ? "Add predicate" : "Complete the current predicate before adding another")"
             type="button">
             <i aria-hidden="true" class="bi bi-plus-circle"></i>
