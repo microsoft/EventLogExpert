@@ -6,11 +6,13 @@
         CancelLabel="Cancel"
         Footer="FooterPreset.AcceptCancel"
         FooterDisabled="@_isApplying"
+        InlineAlert="@CurrentInlineAlert"
         MaxWidth="40rem"
         MinWidth="28rem"
         OnAccept="ApplyAsync"
         OnCancel="HandleCancelButtonClickAsync"
         OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+        OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
         @ref="ChromeRef"
         Title="Database upgrade recovery">
         <p class="recovery-description">
