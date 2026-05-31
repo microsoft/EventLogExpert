@@ -12,9 +12,9 @@ public partial class UnhandledExceptionHandler : ErrorBoundary, IDisposable
 {
     private IDisposable? _recoveryRegistration;
 
-    [Inject] private ICriticalErrorService CriticalErrorService { get; set; } = null!;
+    [Inject] private ICriticalErrorService CriticalErrorService { get; init; } = null!;
 
-    [Inject] private ITraceLogger TraceLogger { get; set; } = null!;
+    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
     public void Dispose()
     {
