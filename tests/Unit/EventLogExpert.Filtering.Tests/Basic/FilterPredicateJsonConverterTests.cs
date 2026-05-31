@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace EventLogExpert.Filtering.Tests.Basic;
 
-public sealed class SubFilterJsonConverterTests
+public sealed class FilterPredicateJsonConverterTests
 {
     [Fact]
     public void JsonRoundTrip_AsPartOfBasicFilter_DispatchesThroughConverterForLegacySubFilters()

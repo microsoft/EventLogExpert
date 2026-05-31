@@ -126,8 +126,10 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         StateHasChanged();
 
         try { await _selectButtonRef.FocusAsync(preventScroll: true); }
+        catch (ObjectDisposedException) { }
         catch (JSDisconnectedException) { }
         catch (JSException) { }
+        catch (TaskCanceledException) { }
     }
 
     /// <summary>
@@ -554,22 +556,30 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         if (!_isSelectionModeActive)
         {
             try { await _selectButtonRef.FocusAsync(preventScroll: true); }
+            catch (ObjectDisposedException) { }
             catch (JSDisconnectedException) { }
             catch (JSException) { }
+            catch (TaskCanceledException) { }
+
             return;
         }
 
         if (_selectedForBulk.Count > 0)
         {
             try { await _masterCheckboxRef.FocusAsync(preventScroll: true); }
+            catch (ObjectDisposedException) { }
             catch (JSDisconnectedException) { }
             catch (JSException) { }
+            catch (TaskCanceledException) { }
+
             return;
         }
 
         try { await _selectButtonRef.FocusAsync(preventScroll: true); }
+        catch (ObjectDisposedException) { }
         catch (JSDisconnectedException) { }
         catch (JSException) { }
+        catch (TaskCanceledException) { }
     }
 
     private async ValueTask FocusEntryRowNameAsync(string fileName)
@@ -772,8 +782,10 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
                 if (_disposed) { return; }
 
                 try { await _bulkUpgradeButtonRef.FocusAsync(preventScroll: true); }
+                catch (ObjectDisposedException) { }
                 catch (JSDisconnectedException) { }
                 catch (JSException) { }
+                catch (TaskCanceledException) { }
 
                 return;
             }
@@ -867,8 +879,10 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         }
 
         try { await _masterCheckboxRef.FocusAsync(preventScroll: true); }
+        catch (ObjectDisposedException) { }
         catch (JSDisconnectedException) { }
         catch (JSException) { }
+        catch (TaskCanceledException) { }
     }
 
     private async Task OnSaveClickAsync()

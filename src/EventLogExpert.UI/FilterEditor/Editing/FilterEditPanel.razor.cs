@@ -12,9 +12,6 @@ public sealed partial class FilterEditPanel : ComponentBase
 
     [Parameter] public string CssClass { get; set; } = string.Empty;
 
-    /// <summary>Optional slot for an "Add Condition" or similar contextual action rendered left of Save/Cancel/Remove.</summary>
-    [Parameter] public RenderFragment? ExtraActions { get; set; }
-
     [Parameter][EditorRequired] public FilterDraft Filter { get; set; } = null!;
 
     [Parameter] public bool IsPending { get; set; }
@@ -35,7 +32,4 @@ public sealed partial class FilterEditPanel : ComponentBase
     [Parameter] public EventCallback OnRemove { get; set; }
 
     [Parameter] public EventCallback OnSave { get; set; }
-
-    /// <summary>Optional slot for condition rows (rendered only when supplied and Basic mode populates them).</summary>
-    [Parameter] public RenderFragment? SubFiltersContent { get; set; }
 }

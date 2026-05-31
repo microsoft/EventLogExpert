@@ -20,9 +20,6 @@ public sealed partial class FilterRowShell : ComponentBase
 
     [Parameter] public string? ErrorMessage { get; set; }
 
-    /// <summary>Optional action button rendered LEFT of Save/Cancel/Remove in edit mode (e.g., "Add Predicate" for Basic).</summary>
-    [Parameter] public RenderFragment? ExtraActions { get; set; }
-
     [Parameter] public FilterDraft? Filter { get; set; }
 
     [Parameter] public bool IsPending { get; set; }
@@ -50,9 +47,6 @@ public sealed partial class FilterRowShell : ComponentBase
     [Parameter] public string? RightCssClass { get; set; }
 
     [Parameter] public bool ShowToggleEnabled { get; set; } = true;
-
-    /// <summary>Optional predicate list rendered in the Subfilters band of <see cref="Editing.FilterEditPanel" />.</summary>
-    [Parameter] public RenderFragment? SubFiltersContent { get; set; }
 
     [Parameter] public bool UseInlineErrorRow { get; set; }
 

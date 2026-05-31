@@ -4,13 +4,14 @@
         <button aria-label="@(Value.JoinWithAny ? "Joining with OR; click to switch to AND" : "Joining with AND; click to switch to OR")"
             class="filter-predicate-and-or"
             data-mode="@(Value.JoinWithAny ? "or" : "and")"
-            @onclick="@(() => Value.JoinWithAny = !Value.JoinWithAny)"
+            @onclick="OnAndOrClick"
+            @ref="_editorFirstInputRef"
             title="@(Value.JoinWithAny ? "OR" : "AND")"
             type="button">
             @(Value.JoinWithAny ? "OR" : "AND")
         </button>
 
-        <FilterComparisonEditor Comparison="Value.Comparison" Id="@($"sf-{Value.Id}")" />
+        <FilterComparisonEditor Comparison="Value.Comparison" Id="@($"sf-{Value.Id}")" OnChanged="OnComparisonChanged" />
 
         <button aria-label="Done editing predicate"
             class="button icon-button"
@@ -36,6 +37,7 @@ else
         <button aria-label="@($"Edit predicate: {SummaryText}")"
             class="filter-predicate-edit"
             @onclick="OnEditChip"
+            @ref="_chipEditButtonRef"
             title="Edit predicate"
             type="button">
             <span class="filter-predicate-joiner">@JoinerLabel</span>

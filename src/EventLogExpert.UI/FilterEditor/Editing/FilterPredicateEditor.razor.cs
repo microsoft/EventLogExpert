@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Drafts;
+using EventLogExpert.UI.Focus;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.FilterEditor.Editing;
@@ -14,7 +15,12 @@ namespace EventLogExpert.UI.FilterEditor.Editing;
 /// </summary>
 public sealed partial class FilterPredicateEditor : ComponentBase
 {
+    private ElementReference _chipEditButtonRef;
+    private ElementReference _editorFirstInputRef;
+
     [Parameter] public bool IsEditing { get; set; }
+
+    [Parameter] public EventCallback OnChanged { get; set; }
 
     [Parameter] public EventCallback OnDone { get; set; }
 
@@ -53,6 +59,30 @@ public sealed partial class FilterPredicateEditor : ComponentBase
 
             return $"{cmp.Property} {opLabel} {valueLabel}";
         }
+    }
+
+    internal ValueTask FocusChipEditButtonAsync() => ElementFocus.SafelyAsync(_chipEditButtonRef);
+
+    internal ValueTask FocusEditorFirstInputAsync() => ElementFocus.SafelyAsync(_editorFirstInputRef);
+
+    /// <summary>
+    ///     AND/OR joiner click handler. Toggles <see cref="FilterPredicateDraft.JoinWithAny" /> and bubbles the change up
+    ///     via <see cref="OnChanged" /> so the parent list re-evaluates Done / Add gating.
+    /// </summary>
+    private async Task OnAndOrClick()
+    {
+        Value.JoinWithAny = !Value.JoinWithAny;
+        await OnChanged.InvokeAsync();
+    }
+
+    /// <summary>
+    ///     Re-render this editor when the child comparison editor mutates the predicate, then bubble up so the parent
+    ///     <see cref="FilterPredicateList" /> can re-evaluate <c>CanAddPredicate</c> / Done-button enablement.
+    /// </summary>
+    private async Task OnComparisonChanged()
+    {
+        await InvokeAsync(StateHasChanged);
+        await OnChanged.InvokeAsync();
     }
 
     private Task OnDoneClick() => OnDone.InvokeAsync();

@@ -13,9 +13,7 @@
                     <i aria-hidden="true" class="@(filter.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"></i>
                 </button>
 
-                <div class="color-picker-wrapper"
-                    data-filter-excluded="@(filter.IsExcluded ? "true" : "false")"
-                    role="group">
+                <div class="color-picker-wrapper" data-filter-excluded="@(filter.IsExcluded ? "true" : "false")">
                     <ValueSelect AriaDescribedBy="@(filter.IsExcluded ? _colorDescriptionId : null)"
                         AriaLabel="Highlight Color"
                         @bind-Value="filter.Color"
@@ -39,8 +37,6 @@
                 @ModeSelector
 
                 @MainContent
-
-                @ExtraActions
             </div>
 
             <div class="filter-edit-panel-actions">
@@ -68,12 +64,5 @@
                 }
             </div>
         </div>
-
-        @if (SubFiltersContent is not null)
-        {
-            <div class="filter-edit-panel-subfilters">
-                @SubFiltersContent
-            </div>
-        }
     </div>
 }
