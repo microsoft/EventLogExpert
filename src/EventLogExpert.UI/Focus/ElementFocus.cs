@@ -17,5 +17,6 @@ internal static class ElementFocus
         catch (ObjectDisposedException) { }
         catch (JSDisconnectedException) { }
         catch (JSException) { }
+        catch (TaskCanceledException) { }
     }
 }
