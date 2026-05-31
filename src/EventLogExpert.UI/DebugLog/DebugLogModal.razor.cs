@@ -51,13 +51,13 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         _displayedView = new ReversedListView<string>(_displayed);
     }
 
-    [Inject] private IAlertDialogService AlertDialogService { get; set; } = null!;
+    [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
-    [Inject] private IClipboardService ClipboardService { get; set; } = null!;
+    [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
-    [Inject] private IFileLogger FileLogger { get; set; } = null!;
+    [Inject] private IFileLogger FileLogger { get; init; } = null!;
 
-    [Inject] private IFileSaveService FileSaveService { get; set; } = null!;
+    [Inject] private IFileSaveService FileSaveService { get; init; } = null!;
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
