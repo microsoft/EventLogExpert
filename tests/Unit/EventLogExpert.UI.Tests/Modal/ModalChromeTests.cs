@@ -6,6 +6,7 @@ using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EventLogExpert.UI.Tests.Modal;
@@ -108,5 +109,45 @@ public sealed class ModalChromeTests : BunitContext
             .AddChildContent("<p>body</p>"));
 
         await component.WaitForAssertionAsync(() => Assert.True(cycleState.ModalContentDisplayed));
+    }
+
+    [Fact]
+    public void Render_WhenFooterPresetNone_RendersNoBuiltInButtons()
+    {
+        var component = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Title, "Test")
+            .Add(p => p.Footer, FooterPreset.None)
+            .AddChildContent("<p>body</p>"));
+
+        var footerGroup = component.Find(".footer-group");
+        Assert.Empty(footerGroup.QuerySelectorAll("button"));
+    }
+
+    [Fact]
+    public void Render_WhenFooterPresetNoneWithExtraFooterContent_RendersOnlyExtraContent()
+    {
+        var component = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Title, "Test")
+            .Add(p => p.Footer, FooterPreset.None)
+            .Add(p => p.ExtraFooterContent, (RenderFragment)(builder =>
+            {
+                builder.OpenElement(0, "button");
+                builder.AddAttribute(1, "type", "button");
+                builder.AddContent(2, "One");
+                builder.CloseElement();
+                builder.OpenElement(3, "button");
+                builder.AddAttribute(4, "type", "button");
+                builder.AddContent(5, "Two");
+                builder.CloseElement();
+                builder.OpenElement(6, "button");
+                builder.AddAttribute(7, "type", "button");
+                builder.AddContent(8, "Three");
+                builder.CloseElement();
+            }))
+            .AddChildContent("<p>body</p>"));
+
+        var footerGroup = component.Find(".footer-group");
+        var buttons = footerGroup.QuerySelectorAll("button");
+        Assert.Equal(3, buttons.Length);
     }
 }

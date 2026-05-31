@@ -9,5 +9,11 @@ public enum FooterPreset
     SaveCancel,
     ImportExportClose,
     Dismiss,
-    AcceptCancel
+    AcceptCancel,
+
+    /// <remarks>
+    ///     When <c>None</c> is selected, consumers MUST provide <c>ExtraFooterContent</c> with dismissal controls OR wire
+    ///     <c>OnDialogClosedByUser</c>; otherwise the modal cannot be dismissed except via Esc.
+    /// </remarks>
+    None,
 }
