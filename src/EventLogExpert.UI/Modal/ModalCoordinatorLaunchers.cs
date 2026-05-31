@@ -22,7 +22,7 @@ public static class ModalCoordinatorLaunchers
         {
             ArgumentNullException.ThrowIfNull(coordinator);
 
-            return coordinator.PushAsync<DatabaseRecoveryDialog, bool>();
+            return coordinator.PushAsync<DatabaseRecoveryModal, bool>();
         }
 
         public Task<ModalOpenResult<bool>> OpenDatabaseToolsAsync()

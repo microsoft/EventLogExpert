@@ -139,7 +139,7 @@ public sealed class DatabaseRecoveryHostTests
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         var openFailure = new InvalidOperationException("coordinator unavailable");
-        _modalCoordinator.PushAsync<DatabaseRecoveryDialog, bool>(Arg.Any<IDictionary<string, object?>?>())
+        _modalCoordinator.PushAsync<DatabaseRecoveryModal, bool>(Arg.Any<IDictionary<string, object?>?>())
             .ThrowsAsync(openFailure);
 
         using var host = CreateHost();
@@ -442,7 +442,7 @@ public sealed class DatabaseRecoveryHostTests
         await _capturedRecoveryAction!();
 
         // Assert
-        await _modalCoordinator.DidNotReceive().PushAsync<DatabaseRecoveryDialog, bool>(
+        await _modalCoordinator.DidNotReceive().PushAsync<DatabaseRecoveryModal, bool>(
             Arg.Any<IDictionary<string, object?>?>());
     }
 
@@ -452,7 +452,7 @@ public sealed class DatabaseRecoveryHostTests
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        _modalCoordinator.PushAsync<DatabaseRecoveryDialog, bool>(Arg.Any<IDictionary<string, object?>?>())
+        _modalCoordinator.PushAsync<DatabaseRecoveryModal, bool>(Arg.Any<IDictionary<string, object?>?>())
             .Returns(new ModalOpenResult<bool>(false, WasOpened: true));
 
         using var host = CreateHost();
@@ -462,7 +462,7 @@ public sealed class DatabaseRecoveryHostTests
         await _capturedRecoveryAction!();
 
         // Assert
-        await _modalCoordinator.Received(1).PushAsync<DatabaseRecoveryDialog, bool>(
+        await _modalCoordinator.Received(1).PushAsync<DatabaseRecoveryModal, bool>(
             Arg.Any<IDictionary<string, object?>?>());
     }
 
@@ -472,7 +472,7 @@ public sealed class DatabaseRecoveryHostTests
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        _modalCoordinator.PushAsync<DatabaseRecoveryDialog, bool>(Arg.Any<IDictionary<string, object?>?>())
+        _modalCoordinator.PushAsync<DatabaseRecoveryModal, bool>(Arg.Any<IDictionary<string, object?>?>())
             .Returns(new ModalOpenResult<bool>(false, WasOpened: false));
 
         using var host = CreateHost();
@@ -482,7 +482,7 @@ public sealed class DatabaseRecoveryHostTests
         await _capturedRecoveryAction!();
 
         // Assert
-        await _modalCoordinator.Received(1).PushAsync<DatabaseRecoveryDialog, bool>(
+        await _modalCoordinator.Received(1).PushAsync<DatabaseRecoveryModal, bool>(
             Arg.Any<IDictionary<string, object?>?>());
         _traceLogger.Received().Trace(Arg.Any<TraceLogHandler>());
     }

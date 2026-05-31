@@ -22,14 +22,14 @@ public sealed class ModalCoordinatorLaunchersTests
     {
         // Arrange
         var coordinator = Substitute.For<IModalCoordinator>();
-        coordinator.PushAsync<DatabaseRecoveryDialog, bool>(Arg.Any<IDictionary<string, object?>?>())
+        coordinator.PushAsync<DatabaseRecoveryModal, bool>(Arg.Any<IDictionary<string, object?>?>())
             .Returns(new ModalOpenResult<bool>(false, WasOpened: true));
 
         // Act
         await coordinator.OpenDatabaseRecoveryAsync();
 
         // Assert
-        await coordinator.Received(1).PushAsync<DatabaseRecoveryDialog, bool>(Arg.Any<IDictionary<string, object?>?>());
+        await coordinator.Received(1).PushAsync<DatabaseRecoveryModal, bool>(Arg.Any<IDictionary<string, object?>?>());
     }
 
     [Fact]
