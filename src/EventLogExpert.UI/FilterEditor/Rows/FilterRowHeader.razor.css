@@ -1,0 +1,53 @@
+.filter-row-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    min-width: 0;
+}
+
+.filter-row-header-text {
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Symmetric include/exclude toggle. Mirrors the edit-view treatment so the
+   user sees the same control in the same position across saved + edit modes.
+   Filled icon when excluded (works in forced-colors via SVG shape difference,
+   not color). */
+.filter-exclude-toggle {
+    color: var(--text-secondary);
+    transition: color 0.1s ease-in-out;
+}
+
+.filter-exclude-toggle[data-excluded="true"] {
+    color: var(--clr-red);
+}
+
+.filter-exclude-toggle:focus-visible {
+    outline: 2px solid var(--toggle-accent);
+    outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+    .filter-exclude-toggle[data-excluded="true"] {
+        color: Highlight;
+    }
+}
+
+.color-box[data-highlight="none"] {
+    background: transparent;
+    border-color: transparent;
+}
+
+.color-box[data-filter-excluded="true"] {
+    opacity: 0.5;
+}
+
+@media (forced-colors: active) {
+    .color-box[data-filter-excluded="true"] {
+        opacity: 1;
+    }
+}

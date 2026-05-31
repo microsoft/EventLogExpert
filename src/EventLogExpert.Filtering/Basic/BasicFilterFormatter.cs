@@ -11,7 +11,7 @@ public static class BasicFilterFormatter
     public static bool TryFormat(BasicFilter basicFilter, out string comparison) =>
         TryFormat(basicFilter, false, out comparison);
 
-    public static bool TryFormat(BasicFilter basicFilter, bool strictSubFilters, out string comparison)
+    public static bool TryFormat(BasicFilter basicFilter, bool strictPredicates, out string comparison)
     {
         ArgumentNullException.ThrowIfNull(basicFilter);
 
@@ -24,15 +24,15 @@ public static class BasicFilterFormatter
 
         StringBuilder stringBuilder = new(comparisonText);
 
-        foreach (var subFilter in basicFilter.SubFilters)
+        foreach (var predicate in basicFilter.Predicates)
         {
-            var joinPrefix = subFilter.JoinWithAny ? " || " : " && ";
+            var joinPrefix = predicate.JoinWithAny ? " || " : " && ";
 
-            if (TryFormatComparison(subFilter.Comparison, joinPrefix, out var subText))
+            if (TryFormatComparison(predicate.Comparison, joinPrefix, out var subText))
             {
                 stringBuilder.Append(subText);
             }
-            else if (strictSubFilters)
+            else if (strictPredicates)
             {
                 return false;
             }

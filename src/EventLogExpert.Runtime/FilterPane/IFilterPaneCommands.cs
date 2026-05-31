@@ -26,6 +26,9 @@ public interface IFilterPaneCommands
     /// <summary>Sets the pane's date-range filter (<see langword="null" /> clears it).</summary>
     void SetFilterDateRange(DateFilter? dateFilter);
 
+    /// <summary>Sets whether the filter with <paramref name="id" /> excludes matching events.</summary>
+    void SetFilterExcluded(FilterId id, bool isExcluded);
+
     /// <summary>Toggles whether the active date range filter is applied.</summary>
     void ToggleFilterDate();
 

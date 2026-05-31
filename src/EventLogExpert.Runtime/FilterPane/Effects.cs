@@ -142,6 +142,14 @@ internal sealed class Effects
         return Task.CompletedTask;
     }
 
+    [EffectMethod(typeof(SetFilterExcludedAction))]
+    public Task HandleSetFilterExcluded(IDispatcher dispatcher)
+    {
+        UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+
+        return Task.CompletedTask;
+    }
+
     [EffectMethod(typeof(ToggleFilterDateAction))]
     public Task HandleToggleFilterDate(IDispatcher dispatcher)
     {

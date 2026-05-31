@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Drafts;
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils.Constants;
 
 namespace EventLogExpert.Filtering.Tests.Drafts;
@@ -11,8 +12,8 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void ApplyModeSwitch_AdvancedToBasic_DecomposableText_HydratesStructure()
     {
-        var draft = new FilterDraft
-        { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        FilterDraft draft = new()
+            { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         draft.ApplyModeSwitch(FilterMode.Basic);
 
@@ -26,7 +27,7 @@ public sealed class FilterDraftModeTests
     {
         // Caller is responsible for prompting the user FIRST when WouldLoseDataSwitchingTo is true; this
         // branch covers the "user accepted loss" path. ApplyModeSwitch must not refuse.
-        var draft = new FilterDraft
+        FilterDraft draft = new()
         {
             Mode = FilterMode.Advanced,
             ComparisonText = FilterTestConstants.FilterComputerNameEqualsServer01
@@ -37,7 +38,7 @@ public sealed class FilterDraftModeTests
         Assert.Equal(FilterMode.Basic, draft.Mode);
         Assert.Equal(string.Empty, draft.ComparisonText);
         Assert.Null(draft.Comparison.Value);
-        Assert.Empty(draft.SubFilters);
+        Assert.Empty(draft.Predicates);
     }
 
     [Fact]
@@ -46,7 +47,7 @@ public sealed class FilterDraftModeTests
         // Degraded persisted-Basic shape: ComparisonText carries the only signal the row has, structure is
         // empty because the BasicFilter blob couldn't be recovered. Going Advanced must surface the raw text
         // so the user can repair it manually — blanking it would destroy the only data the row carried.
-        var draft = new FilterDraft
+        FilterDraft draft = new()
         {
             Mode = FilterMode.Basic,
             ComparisonText = FilterTestConstants.FilterComputerNameEqualsServer01
@@ -62,7 +63,7 @@ public sealed class FilterDraftModeTests
     public void ApplyModeSwitch_BasicToAdvanced_EmptyStructureAndEmptyText_StaysEmpty()
     {
         // Brand-new empty Basic row going Advanced: nothing to preserve, nothing to wipe.
-        var draft = new FilterDraft { Mode = FilterMode.Basic };
+        FilterDraft draft = new() { Mode = FilterMode.Basic };
 
         draft.ApplyModeSwitch(FilterMode.Advanced);
 
@@ -73,32 +74,44 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void ApplyModeSwitch_BasicToAdvanced_FormattableStructure_PopulatesText()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Basic };
-        draft.Comparison.Property = EventProperty.Id;
-        draft.Comparison.Operator = ComparisonOperator.Equals;
-        draft.Comparison.MatchMode = MatchMode.Single;
-        draft.Comparison.Value = "100";
+        FilterDraft draft = new()
+        {
+            Mode = FilterMode.Basic,
+            Comparison =
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            }
+        };
 
         draft.ApplyModeSwitch(FilterMode.Advanced);
 
         Assert.Equal(FilterMode.Advanced, draft.Mode);
         Assert.Equal("Id == \"100\"", draft.ComparisonText);
         Assert.Null(draft.Comparison.Value);
-        Assert.Empty(draft.SubFilters);
+        Assert.Empty(draft.Predicates);
     }
 
     [Fact]
     public void ApplyModeSwitch_BasicToAdvanced_IncompleteSubFilter_FallsBackToLenient()
     {
-        // After user-confirmed loss, lenient formatter drops the incomplete sub-filter so the user gets
+        // After user-confirmed loss, lenient formatter drops the incomplete predicate so the user gets
         // text representing the parts that were valid; an empty result clears the text outright.
-        var draft = new FilterDraft { Mode = FilterMode.Basic };
-        draft.Comparison.Property = EventProperty.Id;
-        draft.Comparison.Operator = ComparisonOperator.Equals;
-        draft.Comparison.MatchMode = MatchMode.Single;
-        draft.Comparison.Value = "100";
+        FilterDraft draft = new()
+        {
+            Mode = FilterMode.Basic,
+            Comparison =
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            }
+        };
 
-        draft.SubFilters.Add(new SubFilterDraft
+        draft.Predicates.Add(new FilterPredicateDraft
         {
             Comparison = new FilterComparisonDraft
             {
@@ -114,14 +127,14 @@ public sealed class FilterDraftModeTests
 
         Assert.Equal(FilterMode.Advanced, draft.Mode);
         Assert.False(string.IsNullOrEmpty(draft.ComparisonText));
-        Assert.Empty(draft.SubFilters);
+        Assert.Empty(draft.Predicates);
     }
 
     [Fact]
     public void ApplyModeSwitch_CachedToAdvanced_PreservesText()
     {
-        var draft = new FilterDraft
-        { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        FilterDraft draft = new()
+            { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         draft.ApplyModeSwitch(FilterMode.Advanced);
 
@@ -132,8 +145,8 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void ApplyModeSwitch_CachedToBasic_DecomposableText_HydratesStructure()
     {
-        var draft = new FilterDraft
-        { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        FilterDraft draft = new()
+            { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         draft.ApplyModeSwitch(FilterMode.Basic);
 
@@ -145,7 +158,8 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void ApplyModeSwitch_SameMode_IsNoOp()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Advanced, ComparisonText = "Id == 100" };
+        FilterDraft draft = new()
+            { Mode = FilterMode.Advanced, ComparisonText = "Id == 100" };
 
         draft.ApplyModeSwitch(FilterMode.Advanced);
 
@@ -156,23 +170,36 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void ApplyModeSwitch_ToCached_ClearsTextAndStructure()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Advanced, ComparisonText = "Id == 100" };
-        draft.Comparison.Value = "200";
-        draft.SubFilters.Add(new SubFilterDraft());
+        FilterDraft draft = new()
+        {
+            Mode = FilterMode.Advanced,
+            ComparisonText = "Id == 100",
+            Comparison =
+            {
+                Value = "200"
+            }
+        };
+
+        draft.Predicates.Add(new FilterPredicateDraft());
 
         draft.ApplyModeSwitch(FilterMode.Cached);
 
         Assert.Equal(FilterMode.Cached, draft.Mode);
         Assert.Equal(string.Empty, draft.ComparisonText);
         Assert.Null(draft.Comparison.Value);
-        Assert.Empty(draft.SubFilters);
+        Assert.Empty(draft.Predicates);
     }
 
     [Fact]
     public void HasMeaningfulStructure_ComparisonValueSet_IsTrue()
     {
-        var draft = new FilterDraft();
-        draft.Comparison.Value = "100";
+        FilterDraft draft = new()
+        {
+            Comparison =
+            {
+                Value = "100"
+            }
+        };
 
         Assert.True(draft.HasMeaningfulStructure);
     }
@@ -180,7 +207,7 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void HasMeaningfulStructure_ComparisonValuesPopulated_IsTrue()
     {
-        var draft = new FilterDraft();
+        FilterDraft draft = new();
         draft.Comparison.Values.Add("Error");
 
         Assert.True(draft.HasMeaningfulStructure);
@@ -189,7 +216,7 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void HasMeaningfulStructure_DefaultDraft_IsFalse()
     {
-        var draft = new FilterDraft();
+        FilterDraft draft = new();
 
         Assert.False(draft.HasMeaningfulStructure);
     }
@@ -199,8 +226,13 @@ public sealed class FilterDraftModeTests
     {
         // FilterComparisonDraft.Property defaults to the first enum value (the dropdown's initial selection).
         // The default selection is not "user input" — without a value, save validation must reject as empty.
-        var draft = new FilterDraft();
-        draft.Comparison.Property = EventProperty.Source;
+        FilterDraft draft = new()
+        {
+            Comparison =
+            {
+                Property = EventProperty.Source
+            }
+        };
 
         Assert.False(draft.HasMeaningfulStructure);
     }
@@ -208,8 +240,8 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void HasMeaningfulStructure_SubFilterPresent_IsTrue()
     {
-        var draft = new FilterDraft();
-        draft.SubFilters.Add(new SubFilterDraft());
+        FilterDraft draft = new();
+        draft.Predicates.Add(new FilterPredicateDraft());
 
         Assert.True(draft.HasMeaningfulStructure);
     }
@@ -217,9 +249,10 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void TryBuildSavedFilter_AdvancedMode_CompileFailure_ReturnsCompileError()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Advanced, ComparisonText = "Id ===== ###" };
+        FilterDraft draft = new()
+            { Mode = FilterMode.Advanced, ComparisonText = "Id ===== ###" };
 
-        bool ok = draft.TryBuildSavedFilter(out var saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
 
         Assert.False(ok);
         Assert.Null(saved);
@@ -231,10 +264,10 @@ public sealed class FilterDraftModeTests
     {
         // L4b intent guard: even when the text decomposes cleanly, an Advanced-mode draft saves as Advanced.
         // The row reopens on the Advanced surface on next edit, no silent surface flip.
-        var draft = new FilterDraft
-        { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        FilterDraft draft = new()
+            { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
-        bool ok = draft.TryBuildSavedFilter(out var saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
 
         Assert.True(ok, error);
         Assert.NotNull(saved);
@@ -245,9 +278,10 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void TryBuildSavedFilter_AdvancedMode_EmptyText_ReturnsError()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Advanced, ComparisonText = string.Empty };
+        FilterDraft draft = new()
+            { Mode = FilterMode.Advanced, ComparisonText = string.Empty };
 
-        bool ok = draft.TryBuildSavedFilter(out var saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
 
         Assert.False(ok);
         Assert.Null(saved);
@@ -257,9 +291,9 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void TryBuildSavedFilter_BasicMode_EmptyStructure_ReturnsErrorMessage()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Basic };
+        FilterDraft draft = new() { Mode = FilterMode.Basic };
 
-        bool ok = draft.TryBuildSavedFilter(out var saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
 
         Assert.False(ok);
         Assert.Null(saved);
@@ -269,9 +303,9 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void TryBuildSavedFilter_BasicMode_IncompleteSubFilter_ReturnsError()
     {
-        // The strict-subfilters formatter overload exists specifically for this gate: an incomplete sub-filter
+        // The strict-predicates formatter overload exists specifically for this gate: an incomplete predicate
         // (e.g. property selected but value blank) must NOT silently disappear from the saved expression.
-        var draft = new FilterDraft
+        FilterDraft draft = new()
         {
             Mode = FilterMode.Basic,
             Comparison =
@@ -283,7 +317,7 @@ public sealed class FilterDraftModeTests
             }
         };
 
-        draft.SubFilters.Add(new SubFilterDraft
+        draft.Predicates.Add(new FilterPredicateDraft
         {
             Comparison = new FilterComparisonDraft
             {
@@ -295,7 +329,7 @@ public sealed class FilterDraftModeTests
             JoinWithAny = false
         });
 
-        bool ok = draft.TryBuildSavedFilter(out var saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
 
         Assert.False(ok);
         Assert.Null(saved);
@@ -305,7 +339,7 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void TryBuildSavedFilter_BasicMode_StructuredInput_BuildsBasicSavedFilter()
     {
-        var draft = new FilterDraft
+        FilterDraft draft = new()
         {
             Mode = FilterMode.Basic,
             Comparison =
@@ -317,7 +351,7 @@ public sealed class FilterDraftModeTests
             }
         };
 
-        bool ok = draft.TryBuildSavedFilter(out var saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
 
         Assert.True(ok, error);
         Assert.NotNull(saved);
@@ -329,9 +363,10 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void TryBuildSavedFilter_CachedMode_EmptyText_ReturnsError()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Cached, ComparisonText = string.Empty };
+        FilterDraft draft = new()
+            { Mode = FilterMode.Cached, ComparisonText = string.Empty };
 
-        bool ok = draft.TryBuildSavedFilter(out var saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
 
         Assert.False(ok);
         Assert.Null(saved);
@@ -341,10 +376,10 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void TryBuildSavedFilter_CachedMode_WithText_ProducesCachedSavedFilter()
     {
-        var draft = new FilterDraft
-        { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        FilterDraft draft = new()
+            { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
-        bool ok = draft.TryBuildSavedFilter(out var saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
 
         Assert.True(ok, error);
         Assert.NotNull(saved);
@@ -355,8 +390,8 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void WouldLoseDataSwitchingTo_AdvancedToBasic_DecomposableText_IsFalse()
     {
-        var draft = new FilterDraft
-        { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        FilterDraft draft = new()
+            { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         Assert.False(draft.WouldLoseDataSwitchingTo(FilterMode.Basic));
     }
@@ -364,7 +399,7 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void WouldLoseDataSwitchingTo_AdvancedToBasic_NonDecomposableText_IsTrue()
     {
-        var draft = new FilterDraft
+        FilterDraft draft = new()
         {
             Mode = FilterMode.Advanced,
             ComparisonText = FilterTestConstants.FilterComputerNameEqualsServer01
@@ -376,7 +411,8 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void WouldLoseDataSwitchingTo_AdvancedToCached_EmptyText_IsFalse()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Advanced, ComparisonText = string.Empty };
+        FilterDraft draft = new()
+            { Mode = FilterMode.Advanced, ComparisonText = string.Empty };
 
         Assert.False(draft.WouldLoseDataSwitchingTo(FilterMode.Cached));
     }
@@ -384,7 +420,8 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void WouldLoseDataSwitchingTo_AdvancedToCached_NonEmptyText_IsTrue()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Advanced, ComparisonText = "Id == 100" };
+        FilterDraft draft = new()
+            { Mode = FilterMode.Advanced, ComparisonText = "Id == 100" };
 
         Assert.True(draft.WouldLoseDataSwitchingTo(FilterMode.Cached));
     }
@@ -394,7 +431,7 @@ public sealed class FilterDraftModeTests
     {
         // Same degraded shape but going Advanced — ApplyModeSwitch preserves the existing ComparisonText, so
         // there is no loss and no confirm prompt should fire.
-        var draft = new FilterDraft
+        FilterDraft draft = new()
         {
             Mode = FilterMode.Basic,
             ComparisonText = FilterTestConstants.FilterComputerNameEqualsServer01
@@ -406,11 +443,17 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void WouldLoseDataSwitchingTo_BasicToAdvanced_FormattableStructure_IsFalse()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Basic };
-        draft.Comparison.Property = EventProperty.Id;
-        draft.Comparison.Operator = ComparisonOperator.Equals;
-        draft.Comparison.MatchMode = MatchMode.Single;
-        draft.Comparison.Value = "100";
+        FilterDraft draft = new()
+        {
+            Mode = FilterMode.Basic,
+            Comparison =
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            }
+        };
 
         Assert.False(draft.WouldLoseDataSwitchingTo(FilterMode.Advanced));
     }
@@ -418,15 +461,21 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void WouldLoseDataSwitchingTo_BasicToAdvanced_IncompleteSubFilter_IsTrue()
     {
-        // Sub-filter has property but no value — strict formatter refuses, so going Advanced would silently
-        // drop the incomplete sub-filter without the user noticing.
-        var draft = new FilterDraft { Mode = FilterMode.Basic };
-        draft.Comparison.Property = EventProperty.Id;
-        draft.Comparison.Operator = ComparisonOperator.Equals;
-        draft.Comparison.MatchMode = MatchMode.Single;
-        draft.Comparison.Value = "100";
+        // Predicate has property but no value — strict formatter refuses, so going Advanced would silently
+        // drop the incomplete predicate without the user noticing.
+        FilterDraft draft = new()
+        {
+            Mode = FilterMode.Basic,
+            Comparison =
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            }
+        };
 
-        draft.SubFilters.Add(new SubFilterDraft
+        draft.Predicates.Add(new FilterPredicateDraft
         {
             Comparison = new FilterComparisonDraft
             {
@@ -447,7 +496,7 @@ public sealed class FilterDraftModeTests
         // Degraded persisted-Basic shape (LoadFromPersisted couldn't recover BasicFilter from non-decomposable
         // text). Switching to Cached would discard the only data the row carries — the raw text — so the
         // confirm prompt must fire even though structure is empty.
-        var draft = new FilterDraft
+        FilterDraft draft = new()
         {
             Mode = FilterMode.Basic,
             ComparisonText = FilterTestConstants.FilterComputerNameEqualsServer01
@@ -459,7 +508,7 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void WouldLoseDataSwitchingTo_BasicToCached_EmptyStructure_IsFalse()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Basic };
+        FilterDraft draft = new() { Mode = FilterMode.Basic };
 
         Assert.False(draft.WouldLoseDataSwitchingTo(FilterMode.Cached));
     }
@@ -470,8 +519,14 @@ public sealed class FilterDraftModeTests
         // Basic mode's ComparisonText is empty/stale by design (only refreshed on save). The mode-switch
         // confirm must inspect HasMeaningfulStructure — checking text alone would let structured input
         // silently disappear when switching to Cached.
-        var draft = new FilterDraft { Mode = FilterMode.Basic };
-        draft.Comparison.Value = "100";
+        FilterDraft draft = new()
+        {
+            Mode = FilterMode.Basic,
+            Comparison =
+            {
+                Value = "100"
+            }
+        };
 
         Assert.True(draft.WouldLoseDataSwitchingTo(FilterMode.Cached));
     }
@@ -480,8 +535,8 @@ public sealed class FilterDraftModeTests
     public void WouldLoseDataSwitchingTo_CachedToAdvanced_IsFalse()
     {
         // Cached → Advanced is loss-free: the text is preserved verbatim as the Advanced expression.
-        var draft = new FilterDraft
-        { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        FilterDraft draft = new()
+            { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         Assert.False(draft.WouldLoseDataSwitchingTo(FilterMode.Advanced));
     }
@@ -489,8 +544,14 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void WouldLoseDataSwitchingTo_SameMode_IsFalse()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Basic };
-        draft.Comparison.Value = "100";
+        FilterDraft draft = new()
+        {
+            Mode = FilterMode.Basic,
+            Comparison =
+            {
+                Value = "100"
+            }
+        };
 
         Assert.False(draft.WouldLoseDataSwitchingTo(FilterMode.Basic));
     }

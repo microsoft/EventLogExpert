@@ -9,7 +9,7 @@ using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.FilterEditor;
+namespace EventLogExpert.UI.FilterEditor.Comparison;
 
 public sealed partial class FilterComparisonEditor : ComponentBase
 {

@@ -17,7 +17,7 @@ public sealed class FilterDraft
     public string ComparisonText { get; set; } = string.Empty;
 
     /// <summary>
-    ///     <see langword="true" /> when the primary <see cref="Comparison" /> has user-supplied input or any sub-filter
+    ///     <see langword="true" /> when the primary <see cref="Comparison" /> has user-supplied input or any predicate
     ///     exists. Used by the row's mode-switch + Basic-mode save validation as the "structure carries data" signal —
     ///     <see cref="FilterComparisonDraft.Property" /> defaulting to the first enum value (the dropdown's initial selection)
     ///     does NOT count as meaningful input on its own.
@@ -25,7 +25,7 @@ public sealed class FilterDraft
     public bool HasMeaningfulStructure =>
         !string.IsNullOrWhiteSpace(Comparison.Value) ||
         Comparison.Values.Count > 0 ||
-        SubFilters.Count > 0;
+        Predicates.Count > 0;
 
     public FilterId Id { get; init; } = FilterId.Create();
 
@@ -35,7 +35,7 @@ public sealed class FilterDraft
 
     public FilterMode Mode { get; set; } = FilterMode.Advanced;
 
-    public List<SubFilterDraft> SubFilters { get; set; } = [];
+    public List<FilterPredicateDraft> Predicates { get; set; } = [];
 
     public static FilterDraft FromSavedFilter(SavedFilter filter)
     {
@@ -91,7 +91,7 @@ public sealed class FilterDraft
                     // Strict first so a clean structured shape produces clean text. Lenient fallback covers the
                     // user-confirmed data-loss path (the row only reaches the lossy branch after
                     // WouldLoseDataSwitchingTo returned true and the user accepted the prompt). When neither
-                    // formatter produces text — empty structure or all sub-filters unprintable — fall back to the
+                    // formatter produces text — empty structure or all predicates unprintable — fall back to the
                     // existing ComparisonText (preserves the degraded-persisted-Basic recovery surface).
                     if (HasMeaningfulStructure && BasicFilterFormatter.TryFormat(ToBasicFilter(), true, out var strict))
                     {
@@ -123,23 +123,23 @@ public sealed class FilterDraft
     }
 
     /// <summary>
-    ///     Replaces <see cref="Comparison" /> and <see cref="SubFilters" /> with structure decomposed (or otherwise
+    ///     Replaces <see cref="Comparison" /> and <see cref="Predicates" /> with structure decomposed (or otherwise
     ///     derived) from <paramref name="basicFilter" />. Used by mode-switch when adopting decomposed Advanced/Cached text as
     ///     Basic structure.
     /// </summary>
     public void HydrateStructure(BasicFilter basicFilter)
     {
         Comparison = FilterComparisonDraft.FromComparison(basicFilter.Comparison);
-        SubFilters = [.. basicFilter.SubFilters.Select(SubFilterDraftFromSubFilter)];
+        Predicates = [.. basicFilter.Predicates.Select(FilterPredicateDraftFromFilterPredicate)];
     }
 
     public BasicFilter ToBasicFilter() =>
-        new(Comparison.ToComparison(), [.. SubFilters.Select(subFilter => subFilter.ToSubFilter())]);
+        new(Comparison.ToComparison(), [.. Predicates.Select(predicate => predicate.ToFilterPredicate())]);
 
     /// <summary>
     ///     Builds a <see cref="SavedFilter" /> from this draft per <see cref="Mode" />. Returns <see langword="false" />
     ///     with a populated <paramref name="error" /> when the draft cannot be saved (empty input, incomplete Basic
-    ///     sub-filter, or compile failure on the resulting text). Pure (does not mutate the draft) so the caller can surface
+    ///     predicate, or compile failure on the resulting text). Pure (does not mutate the draft) so the caller can surface
     ///     the error inline and let the user repair.
     /// </summary>
     public bool TryBuildSavedFilter([NotNullWhen(true)] out SavedFilter? saved, out string error)
@@ -162,7 +162,8 @@ public sealed class FilterDraft
 
             if (!BasicFilterFormatter.TryFormat(draftBasic, true, out var formatted))
             {
-                error = "All sub-filters must be complete before saving.";
+                error = "All predicates must be complete before saving.";
+
                 return false;
             }
 
@@ -178,12 +179,14 @@ public sealed class FilterDraft
         if (string.IsNullOrWhiteSpace(text))
         {
             error = "Cannot save an empty filter";
+
             return false;
         }
 
         if (!FilterCompiler.TryCompile(text, out var compiled, out var compileError))
         {
             error = compileError;
+
             return false;
         }
 
@@ -231,7 +234,7 @@ public sealed class FilterDraft
                 if (Mode == FilterMode.Basic)
                 {
                     // Basic→Advanced is loss-free unless the structure carries data the strict formatter refuses
-                    // (incomplete sub-filter etc.). Empty structure with degraded persisted ComparisonText is also
+                    // (incomplete predicate etc.). Empty structure with degraded persisted ComparisonText is also
                     // loss-free here because ApplyModeSwitch preserves the text.
                     return HasMeaningfulStructure &&
                         !BasicFilterFormatter.TryFormat(ToBasicFilter(), true, out _);
@@ -243,16 +246,16 @@ public sealed class FilterDraft
         }
     }
 
-    private static SubFilterDraft SubFilterDraftFromSubFilter(SubFilter subFilter) =>
+    private static FilterPredicateDraft FilterPredicateDraftFromFilterPredicate(FilterPredicate filterPredicate) =>
         new()
         {
-            Comparison = FilterComparisonDraft.FromComparison(subFilter.Comparison),
-            JoinWithAny = subFilter.JoinWithAny
+            Comparison = FilterComparisonDraft.FromComparison(filterPredicate.Comparison),
+            JoinWithAny = filterPredicate.JoinWithAny
         };
 
     private void ClearStructure()
     {
         Comparison = new FilterComparisonDraft();
-        SubFilters.Clear();
+        Predicates.Clear();
     }
 }

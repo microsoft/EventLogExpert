@@ -4,7 +4,7 @@
 using EventLogExpert.Filtering.Common.Filtering;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.UI.FilterEditor;
+namespace EventLogExpert.UI.FilterEditor.Comparison;
 
 /// <summary>
 ///     Single-dropdown widget that surfaces the (<see cref="ComparisonOperator" />, <see cref="MatchMode" />) pair as

@@ -1,0 +1,59 @@
+@if (!string.IsNullOrEmpty(OuterCssClass))
+{
+    <div class="@OuterCssClass">
+        @RenderShellContent()
+
+        @if (UseInlineErrorRow)
+        {
+            <div class="error-row" hidden="@(string.IsNullOrWhiteSpace(ErrorMessage))">@ErrorMessage</div>
+        }
+    </div>
+}
+else
+{
+    @RenderShellContent()
+}
+
+@if (!UseInlineErrorRow)
+{
+    <div hidden="@(string.IsNullOrWhiteSpace(ErrorMessage))">
+        <span class="advanced-filter-error">@ErrorMessage</span>
+    </div>
+}
+
+@code {
+    private RenderFragment RenderShellContent() =>
+        @<text>
+             @if (Filter is not null)
+             {
+                 <FilterEditPanel ExtraActions="ExtraActions"
+                     Filter="Filter"
+                     IsPending="IsPending"
+                     MainContent="MainContent"
+                     ModeSelector="ModeSelector"
+                     OnCancel="OnCancel"
+                     OnExclusionChanged="OnExclusionChanged"
+                     OnRemove="OnRemove"
+                     OnSave="OnSave"
+                     SubFiltersContent="SubFiltersContent" />
+             }
+             else if (Value is { } savedFilter)
+             {
+                 <div class="flex-space-between">
+                     <FilterRowHeader FilterLabelId="@_filterLabelId"
+                         OnExclusionChanged="OnExclusionChanged"
+                         Value="savedFilter" />
+
+                     <div class="@RightCssClass">
+                         <FilterRowActions FilterLabelId="@_filterLabelId"
+                             OnEdit="OnEdit"
+                             OnRemove="OnRemove"
+                             OnToggleEnabled="OnToggleEnabled"
+                             @ref="_actionsRef"
+                             ShowToggleEnabled="ShowToggleEnabled"
+                             Value="savedFilter" />
+                     </div>
+                 </div>
+             }
+    </text>;
+}

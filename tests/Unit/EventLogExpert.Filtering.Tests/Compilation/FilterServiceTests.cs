@@ -563,7 +563,7 @@ public sealed class FilterServiceTests
                 Value = "100"
             },
             [
-                new SubFilter(
+                new FilterPredicate(
                     new FilterComparison
                     {
                         Property = EventProperty.Level,
@@ -596,7 +596,7 @@ public sealed class FilterServiceTests
                 Value = "100"
             },
             [
-                new SubFilter(
+                new FilterPredicate(
                     new FilterComparison
                     {
                         Property = EventProperty.Level,
@@ -628,7 +628,7 @@ public sealed class FilterServiceTests
                 Value = "100"
             },
             [
-                new SubFilter(
+                new FilterPredicate(
                     new FilterComparison
                     {
                         Property = EventProperty.Level,
@@ -711,7 +711,7 @@ public sealed class FilterServiceTests
                 Value = string.Empty
             },
             [
-                new SubFilter(
+                new FilterPredicate(
                     new FilterComparison
                     {
                         Property = EventProperty.Level,
@@ -823,7 +823,7 @@ public sealed class FilterServiceTests
                 Value = "100"
             },
             [
-                new SubFilter(
+                new FilterPredicate(
                     new FilterComparison
                     {
                         Property = EventProperty.Level,
@@ -832,7 +832,7 @@ public sealed class FilterServiceTests
                         Value = "   "
                     },
                     true),
-                new SubFilter(
+                new FilterPredicate(
                     new FilterComparison
                     {
                         Property = EventProperty.Source,
@@ -867,7 +867,7 @@ public sealed class FilterServiceTests
                 Value = "100"
             },
             [
-                new SubFilter(
+                new FilterPredicate(
                     new FilterComparison
                     {
                         Property = EventProperty.Level,
@@ -876,7 +876,7 @@ public sealed class FilterServiceTests
                         Value = "Error"
                     },
                     true),
-                new SubFilter(
+                new FilterPredicate(
                     new FilterComparison
                     {
                         Property = EventProperty.Source,

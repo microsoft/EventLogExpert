@@ -11,8 +11,8 @@ public sealed class SubFilterJsonConverterTests
     [Fact]
     public void JsonRoundTrip_AsPartOfBasicFilter_DispatchesThroughConverterForLegacySubFilters()
     {
-        // BasicFilter has no custom converter; STJ must still dispatch each ImmutableList<SubFilter> element
-        // through SubFilter's [JsonConverter] so legacy "Data" subfilters survive a BasicFilter-level read.
+        // BasicFilter has no custom converter; STJ must still dispatch each ImmutableList<FilterPredicate> element
+        // through FilterPredicate's [JsonConverter] so legacy "Data" subfilters survive a BasicFilter-level read.
         const string LegacyBasicJson =
             """
             {
@@ -27,10 +27,10 @@ public sealed class SubFilterJsonConverterTests
 
         Assert.NotNull(restored);
         Assert.Equal(EventProperty.Id, restored.Comparison.Property);
-        Assert.Single(restored.SubFilters);
-        Assert.Equal(EventProperty.Level, restored.SubFilters[0].Comparison.Property);
-        Assert.Equal("Error", restored.SubFilters[0].Comparison.Value);
-        Assert.False(restored.SubFilters[0].JoinWithAny);
+        Assert.Single(restored.Predicates);
+        Assert.Equal(EventProperty.Level, restored.Predicates[0].Comparison.Property);
+        Assert.Equal("Error", restored.Predicates[0].Comparison.Value);
+        Assert.False(restored.Predicates[0].JoinWithAny);
 
         var fresh = new BasicFilter(
             new FilterComparison
@@ -40,7 +40,7 @@ public sealed class SubFilterJsonConverterTests
                 MatchMode = MatchMode.Single,
                 Value = "100"
             },
-            ImmutableList.Create(new SubFilter(
+            ImmutableList.Create(new FilterPredicate(
                 new FilterComparison
                 {
                     Property = EventProperty.Level,
@@ -78,8 +78,8 @@ public sealed class SubFilterJsonConverterTests
             }
             """;
 
-        var restoredModernFirst = JsonSerializer.Deserialize<SubFilter>(ModernFirst);
-        var restoredLegacyFirst = JsonSerializer.Deserialize<SubFilter>(LegacyFirst);
+        var restoredModernFirst = JsonSerializer.Deserialize<FilterPredicate>(ModernFirst);
+        var restoredLegacyFirst = JsonSerializer.Deserialize<FilterPredicate>(LegacyFirst);
 
         Assert.NotNull(restoredModernFirst);
         Assert.NotNull(restoredLegacyFirst);
@@ -100,7 +100,7 @@ public sealed class SubFilterJsonConverterTests
             { "Data": { "Property": "Id", "Operator": "Equals", "MatchMode": "Single", "Value": "100", "Values": [] }, "JoinWithAny": false }
             """;
 
-        var restored = JsonSerializer.Deserialize<SubFilter>(LegacyJson);
+        var restored = JsonSerializer.Deserialize<FilterPredicate>(LegacyJson);
 
         Assert.NotNull(restored);
         Assert.False(restored.JoinWithAny);
@@ -109,7 +109,7 @@ public sealed class SubFilterJsonConverterTests
     }
 
     [Fact]
-    public void JsonRoundTrip_LegacyDataKeyWithLegacyConditionShape_ReadsBothLayers()
+    public void JsonRoundTrip_LegacyDataKeyWithLegacyPredicateShape_ReadsBothLayers()
     {
         // Both wrapper (Data) and inner (Category/Evaluator) are legacy; the composed converter dispatch
         // must hydrate both layers in a single deserialize pass.
@@ -118,7 +118,7 @@ public sealed class SubFilterJsonConverterTests
             { "Data": { "Category": 0, "Evaluator": 0, "Value": "200", "Values": [] }, "JoinWithAny": true }
             """;
 
-        var restored = JsonSerializer.Deserialize<SubFilter>(LegacyJson);
+        var restored = JsonSerializer.Deserialize<FilterPredicate>(LegacyJson);
 
         Assert.NotNull(restored);
         Assert.True(restored.JoinWithAny);
@@ -130,7 +130,7 @@ public sealed class SubFilterJsonConverterTests
     [Fact]
     public void JsonRoundTrip_ModernShape_PersistsAsComparison_AndRestores()
     {
-        var original = new SubFilter(
+        var original = new FilterPredicate(
             new FilterComparison
             {
                 Property = EventProperty.Level,
@@ -146,7 +146,7 @@ public sealed class SubFilterJsonConverterTests
         Assert.DoesNotContain("\"Data\"", json);
         Assert.Contains("\"JoinWithAny\":true", json);
 
-        var restored = JsonSerializer.Deserialize<SubFilter>(json);
+        var restored = JsonSerializer.Deserialize<FilterPredicate>(json);
         Assert.NotNull(restored);
         Assert.True(restored.JoinWithAny);
         Assert.Equal(EventProperty.Level, restored.Comparison.Property);

@@ -1,0 +1,30 @@
+@if (Value is { } savedFilter)
+{
+    <div class="filter-row-actions">
+        <button aria-label="@($"Edit {DescribeFilter(savedFilter)}")"
+            class="button icon-button"
+            @onclick="OnEdit"
+            @ref="_editButtonRef"
+            title="Edit filter"
+            type="button">
+            <i aria-hidden="true" class="bi bi-funnel"></i>
+        </button>
+
+        <button aria-label="@($"Remove {DescribeFilter(savedFilter)}")"
+            class="button button-red icon-button"
+            @onclick="OnRemove"
+            title="Remove filter"
+            type="button">
+            <i aria-hidden="true" class="bi bi-dash-circle"></i>
+        </button>
+
+        @if (ShowToggleEnabled)
+        {
+            <span class="visually-hidden" id="@_enableToggleLabelId">Enable filter</span>
+
+            <Toggle AriaLabelledBy="@EnableToggleAriaLabelledBy"
+                Value="savedFilter.IsEnabled"
+                ValueChanged="@(_ => OnToggleEnabled.InvokeAsync())" />
+        }
+    </div>
+}

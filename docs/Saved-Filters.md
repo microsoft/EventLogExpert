@@ -27,7 +27,7 @@ The cache persists across app sessions in user preferences.
 
 <!-- screenshot: filter-groups-modal --> ![Filter groups modal](.images/filter-groups-modal.png)
 
-A filter group is a named collection of full filters — each with its own category / evaluator / comparison text / highlight color and any sub-filters. Groups can be organized into sections (the section name is the prefix before `\` in the group name, e.g. `Exchange\HUB Server` lives under section `Exchange` with display name `HUB Server`). Groups with no `\` in the name appear at the modal's top level.
+A filter group is a named collection of full filters — each with its own category / evaluator / comparison text / highlight color and any predicates. Groups can be organized into sections (the section name is the prefix before `\` in the group name, e.g. `Exchange\HUB Server` lives under section `Exchange` with display name `HUB Server`). Groups with no `\` in the name appear at the modal's top level.
 
 Per-group buttons (when the group is not in edit mode):
 

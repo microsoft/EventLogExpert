@@ -5,9 +5,11 @@ using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.FilterGroup;
 using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.UI.FilterEditor.Rows;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 
@@ -15,6 +17,8 @@ namespace EventLogExpert.UI.FilterEditor;
 
 public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
 {
+    private FilterRowShell? _shellRef;
+
     /// <summary>Notifies the parent which saved rows are mid-edit.</summary>
     [Parameter] public EventCallback<(FilterId Id, bool IsEditing)> OnEditingChanged { get; set; }
 
@@ -23,6 +27,9 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
 
     /// <summary>Pending-row save: parent must remove the draft and dispatch the upsert atomically.</summary>
     [Parameter] public EventCallback<SavedFilter> OnPendingSave { get; set; }
+
+    /// <summary>Saved-row remove: notifies parent BEFORE dispatch so focus restoration can capture pre-removal state.</summary>
+    [Parameter] public EventCallback<FilterId> OnRemoved { get; set; }
 
     /// <summary>
     ///     When set, dispatches route through <see cref="GroupActions" /> with this parent group id and the row adopts
@@ -33,7 +40,11 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
     /// <summary>Mutually exclusive with <see cref="FilterRowBase{TValue}.Value" />.</summary>
     [Parameter] public FilterDraft? PendingDraft { get; set; }
 
+    internal bool IsEditing => Filter is not null;
+
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
+
+    [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
     /// <summary>
     ///     Favourites listed first (flagged <see cref="CachedOption.IsFavorite" />), then recents minus duplicates by
@@ -81,6 +92,9 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
 
     private bool UseInlineErrorRow => ParentFilterGroupId is not null;
 
+    internal ValueTask FocusEditAsync() =>
+        _shellRef is null ? ValueTask.CompletedTask : _shellRef.FocusEditAsync();
+
     protected override void OnParametersSet()
     {
         if (Value is null && PendingDraft is null)
@@ -107,13 +121,6 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
         base.OnParametersSet();
     }
 
-    private void AddSubFilter()
-    {
-        if (Filter is null) { return; }
-
-        Filter.SubFilters.Add(new SubFilterDraft());
-    }
-
     private async Task CancelFilter()
     {
         ResetEditSession();
@@ -122,6 +129,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
 
         if (IsPending)
         {
+            AnnouncementService.Announce("Filter discarded");
             await OnPendingDiscard.InvokeAsync();
 
             return;
@@ -129,6 +137,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
 
         if (Value is not { } savedFilter) { return; }
 
+        AnnouncementService.Announce("Edit cancelled");
         await OnEditingChanged.InvokeAsync((savedFilter.Id, false));
     }
 
@@ -163,18 +172,6 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
         FilterPaneCommands.ToggleFilterEnabled(id);
     }
 
-    private void DispatchToggleExclusion(FilterId id)
-    {
-        if (ParentFilterGroupId is { } parentId)
-        {
-            FilterGroupCommands.ToggleFilterExcluded(parentId, id);
-        }
-        else
-        {
-            FilterPaneCommands.ToggleFilterExcluded(id);
-        }
-    }
-
     private async Task EditFilter()
     {
         if (IsPending) { return; }
@@ -184,6 +181,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
         ResetEditSession();
         Filter = FilterDraft.FromSavedFilter(savedFilter);
 
+        AnnouncementService.Announce("Editing filter");
         await OnEditingChanged.InvokeAsync((savedFilter.Id, true));
     }
 
@@ -203,10 +201,39 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
         ErrorMessage = string.Empty;
     }
 
+    private async Task OnExclusionChangedAsync(bool isExcluded)
+    {
+        string label = isExcluded ? "Exclude" : "Include";
+
+        if (Filter is not null)
+        {
+            AnnouncementService.Announce($"Filter set to {label}");
+            Filter.IsExcluded = isExcluded;
+            await InvokeAsync(StateHasChanged);
+
+            return;
+        }
+
+        if (Value is { } savedFilter)
+        {
+            AnnouncementService.Announce($"Filter set to {label}");
+
+            if (ParentFilterGroupId is { } parentId)
+            {
+                FilterGroupCommands.SetFilterExcluded(parentId, savedFilter.Id, isExcluded);
+            }
+            else
+            {
+                FilterPaneCommands.SetFilterExcluded(savedFilter.Id, isExcluded);
+            }
+        }
+    }
+
     private async Task RemoveFilter()
     {
         if (IsPending)
         {
+            AnnouncementService.Announce("Filter discarded");
             await OnPendingDiscard.InvokeAsync();
 
             return;
@@ -214,15 +241,11 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
 
         if (Value is not { } savedFilter) { return; }
 
+        AnnouncementService.Announce("Filter removed");
+        await OnRemoved.InvokeAsync(savedFilter.Id);
+
         DispatchRemoveFilter(savedFilter.Id);
         await OnEditingChanged.InvokeAsync((savedFilter.Id, false));
-    }
-
-    private void RemoveSubFilter(FilterId subFilterId)
-    {
-        if (Filter is null) { return; }
-
-        Filter.SubFilters.RemoveAll(subFilter => subFilter.Id == subFilterId);
     }
 
     private void ResetEditSession() => ErrorMessage = string.Empty;
@@ -243,6 +266,8 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
         Filter = null;
         ErrorMessage = string.Empty;
 
+        AnnouncementService.Announce("Filter saved");
+
         if (IsPending)
         {
             await OnPendingSave.InvokeAsync(newFilter);
@@ -262,14 +287,10 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
     {
         if (Value is not { } savedFilter) { return; }
 
+        string newState = savedFilter.IsEnabled ? "disabled" : "enabled";
+
+        AnnouncementService.Announce($"Filter {newState}");
         DispatchToggleEnabled(savedFilter.Id);
-    }
-
-    private void ToggleFilterExclusion()
-    {
-        if (Value is not { } savedFilter) { return; }
-
-        DispatchToggleExclusion(savedFilter.Id);
     }
 
     /// <summary>
@@ -297,7 +318,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
                 (FilterMode.Advanced, FilterMode.Basic) or (FilterMode.Cached, FilterMode.Basic) =>
                     "Switching to Basic will discard the current expression because it cannot be represented in the Basic editor. Continue?",
                 (FilterMode.Basic, FilterMode.Advanced) =>
-                    "Switching to Advanced will drop incomplete sub-filters from the Basic editor. Continue?",
+                    "Switching to Advanced will drop incomplete predicates from the Basic editor. Continue?",
                 _ => "Switching modes will discard the current filter contents. Continue?"
             };
 
@@ -316,6 +337,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
             }
         }
 
+        AnnouncementService.Announce($"Switched to {target} filter mode");
         Filter.ApplyModeSwitch(target);
         ErrorMessage = string.Empty;
     }

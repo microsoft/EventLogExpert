@@ -1,0 +1,26 @@
+.filter-predicate-list-wrapper {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.filter-predicate-list {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+
+    min-width: 0;
+}
+
+.add-filter-predicate-button {
+    color: var(--text-secondary);
+}
+
+.add-filter-predicate-button:hover {
+    color: var(--clr-lightblue);
+}

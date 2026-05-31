@@ -25,6 +25,9 @@ public interface IFilterGroupCommands
     /// <summary>Adds or replaces <paramref name="filter" /> in the group identified by <paramref name="parentId" />.</summary>
     void SetFilter(FilterGroupId parentId, SavedFilter filter);
 
+    /// <summary>Sets whether the filter with <paramref name="id" /> in <paramref name="parentId" /> excludes matching events.</summary>
+    void SetFilterExcluded(FilterGroupId parentId, FilterId id, bool isExcluded);
+
     /// <summary>Replaces the group whose id matches <paramref name="group" />.Id with <paramref name="group" />.</summary>
     void SetGroup(SavedFilterGroup group);
 

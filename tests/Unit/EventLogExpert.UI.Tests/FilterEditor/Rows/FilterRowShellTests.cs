@@ -3,12 +3,12 @@
 
 using Bunit;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.UI.FilterEditor;
+using EventLogExpert.UI.FilterEditor.Rows;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.UI.Tests.FilterEditor;
+namespace EventLogExpert.UI.Tests.FilterEditor.Rows;
 
-public sealed class FilterRowChromeTests : BunitContext
+public sealed class FilterRowShellTests : BunitContext
 {
     [Fact]
     public void SavedFilter_AllButtons_HaveTypeButton()
@@ -76,11 +76,14 @@ public sealed class FilterRowChromeTests : BunitContext
         var component = RenderChrome(value: savedFilter);
 
         var toggle = component.Find("input[role='switch']");
-        var labelId = toggle.GetAttribute("aria-labelledby");
-        Assert.False(string.IsNullOrWhiteSpace(labelId));
+        var labelIds = toggle.GetAttribute("aria-labelledby");
+        Assert.False(string.IsNullOrWhiteSpace(labelIds));
 
-        var labelEl = component.Find($"#{labelId}");
-        Assert.Contains(savedFilter.ComparisonText, labelEl.TextContent);
+        // aria-labelledby may chain multiple IDs (filter label + toggle purpose hint); verify the
+        // comparison text appears in at least one of the referenced elements.
+        var referencedTexts = labelIds!.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(id => component.Find($"#{id}").TextContent);
+        Assert.Contains(referencedTexts, text => text.Contains(savedFilter.ComparisonText));
     }
 
     [Fact]
@@ -89,7 +92,7 @@ public sealed class FilterRowChromeTests : BunitContext
         var savedFilter = MakeSavedFilter(isEnabled: false);
         int invocations = 0;
 
-        var component = Render<FilterRowChrome>(parameters => parameters
+        var component = Render<FilterRowShell>(parameters => parameters
             .Add(p => p.Value, savedFilter)
             .Add(p => p.ShowToggleEnabled, true)
             .Add(p => p.OnToggleEnabled,
@@ -109,10 +112,10 @@ public sealed class FilterRowChromeTests : BunitContext
             IsEnabled = isEnabled,
         };
 
-    private IRenderedComponent<FilterRowChrome> RenderChrome(
+    private IRenderedComponent<FilterRowShell> RenderChrome(
         SavedFilter? value,
         bool showToggleEnabled = true) =>
-        Render<FilterRowChrome>(parameters => parameters
+        Render<FilterRowShell>(parameters => parameters
             .Add(p => p.Value, value)
             .Add(p => p.ShowToggleEnabled, showToggleEnabled));
 }

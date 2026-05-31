@@ -1,0 +1,15 @@
+@inherits InputComponent<bool>
+
+<span class="toggle-with-label @CssClass">
+    <Toggle AriaDescribedBy="@AriaDescribedBy"
+        AriaLabel="@(string.IsNullOrEmpty(Label) ? AriaLabel : null)"
+        AriaLabelledBy="@EffectiveAriaLabelledBy"
+        Disabled="@Disabled"
+        Id="@Id"
+        Value="Value"
+        ValueChanged="ValueChanged" />
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <span class="toggle-with-label-text" id="@_textLabelId">@Label</span>
+    }
+</span>

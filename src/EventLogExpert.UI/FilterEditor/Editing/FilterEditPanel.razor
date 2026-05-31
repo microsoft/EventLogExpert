@@ -1,0 +1,79 @@
+@if (Filter is { } filter)
+{
+    <div class="filter-edit-panel @CssClass">
+        <div class="filter-edit-panel-row">
+            <div class="filter-edit-panel-content">
+                <button aria-label="@(filter.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
+                    aria-pressed="@(filter.IsExcluded ? "true" : "false")"
+                    class="button filter-exclude-toggle icon-button"
+                    data-excluded="@(filter.IsExcluded ? "true" : "false")"
+                    @onclick="@(() => OnExclusionChanged.InvokeAsync(!filter.IsExcluded))"
+                    title="@(filter.IsExcluded ? "Excluded \u2014 click to include" : "Included \u2014 click to exclude")"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-slash-circle"></i>
+                </button>
+
+                <div class="color-picker-wrapper"
+                    data-filter-excluded="@(filter.IsExcluded ? "true" : "false")"
+                    role="group">
+                    <ValueSelect AriaDescribedBy="@(filter.IsExcluded ? _colorDescriptionId : null)"
+                        AriaLabel="Highlight Color"
+                        @bind-Value="filter.Color"
+                        CssClass="input color-dropdown"
+                        DataHighlight="@filter.Color.ToCssName()"
+                        T="HighlightColor">
+                        @foreach (var item in Enum.GetValues<HighlightColor>())
+                        {
+                            <ValueSelectItem CssClass="color-dropdown-item"
+                                DataHighlight="@item.ToCssName()"
+                                T="HighlightColor"
+                                Value="item" />
+                        }
+                    </ValueSelect>
+                    @if (filter.IsExcluded)
+                    {
+                        <span class="visually-hidden" id="@_colorDescriptionId">Color applies in Include mode only.</span>
+                    }
+                </div>
+
+                @ModeSelector
+
+                @MainContent
+
+                @ExtraActions
+            </div>
+
+            <div class="filter-edit-panel-actions">
+                <button class="button button-green" @onclick="OnSave" type="button">
+                    <i aria-hidden="true" class="bi bi-check-circle"></i> Save
+                </button>
+
+                <button aria-label="Cancel edit"
+                    class="button icon-button"
+                    @onclick="OnCancel"
+                    title="Cancel edit"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-x-circle"></i>
+                </button>
+
+                @if (!IsPending)
+                {
+                    <button aria-label="Remove filter"
+                        class="button button-red icon-button"
+                        @onclick="OnRemove"
+                        title="Remove filter"
+                        type="button">
+                        <i aria-hidden="true" class="bi bi-dash-circle"></i>
+                    </button>
+                }
+            </div>
+        </div>
+
+        @if (SubFiltersContent is not null)
+        {
+            <div class="filter-edit-panel-subfilters">
+                @SubFiltersContent
+            </div>
+        }
+    </div>
+}

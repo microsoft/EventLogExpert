@@ -9,7 +9,7 @@ A Windows Event Log viewer for tech support and IT professionals.
 * Loads `.evtx` files concurrently — `File` → `Open`, drag-and-drop, or open every `.evtx` in a folder in one step.
 * Combined view interleaves events from any mix of file and live logs by time across multiple machines.
 * Configurable event-table columns (visibility, ordering, sort) with per-row highlight colors driven by your filters.
-* Filter pane with Basic (category × evaluator) filters, sub-filters joined with `AND` / `OR`, Date filter, Advanced Dynamic LINQ expressions, and Exclusion filters.
+* Filter pane with Basic (category × evaluator) filters, predicates joined with `AND` / `OR`, Date filter, Advanced Dynamic LINQ expressions, and Exclusion filters.
 * Filter Cache (Favorites + Recent) and named, importable / exportable Filter Groups.
 * Live event channels with auto-discovery (admin-only channels disabled when not elevated), `Continuously Update`, and a `Load New Events` buffered mode.
 * Provider Databases — load `.db` files captured on another machine so its `.evtx` files resolve descriptions and task categories correctly.

@@ -6,9 +6,9 @@ using System.Text.Json.Serialization;
 
 namespace EventLogExpert.Filtering.Basic;
 
-internal sealed class SubFilterJsonConverter : JsonConverter<SubFilter>
+internal sealed class FilterPredicateJsonConverter : JsonConverter<FilterPredicate>
 {
-    public override SubFilter Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override FilterPredicate Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType != JsonTokenType.StartObject)
         {
@@ -52,10 +52,10 @@ internal sealed class SubFilterJsonConverter : JsonConverter<SubFilter>
             }
         }
 
-        return new SubFilter(modernComparison ?? legacyData ?? new FilterComparison(), joinWithAny);
+        return new FilterPredicate(modernComparison ?? legacyData ?? new FilterComparison(), joinWithAny);
     }
 
-    public override void Write(Utf8JsonWriter writer, SubFilter value, JsonSerializerOptions options)
+    public override void Write(Utf8JsonWriter writer, FilterPredicate value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
         writer.WritePropertyName("Comparison");

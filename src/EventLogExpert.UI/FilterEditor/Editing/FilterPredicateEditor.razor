@@ -1,0 +1,53 @@
+@if (IsEditing)
+{
+    <div class="filter-predicate-editing">
+        <button aria-label="@(Value.JoinWithAny ? "Joining with OR; click to switch to AND" : "Joining with AND; click to switch to OR")"
+            class="filter-predicate-and-or"
+            data-mode="@(Value.JoinWithAny ? "or" : "and")"
+            @onclick="@(() => Value.JoinWithAny = !Value.JoinWithAny)"
+            title="@(Value.JoinWithAny ? "OR" : "AND")"
+            type="button">
+            @(Value.JoinWithAny ? "OR" : "AND")
+        </button>
+
+        <FilterComparisonEditor Comparison="Value.Comparison" Id="@($"sf-{Value.Id}")" />
+
+        <button aria-label="Done editing predicate"
+            class="button icon-button"
+            disabled="@(!Value.IsComplete)"
+            @onclick="OnDoneClick"
+            title="@(Value.IsComplete ? "Done" : "Complete the predicate before continuing")"
+            type="button">
+            <i aria-hidden="true" class="bi bi-check-circle"></i>
+        </button>
+
+        <button aria-label="@($"Remove predicate: {SummaryText}")"
+            class="button button-red icon-button"
+            @onclick="OnRemoveChip"
+            title="Remove predicate"
+            type="button">
+            <i aria-hidden="true" class="bi bi-x-circle"></i>
+        </button>
+    </div>
+}
+else
+{
+    <div class="filter-predicate">
+        <button aria-label="@($"Edit predicate: {SummaryText}")"
+            class="filter-predicate-edit"
+            @onclick="OnEditChip"
+            title="Edit predicate"
+            type="button">
+            <span class="filter-predicate-joiner">@JoinerLabel</span>
+            <span class="filter-predicate-summary">@SummaryText</span>
+        </button>
+
+        <button aria-label="@($"Remove predicate: {SummaryText}")"
+            class="filter-predicate-remove"
+            @onclick="OnRemoveChip"
+            title="Remove predicate"
+            type="button">
+            <i aria-hidden="true" class="bi bi-x-circle"></i>
+        </button>
+    </div>
+}

@@ -37,7 +37,7 @@ public static class FilterBuilder
         bool isEnabled = false,
         bool isExcluded = false,
         FilterComparisonDraft? comparison = null,
-        IEnumerable<SubFilterDraft>? subFilters = null) =>
+        IEnumerable<FilterPredicateDraft>? predicates = null) =>
         new()
         {
             Id = id ?? FilterId.Create(),
@@ -45,7 +45,7 @@ public static class FilterBuilder
             ComparisonText = comparisonText,
             Mode = mode,
             Comparison = comparison ?? new FilterComparisonDraft(),
-            SubFilters = subFilters?.ToList() ?? [],
+            Predicates = predicates?.ToList() ?? [],
             IsEnabled = isEnabled,
             IsExcluded = isExcluded
         };

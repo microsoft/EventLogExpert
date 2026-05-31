@@ -23,6 +23,8 @@ internal sealed class FilterPaneCommands(IDispatcher dispatcher) : IFilterPaneCo
 
     public void SetFilterDateRange(DateFilter? dateFilter) => _dispatcher.Dispatch(new SetFilterDateRangeAction(dateFilter));
 
+    public void SetFilterExcluded(FilterId id, bool isExcluded) => _dispatcher.Dispatch(new SetFilterExcludedAction(id, isExcluded));
+
     public void ToggleFilterDate() => _dispatcher.Dispatch(new ToggleFilterDateAction());
 
     public void ToggleFilterEnabled(FilterId id) => _dispatcher.Dispatch(new ToggleFilterEnabledAction(id));

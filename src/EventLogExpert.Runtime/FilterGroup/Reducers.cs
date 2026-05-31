@@ -92,15 +92,17 @@ internal sealed class Reducers
                     parent with { Filters = [.. parent.Filters, action.Filter] }));
         }
 
-        // Replace the filter in-place. `with` preserves IsExcluded/IsEnabled. Color, ComparisonText,
-        // Compiled, BasicFilter, and Mode are overridden from the incoming action.
+        // Replace the filter in-place. `with` preserves IsEnabled. Color, ComparisonText, Compiled,
+        // BasicFilter, Mode, and IsExcluded are overridden from the incoming action so include/exclude
+        // edits on the draft persist when saved through the group.
         var updatedFilter = existing with
         {
             Color = action.Filter.Color,
             ComparisonText = action.Filter.ComparisonText,
             Compiled = action.Filter.Compiled,
             BasicFilter = action.Filter.BasicFilter,
-            Mode = action.Filter.Mode
+            Mode = action.Filter.Mode,
+            IsExcluded = action.Filter.IsExcluded
         };
 
         return WithGroups(
@@ -109,6 +111,15 @@ internal sealed class Reducers
                 groupIndex,
                 parent with { Filters = ReplaceFilterById(parent.Filters, existing.Id, updatedFilter) }));
     }
+
+    [ReducerMethod]
+    public static FilterGroupState ReducerSetGroupFilterExcluded(
+        FilterGroupState state,
+        SetGroupFilterExcludedAction action) =>
+        UpdateFilterInGroup(state,
+            action.ParentId,
+            action.Id,
+            filter => filter with { IsExcluded = action.IsExcluded });
 
     [ReducerMethod]
     public static FilterGroupState ReducerToggleGroup(FilterGroupState state, ToggleGroupAction action)

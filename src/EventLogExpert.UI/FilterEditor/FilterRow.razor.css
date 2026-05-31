@@ -16,6 +16,17 @@
     gap: 0.25rem;
 }
 
+/* Compact dropdown widths INSIDE the Basic comparison editor only. Mode dropdown
+   (in .filter-row-mode) keeps its default 120px so labels like "Advanced" fit. */
+.filter-row-structured ::deep .input.filter-dropdown {
+    width: 100px;
+}
+
+.filter-row-structured ::deep .input.filter-value-dropdown,
+.filter-row-structured ::deep .input.filter-description {
+    width: 280px;
+}
+
 ::deep .cached-favorite-icon,
 ::deep .cached-favorite-icon-placeholder {
     display: inline-block;

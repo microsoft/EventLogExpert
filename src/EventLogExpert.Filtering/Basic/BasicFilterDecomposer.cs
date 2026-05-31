@@ -77,7 +77,7 @@ internal static class BasicFilterDecomposer
 
         foreach (var orClause in orClauses)
         {
-            var conditions = new List<FilterComparison>(orClause.Count);
+            var clauseComparisons = new List<FilterComparison>(orClause.Count);
 
             foreach (var leaf in orClause)
             {
@@ -86,33 +86,33 @@ internal static class BasicFilterDecomposer
                     return false;
                 }
 
-                conditions.Add(comparison);
+                clauseComparisons.Add(comparison);
             }
 
-            mapped.Add(conditions);
+            mapped.Add(clauseComparisons);
         }
 
-        var subFilters = ImmutableList.CreateBuilder<SubFilter>();
+        var predicates = ImmutableList.CreateBuilder<FilterPredicate>();
         var firstClause = mapped[0];
         var rootComparison = firstClause[0];
 
         for (var i = 1; i < firstClause.Count; i++)
         {
-            subFilters.Add(new SubFilter(firstClause[i], false));
+            predicates.Add(new FilterPredicate(firstClause[i], false));
         }
 
         for (var c = 1; c < mapped.Count; c++)
         {
             var clause = mapped[c];
-            subFilters.Add(new SubFilter(clause[0], true));
+            predicates.Add(new FilterPredicate(clause[0], true));
 
             for (var i = 1; i < clause.Count; i++)
             {
-                subFilters.Add(new SubFilter(clause[i], false));
+                predicates.Add(new FilterPredicate(clause[i], false));
             }
         }
 
-        structured = new BasicFilter(rootComparison, subFilters.ToImmutable());
+        structured = new BasicFilter(rootComparison, predicates.ToImmutable());
 
         return true;
     }

@@ -22,6 +22,9 @@ internal sealed class FilterGroupCommands(IDispatcher dispatcher) : IFilterGroup
 
     public void SetFilter(FilterGroupId parentId, SavedFilter filter) => _dispatcher.Dispatch(new SetGroupFilterAction(parentId, filter));
 
+    public void SetFilterExcluded(FilterGroupId parentId, FilterId id, bool isExcluded) =>
+        _dispatcher.Dispatch(new SetGroupFilterExcludedAction(parentId, id, isExcluded));
+
     public void SetGroup(SavedFilterGroup group) => _dispatcher.Dispatch(new SetGroupAction(group));
 
     public void ToggleFilterExcluded(FilterGroupId parentId, FilterId id) => _dispatcher.Dispatch(new ToggleGroupFilterExcludedAction(parentId, id));

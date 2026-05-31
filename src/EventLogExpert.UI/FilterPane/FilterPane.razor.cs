@@ -14,6 +14,8 @@ using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.FilterEditor;
+using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Modal;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -28,11 +30,15 @@ public sealed partial class FilterPane : IDisposable
 {
     private readonly DateFilter _model = new();
     private readonly List<FilterDraft> _pendingDrafts = [];
+    private readonly Dictionary<FilterId, FilterRow?> _rowRefs = new();
 
+    private ElementReference _addFilterButtonRef;
     private ElementReference _addFilterChevronRef;
     private long _addFilterMenuId;
     private bool _canEditDate;
     private TimeZoneInfo _currentTimeZone = TimeZoneInfo.Utc;
+    private bool _focusAddButtonAfterRemove;
+    private FilterId? _focusTargetAfterRemove;
     private bool _isFilterListVisible;
     private bool _isGroupPickerVisible;
     private FilterGroupId _selectedGroupId;
@@ -85,6 +91,26 @@ public sealed partial class FilterPane : IDisposable
     {
         Settings.TimeZoneChanged -= UpdateFilterDateTimeZone;
         MenuService.StateChanged -= OnMenuServiceStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        PruneStaleRowRefs();
+
+        if (_focusTargetAfterRemove is { } targetId
+            && _rowRefs.TryGetValue(targetId, out var target)
+            && target is not null)
+        {
+            _focusTargetAfterRemove = null;
+            await target.FocusEditAsync();
+        }
+        else if (_focusAddButtonAfterRemove)
+        {
+            _focusAddButtonAfterRemove = false;
+            await ElementFocus.SafelyAsync(_addFilterButtonRef);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
     }
 
     protected override void OnInitialized()
@@ -261,13 +287,37 @@ public sealed partial class FilterPane : IDisposable
         }
     }
 
-    private void HandlePendingDiscard(FilterDraft draft) => _pendingDrafts.Remove(draft);
+    private void HandlePendingDiscard(FilterDraft draft)
+    {
+        _pendingDrafts.Remove(draft);
+
+        var target = FilterPaneFocus.ComputeFocusTargetAfterPendingDiscard(
+            FilterPaneState.Value.Filters,
+            IsFocusable);
+
+        _focusTargetAfterRemove = target;
+        _focusAddButtonAfterRemove = target is null;
+    }
 
     private void HandlePendingSave(FilterDraft draft, SavedFilter filter)
     {
         _pendingDrafts.Remove(draft);
         FilterPaneCommands.SetFilter(filter);
     }
+
+    private void HandleRemovedFilter(FilterId removedId)
+    {
+        var target = FilterPaneFocus.ComputeFocusTargetAfterRemove(
+            FilterPaneState.Value.Filters,
+            removedId,
+            IsFocusable);
+
+        _focusTargetAfterRemove = target;
+        _focusAddButtonAfterRemove = target is null;
+    }
+
+    private bool IsFocusable(FilterId id) =>
+        _rowRefs.TryGetValue(id, out var row) && row is not null && !row.IsEditing;
 
     // Marshaled through the renderer dispatcher because StateChanged may fire from arbitrary threads;
     // re-renders so the chevron's aria-expanded reflects open/close state.
@@ -303,6 +353,28 @@ public sealed partial class FilterPane : IDisposable
     }
 
     private Task OpenFilterGroupsModal() => ModalCoordinator.OpenFilterGroupAsync();
+
+    private void PruneStaleRowRefs()
+    {
+        if (_rowRefs.Count == 0) { return; }
+
+        var liveFilters = FilterPaneState.Value.Filters;
+
+        if (liveFilters.Count == 0)
+        {
+            _rowRefs.Clear();
+            return;
+        }
+
+        var liveIds = liveFilters.Select(f => f.Id).ToHashSet();
+
+        var stale = _rowRefs
+            .Where(kvp => !liveIds.Contains(kvp.Key) || kvp.Value is null)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var id in stale) { _rowRefs.Remove(id); }
+    }
 
     private void RemoveDateFilter()
     {

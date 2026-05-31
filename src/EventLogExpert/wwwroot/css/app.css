@@ -295,10 +295,17 @@ input[type="text"].input { padding: 0; }
 
 .input.cache-dropdown,
 .input.advanced-filter {
-    width: 800px;
+    flex: 0 1 auto;
+    width: clamp(480px, 50vw, 800px);
+    min-width: 320px;
+    max-width: 100%;
 }
 
-.input.filter-multiselect-dropdown { width: 600px; }
+.input.filter-multiselect-dropdown {
+    flex: 1 1 auto;
+    min-width: 240px;
+    max-width: 420px;
+}
 
 .input.filter-group-dropdown { width: 600px; }
 
@@ -345,6 +352,17 @@ input[type="text"].input { padding: 0; }
 .button.button-yellow { --btn-color: var(--clr-yellow); }
 
 .button.fixed-width { width: 11ch; }
+
+/* Compact icon-only buttons. Maintain WCAG 2.5.5 AA 24x24 hit target. */
+.button.icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 24px;
+    min-height: 24px;
+    padding: 4px;
+}
 
 .split-button {
     display: inline-flex;
