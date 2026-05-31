@@ -15,6 +15,7 @@ using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.FilterGroup;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
@@ -56,6 +57,7 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<IEventLogCommands, EventLogCommands>();
         services.AddSingleton<IFilterCacheCommands, FilterCacheCommands>();
         services.AddSingleton<IFilterGroupCommands, FilterGroupCommands>();
+        services.AddSingleton<IFilterLibraryCommands, FilterLibraryCommands>();
         services.AddSingleton<IFilterPaneCommands, FilterPaneCommands>();
         services.AddSingleton<ILogTableCommands, LogTableCommands>();
 

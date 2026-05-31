@@ -16,6 +16,7 @@ using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.FilterGroup;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
@@ -101,6 +102,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IEventLogCommands))]
     [InlineData(typeof(IFilterCacheCommands))]
     [InlineData(typeof(IFilterGroupCommands))]
+    [InlineData(typeof(IFilterLibraryCommands))]
     [InlineData(typeof(IFilterPaneCommands))]
     [InlineData(typeof(ILogTableCommands))]
     // UI capabilities.
