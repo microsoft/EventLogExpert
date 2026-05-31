@@ -30,7 +30,7 @@ public sealed partial class PersistencePolicyTests
         // Assert
         Assert.Contains("\"Comparison\"", json);
         Assert.Contains("\"SubFilters\"", json);
-        Assert.DoesNotContain("\"Predicate\"", json);
+        Assert.DoesNotContain("\"Predicates\"", json);
     }
 
     [Fact]
