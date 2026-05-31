@@ -108,6 +108,19 @@ public sealed class ModalCoordinatorTests
     }
 
     [Fact]
+    public void Dispose_WhenCalledTwice_IsIdempotent()
+    {
+        // Arrange
+        var sut = new ModalCoordinator(new ModalService());
+
+        // Act
+        sut.Dispose();
+        sut.Dispose();
+
+        // Assert — no exception thrown.
+    }
+
+    [Fact]
     public async Task PushAsync_PreemptsPriorModal_CoordinatorMirrorsLatest()
     {
         // Arrange
@@ -134,6 +147,33 @@ public sealed class ModalCoordinatorTests
         ModalOpenResult<bool> secondResult = await secondShow;
         Assert.True(secondResult.WasOpened);
         Assert.False(secondResult.Result);
+    }
+
+    [Fact]
+    public async Task PushAsync_WhenCriticalModalActive_RejectsReplacement()
+    {
+        // Arrange
+        var service = new ModalService();
+        using var sut = new ModalCoordinator(service);
+
+        Task<ModalOpenResult<bool>> firstShow = sut.PushAsync<DummyModal, bool>();
+        ModalId firstId = service.ActiveModalId;
+
+        // Lambda return value is irrelevant for this test path; the Critical-scope policy short-circuits before the registered handler is called.
+        sut.RegisterModal(TestRegistration(firstId, _ => Task.FromResult(true), ModalScope.Critical));
+
+        // Act
+        Task<ModalOpenResult<bool>> secondShow = sut.PushAsync<OtherModal, bool>();
+        ModalOpenResult<bool> secondResult = await secondShow;
+
+        // Assert
+        Assert.False(secondResult.WasOpened);
+
+        // Cleanup — force-close T1 so firstShow doesn't leak past the using block.
+        sut.ForceCloseActive();
+        ModalOpenResult<bool> firstResult = await firstShow;
+        Assert.True(firstResult.WasOpened);
+        Assert.False(firstResult.Result);
     }
 
     [Fact]

@@ -10,6 +10,7 @@ namespace EventLogExpert.Runtime.Modal;
 internal sealed class ModalCoordinator : IModalCoordinator, IDisposable
 {
     private readonly IModalService _modalService;
+    private readonly SemaphoreSlim _pushSemaphore = new(1, 1);
     private readonly Lock _stateLock = new();
 
     private ModalRegistration? _activeRegistration;
@@ -42,6 +43,7 @@ internal sealed class ModalCoordinator : IModalCoordinator, IDisposable
 
         _disposed = true;
         _modalService.StateChanged -= OnModalServiceStateChanged;
+        _pushSemaphore.Dispose();
     }
 
     public void ForceCloseActive() => _modalService.CancelActive();
@@ -54,15 +56,29 @@ internal sealed class ModalCoordinator : IModalCoordinator, IDisposable
     public async Task<ModalOpenResult<TResult>> PushAsync<TModal, TResult>(IDictionary<string, object?>? parameters = null)
         where TModal : IComponent
     {
-        // Use the service-derived active id (immediately available) rather than _activeRegistration
-        // (component-lifecycle gap between Show and OnInitialized's RegisterModal).
-        if (_modalService.ActiveModalId != ModalId.None)
+        Task<TResult?> showTask;
+
+        await _pushSemaphore.WaitAsync();
+
+        try
         {
-            bool accepted = await RequestCloseActiveAsync(ModalCloseReason.OtherModalActivation);
-            if (!accepted) { return new ModalOpenResult<TResult>(default, WasOpened: false); }
+            // Use the service-derived active id (immediately available) rather than _activeRegistration
+            // (component-lifecycle gap between Show and OnInitialized's RegisterModal).
+            if (_modalService.ActiveModalId != ModalId.None)
+            {
+                bool accepted = await RequestCloseActiveAsync(ModalCloseReason.OtherModalActivation);
+
+                if (!accepted) { return new ModalOpenResult<TResult>(default, WasOpened: false); }
+            }
+
+            showTask = _modalService.Show<TModal, TResult>(parameters);
+        }
+        finally
+        {
+            _pushSemaphore.Release();
         }
 
-        TResult? result = await _modalService.Show<TModal, TResult>(parameters);
+        TResult? result = await showTask;
         return new ModalOpenResult<TResult>(result, WasOpened: true);
     }
 
