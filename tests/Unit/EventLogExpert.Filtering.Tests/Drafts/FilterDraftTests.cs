@@ -39,7 +39,7 @@ public sealed class FilterDraftModelTests
         // Assert
         Assert.Equal(FilterMode.Advanced, draft.Mode);
         Assert.Null(draft.Comparison.Value);
-        Assert.Empty(draft.SubFilters);
+        Assert.Empty(draft.Predicates);
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public sealed class FilterDraftModelTests
                 Values = [FilterTestConstants.FilterValue100, FilterTestConstants.FilterValue1000]
             },
             [
-                new SubFilter(
+                new FilterPredicate(
                     new FilterComparison
                     {
                         Property = EventProperty.Level,
@@ -105,10 +105,10 @@ public sealed class FilterDraftModelTests
         Assert.Equal(FilterTestConstants.FilterValue100, draft.Comparison.Value);
         Assert.Equal(2, draft.Comparison.Values.Count);
 
-        Assert.Single(draft.SubFilters);
-        Assert.True(draft.SubFilters[0].JoinWithAny);
-        Assert.Equal(EventProperty.Level, draft.SubFilters[0].Comparison.Property);
-        Assert.Equal("Error", draft.SubFilters[0].Comparison.Value);
+        Assert.Single(draft.Predicates);
+        Assert.True(draft.Predicates[0].JoinWithAny);
+        Assert.Equal(EventProperty.Level, draft.Predicates[0].Comparison.Property);
+        Assert.Equal("Error", draft.Predicates[0].Comparison.Value);
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public sealed class FilterDraftModelTests
         Assert.Equal(EventProperty.Id, draft.Comparison.Property);
         Assert.Null(draft.Comparison.Value);
         Assert.Empty(draft.Comparison.Values);
-        Assert.Empty(draft.SubFilters);
+        Assert.Empty(draft.Predicates);
         Assert.Equal("Id == 100", draft.ComparisonText);
     }
 
@@ -215,9 +215,9 @@ public sealed class FilterDraftModelTests
                 MatchMode = MatchMode.Single,
                 Value = FilterTestConstants.FilterValue100
             },
-            subFilters:
+            predicates:
             [
-                new SubFilterDraft
+                new FilterPredicateDraft
                 {
                     Comparison = new FilterComparisonDraft
                     {
@@ -236,9 +236,9 @@ public sealed class FilterDraftModelTests
         // Assert
         Assert.Equal(EventProperty.Id, source.Comparison.Property);
         Assert.Equal(FilterTestConstants.FilterValue100, source.Comparison.Value);
-        Assert.Single(source.SubFilters);
-        Assert.True(source.SubFilters[0].JoinWithAny);
-        Assert.Equal(EventProperty.Level, source.SubFilters[0].Comparison.Property);
-        Assert.Equal("Error", source.SubFilters[0].Comparison.Value);
+        Assert.Single(source.Predicates);
+        Assert.True(source.Predicates[0].JoinWithAny);
+        Assert.Equal(EventProperty.Level, source.Predicates[0].Comparison.Property);
+        Assert.Equal("Error", source.Predicates[0].Comparison.Value);
     }
 }

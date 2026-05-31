@@ -1,0 +1,169 @@
+/* Pill summary chip (collapsed). Each half rounds its own outer corner so the
+   X button isn't clipped by overflow:hidden + border-radius on the wrapper. */
+.filter-predicate {
+    display: inline-flex;
+    align-items: stretch;
+
+    min-height: 24px;
+}
+
+.filter-predicate:hover .filter-predicate-edit,
+.filter-predicate:hover .filter-predicate-remove {
+    border-color: var(--clr-lightblue);
+}
+
+.filter-predicate-edit,
+.filter-predicate-remove {
+    display: inline-flex;
+    align-items: center;
+
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border-divider);
+
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1;
+    user-select: none;
+
+    transition: color 0.1s ease-in-out, background-color 0.1s ease-in-out, border-color 0.1s ease-in-out;
+}
+
+.filter-predicate-edit {
+    gap: 0.25rem;
+    padding: 2px 6px 2px 12px;
+    border-right: none;
+    border-top-left-radius: 999px;
+    border-bottom-left-radius: 999px;
+}
+
+.filter-predicate-joiner {
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.85rem;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.filter-predicate-summary {
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    line-height: 1;
+    white-space: nowrap;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.filter-predicate-remove {
+    min-width: 32px;
+    padding: 2px 12px 2px 8px;
+
+    color: var(--text-secondary);
+
+    justify-content: center;
+    border-top-right-radius: 999px;
+    border-bottom-right-radius: 999px;
+}
+
+.filter-predicate-remove .bi {
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+.filter-predicate-remove:hover {
+    color: var(--clr-on-status-fill);
+    background: var(--clr-red);
+    border-color: var(--clr-red) !important;
+}
+
+.filter-predicate-edit:focus-visible,
+.filter-predicate-remove:focus-visible {
+    outline: 2px solid var(--toggle-accent);
+    outline-offset: -2px;
+}
+
+@media (forced-colors: active) {
+    .filter-predicate {
+        border: 1px solid ButtonText;
+    }
+    .filter-predicate-remove {
+        border-left: 1px solid ButtonText;
+    }
+    .filter-predicate-remove:hover {
+        background: Highlight;
+        color: HighlightText;
+    }
+}
+
+/* Inline editing container (expanded mode). Matches the collapsed chip's 24px
+   height so the row does not jump when transitioning chip\u2194editor. All controls
+   inside are themselves constrained to <=24px (AND/OR pill, dropdown inputs,
+   icon buttons). */
+.filter-predicate-editing {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+
+    min-height: 24px;
+    min-width: 0;
+}
+
+/* AND/OR toggle in editing mode \u2014 neutral pill matching the chip aesthetic. */
+.filter-predicate-and-or {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 44px;
+    min-height: 24px;
+    padding: 2px 8px;
+
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border-divider);
+    border-radius: 999px;
+
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+
+    transition: color 0.1s ease-in-out, border-color 0.1s ease-in-out;
+}
+
+.filter-predicate-and-or[data-mode="or"] {
+    color: var(--clr-lightblue);
+    border-color: var(--clr-lightblue);
+}
+
+.filter-predicate-and-or:hover {
+    color: var(--clr-lightblue);
+    border-color: var(--clr-lightblue);
+}
+
+.filter-predicate-and-or:focus-visible {
+    outline: 2px solid var(--toggle-accent);
+    outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+    .filter-predicate-and-or[data-mode="or"] {
+        color: Highlight;
+        border-color: Highlight;
+    }
+}
+
+/* Compact dropdowns inside the editing chip. */
+.filter-predicate-editing ::deep .input.filter-dropdown {
+    width: 100px;
+}
+
+.filter-predicate-editing ::deep .input.filter-value-dropdown,
+.filter-predicate-editing ::deep .input.filter-description {
+    width: 240px;
+}

@@ -1,0 +1,123 @@
+.filter-edit-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.filter-edit-panel-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.filter-edit-panel-content {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.filter-edit-panel-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+
+    flex: 0 0 auto;
+}
+
+/* Save is the primary action in edit mode \u2014 elevate from the global ghost-style
+   .button-green (text-only color) to a filled treatment so it reads as the
+   primary commit affordance. Sized to match adjacent icon-buttons (24px floor)
+   so the whole action cluster appears vertically aligned. Scoped to
+   FilterEditPanel actions only; other .button-green call sites elsewhere in
+   the app stay ghost-styled. */
+.filter-edit-panel-actions button.button-green {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+
+    min-height: 24px;
+    padding: 2px 12px;
+
+    background-color: var(--clr-green);
+    color: var(--clr-on-status-fill);
+    border-radius: 4px;
+}
+
+.filter-edit-panel-actions button.button-green:hover {
+    filter: brightness(1.1);
+}
+
+.filter-edit-panel-actions button.button-green:focus-visible {
+    outline: 2px solid var(--clr-green);
+    outline-offset: 2px;
+}
+
+.filter-edit-panel-subfilters {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    padding-left: 1rem;
+}
+
+/* Leftmost icon toggle for include/exclude. Slash-circle icon = excluded state;
+   muted gray = included. Uses aria-pressed for SR + visible color cue. */
+.filter-exclude-toggle {
+    color: var(--text-secondary);
+    transition: color 0.1s ease-in-out;
+}
+
+.filter-exclude-toggle[data-excluded="true"] {
+    color: var(--clr-red);
+}
+
+.filter-exclude-toggle:focus-visible {
+    outline: 2px solid var(--toggle-accent);
+    outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+    .filter-exclude-toggle[data-excluded="true"] {
+        color: Highlight;
+    }
+}
+
+.color-picker-wrapper {
+    display: inline-flex;
+}
+
+.color-picker-wrapper[data-filter-excluded="true"] {
+    opacity: 0.5;
+}
+
+.color-picker-wrapper[data-filter-excluded="true"] ::deep input.color-dropdown:focus-visible {
+    outline: 2px solid var(--toggle-accent);
+    outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+    .color-picker-wrapper[data-filter-excluded="true"] {
+        opacity: 1;
+    }
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

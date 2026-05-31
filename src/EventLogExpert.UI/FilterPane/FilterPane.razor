@@ -4,8 +4,12 @@
     <div class="filter-header">
         <div class="filter-header-actions">
             <div class="split-button">
-                <button class="button split-button-primary" @onclick="AddBasicFilter" title="Add Basic filter (use chevron for Advanced or Cached)">
-                    <i class="bi bi-plus-circle"></i> Add Filter
+                <button class="button split-button-primary"
+                    @onclick="AddBasicFilter"
+                    @ref="_addFilterButtonRef"
+                    title="Add Basic filter (use chevron for Advanced or Cached)"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-plus-circle"></i> Add Filter
                 </button>
                 <button aria-controls="menu-host-popup"
                     aria-expanded="@(IsAddFilterMenuOpen ? "true" : "false")"
@@ -101,14 +105,14 @@
     <div class="filter-group" data-toggle="@MenuState">
         @if (IsDateFilterVisible)
         {
-            <EditForm Model="_model" class="filter-form flex-row">
+            <EditForm class="filter-form flex-row" Model="_model">
                 <span>
                     After:
-                    <InputDate Type="InputDateType.DateTimeLocal" aria-label="After" @bind-Value="_model.After" class="filter-datetime input" disabled="@(!_canEditDate)" />
+                    <InputDate aria-label="After" @bind-Value="_model.After" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
                 </span>
                 <span>
                     Before:
-                    <InputDate Type="InputDateType.DateTimeLocal" aria-label="Before" @bind-Value="_model.Before" class="filter-datetime input" disabled="@(!_canEditDate)" />
+                    <InputDate aria-label="Before" @bind-Value="_model.Before" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
                 </span>
 
                 @if (_canEditDate)
@@ -195,15 +199,15 @@
 
         @foreach (var item in FilterPaneState.Value.Filters)
         {
-            <FilterRow Value="item" @key="item.Id" />
+            <FilterRow @key="item.Id" OnRemoved="HandleRemovedFilter" @ref="_rowRefs[item.Id]" Value="item" />
         }
 
         @foreach (var draft in _pendingDrafts)
         {
-            <FilterRow OnPendingDiscard="() => HandlePendingDiscard(draft)"
+            <FilterRow @key="draft.Id"
+                OnPendingDiscard="() => HandlePendingDiscard(draft)"
                 OnPendingSave="filter => HandlePendingSave(draft, filter)"
-                PendingDraft="draft"
-                @key="draft.Id" />
+                PendingDraft="draft" />
         }
     </div>
 </div>

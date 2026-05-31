@@ -5,5 +5,5 @@ using System.Text.Json.Serialization;
 
 namespace EventLogExpert.Filtering.Basic;
 
-[JsonConverter(typeof(SubFilterJsonConverter))]
-public sealed record SubFilter(FilterComparison Comparison, bool JoinWithAny);
+[JsonConverter(typeof(FilterPredicateJsonConverter))]
+public sealed record FilterPredicate(FilterComparison Comparison, bool JoinWithAny);

@@ -46,10 +46,10 @@ public sealed class SavedFilterTests
         Assert.NotNull(restored.BasicFilter);
         Assert.Equal(EventProperty.Id, restored.BasicFilter.Comparison.Property);
         Assert.Equal("100", restored.BasicFilter.Comparison.Value);
-        Assert.Single(restored.BasicFilter.SubFilters);
-        Assert.False(restored.BasicFilter.SubFilters[0].JoinWithAny);
-        Assert.Equal(EventProperty.Level, restored.BasicFilter.SubFilters[0].Comparison.Property);
-        Assert.Equal("Error", restored.BasicFilter.SubFilters[0].Comparison.Value);
+        Assert.Single(restored.BasicFilter.Predicates);
+        Assert.False(restored.BasicFilter.Predicates[0].JoinWithAny);
+        Assert.Equal(EventProperty.Level, restored.BasicFilter.Predicates[0].Comparison.Property);
+        Assert.Equal("Error", restored.BasicFilter.Predicates[0].Comparison.Value);
     }
 
     [Fact]

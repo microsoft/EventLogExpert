@@ -1,0 +1,22 @@
+<div class="filter-predicate-list-wrapper">
+    <span class="filter-predicate-list">
+        @foreach (var predicate in Predicates)
+        {
+            <FilterPredicateEditor IsEditing="@(_editingPredicateId == predicate.Id)"
+                @key="predicate.Id"
+                OnDone="CollapseEditor"
+                OnEdit="@(() => StartEditing(predicate.Id))"
+                OnRemove="@(() => RemovePredicate(predicate.Id))"
+                Value="predicate" />
+        }
+
+        <button aria-label="@(CanAddPredicate ? "Add predicate" : "Complete the current predicate before adding another")"
+            class="add-filter-predicate-button button icon-button"
+            disabled="@(!CanAddPredicate)"
+            @onclick="AddPredicate"
+            title="@(CanAddPredicate ? "Add predicate" : "Complete the current predicate before adding another")"
+            type="button">
+            <i aria-hidden="true" class="bi bi-plus-circle"></i>
+        </button>
+    </span>
+</div>

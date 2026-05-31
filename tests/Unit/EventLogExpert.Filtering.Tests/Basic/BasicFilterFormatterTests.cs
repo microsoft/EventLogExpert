@@ -19,7 +19,7 @@ public sealed class BasicFilterFormatterTests
                 Value = "100"
             },
             [
-                new SubFilter(
+                new FilterPredicate(
                     new FilterComparison
                     {
                         Property = EventProperty.Level,
@@ -48,7 +48,7 @@ public sealed class BasicFilterFormatterTests
                 Value = "100"
             },
             [
-                new SubFilter(
+                new FilterPredicate(
                     new FilterComparison
                     {
                         Property = EventProperty.Level,
@@ -77,7 +77,7 @@ public sealed class BasicFilterFormatterTests
                 Value = "100"
             },
             [
-                new SubFilter(
+                new FilterPredicate(
                     new FilterComparison
                     {
                         Property = EventProperty.Level,
@@ -105,7 +105,7 @@ public sealed class BasicFilterFormatterTests
                 MatchMode = MatchMode.Single,
                 Value = "Kernel"
             },
-            ImmutableList<SubFilter>.Empty);
+            ImmutableList<FilterPredicate>.Empty);
 
         var strictResult = BasicFilterFormatter.TryFormat(source, true, out var strict);
         var lenientResult = BasicFilterFormatter.TryFormat(source, out var lenient);

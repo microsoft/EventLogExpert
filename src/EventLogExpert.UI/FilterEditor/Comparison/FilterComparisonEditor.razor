@@ -10,14 +10,14 @@
     }
 </ValueSelect>
 
-<label aria-label="Comparison" id="@($"{Id}_Comparison")">Comparison: </label>
+<label class="visually-hidden" id="@($"{Id}_Comparison")">Comparison</label>
 <ComparisonOperatorSelect AriaLabelledBy="@($"{Id}_Comparison")"
     MatchMode="Comparison.MatchMode"
     OnChanged="HandleOperatorChanged"
     Operator="Comparison.Operator"
     SupportsMany="!IsTextOnlyProperty(Comparison.Property)" />
 
-<label aria-label="Value" id="@($"{Id}_Value")">Value: </label>
+<label class="visually-hidden" id="@($"{Id}_Value")">Value</label>
 @if (IsTextOnlyProperty(Comparison.Property))
 {
     <TextInput AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-description" @bind-Value="@Comparison.Value" />

@@ -73,6 +73,12 @@ internal sealed class Reducers
         SetFilterDateRangeSuccessAction action) =>
         state with { FilteredDateRange = action.DateFilter };
 
+    [ReducerMethod]
+    public static FilterPaneState ReduceSetFilterExcluded(
+        FilterPaneState state,
+        SetFilterExcludedAction action) =>
+        UpdateFilterById(state, action.Id, filter => filter with { IsExcluded = action.IsExcluded });
+
     [ReducerMethod(typeof(ToggleFilterDateAction))]
     public static FilterPaneState ReduceToggleFilterDate(FilterPaneState state)
     {
