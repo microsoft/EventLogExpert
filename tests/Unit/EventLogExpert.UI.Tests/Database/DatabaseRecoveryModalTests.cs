@@ -5,6 +5,7 @@ using AngleSharp.Dom;
 using AngleSharp.Html.Dom;
 using Bunit;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Modal;
@@ -601,6 +602,36 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
             Arg.Any<string>(),
             Arg.Any<string?>(),
             Arg.Any<Func<Task>?>());
+    }
+
+    [Fact]
+    public async Task DatabaseRecoveryModal_WhenInlineAlertRequested_ResolvesViaInlineAlertHost()
+    {
+        // Arrange
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
+
+        var component = Render<DatabaseRecoveryModal>();
+
+        // Act
+        var alertTask = component.Instance.ShowInlineAlertAsync(
+            new InlineAlertRequest(
+                Title: "Test",
+                Message: "Test message",
+                AcceptLabel: "OK",
+                CancelLabel: "Cancel",
+                IsPrompt: false,
+                PromptInitialValue: null),
+            CancellationToken.None);
+
+        // Scoped under .inline-alert-buttons so it doesn't match the AcceptCancel footer's
+        // Apply button (also class="button button-green").
+        var acceptButton = await component.WaitForElementAsync(".inline-alert-buttons button.button-green");
+
+        await acceptButton.ClickAsync(new MouseEventArgs());
+
+        // Assert
+        InlineAlertResult result = await alertTask;
+        Assert.True(result.Accepted);
     }
 
     private static DatabaseEntry BuildEntry(string fileName, bool backupExists) =>
