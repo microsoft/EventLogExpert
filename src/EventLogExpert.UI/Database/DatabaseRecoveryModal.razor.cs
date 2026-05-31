@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.Database;
 
-public sealed partial class DatabaseRecoveryDialog : ModalBase<bool>
+public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
 {
     private readonly HashSet<string> _failedFileNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, RecoveryAction> _selectedActions = new(StringComparer.OrdinalIgnoreCase);
@@ -57,7 +57,7 @@ public sealed partial class DatabaseRecoveryDialog : ModalBase<bool>
                 catch (Exception unexpected)
                 {
                     TraceLogger.Error(
-                        $"{nameof(DatabaseRecoveryDialog)} deferred empty-set dismiss threw: {unexpected}");
+                        $"{nameof(DatabaseRecoveryModal)} deferred empty-set dismiss threw: {unexpected}");
                 }
             });
         }
@@ -115,13 +115,13 @@ public sealed partial class DatabaseRecoveryDialog : ModalBase<bool>
                 catch (InvalidOperationException invalidOperation)
                 {
                     TraceLogger.Warning(
-                        $"{nameof(DatabaseRecoveryDialog)}: skipped '{fileName}' ({action}) — {invalidOperation.Message}");
+                        $"{nameof(DatabaseRecoveryModal)}: skipped '{fileName}' ({action}) — {invalidOperation.Message}");
                     continue;
                 }
                 catch (Exception unexpected)
                 {
                     TraceLogger.Error(
-                        $"{nameof(DatabaseRecoveryDialog)}.{nameof(ApplyAsync)} threw for '{fileName}' ({action}): {unexpected}");
+                        $"{nameof(DatabaseRecoveryModal)}.{nameof(ApplyAsync)} threw for '{fileName}' ({action}): {unexpected}");
                     success = false;
                 }
 
@@ -171,7 +171,7 @@ public sealed partial class DatabaseRecoveryDialog : ModalBase<bool>
         catch (Exception unexpected)
         {
             TraceLogger.Error(
-                $"{nameof(DatabaseRecoveryDialog)}.{nameof(HandleEntriesChangedAsync)} threw: {unexpected}");
+                $"{nameof(DatabaseRecoveryModal)}.{nameof(HandleEntriesChangedAsync)} threw: {unexpected}");
         }
     }
 

@@ -18,7 +18,7 @@ using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Database;
 
-public sealed class DatabaseRecoveryDialogTests : BunitContext
+public sealed class DatabaseRecoveryModalTests : BunitContext
 {
     private readonly IDatabaseService _databaseService = Substitute.For<IDatabaseService>();
     private readonly IErrorBannerService _errorBannerService = Substitute.For<IErrorBannerService>();
@@ -29,7 +29,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
 
     private ModalRegistration? _capturedRegistration;
 
-    public DatabaseRecoveryDialogTests()
+    public DatabaseRecoveryModalTests()
     {
         Services.AddBannerHostDependencies();
         Services.AddMenuMocks();
@@ -46,13 +46,13 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         Services.AddSingleton(_modalCoordinator);
         Services.AddSingleton(_modalService);
         Services.AddSingleton(_traceLogger);
-        Services.AddFluxor(options => options.ScanAssemblies(typeof(DatabaseRecoveryDialog).Assembly));
+        Services.AddFluxor(options => options.ScanAssemblies(typeof(DatabaseRecoveryModal).Assembly));
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_AllRowsSucceed_AutoCompletesWithFalseWhenEntriesDrain()
+    public async Task DatabaseRecoveryModal_AllRowsSucceed_AutoCompletesWithFalseWhenEntriesDrain()
     {
         // Arrange
         var entriesBefore = new[]
@@ -66,7 +66,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         _databaseService.RestoreFromBackupAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Act
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
@@ -82,14 +82,14 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_ApplyDeleteReturnsFalse_SurfacesErrorBannerAndMarksRowFailed()
+    public async Task DatabaseRecoveryModal_ApplyDeleteReturnsFalse_SurfacesErrorBannerAndMarksRowFailed()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _databaseService.DeleteEntryWithBackupAsync("a.db", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(false));
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Act
         await component.Find("button.button:contains('Delete all')").ClickAsync(new MouseEventArgs());
@@ -106,7 +106,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_ApplyDisablesAllControls_WhilePending()
+    public async Task DatabaseRecoveryModal_ApplyDisablesAllControls_WhilePending()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
@@ -114,7 +114,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
             .Returns(pendingRestore.Task);
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Act
         var applyClick = component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
@@ -135,7 +135,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_ApplyMixed_CallsBothMethodsForRespectiveRows()
+    public async Task DatabaseRecoveryModal_ApplyMixed_CallsBothMethodsForRespectiveRows()
     {
         // Arrange
         _databaseService.Entries.Returns(
@@ -145,7 +145,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         _databaseService.DeleteEntryWithBackupAsync("b.db", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Act
         var bRow = component.FindAll("li.recovery-row")[1];
@@ -162,14 +162,14 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_ApplyRestoreReturnsFalse_SurfacesErrorBannerAndMarksRowFailed()
+    public async Task DatabaseRecoveryModal_ApplyRestoreReturnsFalse_SurfacesErrorBannerAndMarksRowFailed()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(false));
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Act
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
@@ -185,14 +185,14 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_ApplyThrowsInvalidOperation_TreatsAsBenignSkipNoErrorBanner()
+    public async Task DatabaseRecoveryModal_ApplyThrowsInvalidOperation_TreatsAsBenignSkipNoErrorBanner()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
             .Returns(Task.FromException<bool>(new InvalidOperationException("entry not found")));
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Act
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
@@ -209,14 +209,14 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_ApplyThrowsUnexpected_SurfacesErrorBannerAndMarksRowFailed()
+    public async Task DatabaseRecoveryModal_ApplyThrowsUnexpected_SurfacesErrorBannerAndMarksRowFailed()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
             .Returns(Task.FromException<bool>(new IOException("disk gone")));
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Act
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
@@ -231,14 +231,14 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_ApplyWithDelete_CallsDeleteEntryWithBackupAsyncWithFileName()
+    public async Task DatabaseRecoveryModal_ApplyWithDelete_CallsDeleteEntryWithBackupAsyncWithFileName()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _databaseService.DeleteEntryWithBackupAsync("a.db", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Act
         await component.Find("button.button:contains('Delete all')").ClickAsync(new MouseEventArgs());
@@ -254,14 +254,14 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_ApplyWithRestore_CallsRestoreFromBackupAsyncWithFileName()
+    public async Task DatabaseRecoveryModal_ApplyWithRestore_CallsRestoreFromBackupAsyncWithFileName()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Act
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
@@ -276,12 +276,12 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_CancelClicked_RoutesThroughCoordinatorAndDoesNotCallDatabaseService()
+    public async Task DatabaseRecoveryModal_CancelClicked_RoutesThroughCoordinatorAndDoesNotCallDatabaseService()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Act
         await component.Find("button:contains('Cancel')").ClickAsync(new MouseEventArgs());
@@ -297,14 +297,14 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public void DatabaseRecoveryDialog_DefaultsEachRowToRestore()
+    public void DatabaseRecoveryModal_DefaultsEachRowToRestore()
     {
         // Arrange
         _databaseService.Entries.Returns(
             [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
 
         // Act
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Assert
         foreach (var row in component.FindAll("li.recovery-row"))
@@ -317,13 +317,13 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_DeleteAllClicked_SetsAllRowsToDelete()
+    public async Task DatabaseRecoveryModal_DeleteAllClicked_SetsAllRowsToDelete()
     {
         // Arrange
         _databaseService.Entries.Returns(
             [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Act
         await component.Find("button.button:contains('Delete all')").ClickAsync(new MouseEventArgs());
@@ -338,12 +338,12 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_EntriesChangedAllResolved_AutoCompletesWithFalse()
+    public async Task DatabaseRecoveryModal_EntriesChangedAllResolved_AutoCompletesWithFalse()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Act
         _databaseService.Entries.Returns([]);
@@ -355,12 +355,12 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_EntriesChangedNewBackupExistsEntry_AddsRowWithRestoreDefault()
+    public async Task DatabaseRecoveryModal_EntriesChangedNewBackupExistsEntry_AddsRowWithRestoreDefault()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Act
         _databaseService.Entries.Returns(
@@ -381,13 +381,13 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_EntriesChangedSubsetResolved_RemovesResolvedRowsKeepsDialogOpen()
+    public async Task DatabaseRecoveryModal_EntriesChangedSubsetResolved_RemovesResolvedRowsKeepsDialogOpen()
     {
         // Arrange
         _databaseService.Entries.Returns(
             [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         var bRow = component.FindAll("li.recovery-row")[1];
         var bDeleteRadio = bRow.QuerySelectorAll("input[type=radio]")[1];
@@ -410,7 +410,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_FailedRow_LosesFailureMarkOnNextApplySuccessWhileOthersStayFailed()
+    public async Task DatabaseRecoveryModal_FailedRow_LosesFailureMarkOnNextApplySuccessWhileOthersStayFailed()
     {
         // Arrange
         _databaseService.Entries.Returns(
@@ -420,7 +420,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         _databaseService.RestoreFromBackupAsync("b.db", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(false));
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
@@ -447,13 +447,13 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_InitialEmptySet_AutoCompletesWithoutShowingModal()
+    public async Task DatabaseRecoveryModal_InitialEmptySet_AutoCompletesWithoutShowingModal()
     {
         // Arrange
         _databaseService.Entries.Returns([]);
 
         // Act
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Assert
         await component.WaitForAssertionAsync(() =>
@@ -461,12 +461,12 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_OnRequestCloseAsync_WhenIdle_ReturnsTrue()
+    public async Task DatabaseRecoveryModal_OnRequestCloseAsync_WhenIdle_ReturnsTrue()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        Render<DatabaseRecoveryDialog>();
+        Render<DatabaseRecoveryModal>();
         Assert.NotNull(_capturedRegistration);
 
         // Act
@@ -478,7 +478,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_OnRequestCloseAsync_WhileApplying_ReturnsFalse()
+    public async Task DatabaseRecoveryModal_OnRequestCloseAsync_WhileApplying_ReturnsFalse()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
@@ -486,7 +486,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
             .Returns(pendingRestore.Task);
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
         Assert.NotNull(_capturedRegistration);
 
         // Act — start Apply (sets _isApplying), then ask the registration whether it can close.
@@ -503,13 +503,13 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public void DatabaseRecoveryDialog_RegistersAsCriticalScope()
+    public void DatabaseRecoveryModal_RegistersAsCriticalScope()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         // Act
-        Render<DatabaseRecoveryDialog>();
+        Render<DatabaseRecoveryModal>();
 
         // Assert
         Assert.NotNull(_capturedRegistration);
@@ -517,7 +517,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public void DatabaseRecoveryDialog_RendersOneRowPerBackupExistsEntry()
+    public void DatabaseRecoveryModal_RendersOneRowPerBackupExistsEntry()
     {
         // Arrange
         _databaseService.Entries.Returns(
@@ -528,7 +528,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
             ]);
 
         // Act
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         // Assert
         var rows = component.FindAll("li.recovery-row");
@@ -538,13 +538,13 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_RestoreAllClicked_SetsAllRowsToRestore()
+    public async Task DatabaseRecoveryModal_RestoreAllClicked_SetsAllRowsToRestore()
     {
         // Arrange
         _databaseService.Entries.Returns(
             [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         var rowCount = component.FindAll("li.recovery-row").Count;
         for (var rowIndex = 0; rowIndex < rowCount; rowIndex++)
@@ -567,7 +567,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryDialog_RowResolvedExternallyMidLoop_DoesNotCallServiceForResolvedRow()
+    public async Task DatabaseRecoveryModal_RowResolvedExternallyMidLoop_DoesNotCallServiceForResolvedRow()
     {
         // Arrange
         var entriesBefore = new[]
@@ -586,7 +586,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
 
-        var component = Render<DatabaseRecoveryDialog>();
+        var component = Render<DatabaseRecoveryModal>();
 
         _databaseService.Entries.Returns(entriesAfter);
 
@@ -612,7 +612,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
             backupExists);
 
     private static IElement FindRowByFileName(
-        IRenderedComponent<DatabaseRecoveryDialog> component,
+        IRenderedComponent<DatabaseRecoveryModal> component,
         string fileName)
     {
         foreach (var row in component.FindAll("li.recovery-row"))

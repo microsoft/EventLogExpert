@@ -157,7 +157,7 @@ public sealed class DatabaseRecoveryHost : IDisposable
         if (!result.WasOpened)
         {
             _traceLogger.Trace(
-                $"{nameof(DatabaseRecoveryDialog)} open preempted by an active modal.");
+                $"{nameof(DatabaseRecoveryModal)} open preempted by an active modal.");
         }
     });
 
