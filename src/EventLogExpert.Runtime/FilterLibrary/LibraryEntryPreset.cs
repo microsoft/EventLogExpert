@@ -6,5 +6,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.FilterLibrary;
 
-public sealed record LibraryEntryPreset(string Id, string Name, DateTimeOffset CreatedUtc, ImmutableList<SavedFilter> Filters)
-    : LibraryEntry(Id, Name, CreatedUtc);
+public sealed record LibraryEntryPreset : LibraryEntry
+{
+    public required ImmutableList<SavedFilter> Filters { get; init; }
+}

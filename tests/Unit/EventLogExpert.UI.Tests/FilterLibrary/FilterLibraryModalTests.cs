@@ -99,7 +99,13 @@ public sealed class FilterLibraryModalTests : BunitContext
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
 
-        return new LibraryEntrySavedFilter(id, name, DateTimeOffset.UtcNow, filter);
+        return new LibraryEntrySavedFilter
+        {
+            Id = id,
+            Name = name,
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filter = filter,
+        };
     }
 
     private void SetState(FilterLibraryState state)

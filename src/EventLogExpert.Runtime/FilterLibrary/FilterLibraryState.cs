@@ -13,5 +13,7 @@ public sealed record FilterLibraryState
 
     public bool IsLoaded { get; init; }
 
+    public bool IsLoading { get; init; }
+
     public bool LoadError { get; init; }
 }

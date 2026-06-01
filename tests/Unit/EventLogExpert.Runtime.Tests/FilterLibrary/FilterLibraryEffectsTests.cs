@@ -53,7 +53,13 @@ public sealed class FilterLibraryEffectsTests
         Assert.NotNull(f1);
         Assert.NotNull(f2);
 
-        var preset = new LibraryEntryPreset("preset-1", "Preset", DateTimeOffset.UtcNow, [f1, f2]);
+        var preset = new LibraryEntryPreset
+        {
+            Id = "preset-1",
+            Name = "Preset",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = [f1, f2],
+        };
         var (effects, _, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [preset] });
 
         // Act
@@ -80,7 +86,12 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleApplyLibraryEntry_UnknownConcreteType_ThrowsInvalidOperationException()
     {
-        var unknown = new UnknownLibraryEntry("id-x", "Unknown", DateTimeOffset.UtcNow);
+        var unknown = new UnknownLibraryEntry
+        {
+            Id = "id-x",
+            Name = "Unknown",
+            CreatedUtc = DateTimeOffset.UtcNow,
+        };
         var (effects, _, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [unknown] });
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -181,7 +192,13 @@ public sealed class FilterLibraryEffectsTests
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
 
-        return new LibraryEntrySavedFilter(id, name, DateTimeOffset.UtcNow, filter);
+        return new LibraryEntrySavedFilter
+        {
+            Id = id,
+            Name = name,
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filter = filter,
+        };
     }
 
     private static (Effects effects, IFilterLibraryStore store, IDispatcher dispatcher, IState<FilterLibraryState> stateMock, ITraceLogger logger) CreateEffects(
@@ -201,6 +218,5 @@ public sealed class FilterLibraryEffectsTests
     }
 
     // Used for the unknown-concrete-type wildcard test (covers the throw arm in HandleApplyLibraryEntry).
-    private sealed record UnknownLibraryEntry(string Id, string Name, DateTimeOffset CreatedUtc)
-        : LibraryEntry(Id, Name, CreatedUtc);
+    private sealed record UnknownLibraryEntry : LibraryEntry;
 }
