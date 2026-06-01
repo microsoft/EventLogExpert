@@ -28,7 +28,7 @@ public interface IFilterLibraryStore
     }
 
     /// <summary>Removes the library entry with <paramref name="entryId" /> from the persistent store.</summary>
-    void Delete(string entryId);
+    void Delete(LibraryEntryId entryId);
 
     /// <summary>
     ///     Reads all library entries from the persistent store. Throws on connection/schema failures (FilterLibrary
@@ -41,7 +41,7 @@ public interface IFilterLibraryStore
     ///     entry exists and is not favorited. Returns <c>true</c> when the bump succeeded; <c>false</c> when no row matched
     ///     (entry missing OR favorited).
     /// </summary>
-    bool TryBumpLastUsedIfNotFavorite(string entryId, DateTimeOffset lastUsedUtc);
+    bool TryBumpLastUsedIfNotFavorite(LibraryEntryId entryId, DateTimeOffset lastUsedUtc);
 
     /// <summary>Updates an existing library entry in the persistent store (matched by <see cref="LibraryEntry.Id" />).</summary>
     void Update(LibraryEntry entry);

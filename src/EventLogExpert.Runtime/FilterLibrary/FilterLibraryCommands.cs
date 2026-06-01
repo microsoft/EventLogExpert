@@ -13,7 +13,7 @@ internal sealed class FilterLibraryCommands(IDispatcher dispatcher) : IFilterLib
 
     public void UpdateEntry(LibraryEntry entry) => dispatcher.Dispatch(new UpdateLibraryEntryAction(entry));
 
-    public void DeleteEntry(string entryId) => dispatcher.Dispatch(new DeleteLibraryEntryAction(entryId));
+    public void DeleteEntry(LibraryEntryId entryId) => dispatcher.Dispatch(new DeleteLibraryEntryAction(entryId));
 
-    public void ApplyEntry(string entryId) => dispatcher.Dispatch(new ApplyLibraryEntryAction(entryId));
+    public void ApplyEntry(LibraryEntryId entryId) => dispatcher.Dispatch(new ApplyLibraryEntryAction(entryId));
 }

@@ -179,12 +179,12 @@ public sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         }
     }
 
-    public void Delete(string entryId)
+    public void Delete(LibraryEntryId entryId)
     {
         using var connection = OpenConnection();
         using var cmd = connection.CreateCommand();
         cmd.CommandText = DeleteSql;
-        cmd.Parameters.AddWithValue("$id", entryId);
+        cmd.Parameters.AddWithValue("$id", entryId.Value.ToString("D"));
         cmd.ExecuteNonQuery();
     }
 
@@ -224,16 +224,13 @@ public sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         return entries.ToImmutable();
     }
 
-    public bool TryBumpLastUsedIfNotFavorite(string entryId, DateTimeOffset lastUsedUtc)
+    public bool TryBumpLastUsedIfNotFavorite(LibraryEntryId entryId, DateTimeOffset lastUsedUtc)
     {
-        ArgumentNullException.ThrowIfNull(entryId);
-
         using var connection = OpenConnection();
         using var cmd = connection.CreateCommand();
         cmd.CommandText = BumpLastUsedIfNotFavoriteSql;
-        cmd.Parameters.AddWithValue("$id", entryId);
+        cmd.Parameters.AddWithValue("$id", entryId.Value.ToString("D"));
         cmd.Parameters.AddWithValue("$last_used_utc", lastUsedUtc.ToString("O", CultureInfo.InvariantCulture));
-
         return cmd.ExecuteNonQuery() > 0;
     }
 
@@ -248,7 +245,7 @@ public sealed class FilterLibrarySqliteStore : IFilterLibraryStore
 
     private static void BindEntry(SqliteCommand cmd, LibraryEntry entry)
     {
-        cmd.Parameters.AddWithValue("$id", entry.Id);
+        cmd.Parameters.AddWithValue("$id", entry.Id.Value.ToString("D"));
         cmd.Parameters.AddWithValue("$name", entry.Name);
         cmd.Parameters.AddWithValue("$created", entry.CreatedUtc.ToString("O", CultureInfo.InvariantCulture));
         cmd.Parameters.AddWithValue("$is_favorite", entry.IsFavorite ? 1 : 0);
@@ -283,7 +280,7 @@ public sealed class FilterLibrarySqliteStore : IFilterLibraryStore
     }
 
     private static LibraryEntry? DeserializeEntry(
-        string id,
+        LibraryEntryId id,
         string name,
         DateTimeOffset createdUtc,
         string kind,
@@ -355,7 +352,7 @@ public sealed class FilterLibrarySqliteStore : IFilterLibraryStore
 
     private static LibraryEntry? ReadEntry(SqliteDataReader reader)
     {
-        var id = reader.GetString(0);
+        var id = new LibraryEntryId(Guid.Parse(reader.GetString(0)));
         var name = reader.GetString(1);
         var createdUtc = DateTimeOffset.Parse(reader.GetString(2), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
         var kind = reader.GetString(3);

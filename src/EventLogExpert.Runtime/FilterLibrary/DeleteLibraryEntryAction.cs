@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.Runtime.FilterLibrary;
 
-internal sealed record DeleteLibraryEntryAction(string EntryId);
+internal sealed record DeleteLibraryEntryAction(LibraryEntryId EntryId);

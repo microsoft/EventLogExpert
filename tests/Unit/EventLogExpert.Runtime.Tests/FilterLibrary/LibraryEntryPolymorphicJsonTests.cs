@@ -13,7 +13,7 @@ public sealed class LibraryEntryPolymorphicJsonTests
     public void Deserialize_MissingKind_ThrowsNotSupportedException()
     {
         var json = """
-            {"Id":"x","Name":"y","CreatedUtc":"2026-05-31T12:00:00+00:00"}
+            {"Id":"00000000-0000-0000-0000-000000000001","Name":"y","CreatedUtc":"2026-05-31T12:00:00+00:00"}
             """;
 
         Assert.Throws<NotSupportedException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
@@ -23,7 +23,7 @@ public sealed class LibraryEntryPolymorphicJsonTests
     public void Deserialize_UnknownKind_ThrowsJsonException()
     {
         var json = """
-            {"Kind":"Unknown","Id":"x","Name":"y","CreatedUtc":"2026-05-31T12:00:00+00:00"}
+            {"Kind":"Unknown","Id":"00000000-0000-0000-0000-000000000001","Name":"y","CreatedUtc":"2026-05-31T12:00:00+00:00"}
             """;
 
         Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
@@ -32,28 +32,26 @@ public sealed class LibraryEntryPolymorphicJsonTests
     [Fact]
     public void RoundTrip_PresetEntry_PreservesAllFields_WithKindDiscriminator()
     {
-        // Arrange
         var f1 = SavedFilter.TryCreate("Level == 2");
         var f2 = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(f1);
         Assert.NotNull(f2);
 
         var createdUtc = new DateTimeOffset(2026, 5, 31, 12, 0, 0, TimeSpan.Zero);
+        var presetId = new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-000000000002"));
         LibraryEntry entry = new LibraryEntryPreset
         {
-            Id = "id-2",
+            Id = presetId,
             Name = "My Preset",
             CreatedUtc = createdUtc,
             Filters = [f1, f2],
         };
 
-        // Act
         var json = JsonSerializer.Serialize(entry);
         var restored = JsonSerializer.Deserialize<LibraryEntry>(json);
 
-        // Assert
         var restoredPreset = Assert.IsType<LibraryEntryPreset>(restored);
-        Assert.Equal("id-2", restoredPreset.Id);
+        Assert.Equal(presetId, restoredPreset.Id);
         Assert.Equal("My Preset", restoredPreset.Name);
         Assert.Equal(createdUtc, restoredPreset.CreatedUtc);
         Assert.Equal(2, restoredPreset.Filters.Count);
@@ -65,26 +63,24 @@ public sealed class LibraryEntryPolymorphicJsonTests
     [Fact]
     public void RoundTrip_SavedFilterEntry_PreservesAllFields_WithKindDiscriminator()
     {
-        // Arrange
         var filter = SavedFilter.TryCreate("Level == 4", color: HighlightColor.Blue, isExcluded: true);
         Assert.NotNull(filter);
 
         var createdUtc = new DateTimeOffset(2026, 5, 31, 12, 0, 0, TimeSpan.Zero);
+        var filterId = new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-000000000001"));
         LibraryEntry entry = new LibraryEntrySavedFilter
         {
-            Id = "id-1",
+            Id = filterId,
             Name = "My Filter",
             CreatedUtc = createdUtc,
             Filter = filter,
         };
 
-        // Act
         var json = JsonSerializer.Serialize(entry);
         var restored = JsonSerializer.Deserialize<LibraryEntry>(json);
 
-        // Assert
         var restoredFilter = Assert.IsType<LibraryEntrySavedFilter>(restored);
-        Assert.Equal("id-1", restoredFilter.Id);
+        Assert.Equal(filterId, restoredFilter.Id);
         Assert.Equal("My Filter", restoredFilter.Name);
         Assert.Equal(createdUtc, restoredFilter.CreatedUtc);
         Assert.Equal("Level == 4", restoredFilter.Filter.ComparisonText);

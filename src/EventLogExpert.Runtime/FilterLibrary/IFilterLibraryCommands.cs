@@ -9,10 +9,10 @@ public interface IFilterLibraryCommands
     void AddEntry(LibraryEntry entry);
 
     /// <summary>Applies the library entry's filters to the FilterPane (replacing existing filters).</summary>
-    void ApplyEntry(string entryId);
+    void ApplyEntry(LibraryEntryId entryId);
 
     /// <summary>Removes the library entry with <paramref name="entryId" /> and persists.</summary>
-    void DeleteEntry(string entryId);
+    void DeleteEntry(LibraryEntryId entryId);
 
     /// <summary>Loads persisted library entries from the store into the FilterLibrary state.</summary>
     void LoadLibrary();

@@ -123,6 +123,16 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleMergeFilters_ShouldUpdateEventTableFilters()
+    {
+        var (effects, mockDispatcher) = CreateEffects(true, CreateSingleEnabledFilters());
+
+        await effects.HandleMergeFilters(mockDispatcher);
+
+        mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
+    }
+
+    [Fact]
     public async Task HandleRemoveAdvancedFilter_ShouldUpdateEventTableFilters()
     {
         // Arrange

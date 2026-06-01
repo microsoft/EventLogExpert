@@ -401,6 +401,111 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
+    public void ReduceMergeFilters_PreservesBasicFilter()
+    {
+        // Arrange
+        var basicFilter = new BasicFilter(
+            new FilterComparison
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            },
+            []);
+
+        var state = new FilterPaneState();
+
+        var filters = ImmutableList.Create(FilterBuilder.CreateTestFilter(basicFilter: basicFilter));
+
+        // Act
+        var result = Reducers.ReduceMergeFilters(state, new MergeFiltersAction(filters));
+
+        // Assert
+        Assert.Single(result.Filters);
+        Assert.Equal(basicFilter, result.Filters[0].BasicFilter);
+        Assert.True(result.Filters[0].IsEnabled);
+    }
+
+    [Fact]
+    public void ReduceMergeFilters_RegeneratesFilterIdsToAvoidRazorKeyCollision()
+    {
+        var source = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(source);
+
+        var state = new FilterPaneState();
+
+        var result = Reducers.ReduceMergeFilters(state, new MergeFiltersAction([source]));
+
+        Assert.Single(result.Filters);
+        Assert.NotEqual(source.Id, result.Filters[0].Id);
+    }
+
+    [Fact]
+    public void ReduceMergeFilters_ShouldPreserveIsExcludedOnAppliedFilters()
+    {
+        var state = new FilterPaneState();
+        var filters = ImmutableList.Create(FilterBuilder.CreateTestFilter(isExcluded: true));
+
+        var result = Reducers.ReduceMergeFilters(state, new MergeFiltersAction(filters));
+
+        Assert.Single(result.Filters);
+        Assert.True(result.Filters[0].IsExcluded);
+        Assert.True(result.Filters[0].IsEnabled);
+    }
+
+    [Fact]
+    public void ReduceMergeFilters_WithDuplicateFilter_ShouldSkipDuplicate()
+    {
+        var existingFilter = FilterBuilder.CreateTestFilter();
+        var state = new FilterPaneState { Filters = [existingFilter] };
+        var filters = ImmutableList.Create(FilterBuilder.CreateTestFilter());
+
+        var result = Reducers.ReduceMergeFilters(state, new MergeFiltersAction(filters));
+
+        Assert.Single(result.Filters);
+    }
+
+    [Fact]
+    public void ReduceMergeFilters_WithEmptyFilters_ShouldReturnOriginalState()
+    {
+        var state = new FilterPaneState();
+
+        var result = Reducers.ReduceMergeFilters(state, new MergeFiltersAction([]));
+
+        Assert.Equal(state, result);
+    }
+
+    [Fact]
+    public void ReduceMergeFilters_WithNewFilters_ShouldAddFilters()
+    {
+        var state = new FilterPaneState();
+        var filters = ImmutableList.Create(
+            FilterBuilder.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Red));
+
+        var result = Reducers.ReduceMergeFilters(state, new MergeFiltersAction(filters));
+
+        Assert.Single(result.Filters);
+        Assert.Equal(FilterTestConstants.FilterIdEquals100, result.Filters[0].ComparisonText);
+        Assert.Equal(HighlightColor.Red, result.Filters[0].Color);
+        Assert.True(result.Filters[0].IsEnabled);
+    }
+
+    [Fact]
+    public void ReduceMergeFilters_WithSameComparisonButDifferentExclusion_ShouldKeepBoth()
+    {
+        var existingInclude = FilterBuilder.CreateTestFilter();
+        var state = new FilterPaneState { Filters = [existingInclude] };
+        var filters = ImmutableList.Create(FilterBuilder.CreateTestFilter(isExcluded: true));
+
+        var result = Reducers.ReduceMergeFilters(state, new MergeFiltersAction(filters));
+
+        Assert.Equal(2, result.Filters.Count);
+        Assert.False(result.Filters[0].IsExcluded);
+        Assert.True(result.Filters[1].IsExcluded);
+    }
+
+    [Fact]
     public void ReduceRemoveFilter_WithInvalidFilter_ShouldReturnOriginalState()
     {
         // Arrange

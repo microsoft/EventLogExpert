@@ -16,14 +16,11 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleAddLibraryEntry_PersistsAndDispatchesSuccess()
     {
-        // Arrange
-        var entry = BuildFilterEntry("id-1", "First");
+        var entry = BuildFilterEntry("First");
         var (effects, store, dispatcher, _, _) = CreateEffects();
 
-        // Act
         await effects.HandleAddLibraryEntry(new AddLibraryEntryAction(entry), dispatcher);
 
-        // Assert
         store.Received(1).Add(entry);
         dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => ReferenceEquals(a.Entry, entry)));
     }
@@ -31,23 +28,19 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleAddLibraryEntry_WhenStoreThrows_DoesNotDispatchSuccess()
     {
-        // Arrange
-        var entry = BuildFilterEntry("id-1", "First");
+        var entry = BuildFilterEntry("First");
         var (effects, store, dispatcher, _, logger) = CreateEffects();
         store.When(s => s.Add(Arg.Any<LibraryEntry>())).Do(_ => throw new InvalidOperationException("boom"));
 
-        // Act
         await effects.HandleAddLibraryEntry(new AddLibraryEntryAction(entry), dispatcher);
 
-        // Assert
         dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
     [Fact]
-    public async Task HandleApplyLibraryEntry_PresetEntry_DispatchesReplaceFiltersWithAllFilters()
+    public async Task HandleApplyLibraryEntry_PresetEntry_DispatchesMergeFiltersWithAllFiltersAndRecordEntryApplied()
     {
-        // Arrange
         var f1 = SavedFilter.TryCreate("Level == 2");
         var f2 = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(f1);
@@ -55,32 +48,30 @@ public sealed class FilterLibraryEffectsTests
 
         var preset = new LibraryEntryPreset
         {
-            Id = "preset-1",
             Name = "Preset",
             CreatedUtc = DateTimeOffset.UtcNow,
             Filters = [f1, f2],
         };
         var (effects, _, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [preset] });
 
-        // Act
-        await effects.HandleApplyLibraryEntry(new ApplyLibraryEntryAction("preset-1"), dispatcher);
+        await effects.HandleApplyLibraryEntry(new ApplyLibraryEntryAction(preset.Id), dispatcher);
 
-        // Assert
-        dispatcher.Received(1).Dispatch(Arg.Is<ReplaceFiltersAction>(a => a.Filters.Count == 2));
+        dispatcher.Received(1).Dispatch(Arg.Is<MergeFiltersAction>(a => a.Filters.Count == 2));
+        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a.EntryId == preset.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<ReplaceFiltersAction>());
     }
 
     [Fact]
-    public async Task HandleApplyLibraryEntry_SavedFilterEntry_DispatchesReplaceFiltersWithSingleFilter()
+    public async Task HandleApplyLibraryEntry_SavedFilterEntry_DispatchesMergeFiltersWithSingleFilterAndRecordEntryApplied()
     {
-        // Arrange
-        var entry = BuildFilterEntry("id-1", "First");
+        var entry = BuildFilterEntry("First");
         var (effects, _, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [entry] });
 
-        // Act
-        await effects.HandleApplyLibraryEntry(new ApplyLibraryEntryAction("id-1"), dispatcher);
+        await effects.HandleApplyLibraryEntry(new ApplyLibraryEntryAction(entry.Id), dispatcher);
 
-        // Assert
-        dispatcher.Received(1).Dispatch(Arg.Is<ReplaceFiltersAction>(a => a.Filters.Count == 1));
+        dispatcher.Received(1).Dispatch(Arg.Is<MergeFiltersAction>(a => a.Filters.Count == 1));
+        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a.EntryId == entry.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<ReplaceFiltersAction>());
     }
 
     [Fact]
@@ -88,14 +79,13 @@ public sealed class FilterLibraryEffectsTests
     {
         var unknown = new UnknownLibraryEntry
         {
-            Id = "id-x",
             Name = "Unknown",
             CreatedUtc = DateTimeOffset.UtcNow,
         };
         var (effects, _, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [unknown] });
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            effects.HandleApplyLibraryEntry(new ApplyLibraryEntryAction("id-x"), dispatcher));
+            effects.HandleApplyLibraryEntry(new ApplyLibraryEntryAction(unknown.Id), dispatcher));
     }
 
     [Fact]
@@ -103,29 +93,31 @@ public sealed class FilterLibraryEffectsTests
     {
         var (effects, _, dispatcher, _, _) = CreateEffects();
 
-        await effects.HandleApplyLibraryEntry(new ApplyLibraryEntryAction("missing"), dispatcher);
+        await effects.HandleApplyLibraryEntry(new ApplyLibraryEntryAction(LibraryEntryId.Create()), dispatcher);
 
-        dispatcher.DidNotReceive().Dispatch(Arg.Any<ReplaceFiltersAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<MergeFiltersAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RecordEntryAppliedAction>());
     }
 
     [Fact]
     public async Task HandleDeleteLibraryEntry_PersistsAndDispatchesSuccess()
     {
         var (effects, store, dispatcher, _, _) = CreateEffects();
+        var id = LibraryEntryId.Create();
 
-        await effects.HandleDeleteLibraryEntry(new DeleteLibraryEntryAction("id-1"), dispatcher);
+        await effects.HandleDeleteLibraryEntry(new DeleteLibraryEntryAction(id), dispatcher);
 
-        store.Received(1).Delete("id-1");
-        dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntrySuccessAction>(a => a.EntryId == "id-1"));
+        store.Received(1).Delete(id);
+        dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntrySuccessAction>(a => a.EntryId == id));
     }
 
     [Fact]
     public async Task HandleDeleteLibraryEntry_WhenStoreThrows_DoesNotDispatchSuccess()
     {
         var (effects, store, dispatcher, _, logger) = CreateEffects();
-        store.When(s => s.Delete(Arg.Any<string>())).Do(_ => throw new InvalidOperationException("boom"));
+        store.When(s => s.Delete(Arg.Any<LibraryEntryId>())).Do(_ => throw new InvalidOperationException("boom"));
 
-        await effects.HandleDeleteLibraryEntry(new DeleteLibraryEntryAction("id-1"), dispatcher);
+        await effects.HandleDeleteLibraryEntry(new DeleteLibraryEntryAction(LibraryEntryId.Create()), dispatcher);
 
         dispatcher.DidNotReceive().Dispatch(Arg.Any<DeleteLibraryEntrySuccessAction>());
         logger.ReceivedWithAnyArgs(1).Warning(default);
@@ -134,38 +126,92 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleLoadLibrary_DispatchesSuccessWithStoreEntries()
     {
-        // Arrange
-        var entry = BuildFilterEntry("id-1", "First");
+        var entry = BuildFilterEntry("First");
         var (effects, store, dispatcher, _, _) = CreateEffects();
         store.LoadAll().Returns([entry]);
 
-        // Act
         await effects.HandleLoadLibrary(dispatcher);
 
-        // Assert
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1 && a.Entries[0].Id == "id-1"));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1 && a.Entries[0].Id == entry.Id));
     }
 
     [Fact]
     public async Task HandleLoadLibrary_WhenStoreThrows_DispatchesFailureActionAndLogs()
     {
-        // Arrange
         var (effects, store, dispatcher, _, logger) = CreateEffects();
         store.LoadAll().Returns(_ => throw new InvalidOperationException("boom"));
 
-        // Act
         await effects.HandleLoadLibrary(dispatcher);
 
-        // Assert
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryFailureAction>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibrarySuccessAction>());
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
     [Fact]
+    public async Task HandleReplaceWithLibraryEntry_PresetEntry_DispatchesReplaceFiltersWithAllFiltersAndRecordEntryApplied()
+    {
+        var f1 = SavedFilter.TryCreate("Level == 2");
+        var f2 = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(f1);
+        Assert.NotNull(f2);
+
+        var preset = new LibraryEntryPreset
+        {
+            Name = "Preset",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = [f1, f2],
+        };
+        var (effects, _, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [preset] });
+
+        await effects.HandleReplaceWithLibraryEntry(new ReplaceWithLibraryEntryAction(preset.Id), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<ReplaceFiltersAction>(a => a.Filters.Count == 2));
+        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a.EntryId == preset.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<MergeFiltersAction>());
+    }
+
+    [Fact]
+    public async Task HandleReplaceWithLibraryEntry_SavedFilterEntry_DispatchesReplaceFiltersWithSingleFilterAndRecordEntryApplied()
+    {
+        var entry = BuildFilterEntry("First");
+        var (effects, _, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [entry] });
+
+        await effects.HandleReplaceWithLibraryEntry(new ReplaceWithLibraryEntryAction(entry.Id), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<ReplaceFiltersAction>(a => a.Filters.Count == 1));
+        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a.EntryId == entry.Id));
+    }
+
+    [Fact]
+    public async Task HandleReplaceWithLibraryEntry_UnknownConcreteType_ThrowsInvalidOperationException()
+    {
+        var unknown = new UnknownLibraryEntry
+        {
+            Name = "Unknown",
+            CreatedUtc = DateTimeOffset.UtcNow,
+        };
+        var (effects, _, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [unknown] });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            effects.HandleReplaceWithLibraryEntry(new ReplaceWithLibraryEntryAction(unknown.Id), dispatcher));
+    }
+
+    [Fact]
+    public async Task HandleReplaceWithLibraryEntry_UnknownId_IsNoOp()
+    {
+        var (effects, _, dispatcher, _, _) = CreateEffects();
+
+        await effects.HandleReplaceWithLibraryEntry(new ReplaceWithLibraryEntryAction(LibraryEntryId.Create()), dispatcher);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<ReplaceFiltersAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RecordEntryAppliedAction>());
+    }
+
+    [Fact]
     public async Task HandleUpdateLibraryEntry_PersistsAndDispatchesSuccess()
     {
-        var entry = BuildFilterEntry("id-1", "First");
+        var entry = BuildFilterEntry("First");
         var (effects, store, dispatcher, _, _) = CreateEffects();
 
         await effects.HandleUpdateLibraryEntry(new UpdateLibraryEntryAction(entry), dispatcher);
@@ -177,7 +223,7 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleUpdateLibraryEntry_WhenStoreThrows_DoesNotDispatchSuccess()
     {
-        var entry = BuildFilterEntry("id-1", "First");
+        var entry = BuildFilterEntry("First");
         var (effects, store, dispatcher, _, logger) = CreateEffects();
         store.When(s => s.Update(Arg.Any<LibraryEntry>())).Do(_ => throw new InvalidOperationException("boom"));
 
@@ -187,14 +233,13 @@ public sealed class FilterLibraryEffectsTests
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
-    private static LibraryEntrySavedFilter BuildFilterEntry(string id, string name)
+    private static LibraryEntrySavedFilter BuildFilterEntry(string name)
     {
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
 
         return new LibraryEntrySavedFilter
         {
-            Id = id,
             Name = name,
             CreatedUtc = DateTimeOffset.UtcNow,
             Filter = filter,

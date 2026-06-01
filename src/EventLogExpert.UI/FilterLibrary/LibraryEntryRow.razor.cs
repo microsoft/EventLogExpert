@@ -12,10 +12,10 @@ public sealed partial class LibraryEntryRow : ComponentBase
     public required LibraryEntry Entry { get; set; }
 
     [Parameter]
-    public EventCallback<string> OnApply { get; set; }
+    public EventCallback<LibraryEntryId> OnApply { get; set; }
 
     [Parameter]
-    public EventCallback<string> OnDelete { get; set; }
+    public EventCallback<LibraryEntryId> OnDelete { get; set; }
 
     [Parameter]
     public EventCallback<LibraryEntry> OnEdit { get; set; }
