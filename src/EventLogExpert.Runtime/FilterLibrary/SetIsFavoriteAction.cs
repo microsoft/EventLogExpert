@@ -1,0 +1,6 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+namespace EventLogExpert.Runtime.FilterLibrary;
+
+internal sealed record SetIsFavoriteAction(LibraryEntryId EntryId, bool IsFavorite);
