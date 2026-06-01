@@ -13,6 +13,7 @@ using EventLogExpert.Adapters.Settings;
 using EventLogExpert.Adapters.Threading;
 using EventLogExpert.Adapters.Window;
 using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.AppTitle;
@@ -25,6 +26,7 @@ using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.FilterCache;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterGroup;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
@@ -99,6 +101,11 @@ public static class MauiProgram
         builder.Services.AddSingleton<ISettingsPreferencesProvider, SettingsPreferencesAdapter>();
         builder.Services.AddSingleton<IDetailsPanePreferencesProvider, DetailsPanePreferencesAdapter>();
         builder.Services.AddSingleton<IDatabasePreferencesProvider, DatabasePreferencesAdapter>();
+
+        builder.Services.AddSingleton<IFilterLibraryStore>(sp =>
+            new FilterLibrarySqliteStore(
+                Path.Combine(FileSystem.AppDataDirectory, "filter-library.db"),
+                sp.GetRequiredService<ITraceLogger>()));
 
         // UI Services
         builder.Services.AddEventLogFiltering();

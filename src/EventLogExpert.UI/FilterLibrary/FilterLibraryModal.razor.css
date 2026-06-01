@@ -1,0 +1,20 @@
+.filter-library-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.filter-library-list li {
+    margin-bottom: 0.25rem;
+}
+
+.filter-library-empty,
+.filter-library-error {
+    color: var(--clr-text-secondary, currentColor);
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.filter-library-error {
+    color: var(--clr-red, red);
+}

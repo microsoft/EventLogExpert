@@ -1,0 +1,24 @@
+.library-entry-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.library-entry-kind-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--clr-text-secondary, currentColor);
+    padding: 0.1rem 0.4rem;
+    border: 1px solid currentColor;
+    border-radius: 0.25rem;
+    flex-shrink: 0;
+}
+
+.library-entry-name {
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

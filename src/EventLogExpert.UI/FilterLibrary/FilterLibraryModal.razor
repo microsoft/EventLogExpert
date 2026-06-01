@@ -1,0 +1,34 @@
+@inherits ModalBase<bool>
+
+<ModalChrome AcceptLabel="Close"
+    CancelLabel="Close"
+    CloseButtonAriaLabel="Close"
+    Footer="FooterPreset.CloseOnly"
+    MaxWidth="40rem"
+    MinWidth="28rem"
+    OnClose="OnCancelAsync"
+    OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    @ref="ChromeRef"
+    Title="Filter Library">
+    @if (FilterLibraryState.Value.LoadError)
+    {
+        <p class="filter-library-error">Could not load saved filters. See trace log for details.</p>
+    }
+    else if (FilterLibraryState.Value.Entries.IsEmpty)
+    {
+        <p class="filter-library-empty">No saved filters yet.</p>
+    }
+    else
+    {
+        <ul class="filter-library-list">
+            @foreach (var entry in FilterLibraryState.Value.Entries)
+            {
+                <li>
+                    <LibraryEntryRow Entry="@entry"
+                        OnApply="HandleApplyAsync"
+                        OnDelete="HandleDeleteAsync" />
+                </li>
+            }
+        </ul>
+    }
+</ModalChrome>
