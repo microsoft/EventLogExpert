@@ -39,7 +39,13 @@ public sealed class LibraryEntryPolymorphicJsonTests
         Assert.NotNull(f2);
 
         var createdUtc = new DateTimeOffset(2026, 5, 31, 12, 0, 0, TimeSpan.Zero);
-        LibraryEntry entry = new LibraryEntryPreset("id-2", "My Preset", createdUtc, [f1, f2]);
+        LibraryEntry entry = new LibraryEntryPreset
+        {
+            Id = "id-2",
+            Name = "My Preset",
+            CreatedUtc = createdUtc,
+            Filters = [f1, f2],
+        };
 
         // Act
         var json = JsonSerializer.Serialize(entry);
@@ -64,7 +70,13 @@ public sealed class LibraryEntryPolymorphicJsonTests
         Assert.NotNull(filter);
 
         var createdUtc = new DateTimeOffset(2026, 5, 31, 12, 0, 0, TimeSpan.Zero);
-        LibraryEntry entry = new LibraryEntrySavedFilter("id-1", "My Filter", createdUtc, filter);
+        LibraryEntry entry = new LibraryEntrySavedFilter
+        {
+            Id = "id-1",
+            Name = "My Filter",
+            CreatedUtc = createdUtc,
+            Filter = filter,
+        };
 
         // Act
         var json = JsonSerializer.Serialize(entry);

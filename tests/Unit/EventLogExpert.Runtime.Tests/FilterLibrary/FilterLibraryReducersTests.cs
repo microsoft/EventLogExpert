@@ -129,6 +129,12 @@ public sealed class FilterLibraryReducersTests
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
 
-        return new LibraryEntrySavedFilter(id, name, new DateTimeOffset(2026, 5, 31, 0, 0, 0, TimeSpan.Zero), filter);
+        return new LibraryEntrySavedFilter
+        {
+            Id = id,
+            Name = name,
+            CreatedUtc = new DateTimeOffset(2026, 5, 31, 0, 0, 0, TimeSpan.Zero),
+            Filter = filter,
+        };
     }
 }

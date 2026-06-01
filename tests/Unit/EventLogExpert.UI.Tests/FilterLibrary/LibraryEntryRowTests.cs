@@ -59,7 +59,13 @@ public sealed class LibraryEntryRowTests : BunitContext
         // Arrange
         var f1 = SavedFilter.TryCreate("Level == 2");
         Assert.NotNull(f1);
-        var preset = new LibraryEntryPreset("id-1", "Test", DateTimeOffset.UtcNow, [f1]);
+        var preset = new LibraryEntryPreset
+        {
+            Id = "id-1",
+            Name = "Test",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = [f1],
+        };
 
         // Act
         var component = Render<LibraryEntryRow>(parameters => parameters
@@ -85,6 +91,12 @@ public sealed class LibraryEntryRowTests : BunitContext
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
 
-        return new LibraryEntrySavedFilter(id, name, DateTimeOffset.UtcNow, filter);
+        return new LibraryEntrySavedFilter
+        {
+            Id = id,
+            Name = name,
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filter = filter,
+        };
     }
 }

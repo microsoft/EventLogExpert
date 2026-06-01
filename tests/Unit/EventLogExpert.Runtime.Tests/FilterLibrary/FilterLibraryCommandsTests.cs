@@ -75,6 +75,12 @@ public sealed class FilterLibraryCommandsTests
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
 
-        return new LibraryEntrySavedFilter("id-1", "Test", DateTimeOffset.UtcNow, filter);
+        return new LibraryEntrySavedFilter
+        {
+            Id = "id-1",
+            Name = "Test",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filter = filter,
+        };
     }
 }

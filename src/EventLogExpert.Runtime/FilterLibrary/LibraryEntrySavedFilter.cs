@@ -5,5 +5,7 @@ using EventLogExpert.Filtering.Persistence;
 
 namespace EventLogExpert.Runtime.FilterLibrary;
 
-public sealed record LibraryEntrySavedFilter(string Id, string Name, DateTimeOffset CreatedUtc, SavedFilter Filter)
-    : LibraryEntry(Id, Name, CreatedUtc);
+public sealed record LibraryEntrySavedFilter : LibraryEntry
+{
+    public required SavedFilter Filter { get; init; }
+}
