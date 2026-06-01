@@ -42,7 +42,8 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
 
     private const string DeleteAutoTrackedIfNotFavoriteSql = """
                                                              DELETE FROM library_entries
-                                                             WHERE id = $id AND kind = 'Filter' AND origin = 'AutoTracked' AND is_favorite = 0;
+                                                             WHERE id = $id AND kind = 'Filter' AND origin = 'AutoTracked' AND is_favorite = 0
+                                                                   AND last_used_utc IS NOT NULL;
                                                              """;
 
     private const string DeleteSql =
@@ -116,38 +117,70 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
     {
         ArgumentNullException.ThrowIfNull(candidate);
 
+        // The partial UNIQUE INDEX idx_library_autotracked_dedup is scoped to origin='AutoTracked'.
+        // A UserSaved candidate would bypass the dedup constraint and silently insert duplicates,
+        // violating the method's contract. Reject misuse at the boundary.
+        if (candidate.Origin != LibraryEntryOrigin.AutoTracked)
+        {
+            throw new ArgumentException(
+                $"{nameof(AddOrReturnExistingFilter)} requires candidate.Origin == {nameof(LibraryEntryOrigin.AutoTracked)}; got '{candidate.Origin}'.",
+                nameof(candidate));
+        }
+
+        if (string.IsNullOrWhiteSpace(candidate.Filter.ComparisonText))
+        {
+            throw new ArgumentException(
+                $"{nameof(AddOrReturnExistingFilter)} requires non-empty candidate.Filter.ComparisonText for dedup tuple lookup.",
+                nameof(candidate));
+        }
+
         using var connection = OpenConnection();
+        // BEGIN IMMEDIATE acquires a RESERVED write lock for the duration of the transaction so a
+        // concurrent prune/delete on another connection cannot land between our INSERT OR IGNORE
+        // (collision detection) and the follow-up tuple SELECT. Without it, the row could be
+        // deleted in the gap and the SELECT would surface zero rows for a "we just saw a collision"
+        // path — a benign concurrent delete becomes an exception.
+        using var tx = connection.BeginTransaction(System.Data.IsolationLevel.Serializable);
 
         using (var cmd = connection.CreateCommand())
         {
+            cmd.Transaction = tx;
             cmd.CommandText = InsertOrIgnoreSql;
             BindEntry(cmd, candidate);
-            var rowsAffected = cmd.ExecuteNonQuery();
 
-            if (rowsAffected == 1) { return (candidate, true); }
+            if (cmd.ExecuteNonQuery() == 1)
+            {
+                tx.Commit();
+
+                return (candidate, true);
+            }
         }
 
-        using var findCmd = connection.CreateCommand();
-        findCmd.CommandText = FindAutoTrackedFilterByTupleSql;
-        findCmd.Parameters.AddWithValue("$comparison_text", candidate.Filter.ComparisonText);
-        findCmd.Parameters.AddWithValue("$mode", candidate.Filter.Mode.ToString());
-        findCmd.Parameters.AddWithValue("$is_excluded", candidate.Filter.IsExcluded ? 1 : 0);
-
-        using var reader = findCmd.ExecuteReader();
-        if (!reader.Read())
+        using (var findCmd = connection.CreateCommand())
         {
-            throw new InvalidOperationException(
-                $"FilterLibrary AddOrReturnExistingFilter: INSERT OR IGNORE for '{candidate.Filter.ComparisonText}' collided but no existing row matched the tuple.");
-        }
+            findCmd.Transaction = tx;
+            findCmd.CommandText = FindAutoTrackedFilterByTupleSql;
+            findCmd.Parameters.AddWithValue("$comparison_text", candidate.Filter.ComparisonText);
+            findCmd.Parameters.AddWithValue("$mode", candidate.Filter.Mode.ToString());
+            findCmd.Parameters.AddWithValue("$is_excluded", candidate.Filter.IsExcluded ? 1 : 0);
 
-        var existing = ReadEntry(reader);
-        if (existing is null)
-        {
-            throw new InvalidOperationException(
-                $"FilterLibrary AddOrReturnExistingFilter: collision row had unknown Kind for '{candidate.Filter.ComparisonText}'.");
-        }
+            using var reader = findCmd.ExecuteReader();
+            if (!reader.Read())
+            {
+                throw new InvalidOperationException(
+                    $"FilterLibrary AddOrReturnExistingFilter: INSERT OR IGNORE for '{candidate.Filter.ComparisonText}' collided but no existing row matched the tuple inside the transaction.");
+            }
 
-        return (existing, false);
+            var existing = ReadEntry(reader);
+            if (existing is null)
+            {
+                throw new InvalidOperationException(
+                    $"FilterLibrary AddOrReturnExistingFilter: collision row had unknown Kind for '{candidate.Filter.ComparisonText}'.");
+            }
+
+            tx.Commit();
+            return (existing, false);
+        }
     }
 
     public void AddRange(IEnumerable<LibraryEntry> entries)

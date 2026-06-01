@@ -9,7 +9,8 @@
 }
 
 .filter-library-empty,
-.filter-library-error {
+.filter-library-error,
+.filter-library-loading {
     color: var(--clr-text-secondary, currentColor);
     text-align: center;
     padding: 1rem 0;

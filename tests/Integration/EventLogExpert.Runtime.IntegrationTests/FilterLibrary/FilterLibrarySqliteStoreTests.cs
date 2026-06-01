@@ -105,6 +105,23 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     }
 
     [Fact]
+    public void AddOrReturnExistingFilter_EmptyComparisonText_ThrowsArgumentException()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var emptyText = new LibraryEntrySavedFilter
+        {
+            Name = "Empty",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            LastUsedUtc = DateTimeOffset.UtcNow,
+            Origin = LibraryEntryOrigin.AutoTracked,
+            Filter = SavedFilter.Empty,
+        };
+
+        Assert.Throws<ArgumentException>(() => store.AddOrReturnExistingFilter(emptyText));
+    }
+
+    [Fact]
     public void AddOrReturnExistingFilter_FreshInsert_ReturnsCandidateAndWasInsertedTrue()
     {
         var dbPath = CreateTempDatabasePath();
@@ -116,6 +133,16 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         Assert.True(wasInserted);
         Assert.Same(candidate, entry);
         Assert.Single(store.LoadAll());
+    }
+
+    [Fact]
+    public void AddOrReturnExistingFilter_NonAutoTrackedOrigin_ThrowsArgumentException()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var userSaved = BuildFilterEntry("Saved");  // Origin = UserSaved by default
+
+        Assert.Throws<ArgumentException>(() => store.AddOrReturnExistingFilter(userSaved));
     }
 
     [Fact]
@@ -563,10 +590,14 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         var filter = SavedFilter.TryCreate(comparisonText, mode: mode);
         Assert.NotNull(filter);
 
+        // AutoTracked rows are born with LastUsedUtc = nowUtc in production
+        // (Effects.HandleRecordFilterApplied candidate construction); mirror that here so
+        // SQL guards conditioning on `last_used_utc IS NOT NULL` see the production shape.
         return new LibraryEntrySavedFilter
         {
             Name = comparisonText,
             CreatedUtc = DateTimeOffset.UtcNow,
+            LastUsedUtc = DateTimeOffset.UtcNow,
             Origin = LibraryEntryOrigin.AutoTracked,
             Filter = filter,
         };

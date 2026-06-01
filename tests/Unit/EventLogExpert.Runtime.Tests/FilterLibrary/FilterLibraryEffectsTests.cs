@@ -467,6 +467,53 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
+    public async Task HandleRecordFilterApplied_CollisionBranch_StateAlreadyHasEntry_DoesNotInflateSnapshotForPrune()
+    {
+        var seedFilter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(seedFilter);
+        var entries = new List<LibraryEntry>();
+        for (int i = 0; i < 49; i++)
+        {
+            entries.Add(new LibraryEntrySavedFilter
+            {
+                Name = $"recent-{i}",
+                CreatedUtc = DateTimeOffset.UtcNow,
+                Origin = LibraryEntryOrigin.AutoTracked,
+                LastUsedUtc = new DateTimeOffset(2026, 5, 1, 0, 0, i, TimeSpan.Zero),
+                Filter = SavedFilter.TryCreate($"Level == {i + 100}")!,
+            });
+        }
+
+        // The "already in state" collision target — distinct ComparisonText so in-memory match misses.
+        var alreadyInState = new LibraryEntrySavedFilter
+        {
+            Name = "already-in-state",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Origin = LibraryEntryOrigin.AutoTracked,
+            LastUsedUtc = new DateTimeOffset(2026, 5, 1, 0, 0, 49, TimeSpan.Zero),
+            Filter = SavedFilter.TryCreate("Level == 1999")!,
+        };
+        entries.Add(alreadyInState);  // state count now 50 (at cap)
+
+        var newFilter = SavedFilter.TryCreate("Level == 2777");
+        Assert.NotNull(newFilter);
+
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [.. entries] });
+        store.AddOrReturnExistingFilter(Arg.Any<LibraryEntrySavedFilter>())
+            .Returns((alreadyInState, false));
+        store.TryBumpLastUsedIfNotFavorite(Arg.Any<LibraryEntryId>(), Arg.Any<DateTimeOffset>()).Returns(true);
+        store.TryDeleteAutoTrackedIfNotFavorite(Arg.Any<LibraryEntryId>()).Returns(true);
+
+        await effects.HandleRecordFilterApplied(new RecordFilterAppliedAction(newFilter), dispatcher);
+
+        // Snapshot should be 50 (SetItem on the existing row, not Add); prune sees count == cap; no delete.
+        store.DidNotReceive().TryDeleteAutoTrackedIfNotFavorite(Arg.Any<LibraryEntryId>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<DeleteLibraryEntrySuccessAction>());
+        // Bump + AddSuccess dispatch still happen as part of the collision-bump path.
+        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => a.Entry.Id == alreadyInState.Id));
+    }
+
+    [Fact]
     public async Task HandleRecordFilterApplied_DifferentMode_TreatedAsDistinctEntry()
     {
         var advanced = SavedFilter.TryCreate("Level == 4", mode: FilterMode.Advanced);
@@ -820,6 +867,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleSavePreset(new SavePresetAction("   ", [filter]), dispatcher);
 
         store.DidNotReceive().Add(Arg.Any<LibraryEntry>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
     }
 
     [Fact]

@@ -12,11 +12,15 @@
     Title="Filter Library">
     @if (FilterLibraryState.Value.LoadError)
     {
-        <p class="filter-library-error">Could not load saved filters. See trace log for details.</p>
+        <p class="filter-library-error">Could not load saved filters or presets. See trace log for details.</p>
+    }
+    else if (!FilterLibraryState.Value.IsLoaded)
+    {
+        <p class="filter-library-loading" aria-busy="true">Loading filter library&hellip;</p>
     }
     else if (FilterLibraryState.Value.Entries.IsEmpty)
     {
-        <p class="filter-library-empty">No saved filters yet.</p>
+        <p class="filter-library-empty">No saved filters or presets yet.</p>
     }
     else
     {

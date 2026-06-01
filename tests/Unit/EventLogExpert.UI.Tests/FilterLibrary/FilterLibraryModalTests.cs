@@ -80,6 +80,17 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public void Render_WhenNotLoaded_RendersLoadingStateNotEmptyState()
+    {
+        SetState(new FilterLibraryState { IsLoaded = false, IsLoading = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        Assert.NotNull(component.Find(".filter-library-loading"));
+        Assert.Empty(component.FindAll(".filter-library-empty"));
+    }
+
+    [Fact]
     public void Render_WithEntries_RendersOneRowPerEntry()
     {
         // Arrange

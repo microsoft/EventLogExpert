@@ -274,7 +274,11 @@ internal sealed class Effects(
         if (!collisionBumped) { return Task.CompletedTask; }
 
         var collisionEntry = (LibraryEntrySavedFilter)result.Entry with { LastUsedUtc = collisionNowUtc };
-        var collisionProjected = entries.Add(collisionEntry);
+        var existingIndex = entries.FindIndex(e => e.Id == collisionEntry.Id);
+        var collisionProjected = existingIndex >= 0
+            ? entries.SetItem(existingIndex, collisionEntry)
+            : entries.Add(collisionEntry);
+
         dispatcher.Dispatch(new AddLibraryEntrySuccessAction(collisionEntry));
         PruneFromSnapshot(collisionProjected, dispatcher);
 

@@ -12,8 +12,8 @@ public interface IFilterLibraryCommands
     void AddEntry(LibraryEntry entry);
 
     /// <summary>
-    ///     Appends <paramref name="filter" /> to an existing preset (matched by id). Dedupes by (ComparisonText,
-    ///     IsExcluded).
+    ///     Appends <paramref name="filter" /> to an existing preset (matched by id). Dedupes by (case-insensitive
+    ///     ComparisonText, Mode, IsExcluded), matching the FilterLibrary store invariant.
     /// </summary>
     void AddFilterToExistingPreset(LibraryEntryId presetId, SavedFilter filter, LibraryEntryId? sourceEntryId);
 
@@ -21,8 +21,8 @@ public interface IFilterLibraryCommands
     void AddFilterToNewPreset(string newPresetName, SavedFilter filter, LibraryEntryId? sourceEntryId);
 
     /// <summary>
-    ///     Additively merges the library entry's filters into the current FilterPane (dedup by (ComparisonText,
-    ///     IsExcluded)).
+    ///     Additively merges the library entry's filters into the current FilterPane. Dedupes by (case-insensitive
+    ///     ComparisonText, Mode, IsExcluded).
     /// </summary>
     void ApplyEntry(LibraryEntryId entryId);
 
