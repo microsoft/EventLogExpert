@@ -44,6 +44,11 @@ public static class RuntimeServiceCollectionExtensions
     ///             <c>IFilePickerService</c> — <c>DatabaseOperationCoordinator</c> depends on it for Import.
     ///             Host registers a concrete implementation (e.g., <c>MauiFilePickerService</c>).
     ///         </item>
+    ///         <item>
+    ///             <c>IFilterLibraryStore</c> — <c>FilterLibrary</c> effects depend on it. Register the
+    ///             default SQLite-backed store via
+    ///             <c>services.AddFilterLibrarySqliteStore(<i>dbPath</i>)</c>, or supply a custom implementation.
+    ///         </item>
     ///     </list>
     ///     Omitting any of these produces a DI resolution failure when the dependent services are first activated.
     /// </summary>

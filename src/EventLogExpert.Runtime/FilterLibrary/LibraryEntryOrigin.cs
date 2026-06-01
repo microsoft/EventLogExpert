@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.Runtime.FilterLibrary;
 
-internal enum LibraryEntryOrigin
+public enum LibraryEntryOrigin
 {
     UserSaved = 0,
     AutoTracked = 1,

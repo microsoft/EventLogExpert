@@ -13,66 +13,71 @@ namespace EventLogExpert.Runtime.FilterLibrary;
 internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
 {
     private const string BumpLastUsedIfNotFavoriteSql = """
-        UPDATE library_entries
-        SET last_used_utc = $last_used_utc
-        WHERE id = $id AND is_favorite = 0;
-        """;
+                                                        UPDATE library_entries
+                                                        SET last_used_utc = $last_used_utc
+                                                        WHERE id = $id AND is_favorite = 0;
+                                                        """;
 
     private const string CreateTableSql = """
-        CREATE TABLE IF NOT EXISTS library_entries (
-            id              TEXT PRIMARY KEY,
-            name            TEXT NOT NULL,
-            created_utc     TEXT NOT NULL,
-            kind            TEXT NOT NULL,
-            payload         TEXT NOT NULL,
-            is_favorite     INTEGER NOT NULL DEFAULT 0,
-            last_used_utc   TEXT NULL,
-            origin          TEXT NOT NULL DEFAULT 'UserSaved',
-            comparison_text TEXT NULL,
-            mode            TEXT NULL,
-            is_excluded     INTEGER NULL
-        );
-        """;
+                                          CREATE TABLE IF NOT EXISTS library_entries (
+                                              id              TEXT PRIMARY KEY,
+                                              name            TEXT NOT NULL,
+                                              created_utc     TEXT NOT NULL,
+                                              kind            TEXT NOT NULL,
+                                              payload         TEXT NOT NULL,
+                                              is_favorite     INTEGER NOT NULL DEFAULT 0,
+                                              last_used_utc   TEXT NULL,
+                                              origin          TEXT NOT NULL DEFAULT 'UserSaved',
+                                              comparison_text TEXT NULL,
+                                              mode            TEXT NULL,
+                                              is_excluded     INTEGER NULL
+                                          );
+                                          """;
 
     private const string CreateUniqueIndexSql = """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_library_autotracked_dedup
-        ON library_entries(lower(comparison_text), mode, is_excluded)
-        WHERE kind = 'Filter' AND origin = 'AutoTracked';
-        """;
+                                                CREATE UNIQUE INDEX IF NOT EXISTS idx_library_autotracked_dedup
+                                                ON library_entries(lower(comparison_text), mode, is_excluded)
+                                                WHERE kind = 'Filter' AND origin = 'AutoTracked';
+                                                """;
+
+    private const string DeleteAutoTrackedIfNotFavoriteSql = """
+                                                             DELETE FROM library_entries
+                                                             WHERE id = $id AND kind = 'Filter' AND origin = 'AutoTracked' AND is_favorite = 0;
+                                                             """;
 
     private const string DeleteSql =
         "DELETE FROM library_entries WHERE id = $id;";
 
     private const string FindAutoTrackedFilterByTupleSql = """
-        SELECT id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded
-        FROM library_entries
-        WHERE kind = 'Filter' AND origin = 'AutoTracked'
-            AND lower(comparison_text) = lower($comparison_text)
-            AND mode = $mode
-            AND is_excluded = $is_excluded
-        LIMIT 1;
-        """;
+                                                           SELECT id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded
+                                                           FROM library_entries
+                                                           WHERE kind = 'Filter' AND origin = 'AutoTracked'
+                                                               AND lower(comparison_text) = lower($comparison_text)
+                                                               AND mode = $mode
+                                                               AND is_excluded = $is_excluded
+                                                           LIMIT 1;
+                                                           """;
 
     private const string InsertOrIgnoreSql = """
-        INSERT OR IGNORE INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded)
-        VALUES ($id, $name, $created, $kind, $payload, $is_favorite, $last_used_utc, $origin, $comparison_text, $mode, $is_excluded);
-        """;
+                                             INSERT OR IGNORE INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded)
+                                             VALUES ($id, $name, $created, $kind, $payload, $is_favorite, $last_used_utc, $origin, $comparison_text, $mode, $is_excluded);
+                                             """;
 
     private const string InsertSql = """
-        INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded)
-        VALUES ($id, $name, $created, $kind, $payload, $is_favorite, $last_used_utc, $origin, $comparison_text, $mode, $is_excluded);
-        """;
+                                     INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded)
+                                     VALUES ($id, $name, $created, $kind, $payload, $is_favorite, $last_used_utc, $origin, $comparison_text, $mode, $is_excluded);
+                                     """;
 
     private const string LoadAllSql =
         "SELECT id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded FROM library_entries ORDER BY created_utc;";
 
     private const string UpdateSql = """
-        UPDATE library_entries
-        SET name = $name, created_utc = $created, kind = $kind, payload = $payload,
-            is_favorite = $is_favorite, last_used_utc = $last_used_utc, origin = $origin,
-            comparison_text = $comparison_text, mode = $mode, is_excluded = $is_excluded
-        WHERE id = $id;
-        """;
+                                     UPDATE library_entries
+                                     SET name = $name, created_utc = $created, kind = $kind, payload = $payload,
+                                         is_favorite = $is_favorite, last_used_utc = $last_used_utc, origin = $origin,
+                                         comparison_text = $comparison_text, mode = $mode, is_excluded = $is_excluded
+                                     WHERE id = $id;
+                                     """;
 
     private static readonly (string Column, string Definition)[] s_requiredColumns =
     [
@@ -173,7 +178,12 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         }
         catch
         {
-            tx.Rollback();
+            // Guard Rollback so its exception doesn't mask the original insert failure.
+            try { tx.Rollback(); }
+            catch (Exception rollbackEx)
+            {
+                _logger.Warning($"FilterLibrary AddRange rollback failed after batch insert error: {rollbackEx.Message}");
+            }
 
             throw;
         }
@@ -231,6 +241,15 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         cmd.CommandText = BumpLastUsedIfNotFavoriteSql;
         cmd.Parameters.AddWithValue("$id", entryId.Value.ToString("D"));
         cmd.Parameters.AddWithValue("$last_used_utc", lastUsedUtc.ToString("O", CultureInfo.InvariantCulture));
+        return cmd.ExecuteNonQuery() > 0;
+    }
+
+    public bool TryDeleteAutoTrackedIfNotFavorite(LibraryEntryId entryId)
+    {
+        using var connection = OpenConnection();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = DeleteAutoTrackedIfNotFavoriteSql;
+        cmd.Parameters.AddWithValue("$id", entryId.Value.ToString("D"));
         return cmd.ExecuteNonQuery() > 0;
     }
 

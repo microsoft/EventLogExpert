@@ -401,6 +401,20 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
+    public void ReduceMergeFilters_DifferentCaseSameTuple_DedupesAsDuplicate()
+    {
+        var existing = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(existing);
+        var state = new FilterPaneState { Filters = [existing] };
+        var differentCase = SavedFilter.TryCreate("LEVEL == 4");
+        Assert.NotNull(differentCase);
+
+        var result = Reducers.ReduceMergeFilters(state, new MergeFiltersAction([differentCase]));
+
+        Assert.Single(result.Filters);
+    }
+
+    [Fact]
     public void ReduceMergeFilters_PreservesBasicFilter()
     {
         // Arrange
@@ -439,6 +453,22 @@ public sealed class FilterPaneReducerTests
 
         Assert.Single(result.Filters);
         Assert.NotEqual(source.Id, result.Filters[0].Id);
+    }
+
+    [Fact]
+    public void ReduceMergeFilters_SameTextDifferentMode_KeepsBothAsDistinctFilters()
+    {
+        var advanced = SavedFilter.TryCreate("Level == 4", mode: FilterMode.Advanced);
+        Assert.NotNull(advanced);
+        var state = new FilterPaneState { Filters = [advanced] };
+        var basic = SavedFilter.TryCreate("Level == 4", mode: FilterMode.Basic);
+        Assert.NotNull(basic);
+
+        var result = Reducers.ReduceMergeFilters(state, new MergeFiltersAction([basic]));
+
+        Assert.Equal(2, result.Filters.Count);
+        Assert.Contains(result.Filters, f => f.Mode == FilterMode.Advanced);
+        Assert.Contains(result.Filters, f => f.Mode == FilterMode.Basic);
     }
 
     [Fact]

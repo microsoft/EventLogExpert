@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using Fluxor;
 using System.Collections.Immutable;
@@ -47,14 +48,19 @@ internal sealed class Reducers
     {
         if (action.Filters.IsEmpty) { return state; }
 
-        HashSet<(string Value, bool IsExcluded)> existingKeys =
-            [.. state.Filters.Select(filter => (filter.ComparisonText, filter.IsExcluded))];
+        // Dedup tuple matches the FilterLibrary store's invariant: case-insensitive ComparisonText
+        // + Mode + IsExcluded. See FilterLibrarySqliteStore.idx_library_autotracked_dedup.
+        HashSet<(string LoweredText, FilterMode Mode, bool IsExcluded)> existingKeys =
+            [.. state.Filters.Select(filter => (
+                filter.ComparisonText.ToLowerInvariant(),
+                filter.Mode,
+                filter.IsExcluded))];
 
         List<SavedFilter> additions = [];
 
         foreach (var filter in action.Filters)
         {
-            if (!existingKeys.Add((filter.ComparisonText, filter.IsExcluded))) { continue; }
+            if (!existingKeys.Add((filter.ComparisonText.ToLowerInvariant(), filter.Mode, filter.IsExcluded))) { continue; }
 
             additions.Add(filter with { Id = FilterId.Create(), IsEnabled = filter.Compiled is not null });
         }
