@@ -102,10 +102,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IDetailsPanePreferencesProvider, DetailsPanePreferencesAdapter>();
         builder.Services.AddSingleton<IDatabasePreferencesProvider, DatabasePreferencesAdapter>();
 
-        builder.Services.AddSingleton<IFilterLibraryStore>(sp =>
-            new FilterLibrarySqliteStore(
-                Path.Combine(FileSystem.AppDataDirectory, "filter-library.db"),
-                sp.GetRequiredService<ITraceLogger>()));
+        builder.Services.AddFilterLibrarySqliteStore(
+            Path.Combine(FileSystem.AppDataDirectory, "filter-library.db"));
 
         // UI Services
         builder.Services.AddEventLogFiltering();

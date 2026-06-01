@@ -10,7 +10,7 @@ using System.Text.Json;
 
 namespace EventLogExpert.Runtime.FilterLibrary;
 
-public sealed class FilterLibrarySqliteStore : IFilterLibraryStore
+internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
 {
     private const string BumpLastUsedIfNotFavoriteSql = """
         UPDATE library_entries

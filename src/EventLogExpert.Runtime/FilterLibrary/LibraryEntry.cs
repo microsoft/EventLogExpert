@@ -16,10 +16,10 @@ public abstract record LibraryEntry
 
     public required DateTimeOffset CreatedUtc { get; init; }
 
-    public bool IsFavorite { get; init; }
+    public bool IsFavorite { get; internal init; }
 
-    public DateTimeOffset? LastUsedUtc { get; init; }
+    public DateTimeOffset? LastUsedUtc { get; internal init; }
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public LibraryEntryOrigin Origin { get; init; } = LibraryEntryOrigin.UserSaved;
+    internal LibraryEntryOrigin Origin { get; init; } = LibraryEntryOrigin.UserSaved;
 }
