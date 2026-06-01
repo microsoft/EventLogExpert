@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Persistence;
 using Fluxor;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.FilterPane;
 
@@ -49,6 +50,16 @@ internal sealed class Reducers
         if (filter is null) { return state; }
 
         return state with { Filters = state.Filters.Remove(filter) };
+    }
+
+    [ReducerMethod]
+    public static FilterPaneState ReduceReplaceFilters(FilterPaneState state, ReplaceFiltersAction action)
+    {
+        var replaced = action.Filters
+            .Select(filter => filter with { Id = FilterId.Create(), IsEnabled = filter.Compiled is not null })
+            .ToImmutableList();
+
+        return state with { Filters = replaced };
     }
 
     [ReducerMethod]

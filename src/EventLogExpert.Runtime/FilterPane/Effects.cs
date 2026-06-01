@@ -65,6 +65,13 @@ internal sealed class Effects
         return Task.CompletedTask;
     }
 
+    [EffectMethod(typeof(ReplaceFiltersAction))]
+    public Task HandleReplaceFilters(IDispatcher dispatcher)
+    {
+        UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+        return Task.CompletedTask;
+    }
+
     [EffectMethod]
     public Task HandleSaveFilterGroup(SaveFilterGroupAction action, IDispatcher dispatcher)
     {
