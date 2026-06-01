@@ -21,15 +21,20 @@ internal sealed class Reducers
     {
         if (!action.FilterGroup.Filters.Any()) { return state; }
 
-        // Dedupe key includes IsExcluded so include/exclude pairs of the same expression both land.
-        HashSet<(string Value, bool IsExcluded)> existingKeys =
-            [.. state.Filters.Select(filter => (filter.ComparisonText, filter.IsExcluded))];
+        // Dedup tuple matches FilterLibrary store invariant: case-insensitive ComparisonText
+        // + Mode + IsExcluded. See FilterLibrarySqliteStore.idx_library_autotracked_dedup
+        // and ReduceMergeFilters for parallel implementations.
+        HashSet<(string LoweredText, FilterMode Mode, bool IsExcluded)> existingKeys =
+            [.. state.Filters.Select(filter => (
+                filter.ComparisonText.ToLowerInvariant(),
+                filter.Mode,
+                filter.IsExcluded))];
 
         List<SavedFilter> additions = [];
 
         foreach (var filter in action.FilterGroup.Filters)
         {
-            if (!existingKeys.Add((filter.ComparisonText, filter.IsExcluded))) { continue; }
+            if (!existingKeys.Add((filter.ComparisonText.ToLowerInvariant(), filter.Mode, filter.IsExcluded))) { continue; }
 
             // Preserve the group filter as-is, but only enable when Compiled is non-null. A saved group
             // filter loaded with an invalid expression has Compiled == null and must stay disabled, otherwise
