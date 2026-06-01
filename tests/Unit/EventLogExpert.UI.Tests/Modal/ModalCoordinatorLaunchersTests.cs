@@ -8,6 +8,7 @@ using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
+using EventLogExpert.UI.FilterLibrary;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Update;
@@ -90,6 +91,21 @@ public sealed class ModalCoordinatorLaunchersTests
 
         // Assert
         await coordinator.Received(1).PushAsync<FilterGroupModal, bool>(Arg.Any<IDictionary<string, object?>?>());
+    }
+
+    [Fact]
+    public async Task OpenFilterLibraryAsync_DelegatesToPushAsync()
+    {
+        // Arrange
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.PushAsync<FilterLibraryModal, bool>(Arg.Any<IDictionary<string, object?>?>())
+            .Returns(new ModalOpenResult<bool>(false, WasOpened: true));
+
+        // Act
+        await coordinator.OpenFilterLibraryAsync();
+
+        // Assert
+        await coordinator.Received(1).PushAsync<FilterLibraryModal, bool>(Arg.Any<IDictionary<string, object?>?>());
     }
 
     [Fact]

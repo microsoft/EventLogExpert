@@ -8,6 +8,7 @@ using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
+using EventLogExpert.UI.FilterLibrary;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Update;
 
@@ -51,6 +52,13 @@ public static class ModalCoordinatorLaunchers
             ArgumentNullException.ThrowIfNull(coordinator);
 
             return coordinator.PushAsync<FilterGroupModal, bool>();
+        }
+
+        public Task<ModalOpenResult<bool>> OpenFilterLibraryAsync()
+        {
+            ArgumentNullException.ThrowIfNull(coordinator);
+
+            return coordinator.PushAsync<FilterLibraryModal, bool>();
         }
 
         public Task<ModalOpenResult<bool>> OpenReleaseNotesAsync(ReleaseNotesContent content)
