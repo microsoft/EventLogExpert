@@ -43,6 +43,26 @@ internal sealed class Reducers
     public static FilterPaneState ReduceClearFilters(FilterPaneState state) => new() { IsEnabled = state.IsEnabled };
 
     [ReducerMethod]
+    public static FilterPaneState ReduceMergeFilters(FilterPaneState state, MergeFiltersAction action)
+    {
+        if (action.Filters.IsEmpty) { return state; }
+
+        HashSet<(string Value, bool IsExcluded)> existingKeys =
+            [.. state.Filters.Select(filter => (filter.ComparisonText, filter.IsExcluded))];
+
+        List<SavedFilter> additions = [];
+
+        foreach (var filter in action.Filters)
+        {
+            if (!existingKeys.Add((filter.ComparisonText, filter.IsExcluded))) { continue; }
+
+            additions.Add(filter with { Id = FilterId.Create(), IsEnabled = filter.Compiled is not null });
+        }
+
+        return additions.Count == 0 ? state : state with { Filters = state.Filters.AddRange(additions) };
+    }
+
+    [ReducerMethod]
     public static FilterPaneState ReduceRemoveFilter(FilterPaneState state, RemoveFilterAction action)
     {
         var filter = state.Filters.FirstOrDefault(filter => filter.Id == action.Id);

@@ -25,7 +25,6 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
 
         var entry = new LibraryEntrySavedFilter
         {
-            Id = "fav-1",
             Name = "Fav",
             CreatedUtc = DateTimeOffset.UtcNow,
             IsFavorite = true,
@@ -48,14 +47,14 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     {
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var entry = BuildFilterEntry("id-1", "First");
+        var entry = BuildFilterEntry("First");
 
         store.Add(entry);
         var result = store.LoadAll();
 
         Assert.Single(result);
         var loaded = Assert.IsType<LibraryEntrySavedFilter>(result[0]);
-        Assert.Equal("id-1", loaded.Id);
+        Assert.Equal(entry.Id, loaded.Id);
         Assert.Equal("First", loaded.Name);
         Assert.Equal("Level == 4", loaded.Filter.ComparisonText);
         Assert.False(loaded.IsFavorite);
@@ -76,7 +75,6 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
 
         var preset = new LibraryEntryPreset
         {
-            Id = "id-1",
             Name = "Preset",
             CreatedUtc = DateTimeOffset.UtcNow,
             Filters = [f1, f2],
@@ -95,10 +93,10 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
 
-        var advanced = BuildAutoTrackedFilterEntry("auto-adv", "Level == 4", mode: FilterMode.Advanced);
+        var advanced = BuildAutoTrackedFilterEntry("Level == 4", mode: FilterMode.Advanced);
         store.Add(advanced);
 
-        var basic = BuildAutoTrackedFilterEntry("auto-basic", "Level == 4", mode: FilterMode.Basic);
+        var basic = BuildAutoTrackedFilterEntry("Level == 4", mode: FilterMode.Basic);
         var (entry, wasInserted) = store.AddOrReturnExistingFilter(basic);
 
         Assert.True(wasInserted);
@@ -112,7 +110,7 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
 
-        var candidate = BuildAutoTrackedFilterEntry("auto-1", "Level == 4");
+        var candidate = BuildAutoTrackedFilterEntry("Level == 4");
         var (entry, wasInserted) = store.AddOrReturnExistingFilter(candidate);
 
         Assert.True(wasInserted);
@@ -125,9 +123,9 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     {
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        store.Add(BuildAutoTrackedFilterEntry("auto-1", "Level == 4"));
+        store.Add(BuildAutoTrackedFilterEntry("Level == 4"));
 
-        var differentCase = BuildAutoTrackedFilterEntry("auto-2", "LEVEL == 4");
+        var differentCase = BuildAutoTrackedFilterEntry("LEVEL == 4");
         var (_, wasInserted) = store.AddOrReturnExistingFilter(differentCase);
 
         Assert.False(wasInserted);
@@ -139,14 +137,14 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
 
-        var first = BuildAutoTrackedFilterEntry("auto-original", "Level == 4");
+        var first = BuildAutoTrackedFilterEntry("Level == 4");
         store.Add(first);
 
-        var competing = BuildAutoTrackedFilterEntry("auto-competing", "Level == 4");
+        var competing = BuildAutoTrackedFilterEntry("Level == 4");
         var (entry, wasInserted) = store.AddOrReturnExistingFilter(competing);
 
         Assert.False(wasInserted);
-        Assert.Equal("auto-original", entry.Id);
+        Assert.Equal(first.Id, entry.Id);
         Assert.Single(store.LoadAll());
     }
 
@@ -158,10 +156,10 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
 
-        var userSaved = BuildFilterEntry("user-1", "Saved");
+        var userSaved = BuildFilterEntry("Saved");
         store.Add(userSaved);
 
-        var autoTracked = BuildAutoTrackedFilterEntry("auto-1", "Level == 4");
+        var autoTracked = BuildAutoTrackedFilterEntry("Level == 4");
         var (_, wasInserted) = store.AddOrReturnExistingFilter(autoTracked);
 
         Assert.True(wasInserted);
@@ -173,20 +171,29 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     {
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        store.Add(BuildFilterEntry("seed", "Seed"));
+        var seed = BuildFilterEntry("Seed");
+        store.Add(seed);
+
+        var conflict = new LibraryEntrySavedFilter
+        {
+            Id = seed.Id,
+            Name = "Conflict",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filter = seed.Filter,
+        };
 
         var batch = new List<LibraryEntry>
         {
-            BuildFilterEntry("new-1", "New 1"),
-            BuildFilterEntry("seed", "Conflict"),
-            BuildFilterEntry("new-2", "New 2"),
+            BuildFilterEntry("New 1"),
+            conflict,
+            BuildFilterEntry("New 2"),
         };
 
         Assert.Throws<SqliteException>(() => store.AddRange(batch));
 
         var result = store.LoadAll();
         Assert.Single(result);
-        Assert.Equal("seed", result[0].Id);
+        Assert.Equal(seed.Id, result[0].Id);
     }
 
     [Fact]
@@ -205,20 +212,17 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     {
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var batch = new List<LibraryEntry>
-        {
-            BuildFilterEntry("id-a", "A"),
-            BuildFilterEntry("id-b", "B"),
-            BuildFilterEntry("id-c", "C"),
-        };
+        var entryA = BuildFilterEntry("A");
+        var entryB = BuildFilterEntry("B");
+        var entryC = BuildFilterEntry("C");
 
-        store.AddRange(batch);
+        store.AddRange([entryA, entryB, entryC]);
 
         var result = store.LoadAll();
         Assert.Equal(3, result.Count);
-        Assert.Contains(result, e => e.Id == "id-a");
-        Assert.Contains(result, e => e.Id == "id-b");
-        Assert.Contains(result, e => e.Id == "id-c");
+        Assert.Contains(result, e => e.Id == entryA.Id);
+        Assert.Contains(result, e => e.Id == entryB.Id);
+        Assert.Contains(result, e => e.Id == entryC.Id);
     }
 
     [Fact]
@@ -226,10 +230,10 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     {
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var entry = BuildFilterEntry("id-1", "First");
+        var entry = BuildFilterEntry("First");
         store.Add(entry);
 
-        store.Delete("id-1");
+        store.Delete(entry.Id);
         var result = store.LoadAll();
 
         Assert.Empty(result);
@@ -264,8 +268,8 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
 
-        store.Add(BuildFilterEntry("id-1", "First"));
-        store.Add(BuildFilterEntry("id-2", "Second"));
+        store.Add(BuildFilterEntry("First"));
+        store.Add(BuildFilterEntry("Second"));
         var result = store.LoadAll();
 
         Assert.Equal(2, result.Count);
@@ -286,18 +290,19 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         // Simulate a database created by the PR-2 5-column schema and prove PR-3
         // first-open adds the 6 new columns (+ unique index) without data loss.
         var dbPath = CreateTempDatabasePath();
-        SeedLegacyPr2Schema(dbPath);
+        var legacyId = SeedLegacyPr2Schema(dbPath);
 
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
 
-        store.Add(BuildFilterEntry("post-migration", "Post"));
+        var postMigration = BuildFilterEntry("Post");
+        store.Add(postMigration);
         var result = store.LoadAll();
 
         Assert.Equal(2, result.Count);
-        Assert.Contains(result, e => e.Id == "legacy-row");
-        Assert.Contains(result, e => e.Id == "post-migration");
+        Assert.Contains(result, e => e.Id == legacyId);
+        Assert.Contains(result, e => e.Id == postMigration.Id);
 
-        var legacy = result.First(e => e.Id == "legacy-row");
+        var legacy = result.First(e => e.Id == legacyId);
         Assert.Equal(LibraryEntryOrigin.UserSaved, legacy.Origin);
         Assert.False(legacy.IsFavorite);
         Assert.Null(legacy.LastUsedUtc);
@@ -337,27 +342,30 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
         var store = new FilterLibrarySqliteStore(dbPath, logger);
 
-        var seedEntry = BuildFilterEntry("seed", "Seed");
+        var seedEntry = BuildFilterEntry("Seed");
         store.Add(seedEntry);
-        store.Delete("seed");
+        store.Delete(seedEntry.Id);
+
+        var badId = new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-00000000bad1"));
 
         using (var connection = new SqliteConnection($"Data Source={dbPath}"))
         {
             connection.Open();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = """
+            cmd.CommandText = $"""
                 INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded)
-                VALUES ('bad', 'Bad', '2026-05-31T00:00:00.0000000+00:00', 'Filter', 'not valid json', 0, NULL, 'UserSaved', NULL, NULL, NULL);
+                VALUES ('{badId.Value:D}', 'Bad', '2026-05-31T00:00:00.0000000+00:00', 'Filter', 'not valid json', 0, NULL, 'UserSaved', NULL, NULL, NULL);
                 """;
             cmd.ExecuteNonQuery();
         }
 
-        store.Add(BuildFilterEntry("good", "Good"));
+        var good = BuildFilterEntry("Good");
+        store.Add(good);
 
         var result = store.LoadAll();
 
         Assert.Single(result);
-        Assert.Equal("good", result[0].Id);
+        Assert.Equal(good.Id, result[0].Id);
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
@@ -367,17 +375,17 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         var dbPath = CreateTempDatabasePath();
         var logger = Substitute.For<ITraceLogger>();
         var store = new FilterLibrarySqliteStore(dbPath, logger);
-        store.Add(BuildFilterEntry("seed", "Seed"));
-        store.Delete("seed");
+        var seed = BuildFilterEntry("Seed");
+        store.Add(seed);
+        store.Delete(seed.Id);
+
+        var unknownId = new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-000000000099"));
 
         using (var connection = new SqliteConnection($"Data Source={dbPath}"))
         {
             connection.Open();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = """
-                INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded)
-                VALUES ('unknown', 'Unknown', '2026-05-31T00:00:00.0000000+00:00', 'SomeFutureKind', '{}', 0, NULL, 'UserSaved', NULL, NULL, NULL);
-                """;
+            cmd.CommandText = $"INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded) VALUES ('{unknownId.Value:D}', 'Unknown', '2026-05-31T00:00:00.0000000+00:00', 'SomeFutureKind', '{{}}', 0, NULL, 'UserSaved', NULL, NULL, NULL);";
             cmd.ExecuteNonQuery();
         }
 
@@ -394,16 +402,16 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
-        store.Add(new LibraryEntrySavedFilter
+        var fav = new LibraryEntrySavedFilter
         {
-            Id = "fav-1",
             Name = "Fav",
             CreatedUtc = DateTimeOffset.UtcNow,
             IsFavorite = true,
             Filter = filter,
-        });
+        };
+        store.Add(fav);
 
-        var bumped = store.TryBumpLastUsedIfNotFavorite("fav-1", DateTimeOffset.UtcNow);
+        var bumped = store.TryBumpLastUsedIfNotFavorite(fav.Id, DateTimeOffset.UtcNow);
 
         Assert.False(bumped);
         var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(store.LoadAll()));
@@ -416,7 +424,7 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
 
-        Assert.False(store.TryBumpLastUsedIfNotFavorite("nonexistent", DateTimeOffset.UtcNow));
+        Assert.False(store.TryBumpLastUsedIfNotFavorite(LibraryEntryId.Create(), DateTimeOffset.UtcNow));
     }
 
     [Fact]
@@ -424,10 +432,11 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     {
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        store.Add(BuildAutoTrackedFilterEntry("auto-1", "Level == 4"));
+        var seeded = BuildAutoTrackedFilterEntry("Level == 4");
+        store.Add(seeded);
         var bumpTo = new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
 
-        var bumped = store.TryBumpLastUsedIfNotFavorite("auto-1", bumpTo);
+        var bumped = store.TryBumpLastUsedIfNotFavorite(seeded.Id, bumpTo);
 
         Assert.True(bumped);
         var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(store.LoadAll()));
@@ -439,9 +448,9 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     {
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        store.Add(BuildAutoTrackedFilterEntry("auto-1", "Level == 4"));
+        store.Add(BuildAutoTrackedFilterEntry("Level == 4"));
 
-        Assert.Throws<SqliteException>(() => store.Add(BuildAutoTrackedFilterEntry("auto-2", "Level == 4")));
+        Assert.Throws<SqliteException>(() => store.Add(BuildAutoTrackedFilterEntry("Level == 4")));
     }
 
     [Fact]
@@ -449,10 +458,16 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     {
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var initial = BuildFilterEntry("id-1", "First");
+        var initial = BuildFilterEntry("First");
         store.Add(initial);
 
-        var updated = BuildFilterEntry("id-1", "First (renamed)");
+        var updated = new LibraryEntrySavedFilter
+        {
+            Id = initial.Id,
+            Name = "First (renamed)",
+            CreatedUtc = initial.CreatedUtc,
+            Filter = initial.Filter,
+        };
 
         store.Update(updated);
         var result = store.LoadAll();
@@ -461,14 +476,13 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         Assert.Equal("First (renamed)", result[0].Name);
     }
 
-    private static LibraryEntrySavedFilter BuildAutoTrackedFilterEntry(string id, string comparisonText, FilterMode mode = FilterMode.Advanced)
+    private static LibraryEntrySavedFilter BuildAutoTrackedFilterEntry(string comparisonText, FilterMode mode = FilterMode.Advanced)
     {
         var filter = SavedFilter.TryCreate(comparisonText, mode: mode);
         Assert.NotNull(filter);
 
         return new LibraryEntrySavedFilter
         {
-            Id = id,
             Name = comparisonText,
             CreatedUtc = DateTimeOffset.UtcNow,
             Origin = LibraryEntryOrigin.AutoTracked,
@@ -476,14 +490,13 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         };
     }
 
-    private static LibraryEntrySavedFilter BuildFilterEntry(string id, string name)
+    private static LibraryEntrySavedFilter BuildFilterEntry(string name)
     {
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
 
         return new LibraryEntrySavedFilter
         {
-            Id = id,
             Name = name,
             CreatedUtc = DateTimeOffset.UtcNow,
             Filter = filter,
@@ -504,10 +517,12 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         return columns;
     }
 
-    private static void SeedLegacyPr2Schema(string dbPath)
+    private static LibraryEntryId SeedLegacyPr2Schema(string dbPath)
     {
         var dir = Path.GetDirectoryName(dbPath);
         if (!string.IsNullOrEmpty(dir)) { Directory.CreateDirectory(dir); }
+
+        var legacyId = LibraryEntryId.Create();
 
         using var connection = new SqliteConnection($"Data Source={dbPath}");
         connection.Open();
@@ -527,12 +542,10 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         }
 
         using var insert = connection.CreateCommand();
-        insert.CommandText = """
-            INSERT INTO library_entries (id, name, created_utc, kind, payload)
-            VALUES ('legacy-row', 'Legacy', '2026-05-31T00:00:00.0000000+00:00', 'Filter',
-                '{"Color":0,"ComparisonText":"Level == 4","IsExcluded":false,"Mode":"Advanced"}');
-            """;
+        insert.CommandText = $"INSERT INTO library_entries (id, name, created_utc, kind, payload) VALUES ('{legacyId.Value:D}', 'Legacy', '2026-05-31T00:00:00.0000000+00:00', 'Filter', '{{\"Color\":0,\"ComparisonText\":\"Level == 4\",\"IsExcluded\":false,\"Mode\":\"Advanced\"}}');";
         insert.ExecuteNonQuery();
+
+        return legacyId;
     }
 
     private string CreateTempDatabasePath()

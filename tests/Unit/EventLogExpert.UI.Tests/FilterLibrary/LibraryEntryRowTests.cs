@@ -15,32 +15,34 @@ public sealed class LibraryEntryRowTests : BunitContext
     public async Task Apply_InvokesOnApplyWithEntryId()
     {
         // Arrange
-        string? captured = null;
+        LibraryEntryId? captured = null;
+        var entry = BuildFilterEntry("Test");
         var component = Render<LibraryEntryRow>(parameters => parameters
-            .Add(p => p.Entry, BuildFilterEntry("id-1", "Test"))
+            .Add(p => p.Entry, entry)
             .Add(p => p.OnApply, id => { captured = id; return Task.CompletedTask; }));
 
         // Act
         await component.Find("button.button-green").ClickAsync(new MouseEventArgs());
 
         // Assert
-        Assert.Equal("id-1", captured);
+        Assert.Equal(entry.Id, captured);
     }
 
     [Fact]
     public async Task Delete_InvokesOnDeleteWithEntryId()
     {
         // Arrange
-        string? captured = null;
+        LibraryEntryId? captured = null;
+        var entry = BuildFilterEntry("Test");
         var component = Render<LibraryEntryRow>(parameters => parameters
-            .Add(p => p.Entry, BuildFilterEntry("id-1", "Test"))
+            .Add(p => p.Entry, entry)
             .Add(p => p.OnDelete, id => { captured = id; return Task.CompletedTask; }));
 
         // Act
         await component.Find("button.button-red").ClickAsync(new MouseEventArgs());
 
         // Assert
-        Assert.Equal("id-1", captured);
+        Assert.Equal(entry.Id, captured);
     }
 
     [Fact]
@@ -48,7 +50,7 @@ public sealed class LibraryEntryRowTests : BunitContext
     {
         // PR-2 deliberately ships without an Edit button (regression guard against accidentally adding one back).
         var component = Render<LibraryEntryRow>(parameters => parameters
-            .Add(p => p.Entry, BuildFilterEntry("id-1", "Test")));
+            .Add(p => p.Entry, BuildFilterEntry("Test")));
 
         Assert.DoesNotContain(component.FindAll("button"), b => b.TextContent.Trim() == "Edit");
     }
@@ -61,7 +63,6 @@ public sealed class LibraryEntryRowTests : BunitContext
         Assert.NotNull(f1);
         var preset = new LibraryEntryPreset
         {
-            Id = "id-1",
             Name = "Test",
             CreatedUtc = DateTimeOffset.UtcNow,
             Filters = [f1],
@@ -80,20 +81,19 @@ public sealed class LibraryEntryRowTests : BunitContext
     {
         // Arrange + Act
         var component = Render<LibraryEntryRow>(parameters => parameters
-            .Add(p => p.Entry, BuildFilterEntry("id-1", "Test")));
+            .Add(p => p.Entry, BuildFilterEntry("Test")));
 
         // Assert
         Assert.Equal("Filter", component.Find(".library-entry-kind-badge").TextContent.Trim());
     }
 
-    private static LibraryEntrySavedFilter BuildFilterEntry(string id, string name)
+    private static LibraryEntrySavedFilter BuildFilterEntry(string name)
     {
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
 
         return new LibraryEntrySavedFilter
         {
-            Id = id,
             Name = name,
             CreatedUtc = DateTimeOffset.UtcNow,
             Filter = filter,

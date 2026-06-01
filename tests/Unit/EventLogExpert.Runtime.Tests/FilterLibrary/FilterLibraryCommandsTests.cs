@@ -27,10 +27,11 @@ public sealed class FilterLibraryCommandsTests
     {
         var dispatcher = Substitute.For<IDispatcher>();
         var sut = new FilterLibraryCommands(dispatcher);
+        var id = LibraryEntryId.Create();
 
-        sut.ApplyEntry("id-1");
+        sut.ApplyEntry(id);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<ApplyLibraryEntryAction>(a => a.EntryId == "id-1"));
+        dispatcher.Received(1).Dispatch(Arg.Is<ApplyLibraryEntryAction>(a => a.EntryId == id));
     }
 
     [Fact]
@@ -38,10 +39,11 @@ public sealed class FilterLibraryCommandsTests
     {
         var dispatcher = Substitute.For<IDispatcher>();
         var sut = new FilterLibraryCommands(dispatcher);
+        var id = LibraryEntryId.Create();
 
-        sut.DeleteEntry("id-1");
+        sut.DeleteEntry(id);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntryAction>(a => a.EntryId == "id-1"));
+        dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntryAction>(a => a.EntryId == id));
     }
 
     [Fact]
@@ -77,7 +79,6 @@ public sealed class FilterLibraryCommandsTests
 
         return new LibraryEntrySavedFilter
         {
-            Id = "id-1",
             Name = "Test",
             CreatedUtc = DateTimeOffset.UtcNow,
             Filter = filter,

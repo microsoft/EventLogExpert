@@ -10,7 +10,7 @@ namespace EventLogExpert.Runtime.FilterLibrary;
 [JsonDerivedType(typeof(LibraryEntryPreset), "Preset")]
 public abstract record LibraryEntry
 {
-    public required string Id { get; init; }
+    public LibraryEntryId Id { get; init; } = LibraryEntryId.Create();
 
     public required string Name { get; init; }
 

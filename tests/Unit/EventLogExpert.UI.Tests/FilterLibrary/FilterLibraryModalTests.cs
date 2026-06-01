@@ -40,7 +40,7 @@ public sealed class FilterLibraryModalTests : BunitContext
     public async Task Apply_DispatchesApplyEntryAndCompletesModalWithTrue()
     {
         // Arrange
-        var entry = BuildFilterEntry("id-1", "First");
+        var entry = BuildFilterEntry("First");
         SetState(new FilterLibraryState { Entries = [entry], IsLoaded = true });
 
         var component = Render<FilterLibraryModal>();
@@ -49,7 +49,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         await component.Find(".library-entry-row button.button-green").ClickAsync(new MouseEventArgs());
 
         // Assert
-        _commands.Received(1).ApplyEntry("id-1");
+        _commands.Received(1).ApplyEntry(entry.Id);
         _modalService.Received(1).Complete(_modalId, Arg.Is<object?>(value => Equals(value, true)));
     }
 
@@ -83,8 +83,8 @@ public sealed class FilterLibraryModalTests : BunitContext
     public void Render_WithEntries_RendersOneRowPerEntry()
     {
         // Arrange
-        var e1 = BuildFilterEntry("id-1", "First");
-        var e2 = BuildFilterEntry("id-2", "Second");
+        var e1 = BuildFilterEntry("First");
+        var e2 = BuildFilterEntry("Second");
         SetState(new FilterLibraryState { Entries = [e1, e2], IsLoaded = true });
 
         // Act
@@ -94,14 +94,13 @@ public sealed class FilterLibraryModalTests : BunitContext
         Assert.Equal(2, component.FindAll(".library-entry-row").Count);
     }
 
-    private static LibraryEntrySavedFilter BuildFilterEntry(string id, string name)
+    private static LibraryEntrySavedFilter BuildFilterEntry(string name)
     {
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
 
         return new LibraryEntrySavedFilter
         {
-            Id = id,
             Name = name,
             CreatedUtc = DateTimeOffset.UtcNow,
             Filter = filter,

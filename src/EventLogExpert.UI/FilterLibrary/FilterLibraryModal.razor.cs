@@ -26,15 +26,17 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         }
     }
 
-    private Task HandleApplyAsync(string entryId)
+    private Task HandleApplyAsync(LibraryEntryId entryId)
     {
         FilterLibraryCommands.ApplyEntry(entryId);
+
         return CompleteAsync(true);
     }
 
-    private Task HandleDeleteAsync(string entryId)
+    private Task HandleDeleteAsync(LibraryEntryId entryId)
     {
         FilterLibraryCommands.DeleteEntry(entryId);
+
         return Task.CompletedTask;
     }
 }

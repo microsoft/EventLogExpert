@@ -34,14 +34,10 @@ internal sealed class Effects(IFilterLibraryStore store, IState<FilterLibrarySta
 
         if (entry is null) { return Task.CompletedTask; }
 
-        ImmutableList<SavedFilter> filters = entry switch
-        {
-            LibraryEntrySavedFilter f => [f.Filter],
-            LibraryEntryPreset p => p.Filters,
-            _ => throw new InvalidOperationException($"Unhandled LibraryEntry type '{entry.GetType().FullName}'."),
-        };
+        ImmutableList<SavedFilter> filters = ExtractFilters(entry);
 
-        dispatcher.Dispatch(new ReplaceFiltersAction(filters));
+        dispatcher.Dispatch(new MergeFiltersAction(filters));
+        dispatcher.Dispatch(new RecordEntryAppliedAction(action.EntryId));
 
         return Task.CompletedTask;
     }
@@ -80,6 +76,21 @@ internal sealed class Effects(IFilterLibraryStore store, IState<FilterLibrarySta
     }
 
     [EffectMethod]
+    public Task HandleReplaceWithLibraryEntry(ReplaceWithLibraryEntryAction action, IDispatcher dispatcher)
+    {
+        LibraryEntry? entry = state.Value.Entries.FirstOrDefault(e => e.Id == action.EntryId);
+
+        if (entry is null) { return Task.CompletedTask; }
+
+        ImmutableList<SavedFilter> filters = ExtractFilters(entry);
+
+        dispatcher.Dispatch(new ReplaceFiltersAction(filters));
+        dispatcher.Dispatch(new RecordEntryAppliedAction(action.EntryId));
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod]
     public Task HandleUpdateLibraryEntry(UpdateLibraryEntryAction action, IDispatcher dispatcher)
     {
         try
@@ -94,4 +105,12 @@ internal sealed class Effects(IFilterLibraryStore store, IState<FilterLibrarySta
 
         return Task.CompletedTask;
     }
+
+    private static ImmutableList<SavedFilter> ExtractFilters(LibraryEntry entry) =>
+        entry switch
+        {
+            LibraryEntrySavedFilter f => [f.Filter],
+            LibraryEntryPreset p => p.Filters,
+            _ => throw new InvalidOperationException($"Unhandled LibraryEntry type '{entry.GetType().FullName}'."),
+        };
 }
