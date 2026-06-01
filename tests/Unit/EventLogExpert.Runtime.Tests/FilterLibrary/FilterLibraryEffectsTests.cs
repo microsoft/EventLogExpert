@@ -32,7 +32,7 @@ public sealed class FilterLibraryEffectsTests
             new AddFilterToExistingPresetAction(preset.Id, newFilter, SourceEntryId: null),
             Substitute.For<IDispatcher>());
 
-        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.GetType() == typeof(LibraryEntryPreset)
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e is LibraryEntryPreset
             && ((LibraryEntryPreset)e).Id == preset.Id && ((LibraryEntryPreset)e).Filters.Count == 2
             && ((LibraryEntryPreset)e).Filters.Any(f => f.ComparisonText == "Level == 4")));
     }
@@ -61,6 +61,33 @@ public sealed class FilterLibraryEffectsTests
         store.DidNotReceive().Update(Arg.Is<LibraryEntry>(e => e.Id == preset.Id));
         // But DID promote the source.
         store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Id == source.Id && e.Origin == LibraryEntryOrigin.UserSaved));
+    }
+
+    [Fact]
+    public async Task HandleAddFilterToExistingPreset_SameTextDifferentMode_AppendsAsDistinctFilter()
+    {
+        // Mode-drift policy: distinct Mode + same ComparisonText must coexist in a preset.
+        var advanced = SavedFilter.TryCreate("Level == 4", mode: FilterMode.Advanced);
+        var basic = SavedFilter.TryCreate("Level == 4", mode: FilterMode.Basic);
+        Assert.NotNull(advanced);
+        Assert.NotNull(basic);
+        var preset = new LibraryEntryPreset
+        {
+            Name = "Preset",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = [advanced],
+        };
+        var (effects, store, _, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [preset] });
+
+        await effects.HandleAddFilterToExistingPreset(
+            new AddFilterToExistingPresetAction(preset.Id, basic, SourceEntryId: null),
+            Substitute.For<IDispatcher>());
+
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.GetType() == typeof(LibraryEntryPreset)
+            && ((LibraryEntryPreset)e).Id == preset.Id
+            && ((LibraryEntryPreset)e).Filters.Count == 2
+            && ((LibraryEntryPreset)e).Filters.Any(f => f.Mode == FilterMode.Advanced)
+            && ((LibraryEntryPreset)e).Filters.Any(f => f.Mode == FilterMode.Basic)));
     }
 
     [Fact]
@@ -229,20 +256,7 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleLoadLibrary_AlreadyLoading_SkipsStoreAndDispatch()
-    {
-        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { IsLoading = true });
-
-        await effects.HandleLoadLibrary(dispatcher);
-
-        store.DidNotReceive().LoadAll();
-        dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryStartedAction>());
-        dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibrarySuccessAction>());
-        dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());
-    }
-
-    [Fact]
-    public async Task HandleLoadLibrary_DispatchesSuccessWithStoreEntries()
+    public async Task HandleLoadLibrary_DispatchesStartedAndSuccessWithStoreEntries()
     {
         var entry = BuildFilterEntry("First");
         var (effects, store, dispatcher, _, _) = CreateEffects();
@@ -255,7 +269,7 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleLoadLibrary_WhenStoreThrows_DispatchesFailureActionAndLogs()
+    public async Task HandleLoadLibrary_WhenStoreThrows_DispatchesStartedThenFailureAndLogs()
     {
         var (effects, store, dispatcher, _, logger) = CreateEffects();
         store.LoadAll().Returns(_ => throw new InvalidOperationException("boom"));
@@ -266,6 +280,21 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryFailureAction>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibrarySuccessAction>());
         logger.ReceivedWithAnyArgs(1).Warning(default);
+    }
+
+    [Fact]
+    public async Task HandleRecordEntryApplied_BumpReturnsFalse_SkipsDispatchAndPrune()
+    {
+        // SQL bump returns false (concurrent SetIsFavorite committed) → no dispatch, no prune.
+        var entry = BuildFilterEntry("First") with { Origin = LibraryEntryOrigin.AutoTracked };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [entry] });
+        store.TryBumpLastUsedIfNotFavorite(Arg.Any<LibraryEntryId>(), Arg.Any<DateTimeOffset>()).Returns(false);
+
+        await effects.HandleRecordEntryApplied(new RecordEntryAppliedAction(entry.Id), dispatcher);
+
+        store.Received(1).TryBumpLastUsedIfNotFavorite(entry.Id, Arg.Any<DateTimeOffset>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+        store.DidNotReceive().TryDeleteAutoTrackedIfNotFavorite(Arg.Any<LibraryEntryId>());
     }
 
     [Fact]
@@ -292,6 +321,45 @@ public sealed class FilterLibraryEffectsTests
         store.Received(1).TryBumpLastUsedIfNotFavorite(entry.Id, Arg.Any<DateTimeOffset>());
         dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a =>
             a.Entry.Id == entry.Id && a.Entry.LastUsedUtc != null));
+    }
+
+    [Fact]
+    public async Task HandleRecordEntryApplied_PruneDeleteReturnsFalse_DoesNotDispatchDeleteSuccess()
+    {
+        // SQL DELETE returns false (entry was promoted/favorited since snapshot) → don't orphan state.
+        var seedFilter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(seedFilter);
+        var entries = new List<LibraryEntry>();
+        for (int i = 0; i < 50; i++)
+        {
+            entries.Add(new LibraryEntrySavedFilter
+            {
+                Name = $"recent-{i}",
+                CreatedUtc = DateTimeOffset.UtcNow,
+                Origin = LibraryEntryOrigin.AutoTracked,
+                LastUsedUtc = new DateTimeOffset(2026, 5, 1, 0, 0, i, TimeSpan.Zero),
+                Filter = seedFilter,
+            });
+        }
+
+        var bumpTarget = new LibraryEntrySavedFilter
+        {
+            Name = "bumped",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Origin = LibraryEntryOrigin.AutoTracked,
+            LastUsedUtc = new DateTimeOffset(2026, 5, 1, 0, 1, 0, TimeSpan.Zero),
+            Filter = seedFilter,
+        };
+        entries.Add(bumpTarget);
+
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [.. entries] });
+        store.TryBumpLastUsedIfNotFavorite(Arg.Any<LibraryEntryId>(), Arg.Any<DateTimeOffset>()).Returns(true);
+        store.TryDeleteAutoTrackedIfNotFavorite(Arg.Any<LibraryEntryId>()).Returns(false);
+
+        await effects.HandleRecordEntryApplied(new RecordEntryAppliedAction(bumpTarget.Id), dispatcher);
+
+        store.Received(1).TryDeleteAutoTrackedIfNotFavorite(Arg.Any<LibraryEntryId>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<DeleteLibraryEntrySuccessAction>());
     }
 
     [Fact]
@@ -329,11 +397,12 @@ public sealed class FilterLibraryEffectsTests
         var oldestId = ((LibraryEntrySavedFilter)entries[0]).Id;
         var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [.. entries] });
         store.TryBumpLastUsedIfNotFavorite(Arg.Any<LibraryEntryId>(), Arg.Any<DateTimeOffset>()).Returns(true);
+        store.TryDeleteAutoTrackedIfNotFavorite(Arg.Any<LibraryEntryId>()).Returns(true);
 
         await effects.HandleRecordEntryApplied(new RecordEntryAppliedAction(bumpTarget.Id), dispatcher);
 
-        // Expect the OLDEST entry (the seeded recent-0 with the earliest LastUsedUtc) to be pruned.
-        store.Received(1).Delete(oldestId);
+        // SQL-guarded delete no-ops if the row was concurrently promoted/favorited.
+        store.Received(1).TryDeleteAutoTrackedIfNotFavorite(oldestId);
         dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntrySuccessAction>(a => a.EntryId == oldestId));
     }
 
@@ -345,6 +414,56 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleRecordEntryApplied(new RecordEntryAppliedAction(LibraryEntryId.Create()), dispatcher);
 
         store.DidNotReceive().TryBumpLastUsedIfNotFavorite(Arg.Any<LibraryEntryId>(), Arg.Any<DateTimeOffset>());
+    }
+
+    [Fact]
+    public async Task HandleRecordFilterApplied_CollisionBranch_BumpsExistingAndDispatchesAddSuccess()
+    {
+        // In-memory state has no match; SQL INSERT OR IGNORE collides with an existing AutoTracked row.
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+        var existing = new LibraryEntrySavedFilter
+        {
+            Name = "Pre-existing in SQL",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Origin = LibraryEntryOrigin.AutoTracked,
+            LastUsedUtc = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
+            Filter = filter,
+        };
+
+        var (effects, store, dispatcher, _, _) = CreateEffects();
+        store.AddOrReturnExistingFilter(Arg.Any<LibraryEntrySavedFilter>()).Returns((existing, false));
+        store.TryBumpLastUsedIfNotFavorite(Arg.Any<LibraryEntryId>(), Arg.Any<DateTimeOffset>()).Returns(true);
+
+        await effects.HandleRecordFilterApplied(new RecordFilterAppliedAction(filter), dispatcher);
+
+        store.Received(1).AddOrReturnExistingFilter(Arg.Any<LibraryEntrySavedFilter>());
+        store.Received(1).TryBumpLastUsedIfNotFavorite(existing.Id, Arg.Any<DateTimeOffset>());
+        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a =>
+            a.Entry.Id == existing.Id && a.Entry.LastUsedUtc != existing.LastUsedUtc));
+    }
+
+    [Fact]
+    public async Task HandleRecordFilterApplied_CollisionBranch_FavoritedExisting_SkipsBumpAndDispatch()
+    {
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+        var existing = new LibraryEntrySavedFilter
+        {
+            Name = "Favorited in SQL",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Origin = LibraryEntryOrigin.AutoTracked,
+            IsFavorite = true,
+            Filter = filter,
+        };
+
+        var (effects, store, dispatcher, _, _) = CreateEffects();
+        store.AddOrReturnExistingFilter(Arg.Any<LibraryEntrySavedFilter>()).Returns((existing, false));
+
+        await effects.HandleRecordFilterApplied(new RecordFilterAppliedAction(filter), dispatcher);
+
+        store.DidNotReceive().TryBumpLastUsedIfNotFavorite(Arg.Any<LibraryEntryId>(), Arg.Any<DateTimeOffset>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
     }
 
     [Fact]
@@ -427,6 +546,42 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
+    public async Task HandleRecordFilterApplied_PrunesOldestAutoTrackedEntries_WhenInsertExceedsCap()
+    {
+        // Mirrors the HandleRecordEntryApplied prune test for the auto-create insert path.
+        var seedFilter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(seedFilter);
+        var entries = new List<LibraryEntry>();
+        for (int i = 0; i < 50; i++)
+        {
+            entries.Add(new LibraryEntrySavedFilter
+            {
+                Name = $"recent-{i}",
+                CreatedUtc = DateTimeOffset.UtcNow,
+                Origin = LibraryEntryOrigin.AutoTracked,
+                LastUsedUtc = new DateTimeOffset(2026, 5, 1, 0, 0, i, TimeSpan.Zero),
+                // Distinct ComparisonText per entry forces the effect through AddOrReturnExistingFilter.
+                Filter = SavedFilter.TryCreate($"Level == {i + 100}")!,
+            });
+        }
+
+        var oldestId = ((LibraryEntrySavedFilter)entries[0]).Id;
+        var newFilter = SavedFilter.TryCreate("Level == 999");
+        Assert.NotNull(newFilter);
+
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [.. entries] });
+        store.AddOrReturnExistingFilter(Arg.Any<LibraryEntrySavedFilter>())
+            .Returns(call => (call.Arg<LibraryEntrySavedFilter>(), true));
+        store.TryDeleteAutoTrackedIfNotFavorite(Arg.Any<LibraryEntryId>()).Returns(true);
+
+        await effects.HandleRecordFilterApplied(new RecordFilterAppliedAction(newFilter), dispatcher);
+
+        store.Received(1).AddOrReturnExistingFilter(Arg.Any<LibraryEntrySavedFilter>());
+        store.Received(1).TryDeleteAutoTrackedIfNotFavorite(oldestId);
+        dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntrySuccessAction>(a => a.EntryId == oldestId));
+    }
+
+    [Fact]
     public async Task HandleRecordFilterApplied_TupleMatch_BumpReturnsFalse_SkipsDispatch()
     {
         var filter = SavedFilter.TryCreate("Level == 4");
@@ -469,6 +624,30 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a =>
             a.Entry.Id == existing.Id && a.Entry.LastUsedUtc != existing.LastUsedUtc));
         store.DidNotReceive().AddOrReturnExistingFilter(Arg.Any<LibraryEntrySavedFilter>());
+    }
+
+    [Fact]
+    public async Task HandleRecordFilterApplied_UserSavedExisting_BumpsAndSkipsAutoTrack()
+    {
+        // Re-applying a user-saved filter refreshes its LastUsedUtc; no AutoTracked duplicate.
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+        var existing = new LibraryEntrySavedFilter
+        {
+            Name = "User-Saved Level 4",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Origin = LibraryEntryOrigin.UserSaved,
+            LastUsedUtc = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
+            Filter = filter,
+        };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [existing] });
+        store.TryBumpLastUsedIfNotFavorite(Arg.Any<LibraryEntryId>(), Arg.Any<DateTimeOffset>()).Returns(true);
+
+        await effects.HandleRecordFilterApplied(new RecordFilterAppliedAction(filter), dispatcher);
+
+        store.Received(1).TryBumpLastUsedIfNotFavorite(existing.Id, Arg.Any<DateTimeOffset>());
+        store.DidNotReceive().AddOrReturnExistingFilter(Arg.Any<LibraryEntrySavedFilter>());
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a => a.Entry.Id == existing.Id));
     }
 
     [Fact]
@@ -627,6 +806,18 @@ public sealed class FilterLibraryEffectsTests
         var (effects, store, dispatcher, _, _) = CreateEffects();
 
         await effects.HandleSavePreset(new SavePresetAction("Empty", []), dispatcher);
+
+        store.DidNotReceive().Add(Arg.Any<LibraryEntry>());
+    }
+
+    [Fact]
+    public async Task HandleSavePreset_WhitespaceName_IsNoOp()
+    {
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+        var (effects, store, dispatcher, _, _) = CreateEffects();
+
+        await effects.HandleSavePreset(new SavePresetAction("   ", [filter]), dispatcher);
 
         store.DidNotReceive().Add(Arg.Any<LibraryEntry>());
     }

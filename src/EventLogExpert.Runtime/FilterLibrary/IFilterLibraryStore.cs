@@ -43,6 +43,15 @@ public interface IFilterLibraryStore
     /// </summary>
     bool TryBumpLastUsedIfNotFavorite(LibraryEntryId entryId, DateTimeOffset lastUsedUtc);
 
+    /// <summary>
+    ///     Deletes the library entry with <paramref name="entryId" /> ONLY when the row is still an AutoTracked filter
+    ///     AND is not favorited at the moment of the delete. Returns <c>true</c> when the delete affected a row; <c>false</c>
+    ///     when no row matched (entry missing, promoted to UserSaved, or favorited since the caller's snapshot was projected).
+    ///     Used by the auto-prune path to avoid losing data when a concurrent <c>SetIsFavorite</c> / <c>SaveEntry</c> has
+    ///     changed the row's classification after the snapshot was taken.
+    /// </summary>
+    bool TryDeleteAutoTrackedIfNotFavorite(LibraryEntryId entryId);
+
     /// <summary>Updates an existing library entry in the persistent store (matched by <see cref="LibraryEntry.Id" />).</summary>
     void Update(LibraryEntry entry);
 }

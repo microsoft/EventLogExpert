@@ -30,6 +30,60 @@ public sealed class LibraryEntryPolymorphicJsonTests
     }
 
     [Fact]
+    public void LibraryEntryIdJsonConverter_EmptyString_ThrowsJsonException()
+    {
+        var json = """{"Kind":"Filter","Id":"","Name":"x","CreatedUtc":"2026-05-31T12:00:00+00:00","Filter":{"Color":0,"ComparisonText":"Level == 4","IsExcluded":false,"Mode":"Advanced"}}""";
+
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
+    }
+
+    [Fact]
+    public void LibraryEntryIdJsonConverter_MalformedGuid_ThrowsJsonException()
+    {
+        var json = """{"Kind":"Filter","Id":"not-a-guid","Name":"x","CreatedUtc":"2026-05-31T12:00:00+00:00","Filter":{"Color":0,"ComparisonText":"Level == 4","IsExcluded":false,"Mode":"Advanced"}}""";
+
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
+    }
+
+    [Fact]
+    public void LibraryEntryIdJsonConverter_NonStringToken_ThrowsJsonException()
+    {
+        // GUID written as JSON number, not string.
+        var json = """{"Kind":"Filter","Id":12345,"Name":"x","CreatedUtc":"2026-05-31T12:00:00+00:00","Filter":{"Color":0,"ComparisonText":"Level == 4","IsExcluded":false,"Mode":"Advanced"}}""";
+
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
+    }
+
+    [Fact]
+    public void RoundTrip_LibraryEntry_PreservesOriginIsFavoriteAndLastUsedUtc()
+    {
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+        var lastUsed = new DateTimeOffset(2026, 5, 31, 12, 0, 0, TimeSpan.Zero);
+
+        LibraryEntry entry = new LibraryEntrySavedFilter
+        {
+            Id = new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-000000000003")),
+            Name = "Auto-tracked Fav",
+            CreatedUtc = lastUsed,
+            IsFavorite = true,
+            LastUsedUtc = lastUsed,
+            Origin = LibraryEntryOrigin.AutoTracked,
+            Filter = filter,
+        };
+
+        var json = JsonSerializer.Serialize(entry);
+        var restored = JsonSerializer.Deserialize<LibraryEntry>(json);
+
+        var restoredFilter = Assert.IsType<LibraryEntrySavedFilter>(restored);
+        Assert.True(restoredFilter.IsFavorite);
+        Assert.Equal(lastUsed, restoredFilter.LastUsedUtc);
+        Assert.Equal(LibraryEntryOrigin.AutoTracked, restoredFilter.Origin);
+        Assert.Contains("\"Origin\":\"AutoTracked\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"IsFavorite\":true", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RoundTrip_PresetEntry_PreservesAllFields_WithKindDiscriminator()
     {
         var f1 = SavedFilter.TryCreate("Level == 2");

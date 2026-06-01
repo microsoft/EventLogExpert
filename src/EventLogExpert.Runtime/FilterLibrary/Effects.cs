@@ -24,11 +24,15 @@ internal sealed class Effects(
 
         if (preset is null) { return Task.CompletedTask; }
 
+        // Dedup tuple matches the SQL UNIQUE INDEX scope: (lower(ComparisonText), Mode, IsExcluded).
+        // Distinct Mode values are intentional per the mode-drift policy.
         var addText = action.Filter.ComparisonText;
+        var addMode = action.Filter.Mode;
         var addExcluded = action.Filter.IsExcluded;
 
         if (preset.Filters.Any(f =>
             string.Equals(f.ComparisonText, addText, StringComparison.OrdinalIgnoreCase) &&
+            f.Mode == addMode &&
             f.IsExcluded == addExcluded))
         {
             PromoteSourceIfAutoTracked(action.SourceEntryId, dispatcher);
@@ -129,12 +133,10 @@ internal sealed class Effects(
     [EffectMethod(typeof(LoadLibraryAction))]
     public Task HandleLoadLibrary(IDispatcher dispatcher)
     {
-        // Concurrent-load race fix: a second LoadLibrary while the first is still in-flight
-        // (e.g., modal re-opened before load completes) would dispatch a duplicate
-        // LoadLibrarySuccessAction and clobber any intermediate state. The IsLoading flag
-        // is flipped synchronously by ReduceLoadLibraryStarted before this effect proceeds.
-        if (state.Value.IsLoading) { return Task.CompletedTask; }
-
+        // LoadLibraryStartedAction is queued (not run inline) per Fluxor 6.9 re-entrancy semantics —
+        // it flips IsLoading=true between Started and Success reducer commits for UI subscribers, but
+        // it does NOT prevent concurrent loads from inside this effect. The modal's
+        // `!IsLoaded || LoadError` check is the effective re-open guard.
         dispatcher.Dispatch(new LoadLibraryStartedAction());
 
         try
@@ -272,7 +274,9 @@ internal sealed class Effects(
         if (!collisionBumped) { return Task.CompletedTask; }
 
         var collisionEntry = (LibraryEntrySavedFilter)result.Entry with { LastUsedUtc = collisionNowUtc };
+        var collisionProjected = entries.Add(collisionEntry);
         dispatcher.Dispatch(new AddLibraryEntrySuccessAction(collisionEntry));
+        PruneFromSnapshot(collisionProjected, dispatcher);
 
         return Task.CompletedTask;
     }
@@ -326,7 +330,7 @@ internal sealed class Effects(
     [EffectMethod]
     public Task HandleSavePreset(SavePresetAction action, IDispatcher dispatcher)
     {
-        if (action.Filters.IsEmpty) { return Task.CompletedTask; }
+        if (string.IsNullOrWhiteSpace(action.Name) || action.Filters.IsEmpty) { return Task.CompletedTask; }
 
         var created = new LibraryEntryPreset
         {
@@ -481,20 +485,28 @@ internal sealed class Effects(
 
         if (autoTrackedRecents.Count <= MaxAutoTrackedRecents) { return; }
 
+        // CreatedUtc tie-break keeps prune deterministic when entries share LastUsedUtc.
         var toDelete = autoTrackedRecents
             .OrderBy(e => e.LastUsedUtc!.Value)
+            .ThenBy(e => e.CreatedUtc)
             .Take(autoTrackedRecents.Count - MaxAutoTrackedRecents)
             .ToList();
 
         foreach (var entry in toDelete)
         {
-            try { store.Delete(entry.Id); }
+            // SQL guard no-ops the delete if a concurrent SetIsFavorite/SaveEntry promoted the row
+            // (Origin=UserSaved or IsFavorite=true) after the snapshot was projected.
+            bool deleted;
+
+            try { deleted = store.TryDeleteAutoTrackedIfNotFavorite(entry.Id); }
             catch (Exception ex)
             {
-                logger.Warning($"FilterLibrary Delete (prune) failed for {entry.Id}. {ex.Message}");
+                logger.Warning($"FilterLibrary TryDeleteAutoTrackedIfNotFavorite (prune) failed for {entry.Id}. {ex.Message}");
 
                 continue;
             }
+
+            if (!deleted) { continue; }
 
             dispatcher.Dispatch(new DeleteLibraryEntrySuccessAction(entry.Id));
         }
