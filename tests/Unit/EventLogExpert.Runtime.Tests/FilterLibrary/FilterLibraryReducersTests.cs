@@ -23,6 +23,26 @@ public sealed class FilterLibraryReducersTests
     }
 
     [Fact]
+    public void ReduceAddLibraryEntrySuccess_DuplicateId_ReplacesInPlace()
+    {
+        var existing = BuildFilterEntry("First");
+        var state = new FilterLibraryState { Entries = [existing] };
+        var replacement = new LibraryEntrySavedFilter
+        {
+            Id = existing.Id,
+            Name = "First (collision-bumped)",
+            CreatedUtc = existing.CreatedUtc,
+            LastUsedUtc = DateTimeOffset.UtcNow,
+            Filter = existing.Filter,
+        };
+
+        var result = Reducers.ReduceAddLibraryEntrySuccess(state, new AddLibraryEntrySuccessAction(replacement));
+
+        Assert.Single(result.Entries);
+        Assert.Same(replacement, result.Entries[0]);
+    }
+
+    [Fact]
     public void ReduceDeleteLibraryEntrySuccess_RemovesById()
     {
         var first = BuildFilterEntry("First");
@@ -53,19 +73,34 @@ public sealed class FilterLibraryReducersTests
         {
             Entries = [BuildFilterEntry("Stale")],
             IsLoaded = true,
+            IsLoading = true,
         };
 
         var result = Reducers.ReduceLoadLibraryFailure(initialState);
 
         Assert.Empty(result.Entries);
         Assert.True(result.IsLoaded);
+        Assert.False(result.IsLoading);
         Assert.True(result.LoadError);
     }
 
     [Fact]
-    public void ReduceLoadLibrarySuccess_SetsEntriesAndIsLoaded_ClearsLoadError()
+    public void ReduceLoadLibraryStarted_SetsIsLoadingTrue_PreservesEntries()
     {
-        var initialState = new FilterLibraryState { LoadError = true };
+        var existing = BuildFilterEntry("Existing");
+        var state = new FilterLibraryState { Entries = [existing] };
+
+        var result = Reducers.ReduceLoadLibraryStarted(state);
+
+        Assert.True(result.IsLoading);
+        Assert.Single(result.Entries);
+        Assert.Same(existing, result.Entries[0]);
+    }
+
+    [Fact]
+    public void ReduceLoadLibrarySuccess_SetsEntriesAndIsLoaded_ClearsLoadErrorAndIsLoading()
+    {
+        var initialState = new FilterLibraryState { LoadError = true, IsLoading = true };
         var entry = BuildFilterEntry("First");
         var action = new LoadLibrarySuccessAction([entry]);
 
@@ -73,6 +108,7 @@ public sealed class FilterLibraryReducersTests
 
         Assert.Single(result.Entries);
         Assert.True(result.IsLoaded);
+        Assert.False(result.IsLoading);
         Assert.False(result.LoadError);
     }
 
