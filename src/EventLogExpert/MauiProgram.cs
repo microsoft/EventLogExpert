@@ -14,8 +14,10 @@ using EventLogExpert.Adapters.Threading;
 using EventLogExpert.Adapters.Window;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Platforms.Windows.Activation;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
+using EventLogExpert.Runtime.Common.Activation;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Elevation;
@@ -35,6 +37,7 @@ using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
+using EventLogExpert.WindowsPlatform;
 using Fluxor;
 using Fluxor.DependencyInjection;
 
@@ -126,6 +129,18 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<IMenuActionService>(static provider =>
             provider.GetRequiredService<MauiMenuActionService>());
+
+        builder.Services.AddSingleton<IActivationDispatcher>(static provider =>
+        {
+            var dispatcher = new ActivationDispatcher(
+                provider.GetRequiredService<IAlertDialogService>(),
+                provider.GetRequiredService<ITraceLogger>(),
+                provider.GetRequiredService<IMainThreadService>());
+
+            ActivationBootstrap.AttachDispatcher(dispatcher);
+
+            return dispatcher;
+        });
 
         builder.Services.AddSingleton<KeyboardShortcutService>();
         builder.Services.AddSingleton<DatabaseRecoveryHost>();

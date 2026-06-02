@@ -6,6 +6,10 @@
         <PackageVersion Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
         <PackageVersion Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
         <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
+        <!-- Pinned to the version transitively resolved through Microsoft.Maui.Controls (per
+             dotnet list package, include-transitive) so the ExplorerExtension companion exe and
+             the MAUI head share a single Microsoft.WindowsAppSDK version. -->
+        <PackageVersion Include="Microsoft.WindowsAppSDK" Version="1.7.250909003" />
         <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
         <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
         <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />

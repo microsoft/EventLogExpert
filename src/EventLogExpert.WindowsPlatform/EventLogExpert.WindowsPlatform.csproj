@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>EventLogExpert.WindowsPlatform</RootNamespace>
+    <!-- Non-MAUI library — sits outside the UseMaui block in Directory.Build.props so the
+         Otherwise branch sets TargetFramework=net10.0-windows10.0.19041.0. Provides Windows-shell
+         helpers (folder enumeration, CommandLineToArgvW interop, activation dispatcher) that the
+         MAUI head and platform tests consume without dragging the MAUI build pipeline in. -->
+    <UseMaui>false</UseMaui>
+    <UseWindowsForms>false</UseWindowsForms>
+    <UseWPF>false</UseWPF>
+    <!-- Required by [LibraryImport] source generator (SYSLIB1062). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
+    <ProjectReference Include="..\EventLogExpert.Logging\EventLogExpert.Logging.csproj" />
+    <ProjectReference Include="..\EventLogExpert.Runtime\EventLogExpert.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EventLogExpert.Windows.Tests" />
+  </ItemGroup>
+
+</Project>

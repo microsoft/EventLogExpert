@@ -1,0 +1,7 @@
+; COM entry points for the surrogate-hosted shell extension.
+
+LIBRARY
+
+EXPORTS
+  DllGetClassObject         PRIVATE
+  DllCanUnloadNow           PRIVATE

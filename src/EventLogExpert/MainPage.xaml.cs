@@ -5,6 +5,7 @@ using EventLogExpert.Adapters.Menu;
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Common.Activation;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
@@ -24,8 +25,10 @@ namespace EventLogExpert;
 
 public sealed partial class MainPage : ContentPage, IDisposable
 {
+    private readonly IActivationDispatcher _activationDispatcher;
     private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogs;
     private readonly IAppTitleService _appTitleService;
+    private readonly CancellationTokenSource _consumerCts = new();
     private readonly MauiMenuActionService _menuActionService;
     private readonly ISettingsService _settings;
     private readonly ITraceLogger _traceLogger;
@@ -41,7 +44,8 @@ public sealed partial class MainPage : ContentPage, IDisposable
         ISettingsService settings,
         IAppTitleService appTitleService,
         ITraceLogger traceLogger,
-        MauiMenuActionService menuActionService)
+        MauiMenuActionService menuActionService,
+        IActivationDispatcher activationDispatcher)
     {
         InitializeComponent();
 
@@ -50,6 +54,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _settings = settings;
         _traceLogger = traceLogger;
         _menuActionService = menuActionService;
+        _activationDispatcher = activationDispatcher;
 
         _activeLogs.Select(state => state.ActiveLogs);
 
@@ -60,7 +65,13 @@ public sealed partial class MainPage : ContentPage, IDisposable
         filterCacheCommands.LoadFilters();
         filterGroupCommands.LoadGroups();
 
-        _ = ProcessCommandLine();
+        // Eager subscription so cold-launch args buffered by ActivationBootstrap drain even when
+        // WebView2 is missing and BlazorWebViewInitialized never fires; the StartConsumingAsync
+        // call in BlazorWebViewInitialized is idempotent (guarded by Interlocked) so a second
+        // call from there is safe.
+        _ = _activationDispatcher.StartConsumingAsync(
+            _menuActionService.OpenLogsBatchAsync,
+            _consumerCts.Token);
     }
 
     public void Dispose()
@@ -68,6 +79,11 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _disposed = true;
         _activeLogs.SelectedValueChanged -= OnActiveLogsChanged;
         _settings.ThemeChanged -= OnThemeChanged;
+
+        try { _consumerCts.Cancel(); }
+        catch (ObjectDisposedException) { /* already disposed */ }
+
+        _consumerCts.Dispose();
     }
 
     private void ApplyWebViewTheme(Theme theme)
@@ -139,6 +155,10 @@ public sealed partial class MainPage : ContentPage, IDisposable
     {
         _coreWebView = e.WebView.CoreWebView2;
 
+        _ = _activationDispatcher.StartConsumingAsync(
+            _menuActionService.OpenLogsBatchAsync,
+            _consumerCts.Token);
+
         if (_coreWebView is null) { return; }
 
         ApplyWebViewTheme(_settings.Theme);
@@ -176,23 +196,4 @@ public sealed partial class MainPage : ContentPage, IDisposable
         // ThemeChanged may be raised from non-UI threads; marshal to the UI thread before touching
         // WebView2's profile.
         MainThread.BeginInvokeOnMainThread(() => ApplyWebViewTheme(_settings.Theme));
-
-    private async Task ProcessCommandLine()
-    {
-        try
-        {
-            var evtxArgs = Environment.GetCommandLineArgs()
-                .Where(arg => arg.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase))
-                .Select(arg => (arg, LogPathType.File))
-                .ToList();
-
-            if (evtxArgs.Count == 0) { return; }
-
-            await _menuActionService.OpenLogsBatchAsync(evtxArgs, combineLog: true);
-        }
-        catch (Exception e)
-        {
-            _traceLogger.Error($"Failed to process command line arguments: {e}");
-        }
-    }
 }

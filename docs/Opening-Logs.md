@@ -6,6 +6,13 @@ The `File` menu is the primary entry point for opening logs. There are three sou
 
 `.evtx` files can also be opened by drag-and-drop onto the window or by passing them as command-line arguments at launch. Both routes always combine — they add to the current log set rather than replacing it.
 
+### Explorer right-click context menu
+
+If EventLogExpert is installed as the packaged (MSIX) app, two right-click context menu entries are registered with Windows Explorer:
+
+- **`.evtx` files** → `Open with EventLogExpert` appears as a top-level right-click verb. Selecting one or more `.evtx` files and invoking the verb opens them all in a single EventLogExpert window (combined view). If the app is already running, the selected files are routed to the existing window instead of launching a new instance.
+- **Folders** → `Open with EventLogExpert` opens every `.evtx` file in the right-clicked folder (top-level only, no recursion — same semantic as `File` → `Open` → `Folder`). The verb appears both on a folder icon's right-click AND when right-clicking inside an open folder's empty space (the *Directory\\Background* item type, same pattern Windows Terminal uses for "Open in Terminal"). The folder verb is implemented via a packaged COM Explorer extension and may require an Explorer restart after first install for the entry to surface. If the folder contains no `.evtx` files, invoking the verb is a no-op.
+
 ### File
 
 `File` → `Open` → `File` (`Ctrl+O`) opens the system file picker filtered to `.evtx`. Pick one file or many — every selected `.evtx` is loaded concurrently as a separate log. The same applies for `File` → `Combine` → `File`, which adds the picked files to the existing log set.

@@ -4,6 +4,7 @@
 using EventLogExpert.Adapters.Menu;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Common.Activation;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
@@ -30,7 +31,8 @@ public sealed partial class App : Application
         ISettingsService settings,
         IAppTitleService appTitleService,
         ITraceLogger traceLogger,
-        MauiMenuActionService menuActionService)
+        MauiMenuActionService menuActionService,
+        IActivationDispatcher activationDispatcher)
     {
         InitializeComponent();
 
@@ -47,7 +49,8 @@ public sealed partial class App : Application
             settings,
             appTitleService,
             traceLogger,
-            menuActionService);
+            menuActionService,
+            activationDispatcher);
     }
 
     protected override Window CreateWindow(IActivationState? activationState)

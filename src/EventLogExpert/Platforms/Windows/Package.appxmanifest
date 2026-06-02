@@ -2,10 +2,14 @@
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap2="http://schemas.microsoft.com/appx/manifest/uap/windows10/2"
   xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+  xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap3 rescap">
+  IgnorableNamespaces="uap rescap">
 
   <Identity Name="EventLogExpert" Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" Version="0.9.0.0" />
 
@@ -16,7 +20,9 @@
   </Properties>
 
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+    <!-- Desktop-only. Windows.Universal causes AppX deployment to process under Universal rules
+         first, silently dropping Desktop-specific extension categories like
+         windows.fileExplorerContextMenus (the verb→handler mapping never lands). -->
     <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
   </Dependencies>
 
@@ -49,8 +55,56 @@
               <uap:FileType>.evtx</uap:FileType>
             </uap:SupportedFileTypes>
             <uap:DisplayName>Windows Event Log</uap:DisplayName>
+            <uap2:SupportedVerbs>
+              <!-- FTA "Open with EventLogExpert" verb. Surfaces in the Open With submenu; the
+                   top-level right-click entry comes from the desktop4:fileExplorerContextMenus
+                   block below, not from this verb.
+                   MultiSelectModel="Player" fans a multi-select into one activation — combined
+                   with AppInstance single-instancing in Platforms\Windows\Program.cs, N selected
+                   .evtx files open in one window.
+                   MultiSelectModel is unprefixed because the namespaced uap3:MultiSelectModel
+                   form fails MSIX deployment schema validation (DEP0700 / 0xC00CE015). -->
+              <uap3:Verb Id="open" MultiSelectModel="Player">Open with EventLogExpert</uap3:Verb>
+            </uap2:SupportedVerbs>
           </uap:FileTypeAssociation>
         </uap:Extension>
+
+        <!-- File Explorer context menu — top-level right-click verb backed by an IExplorerCommand
+             COM handler. Three item types, all routed to the same CLSID:
+             - Type="*" (desktop4:Verb) — any-file right-click. The handler's GetState filters
+               to show the verb only on .evtx files.
+             - Type="Directory" (desktop5:Verb) — right-click on a folder icon.
+             - Type="Directory\Background" (desktop5:Verb) — right-click inside an open folder's
+               empty space. -->
+        <desktop4:Extension Category="windows.fileExplorerContextMenus">
+          <desktop4:FileExplorerContextMenus>
+            <desktop4:ItemType Type="*">
+              <desktop4:Verb Id="OpenEvtx" Clsid="F1B2C3D4-E5F6-4789-AB12-CD34EF567890" />
+            </desktop4:ItemType>
+            <desktop5:ItemType Type="Directory">
+              <desktop5:Verb Id="OpenEvtx" Clsid="F1B2C3D4-E5F6-4789-AB12-CD34EF567890" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type="Directory\Background">
+              <desktop5:Verb Id="OpenEvtx" Clsid="F1B2C3D4-E5F6-4789-AB12-CD34EF567890" />
+            </desktop5:ItemType>
+          </desktop4:FileExplorerContextMenus>
+        </desktop4:Extension>
+
+        <!-- COM server for the IExplorerCommand implementation. Uses SurrogateServer (loaded
+             into dllhost.exe) — NOT ExeServer — because Explorer activates context-menu COM
+             handlers via CLSCTX_INPROC_HANDLER (in-process surrogate), not CLSCTX_LOCAL_SERVER
+             (standalone exe). ThreadingModel="STA" matches dllhost's STA activation for shell
+             extensions. The DLL is the native C++/WinRT shell extension built from
+             src\EventLogExpert.ExplorerExtensionNative. -->
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:SurrogateServer DisplayName="EventLogExpert Context Menu">
+              <com:Class Id="F1B2C3D4-E5F6-4789-AB12-CD34EF567890"
+                         Path="EventLogExpert.ExplorerExtension.dll"
+                         ThreadingModel="STA" />
+            </com:SurrogateServer>
+          </com:ComServer>
+        </com:Extension>
       </Extensions>
     </Application>
   </Applications>

@@ -18,6 +18,7 @@ using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
+using EventLogExpert.WindowsPlatform;
 using Fluxor;
 using Application = Microsoft.Maui.Controls.Application;
 using IDispatcher = Fluxor.IDispatcher;
@@ -177,29 +178,29 @@ public sealed class MauiMenuActionService(
         }
         catch (InvalidOperationException ex)
         {
-            await _dialogService.ShowAlert("Open Folder Failed", ex.Message, "OK");
+            await _dialogService.ShowAlert("Open Folder Failed", ex.Message, "Ok");
 
             return;
         }
 
         if (folderPath is null) { return; }
 
-        List<(string, LogPathType)> files;
+        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(folderPath);
 
-        try
+        var alertCopy = EvtxFolderEnumerator.ToAlertCopy(result);
+
+        if (alertCopy is { } copy)
         {
-            files = Directory.EnumerateFiles(folderPath, "*.evtx", SearchOption.TopDirectoryOnly)
-                .Select(file => (file, LogPathType.File))
-                .ToList();
-        }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
-        {
-            await _dialogService.ShowAlert("Open Folder Failed", ex.Message, "OK");
+            await _dialogService.ShowAlert(copy.Title, copy.Message, "Ok");
 
             return;
         }
 
-        if (files.Count == 0) { return; }
+        if (result is not EvtxEnumerationResult.Success success) { return; }
+
+        var files = success.Files
+            .Select(file => (file, LogPathType.File))
+            .ToList();
 
         await OpenLogsBatchAsync(files, combineLog);
     }
