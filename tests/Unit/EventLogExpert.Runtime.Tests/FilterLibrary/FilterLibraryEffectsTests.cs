@@ -7,6 +7,7 @@ using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
 using NSubstitute;
+using System.Collections.Immutable;
 using Effects = EventLogExpert.Runtime.FilterLibrary.Effects;
 
 namespace EventLogExpert.Runtime.Tests.FilterLibrary;
@@ -256,6 +257,109 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
+    public async Task HandleLoadLibrary_BuildEntriesFromLegacyThrows_OuterCatchFires_GateReleased_SecondLoadSucceeds()
+    {
+        var shouldThrow = true;
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(true);
+        migrator.BuildEntriesFromLegacy().Returns(_ => shouldThrow
+            ? throw new InvalidOperationException("migrator broke")
+            : new LegacyMigrationResult(ImmutableList<LibraryEntry>.Empty, LegacyMigrationSections.Recents));
+        var (effects, store, dispatcher, _, _, logger) = CreateEffectsWithMigrator(migrator);
+        store.LoadAll().Returns([]);
+
+        await effects.HandleLoadLibrary(dispatcher);
+        shouldThrow = false;
+        await effects.HandleLoadLibrary(dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryFailureAction>());
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.IsEmpty));
+        logger.ReceivedWithAnyArgs(1).Warning(default);
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_Concurrent_TwoSimultaneousDispatches_MigratorBuildCalledExactlyOnce()
+    {
+        var migratedEntry = BuildFilterEntry("migrated");
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(true);
+        migrator.BuildEntriesFromLegacy()
+            .Returns(new LegacyMigrationResult(
+                ImmutableList.Create<LibraryEntry>(migratedEntry),
+                LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents));
+        var store = Substitute.For<IFilterLibraryStore>();
+        var loadAllCount = 0;
+        store.LoadAll().Returns(_ =>
+        {
+            loadAllCount++;
+            return loadAllCount == 1 ? [] : new[] { migratedEntry };
+        });
+        var (effects, _, dispatcher, _, _, _) = CreateEffectsWithMigrator(migrator, store: store);
+
+        var ct = TestContext.Current.CancellationToken;
+        var task1 = Task.Run(() => effects.HandleLoadLibrary(dispatcher), ct);
+        var task2 = Task.Run(() => effects.HandleLoadLibrary(dispatcher), ct);
+        await Task.WhenAll(task1, task2);
+
+        migrator.Received(1).BuildEntriesFromLegacy();
+        store.Received(1).AddRange(Arg.Any<IEnumerable<LibraryEntry>>());
+        dispatcher.Received(2).Dispatch(Arg.Any<LoadLibrarySuccessAction>());
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_DispatchesStartedActionBeforeAcquiringGate()
+    {
+        using var migratorReleaser = new SemaphoreSlim(initialCount: 0, maxCount: 1);
+        var migratorReachedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(true);
+        var migratorCallCount = 0;
+        migrator.BuildEntriesFromLegacy().Returns(_ =>
+        {
+            if (Interlocked.Increment(ref migratorCallCount) == 1)
+            {
+                migratorReachedSignal.TrySetResult();
+                migratorReleaser.Wait();
+            }
+
+            return new LegacyMigrationResult(
+                ImmutableList.Create<LibraryEntry>(BuildFilterEntry("migrated")),
+                LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents);
+        });
+        var store = Substitute.For<IFilterLibraryStore>();
+        var loadAllCount = 0;
+        var migratedEntry = BuildFilterEntry("migrated");
+        store.LoadAll().Returns(_ => Interlocked.Increment(ref loadAllCount) == 1 ? [] : new[] { migratedEntry });
+        var (effects, _, dispatcher, _, _, _) = CreateEffectsWithMigrator(migrator, store: store);
+
+        var ct = TestContext.Current.CancellationToken;
+        var load1 = Task.Run(() => effects.HandleLoadLibrary(dispatcher), ct);
+        var load2 = default(Task);
+        try
+        {
+            await migratorReachedSignal.Task.WaitAsync(TimeSpan.FromSeconds(5), ct);
+            load2 = Task.Run(() => effects.HandleLoadLibrary(dispatcher), ct);
+            await PollUntilAsync(
+                () => dispatcher.ReceivedCalls().Count(c => c.GetArguments().FirstOrDefault() is LoadLibraryStartedAction) >= 2,
+                TimeSpan.FromSeconds(5),
+                ct);
+
+            dispatcher.Received(2).Dispatch(Arg.Any<LoadLibraryStartedAction>());
+            dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibrarySuccessAction>());
+        }
+        finally
+        {
+            // Always release the migrator so the load tasks unblock even if an assertion or polling timeout
+            // throws — otherwise xUnit's per-test cleanup hangs waiting for the still-running load tasks.
+            migratorReleaser.Release();
+            if (load2 is not null) { await Task.WhenAll(load1, load2); }
+            else { await load1; }
+        }
+
+        dispatcher.Received(2).Dispatch(Arg.Any<LoadLibrarySuccessAction>());
+    }
+
+    [Fact]
     public async Task HandleLoadLibrary_DispatchesStartedAndSuccessWithStoreEntries()
     {
         var entry = BuildFilterEntry("First");
@@ -266,6 +370,144 @@ public sealed class FilterLibraryEffectsTests
 
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryStartedAction>());
         dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1 && a.Entries[0].Id == entry.Id));
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_EmptyStore_AddRangeSucceeds_PostMigrationLoadAllThrows_FallsBackToInMemoryResult_StillMarksCompleted()
+    {
+        var migratedEntry = BuildFilterEntry("migrated");
+        var sections = LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents;
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(true);
+        migrator.BuildEntriesFromLegacy()
+            .Returns(new LegacyMigrationResult(ImmutableList.Create<LibraryEntry>(migratedEntry), sections));
+        var store = Substitute.For<IFilterLibraryStore>();
+        var loadAllCallCount = 0;
+        store.LoadAll().Returns(_ =>
+        {
+            loadAllCallCount++;
+            if (loadAllCallCount == 1) { return []; }
+            throw new InvalidOperationException("reload blew up");
+        });
+        var (effects, _, dispatcher, _, _, logger) = CreateEffectsWithMigrator(migrator, store: store);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        store.Received(1).AddRange(Arg.Any<IEnumerable<LibraryEntry>>());
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1 && a.Entries[0].Id == migratedEntry.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());
+        migrator.Received(1).MarkMigrationCompleted(sections);
+        logger.ReceivedWithAnyArgs(1).Warning(default);
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_EmptyStore_AddRangeThrows_DispatchesSuccessEmpty_DoesNotMarkMigrationCompleted()
+    {
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(true);
+        migrator.BuildEntriesFromLegacy()
+            .Returns(new LegacyMigrationResult(
+                ImmutableList.Create<LibraryEntry>(BuildFilterEntry("migrated")),
+                LegacyMigrationSections.Favorites | LegacyMigrationSections.Recents));
+        var store = Substitute.For<IFilterLibraryStore>();
+        store.LoadAll().Returns([]);
+        store.When(s => s.AddRange(Arg.Any<IEnumerable<LibraryEntry>>())).Do(_ => throw new InvalidOperationException("sqlite locked"));
+        var (effects, _, dispatcher, _, _, logger) = CreateEffectsWithMigrator(migrator, store: store);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.IsEmpty));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());
+        migrator.DidNotReceive().MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
+        logger.ReceivedWithAnyArgs(1).Warning(default);
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_EmptyStore_MigratorReturnsEmptyEntries_DoesNotCallAddRange_MarksMigrationCompletedWithBuildResultSections()
+    {
+        var sections = LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents;
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(true);
+        migrator.BuildEntriesFromLegacy().Returns(new LegacyMigrationResult(ImmutableList<LibraryEntry>.Empty, sections));
+        var (effects, store, dispatcher, _, _, _) = CreateEffectsWithMigrator(migrator);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        store.DidNotReceive().AddRange(Arg.Any<IEnumerable<LibraryEntry>>());
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.IsEmpty));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());
+        migrator.Received(1).MarkMigrationCompleted(sections);
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_EmptyStore_MigratorReturnsEntries_AddRangeSucceeds_DispatchesReloadedEntries_MarksMigrationCompleted()
+    {
+        var migratedEntry = BuildFilterEntry("migrated");
+        var sections = LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents;
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(true);
+        migrator.BuildEntriesFromLegacy()
+            .Returns(new LegacyMigrationResult(ImmutableList.Create<LibraryEntry>(migratedEntry), sections));
+        var store = Substitute.For<IFilterLibraryStore>();
+        store.LoadAll().Returns([], [migratedEntry]);
+        var (effects, _, dispatcher, _, _, _) = CreateEffectsWithMigrator(migrator, store: store);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        store.Received(1).AddRange(Arg.Is<IEnumerable<LibraryEntry>>(e => e.Count() == 1));
+        store.Received(2).LoadAll();
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1 && a.Entries[0].Id == migratedEntry.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());
+        migrator.Received(1).MarkMigrationCompleted(sections);
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_EmptyStore_NoMigratableData_DispatchesSuccessWithEmptyEntries()
+    {
+        var (effects, store, dispatcher, _, migrator, _) = CreateEffectsWithMigrator();
+        store.LoadAll().Returns([]);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.IsEmpty));
+        store.DidNotReceive().AddRange(Arg.Any<IEnumerable<LibraryEntry>>());
+        migrator.Received(1).MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_MigratorShouldRunReturnsFalse_SkipsBuildEntriesFromLegacy_DispatchesSuccessEmpty()
+    {
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(false);
+        var (effects, store, dispatcher, _, _, _) = CreateEffectsWithMigrator(migrator);
+        store.LoadAll().Returns([]);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        migrator.Received(1).ShouldRunMigration();
+        migrator.DidNotReceive().BuildEntriesFromLegacy();
+        migrator.DidNotReceive().MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
+        store.DidNotReceive().AddRange(Arg.Any<IEnumerable<LibraryEntry>>());
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.IsEmpty));
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_NonEmptyStore_DoesNotInvokeMigrator()
+    {
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(true);
+        migrator.BuildEntriesFromLegacy()
+            .Returns(new LegacyMigrationResult(ImmutableList<LibraryEntry>.Empty, LegacyMigrationSections.Recents));
+        var (effects, store, dispatcher, _, _, _) = CreateEffectsWithMigrator(migrator);
+        store.LoadAll().Returns([BuildFilterEntry("existing")]);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        migrator.DidNotReceive().ShouldRunMigration();
+        migrator.DidNotReceive().BuildEntriesFromLegacy();
+        migrator.DidNotReceive().MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
+        store.DidNotReceive().AddRange(Arg.Any<IEnumerable<LibraryEntry>>());
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1));
     }
 
     [Fact]
@@ -984,8 +1226,23 @@ public sealed class FilterLibraryEffectsTests
         FilterLibraryState? state = null,
         FilterPaneState? paneState = null)
     {
-        var store = Substitute.For<IFilterLibraryStore>();
-        store.LoadAll().Returns([]);
+        var (effects, store, dispatcher, stateMock, _, logger) = CreateEffectsWithMigrator(
+            migrator: null,
+            state: state,
+            paneState: paneState);
+
+        return (effects, store, dispatcher, stateMock, logger);
+    }
+
+    private static (Effects effects, IFilterLibraryStore store, IDispatcher dispatcher, IState<FilterLibraryState> stateMock, ILegacyFilterMigrator migrator, ITraceLogger logger) CreateEffectsWithMigrator(
+        ILegacyFilterMigrator? migrator = null,
+        FilterLibraryState? state = null,
+        FilterPaneState? paneState = null,
+        IFilterLibraryStore? store = null)
+    {
+        var storeWasSupplied = store is not null;
+        store ??= Substitute.For<IFilterLibraryStore>();
+        if (!storeWasSupplied) { store.LoadAll().Returns([]); }
 
         var stateMock = Substitute.For<IState<FilterLibraryState>>();
         stateMock.Value.Returns(state ?? new FilterLibraryState());
@@ -993,11 +1250,32 @@ public sealed class FilterLibraryEffectsTests
         var paneStateMock = Substitute.For<IState<FilterPaneState>>();
         paneStateMock.Value.Returns(paneState ?? new FilterPaneState());
 
+        if (migrator is null)
+        {
+            migrator = Substitute.For<ILegacyFilterMigrator>();
+            migrator.ShouldRunMigration().Returns(true);
+            migrator.BuildEntriesFromLegacy()
+                .Returns(new LegacyMigrationResult(
+                    ImmutableList<LibraryEntry>.Empty,
+                    LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents));
+        }
+
         var logger = Substitute.For<ITraceLogger>();
         var dispatcher = Substitute.For<IDispatcher>();
-        var effects = new Effects(store, stateMock, paneStateMock, logger);
+        var effects = new Effects(store, stateMock, paneStateMock, migrator, logger);
 
-        return (effects, store, dispatcher, stateMock, logger);
+        return (effects, store, dispatcher, stateMock, migrator, logger);
+    }
+
+    private static async Task PollUntilAsync(Func<bool> predicate, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (predicate()) { return; }
+            await Task.Delay(10, cancellationToken);
+        }
+        if (!predicate()) { throw new TimeoutException($"Predicate did not become true within {timeout}."); }
     }
 
     // Used for the unknown-concrete-type wildcard test (covers the throw arm in HandleApplyLibraryEntry).

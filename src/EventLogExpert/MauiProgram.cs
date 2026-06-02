@@ -104,6 +104,8 @@ public static class MauiProgram
 
         builder.Services.AddFilterLibrarySqliteStore(
             Path.Combine(FileSystem.AppDataDirectory, "filter-library.db"));
+        builder.Services.AddSingleton<ILegacyPreferences, MauiLegacyPreferencesAdapter>();
+        builder.Services.AddLegacyFilterMigration();
 
         // UI Services
         builder.Services.AddEventLogFiltering();
