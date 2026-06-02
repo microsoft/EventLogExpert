@@ -13,9 +13,12 @@ internal sealed class Effects(
     IFilterLibraryStore store,
     IState<FilterLibraryState> state,
     IState<FilterPaneState> filterPaneState,
+    ILegacyFilterMigrator legacyMigrator,
     ITraceLogger logger)
 {
     private const int MaxAutoTrackedRecents = 50;
+
+    private readonly SemaphoreSlim _migrationGate = new(initialCount: 1, maxCount: 1);
 
     [EffectMethod]
     public Task HandleAddFilterToExistingPreset(AddFilterToExistingPresetAction action, IDispatcher dispatcher)
@@ -131,17 +134,54 @@ internal sealed class Effects(
     }
 
     [EffectMethod(typeof(LoadLibraryAction))]
-    public Task HandleLoadLibrary(IDispatcher dispatcher)
+    public async Task HandleLoadLibrary(IDispatcher dispatcher)
     {
-        // LoadLibraryStartedAction is queued (not run inline) per Fluxor 6.9 re-entrancy semantics —
-        // it flips IsLoading=true between Started and Success reducer commits for UI subscribers, but
-        // it does NOT prevent concurrent loads from inside this effect. The modal's
-        // `!IsLoaded || LoadError` check is the effective re-open guard.
         dispatcher.Dispatch(new LoadLibraryStartedAction());
+
+        await _migrationGate.WaitAsync().ConfigureAwait(false);
 
         try
         {
             var entries = store.LoadAll().ToImmutableList();
+
+            if (entries.IsEmpty && legacyMigrator.ShouldRunMigration())
+            {
+                // AddRange-throws → Success(empty) + return without marking complete (retries next launch).
+                // Post-AddRange LoadAll-throws → in-memory fallback + MarkMigrationCompleted as on happy path.
+                var migrationResult = legacyMigrator.BuildEntriesFromLegacy();
+
+                if (migrationResult.Entries.Count > 0)
+                {
+                    try
+                    {
+                        store.AddRange(migrationResult.Entries);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Warning($"FilterLibrary migration AddRange failed; legacy preserved. {ex.Message}");
+                        dispatcher.Dispatch(new LoadLibrarySuccessAction(ImmutableList<LibraryEntry>.Empty));
+
+                        return;
+                    }
+
+                    try
+                    {
+                        entries = store.LoadAll().ToImmutableList();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Warning($"FilterLibrary post-migration reload failed; using in-memory result. {ex.Message}");
+                        entries = migrationResult.Entries;
+                    }
+
+                    logger.Information($"Migrated {entries.Count} legacy entries to filter library.");
+                }
+
+                // Not wrapped: a SetString failure surfaces via the outer catch (LoadLibraryFailure). Next launch
+                // self-heals because the store is already non-empty (or the same retry decision repeats).
+                legacyMigrator.MarkMigrationCompleted(migrationResult.SuccessfulSections);
+            }
+
             dispatcher.Dispatch(new LoadLibrarySuccessAction(entries));
         }
         catch (Exception ex)
@@ -149,8 +189,10 @@ internal sealed class Effects(
             logger.Warning($"FilterLibrary load failed; rendering error state. {ex.Message}");
             dispatcher.Dispatch(new LoadLibraryFailureAction());
         }
-
-        return Task.CompletedTask;
+        finally
+        {
+            _migrationGate.Release();
+        }
     }
 
     [EffectMethod]

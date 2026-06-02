@@ -8,19 +8,32 @@ namespace EventLogExpert.Runtime.FilterLibrary;
 
 public static class FilterLibraryServiceCollectionExtensions
 {
-    /// <summary>
-    ///     Registers the SQLite-backed <see cref="IFilterLibraryStore" /> implementation at <paramref name="dbPath" />.
-    ///     The concrete <c>FilterLibrarySqliteStore</c> type stays internal to the runtime assembly; consumers depend on
-    ///     <see cref="IFilterLibraryStore" /> only.
-    /// </summary>
-    public static IServiceCollection AddFilterLibrarySqliteStore(this IServiceCollection services, string dbPath)
+    extension(IServiceCollection services)
     {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(dbPath);
+        /// <summary>
+        ///     Registers the SQLite-backed <see cref="IFilterLibraryStore" /> implementation at <paramref name="dbPath" />.
+        ///     The concrete <c>FilterLibrarySqliteStore</c> type stays internal to the runtime assembly; consumers depend on
+        ///     <see cref="IFilterLibraryStore" /> only.
+        /// </summary>
+        public IServiceCollection AddFilterLibrarySqliteStore(string dbPath)
+        {
+            ArgumentNullException.ThrowIfNull(services);
+            ArgumentNullException.ThrowIfNull(dbPath);
 
-        services.AddSingleton<IFilterLibraryStore>(sp =>
-            new FilterLibrarySqliteStore(dbPath, sp.GetRequiredService<ITraceLogger>()));
+            services.AddSingleton<IFilterLibraryStore>(sp =>
+                new FilterLibrarySqliteStore(dbPath, sp.GetRequiredService<ITraceLogger>()));
 
-        return services;
+            return services;
+        }
+
+        /// <summary>Registers the legacy-filter migration singleton. Callers MUST also register <see cref="ILegacyPreferences" />.</summary>
+        public IServiceCollection AddLegacyFilterMigration()
+        {
+            ArgumentNullException.ThrowIfNull(services);
+
+            services.AddSingleton<ILegacyFilterMigrator, LegacyFilterMigrator>();
+
+            return services;
+        }
     }
 }
