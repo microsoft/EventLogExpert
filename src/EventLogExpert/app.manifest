@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Embedded native application manifest for the MAUI head exe. Enables long-path support so
+  filesystem operations against >MAX_PATH paths (.evtx files, folder enumeration) don't
+  silently fail when the legacy 260-char limit would otherwise reject them.
+  See: https://learn.microsoft.com/windows/win32/fileio/maximum-file-path-limitation
+-->
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+    </windowsSettings>
+  </application>
+</assembly>

@@ -27,6 +27,15 @@
         <ApplicationVersion>1</ApplicationVersion>
     </PropertyGroup>
 
+    <!-- Suppress MAUI's source-generated Windows Main on the Windows TFM so our handwritten
+         Platforms\Windows\Program.cs takes over. Required to intercept activation BEFORE
+         Application.Start() runs (AppInstance single-instance contract). Also embed app.manifest
+         so the exe is long-path-aware (filesystem operations against >MAX_PATH paths). -->
+    <PropertyGroup Condition="$(TargetFramework.Contains('-windows'))">
+        <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+        <ApplicationManifest>app.manifest</ApplicationManifest>
+    </PropertyGroup>
+
     <ItemGroup>
         <!-- App Icon -->
         <MauiIcon Include="Resources\AppIcon\eventlogexperticon.png" />
@@ -57,12 +66,106 @@
         <PackageReference Include="Microsoft.Maui.Controls" />
         <PackageReference Include="Microsoft.Maui.Controls.Compatibility" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" />
+        <PackageReference Include="Microsoft.WindowsAppSDK" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\EventLogExpert.Provider.Database\EventLogExpert.Provider.Database.csproj" />
       <ProjectReference Include="..\EventLogExpert.Runtime\EventLogExpert.Runtime.csproj" />
       <ProjectReference Include="..\EventLogExpert.UI\EventLogExpert.UI.csproj" />
+      <ProjectReference Include="..\EventLogExpert.WindowsPlatform\EventLogExpert.WindowsPlatform.csproj" />
     </ItemGroup>
+
+    <!--
+      Derive the native vcxproj Platform from the current .NET RuntimeIdentifier. Only x64 is
+      supported today — the vcxproj only declares Debug|x64/Release|x64 configurations. Other
+      RIDs (win-arm64, win-x86) require matching ProjectConfiguration entries in the vcxproj
+      first; the BuildExplorerExtensionNative target fails fast with a clear message rather
+      than producing a confusing MSB4126 from VS MSBuild.
+    -->
+    <PropertyGroup>
+      <ExplorerExtensionNativePlatform Condition="'$(RuntimeIdentifier)' == '' OR $(RuntimeIdentifier.Contains('-x64'))">x64</ExplorerExtensionNativePlatform>
+    </PropertyGroup>
+
+    <!--
+      Static items: tell MAUI the native DLL belongs in the package. Only included on MSIX
+      packaging builds — non-MSIX dotnet builds don't trigger BuildExplorerExtensionNative and
+      would fail trying to copy a missing DLL from the C++ project's build output.
+    -->
+    <ItemGroup Condition="$(TargetFramework.Contains('-windows')) AND '$(WindowsPackageType)' == 'MSIX'">
+      <Content Include="..\EventLogExpert.ExplorerExtensionNative\$(ExplorerExtensionNativePlatform)\$(Configuration)\EventLogExpert.ExplorerExtension.dll"
+               Link="EventLogExpert.ExplorerExtension.dll"
+               CopyToOutputDirectory="PreserveNewest"
+               Visible="false" />
+    </ItemGroup>
+
+    <!--
+        Native C++/WinRT shell extension DLL (EventLogExpert.ExplorerExtension.dll) — packaged
+        alongside the main exe at MSIX root and loaded by dllhost.exe via the
+        <com:SurrogateServer> registration in Package.appxmanifest.
+
+        Builds via VS MSBuild (NOT the .NET SDK MSBuild — .NET SDK doesn't include the C++ build
+        system $(VCTargetsPath)). We locate VS MSBuild via vswhere, requiring the VC toolset
+        component so we don't pick a Build Tools instance that lacks the C++ workload.
+        The C++ project is INTENTIONALLY not in EventLogExpert.slnx so `dotnet build` doesn't
+        try to process it.
+
+        Only runs when actually packaging an MSIX (WindowsPackageType=MSIX).
+    -->
+    <Target Name="BuildExplorerExtensionNative"
+            Condition="$(TargetFramework.Contains('-windows')) AND '$(WindowsPackageType)' == 'MSIX'"
+            BeforeTargets="AssignTargetPaths;_ComputeAppxPackagePayload">
+      <PropertyGroup>
+        <ExplorerExtensionNativeDir>$(MSBuildThisFileDirectory)..\EventLogExpert.ExplorerExtensionNative\</ExplorerExtensionNativeDir>
+        <ExplorerExtensionNativeProject>$(ExplorerExtensionNativeDir)EventLogExpert.ExplorerExtensionNative.vcxproj</ExplorerExtensionNativeProject>
+        <ExplorerExtensionPackagesDir>$(MSBuildThisFileDirectory)..\packages</ExplorerExtensionPackagesDir>
+        <ExplorerExtensionNativeOutDir>$(ExplorerExtensionNativeDir)$(ExplorerExtensionNativePlatform)\$(Configuration)\</ExplorerExtensionNativeOutDir>
+        <ExplorerExtensionNativeDll>$(ExplorerExtensionNativeOutDir)EventLogExpert.ExplorerExtension.dll</ExplorerExtensionNativeDll>
+        <_VswherePath>$(MSBuildProgramFiles32)\Microsoft Visual Studio\Installer\vswhere.exe</_VswherePath>
+      </PropertyGroup>
+      <Error Condition="'$(ExplorerExtensionNativePlatform)' == ''"
+             Text="EventLogExpert.ExplorerExtensionNative.vcxproj only declares x64 ProjectConfiguration entries. RuntimeIdentifier=$(RuntimeIdentifier) does not map to a supported native platform. Build for win-x64 OR add matching arm64/Win32 ProjectConfiguration + ItemDefinitionGroup blocks to the vcxproj." />
+      <!-- Locate VS MSBuild requiring the VC toolset specifically — bare Microsoft.Component.MSBuild
+           can match a Build Tools install without the C++ workload, which can't process vcxproj. -->
+      <Exec Command="&quot;$(_VswherePath)&quot; -latest -products * -requires Microsoft.Component.MSBuild Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find MSBuild\Current\Bin\amd64\MSBuild.exe"
+            ConsoleToMSBuild="true"
+            ContinueOnError="true">
+        <Output TaskParameter="ConsoleOutput" PropertyName="VsMSBuildPath" />
+      </Exec>
+      <!-- ConsoleOutput from Exec includes the trailing newline; Exists(...) on a path with a
+           trailing CR/LF fails even when MSBuild.exe is found. Trim before any subsequent use. -->
+      <PropertyGroup>
+        <VsMSBuildPath>$(VsMSBuildPath.Trim())</VsMSBuildPath>
+      </PropertyGroup>
+      <Error Condition="'$(VsMSBuildPath)' == '' OR !Exists('$(VsMSBuildPath)')"
+             Text="Could not locate Visual Studio MSBuild.exe with the C++ workload via vswhere ($(_VswherePath)). The native shell extension requires the Desktop Development with C++ workload (Microsoft.VisualStudio.Component.VC.Tools.x86.x64) AND the Windows 10/11 SDK. See docs/Explorer-Context-Menu.md for prereqs." />
+      <Exec Command="where nuget.exe" ConsoleToMSBuild="true" ContinueOnError="true" IgnoreExitCode="true">
+        <Output TaskParameter="ExitCode" PropertyName="_WhereNugetExitCode" />
+        <Output TaskParameter="ConsoleOutput" PropertyName="_WhereNugetOutput" />
+      </Exec>
+      <PropertyGroup>
+        <!-- where prints one match per line (newline-separated, NOT semicolon-separated).
+             Use Regex.Match to extract the first line; the trailing CR is implicitly excluded
+             by the [^\r\n]+ class. -->
+        <_NugetExePath Condition="'$(_WhereNugetExitCode)' == '0'">$([System.Text.RegularExpressions.Regex]::Match($(_WhereNugetOutput), '^[^\r\n]+').Value)</_NugetExePath>
+      </PropertyGroup>
+      <Error Condition="'$(_NugetExePath)' == '' OR !Exists('$(_NugetExePath)')"
+             Text="nuget.exe not found on PATH. The native shell extension's packages.config restore requires nuget.exe. Install via `winget install Microsoft.NuGet` (dev), the NuGetToolInstaller@1 pipeline task (ADO), or any equivalent. See docs/Explorer-Context-Menu.md for prereqs." />
+      <!-- nuget restore source selection:
+           - $(RestoreConfigFile) is set when the caller passes the dotnet configfile flag
+             (the locked-down ADO pipeline pattern; the file points at the internal mirror).
+             Use -ConfigFile to honor it, and omit -Source so nuget doesn't bypass the config.
+           - Otherwise (dev), use the public nuget.org feed directly. -->
+      <PropertyGroup>
+        <_NugetRestoreConfigArg Condition="'$(RestoreConfigFile)' != '' AND Exists('$(RestoreConfigFile)')">-ConfigFile &quot;$(RestoreConfigFile)&quot;</_NugetRestoreConfigArg>
+        <_NugetRestoreSourceArg Condition="'$(_NugetRestoreConfigArg)' == ''">-Source https://api.nuget.org/v3/index.json</_NugetRestoreSourceArg>
+      </PropertyGroup>
+      <Exec Command="&quot;$(_NugetExePath)&quot; restore &quot;$(ExplorerExtensionNativeDir)packages.config&quot; -PackagesDirectory &quot;$(ExplorerExtensionPackagesDir)&quot; $(_NugetRestoreConfigArg) $(_NugetRestoreSourceArg) -NonInteractive"
+            ContinueOnError="false" />
+      <Exec Command="&quot;$(VsMSBuildPath)&quot; &quot;$(ExplorerExtensionNativeProject)&quot; /p:Configuration=$(Configuration) /p:Platform=$(ExplorerExtensionNativePlatform) /nologo /v:minimal"
+            ContinueOnError="false" />
+      <Error Condition="!Exists('$(ExplorerExtensionNativeDll)')"
+             Text="EventLogExpert.ExplorerExtension.dll native build did not produce output at $(ExplorerExtensionNativeDll). Check the C++ workload + Windows SDK install. See docs/Explorer-Context-Menu.md for prereqs." />
+    </Target>
 
 </Project>

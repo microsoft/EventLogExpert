@@ -22,9 +22,19 @@
     <Project Path="src/EventLogExpert.Filtering/EventLogExpert.Filtering.csproj" />
     <Project Path="src/EventLogExpert.Provider.Database/EventLogExpert.Provider.Database.csproj" />
     <Project Path="src/EventLogExpert.DatabaseTools/EventLogExpert.DatabaseTools.csproj" />
+    <Project Path="src/EventLogExpert.WindowsPlatform/EventLogExpert.WindowsPlatform.csproj" />
+    <!--
+      Native C++/WinRT shell extension is NOT in the slnx because dotnet build cannot process
+      .vcxproj (the .NET SDK MSBuild lacks $(VCTargetsPath)). It's built indirectly by the
+      EventLogExpert csproj's BuildExplorerExtensionNative target via VS MSBuild during MSIX
+      packaging. Open it in Visual Studio manually if you need to edit the C++ project file.
+
+      Project at: src/EventLogExpert.ExplorerExtensionNative/EventLogExpert.ExplorerExtensionNative.vcxproj
+    -->
   </Folder>
   <Folder Name="/tests/Unit/">
     <Project Path="tests/Unit/EventLogExpert.UI.Tests/EventLogExpert.UI.Tests.csproj" />
+    <Project Path="tests/Unit/EventLogExpert.Windows.Tests/EventLogExpert.Windows.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.EventDbTool.Tests/EventLogExpert.EventDbTool.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Eventing.Tests/EventLogExpert.Eventing.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Runtime.Tests/EventLogExpert.Runtime.Tests.csproj" />
