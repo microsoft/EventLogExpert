@@ -1,38 +1,79 @@
 @inherits ModalBase<bool>
 
-<ModalChrome AcceptLabel="Close"
-    CancelLabel="Close"
+<ModalChrome AriaLabel="Filter Library"
     CloseButtonAriaLabel="Close"
     Footer="FooterPreset.CloseOnly"
-    MaxWidth="40rem"
-    MinWidth="28rem"
+    MaxWidth="60rem"
+    MinWidth="40rem"
     OnClose="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     @ref="ChromeRef"
     Title="Filter Library">
     @if (FilterLibraryState.Value.LoadError)
     {
-        <p class="filter-library-error">Could not load saved filters or presets. See trace log for details.</p>
+        <div class="filter-library-error" role="alert">
+            <p>Could not load saved filters or presets. See trace log for details.</p>
+            <button class="button" @onclick="RetryLoad" type="button">Retry</button>
+        </div>
     }
     else if (!FilterLibraryState.Value.IsLoaded)
     {
-        <p class="filter-library-loading" aria-busy="true">Loading filter library&hellip;</p>
-    }
-    else if (FilterLibraryState.Value.Entries.IsEmpty)
-    {
-        <p class="filter-library-empty">No saved filters or presets yet.</p>
+        <p aria-busy="true" class="filter-library-loading">Loading filter library&hellip;</p>
     }
     else
     {
-        <ul class="filter-library-list">
-            @foreach (var entry in FilterLibraryState.Value.Entries)
+        <div aria-label="Filter library views" class="library-tabs" @ref="_tablistRef" role="tablist">
+            @foreach (var (tab, label) in s_tabs)
             {
-                <li>
-                    <LibraryEntryRow Entry="@entry"
-                        OnApply="HandleApplyAsync"
-                        OnDelete="HandleDeleteAsync" />
-                </li>
+                <button aria-controls="@($"library-tabpanel-{tab}")"
+                    aria-selected="@(tab == _activeTab ? "true" : "false")"
+                    class="@(tab == _activeTab ? "tab active library-tab-button" : "tab library-tab-button")"
+                    id="@($"library-tab-{tab}")"
+                    @onclick="() => SetActiveTab(tab)"
+                    @onkeydown="e => OnTabKeyDown(e, tab)"
+                    @ref="_tabButtonRefs[tab]"
+                    role="tab"
+                    tabindex="@(tab == _activeTab ? "0" : "-1")"
+                    type="button">
+                    @label (@GetCount(tab))
+                </button>
             }
-        </ul>
+        </div>
+
+        @foreach (var (tab, _) in s_tabs)
+        {
+            <div aria-labelledby="@($"library-tab-{tab}")"
+                class="@(tab == _activeTab ? "library-tab-panel active" : "library-tab-panel")"
+                id="@($"library-tabpanel-{tab}")"
+                role="tabpanel"
+                style="@(tab == _activeTab ? "" : "display: none")"
+                tabindex="@(tab == _activeTab && NeedsTabpanelFocus ? "0" : null)">
+                @if (tab == _activeTab)
+                {
+                    @if (CurrentTabEntries.Count == 0)
+                    {
+                        <p class="library-empty-state">@EmptyStateMessage</p>
+                    }
+                    else
+                    {
+                        @foreach (var entry in CurrentTabEntries)
+                        {
+                            <LibraryEntryRow ActiveTab="_activeTab"
+                                AllPresets="AllPresets"
+                                Entry="entry"
+                                @key="entry.Id"
+                                OnAddToPreset="HandleAddToPresetAsync"
+                                OnApply="HandleApplyAsync"
+                                OnDelete="HandleDelete"
+                                OnReplace="HandleReplaceAsync"
+                                OnRequestPendingFocus="HandleRequestPendingFocusAsync"
+                                OnSaveToLibrary="HandleSaveToLibrary"
+                                OnToggleFavorite="HandleToggleFavorite"
+                                @ref="_rowRefs[entry.Id]" />
+                        }
+                    }
+                }
+            </div>
+        }
     }
 </ModalChrome>

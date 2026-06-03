@@ -19,4 +19,18 @@ internal static class ElementFocus
         catch (JSException) { }
         catch (TaskCanceledException) { }
     }
+
+    public static async ValueTask<bool> TrySafelyAsync(ElementReference target)
+    {
+        try
+        {
+            await target.FocusAsync();
+
+            return true;
+        }
+        catch (ObjectDisposedException) { return false; }
+        catch (JSDisconnectedException) { return false; }
+        catch (JSException) { return false; }
+        catch (TaskCanceledException) { return false; }
+    }
 }

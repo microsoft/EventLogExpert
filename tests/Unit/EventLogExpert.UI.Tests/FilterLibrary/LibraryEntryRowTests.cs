@@ -3,88 +3,434 @@
 
 using Bunit;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
+using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.FilterLibrary;
+using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.FilterLibrary;
 
 public sealed class LibraryEntryRowTests : BunitContext
 {
-    [Fact]
-    public async Task Apply_InvokesOnApplyWithEntryId()
-    {
-        // Arrange
-        LibraryEntryId? captured = null;
-        var entry = BuildFilterEntry("Test");
-        var component = Render<LibraryEntryRow>(parameters => parameters
-            .Add(p => p.Entry, entry)
-            .Add(p => p.OnApply, id => { captured = id; return Task.CompletedTask; }));
+    private readonly IAlertDialogService _alerts = Substitute.For<IAlertDialogService>();
+    private readonly IAnnouncementService _announcements = Substitute.For<IAnnouncementService>();
+    private readonly IMenuService _menuService = Substitute.For<IMenuService>();
+    private FilterPaneState _paneState = new();
 
-        // Act
+    public LibraryEntryRowTests()
+    {
+        Services.AddSingleton(_alerts);
+        Services.AddSingleton(_announcements);
+        Services.AddSingleton(_menuService);
+
+        var paneStateMock = Substitute.For<IState<FilterPaneState>>();
+        paneStateMock.Value.Returns(_ => _paneState);
+        Services.AddSingleton(paneStateMock);
+
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        JSInterop.Setup<MenuAnchorRect>("getMenuElementRect", _ => true)
+            .SetResult(new MenuAnchorRect(0, 0, 0, 0, 0, 0));
+    }
+
+    [Fact]
+    public async Task AddToPresetSubmenu_WithNoPresets_OnlyHasNewPresetItem()
+    {
+        var entry = BuildSavedFilter("X");
+        var component = RenderRow(entry, allPresets: []);
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+        var sub = items.First(i => i.Label == "Add to preset...").Children;
+
+        Assert.NotNull(sub);
+        Assert.Single(sub);
+        Assert.Equal("+ New preset...", sub[0].Label);
+    }
+
+    [Fact]
+    public async Task AddToPresetSubmenu_WithPresets_HasNewSeparatorAndPresets()
+    {
+        var entry = BuildSavedFilter("X");
+        var preset = BuildPreset("P1");
+        var component = RenderRow(entry, allPresets: [preset]);
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+        var sub = items.First(i => i.Label == "Add to preset...").Children!;
+
+        Assert.Equal(3, sub.Count); // "+ New preset...", separator, "P1"
+        Assert.Equal("+ New preset...", sub[0].Label);
+        Assert.True(sub[1].IsSeparator);
+        Assert.Equal("P1", sub[2].Label);
+    }
+
+    [Fact]
+    public async Task ApplyClick_InvokesOnApplyWithEntryId()
+    {
+        var entry = BuildSavedFilter("X");
+        LibraryEntryId? captured = null;
+        var component = RenderRow(entry, onApply: id => { captured = id; return Task.CompletedTask; });
+
         await component.Find("button.button-green").ClickAsync(new MouseEventArgs());
 
-        // Assert
         Assert.Equal(entry.Id, captured);
     }
 
     [Fact]
-    public async Task Delete_InvokesOnDeleteWithEntryId()
+    public async Task DeleteOnAutoTrackedFilter_NoConfirm_InvokesPendingFocusThenDelete()
     {
-        // Arrange
+        var entry = BuildAutoTrackedFilterEntry("X");
+        var calls = new List<string>();
+        var component = RenderRow(
+            entry,
+            onDelete: id => { calls.Add("delete"); return Task.CompletedTask; },
+            onRequestPendingFocus: id => { calls.Add("focus"); return Task.CompletedTask; });
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+        await items.First(i => i.Label == "Delete").OnClickAsync!.Invoke();
+
+        Assert.Equal(["focus", "delete"], calls);
+    }
+
+    [Fact]
+    public async Task DeleteOnPreset_ShowsConfirm()
+    {
+        var preset = BuildPreset("P", filterCount: 2);
+        var component = RenderRow(preset);
+        _alerts.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns(true);
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+        await items.First(i => i.Label == "Delete").OnClickAsync!.Invoke();
+
+        await _alerts.Received(1).ShowAlert("Delete from library?", Arg.Is<string>(m => m.Contains("preset 'P' with 2 filters")), "Delete", "Cancel");
+    }
+
+    [Fact]
+    public async Task DeleteOnUserSavedFilter_ShowsConfirm_InvokesOnlyOnAccept()
+    {
+        var entry = BuildSavedFilter("X");
+        bool deleted = false;
+        var component = RenderRow(entry, onDelete: id => { deleted = true; return Task.CompletedTask; });
+        _alerts.ShowAlert("Delete from library?", Arg.Any<string>(), "Delete", "Cancel").Returns(false);
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+        await items.First(i => i.Label == "Delete").OnClickAsync!.Invoke();
+
+        Assert.False(deleted);
+    }
+
+    [Fact]
+    public void DisposeAsync_UnsubscribesFromMenuServiceStateChanged()
+    {
+        var entry = BuildSavedFilter("X");
+        var component = RenderRow(entry);
+        component.Dispose();
+        _menuService.StateChanged += Raise.Event<Action>();
+    }
+
+    [Fact]
+    public async Task ExistingPresetSelected_InvokesAddToPresetWithPresetId()
+    {
+        var entry = BuildSavedFilter("X");
+        var preset = BuildPreset("P1");
+        AddToPresetIntent? captured = null;
+        var component = RenderRow(
+            entry,
+            allPresets: [preset],
+            onAddToPreset: i => { captured = i; return Task.CompletedTask; });
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+        var p1Item = items.First(i => i.Label == "Add to preset...").Children!.First(c => c.Label == "P1");
+        await p1Item.OnClickAsync!.Invoke();
+
+        Assert.NotNull(captured);
+        Assert.Equal(preset.Id, captured.PresetId);
+        Assert.Null(captured.NewPresetName);
+    }
+
+    [Fact]
+    public void FavoriteButton_AriaPressedReflectsState()
+    {
+        var entry = BuildSavedFilter("X") with { IsFavorite = true };
+        var component = RenderRow(entry);
+
+        Assert.Equal("true", component.Find("button.button-yellow").GetAttribute("aria-pressed"));
+    }
+
+    [Fact]
+    public async Task FavoriteClick_InvokesOnToggleFavoriteWithNewState()
+    {
+        var entry = BuildSavedFilter("X");
+        FavoriteToggleIntent? captured = null;
+        var component = RenderRow(entry, onToggleFavorite: i => { captured = i; return Task.CompletedTask; });
+
+        await component.Find("button.button-yellow").ClickAsync(new MouseEventArgs());
+
+        Assert.NotNull(captured);
+        Assert.Equal(entry.Id, captured.EntryId);
+        Assert.True(captured.NewIsFavorite);
+        _announcements.Received(1).Announce(Arg.Is<string>(s => s.Contains("Marked X as favorite")));
+    }
+
+    [Fact]
+    public async Task FavoriteOnPreviouslyUsedTab_InvokesPendingFocusBeforeToggle()
+    {
+        var entry = BuildAutoTrackedFilterEntry("X");
+        var calls = new List<string>();
+        var component = RenderRow(
+            entry,
+            activeTab: LibraryTab.PreviouslyUsed,
+            onRequestPendingFocus: id => { calls.Add("focus"); return Task.CompletedTask; },
+            onToggleFavorite: i => { calls.Add("toggle"); return Task.CompletedTask; });
+
+        await component.Find("button.button-yellow").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(["focus", "toggle"], calls);
+    }
+
+    [Fact]
+    public async Task FavoriteOnSavedTab_DoesNotInvokePendingFocus()
+    {
+        var entry = BuildSavedFilter("X");
+        var focusCalled = false;
+        var component = RenderRow(
+            entry,
+            activeTab: LibraryTab.Saved,
+            onRequestPendingFocus: id => { focusCalled = true; return Task.CompletedTask; });
+
+        await component.Find("button.button-yellow").ClickAsync(new MouseEventArgs());
+
+        Assert.False(focusCalled);
+    }
+
+    [Fact]
+    public void MoreButton_HasAriaLabel_AriaHaspopup_AriaExpandedFalseInitial()
+    {
+        var entry = BuildSavedFilter("X");
+        var component = RenderRow(entry);
+
+        var more = component.FindAll("button.icon-button").Last();
+        Assert.Contains("More actions for X", more.GetAttribute("aria-label"));
+        Assert.Equal("menu", more.GetAttribute("aria-haspopup"));
+        Assert.Equal("false", more.GetAttribute("aria-expanded"));
+    }
+
+    [Fact]
+    public async Task MoreButtonClick_OpensMenuViaIMenuServiceWithAnchorCoords()
+    {
+        var entry = BuildSavedFilter("X");
+        var component = RenderRow(entry);
+
+        await component.FindAll("button.icon-button").Last().ClickAsync(new MouseEventArgs());
+
+        _menuService.Received(1).OpenAt(
+            Arg.Any<double>(),
+            Arg.Any<double>(),
+            Arg.Any<IReadOnlyList<MenuItem>>());
+    }
+
+    [Fact]
+    public async Task MoreMenu_OnAutoTrackedFilter_IncludesSaveToLibraryItem()
+    {
+        var entry = BuildAutoTrackedFilterEntry("X");
+        var component = RenderRow(entry);
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+
+        Assert.Contains(items, i => i.Label == "Save to Library");
+    }
+
+    [Fact]
+    public async Task MoreMenu_OnFavoritedAutoTracked_OmitsSaveToLibraryItem()
+    {
+        var entry = BuildAutoTrackedFilterEntry("X") with { IsFavorite = true };
+        var component = RenderRow(entry);
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+
+        Assert.DoesNotContain(items, i => i.Label == "Save to Library");
+    }
+
+    [Fact]
+    public async Task MoreMenu_OnFilterEntry_IncludesAddToPresetSubmenu()
+    {
+        var entry = BuildSavedFilter("X");
+        var component = RenderRow(entry);
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+        var addToPreset = items.FirstOrDefault(i => i.Label == "Add to preset...");
+
+        Assert.NotNull(addToPreset);
+        Assert.NotNull(addToPreset.Children);
+    }
+
+    [Fact]
+    public async Task MoreMenu_OnPresetEntry_OmitsAddToPresetItem()
+    {
+        var preset = BuildPreset("P");
+        var component = RenderRow(preset);
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+
+        Assert.DoesNotContain(items, i => i.Label == "Add to preset...");
+    }
+
+    [Fact]
+    public async Task MoreMenu_OnUserSavedFilter_OmitsSaveToLibraryItem()
+    {
+        var entry = BuildSavedFilter("X");
+        var component = RenderRow(entry);
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+
+        Assert.DoesNotContain(items, i => i.Label == "Save to Library");
+    }
+
+    [Fact]
+    public async Task NewPresetSelected_PromptCancelled_DoesNotInvokeCallback()
+    {
+        var entry = BuildSavedFilter("X");
+        bool invoked = false;
+        var component = RenderRow(entry, onAddToPreset: _ => { invoked = true; return Task.CompletedTask; });
+        _alerts.DisplayPrompt(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns("");
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+        await items.First(i => i.Label == "Add to preset...").Children!.First().OnClickAsync!.Invoke();
+
+        Assert.False(invoked);
+    }
+
+    [Fact]
+    public async Task NewPresetSelected_PromptReturnsName_InvokesAddToPresetWithNewName()
+    {
+        var entry = BuildSavedFilter("X");
+        AddToPresetIntent? captured = null;
+        var component = RenderRow(entry, onAddToPreset: i => { captured = i; return Task.CompletedTask; });
+        _alerts.DisplayPrompt(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns("My Preset");
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+        await items.First(i => i.Label == "Add to preset...").Children!.First().OnClickAsync!.Invoke();
+
+        Assert.NotNull(captured);
+        Assert.Null(captured.PresetId);
+        Assert.Equal("My Preset", captured.NewPresetName);
+    }
+
+    [Fact]
+    public void Render_FilterEntry_ShowsKindIconAndStatusBadge()
+    {
+        var entry = BuildSavedFilter("F");
+        var component = RenderRow(entry);
+
+        Assert.Contains("bi-funnel", component.Find("i.library-entry-kind-icon").GetAttribute("class"));
+        Assert.Equal("Saved", component.Find(".library-entry-status-badge").TextContent.Trim());
+    }
+
+    [Fact]
+    public void Render_PresetEntry_ShowsPresetIconAndFiltersCount()
+    {
+        var preset = BuildPreset("P", filterCount: 3);
+        var component = RenderRow(preset);
+
+        Assert.Contains("bi-collection", component.Find("i.library-entry-kind-icon").GetAttribute("class"));
+        Assert.Contains("(3 filters)", component.Find(".library-entry-name").TextContent);
+    }
+
+    [Fact]
+    public async Task ReplaceOnEmptyPane_NoConfirm_InvokesOnReplace()
+    {
+        var entry = BuildSavedFilter("X");
         LibraryEntryId? captured = null;
-        var entry = BuildFilterEntry("Test");
-        var component = Render<LibraryEntryRow>(parameters => parameters
-            .Add(p => p.Entry, entry)
-            .Add(p => p.OnDelete, id => { captured = id; return Task.CompletedTask; }));
+        var component = RenderRow(entry, onReplace: id => { captured = id; return Task.CompletedTask; });
 
-        // Act
-        await component.Find("button.button-red").ClickAsync(new MouseEventArgs());
+        var items = await CapturedMoreMenuItemsAsync(component);
+        var replace = items.First(i => i.Label == "Replace current filters");
+        await replace.OnClickAsync!.Invoke();
 
-        // Assert
         Assert.Equal(entry.Id, captured);
+        await _alerts.DidNotReceiveWithAnyArgs().ShowAlert(default!, default!, default!, default(string)!);
     }
 
     [Fact]
-    public void Render_DoesNotRenderEditButton_ForPR2()
+    public async Task ReplaceOnNonEmptyPane_ShowsConfirm_InvokesOnlyOnAccept()
     {
-        // PR-2 deliberately ships without an Edit button (regression guard against accidentally adding one back).
-        var component = Render<LibraryEntryRow>(parameters => parameters
-            .Add(p => p.Entry, BuildFilterEntry("Test")));
+        var filter = SavedFilter.TryCreate("Level == 9")!;
+        SetPaneFilters([filter]);
 
-        Assert.DoesNotContain(component.FindAll("button"), b => b.TextContent.Trim() == "Edit");
+        var entry = BuildSavedFilter("X");
+        bool replaced = false;
+        var component = RenderRow(entry, onReplace: id => { replaced = true; return Task.CompletedTask; });
+
+        _alerts.ShowAlert("Replace current filters?", Arg.Any<string>(), "Replace", "Cancel").Returns(false);
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+        await items.First(i => i.Label == "Replace current filters").OnClickAsync!.Invoke();
+
+        Assert.False(replaced);
     }
 
     [Fact]
-    public void Render_PresetEntry_DisplaysPresetBadge()
+    public async Task SaveToLibrary_InvokesCallbackAndAnnounces()
     {
-        // Arrange
-        var f1 = SavedFilter.TryCreate("Level == 2");
-        Assert.NotNull(f1);
-        var preset = new LibraryEntryPreset
+        var entry = BuildAutoTrackedFilterEntry("X");
+        bool invoked = false;
+        var component = RenderRow(entry, onSaveToLibrary: id => { invoked = true; return Task.CompletedTask; });
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+        await items.First(i => i.Label == "Save to Library").OnClickAsync!.Invoke();
+
+        Assert.True(invoked);
+        _announcements.Received(1).Announce(Arg.Is<string>(s => s.Contains("Saved X to library")));
+    }
+
+    [Theory]
+    [InlineData(LibraryEntryOrigin.UserSaved, false, null, "Saved", "saved")]
+    [InlineData(LibraryEntryOrigin.AutoTracked, false, "2025-01-01", "Previously used", "previously-used")]
+    [InlineData(LibraryEntryOrigin.UserSaved, true, null, "Favorite", "favorite")]
+    public void StatusBadge_ReflectsEntryState(LibraryEntryOrigin origin, bool isFav, string? lastUsedString, string expectedText, string expectedKind)
+    {
+        DateTimeOffset? lastUsed = lastUsedString is null ? null : DateTimeOffset.Parse(lastUsedString);
+        var entry = BuildFilterEntry("X") with { Origin = origin, IsFavorite = isFav, LastUsedUtc = lastUsed };
+        var component = RenderRow(entry);
+
+        var badge = component.Find(".library-entry-status-badge");
+        Assert.Equal(expectedText, badge.TextContent.Trim());
+        Assert.Equal(expectedKind, badge.GetAttribute("data-status"));
+    }
+
+    [Fact]
+    public async Task UnfavoriteOnFavoritesTab_InvokesPendingFocusBeforeToggle()
+    {
+        var entry = BuildSavedFilter("X") with { IsFavorite = true };
+        var calls = new List<string>();
+        var component = RenderRow(
+            entry,
+            activeTab: LibraryTab.Favorites,
+            onRequestPendingFocus: id => { calls.Add("focus"); return Task.CompletedTask; },
+            onToggleFavorite: i => { calls.Add("toggle"); return Task.CompletedTask; });
+
+        await component.Find("button.button-yellow").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(["focus", "toggle"], calls);
+    }
+
+    private static LibraryEntrySavedFilter BuildAutoTrackedFilterEntry(string name)
+    {
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+
+        return new LibraryEntrySavedFilter
         {
-            Name = "Test",
+            Name = name,
             CreatedUtc = DateTimeOffset.UtcNow,
-            Filters = [f1],
+            Filter = filter,
+            Origin = LibraryEntryOrigin.AutoTracked,
+            LastUsedUtc = DateTimeOffset.UtcNow,
         };
-
-        // Act
-        var component = Render<LibraryEntryRow>(parameters => parameters
-            .Add(p => p.Entry, preset));
-
-        // Assert
-        Assert.Equal("Preset", component.Find(".library-entry-kind-badge").TextContent.Trim());
-    }
-
-    [Fact]
-    public void Render_SavedFilterEntry_DisplaysFilterBadge()
-    {
-        // Arrange + Act
-        var component = Render<LibraryEntryRow>(parameters => parameters
-            .Add(p => p.Entry, BuildFilterEntry("Test")));
-
-        // Assert
-        Assert.Equal("Filter", component.Find(".library-entry-kind-badge").TextContent.Trim());
     }
 
     private static LibraryEntrySavedFilter BuildFilterEntry(string name)
@@ -98,5 +444,59 @@ public sealed class LibraryEntryRowTests : BunitContext
             CreatedUtc = DateTimeOffset.UtcNow,
             Filter = filter,
         };
+    }
+
+    private static LibraryEntryPreset BuildPreset(string name, int filterCount = 1)
+    {
+        var filters = new List<SavedFilter>();
+        for (var i = 0; i < filterCount; i++) { filters.Add(SavedFilter.TryCreate($"Level == {i}")!); }
+
+        return new LibraryEntryPreset
+        {
+            Name = name,
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = [.. filters],
+        };
+    }
+
+    private static LibraryEntrySavedFilter BuildSavedFilter(string name) =>
+        BuildFilterEntry(name) with { Origin = LibraryEntryOrigin.UserSaved };
+
+    private async Task<IReadOnlyList<MenuItem>> CapturedMoreMenuItemsAsync(IRenderedComponent<LibraryEntryRow> component)
+    {
+        IReadOnlyList<MenuItem>? captured = null;
+        _menuService.WhenForAnyArgs(s => s.OpenAt(0, 0, null!, false, false))
+            .Do(call => captured = (IReadOnlyList<MenuItem>)call[2]!);
+        await component.FindAll("button.icon-button").Last().ClickAsync(new MouseEventArgs());
+        Assert.NotNull(captured);
+        return captured;
+    }
+
+    private IRenderedComponent<LibraryEntryRow> RenderRow(
+        LibraryEntry entry,
+        LibraryTab activeTab = LibraryTab.Saved,
+        IReadOnlyList<LibraryEntryPreset>? allPresets = null,
+        Func<LibraryEntryId, Task>? onApply = null,
+        Func<LibraryEntryId, Task>? onReplace = null,
+        Func<LibraryEntryId, Task>? onDelete = null,
+        Func<FavoriteToggleIntent, Task>? onToggleFavorite = null,
+        Func<LibraryEntryId, Task>? onSaveToLibrary = null,
+        Func<AddToPresetIntent, Task>? onAddToPreset = null,
+        Func<LibraryEntryId, Task>? onRequestPendingFocus = null) =>
+        Render<LibraryEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.ActiveTab, activeTab)
+            .Add(p => p.AllPresets, allPresets ?? [])
+            .Add(p => p.OnApply, onApply ?? (_ => Task.CompletedTask))
+            .Add(p => p.OnReplace, onReplace ?? (_ => Task.CompletedTask))
+            .Add(p => p.OnDelete, onDelete ?? (_ => Task.CompletedTask))
+            .Add(p => p.OnToggleFavorite, onToggleFavorite ?? (_ => Task.CompletedTask))
+            .Add(p => p.OnSaveToLibrary, onSaveToLibrary ?? (_ => Task.CompletedTask))
+            .Add(p => p.OnAddToPreset, onAddToPreset ?? (_ => Task.CompletedTask))
+            .Add(p => p.OnRequestPendingFocus, onRequestPendingFocus ?? (_ => Task.CompletedTask)));
+
+    private void SetPaneFilters(IEnumerable<SavedFilter> filters)
+    {
+        _paneState = new FilterPaneState { Filters = [.. filters] };
     }
 }
