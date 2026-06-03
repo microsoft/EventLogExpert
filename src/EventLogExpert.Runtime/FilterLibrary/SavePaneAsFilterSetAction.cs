@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.Runtime.FilterLibrary;
 
-internal sealed record SavePaneAsPresetAction(string Name);
+internal sealed record SavePaneAsFilterSetAction(string Name);

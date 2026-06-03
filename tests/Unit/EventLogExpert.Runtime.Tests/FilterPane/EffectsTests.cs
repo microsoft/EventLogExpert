@@ -8,8 +8,7 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Filtering.TestUtils.Constants;
 using EventLogExpert.Runtime.EventLog;
-using EventLogExpert.Runtime.FilterCache;
-using EventLogExpert.Runtime.FilterGroup;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
@@ -61,7 +60,7 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleAddFilter_WhenFilterHasBasicFilter_ShouldAddToRecentFilters()
+    public async Task HandleAddFilter_WhenFilterHasBasicFilter_ShouldRecordFilterApplied()
     {
         // Arrange
         var filterModel = FilterBuilder.CreateTestFilter(basicFilter: CreateBasicFilter());
@@ -73,12 +72,12 @@ public sealed class EffectsTests
         await effects.HandleAddFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterAction>(x =>
-            x.Filter == FilterTestConstants.FilterIdEquals100));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
+            x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
     }
 
     [Fact]
-    public async Task HandleAddFilter_WhenFilterHasNoBasicFilter_ShouldAddToRecentFilters()
+    public async Task HandleAddFilter_WhenFilterHasNoBasicFilter_ShouldRecordFilterApplied()
     {
         // Arrange
         var filterModel = FilterBuilder.CreateTestFilter();
@@ -90,21 +89,8 @@ public sealed class EffectsTests
         await effects.HandleAddFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterAction>(x =>
-            x.Filter == FilterTestConstants.FilterIdEquals100));
-    }
-
-    [Fact]
-    public async Task HandleApplyFilterGroup_ShouldUpdateEventTableFilters()
-    {
-        // Arrange
-        var (effects, mockDispatcher) = CreateEffects(true, CreateSingleEnabledFilters());
-
-        // Act
-        await effects.HandleApplyFilterGroup(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
+            x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
     }
 
     [Fact]
@@ -148,87 +134,6 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleSaveFilterGroup_ShouldCopyFilterProperties()
-    {
-        // Arrange
-        var filters = ImmutableList.Create(
-            FilterBuilder.CreateTestFilter(
-                FilterTestConstants.FilterIdEquals100,
-                HighlightColor.Red,
-                isExcluded: true));
-
-        var (effects, mockDispatcher) = CreateEffects(filters: filters);
-        var action = new SaveFilterGroupAction(FilterTestConstants.FilterGroupName);
-
-        // Act
-        await effects.HandleSaveFilterGroup(action, mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddGroupAction>(x =>
-            x.FilterGroup != null &&
-            x.FilterGroup.Filters[0].Color == HighlightColor.Red &&
-            x.FilterGroup.Filters[0].IsExcluded == true &&
-            x.FilterGroup.Filters[0].ComparisonText == FilterTestConstants.FilterIdEquals100));
-    }
-
-    [Fact]
-    public async Task HandleSaveFilterGroup_ShouldDispatchAddGroupAction()
-    {
-        // Arrange
-        var filters = ImmutableList.Create(
-            FilterBuilder.CreateTestFilter(
-                FilterTestConstants.FilterIdEquals100,
-                HighlightColor.Blue,
-                isExcluded: false));
-
-        var (effects, mockDispatcher) = CreateEffects(filters: filters);
-        var action = new SaveFilterGroupAction(FilterTestConstants.FilterGroupName);
-
-        // Act
-        await effects.HandleSaveFilterGroup(action, mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddGroupAction>(x =>
-            x.FilterGroup != null &&
-            x.FilterGroup.Name == FilterTestConstants.FilterGroupName &&
-            x.FilterGroup.Filters.Count == 1));
-    }
-
-    [Fact]
-    public async Task HandleSaveFilterGroup_WhenPaneEmpty_ShouldNotDispatchAddGroupAction()
-    {
-        // Arrange
-        var (effects, mockDispatcher) = CreateEffects(filters: ImmutableList<SavedFilter>.Empty);
-        var action = new SaveFilterGroupAction(FilterTestConstants.FilterGroupName);
-
-        // Act
-        await effects.HandleSaveFilterGroup(action, mockDispatcher);
-
-        // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddGroupAction>());
-    }
-
-    [Fact]
-    public async Task HandleSaveFilterGroup_WithMultipleFilters_ShouldSaveAll()
-    {
-        // Arrange
-        var filters = ImmutableList.Create(
-            FilterBuilder.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Blue),
-            FilterBuilder.CreateTestFilter(FilterTestConstants.FilterLevelEqualsError, HighlightColor.Red));
-
-        var (effects, mockDispatcher) = CreateEffects(filters: filters);
-        var action = new SaveFilterGroupAction(FilterTestConstants.FilterGroupName);
-
-        // Act
-        await effects.HandleSaveFilterGroup(action, mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddGroupAction>(x =>
-            x.FilterGroup != null &&
-            x.FilterGroup.Filters.Count == 2));
-    }
-
-    [Fact]
     public async Task HandleSetFilter_ShouldUpdateEventTableFilters()
     {
         // Arrange
@@ -245,7 +150,7 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleSetFilter_WhenFilterHasBasicFilter_ShouldAddToRecentFilters()
+    public async Task HandleSetFilter_WhenFilterHasBasicFilter_ShouldRecordFilterApplied()
     {
         // Arrange
         var filterModel = FilterBuilder.CreateTestFilter(basicFilter: CreateBasicFilter());
@@ -257,12 +162,12 @@ public sealed class EffectsTests
         await effects.HandleSetFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterAction>(x =>
-            x.Filter == FilterTestConstants.FilterIdEquals100));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
+            x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
     }
 
     [Fact]
-    public async Task HandleSetFilter_WhenFilterHasNoBasicFilter_ShouldAddToRecentFilters()
+    public async Task HandleSetFilter_WhenFilterHasNoBasicFilter_ShouldRecordFilterApplied()
     {
         // Arrange
         var filterModel = FilterBuilder.CreateTestFilter();
@@ -274,8 +179,8 @@ public sealed class EffectsTests
         await effects.HandleSetFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterAction>(x =>
-            x.Filter == FilterTestConstants.FilterIdEquals100));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
+            x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
     }
 
     [Fact]

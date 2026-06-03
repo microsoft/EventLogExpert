@@ -39,33 +39,33 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public async Task AddToPresetSubmenu_WithNoPresets_OnlyHasNewPresetItem()
+    public async Task AddToFilterSetSubmenu_WithFilterSets_HasNewSeparatorAndFilterSets()
     {
         var entry = BuildSavedFilter("X");
-        var component = RenderRow(entry, allPresets: []);
+        var filterSet = BuildFilterSet("P1");
+        var component = RenderRow(entry, AllFilterSets: [filterSet]);
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        var sub = items.First(i => i.Label == "Add to preset...").Children;
+        var sub = items.First(i => i.Label == "Add to filter set...").Children!;
 
-        Assert.NotNull(sub);
-        Assert.Single(sub);
-        Assert.Equal("+ New preset...", sub[0].Label);
+        Assert.Equal(3, sub.Count); // "+ New filter set...", separator, "P1"
+        Assert.Equal("+ New filter set...", sub[0].Label);
+        Assert.True(sub[1].IsSeparator);
+        Assert.Equal("P1", sub[2].Label);
     }
 
     [Fact]
-    public async Task AddToPresetSubmenu_WithPresets_HasNewSeparatorAndPresets()
+    public async Task AddToFilterSetSubmenu_WithNoFilterSets_OnlyHasNewFilterSetItem()
     {
         var entry = BuildSavedFilter("X");
-        var preset = BuildPreset("P1");
-        var component = RenderRow(entry, allPresets: [preset]);
+        var component = RenderRow(entry, AllFilterSets: []);
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        var sub = items.First(i => i.Label == "Add to preset...").Children!;
+        var sub = items.First(i => i.Label == "Add to filter set...").Children;
 
-        Assert.Equal(3, sub.Count); // "+ New preset...", separator, "P1"
-        Assert.Equal("+ New preset...", sub[0].Label);
-        Assert.True(sub[1].IsSeparator);
-        Assert.Equal("P1", sub[2].Label);
+        Assert.NotNull(sub);
+        Assert.Single(sub);
+        Assert.Equal("+ New filter set...", sub[0].Label);
     }
 
     [Fact]
@@ -97,16 +97,16 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public async Task DeleteOnPreset_ShowsConfirm()
+    public async Task DeleteOnFilterSet_ShowsConfirm()
     {
-        var preset = BuildPreset("P", filterCount: 2);
-        var component = RenderRow(preset);
+        var filterSet = BuildFilterSet("P", filterCount: 2);
+        var component = RenderRow(filterSet);
         _alerts.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns(true);
 
         var items = await CapturedMoreMenuItemsAsync(component);
         await items.First(i => i.Label == "Delete").OnClickAsync!.Invoke();
 
-        await _alerts.Received(1).ShowAlert("Delete from library?", Arg.Is<string>(m => m.Contains("preset 'P' with 2 filters")), "Delete", "Cancel");
+        await _alerts.Received(1).ShowAlert("Delete from library?", Arg.Is<string>(m => m.Contains("filter set 'P' with 2 filters")), "Delete", "Cancel");
     }
 
     [Fact]
@@ -133,23 +133,23 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public async Task ExistingPresetSelected_InvokesAddToPresetWithPresetId()
+    public async Task ExistingFilterSetSelected_InvokesAddToFilterSetWithFilterSetId()
     {
         var entry = BuildSavedFilter("X");
-        var preset = BuildPreset("P1");
-        AddToPresetIntent? captured = null;
+        var filterSet = BuildFilterSet("P1");
+        AddToFilterSetIntent? captured = null;
         var component = RenderRow(
             entry,
-            allPresets: [preset],
-            onAddToPreset: i => { captured = i; return Task.CompletedTask; });
+            AllFilterSets: [filterSet],
+            OnAddToFilterSet: i => { captured = i; return Task.CompletedTask; });
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        var p1Item = items.First(i => i.Label == "Add to preset...").Children!.First(c => c.Label == "P1");
+        var p1Item = items.First(i => i.Label == "Add to filter set...").Children!.First(c => c.Label == "P1");
         await p1Item.OnClickAsync!.Invoke();
 
         Assert.NotNull(captured);
-        Assert.Equal(preset.Id, captured.PresetId);
-        Assert.Null(captured.NewPresetName);
+        Assert.Equal(filterSet.Id, captured.FilterSetId);
+        Assert.Null(captured.NewFilterSetName);
     }
 
     [Fact]
@@ -256,27 +256,27 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public async Task MoreMenu_OnFilterEntry_IncludesAddToPresetSubmenu()
+    public async Task MoreMenu_OnFilterEntry_IncludesAddToFilterSetSubmenu()
     {
         var entry = BuildSavedFilter("X");
         var component = RenderRow(entry);
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        var addToPreset = items.FirstOrDefault(i => i.Label == "Add to preset...");
+        var addToFilterSet = items.FirstOrDefault(i => i.Label == "Add to filter set...");
 
-        Assert.NotNull(addToPreset);
-        Assert.NotNull(addToPreset.Children);
+        Assert.NotNull(addToFilterSet);
+        Assert.NotNull(addToFilterSet.Children);
     }
 
     [Fact]
-    public async Task MoreMenu_OnPresetEntry_OmitsAddToPresetItem()
+    public async Task MoreMenu_OnFilterSetEntry_OmitsAddToFilterSetItem()
     {
-        var preset = BuildPreset("P");
-        var component = RenderRow(preset);
+        var filterSet = BuildFilterSet("P");
+        var component = RenderRow(filterSet);
 
         var items = await CapturedMoreMenuItemsAsync(component);
 
-        Assert.DoesNotContain(items, i => i.Label == "Add to preset...");
+        Assert.DoesNotContain(items, i => i.Label == "Add to filter set...");
     }
 
     [Fact]
@@ -291,33 +291,33 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public async Task NewPresetSelected_PromptCancelled_DoesNotInvokeCallback()
+    public async Task NewFilterSetSelected_PromptCancelled_DoesNotInvokeCallback()
     {
         var entry = BuildSavedFilter("X");
         bool invoked = false;
-        var component = RenderRow(entry, onAddToPreset: _ => { invoked = true; return Task.CompletedTask; });
+        var component = RenderRow(entry, OnAddToFilterSet: _ => { invoked = true; return Task.CompletedTask; });
         _alerts.DisplayPrompt(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns("");
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        await items.First(i => i.Label == "Add to preset...").Children!.First().OnClickAsync!.Invoke();
+        await items.First(i => i.Label == "Add to filter set...").Children!.First().OnClickAsync!.Invoke();
 
         Assert.False(invoked);
     }
 
     [Fact]
-    public async Task NewPresetSelected_PromptReturnsName_InvokesAddToPresetWithNewName()
+    public async Task NewFilterSetSelected_PromptReturnsName_InvokesAddToFilterSetWithNewName()
     {
         var entry = BuildSavedFilter("X");
-        AddToPresetIntent? captured = null;
-        var component = RenderRow(entry, onAddToPreset: i => { captured = i; return Task.CompletedTask; });
+        AddToFilterSetIntent? captured = null;
+        var component = RenderRow(entry, OnAddToFilterSet: i => { captured = i; return Task.CompletedTask; });
         _alerts.DisplayPrompt(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns("My Preset");
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        await items.First(i => i.Label == "Add to preset...").Children!.First().OnClickAsync!.Invoke();
+        await items.First(i => i.Label == "Add to filter set...").Children!.First().OnClickAsync!.Invoke();
 
         Assert.NotNull(captured);
-        Assert.Null(captured.PresetId);
-        Assert.Equal("My Preset", captured.NewPresetName);
+        Assert.Null(captured.FilterSetId);
+        Assert.Equal("My Preset", captured.NewFilterSetName);
     }
 
     [Fact]
@@ -331,10 +331,10 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_PresetEntry_ShowsPresetIconAndFiltersCount()
+    public void Render_FilterSetEntry_ShowsFilterSetIconAndFiltersCount()
     {
-        var preset = BuildPreset("P", filterCount: 3);
-        var component = RenderRow(preset);
+        var filterSet = BuildFilterSet("P", filterCount: 3);
+        var component = RenderRow(filterSet);
 
         Assert.Contains("bi-collection", component.Find("i.library-entry-kind-icon").GetAttribute("class"));
         Assert.Contains("(3 filters)", component.Find(".library-entry-name").TextContent);
@@ -446,12 +446,12 @@ public sealed class LibraryEntryRowTests : BunitContext
         };
     }
 
-    private static LibraryEntryPreset BuildPreset(string name, int filterCount = 1)
+    private static LibraryEntryFilterSet BuildFilterSet(string name, int filterCount = 1)
     {
         var filters = new List<SavedFilter>();
         for (var i = 0; i < filterCount; i++) { filters.Add(SavedFilter.TryCreate($"Level == {i}")!); }
 
-        return new LibraryEntryPreset
+        return new LibraryEntryFilterSet
         {
             Name = name,
             CreatedUtc = DateTimeOffset.UtcNow,
@@ -475,24 +475,24 @@ public sealed class LibraryEntryRowTests : BunitContext
     private IRenderedComponent<LibraryEntryRow> RenderRow(
         LibraryEntry entry,
         LibraryTab activeTab = LibraryTab.Saved,
-        IReadOnlyList<LibraryEntryPreset>? allPresets = null,
+        IReadOnlyList<LibraryEntryFilterSet>? AllFilterSets = null,
         Func<LibraryEntryId, Task>? onApply = null,
         Func<LibraryEntryId, Task>? onReplace = null,
         Func<LibraryEntryId, Task>? onDelete = null,
         Func<FavoriteToggleIntent, Task>? onToggleFavorite = null,
         Func<LibraryEntryId, Task>? onSaveToLibrary = null,
-        Func<AddToPresetIntent, Task>? onAddToPreset = null,
+        Func<AddToFilterSetIntent, Task>? OnAddToFilterSet = null,
         Func<LibraryEntryId, Task>? onRequestPendingFocus = null) =>
         Render<LibraryEntryRow>(parameters => parameters
             .Add(p => p.Entry, entry)
             .Add(p => p.ActiveTab, activeTab)
-            .Add(p => p.AllPresets, allPresets ?? [])
+            .Add(p => p.AllFilterSets, AllFilterSets ?? [])
             .Add(p => p.OnApply, onApply ?? (_ => Task.CompletedTask))
             .Add(p => p.OnReplace, onReplace ?? (_ => Task.CompletedTask))
             .Add(p => p.OnDelete, onDelete ?? (_ => Task.CompletedTask))
             .Add(p => p.OnToggleFavorite, onToggleFavorite ?? (_ => Task.CompletedTask))
             .Add(p => p.OnSaveToLibrary, onSaveToLibrary ?? (_ => Task.CompletedTask))
-            .Add(p => p.OnAddToPreset, onAddToPreset ?? (_ => Task.CompletedTask))
+            .Add(p => p.OnAddToFilterSet, OnAddToFilterSet ?? (_ => Task.CompletedTask))
             .Add(p => p.OnRequestPendingFocus, onRequestPendingFocus ?? (_ => Task.CompletedTask)));
 
     private void SetPaneFilters(IEnumerable<SavedFilter> filters)

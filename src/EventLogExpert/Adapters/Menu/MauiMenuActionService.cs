@@ -9,6 +9,7 @@ using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
@@ -34,6 +35,7 @@ namespace EventLogExpert.Adapters.Menu;
 public sealed class MauiMenuActionService(
     IDispatcher dispatcher,
     IEventLogCommands eventLogCommands,
+    IFilterLibraryCommands filterLibraryCommands,
     IFilterPaneCommands filterPaneCommands,
     IClipboardService clipboardService,
     IAlertDialogService dialogService,
@@ -51,6 +53,7 @@ public sealed class MauiMenuActionService(
     private readonly IDispatcher _dispatcher = dispatcher;
     private readonly IEventLogCommands _eventLogCommands = eventLogCommands;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
+    private readonly IFilterLibraryCommands _filterLibraryCommands = filterLibraryCommands;
     private readonly IFilterPaneCommands _filterPaneCommands = filterPaneCommands;
     private readonly IFolderPickerService _folderPickerService = folderPickerService;
     private readonly SemaphoreSlim _logNamesLock = new(1, 1);
@@ -300,16 +303,16 @@ public sealed class MauiMenuActionService(
     public Task<bool> OpenSettingsAsync() =>
         TryOpenModalAsync(_modalCoordinator.OpenSettingsAsync, nameof(SettingsModal));
 
-    public async Task SaveFiltersAsGroupAsync()
+    public async Task SaveFiltersAsFilterSetAsync()
     {
-        var groupName = await _dialogService.DisplayPrompt(
-            "Group Name",
-            "What would you like to name this group?",
-            "New Filter Section\\New Filter Group");
+        var filterSetName = await _dialogService.DisplayPrompt(
+            "Filter Set Name",
+            "What would you like to name this filter set?",
+            "New Filter Set");
 
-        if (string.IsNullOrEmpty(groupName)) { return; }
+        if (string.IsNullOrWhiteSpace(filterSetName)) { return; }
 
-        _filterPaneCommands.SaveFilterGroup(groupName);
+        _filterLibraryCommands.SavePaneAsFilterSet(filterSetName);
     }
 
     public void SetContinuouslyUpdate(bool value) =>

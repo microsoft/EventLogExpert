@@ -68,19 +68,6 @@ public sealed class FilterPaneActionTests
     }
 
     [Fact]
-    public void ApplyFilterGroupAction_ShouldCreateAction()
-    {
-        // Arrange
-        var filterGroup = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
-
-        // Act
-        var action = new ApplyFilterGroupAction(filterGroup);
-
-        // Assert
-        Assert.Equal(filterGroup, action.FilterGroup);
-    }
-
-    [Fact]
     public void ClearAllFiltersAction_ShouldCreateAction()
     {
         // Arrange + Act
@@ -101,16 +88,6 @@ public sealed class FilterPaneActionTests
 
         // Assert
         Assert.Equal(filterId, action.Id);
-    }
-
-    [Fact]
-    public void SaveFilterGroupAction_ShouldCreateAction()
-    {
-        // Arrange + Act
-        var action = new SaveFilterGroupAction(FilterTestConstants.FilterGroupName);
-
-        // Assert
-        Assert.Equal(FilterTestConstants.FilterGroupName, action.Name);
     }
 
     [Fact]
@@ -230,192 +207,6 @@ public sealed class FilterPaneReducerTests
         // Assert
         Assert.Single(result.Filters);
         Assert.Equal(filter, result.Filters[0]);
-    }
-
-    [Fact]
-    public void ReduceApplyFilterGroup_DifferentCaseSameTuple_DedupesAsDuplicate()
-    {
-        var existing = SavedFilter.TryCreate("Level == 4");
-        Assert.NotNull(existing);
-        var state = new FilterPaneState { Filters = [existing] };
-        var differentCase = SavedFilter.TryCreate("LEVEL == 4");
-        Assert.NotNull(differentCase);
-
-        var result = Reducers.ReduceApplyFilterGroup(state, new ApplyFilterGroupAction(new SavedFilterGroup
-        {
-            Filters = [differentCase],
-        }));
-
-        Assert.Single(result.Filters);
-    }
-
-    [Fact]
-    public void ReduceApplyFilterGroup_PreservesBasicFilter()
-    {
-        // Arrange
-        var basicFilter = new BasicFilter(
-            new FilterComparison
-            {
-                Property = EventProperty.Id,
-                Operator = ComparisonOperator.Equals,
-                MatchMode = MatchMode.Single,
-                Value = "100"
-            },
-            []);
-
-        var state = new FilterPaneState();
-
-        var filterGroup = new SavedFilterGroup
-        {
-            Filters =
-            [
-                FilterBuilder.CreateTestFilter(basicFilter: basicFilter)
-            ]
-        };
-
-        // Act
-        var result = Reducers.ReduceApplyFilterGroup(
-            state,
-            new ApplyFilterGroupAction(filterGroup));
-
-        // Assert
-        Assert.Single(result.Filters);
-        Assert.Equal(basicFilter, result.Filters[0].BasicFilter);
-        Assert.True(result.Filters[0].IsEnabled);
-    }
-
-    [Fact]
-    public void ReduceApplyFilterGroup_SameTextDifferentMode_KeepsBothAsDistinctFilters()
-    {
-        var advanced = SavedFilter.TryCreate("Level == 4", mode: FilterMode.Advanced);
-        Assert.NotNull(advanced);
-        var state = new FilterPaneState { Filters = [advanced] };
-        var basic = SavedFilter.TryCreate("Level == 4", mode: FilterMode.Basic);
-        Assert.NotNull(basic);
-
-        var result = Reducers.ReduceApplyFilterGroup(state, new ApplyFilterGroupAction(new SavedFilterGroup
-        {
-            Filters = [basic],
-        }));
-
-        Assert.Equal(2, result.Filters.Count);
-        Assert.Contains(result.Filters, f => f.Mode == FilterMode.Advanced);
-        Assert.Contains(result.Filters, f => f.Mode == FilterMode.Basic);
-    }
-
-    [Fact]
-    public void ReduceApplyFilterGroup_ShouldPreserveIsExcludedOnAppliedFilters()
-    {
-        // Arrange
-        var state = new FilterPaneState();
-
-        var filterGroup = new SavedFilterGroup
-        {
-            Filters =
-            [
-                FilterBuilder.CreateTestFilter(isExcluded: true)
-            ]
-        };
-
-        var action = new ApplyFilterGroupAction(filterGroup);
-
-        // Act
-        var result = Reducers.ReduceApplyFilterGroup(state, action);
-
-        // Assert
-        Assert.Single(result.Filters);
-        Assert.True(result.Filters[0].IsExcluded);
-        Assert.True(result.Filters[0].IsEnabled);
-    }
-
-    [Fact]
-    public void ReduceApplyFilterGroup_WithDuplicateFilter_ShouldSkipDuplicate()
-    {
-        // Arrange
-        var existingFilter = FilterBuilder.CreateTestFilter();
-
-        var state = new FilterPaneState { Filters = [existingFilter] };
-
-        var filterGroup = new SavedFilterGroup
-        {
-            Filters = [FilterBuilder.CreateTestFilter()]
-        };
-
-        var action = new ApplyFilterGroupAction(filterGroup);
-
-        // Act
-        var result = Reducers.ReduceApplyFilterGroup(state, action);
-
-        // Assert
-        Assert.Single(result.Filters);
-    }
-
-    [Fact]
-    public void ReduceApplyFilterGroup_WithEmptyFilters_ShouldReturnOriginalState()
-    {
-        // Arrange
-        var state = new FilterPaneState();
-        var filterGroup = new SavedFilterGroup { Filters = [] };
-        var action = new ApplyFilterGroupAction(filterGroup);
-
-        // Act
-        var result = Reducers.ReduceApplyFilterGroup(state, action);
-
-        // Assert
-        Assert.Equal(state, result);
-    }
-
-    [Fact]
-    public void ReduceApplyFilterGroup_WithNewFilters_ShouldAddFilters()
-    {
-        // Arrange
-        var state = new FilterPaneState();
-
-        var filterGroup = new SavedFilterGroup
-        {
-            Filters =
-            [
-                FilterBuilder.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Red)
-            ]
-        };
-
-        var action = new ApplyFilterGroupAction(filterGroup);
-
-        // Act
-        var result = Reducers.ReduceApplyFilterGroup(state, action);
-
-        // Assert
-        Assert.Single(result.Filters);
-        Assert.Equal(FilterTestConstants.FilterIdEquals100, result.Filters[0].ComparisonText);
-        Assert.Equal(HighlightColor.Red, result.Filters[0].Color);
-        Assert.True(result.Filters[0].IsEnabled);
-    }
-
-    [Fact]
-    public void ReduceApplyFilterGroup_WithSameComparisonButDifferentExclusion_ShouldKeepBoth()
-    {
-        // Arrange
-        var existingInclude = FilterBuilder.CreateTestFilter();
-
-        var state = new FilterPaneState { Filters = [existingInclude] };
-
-        var filterGroup = new SavedFilterGroup
-        {
-            Filters =
-            [
-                FilterBuilder.CreateTestFilter(isExcluded: true)
-            ]
-        };
-
-        var action = new ApplyFilterGroupAction(filterGroup);
-
-        // Act
-        var result = Reducers.ReduceApplyFilterGroup(state, action);
-
-        // Assert
-        Assert.Equal(2, result.Filters.Count);
-        Assert.False(result.Filters[0].IsExcluded);
-        Assert.True(result.Filters[1].IsExcluded);
     }
 
     [Fact]
@@ -909,32 +700,6 @@ public sealed class FilterPaneIntegrationTests
             new SetFilterDateRangeSuccessAction(null));
 
         Assert.Null(state.FilteredDateRange);
-    }
-
-    [Fact]
-    public void FilterGroupApplication_ShouldAddMultipleFilters()
-    {
-        // Arrange
-        var state = new FilterPaneState();
-        var filterGroup = new SavedFilterGroup
-        {
-            Name = FilterTestConstants.FilterGroupName,
-            Filters =
-            [
-                FilterBuilder.CreateTestFilter(),
-                FilterBuilder.CreateTestFilter(FilterTestConstants.FilterIdEquals200),
-                FilterBuilder.CreateTestFilter(FilterTestConstants.FilterLevelEqualsError)
-            ]
-        };
-
-        // Act
-        state = Reducers.ReduceApplyFilterGroup(
-            state,
-            new ApplyFilterGroupAction(filterGroup));
-
-        // Assert
-        Assert.Equal(3, state.Filters.Count);
-        Assert.All(state.Filters, filter => Assert.True(filter.IsEnabled));
     }
 
     [Fact]

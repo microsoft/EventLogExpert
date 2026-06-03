@@ -4,6 +4,6 @@
 using EventLogExpert.Filtering.Persistence;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Runtime.FilterGroup;
+namespace EventLogExpert.Runtime.FilterLibrary;
 
-internal sealed record ImportGroupsAction(ImmutableList<SavedFilterGroup> Groups);
+internal sealed record SaveFilterSetAction(string Name, ImmutableList<SavedFilter> Filters);

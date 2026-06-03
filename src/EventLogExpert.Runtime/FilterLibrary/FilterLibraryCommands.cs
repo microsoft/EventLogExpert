@@ -11,11 +11,11 @@ internal sealed class FilterLibraryCommands(IDispatcher dispatcher) : IFilterLib
 {
     public void AddEntry(LibraryEntry entry) => dispatcher.Dispatch(new AddLibraryEntryAction(entry));
 
-    public void AddFilterToExistingPreset(LibraryEntryId presetId, SavedFilter filter, LibraryEntryId? sourceEntryId) =>
-        dispatcher.Dispatch(new AddFilterToExistingPresetAction(presetId, filter, sourceEntryId));
+    public void AddFilterToExistingFilterSet(LibraryEntryId filterSetId, SavedFilter filter, LibraryEntryId? sourceEntryId) =>
+        dispatcher.Dispatch(new AddFilterToExistingFilterSetAction(filterSetId, filter, sourceEntryId));
 
-    public void AddFilterToNewPreset(string newPresetName, SavedFilter filter, LibraryEntryId? sourceEntryId) =>
-        dispatcher.Dispatch(new AddFilterToNewPresetAction(newPresetName, filter, sourceEntryId));
+    public void AddFilterToNewFilterSet(string newFilterSetName, SavedFilter filter, LibraryEntryId? sourceEntryId) =>
+        dispatcher.Dispatch(new AddFilterToNewFilterSetAction(newFilterSetName, filter, sourceEntryId));
 
     public void ApplyEntry(LibraryEntryId entryId) => dispatcher.Dispatch(new ApplyLibraryEntryAction(entryId));
 
@@ -29,10 +29,10 @@ internal sealed class FilterLibraryCommands(IDispatcher dispatcher) : IFilterLib
 
     public void SaveEntry(LibraryEntryId entryId) => dispatcher.Dispatch(new SaveEntryAction(entryId));
 
-    public void SavePaneAsPreset(string name) => dispatcher.Dispatch(new SavePaneAsPresetAction(name));
+    public void SaveFilterSet(string name, ImmutableList<SavedFilter> filters) =>
+        dispatcher.Dispatch(new SaveFilterSetAction(name, filters));
 
-    public void SavePreset(string name, ImmutableList<SavedFilter> filters) =>
-        dispatcher.Dispatch(new SavePresetAction(name, filters));
+    public void SavePaneAsFilterSet(string name) => dispatcher.Dispatch(new SavePaneAsFilterSetAction(name));
 
     public void SetIsFavorite(LibraryEntryId entryId, bool isFavorite) =>
         dispatcher.Dispatch(new SetIsFavoriteAction(entryId, isFavorite));

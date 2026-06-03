@@ -20,11 +20,11 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     [Parameter][EditorRequired] public LibraryTab ActiveTab { get; set; }
 
-    [Parameter][EditorRequired] public required IReadOnlyList<LibraryEntryPreset> AllPresets { get; set; }
+    [Parameter][EditorRequired] public required IReadOnlyList<LibraryEntryFilterSet> AllFilterSets { get; set; }
 
     [Parameter][EditorRequired] public required LibraryEntry Entry { get; set; }
 
-    [Parameter][EditorRequired] public EventCallback<AddToPresetIntent> OnAddToPreset { get; set; }
+    [Parameter][EditorRequired] public EventCallback<AddToFilterSetIntent> OnAddToFilterSet { get; set; }
 
     [Parameter][EditorRequired] public EventCallback<LibraryEntryId> OnApply { get; set; }
 
@@ -57,9 +57,9 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
-    private string KindAriaLabel => Entry is LibraryEntryPreset ? "Preset" : "Filter";
+    private string KindAriaLabel => Entry is LibraryEntryFilterSet ? "Filter set" : "Filter";
 
-    private string KindIconClass => Entry is LibraryEntryPreset
+    private string KindIconClass => Entry is LibraryEntryFilterSet
         ? "bi bi-collection library-entry-kind-icon"
         : "bi bi-funnel library-entry-kind-icon";
 
@@ -119,28 +119,28 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
             lastUsed.ToLocalTime().ToString("yyyy-MM-dd");
     }
 
-    private MenuItem BuildAddToPresetItem(LibraryEntrySavedFilter filterEntry)
+    private MenuItem BuildAddToFilterSetItem(LibraryEntrySavedFilter filterEntry)
     {
         var children = new List<MenuItem>
         {
-            MenuItem.Item("+ New preset...", () => OnNewPresetSelectedAsync(filterEntry)),
+            MenuItem.Item("+ New filter set...", () => OnNewFilterSetSelectedAsync(filterEntry)),
         };
 
-        if (AllPresets.Count <= 0)
+        if (AllFilterSets.Count <= 0)
         {
-            return MenuItem.SubMenu("Add to preset...", children);
+            return MenuItem.SubMenu("Add to filter set...", children);
         }
 
         children.Add(MenuItem.Separator());
 
-        foreach (var preset in AllPresets)
+        foreach (var filterSet in AllFilterSets)
         {
-            var pid = preset.Id;
-            var pname = preset.Name;
-            children.Add(MenuItem.Item(pname, () => OnExistingPresetSelectedAsync(filterEntry, pid, pname)));
+            var pid = filterSet.Id;
+            var pname = filterSet.Name;
+            children.Add(MenuItem.Item(pname, () => OnExistingFilterSetSelectedAsync(filterEntry, pid, pname)));
         }
 
-        return MenuItem.SubMenu("Add to preset...", children);
+        return MenuItem.SubMenu("Add to filter set...", children);
     }
 
     private IReadOnlyList<MenuItem> BuildMoreMenu()
@@ -157,7 +157,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
         if (Entry is LibraryEntrySavedFilter filterEntry)
         {
-            items.Add(BuildAddToPresetItem(filterEntry));
+            items.Add(BuildAddToFilterSetItem(filterEntry));
         }
 
         items.Add(MenuItem.Separator());
@@ -170,12 +170,12 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     private async Task OnDeleteAsync()
     {
-        var needsConfirm = Entry is LibraryEntryPreset || Entry.Origin == LibraryEntryOrigin.UserSaved;
+        var needsConfirm = Entry is LibraryEntryFilterSet || Entry.Origin == LibraryEntryOrigin.UserSaved;
 
         if (needsConfirm)
         {
-            var entryKind = Entry is LibraryEntryPreset p
-                ? $"preset '{Entry.Name}' with {p.Filters.Count} filter{(p.Filters.Count == 1 ? "" : "s")}"
+            var entryKind = Entry is LibraryEntryFilterSet p
+                ? $"filter set '{Entry.Name}' with {p.Filters.Count} filter{(p.Filters.Count == 1 ? "" : "s")}"
                 : $"filter '{Entry.Name}'";
 
             var confirmed = await AlertDialogService.ShowAlert(
@@ -192,25 +192,25 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         AnnouncementService.Announce($"Deleted {Entry.Name} from library");
     }
 
-    private async Task OnExistingPresetSelectedAsync(LibraryEntrySavedFilter filterEntry, LibraryEntryId presetId, string presetName)
+    private async Task OnExistingFilterSetSelectedAsync(LibraryEntrySavedFilter filterEntry, LibraryEntryId filterSetId, string filterSetName)
     {
-        await OnAddToPreset.InvokeAsync(new AddToPresetIntent(filterEntry.Filter, presetId, null, filterEntry.Id));
-        AnnouncementService.Announce($"Added filter to preset '{presetName}'");
+        await OnAddToFilterSet.InvokeAsync(new AddToFilterSetIntent(filterEntry.Filter, filterSetId, null, filterEntry.Id));
+        AnnouncementService.Announce($"Added filter to filter set '{filterSetName}'");
     }
 
     private void OnMenuServiceStateChanged() => _ = InvokeAsync(StateHasChanged);
 
-    private async Task OnNewPresetSelectedAsync(LibraryEntrySavedFilter filterEntry)
+    private async Task OnNewFilterSetSelectedAsync(LibraryEntrySavedFilter filterEntry)
     {
         var name = await AlertDialogService.DisplayPrompt(
-            "Preset name",
-            "What would you like to name this preset? (use \\ for folder paths)",
-            "New Preset");
+            "Filter set name",
+            "What would you like to name this filter set? (use \\ for folder paths)",
+            "New Filter Set");
 
         if (string.IsNullOrWhiteSpace(name)) { return; }
 
-        await OnAddToPreset.InvokeAsync(new AddToPresetIntent(filterEntry.Filter, null, name, filterEntry.Id));
-        AnnouncementService.Announce($"Added filter to new preset '{name}'");
+        await OnAddToFilterSet.InvokeAsync(new AddToFilterSetIntent(filterEntry.Filter, null, name, filterEntry.Id));
+        AnnouncementService.Announce($"Added filter to new filter set '{name}'");
     }
 
     private async Task OnReplaceAsync()

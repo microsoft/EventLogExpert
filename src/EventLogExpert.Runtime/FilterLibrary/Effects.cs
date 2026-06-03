@@ -1,11 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
 using System.Collections.Immutable;
+using System.Text;
 
 namespace EventLogExpert.Runtime.FilterLibrary;
 
@@ -21,11 +23,11 @@ internal sealed class Effects(
     private readonly SemaphoreSlim _migrationGate = new(initialCount: 1, maxCount: 1);
 
     [EffectMethod]
-    public Task HandleAddFilterToExistingPreset(AddFilterToExistingPresetAction action, IDispatcher dispatcher)
+    public Task HandleAddFilterToExistingFilterSet(AddFilterToExistingFilterSetAction action, IDispatcher dispatcher)
     {
-        var preset = state.Value.Entries.OfType<LibraryEntryPreset>().FirstOrDefault(p => p.Id == action.PresetId);
+        var filterSet = state.Value.Entries.OfType<LibraryEntryFilterSet>().FirstOrDefault(p => p.Id == action.FilterSetId);
 
-        if (preset is null) { return Task.CompletedTask; }
+        if (filterSet is null) { return Task.CompletedTask; }
 
         // Dedup tuple matches the SQL UNIQUE INDEX scope: (lower(ComparisonText), Mode, IsExcluded).
         // Distinct Mode values are intentional per the mode-drift policy.
@@ -33,7 +35,7 @@ internal sealed class Effects(
         var addMode = action.Filter.Mode;
         var addExcluded = action.Filter.IsExcluded;
 
-        if (preset.Filters.Any(f =>
+        if (filterSet.Filters.Any(f =>
             string.Equals(f.ComparisonText, addText, StringComparison.OrdinalIgnoreCase) &&
             f.Mode == addMode &&
             f.IsExcluded == addExcluded))
@@ -43,30 +45,30 @@ internal sealed class Effects(
         }
 
         var newFilter = action.Filter with { Id = FilterId.Create(), IsEnabled = false };
-        var updatedPreset = preset with { Filters = preset.Filters.Add(newFilter) };
+        var updatedFilterSet = filterSet with { Filters = filterSet.Filters.Add(newFilter) };
 
-        try { store.Update(updatedPreset); }
+        try { store.Update(updatedFilterSet); }
         catch (Exception ex)
         {
-            logger.Warning($"FilterLibrary Update (add to preset) failed for {preset.Id}. {ex.Message}");
+            logger.Warning($"FilterLibrary Update (add to filter set) failed for {filterSet.Id}. {ex.Message}");
 
             return Task.CompletedTask;
         }
 
-        dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(updatedPreset));
+        dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(updatedFilterSet));
         PromoteSourceIfAutoTracked(action.SourceEntryId, dispatcher);
 
         return Task.CompletedTask;
     }
 
     [EffectMethod]
-    public Task HandleAddFilterToNewPreset(AddFilterToNewPresetAction action, IDispatcher dispatcher)
+    public Task HandleAddFilterToNewFilterSet(AddFilterToNewFilterSetAction action, IDispatcher dispatcher)
     {
-        if (string.IsNullOrWhiteSpace(action.NewPresetName)) { return Task.CompletedTask; }
+        if (string.IsNullOrWhiteSpace(action.NewFilterSetName)) { return Task.CompletedTask; }
 
-        var created = new LibraryEntryPreset
+        var created = new LibraryEntryFilterSet
         {
-            Name = action.NewPresetName,
+            Name = action.NewFilterSetName,
             CreatedUtc = DateTimeOffset.UtcNow,
             Filters = [action.Filter with { Id = FilterId.Create(), IsEnabled = false }],
             Origin = LibraryEntryOrigin.UserSaved,
@@ -75,7 +77,7 @@ internal sealed class Effects(
         try { store.Add(created); }
         catch (Exception ex)
         {
-            logger.Warning($"FilterLibrary Add (new preset) failed for {created.Id}. {ex.Message}");
+            logger.Warning($"FilterLibrary Add (new filter set) failed for {created.Id}. {ex.Message}");
 
             return Task.CompletedTask;
         }
@@ -144,22 +146,30 @@ internal sealed class Effects(
         {
             var entries = store.LoadAll().ToImmutableList();
 
-            if (entries.IsEmpty && legacyMigrator.ShouldRunMigration())
+            if (legacyMigrator.ShouldRunMigration())
             {
-                // AddRange-throws → Success(empty) + return without marking complete (retries next launch).
-                // Post-AddRange LoadAll-throws → in-memory fallback + MarkMigrationCompleted as on happy path.
+                // AddRange-throws → keep returning currently-loaded entries + return without marking complete
+                // (retries next launch). Post-AddRange LoadAll-throws → in-memory fallback + MarkMigrationCompleted
+                // as on the happy path.
                 var migrationResult = legacyMigrator.BuildEntriesFromLegacy();
 
-                if (migrationResult.Entries.Count > 0)
+                // Dedup against the already-loaded entries before AddRange — the per-section flag check in
+                // BuildEntriesFromLegacy short-circuits already-completed sections, but on the bitmask-not-advanced
+                // path (e.g., MarkMigrationCompleted SetString throws after a successful AddRange) the next launch
+                // would re-read the still-present legacy keys and produce content-duplicate rows because migration
+                // entries are Origin=UserSaved and the store's partial UNIQUE INDEX only covers AutoTracked rows.
+                var entriesToAdd = DedupMigrationEntriesAgainstExisting(migrationResult.Entries, entries);
+
+                if (entriesToAdd.Count > 0)
                 {
                     try
                     {
-                        store.AddRange(migrationResult.Entries);
+                        store.AddRange(entriesToAdd);
                     }
                     catch (Exception ex)
                     {
                         logger.Warning($"FilterLibrary migration AddRange failed; legacy preserved. {ex.Message}");
-                        dispatcher.Dispatch(new LoadLibrarySuccessAction(ImmutableList<LibraryEntry>.Empty));
+                        dispatcher.Dispatch(new LoadLibrarySuccessAction(entries));
 
                         return;
                     }
@@ -171,14 +181,16 @@ internal sealed class Effects(
                     catch (Exception ex)
                     {
                         logger.Warning($"FilterLibrary post-migration reload failed; using in-memory result. {ex.Message}");
-                        entries = migrationResult.Entries;
+                        entries = entries.AddRange(entriesToAdd);
                     }
 
-                    logger.Information($"Migrated {entries.Count} legacy entries to filter library.");
+                    logger.Information($"Migrated {entriesToAdd.Count} legacy entries to filter library (deduped from {migrationResult.Entries.Count}).");
                 }
 
-                // Not wrapped: a SetString failure surfaces via the outer catch (LoadLibraryFailure). Next launch
-                // self-heals because the store is already non-empty (or the same retry decision repeats).
+                // Not wrapped: a SetString failure surfaces via the outer catch (LoadLibraryFailure). On the next
+                // launch ShouldRunMigration returns true again, BuildEntriesFromLegacy re-emits the same entries,
+                // and DedupMigrationEntriesAgainstExisting filters them out against the now-non-empty store —
+                // so the SetString-throws path is idempotent rather than duplicating.
                 legacyMigrator.MarkMigrationCompleted(migrationResult.SuccessfulSections);
             }
 
@@ -219,7 +231,7 @@ internal sealed class Effects(
         LibraryEntry bumpedEntry = entry switch
         {
             LibraryEntrySavedFilter f => f with { LastUsedUtc = nowUtc },
-            LibraryEntryPreset p => p with { LastUsedUtc = nowUtc },
+            LibraryEntryFilterSet p => p with { LastUsedUtc = nowUtc },
             _ => entry,
         };
 
@@ -352,7 +364,7 @@ internal sealed class Effects(
         LibraryEntry promoted = entry switch
         {
             LibraryEntrySavedFilter f => f with { Origin = LibraryEntryOrigin.UserSaved },
-            LibraryEntryPreset p => p with { Origin = LibraryEntryOrigin.UserSaved },
+            LibraryEntryFilterSet p => p with { Origin = LibraryEntryOrigin.UserSaved },
             _ => entry,
         };
 
@@ -360,7 +372,25 @@ internal sealed class Effects(
     }
 
     [EffectMethod]
-    public Task HandleSavePaneAsPreset(SavePaneAsPresetAction action, IDispatcher dispatcher)
+    public Task HandleSaveFilterSet(SaveFilterSetAction action, IDispatcher dispatcher)
+    {
+        if (string.IsNullOrWhiteSpace(action.Name) || action.Filters.IsEmpty) { return Task.CompletedTask; }
+
+        var created = new LibraryEntryFilterSet
+        {
+            Name = action.Name,
+            CreatedUtc = DateTimeOffset.UtcNow,
+            // Regenerate FilterIds so Razor `@key=filter.Id` diffing stays correct when the
+            // same pane filters are saved into multiple filter sets.
+            Filters = [.. action.Filters.Select(f => f with { Id = FilterId.Create(), IsEnabled = false })],
+            Origin = LibraryEntryOrigin.UserSaved,
+        };
+
+        return PersistAddAsync(created, dispatcher);
+    }
+
+    [EffectMethod]
+    public Task HandleSavePaneAsFilterSet(SavePaneAsFilterSetAction action, IDispatcher dispatcher)
     {
         if (string.IsNullOrWhiteSpace(action.Name)) { return Task.CompletedTask; }
 
@@ -368,27 +398,9 @@ internal sealed class Effects(
 
         if (paneFilters.IsEmpty) { return Task.CompletedTask; }
 
-        dispatcher.Dispatch(new SavePresetAction(action.Name, paneFilters));
+        dispatcher.Dispatch(new SaveFilterSetAction(action.Name, paneFilters));
 
         return Task.CompletedTask;
-    }
-
-    [EffectMethod]
-    public Task HandleSavePreset(SavePresetAction action, IDispatcher dispatcher)
-    {
-        if (string.IsNullOrWhiteSpace(action.Name) || action.Filters.IsEmpty) { return Task.CompletedTask; }
-
-        var created = new LibraryEntryPreset
-        {
-            Name = action.Name,
-            CreatedUtc = DateTimeOffset.UtcNow,
-            // Regenerate FilterIds so Razor `@key=filter.Id` diffing stays correct when the
-            // same pane filters are saved into multiple presets.
-            Filters = [.. action.Filters.Select(f => f with { Id = FilterId.Create(), IsEnabled = false })],
-            Origin = LibraryEntryOrigin.UserSaved,
-        };
-
-        return PersistAddAsync(created, dispatcher);
     }
 
     [EffectMethod]
@@ -402,7 +414,7 @@ internal sealed class Effects(
 
         if (action.IsFavorite)
         {
-            // Favoriting: mutex (LastUsedUtc=null) + promotion (Origin=UserSaved). Symmetric for filter + preset.
+            // Favoriting: mutex (LastUsedUtc=null) + promotion (Origin=UserSaved). Symmetric for filter + filter set.
             updated = entry switch
             {
                 LibraryEntrySavedFilter f => f with
@@ -411,7 +423,7 @@ internal sealed class Effects(
                     LastUsedUtc = null,
                     Origin = LibraryEntryOrigin.UserSaved,
                 },
-                LibraryEntryPreset p => p with
+                LibraryEntryFilterSet p => p with
                 {
                     IsFavorite = true,
                     LastUsedUtc = null,
@@ -422,7 +434,7 @@ internal sealed class Effects(
         }
         else
         {
-            // Unfavoriting: filters drop to Recents (matches legacy FilterCache UX); presets stay out of Recents.
+            // Unfavoriting: filters drop to Recents (matches legacy FilterCache UX); filter sets stay out of Recents.
             updated = entry switch
             {
                 LibraryEntrySavedFilter f => f with
@@ -430,7 +442,7 @@ internal sealed class Effects(
                     IsFavorite = false,
                     LastUsedUtc = DateTimeOffset.UtcNow,
                 },
-                LibraryEntryPreset p => p with
+                LibraryEntryFilterSet p => p with
                 {
                     IsFavorite = false,
                 },
@@ -457,11 +469,53 @@ internal sealed class Effects(
         return Task.CompletedTask;
     }
 
+    private static void AppendLengthPrefixed(StringBuilder sb, string s) =>
+        sb.Append(s.Length).Append(':').Append(s);
+
+    private static string BuildFilterSetIdentityKey(LibraryEntryFilterSet filterSet)
+    {
+        var sb = new StringBuilder();
+        AppendLengthPrefixed(sb, filterSet.Name.ToLowerInvariant());
+
+        foreach (var f in filterSet.Filters)
+        {
+            AppendLengthPrefixed(sb, f.ComparisonText.ToLowerInvariant());
+            sb.Append('|').Append(f.Mode).Append('|').Append(f.IsExcluded);
+        }
+
+        return sb.ToString();
+    }
+
+    private static ImmutableList<LibraryEntry> DedupMigrationEntriesAgainstExisting(
+        ImmutableList<LibraryEntry> candidates,
+        ImmutableList<LibraryEntry> existing)
+    {
+        if (candidates.IsEmpty || existing.IsEmpty) { return candidates; }
+
+        var existingFilterKeys = new HashSet<(string ComparisonText, FilterMode Mode, bool IsExcluded)>(
+            existing.OfType<LibraryEntrySavedFilter>()
+                .Select(e => (e.Filter.ComparisonText.ToLowerInvariant(), e.Filter.Mode, e.Filter.IsExcluded)));
+
+        // Filter-set dedup: name + ordered filter-content fingerprint. Name-only would drop legacy
+        // filter sets that share a display name with a user-created filter set but carry different filters.
+        var existingFilterSetKeys = new HashSet<string>(
+            existing.OfType<LibraryEntryFilterSet>().Select(BuildFilterSetIdentityKey));
+
+        return [.. candidates.Where(entry => entry switch
+        {
+            LibraryEntrySavedFilter sf =>
+                !existingFilterKeys.Contains((sf.Filter.ComparisonText.ToLowerInvariant(), sf.Filter.Mode, sf.Filter.IsExcluded)),
+            LibraryEntryFilterSet filterSet =>
+                !existingFilterSetKeys.Contains(BuildFilterSetIdentityKey(filterSet)),
+            _ => true,
+        })];
+    }
+
     private static ImmutableList<SavedFilter> ExtractFilters(LibraryEntry entry) =>
         entry switch
         {
             LibraryEntrySavedFilter f => [f.Filter],
-            LibraryEntryPreset p => p.Filters,
+            LibraryEntryFilterSet p => p.Filters,
             _ => throw new InvalidOperationException($"Unhandled LibraryEntry type '{entry.GetType().FullName}'."),
         };
 
@@ -507,7 +561,7 @@ internal sealed class Effects(
         LibraryEntry promoted = source switch
         {
             LibraryEntrySavedFilter f => f with { Origin = LibraryEntryOrigin.UserSaved },
-            LibraryEntryPreset p => p with { Origin = LibraryEntryOrigin.UserSaved },
+            LibraryEntryFilterSet p => p with { Origin = LibraryEntryOrigin.UserSaved },
             _ => source,
         };
 

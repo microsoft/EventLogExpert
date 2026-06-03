@@ -12,7 +12,7 @@
     @if (FilterLibraryState.Value.LoadError)
     {
         <div class="filter-library-error" role="alert">
-            <p>Could not load saved filters or presets. See trace log for details.</p>
+            <p>Could not load saved filters or filter sets. See trace log for details.</p>
             <button class="button" @onclick="RetryLoad" type="button">Retry</button>
         </div>
     }
@@ -59,10 +59,10 @@
                         @foreach (var entry in CurrentTabEntries)
                         {
                             <LibraryEntryRow ActiveTab="_activeTab"
-                                AllPresets="AllPresets"
+                                AllFilterSets="AllFilterSets"
                                 Entry="entry"
                                 @key="entry.Id"
-                                OnAddToPreset="HandleAddToPresetAsync"
+                                OnAddToFilterSet="HandleAddToFilterSetAsync"
                                 OnApply="HandleApplyAsync"
                                 OnDelete="HandleDelete"
                                 OnReplace="HandleReplaceAsync"

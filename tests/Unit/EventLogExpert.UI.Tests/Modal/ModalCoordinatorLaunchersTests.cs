@@ -6,8 +6,6 @@ using EventLogExpert.Runtime.Update.ReleaseNotes;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DebugLog;
-using EventLogExpert.UI.FilterCache;
-using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.FilterLibrary;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
@@ -64,36 +62,6 @@ public sealed class ModalCoordinatorLaunchersTests
     }
 
     [Fact]
-    public async Task OpenFilterCacheAsync_DelegatesToPushAsync()
-    {
-        // Arrange
-        var coordinator = Substitute.For<IModalCoordinator>();
-        coordinator.PushAsync<FilterCacheModal, bool>(Arg.Any<IDictionary<string, object?>?>())
-            .Returns(new ModalOpenResult<bool>(false, WasOpened: true));
-
-        // Act
-        await coordinator.OpenFilterCacheAsync();
-
-        // Assert
-        await coordinator.Received(1).PushAsync<FilterCacheModal, bool>(Arg.Any<IDictionary<string, object?>?>());
-    }
-
-    [Fact]
-    public async Task OpenFilterGroupAsync_DelegatesToPushAsync()
-    {
-        // Arrange
-        var coordinator = Substitute.For<IModalCoordinator>();
-        coordinator.PushAsync<FilterGroupModal, bool>(Arg.Any<IDictionary<string, object?>?>())
-            .Returns(new ModalOpenResult<bool>(false, WasOpened: true));
-
-        // Act
-        await coordinator.OpenFilterGroupAsync();
-
-        // Assert
-        await coordinator.Received(1).PushAsync<FilterGroupModal, bool>(Arg.Any<IDictionary<string, object?>?>());
-    }
-
-    [Fact]
     public async Task OpenFilterLibraryAsync_DelegatesToPushAsync()
     {
         // Arrange
@@ -106,6 +74,25 @@ public sealed class ModalCoordinatorLaunchersTests
 
         // Assert
         await coordinator.Received(1).PushAsync<FilterLibraryModal, bool>(Arg.Any<IDictionary<string, object?>?>());
+    }
+
+    [Fact]
+    public async Task OpenFilterLibraryAsync_WithInitialTab_PassesTabViaParameters()
+    {
+        // Arrange
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.PushAsync<FilterLibraryModal, bool>(Arg.Any<IDictionary<string, object?>?>())
+            .Returns(new ModalOpenResult<bool>(false, WasOpened: true));
+
+        // Act
+        await coordinator.OpenFilterLibraryAsync(LibraryTab.Favorites);
+
+        // Assert
+        await coordinator.Received(1).PushAsync<FilterLibraryModal, bool>(
+            Arg.Is<IDictionary<string, object?>?>(p =>
+                p != null
+                && p.ContainsKey(nameof(FilterLibraryModal.InitialTab))
+                && (LibraryTab)p[nameof(FilterLibraryModal.InitialTab)]! == LibraryTab.Favorites));
     }
 
     [Fact]

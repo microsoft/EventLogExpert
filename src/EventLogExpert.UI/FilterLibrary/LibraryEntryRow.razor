@@ -3,9 +3,9 @@
 
     <div class="library-entry-name">
         <span class="library-entry-name-text" title="@Entry.Name">@Entry.Name</span>
-        @if (Entry is LibraryEntryPreset preset)
+        @if (Entry is LibraryEntryFilterSet filterSet)
         {
-            <span class="library-entry-detail">(@preset.Filters.Count filter@(preset.Filters.Count == 1 ? "" : "s"))</span>
+            <span class="library-entry-detail">(@filterSet.Filters.Count filter@(filterSet.Filters.Count == 1 ? "" : "s"))</span>
         }
         @if (ActiveTab == LibraryTab.PreviouslyUsed && Entry.LastUsedUtc is { } lastUsed)
         {

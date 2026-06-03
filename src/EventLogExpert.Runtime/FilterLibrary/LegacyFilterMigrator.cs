@@ -22,11 +22,15 @@ internal sealed class LegacyFilterMigrator(ILegacyPreferences preferences, ITrac
 
     public LegacyMigrationResult BuildEntriesFromLegacy()
     {
+        var alreadyCompleted = ReadCompletedSections();
         var builder = ImmutableList.CreateBuilder<LibraryEntry>();
         var now = DateTimeOffset.UtcNow;
-        var successful = LegacyMigrationSections.Recents;
 
-        if (TryReadFavorites(out var favorites))
+        // Carry forward the persisted bitmask so retries preserve sections completed by prior launches.
+        // Recents is always set (recents are dropped, not migrated).
+        var successful = alreadyCompleted | LegacyMigrationSections.Recents;
+
+        if (!alreadyCompleted.HasFlag(LegacyMigrationSections.Favorites) && TryReadFavorites(out var favorites))
         {
             var localFavoriteEntries = new List<LibraryEntry>();
             bool favoritesSucceeded = true;
@@ -67,39 +71,43 @@ internal sealed class LegacyFilterMigrator(ILegacyPreferences preferences, ITrac
             }
         }
 
-        if (TryReadGroups(out var groups))
+        if (alreadyCompleted.HasFlag(LegacyMigrationSections.Groups) || !TryReadGroups(out var groups))
         {
-            var localGroupEntries = new List<LibraryEntry>();
-            bool groupsSucceeded = true;
+            return new LegacyMigrationResult(builder.ToImmutable(), successful);
+        }
 
-            try
+        var localGroupEntries = new List<LibraryEntry>();
+        bool groupsSucceeded = true;
+
+        try
+        {
+            foreach (var group in groups.Where(static g => g.Filters.Count > 0))
             {
-                foreach (var group in groups.Where(static g => g.Filters.Count > 0))
+                localGroupEntries.Add(new LibraryEntryFilterSet
                 {
-                    localGroupEntries.Add(new LibraryEntryPreset
-                    {
-                        Id = LibraryEntryId.Create(),
-                        Name = string.IsNullOrWhiteSpace(group.Name) ? "(unnamed)" : group.Name,
-                        CreatedUtc = now,
-                        Filters = [.. group.Filters.Select(f => f with { Id = FilterId.Create(), IsEnabled = false })],
-                        IsFavorite = false,
-                        LastUsedUtc = null,
-                        Origin = LibraryEntryOrigin.UserSaved,
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.Warning($"Failed to migrate filter groups (partial section discarded): {ex.Message}");
-                groupsSucceeded = false;
-            }
-
-            if (groupsSucceeded)
-            {
-                builder.AddRange(localGroupEntries);
-                successful |= LegacyMigrationSections.Groups;
+                    Id = LibraryEntryId.Create(),
+                    Name = string.IsNullOrWhiteSpace(group.Name) ? "(unnamed)" : group.Name,
+                    CreatedUtc = now,
+                    Filters = [.. group.Filters.Select(f => f with { Id = FilterId.Create(), IsEnabled = false })],
+                    IsFavorite = false,
+                    LastUsedUtc = null,
+                    Origin = LibraryEntryOrigin.UserSaved,
+                });
             }
         }
+        catch (Exception ex)
+        {
+            logger.Warning($"Failed to migrate filter groups (partial section discarded): {ex.Message}");
+            groupsSucceeded = false;
+        }
+
+        if (!groupsSucceeded)
+        {
+            return new LegacyMigrationResult(builder.ToImmutable(), successful);
+        }
+
+        builder.AddRange(localGroupEntries);
+        successful |= LegacyMigrationSections.Groups;
 
         return new LegacyMigrationResult(builder.ToImmutable(), successful);
     }
@@ -127,7 +135,13 @@ internal sealed class LegacyFilterMigrator(ILegacyPreferences preferences, ITrac
             MigrationSectionsKey,
             ((int)successfulSections).ToString(CultureInfo.InvariantCulture));
 
-    public bool ShouldRunMigration()
+    public bool ShouldRunMigration() =>
+        (ReadCompletedSections() & RequiredForCompletion) != RequiredForCompletion;
+
+    private static string TruncateForDisplay(string text) =>
+        text.Length <= DisplayNameMaxLength ? text : text[..(DisplayNameMaxLength - 3)] + "...";
+
+    private LegacyMigrationSections ReadCompletedSections()
     {
         var raw = preferences.GetString(MigrationSectionsKey);
 
@@ -135,14 +149,11 @@ internal sealed class LegacyFilterMigrator(ILegacyPreferences preferences, ITrac
             !int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sectionsInt) ||
             sectionsInt < 0)
         {
-            return true;
+            return LegacyMigrationSections.None;
         }
 
-        return ((LegacyMigrationSections)sectionsInt & RequiredForCompletion) != RequiredForCompletion;
+        return (LegacyMigrationSections)sectionsInt;
     }
-
-    private static string TruncateForDisplay(string text) =>
-        text.Length <= DisplayNameMaxLength ? text : text[..(DisplayNameMaxLength - 3)] + "...";
 
     private bool TryReadFavorites(out List<string> favorites)
     {

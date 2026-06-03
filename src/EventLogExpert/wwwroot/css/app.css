@@ -307,7 +307,7 @@ input[type="text"].input { padding: 0; }
     max-width: 420px;
 }
 
-.input.filter-group-dropdown { width: 600px; }
+.input.filter-set-dropdown { width: 600px; }
 
 .input.filter-value-dropdown,
 .input.filter-description {

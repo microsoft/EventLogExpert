@@ -6,8 +6,6 @@ using EventLogExpert.Runtime.Update.ReleaseNotes;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DebugLog;
-using EventLogExpert.UI.FilterCache;
-using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.FilterLibrary;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Update;
@@ -40,23 +38,15 @@ public static class ModalCoordinatorLaunchers
             return coordinator.PushAsync<DebugLogModal, bool>();
         }
 
-        public Task<ModalOpenResult<bool>> OpenFilterCacheAsync()
+        public Task<ModalOpenResult<bool>> OpenFilterLibraryAsync(LibraryTab? initialTab = null)
         {
             ArgumentNullException.ThrowIfNull(coordinator);
 
-            return coordinator.PushAsync<FilterCacheModal, bool>();
-        }
-
-        public Task<ModalOpenResult<bool>> OpenFilterGroupAsync()
-        {
-            ArgumentNullException.ThrowIfNull(coordinator);
-
-            return coordinator.PushAsync<FilterGroupModal, bool>();
-        }
-
-        public Task<ModalOpenResult<bool>> OpenFilterLibraryAsync()
-        {
-            ArgumentNullException.ThrowIfNull(coordinator);
+            if (initialTab is { } tab)
+            {
+                return coordinator.PushAsync<FilterLibraryModal, bool>(
+                    new Dictionary<string, object?> { [nameof(FilterLibraryModal.InitialTab)] = tab });
+            }
 
             return coordinator.PushAsync<FilterLibraryModal, bool>();
         }

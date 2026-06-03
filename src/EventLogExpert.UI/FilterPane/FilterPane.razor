@@ -35,8 +35,8 @@
                 </button>
             }
 
-            <button class="button" @onclick="OpenFilterGroupPicker">
-                <i class="bi bi-plus-circle"></i> Apply Filter Group
+            <button class="button" @onclick="OpenFilterSetPicker">
+                <i class="bi bi-plus-circle"></i> Apply Filter Set
             </button>
         </div>
 
@@ -54,10 +54,10 @@
         <div class="filter-header-secondary">
             <button aria-describedby="@(HasSavableFilters ? null : "save-filters-empty-hint")"
                 aria-disabled="@(!HasSavableFilters)"
-                aria-label="Save Filters as Group"
+                aria-label="Save as Filter Set"
                 class="button icon-button"
-                @onclick="SaveFiltersAsGroupAsync"
-                title="@(HasSavableFilters ? "Save Filters as Group..." : "No filters to save")"
+                @onclick="SaveFiltersAsFilterSetAsync"
+                title="@(HasSavableFilters ? "Save as Filter Set..." : "No filters to save")"
                 type="button">
                 <i class="bi bi-bookmark-plus"></i>
             </button>
@@ -76,12 +76,12 @@
                 <i class="bi bi-bookmark"></i>
             </button>
 
-            <button aria-label="Manage Filter Groups" class="button icon-button" @onclick="OpenFilterGroupsModal" title="Manage Filter Groups" type="button">
+            <button aria-label="Manage Saved Filters" class="button icon-button" @onclick="OpenSavedFiltersModal" title="Manage Saved Filters" type="button">
                 <i class="bi bi-collection"></i>
             </button>
 
             <span class="visually-hidden" id="save-filters-empty-hint">
-                Add a filter before saving as a group.
+                Add a filter before saving as a Filter Set.
             </span>
             <span class="visually-hidden" id="clear-filters-empty-hint">
                 There are no filters to clear.
@@ -102,7 +102,7 @@
         </div>
     </div>
 
-    <div class="filter-group" data-toggle="@MenuState">
+    <div class="filter-set" data-toggle="@MenuState">
         @if (IsDateFilterVisible)
         {
             <EditForm class="filter-form flex-row" Model="_model">
@@ -151,27 +151,27 @@
             </EditForm>
         }
 
-        @if (_isGroupPickerVisible)
+        @if (IsFilterSetPickerVisible)
         {
             <div class="filter-form flex-row">
-                @if (HasFilterGroups)
+                @if (HasFilterSets)
                 {
                     <span>
-                        Filter Group:
-                        <ValueSelect AriaLabel="Filter Group"
-                            CssClass="input filter-group-dropdown"
-                            T="FilterGroupId"
-                            ToStringFunc="@(GetGroupName)"
-                            Value="_selectedGroupId"
-                            ValueChanged="id => _selectedGroupId = id">
-                            @foreach (var group in FilterGroupState.Value.Groups.OrderBy(g => g.Name))
+                        Filter Set:
+                        <ValueSelect AriaLabel="Filter Set"
+                            CssClass="input filter-set-dropdown"
+                            T="LibraryEntryId"
+                            ToStringFunc="@(GetFilterSetName)"
+                            Value="SelectedFilterSetId"
+                            ValueChanged="id => SelectedFilterSetId = id">
+                            @foreach (var filterSet in FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
                             {
-                                <ValueSelectItem T="FilterGroupId" Value="group.Id">@group.Name</ValueSelectItem>
+                                <ValueSelectItem T="LibraryEntryId" Value="filterSet.Id">@filterSet.Name</ValueSelectItem>
                             }
                         </ValueSelect>
                     </span>
 
-                    <button class="button button-green" disabled="@(_selectedGroupId == default)" @onclick="ApplyFilterGroupSelection">
+                    <button class="button button-green" disabled="@(SelectedFilterSetId == default)" @onclick="ApplyFilterSetSelection">
                         <i class="bi bi-check-circle"></i> Apply
                     </button>
                 }
@@ -180,18 +180,18 @@
                     <span class="filter-empty-state">
                         @if (HasSavableFilters)
                         {
-                            @:No saved filter groups yet — use <strong>Save Filters as Group</strong> on the right
+                            @:No saved filter sets yet — use <strong>Save as Filter Set</strong> on the right
                             @:to create one from the current pane.
                         }
                         else
                         {
-                            @:No saved filter groups yet. Add and apply filters first, then use
-                            @:<strong>Save Filters as Group</strong> on the right to create one.
+                            @:No saved filter sets yet. Add and apply filters first, then use
+                            @:<strong>Save as Filter Set</strong> on the right to create one.
                         }
                     </span>
                 }
 
-                <button class="button button-red" @onclick="CancelFilterGroupPicker" type="button">
+                <button class="button button-red" @onclick="CancelFilterSetPicker" type="button">
                     <i class="bi bi-dash-circle"></i> Cancel
                 </button>
             </div>

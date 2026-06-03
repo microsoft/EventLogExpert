@@ -3,10 +3,8 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Evaluation;
-using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.EventLog;
-using EventLogExpert.Runtime.FilterCache;
-using EventLogExpert.Runtime.FilterGroup;
+using EventLogExpert.Runtime.FilterLibrary;
 using Fluxor;
 
 namespace EventLogExpert.Runtime.FilterPane;
@@ -33,21 +31,15 @@ internal sealed class Effects
     [EffectMethod]
     public Task HandleAddFilter(AddFilterAction action, IDispatcher dispatcher)
     {
-        if (!string.IsNullOrEmpty(action.SavedFilter.ComparisonText))
+        if (string.IsNullOrEmpty(action.SavedFilter.ComparisonText))
         {
-            UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
-
-            dispatcher.Dispatch(
-                new AddRecentFilterAction(action.SavedFilter.ComparisonText));
+            return Task.CompletedTask;
         }
 
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod(typeof(ApplyFilterGroupAction))]
-    public Task HandleApplyFilterGroup(IDispatcher dispatcher)
-    {
         UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+
+        dispatcher.Dispatch(new RecordFilterAppliedAction(action.SavedFilter));
+
         return Task.CompletedTask;
     }
 
@@ -80,37 +72,13 @@ internal sealed class Effects
     }
 
     [EffectMethod]
-    public Task HandleSaveFilterGroup(SaveFilterGroupAction action, IDispatcher dispatcher)
-    {
-        // Empty pane → no-op. Without this guard the user can create empty groups via the Save
-        // affordance (icon click after the pane was just cleared, etc.).
-        if (_filterPaneState.Value.Filters.IsEmpty) { return Task.CompletedTask; }
-
-        // New Id so re-applying the group inserts cleanly into the pane's de-dup; IsEnabled cleared
-        // so the user opts in by toggling. All other identity is preserved verbatim via record copy.
-        dispatcher.Dispatch(
-            new AddGroupAction(
-                new SavedFilterGroup
-                {
-                    Name = action.Name,
-                    Filters =
-                    [
-                        .. _filterPaneState.Value.Filters.Select(filter =>
-                            filter with { Id = FilterId.Create(), IsEnabled = false })
-                    ]
-                }));
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod]
     public Task HandleSetFilter(SetFilterAction action, IDispatcher dispatcher)
     {
         UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
 
         if (!string.IsNullOrEmpty(action.SavedFilter.ComparisonText))
         {
-            dispatcher.Dispatch(new AddRecentFilterAction(action.SavedFilter.ComparisonText));
+            dispatcher.Dispatch(new RecordFilterAppliedAction(action.SavedFilter));
         }
 
         return Task.CompletedTask;

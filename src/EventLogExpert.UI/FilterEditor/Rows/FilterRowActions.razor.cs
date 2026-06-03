@@ -25,8 +25,6 @@ public sealed partial class FilterRowActions : ComponentBase
 
     [Parameter] public EventCallback OnToggleEnabled { get; set; }
 
-    [Parameter] public bool ShowToggleEnabled { get; set; } = true;
-
     [Parameter] public SavedFilter? Value { get; set; }
 
     private string EnableToggleAriaLabelledBy =>

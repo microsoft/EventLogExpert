@@ -1,43 +1,16 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Adapters.ClipboardAdapter;
-using EventLogExpert.Adapters.Elevation;
-using EventLogExpert.Adapters.FilePickerAdapter;
-using EventLogExpert.Adapters.FileSave;
-using EventLogExpert.Adapters.Identity;
 using EventLogExpert.Adapters.Input;
-using EventLogExpert.Adapters.Lifecycle;
-using EventLogExpert.Adapters.Menu;
 using EventLogExpert.Adapters.Settings;
-using EventLogExpert.Adapters.Threading;
-using EventLogExpert.Adapters.Window;
+using EventLogExpert.DependencyInjection;
 using EventLogExpert.Eventing.Resolvers;
-using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Platforms.Windows.Activation;
-using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
-using EventLogExpert.Runtime.Common.Activation;
-using EventLogExpert.Runtime.Common.AppTitle;
-using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
-using EventLogExpert.Runtime.Common.Identity;
-using EventLogExpert.Runtime.Common.Restart;
-using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Database;
-using EventLogExpert.Runtime.DatabaseTools.Elevation;
-using EventLogExpert.Runtime.DetailsPane;
-using EventLogExpert.Runtime.FilterCache;
-using EventLogExpert.Runtime.FilterGroup;
 using EventLogExpert.Runtime.FilterLibrary;
-using EventLogExpert.Runtime.LogTable;
-using EventLogExpert.Runtime.Menu;
-using EventLogExpert.Runtime.Modal;
-using EventLogExpert.Runtime.Settings;
-using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
-using EventLogExpert.WindowsPlatform;
 using Fluxor;
 using Fluxor.DependencyInjection;
 
@@ -72,7 +45,7 @@ public static class MauiProgram
                 .WithLifetime(StoreLifetime.Singleton);
         });
 
-        // Core Services
+        // Bootstrap infrastructure
         var fileLocationOptions = new FileLocationOptions(FileSystem.AppDataDirectory);
         builder.Services.AddSingleton(fileLocationOptions);
         Directory.CreateDirectory(fileLocationOptions.DatabasePath);
@@ -88,98 +61,44 @@ public static class MauiProgram
             return client;
         });
 
-        builder.Services.AddElevatedDatabaseToolsRunner();
-
-        // Build Services
-        builder.Services.AddSingleton<IApplicationRestartService, WindowsApplicationRestartService>();
-
-        // Provider Services
+        // Provider event-log resolvers
         builder.Services.AddEventLogProviderDatabase();
         builder.Services.AddSingleton<IEventResolverCache, EventResolverCache>();
         builder.Services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
         builder.Services.AddTransient<IEventResolver, EventResolver>();
 
-        // Preference Providers
-        builder.Services.AddSingleton<ILogTablePreferencesProvider, LogTablePreferencesAdapter>();
-        builder.Services.AddSingleton<IFilterGroupPreferencesProvider, FilterGroupPreferencesAdapter>();
-        builder.Services.AddSingleton<IFilterCachePreferencesProvider, FilterCachePreferencesAdapter>();
-        builder.Services.AddSingleton<ISettingsPreferencesProvider, SettingsPreferencesAdapter>();
-        builder.Services.AddSingleton<IDetailsPanePreferencesProvider, DetailsPanePreferencesAdapter>();
-        builder.Services.AddSingleton<IDatabasePreferencesProvider, DatabasePreferencesAdapter>();
-
+        // FilterLibrary persistence + gated legacy migration (see LegacyMigrationFeature for the removal contract)
         builder.Services.AddFilterLibrarySqliteStore(
             Path.Combine(FileSystem.AppDataDirectory, "filter-library.db"));
-        builder.Services.AddSingleton<ILegacyPreferences, MauiLegacyPreferencesAdapter>();
+
+        if (LegacyMigrationFeature.Enabled)
+        {
+            builder.Services.AddSingleton<ILegacyPreferences, MauiLegacyPreferencesAdapter>();
+        }
+
         builder.Services.AddLegacyFilterMigration();
 
-        // UI Services
+        // Top-level layer registration
         builder.Services.AddEventLogFiltering();
         builder.Services.AddEventLogRuntime();
+        builder.Services.AddElevatedDatabaseToolsRunner();
         builder.Services.AddEventLogUiServices();
 
+        // Host-side DI groupings (see MauiProgramExtensions for membership)
+        builder.Services.AddMauiPreferenceAdapters();
+        builder.Services.AddMauiPlatformAdapters();
+        builder.Services.AddMauiMenuServices();
+        builder.Services.AddMauiActivationDispatcher();
+        builder.Services.AddMauiAlertDialogService();
+
         builder.Services.AddSingleton<IBannerCycleStateService, BannerCycleStateService>();
-
-        builder.Services.AddSingleton<IMainThreadService, MauiMainThreadService>();
-        builder.Services.AddSingleton<ITitleProvider, TitleProvider>();
-        builder.Services.AddSingleton<IClipboardService, ClipboardService>();
-        builder.Services.AddSingleton<IFileSaveService, MauiFileSaveService>();
-        builder.Services.AddSingleton<IFilePickerService, MauiFilePickerService>();
-        builder.Services.AddSingleton<IFolderPickerService, MauiFolderPickerService>();
-        builder.Services.AddSingleton<IWindowsIdentityProvider, WindowsIdentityProvider>();
-        builder.Services.AddSingleton<IElevatedHelperProcessHost, MauiElevatedHelperProcessHost>();
-        builder.Services.AddSingleton<MauiMenuActionService>();
-
-        builder.Services.AddSingleton<IMenuActionService>(static provider =>
-            provider.GetRequiredService<MauiMenuActionService>());
-
-        builder.Services.AddSingleton<IActivationDispatcher>(static provider =>
-        {
-            var dispatcher = new ActivationDispatcher(
-                provider.GetRequiredService<IAlertDialogService>(),
-                provider.GetRequiredService<ITraceLogger>(),
-                provider.GetRequiredService<IMainThreadService>());
-
-            ActivationBootstrap.AttachDispatcher(dispatcher);
-
-            return dispatcher;
-        });
-
         builder.Services.AddSingleton<KeyboardShortcutService>();
         builder.Services.AddSingleton<DatabaseRecoveryHost>();
 
-        builder.Services.AddSingleton<IAlertDialogService>(static provider =>
-        {
-            var modalCoordinator = provider.GetRequiredService<IModalCoordinator>();
-            var mainThreadService = provider.GetRequiredService<IMainThreadService>();
-            var errorBannerService = provider.GetRequiredService<IErrorBannerService>();
-            var infoBannerService = provider.GetRequiredService<IInfoBannerService>();
-
-            return new AlertDialogService(
-                modalCoordinator,
-                mainThreadService,
-                errorBannerService,
-                infoBannerService,
-                async parameters =>
-                {
-                    ModalOpenResult<bool> result = await modalCoordinator.PushAsync<AlertModal, bool>(
-                        parameters as IDictionary<string, object?> ?? new Dictionary<string, object?>(parameters));
-
-                    return result is { WasOpened: true, Result: true };
-                },
-                async parameters =>
-                {
-                    ModalOpenResult<string> result = await modalCoordinator.PushAsync<PromptModal, string>(
-                        parameters as IDictionary<string, object?> ?? new Dictionary<string, object?>(parameters));
-
-                    return result.WasOpened ? result.Result ?? string.Empty : string.Empty;
-                });
-        });
-
         var mauiApp = builder.Build();
 
-        // Force eager construction of BannerService — its ctor subscribes to
-        // IDatabaseService.EntriesChanged + UpgradeBatch* events. Any facet
-        // resolves to the same singleton instance.
+        // Force eager construction of BannerService — its ctor subscribes to IDatabaseService.EntriesChanged +
+        // UpgradeBatch* events. Any facet resolves to the same singleton instance.
         mauiApp.Services.GetRequiredService<IAttentionBannerService>();
         mauiApp.Services.GetRequiredService<DatabaseRecoveryHost>();
 

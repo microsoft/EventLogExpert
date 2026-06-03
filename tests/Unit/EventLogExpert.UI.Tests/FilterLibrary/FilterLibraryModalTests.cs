@@ -194,7 +194,7 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Theory]
-    [InlineData(0, "No saved filters or presets")]
+    [InlineData(0, "No saved filters or filter sets")]
     [InlineData(1, "No favorited")]
     [InlineData(2, "No filters have been applied recently")]
     public async Task Render_EmptyTab_ShowsTabSpecificMessage(int tabIndex, string expectedFragment)

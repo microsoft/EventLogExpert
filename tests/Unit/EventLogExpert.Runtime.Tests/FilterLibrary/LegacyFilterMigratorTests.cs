@@ -27,7 +27,28 @@ public sealed class LegacyFilterMigratorTests
 
         var result = sut.BuildEntriesFromLegacy();
 
-        Assert.IsType<LibraryEntryPreset>(Assert.Single(result.Entries));
+        Assert.IsType<LibraryEntryFilterSet>(Assert.Single(result.Entries));
+        Assert.True(result.SuccessfulSections.HasFlag(LegacyMigrationSections.Favorites));
+        Assert.True(result.SuccessfulSections.HasFlag(LegacyMigrationSections.Groups));
+    }
+
+    [Fact]
+    public void BuildEntriesFromLegacy_FavoritesAlreadyCompleted_SkipsFavoritesBuildEvenWhenLegacyKeyPresent()
+    {
+        var favoritesJson = JsonSerializer.Serialize(new List<string> { "Level == 4", "Level == 5" });
+        var groupsJson = JsonSerializer.Serialize(new List<SavedFilterGroup>
+        {
+            new() { Name = "G1", Filters = [SavedFilter.TryCreate("Level == 4")!] },
+        });
+        var prefs = StubPreferences(favoritesJson: favoritesJson, groupsJson: groupsJson);
+        prefs.GetString("filter-library-migration-sections")
+            .Returns(((int)(LegacyMigrationSections.Favorites | LegacyMigrationSections.Recents)).ToString());
+        var sut = new LegacyFilterMigrator(prefs, Substitute.For<ITraceLogger>());
+
+        var result = sut.BuildEntriesFromLegacy();
+
+        // Only the group entry is built — favorites are skipped because their bit is already set.
+        Assert.IsType<LibraryEntryFilterSet>(Assert.Single(result.Entries));
         Assert.True(result.SuccessfulSections.HasFlag(LegacyMigrationSections.Favorites));
         Assert.True(result.SuccessfulSections.HasFlag(LegacyMigrationSections.Groups));
     }
@@ -77,7 +98,7 @@ public sealed class LegacyFilterMigratorTests
         var result = sut.BuildEntriesFromLegacy();
 
         Assert.Single(result.Entries);
-        Assert.IsType<LibraryEntryPreset>(result.Entries[0]);
+        Assert.IsType<LibraryEntryFilterSet>(result.Entries[0]);
         Assert.Equal(
             LegacyMigrationSections.Groups | LegacyMigrationSections.Recents,
             result.SuccessfulSections);
@@ -180,7 +201,7 @@ public sealed class LegacyFilterMigratorTests
 
         Assert.Equal(3, result.Entries.Count);
         Assert.Equal(2, result.Entries.OfType<LibraryEntrySavedFilter>().Count());
-        Assert.Single(result.Entries.OfType<LibraryEntryPreset>());
+        Assert.Single(result.Entries.OfType<LibraryEntryFilterSet>());
         Assert.Equal(
             LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents,
             result.SuccessfulSections);
@@ -219,6 +240,26 @@ public sealed class LegacyFilterMigratorTests
     }
 
     [Fact]
+    public void BuildEntriesFromLegacy_GroupsAlreadyCompleted_SkipsGroupsBuildEvenWhenLegacyKeyPresent()
+    {
+        var favoritesJson = JsonSerializer.Serialize(new List<string> { "Level == 4" });
+        var groupsJson = JsonSerializer.Serialize(new List<SavedFilterGroup>
+        {
+            new() { Name = "G1", Filters = [SavedFilter.TryCreate("Level == 4")!] },
+        });
+        var prefs = StubPreferences(favoritesJson: favoritesJson, groupsJson: groupsJson);
+        prefs.GetString("filter-library-migration-sections")
+            .Returns(((int)(LegacyMigrationSections.Groups | LegacyMigrationSections.Recents)).ToString());
+        var sut = new LegacyFilterMigrator(prefs, Substitute.For<ITraceLogger>());
+
+        var result = sut.BuildEntriesFromLegacy();
+
+        Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(result.Entries));
+        Assert.True(result.SuccessfulSections.HasFlag(LegacyMigrationSections.Favorites));
+        Assert.True(result.SuccessfulSections.HasFlag(LegacyMigrationSections.Groups));
+    }
+
+    [Fact]
     public void BuildEntriesFromLegacy_GroupsContainsEmptyFilterLists_EmptyGroupsAreFilteredOut()
     {
         var groupsJson = JsonSerializer.Serialize(new List<SavedFilterGroup>
@@ -232,8 +273,8 @@ public sealed class LegacyFilterMigratorTests
 
         var result = sut.BuildEntriesFromLegacy();
 
-        var preset = Assert.IsType<LibraryEntryPreset>(Assert.Single(result.Entries));
-        Assert.Equal("WithFilters", preset.Name);
+        var filterSet = Assert.IsType<LibraryEntryFilterSet>(Assert.Single(result.Entries));
+        Assert.Equal("WithFilters", filterSet.Name);
     }
 
     [Fact]
@@ -250,11 +291,11 @@ public sealed class LegacyFilterMigratorTests
         var sut = new LegacyFilterMigrator(prefs, Substitute.For<ITraceLogger>());
         var result = sut.BuildEntriesFromLegacy();
 
-        var preset = Assert.IsType<LibraryEntryPreset>(Assert.Single(result.Entries));
-        Assert.False(preset.IsFavorite);
-        Assert.Equal(LibraryEntryOrigin.UserSaved, preset.Origin);
-        Assert.Null(preset.LastUsedUtc);
-        var migratedFilter = Assert.Single(preset.Filters);
+        var filterSet = Assert.IsType<LibraryEntryFilterSet>(Assert.Single(result.Entries));
+        Assert.False(filterSet.IsFavorite);
+        Assert.Equal(LibraryEntryOrigin.UserSaved, filterSet.Origin);
+        Assert.Null(filterSet.LastUsedUtc);
+        var migratedFilter = Assert.Single(filterSet.Filters);
         Assert.NotEqual(originalFilterId, migratedFilter.Id);
         Assert.False(migratedFilter.IsEnabled);
     }

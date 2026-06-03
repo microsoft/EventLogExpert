@@ -26,12 +26,25 @@ public static class FilterLibraryServiceCollectionExtensions
             return services;
         }
 
-        /// <summary>Registers the legacy-filter migration singleton. Callers MUST also register <see cref="ILegacyPreferences" />.</summary>
+        /// <summary>
+        ///     Registers the legacy-filter migration singleton. When <see cref="LegacyMigrationFeature.Enabled" /> is
+        ///     <see langword="true" /> (default), the real <see cref="LegacyFilterMigrator" /> is registered and the host MUST
+        ///     also register <see cref="ILegacyPreferences" />. When <see langword="false" />, a
+        ///     <see cref="NoOpLegacyFilterMigrator" /> is registered instead and <see cref="ILegacyPreferences" /> is not
+        ///     required.
+        /// </summary>
         public IServiceCollection AddLegacyFilterMigration()
         {
             ArgumentNullException.ThrowIfNull(services);
 
-            services.AddSingleton<ILegacyFilterMigrator, LegacyFilterMigrator>();
+            if (LegacyMigrationFeature.Enabled)
+            {
+                services.AddSingleton<ILegacyFilterMigrator, LegacyFilterMigrator>();
+            }
+            else
+            {
+                services.AddSingleton<ILegacyFilterMigrator, NoOpLegacyFilterMigrator>();
+            }
 
             return services;
         }
