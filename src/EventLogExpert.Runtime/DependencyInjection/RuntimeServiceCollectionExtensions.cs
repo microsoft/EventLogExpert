@@ -11,6 +11,7 @@ using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.DatabaseTools;
+using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
@@ -29,6 +30,45 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class RuntimeServiceCollectionExtensions
 {
     /// <summary>
+    ///     Helper-friendly subset of <see cref="AddEventLogRuntime" />. Registers ONLY
+    ///     <see cref="IDatabaseToolsService" /> and its operation factory dependency. Used by the packaged elevation helper
+    ///     which needs to run DatabaseTools operations but must NOT pull in the rest of the runtime (Fluxor, banner services,
+    ///     settings, etc.) — those would require host services (file pickers, modal coordinators) that don't exist in a
+    ///     console helper.
+    /// </summary>
+    /// <remarks>
+    ///     The caller must also register an <see cref="EventLogExpert.Logging.Abstractions.ITraceLogger" /> if any code
+    ///     this extension wires up resolves one transitively. <see cref="DatabaseToolsService" /> itself does NOT — it
+    ///     constructs its own <c>StreamingTraceLogger</c> per operation against the caller-supplied
+    ///     <c>IProgress&lt;DatabaseToolsLogEntry&gt;</c> sink. No additional ITraceLogger registration is required for the
+    ///     helper's normal operation path.
+    /// </remarks>
+    public static IServiceCollection AddDatabaseToolsRuntime(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddSingleton<IDatabaseToolsOperationFactory, DatabaseToolsOperationFactory>();
+        services.AddSingleton<IDatabaseToolsService, DatabaseToolsService>();
+
+        return services;
+    }
+
+    /// <summary>
+    ///     Registers <see cref="IElevatedDatabaseToolsRunner" /> backed by the in-Runtime
+    ///     <see cref="ElevatedDatabaseToolsRunner" /> implementation. Callers MUST also register
+    ///     <see cref="IElevatedHelperProcessHost" /> separately (the production implementation lives in the MAUI head's
+    ///     adapter layer; tests substitute scripted fakes).
+    /// </summary>
+    public static IServiceCollection AddElevatedDatabaseToolsRunner(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddSingleton<IElevatedDatabaseToolsRunner, ElevatedDatabaseToolsRunner>();
+
+        return services;
+    }
+
+    /// <summary>
     ///     Registers the runtime tier's services. Callers MUST also register:
     ///     <list type="bullet">
     ///         <item>
@@ -41,13 +81,13 @@ public static class RuntimeServiceCollectionExtensions
     ///             <c>IProviderDatabaseMaintenance</c>.
     ///         </item>
     ///         <item>
-    ///             <c>IFilePickerService</c> — <c>DatabaseOperationCoordinator</c> depends on it for Import.
-    ///             Host registers a concrete implementation (e.g., <c>MauiFilePickerService</c>).
+    ///             <c>IFilePickerService</c> — <c>DatabaseOperationCoordinator</c> depends on it for Import. Host registers
+    ///             a concrete implementation (e.g., <c>MauiFilePickerService</c>).
     ///         </item>
     ///         <item>
-    ///             <c>IFilterLibraryStore</c> — <c>FilterLibrary</c> effects depend on it. Register the
-    ///             default SQLite-backed store via
-    ///             <c>services.AddFilterLibrarySqliteStore(<i>dbPath</i>)</c>, or supply a custom implementation.
+    ///             <c>IFilterLibraryStore</c> — <c>FilterLibrary</c> effects depend on it. Register the default
+    ///             SQLite-backed store via <c>services.AddFilterLibrarySqliteStore(<i>dbPath</i>)</c>, or supply a custom
+    ///             implementation.
     ///         </item>
     ///     </list>
     ///     Omitting any of these produces a DI resolution failure when the dependent services are first activated.

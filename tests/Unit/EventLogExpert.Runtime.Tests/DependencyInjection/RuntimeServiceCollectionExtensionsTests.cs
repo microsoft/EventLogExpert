@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Maintenance;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Runtime.Alerts;
@@ -13,6 +14,8 @@ using EventLogExpert.Runtime.Common.Restart;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.DatabaseTools;
+using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.FilterGroup;
@@ -32,6 +35,42 @@ namespace EventLogExpert.Runtime.Tests.DependencyInjection;
 
 public sealed class RuntimeServiceCollectionExtensionsTests
 {
+    [Theory]
+    [InlineData(typeof(IDatabaseToolsOperationFactory))]
+    [InlineData(typeof(IDatabaseToolsService))]
+    public async Task AddDatabaseToolsRuntime_ShouldResolveDatabaseToolsAbstraction(Type serviceType)
+    {
+        var services = new ServiceCollection();
+        services.AddDatabaseToolsRuntime();
+
+        await using var provider = services.BuildServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+
+        await using var scope = provider.CreateAsyncScope();
+
+        var resolved = scope.ServiceProvider.GetService(serviceType);
+
+        Assert.NotNull(resolved);
+    }
+
+    [Fact]
+    public async Task AddElevatedDatabaseToolsRunner_ShouldResolveRunnerWhenHostIsRegistered()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(Substitute.For<IElevatedHelperProcessHost>());
+        services.AddSingleton(Substitute.For<ITraceLogger>());
+        services.AddElevatedDatabaseToolsRunner();
+
+        await using var provider = services.BuildServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+
+        await using var scope = provider.CreateAsyncScope();
+
+        var resolved = scope.ServiceProvider.GetService<IElevatedDatabaseToolsRunner>();
+
+        Assert.NotNull(resolved);
+    }
+
     [Theory]
     [InlineData(typeof(IAttentionBannerService))]
     [InlineData(typeof(IProgressBannerService))]

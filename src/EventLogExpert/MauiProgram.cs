@@ -20,16 +20,16 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Activation;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Common.Clipboard;
-using EventLogExpert.Runtime.Common.Elevation;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Identity;
 using EventLogExpert.Runtime.Common.Restart;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.FilterCache;
-using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterGroup;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
@@ -88,6 +88,8 @@ public static class MauiProgram
             return client;
         });
 
+        builder.Services.AddElevatedDatabaseToolsRunner();
+
         // Build Services
         builder.Services.AddSingleton<IApplicationRestartService, WindowsApplicationRestartService>();
 
@@ -124,7 +126,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IFilePickerService, MauiFilePickerService>();
         builder.Services.AddSingleton<IFolderPickerService, MauiFolderPickerService>();
         builder.Services.AddSingleton<IWindowsIdentityProvider, WindowsIdentityProvider>();
-        builder.Services.AddSingleton<IElevationService, MauiElevationService>();
+        builder.Services.AddSingleton<IElevatedHelperProcessHost, MauiElevatedHelperProcessHost>();
         builder.Services.AddSingleton<MauiMenuActionService>();
 
         builder.Services.AddSingleton<IMenuActionService>(static provider =>

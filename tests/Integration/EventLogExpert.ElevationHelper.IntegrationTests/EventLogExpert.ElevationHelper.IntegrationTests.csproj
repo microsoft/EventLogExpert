@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\EventLogExpert.DatabaseTools\EventLogExpert.DatabaseTools.csproj" />
+    <ProjectReference Include="..\..\..\src\EventLogExpert.ElevationHelper\EventLogExpert.ElevationHelper.csproj" />
+    <ProjectReference Include="..\..\..\src\EventLogExpert.Runtime\EventLogExpert.Runtime.csproj" />
+  </ItemGroup>
+
+</Project>

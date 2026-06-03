@@ -46,6 +46,13 @@ services:
       - --logger
       - "trx;LogFileName=eventdbtool.trx"
 
+  elevationhelper:
+    <<: *base
+    command:
+      - tests/Integration/EventLogExpert.ElevationHelper.IntegrationTests/EventLogExpert.ElevationHelper.IntegrationTests.csproj
+      - --logger
+      - "trx;LogFileName=elevationhelper.trx"
+
 volumes:
   nuget-packages:
   build-artifacts:

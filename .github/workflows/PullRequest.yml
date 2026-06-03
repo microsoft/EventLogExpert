@@ -26,7 +26,7 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore EventLogExpert.slnx
     - name: Build
-      run: dotnet build EventLogExpert.slnx --no-restore -c Release -p:PublishReadyToRun=false
+      run: dotnet build EventLogExpert.slnx --no-restore -c Release -p:PublishReadyToRun=false -m:1
     - name: Test (unit)
       shell: pwsh
       run: |

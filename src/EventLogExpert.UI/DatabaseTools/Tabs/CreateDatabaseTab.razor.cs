@@ -2,9 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.Contracts;
-using EventLogExpert.Runtime.Common.Elevation;
 using EventLogExpert.Runtime.Common.Versioning;
-using EventLogExpert.Runtime.Menu;
+using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using Microsoft.AspNetCore.Components;
 using System.Text.RegularExpressions;
 
@@ -17,7 +16,6 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
     private static readonly IReadOnlyList<string> s_sourceExtensions = [".db", ".evtx"];
 
     private Regex? _compiledFilter;
-    private string? _elevationError;
     private string? _filterError;
     private string _filterText = string.Empty;
     private string _skipPath = string.Empty;
@@ -28,11 +26,9 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
 
     [Inject] private ICurrentVersionProvider CurrentVersionProvider { get; init; } = null!;
 
-    [Inject] private IElevationService ElevationService { get; init; } = null!;
+    [Inject] private IElevatedDatabaseToolsRunner ElevatedRunner { get; init; } = null!;
 
     private string FilterCssClass => _filterError is null ? "input filter" : "input filter invalid";
-
-    [Inject] private IMenuActionService MenuActionService { get; init; } = null!;
 
     /// <summary>Show the elevation warning only when source is empty (= local providers) AND not running elevated.</summary>
     private bool ShowElevationWarning =>
@@ -100,23 +96,6 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
         if (!string.IsNullOrEmpty(path)) { _targetPath = path; }
     }
 
-    private async Task RelaunchAsAdminAsync()
-    {
-        _elevationError = null;
-
-        var result = await ElevationService.RelaunchElevatedAsync();
-
-        switch (result)
-        {
-            case ElevationResult.Relaunched:
-                MenuActionService.Exit();
-                break;
-            case ElevationResult.UserCancelled:
-                _elevationError = "Relaunch cancelled. Continuing without elevation.";
-                break;
-            case ElevationResult.Failed:
-                _elevationError = "Relaunch failed. See debug log for details.";
-                break;
-        }
-    }
+    private Task RunElevatedAsync() =>
+        base.RunElevatedAsync((request, logSink, ct) => ElevatedRunner.CreateAsync(request, logSink, progress: null, ct, VerboseLogging));
 }
