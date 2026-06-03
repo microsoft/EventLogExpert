@@ -1,15 +1,44 @@
-<div class="library-entry-row">
-    <span class="library-entry-kind-badge">@KindLabel</span>
-    <span class="library-entry-name">@Entry.Name</span>
+<div class="library-entry-row" data-entry-id="@Entry.Id">
+    <i aria-label="@KindAriaLabel" class="@KindIconClass" role="img"></i>
 
-    <button class="button button-green"
-        @onclick="HandleApplyClicked"
+    <div class="library-entry-name">
+        <span class="library-entry-name-text" title="@Entry.Name">@Entry.Name</span>
+        @if (Entry is LibraryEntryPreset preset)
+        {
+            <span class="library-entry-detail">(@preset.Filters.Count filter@(preset.Filters.Count == 1 ? "" : "s"))</span>
+        }
+        @if (ActiveTab == LibraryTab.PreviouslyUsed && Entry.LastUsedUtc is { } lastUsed)
+        {
+            <span class="library-entry-detail">Last used: @FormatRelativeTime(lastUsed)</span>
+        }
+    </div>
+
+    <span class="library-entry-status-badge" data-status="@StatusBadgeKind">@StatusBadgeText</span>
+
+    <button aria-label="@($"Apply {Entry.Name} additively to current filters")"
+        class="button button-green"
+        @onclick="OnApplyAsync"
         type="button">
-        Apply
+        <i aria-hidden="true" class="bi bi-plus-circle"></i> Apply
     </button>
-    <button class="button button-red"
-        @onclick="HandleDeleteClicked"
+
+    <button aria-label="@FavoriteAriaLabel"
+        aria-pressed="@(Entry.IsFavorite ? "true" : "false")"
+        class="button button-yellow icon-button"
+        @onclick="OnToggleFavoriteAsync"
+        title="@FavoriteTitle"
         type="button">
-        Delete
+        <i aria-hidden="true" class="@FavoriteIconClass"></i>
+    </button>
+
+    <button aria-expanded="@(IsMoreMenuOpen ? "true" : "false")"
+        aria-haspopup="menu"
+        aria-label="@($"More actions for {Entry.Name}")"
+        class="button icon-button"
+        @onclick="ToggleMoreMenuAsync"
+        @ref="_moreMenuButtonRef"
+        title="More actions"
+        type="button">
+        <i aria-hidden="true" class="bi bi-three-dots-vertical"></i>
     </button>
 </div>
