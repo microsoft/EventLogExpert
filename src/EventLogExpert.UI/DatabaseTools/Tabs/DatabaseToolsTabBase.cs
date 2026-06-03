@@ -196,64 +196,10 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     ///     translates the result into UI state. Wrapped exceptions surface as a synthetic Failed outcome with the exception
     ///     message rather than tearing down the component tree.
     /// </summary>
-    protected async Task RunAsync()
-    {
-        if (IsRunning || !CanRun) { return; }
+    protected Task RunAsync() => RunCoreAsync((request, logSink, ct) => DispatchAsync(request, logSink, ct));
 
-        var request = BuildRequest();
-
-        LogEntries = ImmutableList<DatabaseToolsLogEntry>.Empty;
-        Outcome = null;
-        IsRunning = true;
-        IsCancelling = false;
-        Cts = new CancellationTokenSource();
-
-        lock (_pendingLock)
-        {
-            _pendingEntries.Clear();
-            _flushScheduled = false;
-        }
-
-        var logSink = new Progress<DatabaseToolsLogEntry>(AppendEntry);
-        var startTimestamp = Stopwatch.GetTimestamp();
-
-        try
-        {
-            var result = await DispatchAsync(request, logSink, Cts.Token);
-            Outcome = result;
-            AppendOutcome(result);
-        }
-        catch (Exception ex)
-        {
-            var failedOutcome = new DatabaseToolsResult(DatabaseToolsOutcome.Failed, ex.Message, Stopwatch.GetElapsedTime(startTimestamp));
-            Outcome = failedOutcome;
-            AppendEntry(new DatabaseToolsLogEntry(
-                DateTime.UtcNow,
-                LogLevel.Error,
-                $"Unexpected error: {ex.Message}"));
-            AppendOutcome(failedOutcome);
-        }
-        finally
-        {
-            IsRunning = false;
-            IsCancelling = false;
-            Cts?.Dispose();
-            Cts = null;
-
-            if (!_disposed)
-            {
-                // Flush before the final StateHasChanged so the outcome line + any tail entries are
-                // visible in the same render as "Run complete".
-                await FlushPendingEntriesAsync();
-
-                try { await InvokeAsync(StateHasChanged); }
-                catch (ObjectDisposedException)
-                {
-                    // Disposed between _disposed check and dispatch; ignore.
-                }
-            }
-        }
-    }
+    protected Task RunElevatedAsync(Func<TRequest, IProgress<DatabaseToolsLogEntry>, CancellationToken, Task<DatabaseToolsResult>> elevatedDispatcher) =>
+        RunCoreAsync(elevatedDispatcher);
 
     /// <summary>
     ///     Drains the pending buffer and renders the accumulated batch. Must be called on the Blazor renderer thread
@@ -282,5 +228,61 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         LogEntries = LogEntries.AddRange(batch);
 
         StateHasChanged();
+    }
+
+    private async Task RunCoreAsync(Func<TRequest, IProgress<DatabaseToolsLogEntry>, CancellationToken, Task<DatabaseToolsResult>> dispatcher)
+    {
+        if (IsRunning || !CanRun) { return; }
+
+        var request = BuildRequest();
+
+        LogEntries = ImmutableList<DatabaseToolsLogEntry>.Empty;
+        Outcome = null;
+        IsRunning = true;
+        IsCancelling = false;
+        Cts = new CancellationTokenSource();
+
+        lock (_pendingLock)
+        {
+            _pendingEntries.Clear();
+            _flushScheduled = false;
+        }
+
+        var logSink = new Progress<DatabaseToolsLogEntry>(AppendEntry);
+        var startTimestamp = Stopwatch.GetTimestamp();
+
+        try
+        {
+            var result = await dispatcher(request, logSink, Cts.Token);
+            Outcome = result;
+            AppendOutcome(result);
+        }
+        catch (Exception ex)
+        {
+            var failedOutcome = new DatabaseToolsResult(DatabaseToolsOutcome.Failed, ex.Message, Stopwatch.GetElapsedTime(startTimestamp));
+            Outcome = failedOutcome;
+            AppendEntry(new DatabaseToolsLogEntry(
+                DateTime.UtcNow,
+                LogLevel.Error,
+                $"Unexpected error: {ex.Message}"));
+            AppendOutcome(failedOutcome);
+        }
+        finally
+        {
+            IsRunning = false;
+            IsCancelling = false;
+            Cts?.Dispose();
+            Cts = null;
+
+            if (!_disposed)
+            {
+                await FlushPendingEntriesAsync();
+
+                try { await InvokeAsync(StateHasChanged); }
+                catch (ObjectDisposedException)
+                {
+                }
+            }
+        }
     }
 }

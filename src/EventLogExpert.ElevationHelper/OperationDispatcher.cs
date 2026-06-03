@@ -1,0 +1,59 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.DatabaseTools.Contracts;
+using EventLogExpert.Runtime.DatabaseTools;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace EventLogExpert.ElevationHelper;
+
+/// <summary>
+///     Helper-side operation dispatcher. Given an already-deserialized <see cref="DatabaseToolsIpcRequest" />,
+///     resolves <see cref="IDatabaseToolsService" /> via the helper-friendly <c>AddDatabaseToolsRuntime</c> DI extension,
+///     dispatches to the correct service method per request type, and returns the final <see cref="DatabaseToolsResult" />
+///     . Destructive-recovery wrapping (Create/Diff output cleanup on failure, Upgrade .bak/restore) lives in
+///     <see cref="DestructiveRecovery" /> and is applied transparently before the result is returned.
+/// </summary>
+/// <remarks>
+///     Request reading happens in <see cref="ProgramEntry" /> (so the helper can start a control-reader task on the
+///     same pipe AFTER the request is consumed and BEFORE this dispatch starts; that control reader watches for
+///     <see cref="CancelEnvelope" /> and cancels the operation CT).
+/// </remarks>
+internal static class OperationDispatcher
+{
+    public static async Task<DatabaseToolsResult> DispatchAsync(
+        DatabaseToolsIpcRequest request,
+        IpcEnvelopeWriter writer,
+        CancellationToken cancellationToken)
+    {
+        await using var services = new ServiceCollection()
+            .AddDatabaseToolsRuntime()
+            .BuildServiceProvider();
+
+        var service = services.GetRequiredService<IDatabaseToolsService>();
+        var logSink = new IpcLogEntrySink(writer);
+        var progressSink = new IpcProgressSink(writer);
+
+        return await DestructiveRecovery.WrapAsync(
+            request,
+            (req, ct) => RawDispatchAsync(service, req, logSink, progressSink, ct),
+            cancellationToken);
+    }
+
+    private static Task<DatabaseToolsResult> RawDispatchAsync(
+        IDatabaseToolsService service,
+        DatabaseToolsIpcRequest request,
+        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<DatabaseToolsProgress> progressSink,
+        CancellationToken cancellationToken)
+        => request switch
+        {
+            ShowProvidersIpcRequest s => service.ShowAsync(s.Request, logSink, progressSink, cancellationToken, s.Verbose),
+            CreateDatabaseIpcRequest c => service.CreateAsync(c.Request, logSink, progressSink, cancellationToken, c.Verbose),
+            MergeDatabaseIpcRequest m => service.MergeAsync(m.Request, logSink, progressSink, cancellationToken, m.Verbose),
+            DiffDatabaseIpcRequest d => service.DiffAsync(d.Request, logSink, progressSink, cancellationToken, d.Verbose),
+            UpgradeDatabaseIpcRequest u => service.UpgradeAsync(u.Request, logSink, progressSink, cancellationToken, u.Verbose),
+            _ => Task.FromResult(new DatabaseToolsResult(DatabaseToolsOutcome.Failed, $"Unknown request type: {request.GetType().Name}", TimeSpan.Zero))
+        };
+}
+

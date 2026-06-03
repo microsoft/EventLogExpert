@@ -168,4 +168,72 @@
              Text="EventLogExpert.ExplorerExtension.dll native build did not produce output at $(ExplorerExtensionNativeDll). Check the C++ workload + Windows SDK install. See docs/Explorer-Context-Menu.md for prereqs." />
     </Target>
 
+    <!--
+      ElevationHelper packaging integration. The helper is a same-MSIX companion EXE that runs the
+      DatabaseTools operations at high IL via UAC, so the main MAUI app (which crashes if relaunched
+      elevated due to WinUI3 XAML init) stays at medium IL.
+      Two targets: PublishElevationHelper runs the publish (skippable when source is unchanged);
+      IncludeElevationHelperInPackage always-fires before MSIX packaging to add the published files
+      to the package content set even when the publish target was up-to-date.
+    -->
+    <ItemGroup>
+      <_ElevationHelperInputs Include="..\EventLogExpert.ElevationHelper\**\*.cs" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.ElevationHelper\*.csproj" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.DatabaseTools\**\*.cs" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.DatabaseTools\*.csproj" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.Runtime\DatabaseTools\**\*.cs" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.Runtime\DependencyInjection\**\*.cs" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.Runtime\*.csproj" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.Logging\**\*.cs" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.Logging\*.csproj" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.Eventing\**\*.cs" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.Eventing\*.csproj" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.Provider\**\*.cs" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.Provider\*.csproj" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.Provider.Database\**\*.cs" />
+      <_ElevationHelperInputs Include="..\EventLogExpert.Provider.Database\*.csproj" />
+    </ItemGroup>
+
+    <PropertyGroup>
+      <_ElevationHelperRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_ElevationHelperRid>
+      <_ElevationHelperRid Condition="'$(_ElevationHelperRid)' == '' and '$(Platform)' == 'ARM64'">win-arm64</_ElevationHelperRid>
+      <_ElevationHelperRid Condition="'$(_ElevationHelperRid)' == ''">win-x64</_ElevationHelperRid>
+      <!--
+        Anchor the publish output under $(BaseIntermediateOutputPath) (always "obj/") so the SDK's default Content
+        glob (which excludes obj/) does NOT also pick up the published .json files; otherwise the explicit Content
+        adds in IncludeElevationHelperInPackage cause NETSDK1022 duplicate-item errors.
+      -->
+      <_ElevationHelperOutDir>$(BaseIntermediateOutputPath)ElevationHelper-$(Configuration)-$(_ElevationHelperRid)\</_ElevationHelperOutDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <_ElevationHelperInputs Include="$(MSBuildThisFileDirectory)..\..\Directory.Build.props" />
+      <_ElevationHelperInputs Include="$(MSBuildThisFileDirectory)..\..\Directory.Packages.props" />
+      <_ElevationHelperInputs Include="$(MSBuildThisFileDirectory)..\..\global.json" />
+    </ItemGroup>
+
+    <Target Name="PublishElevationHelper"
+            Condition="'$(WindowsPackageType)' == 'MSIX'"
+            BeforeTargets="BeforeBuild"
+            Inputs="@(_ElevationHelperInputs)"
+            Outputs="$(_ElevationHelperOutDir).publish.flag">
+      <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\EventLogExpert.ElevationHelper\EventLogExpert.ElevationHelper.csproj&quot; -c $(Configuration) -r $(_ElevationHelperRid) -o &quot;$(_ElevationHelperOutDir.TrimEnd('\'))&quot; --self-contained true /p:PublishSingleFile=false /p:DebugType=embedded -m:1" />
+      <Touch Files="$(_ElevationHelperOutDir).publish.flag" AlwaysCreate="true" />
+    </Target>
+
+    <Target Name="IncludeElevationHelperInPackage"
+            Condition="'$(WindowsPackageType)' == 'MSIX'"
+            AfterTargets="PublishElevationHelper"
+            BeforeTargets="_GenerateAppxPackageOutputs;GenerateAppxPackagingManifest;BeforeBuild">
+      <ItemGroup>
+        <_PublishedHelperFiles Include="$(_ElevationHelperOutDir)**\*.*"
+                               Exclude="$(_ElevationHelperOutDir).publish.flag" />
+        <Content Include="@(_PublishedHelperFiles)"
+                 Link="ElevationHelper\%(RecursiveDir)%(Filename)%(Extension)"
+                 CopyToOutputDirectory="PreserveNewest" />
+      </ItemGroup>
+      <Error Condition="'@(_PublishedHelperFiles->Count())' == '0'"
+             Text="ElevationHelper publish output missing at $(_ElevationHelperOutDir) — PublishElevationHelper target did not produce files." />
+    </Target>
+
 </Project>

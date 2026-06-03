@@ -22,6 +22,7 @@
     <Project Path="src/EventLogExpert.Filtering/EventLogExpert.Filtering.csproj" />
     <Project Path="src/EventLogExpert.Provider.Database/EventLogExpert.Provider.Database.csproj" />
     <Project Path="src/EventLogExpert.DatabaseTools/EventLogExpert.DatabaseTools.csproj" />
+    <Project Path="src/EventLogExpert.ElevationHelper/EventLogExpert.ElevationHelper.csproj" />
     <Project Path="src/EventLogExpert.WindowsPlatform/EventLogExpert.WindowsPlatform.csproj" />
     <!--
       Native C++/WinRT shell extension is NOT in the slnx because dotnet build cannot process
@@ -49,6 +50,7 @@
     <Project Path="tests/Integration/EventLogExpert.Runtime.IntegrationTests/EventLogExpert.Runtime.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.Provider.Database.IntegrationTests/EventLogExpert.Provider.Database.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.DatabaseTools.IntegrationTests/EventLogExpert.DatabaseTools.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/EventLogExpert.ElevationHelper.IntegrationTests/EventLogExpert.ElevationHelper.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.UI.IntegrationTests/EventLogExpert.UI.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/Shared/">

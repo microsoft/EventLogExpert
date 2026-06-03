@@ -2,6 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.Contracts;
+using EventLogExpert.Runtime.Common.Versioning;
+using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using Microsoft.AspNetCore.Components;
 using System.Text.RegularExpressions;
 
@@ -19,7 +21,14 @@ public sealed partial class ShowProvidersTab : DatabaseToolsTabBase<ShowProvider
 
     protected override bool CanRun => _filterError is null;
 
+    [Inject] private ICurrentVersionProvider CurrentVersionProvider { get; init; } = null!;
+
+    [Inject] private IElevatedDatabaseToolsRunner ElevatedRunner { get; init; } = null!;
+
     private string FilterCssClass => _filterError is null ? "input filter" : "input filter invalid";
+
+    private bool ShowElevationWarning =>
+        string.IsNullOrWhiteSpace(_sourcePath) && !CurrentVersionProvider.IsAdmin;
 
     protected override ShowProvidersRequest BuildRequest()
     {
@@ -65,4 +74,7 @@ public sealed partial class ShowProvidersTab : DatabaseToolsTabBase<ShowProvider
 
         if (!string.IsNullOrEmpty(path)) { _sourcePath = path; }
     }
+
+    private Task RunElevatedAsync() =>
+        base.RunElevatedAsync((request, logSink, ct) => ElevatedRunner.ShowAsync(request, logSink, progress: null, ct, VerboseLogging));
 }

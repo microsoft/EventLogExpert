@@ -19,6 +19,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="EventLogExpert.Runtime.IntegrationTests" />
     <InternalsVisibleTo Include="EventLogExpert.Runtime.Tests" />
+    <InternalsVisibleTo Include="EventLogExpert.ElevationHelper.IntegrationTests" />
   </ItemGroup>
 
 </Project>

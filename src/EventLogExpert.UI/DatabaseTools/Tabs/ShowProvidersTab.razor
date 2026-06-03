@@ -44,6 +44,17 @@
                 </span>
             }
         </div>
+
+        @if (ShowElevationWarning)
+        {
+            <div class="elevation-warning-slot">
+                <div class="elevation-warning" role="alert">
+                    <i aria-hidden="true" class="bi bi-shield-exclamation"></i>
+                    <span>Running without elevation — some local providers (Security, etc.) will be skipped or return incomplete metadata.</span>
+                    <button class="button" disabled="@IsRunning" @onclick="RunElevatedAsync" title="Run this operation in an elevated helper process; main app stays running." type="button">Run Elevated</button>
+                </div>
+            </div>
+        }
     </div>
 
     <DatabaseToolsLogView Entries="@LogEntries" FileNamePrefix="show-providers" Outcome="@Outcome">
