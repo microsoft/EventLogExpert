@@ -12,13 +12,13 @@ public interface IFilterLibraryCommands
     void AddEntry(LibraryEntry entry);
 
     /// <summary>
-    ///     Appends <paramref name="filter" /> to an existing preset (matched by id). Dedupes by (case-insensitive
+    ///     Appends <paramref name="filter" /> to an existing filter set (matched by id). Dedupes by (case-insensitive
     ///     ComparisonText, Mode, IsExcluded), matching the FilterLibrary store invariant.
     /// </summary>
-    void AddFilterToExistingPreset(LibraryEntryId presetId, SavedFilter filter, LibraryEntryId? sourceEntryId);
+    void AddFilterToExistingFilterSet(LibraryEntryId filterSetId, SavedFilter filter, LibraryEntryId? sourceEntryId);
 
-    /// <summary>Creates a new preset containing only <paramref name="filter" />.</summary>
-    void AddFilterToNewPreset(string newPresetName, SavedFilter filter, LibraryEntryId? sourceEntryId);
+    /// <summary>Creates a new filter set containing only <paramref name="filter" />.</summary>
+    void AddFilterToNewFilterSet(string newFilterSetName, SavedFilter filter, LibraryEntryId? sourceEntryId);
 
     /// <summary>
     ///     Additively merges the library entry's filters into the current FilterPane. Dedupes by (case-insensitive
@@ -41,11 +41,11 @@ public interface IFilterLibraryCommands
     /// <summary>Promotes the library entry's <see cref="LibraryEntry.Origin" /> to UserSaved (no-op if already UserSaved).</summary>
     void SaveEntry(LibraryEntryId entryId);
 
-    /// <summary>Saves the current FilterPane filters as a new preset (effect reads pane state).</summary>
-    void SavePaneAsPreset(string name);
+    /// <summary>Creates a new filter set from the given filter list (regenerates FilterIds for Razor key safety).</summary>
+    void SaveFilterSet(string name, ImmutableList<SavedFilter> filters);
 
-    /// <summary>Creates a new preset from the given filter list (regenerates FilterIds for Razor key safety).</summary>
-    void SavePreset(string name, ImmutableList<SavedFilter> filters);
+    /// <summary>Saves the current FilterPane filters as a new filter set (effect reads pane state).</summary>
+    void SavePaneAsFilterSet(string name);
 
     /// <summary>Sets the favorite flag on the library entry (applies mutex + Origin promotion).</summary>
     void SetIsFavorite(LibraryEntryId entryId, bool isFavorite);

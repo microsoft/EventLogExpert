@@ -55,6 +55,37 @@ public sealed class LibraryEntryPolymorphicJsonTests
     }
 
     [Fact]
+    public void RoundTrip_FilterSetEntry_PreservesAllFields_WithKindDiscriminator()
+    {
+        var f1 = SavedFilter.TryCreate("Level == 2");
+        var f2 = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(f1);
+        Assert.NotNull(f2);
+
+        var createdUtc = new DateTimeOffset(2026, 5, 31, 12, 0, 0, TimeSpan.Zero);
+        var filterSetId = new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-000000000002"));
+        LibraryEntry entry = new LibraryEntryFilterSet
+        {
+            Id = filterSetId,
+            Name = "My Preset",
+            CreatedUtc = createdUtc,
+            Filters = [f1, f2],
+        };
+
+        var json = JsonSerializer.Serialize(entry);
+        var restored = JsonSerializer.Deserialize<LibraryEntry>(json);
+
+        var restoredFilterSet = Assert.IsType<LibraryEntryFilterSet>(restored);
+        Assert.Equal(filterSetId, restoredFilterSet.Id);
+        Assert.Equal("My Preset", restoredFilterSet.Name);
+        Assert.Equal(createdUtc, restoredFilterSet.CreatedUtc);
+        Assert.Equal(2, restoredFilterSet.Filters.Count);
+        Assert.Equal("Level == 2", restoredFilterSet.Filters[0].ComparisonText);
+        Assert.Equal("Level == 4", restoredFilterSet.Filters[1].ComparisonText);
+        Assert.Contains("\"Kind\":\"FilterSet\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RoundTrip_LibraryEntry_PreservesOriginIsFavoriteAndLastUsedUtc()
     {
         var filter = SavedFilter.TryCreate("Level == 4");
@@ -81,37 +112,6 @@ public sealed class LibraryEntryPolymorphicJsonTests
         Assert.Equal(LibraryEntryOrigin.AutoTracked, restoredFilter.Origin);
         Assert.Contains("\"Origin\":\"AutoTracked\"", json, StringComparison.Ordinal);
         Assert.Contains("\"IsFavorite\":true", json, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void RoundTrip_PresetEntry_PreservesAllFields_WithKindDiscriminator()
-    {
-        var f1 = SavedFilter.TryCreate("Level == 2");
-        var f2 = SavedFilter.TryCreate("Level == 4");
-        Assert.NotNull(f1);
-        Assert.NotNull(f2);
-
-        var createdUtc = new DateTimeOffset(2026, 5, 31, 12, 0, 0, TimeSpan.Zero);
-        var presetId = new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-000000000002"));
-        LibraryEntry entry = new LibraryEntryPreset
-        {
-            Id = presetId,
-            Name = "My Preset",
-            CreatedUtc = createdUtc,
-            Filters = [f1, f2],
-        };
-
-        var json = JsonSerializer.Serialize(entry);
-        var restored = JsonSerializer.Deserialize<LibraryEntry>(json);
-
-        var restoredPreset = Assert.IsType<LibraryEntryPreset>(restored);
-        Assert.Equal(presetId, restoredPreset.Id);
-        Assert.Equal("My Preset", restoredPreset.Name);
-        Assert.Equal(createdUtc, restoredPreset.CreatedUtc);
-        Assert.Equal(2, restoredPreset.Filters.Count);
-        Assert.Equal("Level == 2", restoredPreset.Filters[0].ComparisonText);
-        Assert.Equal("Level == 4", restoredPreset.Filters[1].ComparisonText);
-        Assert.Contains("\"Kind\":\"Preset\"", json, StringComparison.Ordinal);
     }
 
     [Fact]

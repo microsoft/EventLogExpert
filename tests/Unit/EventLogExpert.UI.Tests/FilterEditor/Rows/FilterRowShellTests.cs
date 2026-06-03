@@ -59,16 +59,6 @@ public sealed class FilterRowShellTests : BunitContext
     }
 
     [Fact]
-    public void SavedFilter_ShowToggleEnabledFalse_DoesNotRenderToggle()
-    {
-        var savedFilter = MakeSavedFilter(isEnabled: true);
-
-        var component = RenderChrome(value: savedFilter, showToggleEnabled: false);
-
-        Assert.Empty(component.FindAll("input[role='switch']"));
-    }
-
-    [Fact]
     public void SavedFilter_Toggle_AriaLabelledByTargetsVisibleComparisonText()
     {
         var savedFilter = MakeSavedFilter(isEnabled: true);
@@ -94,7 +84,6 @@ public sealed class FilterRowShellTests : BunitContext
 
         var component = Render<FilterRowShell>(parameters => parameters
             .Add(p => p.Value, savedFilter)
-            .Add(p => p.ShowToggleEnabled, true)
             .Add(p => p.OnToggleEnabled,
                 EventCallback.Factory.Create(this, () => invocations++)));
 
@@ -112,10 +101,7 @@ public sealed class FilterRowShellTests : BunitContext
             IsEnabled = isEnabled,
         };
 
-    private IRenderedComponent<FilterRowShell> RenderChrome(
-        SavedFilter? value,
-        bool showToggleEnabled = true) =>
+    private IRenderedComponent<FilterRowShell> RenderChrome(SavedFilter? value) =>
         Render<FilterRowShell>(parameters => parameters
-            .Add(p => p.Value, value)
-            .Add(p => p.ShowToggleEnabled, showToggleEnabled));
+            .Add(p => p.Value, value));
 }

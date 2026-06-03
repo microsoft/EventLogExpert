@@ -25,7 +25,7 @@
     min-width: 0;
 }
 
-.filter-group {
+.filter-set {
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
@@ -34,7 +34,7 @@
     transition: max-height 1s, padding 1s, border 1s;
 }
 
-.filter-group[data-toggle="false"] {
+.filter-set[data-toggle="false"] {
     display: none;
 
     border: none;

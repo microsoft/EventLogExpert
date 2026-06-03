@@ -5,6 +5,7 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
 using Microsoft.Data.Sqlite;
 using System.Collections.Immutable;
+using System.Data;
 using System.Globalization;
 using System.Text.Json;
 
@@ -140,7 +141,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         // (collision detection) and the follow-up tuple SELECT. Without it, the row could be
         // deleted in the gap and the SELECT would surface zero rows for a "we just saw a collision"
         // path — a benign concurrent delete becomes an exception.
-        using var tx = connection.BeginTransaction(System.Data.IsolationLevel.Serializable);
+        using var tx = connection.BeginTransaction(IsolationLevel.Serializable);
 
         using (var cmd = connection.CreateCommand())
         {
@@ -318,8 +319,8 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
                 cmd.Parameters.AddWithValue("$is_excluded", f.Filter.IsExcluded ? 1 : 0);
                 break;
 
-            case LibraryEntryPreset p:
-                cmd.Parameters.AddWithValue("$kind", "Preset");
+            case LibraryEntryFilterSet p:
+                cmd.Parameters.AddWithValue("$kind", "FilterSet");
                 cmd.Parameters.AddWithValue("$payload", JsonSerializer.Serialize(p.Filters));
                 cmd.Parameters.AddWithValue("$comparison_text", DBNull.Value);
                 cmd.Parameters.AddWithValue("$mode", DBNull.Value);
@@ -354,7 +355,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
                 Filter = JsonSerializer.Deserialize<SavedFilter>(payload)
                     ?? throw new InvalidOperationException($"LibraryEntrySavedFilter '{id}' payload deserialized to null."),
             },
-            "Preset" => new LibraryEntryPreset
+            "FilterSet" => new LibraryEntryFilterSet
             {
                 Id = id,
                 Name = name,

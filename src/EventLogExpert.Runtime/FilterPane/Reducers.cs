@@ -14,37 +14,6 @@ internal sealed class Reducers
     public static FilterPaneState ReduceAddFilter(FilterPaneState state, AddFilterAction action) =>
         state with { Filters = state.Filters.Add(action.SavedFilter) };
 
-    [ReducerMethod]
-    public static FilterPaneState ReduceApplyFilterGroup(
-        FilterPaneState state,
-        ApplyFilterGroupAction action)
-    {
-        if (!action.FilterGroup.Filters.Any()) { return state; }
-
-        // Dedup tuple matches FilterLibrary store invariant: case-insensitive ComparisonText
-        // + Mode + IsExcluded. See FilterLibrarySqliteStore.idx_library_autotracked_dedup
-        // and ReduceMergeFilters for parallel implementations.
-        HashSet<(string LoweredText, FilterMode Mode, bool IsExcluded)> existingKeys =
-            [.. state.Filters.Select(filter => (
-                filter.ComparisonText.ToLowerInvariant(),
-                filter.Mode,
-                filter.IsExcluded))];
-
-        List<SavedFilter> additions = [];
-
-        foreach (var filter in action.FilterGroup.Filters)
-        {
-            if (!existingKeys.Add((filter.ComparisonText.ToLowerInvariant(), filter.Mode, filter.IsExcluded))) { continue; }
-
-            // Preserve the group filter as-is, but only enable when Compiled is non-null. A saved group
-            // filter loaded with an invalid expression has Compiled == null and must stay disabled, otherwise
-            // it appears active in the UI but is silently skipped by filtering/highlighting.
-            additions.Add(filter with { Id = FilterId.Create(), IsEnabled = filter.Compiled is not null });
-        }
-
-        return additions.Count == 0 ? state : state with { Filters = state.Filters.AddRange(additions) };
-    }
-
     [ReducerMethod(typeof(ClearAllFiltersAction))]
     public static FilterPaneState ReduceClearFilters(FilterPaneState state) => new() { IsEnabled = state.IsEnabled };
 

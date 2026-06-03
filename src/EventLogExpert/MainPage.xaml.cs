@@ -8,8 +8,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Activation;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.EventLog;
-using EventLogExpert.Runtime.FilterCache;
-using EventLogExpert.Runtime.FilterGroup;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
 using Fluxor;
@@ -37,9 +36,8 @@ public sealed partial class MainPage : ContentPage, IDisposable
     private bool _disposed;
 
     public MainPage(
-        IFilterCacheCommands filterCacheCommands,
+        IFilterLibraryCommands filterLibraryCommands,
         ILogTableCommands logTableCommands,
-        IFilterGroupCommands filterGroupCommands,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogs,
         ISettingsService settings,
         IAppTitleService appTitleService,
@@ -62,8 +60,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _settings.ThemeChanged += OnThemeChanged;
 
         logTableCommands.LoadColumns();
-        filterCacheCommands.LoadFilters();
-        filterGroupCommands.LoadGroups();
+        filterLibraryCommands.LoadLibrary();
 
         // Eager subscription so cold-launch args buffered by ActivationBootstrap drain even when
         // WebView2 is missing and BlazorWebViewInitialized never fires; the StartConsumingAsync

@@ -18,13 +18,10 @@
             <i aria-hidden="true" class="bi bi-dash-circle"></i>
         </button>
 
-        @if (ShowToggleEnabled)
-        {
-            <span class="visually-hidden" id="@_enableToggleLabelId">Enable filter</span>
+        <span class="visually-hidden" id="@_enableToggleLabelId">Enable filter</span>
 
-            <Toggle AriaLabelledBy="@EnableToggleAriaLabelledBy"
-                Value="savedFilter.IsEnabled"
-                ValueChanged="@(_ => OnToggleEnabled.InvokeAsync())" />
-        }
+        <Toggle AriaLabelledBy="@EnableToggleAriaLabelledBy"
+            Value="savedFilter.IsEnabled"
+            ValueChanged="@(_ => OnToggleEnabled.InvokeAsync())" />
     </div>
 }

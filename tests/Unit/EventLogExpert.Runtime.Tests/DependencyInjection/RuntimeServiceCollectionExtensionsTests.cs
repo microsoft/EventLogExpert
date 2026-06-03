@@ -17,8 +17,6 @@ using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.Runtime.EventLog;
-using EventLogExpert.Runtime.FilterCache;
-using EventLogExpert.Runtime.FilterGroup;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
@@ -139,8 +137,6 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [Theory]
     // Command facades.
     [InlineData(typeof(IEventLogCommands))]
-    [InlineData(typeof(IFilterCacheCommands))]
-    [InlineData(typeof(IFilterGroupCommands))]
     [InlineData(typeof(IFilterLibraryCommands))]
     [InlineData(typeof(IFilterPaneCommands))]
     [InlineData(typeof(ILogTableCommands))]

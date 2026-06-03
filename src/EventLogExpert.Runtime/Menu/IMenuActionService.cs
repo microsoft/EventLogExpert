@@ -37,7 +37,7 @@ public interface IMenuActionService
 
     Task<bool> OpenSettingsAsync();
 
-    Task SaveFiltersAsGroupAsync();
+    Task SaveFiltersAsFilterSetAsync();
 
     void SetContinuouslyUpdate(bool value);
 

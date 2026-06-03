@@ -63,7 +63,7 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     }
 
     [Fact]
-    public void Add_PersistsPresetEntryWithMultipleFilters()
+    public void Add_PersistsFilterSetEntryWithMultipleFilters()
     {
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
@@ -73,17 +73,17 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         Assert.NotNull(f1);
         Assert.NotNull(f2);
 
-        var preset = new LibraryEntryPreset
+        var filterSet = new LibraryEntryFilterSet
         {
-            Name = "Preset",
+            Name = "Filter Set",
             CreatedUtc = DateTimeOffset.UtcNow,
             Filters = [f1, f2],
         };
 
-        store.Add(preset);
+        store.Add(filterSet);
         var result = store.LoadAll();
 
-        var loaded = Assert.IsType<LibraryEntryPreset>(result[0]);
+        var loaded = Assert.IsType<LibraryEntryFilterSet>(result[0]);
         Assert.Equal(2, loaded.Filters.Count);
     }
 
@@ -508,34 +508,34 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     }
 
     [Fact]
+    public void TryDeleteAutoTrackedIfNotFavorite_FilterSetRow_DoesNotDeleteAndReturnsFalse()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+        var filterSet = new LibraryEntryFilterSet
+        {
+            Name = "Filter Set",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Origin = LibraryEntryOrigin.AutoTracked,
+            Filters = [filter],
+        };
+        store.Add(filterSet);
+
+        var deleted = store.TryDeleteAutoTrackedIfNotFavorite(filterSet.Id);
+
+        Assert.False(deleted);
+        Assert.Single(store.LoadAll());
+    }
+
+    [Fact]
     public void TryDeleteAutoTrackedIfNotFavorite_MissingEntry_ReturnsFalse()
     {
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
 
         Assert.False(store.TryDeleteAutoTrackedIfNotFavorite(LibraryEntryId.Create()));
-    }
-
-    [Fact]
-    public void TryDeleteAutoTrackedIfNotFavorite_PresetRow_DoesNotDeleteAndReturnsFalse()
-    {
-        var dbPath = CreateTempDatabasePath();
-        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var filter = SavedFilter.TryCreate("Level == 4");
-        Assert.NotNull(filter);
-        var preset = new LibraryEntryPreset
-        {
-            Name = "Preset",
-            CreatedUtc = DateTimeOffset.UtcNow,
-            Origin = LibraryEntryOrigin.AutoTracked,
-            Filters = [filter],
-        };
-        store.Add(preset);
-
-        var deleted = store.TryDeleteAutoTrackedIfNotFavorite(preset.Id);
-
-        Assert.False(deleted);
-        Assert.Single(store.LoadAll());
     }
 
     [Fact]

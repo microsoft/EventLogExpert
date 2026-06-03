@@ -6,28 +6,32 @@ using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.EventLog;
-using EventLogExpert.Runtime.FilterCache;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.FilterEditor;
+using EventLogExpert.UI.FilterLibrary;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Modal;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
-using FilterGroupState = EventLogExpert.Runtime.FilterGroup.FilterGroupState;
 using FilterMode = EventLogExpert.Filtering.Evaluation.FilterMode;
 
 namespace EventLogExpert.UI.FilterPane;
 
 public sealed partial class FilterPane : IDisposable
 {
+    internal bool IsFilterSetPickerVisible;
+    internal LibraryEntryId SelectedFilterSetId;
+
     private readonly DateFilter _model = new();
     private readonly List<FilterDraft> _pendingDrafts = [];
     private readonly Dictionary<FilterId, FilterRow?> _rowRefs = new();
@@ -40,16 +44,16 @@ public sealed partial class FilterPane : IDisposable
     private bool _focusAddButtonAfterRemove;
     private FilterId? _focusTargetAfterRemove;
     private bool _isFilterListVisible;
-    private bool _isGroupPickerVisible;
-    private FilterGroupId _selectedGroupId;
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
+    [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
+
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
-    [Inject] private IState<FilterCacheState> FilterCacheState { get; init; } = null!;
+    [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
 
-    [Inject] private IState<FilterGroupState> FilterGroupState { get; init; } = null!;
+    [Inject] private IState<FilterLibraryState> FilterLibraryState { get; init; } = null!;
 
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
@@ -58,15 +62,20 @@ public sealed partial class FilterPane : IDisposable
     [Inject] private IState<FilterProgressState> FilterProgressState { get; init; } = null!;
 
     private bool HasCachedFilters =>
-        !FilterCacheState.Value.FavoriteFilters.IsEmpty || !FilterCacheState.Value.RecentFilters.IsEmpty;
+        FilterLibraryState.Value.IsLoaded
+        && !FilterLibraryState.Value.LoadError
+        && FilterLibraryState.Value.Entries.OfType<LibraryEntrySavedFilter>().Any(e => e.IsFavorite || e.LastUsedUtc is not null);
 
     private bool HasClearableFilters =>
         IsDateFilterVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
 
-    private bool HasFilterGroups => !FilterGroupState.Value.Groups.IsEmpty;
-
     private bool HasFilters =>
-        IsDateFilterVisible || _isGroupPickerVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
+        IsDateFilterVisible || IsFilterSetPickerVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
+
+    private bool HasFilterSets =>
+        FilterLibraryState.Value.IsLoaded
+        && !FilterLibraryState.Value.LoadError
+        && FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().Any();
 
     private bool HasSavableFilters => !FilterPaneState.Value.Filters.IsEmpty;
 
@@ -91,6 +100,90 @@ public sealed partial class FilterPane : IDisposable
     {
         Settings.TimeZoneChanged -= UpdateFilterDateTimeZone;
         MenuService.StateChanged -= OnMenuServiceStateChanged;
+    }
+
+    internal void ApplyFilterSetSelection()
+    {
+        if (FilterLibraryState.Value.LoadError)
+        {
+            AnnouncementService.Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal);
+            CancelFilterSetPicker();
+
+            return;
+        }
+
+        if (!FilterLibraryState.Value.IsLoaded)
+        {
+            AnnouncementService.Announce(FilterPaneAnnouncements.LoadingTryAgain);
+            CancelFilterSetPicker();
+            
+            return;
+        }
+
+        var filterSets = FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().ToList();
+
+        if (!filterSets.Any(p => p.Id.Equals(SelectedFilterSetId)))
+        {
+            AnnouncementService.Announce(FilterPaneAnnouncements.SelectedFilterSetMissing);
+            SelectedFilterSetId = filterSets
+                .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault()?.Id ?? default;
+            
+            return;
+        }
+
+        FilterLibraryCommands.ApplyEntry(SelectedFilterSetId);
+        CancelFilterSetPicker();
+    }
+
+    internal IReadOnlyList<MenuItem> BuildAddFilterMenu() =>
+    [
+        MenuItem.Item("Basic", AddBasicFilterFromMenu),
+        MenuItem.Item("Advanced", AddAdvancedFilterFromMenu),
+        MenuItem.Item(
+            "Cached",
+            AddCachedFilterFromMenu,
+            isEnabled: HasCachedFilters,
+            disabledReason: GetCachedDisabledReason()),
+    ];
+
+    internal string? GetCachedDisabledReason()
+    {
+        if (HasCachedFilters) { return null; }
+
+        if (FilterLibraryState.Value.LoadError) { return FilterPaneAnnouncements.LoadFailedRetryViaModal; }
+
+        return !FilterLibraryState.Value.IsLoaded ?
+            FilterPaneAnnouncements.LoadingTryAgain :
+            FilterPaneAnnouncements.CachedNoneAvailable;
+    }
+
+    internal void OpenFilterSetPicker()
+    {
+        // Re-clicking the trigger is a no-op so an in-progress dropdown selection isn't silently
+        // overwritten by `filterSets.First()` reset. Cancel button is the only way to dismiss the picker.
+        if (IsFilterSetPickerVisible) { return; }
+
+        if (FilterLibraryState.Value.LoadError)
+        {
+            AnnouncementService.Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal);
+            return;
+        }
+
+        if (!FilterLibraryState.Value.IsLoaded)
+        {
+            AnnouncementService.Announce(FilterPaneAnnouncements.LoadingTryAgain);
+            return;
+        }
+
+        IsFilterSetPickerVisible = true;
+        SelectedFilterSetId = HasFilterSets
+            ? FilterLibraryState.Value.Entries
+                .OfType<LibraryEntryFilterSet>()
+                .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                .First().Id
+            : default;
+        _isFilterListVisible = true;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -119,8 +212,8 @@ public sealed partial class FilterPane : IDisposable
         {
             _canEditDate = false;
             _pendingDrafts.Clear();
-            _isGroupPickerVisible = false;
-            _selectedGroupId = default;
+            IsFilterSetPickerVisible = false;
+            SelectedFilterSetId = default;
         });
 
         SubscribeToAction<SetFilterDateRangeSuccessAction>(action =>
@@ -201,35 +294,10 @@ public sealed partial class FilterPane : IDisposable
         _canEditDate = false;
     }
 
-    private void ApplyFilterGroupSelection()
+    private void CancelFilterSetPicker()
     {
-        var group = FilterGroupState.Value.Groups.FirstOrDefault(g => g.Id == _selectedGroupId);
-
-        if (group is not null)
-        {
-            FilterPaneCommands.ApplyFilterGroup(group);
-        }
-
-        CancelFilterGroupPicker();
-    }
-
-    private IReadOnlyList<MenuItem> BuildAddFilterMenu() =>
-    [
-        MenuItem.Item("Basic", AddBasicFilterFromMenu),
-        MenuItem.Item("Advanced", AddAdvancedFilterFromMenu),
-        MenuItem.Item(
-            "Cached",
-            AddCachedFilterFromMenu,
-            isEnabled: HasCachedFilters,
-            disabledReason: HasCachedFilters
-                ? null
-                : "No cached filters yet — apply a Basic or Advanced filter to populate."),
-    ];
-
-    private void CancelFilterGroupPicker()
-    {
-        _isGroupPickerVisible = false;
-        _selectedGroupId = default;
+        IsFilterSetPickerVisible = false;
+        SelectedFilterSetId = default;
     }
 
     private async Task ClearAllFiltersAsync()
@@ -264,8 +332,8 @@ public sealed partial class FilterPane : IDisposable
         return count;
     }
 
-    private string GetGroupName(FilterGroupId id) =>
-        FilterGroupState.Value.Groups.FirstOrDefault(g => g.Id == id)?.Name ?? string.Empty;
+    private string GetFilterSetName(LibraryEntryId id) =>
+        FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().FirstOrDefault(p => p.Id.Equals(id))?.Name ?? string.Empty;
 
     private async Task HandleAddFilterChevronKeyDownAsync(KeyboardEventArgs e)
     {
@@ -333,26 +401,9 @@ public sealed partial class FilterPane : IDisposable
         StateHasChanged();
     }
 
-    private Task OpenCachedFiltersModal() => ModalCoordinator.OpenFilterCacheAsync();
+    private Task OpenCachedFiltersModal() => ModalCoordinator.OpenFilterLibraryAsync(LibraryTab.Favorites);
 
-    private void OpenFilterGroupPicker()
-    {
-        // Re-clicking the trigger is a no-op so an in-progress dropdown selection isn't silently
-        // overwritten by `Groups.First()` reset. Cancel button is the only way to dismiss the picker.
-        if (_isGroupPickerVisible) { return; }
-
-        // Per locked design: trigger is always enabled. Picker shows empty-state copy when no groups
-        // exist (rather than disabling the trigger and leaving users without a discovery hint).
-        // Pre-select uses the dropdown's display order (alphabetical) so the highlighted entry
-        // matches the first row a sighted user sees.
-        _isGroupPickerVisible = true;
-        _selectedGroupId = HasFilterGroups
-            ? FilterGroupState.Value.Groups.OrderBy(g => g.Name).First().Id
-            : default;
-        _isFilterListVisible = true;
-    }
-
-    private Task OpenFilterGroupsModal() => ModalCoordinator.OpenFilterGroupAsync();
+    private Task OpenSavedFiltersModal() => ModalCoordinator.OpenFilterLibraryAsync(LibraryTab.Saved);
 
     private void PruneStaleRowRefs()
     {
@@ -382,7 +433,7 @@ public sealed partial class FilterPane : IDisposable
         FilterPaneCommands.SetFilterDateRange(null);
     }
 
-    private Task SaveFiltersAsGroupAsync() => !HasSavableFilters ? Task.CompletedTask : MenuActions.SaveFiltersAsGroupAsync();
+    private Task SaveFiltersAsFilterSetAsync() => !HasSavableFilters ? Task.CompletedTask : MenuActions.SaveFiltersAsFilterSetAsync();
 
     private void ToggleDateFilter() => FilterPaneCommands.ToggleFilterDate();
 

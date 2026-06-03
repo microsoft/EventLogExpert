@@ -7,7 +7,7 @@ namespace EventLogExpert.Runtime.FilterLibrary;
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "Kind")]
 [JsonDerivedType(typeof(LibraryEntrySavedFilter), "Filter")]
-[JsonDerivedType(typeof(LibraryEntryPreset), "Preset")]
+[JsonDerivedType(typeof(LibraryEntryFilterSet), "FilterSet")]
 public abstract record LibraryEntry
 {
     public LibraryEntryId Id { get; init; } = LibraryEntryId.Create();

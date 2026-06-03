@@ -32,9 +32,11 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private bool _tabKeyShimAttached;
     private ElementReference _tablistRef;
 
-    private IReadOnlyList<LibraryEntryPreset> AllPresets =>
+    [Parameter] public LibraryTab? InitialTab { get; set; }
+
+    private IReadOnlyList<LibraryEntryFilterSet> AllFilterSets =>
         [.. FilterLibraryState.Value.Entries
-            .OfType<LibraryEntryPreset>()
+            .OfType<LibraryEntryFilterSet>()
             .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)];
 
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
@@ -48,9 +50,9 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private string EmptyStateMessage => _activeTab switch
     {
-        LibraryTab.Favorites => "No favorited filters or presets yet. Star an entry to add it here.",
+        LibraryTab.Favorites => "No favorited filters or filter sets yet. Star an entry to add it here.",
         LibraryTab.PreviouslyUsed => "No filters have been applied recently.",
-        _ => "No saved filters or presets yet. Use \"Save as Preset\" from the filter pane.",
+        _ => "No saved filters or filter sets yet. Use \"Save as Filter Set\" from the filter pane.",
     };
 
     private IReadOnlyList<LibraryEntry> FavoriteEntries =>
@@ -225,6 +227,11 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     {
         base.OnInitialized();
 
+        if (InitialTab is { } tab)
+        {
+            _activeTab = tab;
+        }
+
         if (!FilterLibraryState.Value.IsLoaded || FilterLibraryState.Value.LoadError)
         {
             FilterLibraryCommands.LoadLibrary();
@@ -252,15 +259,15 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         _ => SavedEntries.Count,
     };
 
-    private Task HandleAddToPresetAsync(AddToPresetIntent intent)
+    private Task HandleAddToFilterSetAsync(AddToFilterSetIntent intent)
     {
-        if (intent.PresetId is { } presetId)
+        if (intent.FilterSetId is { } filterSetId)
         {
-            FilterLibraryCommands.AddFilterToExistingPreset(presetId, intent.Filter, intent.SourceEntryId);
+            FilterLibraryCommands.AddFilterToExistingFilterSet(filterSetId, intent.Filter, intent.SourceEntryId);
         }
-        else if (!string.IsNullOrWhiteSpace(intent.NewPresetName))
+        else if (!string.IsNullOrWhiteSpace(intent.NewFilterSetName))
         {
-            FilterLibraryCommands.AddFilterToNewPreset(intent.NewPresetName!, intent.Filter, intent.SourceEntryId);
+            FilterLibraryCommands.AddFilterToNewFilterSet(intent.NewFilterSetName!, intent.Filter, intent.SourceEntryId);
         }
 
         return Task.CompletedTask;

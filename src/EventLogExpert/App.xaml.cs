@@ -7,8 +7,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Activation;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.EventLog;
-using EventLogExpert.Runtime.FilterCache;
-using EventLogExpert.Runtime.FilterGroup;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
 using Fluxor;
@@ -24,9 +23,8 @@ public sealed partial class App : Application
     private readonly ISettingsService _settings;
 
     public App(
-        IFilterCacheCommands filterCacheCommands,
+        IFilterLibraryCommands filterLibraryCommands,
         ILogTableCommands logTableCommands,
-        IFilterGroupCommands filterGroupCommands,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogs,
         ISettingsService settings,
         IAppTitleService appTitleService,
@@ -42,9 +40,8 @@ public sealed partial class App : Application
         _settings.ThemeChanged += OnThemeChanged;
 
         _mainPage = new MainPage(
-            filterCacheCommands,
+            filterLibraryCommands,
             logTableCommands,
-            filterGroupCommands,
             activeLogs,
             settings,
             appTitleService,

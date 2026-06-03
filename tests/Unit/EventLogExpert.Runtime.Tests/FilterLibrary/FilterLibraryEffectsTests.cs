@@ -15,133 +15,133 @@ namespace EventLogExpert.Runtime.Tests.FilterLibrary;
 public sealed class FilterLibraryEffectsTests
 {
     [Fact]
-    public async Task HandleAddFilterToExistingPreset_AppendsToPreset()
+    public async Task HandleAddFilterToExistingFilterSet_AppendsToFilterSet()
     {
         var existingFilter = SavedFilter.TryCreate("Level == 2");
         var newFilter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(existingFilter);
         Assert.NotNull(newFilter);
-        var preset = new LibraryEntryPreset
+        var filterSet = new LibraryEntryFilterSet
         {
-            Name = "Preset",
+            Name = "Filter Set",
             CreatedUtc = DateTimeOffset.UtcNow,
             Filters = [existingFilter],
         };
-        var (effects, store, _, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [preset] });
+        var (effects, store, _, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [filterSet] });
 
-        await effects.HandleAddFilterToExistingPreset(
-            new AddFilterToExistingPresetAction(preset.Id, newFilter, SourceEntryId: null),
+        await effects.HandleAddFilterToExistingFilterSet(
+            new AddFilterToExistingFilterSetAction(filterSet.Id, newFilter, SourceEntryId: null),
             Substitute.For<IDispatcher>());
 
-        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e is LibraryEntryPreset
-            && ((LibraryEntryPreset)e).Id == preset.Id && ((LibraryEntryPreset)e).Filters.Count == 2
-            && ((LibraryEntryPreset)e).Filters.Any(f => f.ComparisonText == "Level == 4")));
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e is LibraryEntryFilterSet
+            && ((LibraryEntryFilterSet)e).Id == filterSet.Id && ((LibraryEntryFilterSet)e).Filters.Count == 2
+            && ((LibraryEntryFilterSet)e).Filters.Any(f => f.ComparisonText == "Level == 4")));
     }
 
     [Fact]
-    public async Task HandleAddFilterToExistingPreset_DuplicateTuple_DoesNotAppendButStillPromotesSource()
+    public async Task HandleAddFilterToExistingFilterSet_DuplicateTuple_DoesNotAppendButStillPromotesSource()
     {
         var existingFilter = SavedFilter.TryCreate("Level == 4");
         var duplicate = SavedFilter.TryCreate("LEVEL == 4");
         Assert.NotNull(existingFilter);
         Assert.NotNull(duplicate);
-        var preset = new LibraryEntryPreset
+        var filterSet = new LibraryEntryFilterSet
         {
-            Name = "Preset",
+            Name = "Filter Set",
             CreatedUtc = DateTimeOffset.UtcNow,
             Filters = [existingFilter],
         };
         var source = BuildFilterEntry("Source") with { Origin = LibraryEntryOrigin.AutoTracked };
-        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [preset, source] });
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [filterSet, source] });
 
-        await effects.HandleAddFilterToExistingPreset(
-            new AddFilterToExistingPresetAction(preset.Id, duplicate, source.Id),
+        await effects.HandleAddFilterToExistingFilterSet(
+            new AddFilterToExistingFilterSetAction(filterSet.Id, duplicate, source.Id),
             dispatcher);
 
-        // Did NOT update the preset (duplicate).
-        store.DidNotReceive().Update(Arg.Is<LibraryEntry>(e => e.Id == preset.Id));
+        // Did NOT update the filter set (duplicate).
+        store.DidNotReceive().Update(Arg.Is<LibraryEntry>(e => e.Id == filterSet.Id));
         // But DID promote the source.
         store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Id == source.Id && e.Origin == LibraryEntryOrigin.UserSaved));
     }
 
     [Fact]
-    public async Task HandleAddFilterToExistingPreset_SameTextDifferentMode_AppendsAsDistinctFilter()
+    public async Task HandleAddFilterToExistingFilterSet_SameTextDifferentMode_AppendsAsDistinctFilter()
     {
-        // Mode-drift policy: distinct Mode + same ComparisonText must coexist in a preset.
+        // Mode-drift policy: distinct Mode + same ComparisonText must coexist in a filter set.
         var advanced = SavedFilter.TryCreate("Level == 4", mode: FilterMode.Advanced);
         var basic = SavedFilter.TryCreate("Level == 4", mode: FilterMode.Basic);
         Assert.NotNull(advanced);
         Assert.NotNull(basic);
-        var preset = new LibraryEntryPreset
+        var filterSet = new LibraryEntryFilterSet
         {
-            Name = "Preset",
+            Name = "Filter Set",
             CreatedUtc = DateTimeOffset.UtcNow,
             Filters = [advanced],
         };
-        var (effects, store, _, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [preset] });
+        var (effects, store, _, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [filterSet] });
 
-        await effects.HandleAddFilterToExistingPreset(
-            new AddFilterToExistingPresetAction(preset.Id, basic, SourceEntryId: null),
+        await effects.HandleAddFilterToExistingFilterSet(
+            new AddFilterToExistingFilterSetAction(filterSet.Id, basic, SourceEntryId: null),
             Substitute.For<IDispatcher>());
 
-        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.GetType() == typeof(LibraryEntryPreset)
-            && ((LibraryEntryPreset)e).Id == preset.Id
-            && ((LibraryEntryPreset)e).Filters.Count == 2
-            && ((LibraryEntryPreset)e).Filters.Any(f => f.Mode == FilterMode.Advanced)
-            && ((LibraryEntryPreset)e).Filters.Any(f => f.Mode == FilterMode.Basic)));
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.GetType() == typeof(LibraryEntryFilterSet)
+            && ((LibraryEntryFilterSet)e).Id == filterSet.Id
+            && ((LibraryEntryFilterSet)e).Filters.Count == 2
+            && ((LibraryEntryFilterSet)e).Filters.Any(f => f.Mode == FilterMode.Advanced)
+            && ((LibraryEntryFilterSet)e).Filters.Any(f => f.Mode == FilterMode.Basic)));
     }
 
     [Fact]
-    public async Task HandleAddFilterToExistingPreset_UnknownPreset_IsNoOp()
+    public async Task HandleAddFilterToExistingFilterSet_UnknownFilterSet_IsNoOp()
     {
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
         var (effects, store, _, _, _) = CreateEffects();
 
-        await effects.HandleAddFilterToExistingPreset(
-            new AddFilterToExistingPresetAction(LibraryEntryId.Create(), filter, SourceEntryId: null),
+        await effects.HandleAddFilterToExistingFilterSet(
+            new AddFilterToExistingFilterSetAction(LibraryEntryId.Create(), filter, SourceEntryId: null),
             Substitute.For<IDispatcher>());
 
         store.DidNotReceive().Update(Arg.Any<LibraryEntry>());
     }
 
     [Fact]
-    public async Task HandleAddFilterToNewPreset_CreatesPresetWithSingleFilter()
+    public async Task HandleAddFilterToNewFilterSet_CreatesFilterSetWithSingleFilter()
     {
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
         var (effects, store, dispatcher, _, _) = CreateEffects();
 
-        await effects.HandleAddFilterToNewPreset(new AddFilterToNewPresetAction("New", filter, SourceEntryId: null), dispatcher);
+        await effects.HandleAddFilterToNewFilterSet(new AddFilterToNewFilterSetAction("New", filter, SourceEntryId: null), dispatcher);
 
-        store.Received(1).Add(Arg.Is<LibraryEntry>(e => e.GetType() == typeof(LibraryEntryPreset)
-            && ((LibraryEntryPreset)e).Name == "New"
-            && ((LibraryEntryPreset)e).Filters.Count == 1
-            && ((LibraryEntryPreset)e).Filters[0].Id != filter.Id));
+        store.Received(1).Add(Arg.Is<LibraryEntry>(e => e.GetType() == typeof(LibraryEntryFilterSet)
+            && ((LibraryEntryFilterSet)e).Name == "New"
+            && ((LibraryEntryFilterSet)e).Filters.Count == 1
+            && ((LibraryEntryFilterSet)e).Filters[0].Id != filter.Id));
     }
 
     [Fact]
-    public async Task HandleAddFilterToNewPreset_PromotesAutoTrackedSource()
+    public async Task HandleAddFilterToNewFilterSet_PromotesAutoTrackedSource()
     {
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
         var source = BuildFilterEntry("Source") with { Origin = LibraryEntryOrigin.AutoTracked };
         var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [source] });
 
-        await effects.HandleAddFilterToNewPreset(new AddFilterToNewPresetAction("New", filter, source.Id), dispatcher);
+        await effects.HandleAddFilterToNewFilterSet(new AddFilterToNewFilterSetAction("New", filter, source.Id), dispatcher);
 
         store.Received(1).Update(Arg.Is<LibraryEntry>(e =>
             e.Id == source.Id && e.Origin == LibraryEntryOrigin.UserSaved));
     }
 
     [Fact]
-    public async Task HandleAddFilterToNewPreset_WhitespaceName_IsNoOp()
+    public async Task HandleAddFilterToNewFilterSet_WhitespaceName_IsNoOp()
     {
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
         var (effects, store, _, _, _) = CreateEffects();
 
-        await effects.HandleAddFilterToNewPreset(new AddFilterToNewPresetAction("   ", filter, SourceEntryId: null), Substitute.For<IDispatcher>());
+        await effects.HandleAddFilterToNewFilterSet(new AddFilterToNewFilterSetAction("   ", filter, SourceEntryId: null), Substitute.For<IDispatcher>());
 
         store.DidNotReceive().Add(Arg.Any<LibraryEntry>());
     }
@@ -172,25 +172,25 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleApplyLibraryEntry_PresetEntry_DispatchesMergeFiltersWithAllFiltersAndRecordEntryApplied()
+    public async Task HandleApplyLibraryEntry_FilterSetEntry_DispatchesMergeFiltersWithAllFiltersAndRecordEntryApplied()
     {
         var f1 = SavedFilter.TryCreate("Level == 2");
         var f2 = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(f1);
         Assert.NotNull(f2);
 
-        var preset = new LibraryEntryPreset
+        var filterSet = new LibraryEntryFilterSet
         {
-            Name = "Preset",
+            Name = "Filter Set",
             CreatedUtc = DateTimeOffset.UtcNow,
             Filters = [f1, f2],
         };
-        var (effects, _, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [preset] });
+        var (effects, _, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [filterSet] });
 
-        await effects.HandleApplyLibraryEntry(new ApplyLibraryEntryAction(preset.Id), dispatcher);
+        await effects.HandleApplyLibraryEntry(new ApplyLibraryEntryAction(filterSet.Id), dispatcher);
 
         dispatcher.Received(1).Dispatch(Arg.Is<MergeFiltersAction>(a => a.Filters.Count == 2));
-        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a.EntryId == preset.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a.EntryId == filterSet.Id));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<ReplaceFiltersAction>());
     }
 
@@ -282,7 +282,13 @@ public sealed class FilterLibraryEffectsTests
     {
         var migratedEntry = BuildFilterEntry("migrated");
         var migrator = Substitute.For<ILegacyFilterMigrator>();
-        migrator.ShouldRunMigration().Returns(true);
+        var migrationComplete = 0;
+        // Realistic mock: ShouldRunMigration returns true until the migrator marks completion (matches the
+        // real LegacyFilterMigrator's per-section flag semantics). The previous test relied on the now-removed
+        // entries.IsEmpty guard to suppress the second BuildEntriesFromLegacy call.
+        migrator.ShouldRunMigration().Returns(_ => Volatile.Read(ref migrationComplete) == 0);
+        migrator.When(m => m.MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>()))
+            .Do(_ => Volatile.Write(ref migrationComplete, 1));
         migrator.BuildEntriesFromLegacy()
             .Returns(new LegacyMigrationResult(
                 ImmutableList.Create<LibraryEntry>(migratedEntry),
@@ -492,7 +498,139 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleLoadLibrary_NonEmptyStore_DoesNotInvokeMigrator()
+    public async Task HandleLoadLibrary_NonEmptyStore_FilterSetsSameNameDifferentFilters_BothSurvive()
+    {
+        // Presets are user-created with no name-uniqueness invariant; same-name presets with distinct
+        // filter content must both persist. Dedup must key on name + filters fingerprint, not name alone.
+        var existingFilter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(existingFilter);
+        var existingFilterSet = new LibraryEntryFilterSet
+        {
+            Name = "Errors",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = ImmutableList.Create(existingFilter),
+        };
+        var migratedFilter = SavedFilter.TryCreate("Level == 5");
+        Assert.NotNull(migratedFilter);
+        var migratedPreset = new LibraryEntryFilterSet
+        {
+            Name = "Errors", // same name
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = ImmutableList.Create(migratedFilter), // different filters
+        };
+        var sections = LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents;
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(true);
+        migrator.BuildEntriesFromLegacy()
+            .Returns(new LegacyMigrationResult(ImmutableList.Create<LibraryEntry>(migratedPreset), sections));
+        var store = Substitute.For<IFilterLibraryStore>();
+        store.LoadAll().Returns([existingFilterSet], [existingFilterSet, migratedPreset]);
+        var (effects, _, dispatcher, _, _, _) = CreateEffectsWithMigrator(migrator, store: store);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        // Distinct filter content → migrated filter set is NOT deduped → AddRange called with it.
+        store.Received(1).AddRange(Arg.Is<IEnumerable<LibraryEntry>>(e => e.Count() == 1 && e.First() is LibraryEntryFilterSet));
+        migrator.Received(1).MarkMigrationCompleted(sections);
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 2));
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_NonEmptyStore_MigrationEntriesOverlap_DedupsAgainstExisting_NoDuplicateInsertion()
+    {
+        // Critical defense against the SetString-throws-then-retry duplication scenario: if a prior launch
+        // successfully ran AddRange but failed MarkMigrationCompleted, the next launch reads the populated
+        // store, ShouldRunMigration still returns true, BuildEntriesFromLegacy re-emits the same entries
+        // (fresh GUIDs but same content), and the migration must NOT re-insert them as content-duplicates.
+        var existingFavorite = BuildFilterEntryWithText("Favorite", "Level == 4");
+        var existingFilterSet = BuildFilterSetEntry("Errors");
+        var duplicateFavorite = BuildFilterEntryWithText("Favorite-rebuilt-fresh-id", "Level == 4"); // same ComparisonText
+        var duplicateFilterSet = BuildFilterSetEntry("Errors"); // same Name
+        var sections = LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents;
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(true);
+        migrator.BuildEntriesFromLegacy()
+            .Returns(new LegacyMigrationResult(ImmutableList.Create<LibraryEntry>(duplicateFavorite, duplicateFilterSet), sections));
+        var store = Substitute.For<IFilterLibraryStore>();
+        store.LoadAll().Returns([existingFavorite, existingFilterSet]);
+        var (effects, _, dispatcher, _, _, _) = CreateEffectsWithMigrator(migrator, store: store);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        // Both migration entries collide with existing store content → AddRange must NOT be called with them.
+        store.DidNotReceive().AddRange(Arg.Any<IEnumerable<LibraryEntry>>());
+        // Bitmask still advances — the section is "complete" from the persistence perspective.
+        migrator.Received(1).MarkMigrationCompleted(sections);
+        // Loaded entries reflect the existing store (no duplicates).
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 2));
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_NonEmptyStore_MigrationEntriesPartiallyOverlap_OnlyNonOverlappingPersisted()
+    {
+        var existing = BuildFilterEntryWithText("Existing", "Level == 4");
+        var dupeOverlap = BuildFilterEntryWithText("Overlap", "Level == 4"); // collides with existing
+        var newEntry = BuildFilterEntryWithText("New", "Level == 5"); // does not collide
+        var sections = LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents;
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(true);
+        migrator.BuildEntriesFromLegacy()
+            .Returns(new LegacyMigrationResult(ImmutableList.Create<LibraryEntry>(dupeOverlap, newEntry), sections));
+        var store = Substitute.For<IFilterLibraryStore>();
+        store.LoadAll().Returns([existing], [existing, newEntry]);
+        var (effects, _, dispatcher, _, _, _) = CreateEffectsWithMigrator(migrator, store: store);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        // Only the non-overlapping entry is inserted.
+        store.Received(1).AddRange(Arg.Is<IEnumerable<LibraryEntry>>(e => e.Count() == 1 && e.First().Id == newEntry.Id));
+        migrator.Received(1).MarkMigrationCompleted(sections);
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 2));
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_NonEmptyStore_PartialMigration_AddRangeThrows_PreservesExistingEntriesWithoutMarkingComplete()
+    {
+        var existingEntry = BuildFilterEntryWithText("existing", "Level == 4");
+        var migrationEntry = BuildFilterEntryWithText("would-be-migrated", "Level == 5");
+        var partial = LegacyMigrationSections.Favorites | LegacyMigrationSections.Recents;
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(true);
+        migrator.BuildEntriesFromLegacy()
+            .Returns(new LegacyMigrationResult(ImmutableList.Create<LibraryEntry>(migrationEntry), partial));
+        var store = Substitute.For<IFilterLibraryStore>();
+        store.LoadAll().Returns([existingEntry]);
+        store.When(s => s.AddRange(Arg.Any<IEnumerable<LibraryEntry>>()))
+            .Do(_ => throw new InvalidOperationException("boom"));
+        var (effects, _, dispatcher, _, _, _) = CreateEffectsWithMigrator(migrator, store: store);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        migrator.DidNotReceive().MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1 && a.Entries[0].Id == existingEntry.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_NonEmptyStore_ShouldRunReturnsFalse_DoesNotInvokeBuildOrAddRange()
+    {
+        var existingEntry = BuildFilterEntry("existing");
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(false);
+        var (effects, store, dispatcher, _, _, _) = CreateEffectsWithMigrator(migrator);
+        store.LoadAll().Returns([existingEntry]);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        migrator.Received(1).ShouldRunMigration();
+        migrator.DidNotReceive().BuildEntriesFromLegacy();
+        store.DidNotReceive().AddRange(Arg.Any<IEnumerable<LibraryEntry>>());
+        migrator.DidNotReceive().MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1));
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_NonEmptyStore_ShouldRunReturnsTrue_StillInvokesMigrator()
     {
         var migrator = Substitute.For<ILegacyFilterMigrator>();
         migrator.ShouldRunMigration().Returns(true);
@@ -503,11 +641,34 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleLoadLibrary(dispatcher);
 
-        migrator.DidNotReceive().ShouldRunMigration();
-        migrator.DidNotReceive().BuildEntriesFromLegacy();
-        migrator.DidNotReceive().MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
+        migrator.Received(1).ShouldRunMigration();
+        migrator.Received(1).BuildEntriesFromLegacy();
         store.DidNotReceive().AddRange(Arg.Any<IEnumerable<LibraryEntry>>());
+        migrator.Received(1).MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
         dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1));
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_NonEmptyStore_StillInvokesMigratorWhenShouldRun_MergesNonOverlappingEntries()
+    {
+        var existingEntry = BuildFilterEntryWithText("existing", "Level == 4");
+        var migratedEntry = BuildFilterEntryWithText("migrated-groups", "Level == 5");
+        var sections = LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents;
+        var migrator = Substitute.For<ILegacyFilterMigrator>();
+        migrator.ShouldRunMigration().Returns(true);
+        migrator.BuildEntriesFromLegacy()
+            .Returns(new LegacyMigrationResult(ImmutableList.Create<LibraryEntry>(migratedEntry), sections));
+        var store = Substitute.For<IFilterLibraryStore>();
+        store.LoadAll().Returns([existingEntry], [existingEntry, migratedEntry]);
+        var (effects, _, dispatcher, _, _, _) = CreateEffectsWithMigrator(migrator, store: store);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        migrator.Received(1).ShouldRunMigration();
+        migrator.Received(1).BuildEntriesFromLegacy();
+        store.Received(1).AddRange(Arg.Is<IEnumerable<LibraryEntry>>(e => e.Count() == 1));
+        migrator.Received(1).MarkMigrationCompleted(sections);
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 2));
     }
 
     [Fact]
@@ -940,25 +1101,25 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleReplaceWithLibraryEntry_PresetEntry_DispatchesReplaceFiltersWithAllFiltersAndRecordEntryApplied()
+    public async Task HandleReplaceWithLibraryEntry_FilterSetEntry_DispatchesReplaceFiltersWithAllFiltersAndRecordEntryApplied()
     {
         var f1 = SavedFilter.TryCreate("Level == 2");
         var f2 = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(f1);
         Assert.NotNull(f2);
 
-        var preset = new LibraryEntryPreset
+        var filterSet = new LibraryEntryFilterSet
         {
-            Name = "Preset",
+            Name = "Filter Set",
             CreatedUtc = DateTimeOffset.UtcNow,
             Filters = [f1, f2],
         };
-        var (effects, _, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [preset] });
+        var (effects, _, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [filterSet] });
 
-        await effects.HandleReplaceWithLibraryEntry(new ReplaceWithLibraryEntryAction(preset.Id), dispatcher);
+        await effects.HandleReplaceWithLibraryEntry(new ReplaceWithLibraryEntryAction(filterSet.Id), dispatcher);
 
         dispatcher.Received(1).Dispatch(Arg.Is<ReplaceFiltersAction>(a => a.Filters.Count == 2));
-        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a.EntryId == preset.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a.EntryId == filterSet.Id));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<MergeFiltersAction>());
     }
 
@@ -1033,43 +1194,7 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleSavePaneAsPreset_EmptyPane_IsNoOp()
-    {
-        var (effects, _, dispatcher, _, _) = CreateEffects(paneState: new FilterPaneState());
-
-        await effects.HandleSavePaneAsPreset(new SavePaneAsPresetAction("Pane Preset"), dispatcher);
-
-        dispatcher.DidNotReceive().Dispatch(Arg.Any<SavePresetAction>());
-    }
-
-    [Fact]
-    public async Task HandleSavePaneAsPreset_PaneHasFilters_DispatchesSavePresetWithPaneFilters()
-    {
-        var f1 = SavedFilter.TryCreate("Level == 2");
-        Assert.NotNull(f1);
-        var paneState = new FilterPaneState { Filters = [f1] };
-        var (effects, _, dispatcher, _, _) = CreateEffects(paneState: paneState);
-
-        await effects.HandleSavePaneAsPreset(new SavePaneAsPresetAction("Pane Preset"), dispatcher);
-
-        dispatcher.Received(1).Dispatch(Arg.Is<SavePresetAction>(a =>
-            a.Name == "Pane Preset" && a.Filters.Count == 1 && a.Filters[0] == f1));
-    }
-
-    [Fact]
-    public async Task HandleSavePaneAsPreset_WhitespaceName_IsNoOp()
-    {
-        var f1 = SavedFilter.TryCreate("Level == 2");
-        Assert.NotNull(f1);
-        var (effects, _, dispatcher, _, _) = CreateEffects(paneState: new FilterPaneState { Filters = [f1] });
-
-        await effects.HandleSavePaneAsPreset(new SavePaneAsPresetAction("   "), dispatcher);
-
-        dispatcher.DidNotReceive().Dispatch(Arg.Any<SavePresetAction>());
-    }
-
-    [Fact]
-    public async Task HandleSavePreset_CreatesNewPresetWithRegeneratedFilterIds()
+    public async Task HandleSaveFilterSet_CreatesNewFilterSetWithRegeneratedFilterIds()
     {
         var f1 = SavedFilter.TryCreate("Level == 2");
         var f2 = SavedFilter.TryCreate("Level == 4");
@@ -1078,38 +1203,74 @@ public sealed class FilterLibraryEffectsTests
         var originalIds = new[] { f1.Id, f2.Id };
         var (effects, store, dispatcher, _, _) = CreateEffects();
 
-        await effects.HandleSavePreset(new SavePresetAction("My Preset", [f1, f2]), dispatcher);
+        await effects.HandleSaveFilterSet(new SaveFilterSetAction("My Preset", [f1, f2]), dispatcher);
 
-        store.Received(1).Add(Arg.Is<LibraryEntry>(e => e.GetType() == typeof(LibraryEntryPreset)
-            && ((LibraryEntryPreset)e).Name == "My Preset"
-            && ((LibraryEntryPreset)e).Origin == LibraryEntryOrigin.UserSaved
-            && ((LibraryEntryPreset)e).Filters.Count == 2
-            && ((LibraryEntryPreset)e).Filters.All(f => !originalIds.Contains(f.Id))
-            && ((LibraryEntryPreset)e).Filters.All(f => !f.IsEnabled)));
-        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => a.Entry.GetType() == typeof(LibraryEntryPreset)));
+        store.Received(1).Add(Arg.Is<LibraryEntry>(e => e.GetType() == typeof(LibraryEntryFilterSet)
+            && ((LibraryEntryFilterSet)e).Name == "My Preset"
+            && ((LibraryEntryFilterSet)e).Origin == LibraryEntryOrigin.UserSaved
+            && ((LibraryEntryFilterSet)e).Filters.Count == 2
+            && ((LibraryEntryFilterSet)e).Filters.All(f => !originalIds.Contains(f.Id))
+            && ((LibraryEntryFilterSet)e).Filters.All(f => !f.IsEnabled)));
+        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => a.Entry.GetType() == typeof(LibraryEntryFilterSet)));
     }
 
     [Fact]
-    public async Task HandleSavePreset_EmptyFilters_IsNoOp()
+    public async Task HandleSaveFilterSet_EmptyFilters_IsNoOp()
     {
         var (effects, store, dispatcher, _, _) = CreateEffects();
 
-        await effects.HandleSavePreset(new SavePresetAction("Empty", []), dispatcher);
+        await effects.HandleSaveFilterSet(new SaveFilterSetAction("Empty", []), dispatcher);
 
         store.DidNotReceive().Add(Arg.Any<LibraryEntry>());
     }
 
     [Fact]
-    public async Task HandleSavePreset_WhitespaceName_IsNoOp()
+    public async Task HandleSaveFilterSet_WhitespaceName_IsNoOp()
     {
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
         var (effects, store, dispatcher, _, _) = CreateEffects();
 
-        await effects.HandleSavePreset(new SavePresetAction("   ", [filter]), dispatcher);
+        await effects.HandleSaveFilterSet(new SaveFilterSetAction("   ", [filter]), dispatcher);
 
         store.DidNotReceive().Add(Arg.Any<LibraryEntry>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
+    public async Task HandleSavePaneAsFilterSet_EmptyPane_IsNoOp()
+    {
+        var (effects, _, dispatcher, _, _) = CreateEffects(paneState: new FilterPaneState());
+
+        await effects.HandleSavePaneAsFilterSet(new SavePaneAsFilterSetAction("Pane Preset"), dispatcher);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<SaveFilterSetAction>());
+    }
+
+    [Fact]
+    public async Task HandleSavePaneAsFilterSet_PaneHasFilters_DispatchesSaveFilterSetWithPaneFilters()
+    {
+        var f1 = SavedFilter.TryCreate("Level == 2");
+        Assert.NotNull(f1);
+        var paneState = new FilterPaneState { Filters = [f1] };
+        var (effects, _, dispatcher, _, _) = CreateEffects(paneState: paneState);
+
+        await effects.HandleSavePaneAsFilterSet(new SavePaneAsFilterSetAction("Pane Preset"), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(a =>
+            a.Name == "Pane Preset" && a.Filters.Count == 1 && a.Filters[0] == f1));
+    }
+
+    [Fact]
+    public async Task HandleSavePaneAsFilterSet_WhitespaceName_IsNoOp()
+    {
+        var f1 = SavedFilter.TryCreate("Level == 2");
+        Assert.NotNull(f1);
+        var (effects, _, dispatcher, _, _) = CreateEffects(paneState: new FilterPaneState { Filters = [f1] });
+
+        await effects.HandleSavePaneAsFilterSet(new SavePaneAsFilterSetAction("   "), dispatcher);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<SaveFilterSetAction>());
     }
 
     [Fact]
@@ -1137,22 +1298,22 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleSetIsFavorite_False_OnPreset_LeavesLastUsedNull()
+    public async Task HandleSetIsFavorite_False_OnFilterSet_LeavesLastUsedNull()
     {
         var f = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(f);
-        var preset = new LibraryEntryPreset
+        var filterSet = new LibraryEntryFilterSet
         {
-            Name = "Preset",
+            Name = "Filter Set",
             CreatedUtc = DateTimeOffset.UtcNow,
             IsFavorite = true,
             Filters = [f],
         };
-        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [preset] });
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [filterSet] });
 
-        await effects.HandleSetIsFavorite(new SetIsFavoriteAction(preset.Id, IsFavorite: false), dispatcher);
+        await effects.HandleSetIsFavorite(new SetIsFavoriteAction(filterSet.Id, IsFavorite: false), dispatcher);
 
-        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Id == preset.Id && !e.IsFavorite && e.LastUsedUtc == null));
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Id == filterSet.Id && !e.IsFavorite && e.LastUsedUtc == null));
     }
 
     [Fact]
@@ -1221,6 +1382,27 @@ public sealed class FilterLibraryEffectsTests
             Filter = filter,
         };
     }
+
+    private static LibraryEntrySavedFilter BuildFilterEntryWithText(string name, string comparisonText)
+    {
+        var filter = SavedFilter.TryCreate(comparisonText);
+        Assert.NotNull(filter);
+
+        return new LibraryEntrySavedFilter
+        {
+            Name = name,
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filter = filter,
+        };
+    }
+
+    private static LibraryEntryFilterSet BuildFilterSetEntry(string name) =>
+        new()
+        {
+            Name = name,
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = ImmutableList<SavedFilter>.Empty,
+        };
 
     private static (Effects effects, IFilterLibraryStore store, IDispatcher dispatcher, IState<FilterLibraryState> stateMock, ITraceLogger logger) CreateEffects(
         FilterLibraryState? state = null,

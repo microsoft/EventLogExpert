@@ -6,10 +6,10 @@ using EventLogExpert.Runtime.FilterLibrary;
 
 namespace EventLogExpert.UI.FilterLibrary;
 
-public sealed record AddToPresetIntent(
+public sealed record AddToFilterSetIntent(
     SavedFilter Filter,
-    LibraryEntryId? PresetId,
-    string? NewPresetName,
+    LibraryEntryId? FilterSetId,
+    string? NewFilterSetName,
     LibraryEntryId SourceEntryId)
 {
     public SavedFilter Filter { get; init; } = Filter ?? throw new ArgumentNullException(nameof(Filter));

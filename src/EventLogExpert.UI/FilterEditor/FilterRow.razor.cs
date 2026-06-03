@@ -6,8 +6,7 @@ using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
-using EventLogExpert.Runtime.FilterCache;
-using EventLogExpert.Runtime.FilterGroup;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.UI.FilterEditor.Rows;
 using Fluxor;
@@ -31,14 +30,50 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
     /// <summary>Saved-row remove: notifies parent BEFORE dispatch so focus restoration can capture pre-removal state.</summary>
     [Parameter] public EventCallback<FilterId> OnRemoved { get; set; }
 
-    /// <summary>
-    ///     When set, dispatches route through <see cref="GroupActions" /> with this parent group id and the row adopts
-    ///     the group-row chrome variants (no enable/disable toggle, inline error row, group CSS).
-    /// </summary>
-    [Parameter] public FilterGroupId? ParentFilterGroupId { get; set; }
-
     /// <summary>Mutually exclusive with <see cref="FilterRowBase{TValue}.Value" />.</summary>
     [Parameter] public FilterDraft? PendingDraft { get; set; }
+
+    /// <summary>
+    ///     Favourites listed first (flagged <see cref="CachedOption.IsFavorite" />), then previously-used filters minus
+    ///     duplicates by case-insensitive <see cref="SavedFilter.ComparisonText" /> comparison. The dedupe key is
+    ///     <see cref="SavedFilter.ComparisonText" /> ONLY (legacy UX): the cached quick-pick is a string-based shortcut where
+    ///     Mode/IsExcluded come from the user's current <see cref="FilterDraft" /> at pick time, not from the source entry.
+    ///     The library store itself dedupes by the richer <c>(ComparisonText, Mode, IsExcluded)</c> tuple — these are
+    ///     different layers with different contracts. Excludes <see cref="LibraryEntryFilterSet" /> entries (filter sets have
+    ///     no <c>Filter</c> property).
+    /// </summary>
+    internal List<CachedOption> CachedOptions
+    {
+        get
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var result = new List<CachedOption>();
+
+            var savedFilters = FilterLibraryState.Value.Entries.OfType<LibraryEntrySavedFilter>().ToList();
+
+            foreach (var entry in savedFilters
+                .Where(e => e.IsFavorite)
+                .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                if (seen.Add(entry.Filter.ComparisonText))
+                {
+                    result.Add(new CachedOption(entry.Filter.ComparisonText, true));
+                }
+            }
+
+            foreach (var entry in savedFilters
+                .Where(e => !e.IsFavorite && e.LastUsedUtc is not null)
+                .OrderByDescending(e => e.LastUsedUtc!.Value))
+            {
+                if (seen.Add(entry.Filter.ComparisonText))
+                {
+                    result.Add(new CachedOption(entry.Filter.ComparisonText, false));
+                }
+            }
+
+            return result;
+        }
+    }
 
     internal bool IsEditing => Filter is not null;
 
@@ -46,51 +81,15 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
 
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
-    /// <summary>
-    ///     Favourites listed first (flagged <see cref="CachedOption.IsFavorite" />), then recents minus duplicates by
-    ///     case-insensitive comparison. Provides a stable selection list for Cached rows even when the same expression has
-    ///     been promoted from recents to favourites (or duplicated across the two buckets via separate code paths).
-    /// </summary>
-    private List<CachedOption> CachedOptions
-    {
-        get
-        {
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var result = new List<CachedOption>();
-
-            foreach (string favourite in FilterCacheState.Value.FavoriteFilters)
-            {
-                if (seen.Add(favourite)) { result.Add(new CachedOption(favourite, true)); }
-            }
-
-            foreach (string recent in FilterCacheState.Value.RecentFilters)
-            {
-                if (seen.Add(recent)) { result.Add(new CachedOption(recent, false)); }
-            }
-
-            return result;
-        }
-    }
-
     private string ErrorMessage { get; set; } = string.Empty;
 
     private FilterDraft? Filter { get; set; }
 
-    [Inject] private IState<FilterCacheState> FilterCacheState { get; init; } = null!;
-
-    [Inject] private IFilterGroupCommands FilterGroupCommands { get; init; } = null!;
+    [Inject] private IState<FilterLibraryState> FilterLibraryState { get; init; } = null!;
 
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
     private bool IsPending => Value is null && PendingDraft is not null;
-
-    private string? OuterCssClass => ParentFilterGroupId is not null ? "filter-group-row" : null;
-
-    private string? RightCssClass => ParentFilterGroupId is not null ? "justify-self-right" : null;
-
-    private bool ShowToggleEnabled => ParentFilterGroupId is null;
-
-    private bool UseInlineErrorRow => ParentFilterGroupId is not null;
 
     internal ValueTask FocusEditAsync() =>
         _shellRef is null ? ValueTask.CompletedTask : _shellRef.FocusEditAsync();
@@ -141,36 +140,11 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
         await OnEditingChanged.InvokeAsync((savedFilter.Id, false));
     }
 
-    private void DispatchRemoveFilter(FilterId id)
-    {
-        if (ParentFilterGroupId is { } parentId)
-        {
-            FilterGroupCommands.RemoveFilter(parentId, id);
-        }
-        else
-        {
-            FilterPaneCommands.RemoveFilter(id);
-        }
-    }
+    private void DispatchRemoveFilter(FilterId id) => FilterPaneCommands.RemoveFilter(id);
 
-    private void DispatchSetFilter(SavedFilter filter)
-    {
-        if (ParentFilterGroupId is { } parentId)
-        {
-            FilterGroupCommands.SetFilter(parentId, filter);
-        }
-        else
-        {
-            FilterPaneCommands.SetFilter(filter);
-        }
-    }
+    private void DispatchSetFilter(SavedFilter filter) => FilterPaneCommands.SetFilter(filter);
 
-    private void DispatchToggleEnabled(FilterId id)
-    {
-        if (ParentFilterGroupId is not null) { return; }
-
-        FilterPaneCommands.ToggleFilterEnabled(id);
-    }
+    private void DispatchToggleEnabled(FilterId id) => FilterPaneCommands.ToggleFilterEnabled(id);
 
     private async Task EditFilter()
     {
@@ -217,15 +191,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
         if (Value is { } savedFilter)
         {
             AnnouncementService.Announce($"Filter set to {label}");
-
-            if (ParentFilterGroupId is { } parentId)
-            {
-                FilterGroupCommands.SetFilterExcluded(parentId, savedFilter.Id, isExcluded);
-            }
-            else
-            {
-                FilterPaneCommands.SetFilterExcluded(savedFilter.Id, isExcluded);
-            }
+            FilterPaneCommands.SetFilterExcluded(savedFilter.Id, isExcluded);
         }
     }
 
@@ -342,5 +308,5 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
         ErrorMessage = string.Empty;
     }
 
-    private sealed record CachedOption(string Value, bool IsFavorite);
+    internal sealed record CachedOption(string Value, bool IsFavorite);
 }

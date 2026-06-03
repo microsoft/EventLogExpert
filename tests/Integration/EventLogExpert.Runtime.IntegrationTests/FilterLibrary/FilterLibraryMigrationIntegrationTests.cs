@@ -123,8 +123,12 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task Migration_CorruptGroupsLegacyData_FirstLoadMigratesFavoritesOnly_SecondLoadSkipsBecauseStoreNonEmpty_GroupsStranded()
+    public async Task Migration_CorruptGroupsLegacyData_FirstLoadMigratesFavorites_SecondLoadRetriesGroupsButStillFails_NoDuplicateFavoriteInsertion()
     {
+        // Behavior verified: with per-section flag check + DedupMigrationEntriesAgainstExisting, partial-success
+        // migration retries on every launch (Groups bit unset → ShouldRunMigration true), but the already-completed
+        // Favorites section is skipped in BuildEntriesFromLegacy AND dedup defends against re-insertion if the bit
+        // somehow regressed. The corrupt Groups JSON is preserved indefinitely for a future fix.
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
 
@@ -146,9 +150,13 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
         await effects.HandleLoadLibrary(dispatcher);
         await effects.HandleLoadLibrary(dispatcher);
 
-        spyMigrator.Received(1).BuildEntriesFromLegacy();
+        // Both loads invoke the migrator because ShouldRunMigration stays true while Groups remains unmigrated.
+        spyMigrator.Received(2).BuildEntriesFromLegacy();
+        // Favorite migrated exactly once (dedup prevents duplicate on retry).
         Assert.Single(store.LoadAll());
+        // Bitmask: Favorites (1) | Recents (4) = 5; Groups (2) stays unset because the JSON is still corrupt.
         Assert.Equal("5", prefs.GetString(MigrationSectionsKey));
+        // Corrupt Groups JSON preserved for future fix attempt.
         Assert.True(prefs.ContainsKey(SavedGroupsKey));
     }
 
@@ -184,10 +192,10 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
         Assert.Equal(2, favorites.Count);
         Assert.All(favorites, f => Assert.True(f.IsFavorite));
         Assert.All(favorites, f => Assert.Equal(LibraryEntryOrigin.UserSaved, f.Origin));
-        var preset = Assert.Single(loaded.OfType<LibraryEntryPreset>());
-        Assert.Equal("PresetA", preset.Name);
-        Assert.Equal(2, preset.Filters.Count);
-        Assert.Equal(LibraryEntryOrigin.UserSaved, preset.Origin);
+        var filterSet = Assert.Single(loaded.OfType<LibraryEntryFilterSet>());
+        Assert.Equal("PresetA", filterSet.Name);
+        Assert.Equal(2, filterSet.Filters.Count);
+        Assert.Equal(LibraryEntryOrigin.UserSaved, filterSet.Origin);
 
         dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 3));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());

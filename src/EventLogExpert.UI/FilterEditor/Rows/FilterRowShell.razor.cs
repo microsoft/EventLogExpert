@@ -42,14 +42,6 @@ public sealed partial class FilterRowShell : ComponentBase
 
     [Parameter] public EventCallback OnToggleEnabled { get; set; }
 
-    [Parameter] public string? OuterCssClass { get; set; }
-
-    [Parameter] public string? RightCssClass { get; set; }
-
-    [Parameter] public bool ShowToggleEnabled { get; set; } = true;
-
-    [Parameter] public bool UseInlineErrorRow { get; set; }
-
     [Parameter] public SavedFilter? Value { get; set; }
 
     internal ValueTask FocusEditAsync() =>

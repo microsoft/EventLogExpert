@@ -5,4 +5,4 @@ using EventLogExpert.Filtering.Persistence;
 
 namespace EventLogExpert.Runtime.FilterLibrary;
 
-internal sealed record AddFilterToNewPresetAction(string NewPresetName, SavedFilter Filter, LibraryEntryId? SourceEntryId);
+internal sealed record AddFilterToNewFilterSetAction(string NewFilterSetName, SavedFilter Filter, LibraryEntryId? SourceEntryId);

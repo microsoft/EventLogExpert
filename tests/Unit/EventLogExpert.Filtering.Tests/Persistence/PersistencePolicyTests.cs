@@ -4,11 +4,10 @@
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Filtering.Tests.Persistence;
 
-public sealed partial class PersistencePolicyTests
+public sealed class PersistencePolicyTests
 {
     [Fact]
     public void BasicFilter_Write_PinsNestedComparisonAndSubFiltersKeys()
@@ -246,46 +245,5 @@ public sealed partial class PersistencePolicyTests
         // Assert
         Assert.Contains("\"Color\":17", json);
         Assert.DoesNotContain("\"Color\":\"Blue\"", json);
-    }
-
-    [Fact]
-    public void SavedFiltersStorageKey_LiteralValue_IsFrozenForWireCompatibility()
-    {
-        // Arrange
-        string preferencesProviderPath = ResolveRepoRelativePath(
-            "src",
-            "EventLogExpert",
-            "Adapters",
-            "Settings",
-            "FilterGroupPreferencesAdapter.cs");
-
-        string source = File.ReadAllText(preferencesProviderPath);
-
-        // Act + Assert
-        Assert.Matches(
-            MyRegex(),
-            source);
-
-        Assert.Contains("Preferences.Default.Get(SavedFilters, \"[]\")", source);
-        Assert.Contains("Preferences.Default.Set(SavedFilters, JsonSerializer.Serialize(value))", source);
-    }
-
-    [GeneratedRegex("""private\s+const\s+string\s+SavedFilters\s*=\s*"saved-filters"\s*;""")]
-    private static partial Regex MyRegex();
-
-    private static string ResolveRepoRelativePath(params string[] segments)
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "EventLogExpert.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        Assert.NotNull(directory);
-
-        string combined = Path.Combine([directory.FullName, .. segments]);
-        Assert.True(File.Exists(combined), $"Expected source file at {combined} to exist.");
-        return combined;
     }
 }

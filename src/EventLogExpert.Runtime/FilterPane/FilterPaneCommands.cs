@@ -11,13 +11,9 @@ internal sealed class FilterPaneCommands(IDispatcher dispatcher) : IFilterPaneCo
 {
     private readonly IDispatcher _dispatcher = dispatcher;
 
-    public void ApplyFilterGroup(SavedFilterGroup group) => _dispatcher.Dispatch(new ApplyFilterGroupAction(group));
-
     public void ClearAllFilters() => _dispatcher.Dispatch(new ClearAllFiltersAction());
 
     public void RemoveFilter(FilterId id) => _dispatcher.Dispatch(new RemoveFilterAction(id));
-
-    public void SaveFilterGroup(string name) => _dispatcher.Dispatch(new SaveFilterGroupAction(name));
 
     public void SetFilter(SavedFilter filter) => _dispatcher.Dispatch(new SetFilterAction(filter));
 

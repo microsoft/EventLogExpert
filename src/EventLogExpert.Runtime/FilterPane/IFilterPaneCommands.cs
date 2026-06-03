@@ -8,17 +8,11 @@ namespace EventLogExpert.Runtime.FilterPane;
 
 public interface IFilterPaneCommands
 {
-    /// <summary>Applies every filter in <paramref name="group" /> to the pane (de-duping against existing filters).</summary>
-    void ApplyFilterGroup(SavedFilterGroup group);
-
     /// <summary>Clears all filters from the pane (date filter + saved filters + pending drafts).</summary>
     void ClearAllFilters();
 
     /// <summary>Removes the filter with <paramref name="id" /> from the pane.</summary>
     void RemoveFilter(FilterId id);
-
-    /// <summary>Saves the current pane's filters as a new <see cref="SavedFilterGroup" /> named <paramref name="name" />.</summary>
-    void SaveFilterGroup(string name);
 
     /// <summary>Adds or replaces <paramref name="filter" /> in the pane (upsert by FilterId).</summary>
     void SetFilter(SavedFilter filter);
