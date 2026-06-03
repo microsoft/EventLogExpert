@@ -144,10 +144,14 @@
         <Output TaskParameter="ConsoleOutput" PropertyName="_WhereNugetOutput" />
       </Exec>
       <PropertyGroup>
-        <!-- where prints one match per line (newline-separated, NOT semicolon-separated).
-             Use Regex.Match to extract the first line; the trailing CR is implicitly excluded
-             by the [^\r\n]+ class. -->
-        <_NugetExePath Condition="'$(_WhereNugetExitCode)' == '0'">$([System.Text.RegularExpressions.Regex]::Match($(_WhereNugetOutput), '^[^\r\n]+').Value)</_NugetExePath>
+        <!-- where prints one match per line. Exec captures ConsoleOutput as ITaskItem[]
+             (one item per line); when MSBuild assigns that ITaskItem[] to a property via
+             <Output PropertyName=...>, it joins items with ';'. So $(_WhereNugetOutput)
+             is ';'-separated when 'where' returns multiple paths (build agents commonly
+             have nuget.exe at both C:\__t\NuGet\<ver>\x64\nuget.exe from NuGetToolInstaller
+             AND a pre-existing C:\nuget\nuget.exe). The character class excludes ';' (Windows
+             path separator-disallowed) and \r\n so Match returns just the first path. -->
+        <_NugetExePath Condition="'$(_WhereNugetExitCode)' == '0'">$([System.Text.RegularExpressions.Regex]::Match($(_WhereNugetOutput), '^[^;\r\n]+').Value)</_NugetExePath>
       </PropertyGroup>
       <Error Condition="'$(_NugetExePath)' == '' OR !Exists('$(_NugetExePath)')"
              Text="nuget.exe not found on PATH. The native shell extension's packages.config restore requires nuget.exe. Install via `winget install Microsoft.NuGet` (dev), the NuGetToolInstaller@1 pipeline task (ADO), or any equivalent. See docs/Explorer-Context-Menu.md for prereqs." />
