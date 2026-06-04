@@ -231,14 +231,16 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
         Assert.Equal("7", prefs.GetString(MigrationSectionsKey));
     }
 
-    private static Effects BuildEffects(IFilterLibraryStore store, ILegacyFilterMigrator migrator)
+    private static Effects BuildEffects(IFilterLibraryStore store, ILegacyFilterMigrator migrator, IBackslashNameMigrator? backslashMigrator = null)
     {
         var libraryState = Substitute.For<IState<FilterLibraryState>>();
         libraryState.Value.Returns(new FilterLibraryState());
         var paneState = Substitute.For<IState<FilterPaneState>>();
         paneState.Value.Returns(new FilterPaneState());
 
-        return new Effects(store, libraryState, paneState, migrator, Substitute.For<ITraceLogger>());
+        backslashMigrator ??= Substitute.For<IBackslashNameMigrator>();
+
+        return new Effects(store, libraryState, paneState, migrator, backslashMigrator, Substitute.For<ITraceLogger>());
     }
 
     private string CreateTempDatabasePath()

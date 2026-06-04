@@ -72,12 +72,13 @@ public static class MauiProgram
 
         builder.Services.AddFilterLibraryExport();
 
-        if (LegacyMigrationFeature.Enabled)
+        if (LegacyMigrationFeature.Enabled || BackslashMigrationFeature.Enabled)
         {
             builder.Services.AddSingleton<ILegacyPreferences, MauiLegacyPreferencesAdapter>();
         }
 
         builder.Services.AddLegacyFilterMigration();
+        builder.Services.AddBackslashNameMigration();
 
         // Top-level layer registration
         builder.Services.AddEventLogFiltering();

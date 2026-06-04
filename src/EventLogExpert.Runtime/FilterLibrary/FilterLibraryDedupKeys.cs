@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Evaluation;
 using System.Text;
 
 namespace EventLogExpert.Runtime.FilterLibrary;
@@ -42,12 +41,18 @@ internal static class FilterLibraryDedupKeys
         return sb.ToString();
     }
 
-    public static (string ComparisonText, FilterMode Mode, bool IsExcluded) ForSavedFilter(
-        LibraryEntrySavedFilter entry)
+    public static string ForSavedFilter(LibraryEntrySavedFilter entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        return (entry.Filter.ComparisonText.ToLowerInvariant(), entry.Filter.Mode, entry.Filter.IsExcluded);
+        var sb = new StringBuilder();
+        AppendLengthPrefixed(sb, entry.Name.ToLowerInvariant());
+        AppendLengthPrefixed(sb, entry.Filter.ComparisonText.ToLowerInvariant());
+        sb.Append('|').Append(entry.Filter.Mode).Append('|').Append(entry.Filter.IsExcluded);
+
+        AppendSortedTags(sb, entry.Tags);
+
+        return sb.ToString();
     }
 
     public static string ForSavedFilterTagRelaxed(LibraryEntrySavedFilter entry)

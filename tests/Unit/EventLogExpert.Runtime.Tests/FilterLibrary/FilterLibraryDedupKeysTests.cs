@@ -107,19 +107,22 @@ public sealed class FilterLibraryDedupKeysTests
     }
 
     [Fact]
-    public void ForSavedFilter_ReturnsTupleNormalizedLowerForComparisonText()
+    public void ForSavedFilter_ReturnsStringIncludingNameFiltersAndTags()
     {
-        var entry = new LibraryEntrySavedFilter
-        {
-            Name = "n",
-            CreatedUtc = DateTimeOffset.UtcNow,
-            Filter = BuildSavedFilter("Level == 4"),
-        };
+        var a = BuildSavedFilterEntry("Filter", tags: ["exchange"], "Level == 4");
+        var b = BuildSavedFilterEntry("Filter", tags: ["exchange"], "Level == 4");
+        var differentName = BuildSavedFilterEntry("Other", tags: ["exchange"], "Level == 4");
+        var differentTags = BuildSavedFilterEntry("Filter", tags: ["hub"], "Level == 4");
 
-        var key = FilterLibraryDedupKeys.ForSavedFilter(entry);
-
-        Assert.Equal("level == 4", key.ComparisonText);
-        Assert.False(key.IsExcluded);
+        Assert.Equal(
+            FilterLibraryDedupKeys.ForSavedFilter(a),
+            FilterLibraryDedupKeys.ForSavedFilter(b));
+        Assert.NotEqual(
+            FilterLibraryDedupKeys.ForSavedFilter(a),
+            FilterLibraryDedupKeys.ForSavedFilter(differentName));
+        Assert.NotEqual(
+            FilterLibraryDedupKeys.ForSavedFilter(a),
+            FilterLibraryDedupKeys.ForSavedFilter(differentTags));
     }
 
     [Fact]

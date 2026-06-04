@@ -12,24 +12,25 @@ public sealed class FilterLibraryExportServiceTests
     private readonly FilterLibraryExportService _service = new();
 
     [Fact]
+    public void Deserialize_DuplicateNamesWithinIncomingFile_DifferentFilters_NoExisting_BothImported()
+    {
+        var entry1 = BuildSavedEntry("duplicate", comparisonText: "Level == 4");
+        var entry2 = BuildSavedEntry("DUPLICATE", comparisonText: "Level == 5");
+        var json = _service.Serialize([entry1, entry2]);
+
+        var preflight = _service.Deserialize(json, []);
+
+        Assert.Null(preflight.Error);
+        Assert.Equal(2, preflight.ToAdd.Count);
+        Assert.Empty(preflight.SkippedDuplicates);
+    }
+
+    [Fact]
     public void Deserialize_EmptyString_ReturnsErrorWithoutThrowing()
     {
         var preflight = _service.Deserialize(string.Empty, []);
 
         Assert.NotNull(preflight.Error);
-    }
-
-    [Fact]
-    public void Deserialize_ExactDuplicate_BySavedFilterFingerprint_RoutesToSkipped()
-    {
-        var existing = BuildSavedEntry("entry", comparisonText: "Level == 4");
-        var incoming = BuildSavedEntry("different-name", comparisonText: "Level == 4");
-        var json = _service.Serialize([incoming]);
-
-        var preflight = _service.Deserialize(json, [existing]);
-
-        Assert.Null(preflight.Error);
-        Assert.Single(preflight.SkippedDuplicates);
     }
 
     [Fact]
@@ -79,8 +80,8 @@ public sealed class FilterLibraryExportServiceTests
         Assert.Null(preflight.Error);
         Assert.Equal(2, preflight.ToAdd.Count);
         Assert.All(preflight.ToAdd, e => Assert.IsType<LibraryEntryFilterSet>(e));
-        Assert.Contains(preflight.ToAdd, e => e.Name == "Exchange\\HUB");
-        Assert.Contains(preflight.ToAdd, e => e.Name == "Sharepoint");
+        Assert.Contains(preflight.ToAdd, e => e.Name == "HUB" && e.Tags.SequenceEqual(new[] { "exchange" }, StringComparer.Ordinal));
+        Assert.Contains(preflight.ToAdd, e => e.Name == "Sharepoint" && e.Tags.Count == 0);
     }
 
     [Fact]
@@ -98,6 +99,38 @@ public sealed class FilterLibraryExportServiceTests
         Assert.Null(preflight.Error);
         Assert.Single(preflight.ToAdd);
         Assert.Equal("HasFilter", preflight.ToAdd[0].Name);
+    }
+
+    [Fact]
+    public void Deserialize_LocalRawMatchesIncomingMigrated_RoutesToSkippedDuplicates()
+    {
+        var existing = BuildFilterSet(@"Network\DNS", BuildSavedFilter("Level == 4"));
+        var incomingRaw = BuildFilterSet(@"Network\DNS", BuildSavedFilter("Level == 4"));
+        var json = _service.Serialize([incomingRaw]);
+
+        var preflight = _service.Deserialize(json, [existing]);
+
+        Assert.Null(preflight.Error);
+        Assert.Empty(preflight.ToAdd);
+        Assert.Empty(preflight.ToReplace);
+        Assert.Empty(preflight.ToUpdate);
+        Assert.Single(preflight.SkippedDuplicates);
+    }
+
+    [Fact]
+    public void Deserialize_LocalUnmigratedMatchesIncomingTagsOnly_RoutesToToUpdate()
+    {
+        var existing = BuildFilterSet(@"Network\DNS", BuildSavedFilter("Level == 4"));
+        var incoming = BuildFilterSet("DNS", BuildSavedFilter("Level == 4")) with { Tags = ["network", "extra-tag"] };
+        var json = _service.Serialize([incoming]);
+
+        var preflight = _service.Deserialize(json, [existing]);
+
+        Assert.Null(preflight.Error);
+        Assert.Empty(preflight.ToAdd);
+        Assert.Empty(preflight.ToReplace);
+        Assert.Single(preflight.ToUpdate);
+        Assert.Equal(existing.Id, preflight.ToUpdate[0].Existing.Id);
     }
 
     [Fact]
@@ -121,6 +154,8 @@ public sealed class FilterLibraryExportServiceTests
         Assert.Null(preflight.Error);
         Assert.Empty(preflight.ToAdd);
         Assert.Single(preflight.ToReplace);
+        Assert.Empty(preflight.ToUpdate);
+        Assert.Empty(preflight.AmbiguousMatches);
         Assert.Equal(existing.Id, preflight.ToReplace[0].Existing.Id);
         Assert.Equal(incoming.Name, preflight.ToReplace[0].Incoming.Name);
     }
@@ -157,6 +192,20 @@ public sealed class FilterLibraryExportServiceTests
     }
 
     [Fact]
+    public void Deserialize_SameSavedFilterContentDifferentNames_BothRouteToToAdd()
+    {
+        var existing = BuildSavedEntry("entry", comparisonText: "Level == 4");
+        var incoming = BuildSavedEntry("different-name", comparisonText: "Level == 4");
+        var json = _service.Serialize([incoming]);
+
+        var preflight = _service.Deserialize(json, [existing]);
+
+        Assert.Null(preflight.Error);
+        Assert.Single(preflight.ToAdd);
+        Assert.Empty(preflight.SkippedDuplicates);
+    }
+
+    [Fact]
     public void Deserialize_SchemaVersionGreaterThanCurrent_ReturnsUnsupportedError()
     {
         var json = """{"schemaVersion": 2, "entries": []}""";
@@ -180,6 +229,95 @@ public sealed class FilterLibraryExportServiceTests
     }
 
     [Fact]
+    public void Deserialize_TwoIncomingShareMigratedNameDifferentTags_BothImported()
+    {
+        var legacyJson = """
+            [
+                {
+                    "Name": "A\\Child",
+                    "Filters": [
+                        { "Color": "None", "ComparisonText": "Level == 4", "Mode": "Basic" }
+                    ]
+                },
+                {
+                    "Name": "B\\Child",
+                    "Filters": [
+                        { "Color": "None", "ComparisonText": "Level == 5", "Mode": "Basic" }
+                    ]
+                }
+            ]
+            """;
+
+        var preflight = _service.Deserialize(legacyJson, []);
+
+        Assert.Null(preflight.Error);
+        Assert.Equal(2, preflight.ToAdd.Count);
+        Assert.Contains(preflight.ToAdd, e => e.Name == "Child" && e.Tags.Contains("a"));
+        Assert.Contains(preflight.ToAdd, e => e.Name == "Child" && e.Tags.Contains("b"));
+    }
+
+    [Fact]
+    public void Deserialize_TwoIncomingShareMigratedNameSameTagsSameFilters_SecondSkipped()
+    {
+        var legacyJson = """
+            [
+                {
+                    "Name": "A\\Child",
+                    "Filters": [
+                        { "Color": "None", "ComparisonText": "Level == 4", "Mode": "Basic" }
+                    ]
+                },
+                {
+                    "Name": "A\\Child",
+                    "Filters": [
+                        { "Color": "None", "ComparisonText": "Level == 4", "Mode": "Basic" }
+                    ]
+                }
+            ]
+            """;
+
+        var preflight = _service.Deserialize(legacyJson, []);
+
+        Assert.Null(preflight.Error);
+        Assert.Single(preflight.ToAdd);
+        Assert.Single(preflight.SkippedDuplicates);
+    }
+
+    [Fact]
+    public void Deserialize_TwoLocalEntriesShareMigratedName_DifferentFilters_IncomingMatch_RoutesToAmbiguousMatches()
+    {
+        var existingA = BuildSavedEntry("Child", comparisonText: "Level == 4") with { Tags = ["a"] };
+        var existingB = BuildSavedEntry("Child", comparisonText: "Level == 5") with { Tags = ["b"] };
+        var incoming = BuildSavedEntry("Child", comparisonText: "Level == 6");
+        var json = _service.Serialize([incoming]);
+
+        var preflight = _service.Deserialize(json, [existingA, existingB]);
+
+        Assert.Null(preflight.Error);
+        Assert.Empty(preflight.ToAdd);
+        Assert.Empty(preflight.ToReplace);
+        Assert.Empty(preflight.ToUpdate);
+        Assert.Single(preflight.AmbiguousMatches);
+        var ambiguous = preflight.AmbiguousMatches[0];
+        Assert.Equal(2, ambiguous.Candidates.Count);
+    }
+
+    [Fact]
+    public void Deserialize_TwoLocalEntriesShareRelaxedKey_IncomingMatch_RoutesToAmbiguousMatches()
+    {
+        var existingA = BuildSavedEntry("Same", comparisonText: "Level == 4") with { Tags = ["hub"] };
+        var existingB = BuildSavedEntry("Same", comparisonText: "Level == 4") with { Tags = ["exchange"] };
+        var incoming = BuildSavedEntry("Same", comparisonText: "Level == 4") with { Tags = ["extra"] };
+        var json = _service.Serialize([incoming]);
+
+        var preflight = _service.Deserialize(json, [existingA, existingB]);
+
+        Assert.Null(preflight.Error);
+        Assert.Empty(preflight.ToUpdate);
+        Assert.Single(preflight.AmbiguousMatches);
+    }
+
+    [Fact]
     public void Deserialize_WithDuplicateExistingFilterSets_DoesNotThrow_RoutesIncomingToSkipped()
     {
         var existingA = BuildFilterSet("alpha", BuildSavedFilter("Level == 4"));
@@ -191,35 +329,6 @@ public sealed class FilterLibraryExportServiceTests
 
         Assert.Null(preflight.Error);
         Assert.Single(preflight.SkippedDuplicates);
-    }
-
-    [Fact]
-    public void Deserialize_WithDuplicateExistingSavedFilters_DoesNotThrow_RoutesIncomingToSkipped()
-    {
-        var existingA = BuildSavedEntry("first", comparisonText: "Level == 4");
-        var existingB = BuildSavedEntry("second", comparisonText: "Level == 4");
-        var incoming = BuildSavedEntry("third", comparisonText: "Level == 4");
-        var json = _service.Serialize([incoming]);
-
-        var preflight = _service.Deserialize(json, [existingA, existingB]);
-
-        Assert.Null(preflight.Error);
-        Assert.Single(preflight.SkippedDuplicates);
-    }
-
-    [Fact]
-    public void Deserialize_WithDuplicateNamesWithinIncomingFile_KeepsFirst_SkipsLater()
-    {
-        var entry1 = BuildSavedEntry("duplicate", comparisonText: "Level == 4");
-        var entry2 = BuildSavedEntry("DUPLICATE", comparisonText: "Level == 5");
-        var json = _service.Serialize([entry1, entry2]);
-
-        var preflight = _service.Deserialize(json, []);
-
-        Assert.Null(preflight.Error);
-        Assert.Single(preflight.ToAdd);
-        Assert.Single(preflight.SkippedDuplicates);
-        Assert.Equal("duplicate", preflight.ToAdd[0].Name);
     }
 
     [Fact]
