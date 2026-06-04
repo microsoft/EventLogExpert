@@ -30,6 +30,8 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     [Parameter][EditorRequired] public EventCallback<LibraryEntryId> OnDelete { get; set; }
 
+    [Parameter] public EventCallback<LibraryEntryId> OnExportEntry { get; set; }
+
     [Parameter][EditorRequired] public EventCallback<LibraryEntryId> OnReplace { get; set; }
 
     [Parameter][EditorRequired] public EventCallback<LibraryEntryId> OnRequestPendingFocus { get; set; }
@@ -49,6 +51,10 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     private string FavoriteIconClass => Entry.IsFavorite ? "bi bi-star-fill" : "bi bi-star";
 
     private string FavoriteTitle => Entry.IsFavorite ? "Remove from favorites" : "Add to favorites";
+
+    [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
+
+    [Inject] private IState<FilterLibraryState> FilterLibraryState { get; init; } = null!;
 
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
@@ -160,10 +166,35 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
             items.Add(BuildAddToFilterSetItem(filterEntry));
         }
 
+        if (Entry.Origin == LibraryEntryOrigin.UserSaved)
+        {
+            items.Add(MenuItem.Item("Rename...", OnRenameAsync));
+        }
+
+        if (Entry is LibraryEntryFilterSet && OnExportEntry.HasDelegate)
+        {
+            items.Add(MenuItem.Item("Export...", OnExportEntryAsync));
+        }
+
         items.Add(MenuItem.Separator());
         items.Add(MenuItem.Item("Delete", OnDeleteAsync, isDanger: true));
 
         return items;
+    }
+
+    private bool HasDuplicateNameOfSameKind(string candidateName)
+    {
+        return FilterLibraryState.Value.Entries.Any(other =>
+            !other.Id.Equals(Entry.Id) &&
+            SameKind(other) &&
+            string.Equals(other.Name, candidateName, StringComparison.OrdinalIgnoreCase));
+
+        bool SameKind(LibraryEntry e) => Entry switch
+        {
+            LibraryEntryFilterSet => e is LibraryEntryFilterSet,
+            LibraryEntrySavedFilter => e is LibraryEntrySavedFilter,
+            _ => false,
+        };
     }
 
     private Task OnApplyAsync() => OnApply.InvokeAsync(Entry.Id);
@@ -198,6 +229,8 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         AnnouncementService.Announce($"Added filter to filter set '{filterSetName}'");
     }
 
+    private Task OnExportEntryAsync() => OnExportEntry.InvokeAsync(Entry.Id);
+
     private void OnMenuServiceStateChanged() => _ = InvokeAsync(StateHasChanged);
 
     private async Task OnNewFilterSetSelectedAsync(LibraryEntrySavedFilter filterEntry)
@@ -211,6 +244,30 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
         await OnAddToFilterSet.InvokeAsync(new AddToFilterSetIntent(filterEntry.Filter, null, name, filterEntry.Id));
         AnnouncementService.Announce($"Added filter to new filter set '{name}'");
+    }
+
+    private async Task OnRenameAsync()
+    {
+        var newName = await AlertDialogService.DisplayPrompt(
+            "Rename entry",
+            "What would you like to rename this entry to? (use \\ for folder paths)",
+            Entry.Name);
+
+        if (string.IsNullOrWhiteSpace(newName)) { return; }
+
+        var trimmed = newName.Trim();
+
+        if (string.Equals(trimmed, Entry.Name, StringComparison.Ordinal)) { return; }
+
+        if (HasDuplicateNameOfSameKind(trimmed))
+        {
+            AnnouncementService.Announce($"An entry of the same kind named '{trimmed}' already exists.");
+
+            return;
+        }
+
+        FilterLibraryCommands.UpdateEntry(Entry with { Name = trimmed });
+        AnnouncementService.Announce($"Renamed entry to '{trimmed}'");
     }
 
     private async Task OnReplaceAsync()

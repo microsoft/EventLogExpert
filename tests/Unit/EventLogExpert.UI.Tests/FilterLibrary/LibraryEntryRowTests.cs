@@ -20,18 +20,26 @@ public sealed class LibraryEntryRowTests : BunitContext
 {
     private readonly IAlertDialogService _alerts = Substitute.For<IAlertDialogService>();
     private readonly IAnnouncementService _announcements = Substitute.For<IAnnouncementService>();
+    private readonly IFilterLibraryCommands _commands = Substitute.For<IFilterLibraryCommands>();
+    private readonly FilterLibraryState _libraryState = new();
     private readonly IMenuService _menuService = Substitute.For<IMenuService>();
+
     private FilterPaneState _paneState = new();
 
     public LibraryEntryRowTests()
     {
         Services.AddSingleton(_alerts);
         Services.AddSingleton(_announcements);
+        Services.AddSingleton(_commands);
         Services.AddSingleton(_menuService);
 
         var paneStateMock = Substitute.For<IState<FilterPaneState>>();
         paneStateMock.Value.Returns(_ => _paneState);
         Services.AddSingleton(paneStateMock);
+
+        var libraryStateMock = Substitute.For<IState<FilterLibraryState>>();
+        libraryStateMock.Value.Returns(_ => _libraryState);
+        Services.AddSingleton(libraryStateMock);
 
         JSInterop.Mode = JSRuntimeMode.Loose;
         JSInterop.Setup<MenuAnchorRect>("getMenuElementRect", _ => true)

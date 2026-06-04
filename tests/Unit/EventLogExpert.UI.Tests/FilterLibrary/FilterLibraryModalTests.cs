@@ -5,6 +5,7 @@ using Bunit;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Modal;
@@ -21,6 +22,8 @@ public sealed class FilterLibraryModalTests : BunitContext
 {
     private readonly IAnnouncementService _announcements = Substitute.For<IAnnouncementService>();
     private readonly IFilterLibraryCommands _commands = Substitute.For<IFilterLibraryCommands>();
+    private readonly IFilterLibraryExportService _exportService = Substitute.For<IFilterLibraryExportService>();
+    private readonly IFilePickerService _filePicker = Substitute.For<IFilePickerService>();
     private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
     private readonly ModalId _modalId = new(1L);
     private readonly IModalService _modalService = Substitute.For<IModalService>();
@@ -36,6 +39,8 @@ public sealed class FilterLibraryModalTests : BunitContext
         Services.AddSingleton(_commands);
         Services.AddSingleton(_modalCoordinator);
         Services.AddSingleton(_modalService);
+        Services.AddSingleton(_filePicker);
+        Services.AddSingleton(_exportService);
 
         var paneState = Substitute.For<IState<FilterPaneState>>();
         paneState.Value.Returns(new FilterPaneState());
@@ -130,7 +135,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         var component = Render<FilterLibraryModal>();
         await component.FindAll("[role='tab']")[1].ClickAsync(new MouseEventArgs());
 
-        var names = component.FindAll(".library-entry-name-text").Select(n => n.TextContent.Trim()).ToList();
+        var names = component.FindAll(".sidebar-tabs-tabpanel.active .library-entry-name-text").Select(n => n.TextContent.Trim()).ToList();
         Assert.Equal(["Alpha", "Beta"], names);
     }
 
@@ -175,7 +180,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         var component = Render<FilterLibraryModal>();
         await component.FindAll("[role='tab']")[2].ClickAsync(new MouseEventArgs());
 
-        var names = component.FindAll(".library-entry-name-text").Select(n => n.TextContent.Trim()).ToList();
+        var names = component.FindAll(".sidebar-tabs-tabpanel.active .library-entry-name-text").Select(n => n.TextContent.Trim()).ToList();
         Assert.Equal(["New", "Old"], names);
     }
 
@@ -207,7 +212,8 @@ public sealed class FilterLibraryModalTests : BunitContext
             await component.FindAll("[role='tab']")[tabIndex].ClickAsync(new MouseEventArgs());
         }
 
-        Assert.Contains(expectedFragment, component.Find(".library-empty-state").TextContent);
+        var emptyState = component.Find(".sidebar-tabs-tabpanel.active .library-empty-state");
+        Assert.Contains(expectedFragment, emptyState.TextContent);
     }
 
     [Fact]
@@ -250,7 +256,7 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var component = Render<FilterLibraryModal>();
 
-        var names = component.FindAll(".library-entry-name-text").Select(n => n.TextContent.Trim()).ToList();
+        var names = component.FindAll(".sidebar-tabs-tabpanel.active .library-entry-name-text").Select(n => n.TextContent.Trim()).ToList();
         Assert.Equal(["Alpha", "Beta"], names);
     }
 
@@ -330,8 +336,8 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Theory]
-    [InlineData("ArrowRight", 1)]
-    [InlineData("ArrowLeft", 2)] // wraps to End
+    [InlineData("ArrowDown", 1)]
+    [InlineData("ArrowUp", 2)] // wraps to End
     [InlineData("Home", 0)]
     [InlineData("End", 2)]
     public async Task TabKeydown_RotatesActiveTab(string key, int expectedTabIndex)

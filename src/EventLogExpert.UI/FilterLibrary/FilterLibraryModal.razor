@@ -1,79 +1,108 @@
 @inherits ModalBase<bool>
 
 <ModalChrome AriaLabel="Filter Library"
-    CloseButtonAriaLabel="Close"
-    Footer="FooterPreset.CloseOnly"
-    MaxWidth="60rem"
-    MinWidth="40rem"
+    BodyLayout="ModalBodyLayout.Flex"
+    Footer="FooterPreset.ImportExportClose"
+    Height="80%"
+    InlineAlert="@CurrentInlineAlert"
+    MaxWidth="min(80rem, calc(100vw - 2rem))"
+    MinWidth="min(80rem, calc(100vw - 2rem))"
     OnClose="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    OnExport="OnExportAsync"
+    OnImport="OnImportAsync"
+    OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
     @ref="ChromeRef"
     Title="Filter Library">
-    @if (FilterLibraryState.Value.LoadError)
-    {
-        <div class="filter-library-error" role="alert">
-            <p>Could not load saved filters or filter sets. See trace log for details.</p>
-            <button class="button" @onclick="RetryLoad" type="button">Retry</button>
-        </div>
-    }
-    else if (!FilterLibraryState.Value.IsLoaded)
-    {
-        <p aria-busy="true" class="filter-library-loading">Loading filter library&hellip;</p>
-    }
-    else
-    {
-        <div aria-label="Filter library views" class="library-tabs" @ref="_tablistRef" role="tablist">
-            @foreach (var (tab, label) in s_tabs)
-            {
-                <button aria-controls="@($"library-tabpanel-{tab}")"
-                    aria-selected="@(tab == _activeTab ? "true" : "false")"
-                    class="@(tab == _activeTab ? "tab active library-tab-button" : "tab library-tab-button")"
-                    id="@($"library-tab-{tab}")"
-                    @onclick="() => SetActiveTab(tab)"
-                    @onkeydown="e => OnTabKeyDown(e, tab)"
-                    @ref="_tabButtonRefs[tab]"
-                    role="tab"
-                    tabindex="@(tab == _activeTab ? "0" : "-1")"
-                    type="button">
-                    @label (@GetCount(tab))
-                </button>
-            }
-        </div>
-
-        @foreach (var (tab, _) in s_tabs)
+    <ChildContent>
+        @if (FilterLibraryState.Value.LoadError)
         {
-            <div aria-labelledby="@($"library-tab-{tab}")"
-                class="@(tab == _activeTab ? "library-tab-panel active" : "library-tab-panel")"
-                id="@($"library-tabpanel-{tab}")"
-                role="tabpanel"
-                style="@(tab == _activeTab ? "" : "display: none")"
-                tabindex="@(tab == _activeTab && NeedsTabpanelFocus ? "0" : null)">
-                @if (tab == _activeTab)
-                {
-                    @if (CurrentTabEntries.Count == 0)
-                    {
-                        <p class="library-empty-state">@EmptyStateMessage</p>
-                    }
-                    else
-                    {
-                        @foreach (var entry in CurrentTabEntries)
-                        {
-                            <LibraryEntryRow ActiveTab="_activeTab"
-                                AllFilterSets="AllFilterSets"
-                                Entry="entry"
-                                @key="entry.Id"
-                                OnAddToFilterSet="HandleAddToFilterSetAsync"
-                                OnApply="HandleApplyAsync"
-                                OnDelete="HandleDelete"
-                                OnReplace="HandleReplaceAsync"
-                                OnRequestPendingFocus="HandleRequestPendingFocusAsync"
-                                OnSaveToLibrary="HandleSaveToLibrary"
-                                OnToggleFavorite="HandleToggleFavorite"
-                                @ref="_rowRefs[entry.Id]" />
-                        }
-                    }
-                }
+            <div class="filter-library-error" role="alert">
+                <p>Could not load saved filters or filter sets. See trace log for details.</p>
+                <button class="button" @onclick="RetryLoad" type="button">Retry</button>
             </div>
         }
-    }
+        else if (!FilterLibraryState.Value.IsLoaded)
+        {
+            <p aria-busy="true" class="filter-library-loading">Loading filter library&hellip;</p>
+        }
+        else
+        {
+            <SidebarTabs @bind-ActiveTab="_activeTab"
+                IsTabpanelFocusable="@IsTabpanelEmpty"
+                TablistAriaLabel="Filter library views"
+                Tabs="@CurrentTabLabels"
+                TTab="LibraryTab">
+                <TabContent Context="tab">
+                    @switch (tab)
+                    {
+                        case LibraryTab.Saved:
+                            @if (SavedDirectEntries.Count == 0 && SavedSectionTree.Count == 0)
+                            {
+                                <p class="library-empty-state">@GetEmptyStateMessage(tab)</p>
+                            }
+                            else
+                            {
+                                @foreach (var section in SavedSectionTree)
+                                {
+                                    <LibraryEntrySection ChildSections="@section.ChildSections"
+                                        DirectEntries="@section.DirectEntries"
+                                        EntryTemplate="@(entry => RenderEntryRow(tab, entry))"
+                                        SectionName="@section.SectionName" />
+                                }
+
+                                @foreach (var entry in SavedDirectEntries)
+                                {
+                                    @RenderEntryRow(tab, entry)
+                                }
+                            }
+
+                            break;
+                        case LibraryTab.Favorites:
+                            @if (FavoriteEntries.Count == 0)
+                            {
+                                <p class="library-empty-state">@GetEmptyStateMessage(tab)</p>
+                            }
+                            else
+                            {
+                                @foreach (var entry in FavoriteEntries) { @RenderEntryRow(tab, entry) }
+                            }
+
+                            break;
+                        case LibraryTab.PreviouslyUsed:
+                            @if (PreviouslyUsedEntries.Count == 0)
+                            {
+                                <p class="library-empty-state">@GetEmptyStateMessage(tab)</p>
+                            }
+                            else
+                            {
+                                @foreach (var entry in PreviouslyUsedEntries) { @RenderEntryRow(tab, entry) }
+                            }
+
+                            break;
+                    }
+                </TabContent>
+            </SidebarTabs>
+        }
+    </ChildContent>
 </ModalChrome>
+
+@code {
+    private RenderFragment RenderEntryRow(LibraryTab tab, LibraryEntry entry) =>
+        __builder =>
+        {
+            <LibraryEntryRow ActiveTab="@tab"
+                AllFilterSets="@AllFilterSets"
+                Entry="@entry"
+                @key="entry.Id"
+                OnAddToFilterSet="@HandleAddToFilterSetAsync"
+                OnApply="@HandleApplyAsync"
+                OnDelete="@HandleDelete"
+                OnExportEntry="@HandleExportEntryAsync"
+                OnReplace="@HandleReplaceAsync"
+                OnRequestPendingFocus="@(id => HandleRequestPendingFocusAsync(tab, id))"
+                OnSaveToLibrary="@HandleSaveToLibrary"
+                OnToggleFavorite="@HandleToggleFavorite"
+                @ref="_rowRefs[(tab, entry.Id)]" />
+        };
+}
