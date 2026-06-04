@@ -15,6 +15,21 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     private readonly List<string> _tempDatabases = [];
 
     [Fact]
+    public void Add_NoTags_PersistsAsNullColumn_DefaultsToEmptyOnLoad()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var entry = BuildFilterEntry("Untagged");
+
+        store.Add(entry);
+        var result = store.LoadAll();
+
+        var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(result));
+        Assert.NotNull(loaded.Tags);
+        Assert.Empty(loaded.Tags);
+    }
+
+    [Fact]
     public void Add_PersistsAllNewColumns_FavoriteLastUsedOrigin()
     {
         var dbPath = CreateTempDatabasePath();
@@ -85,6 +100,52 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
 
         var loaded = Assert.IsType<LibraryEntryFilterSet>(result[0]);
         Assert.Equal(2, loaded.Filters.Count);
+    }
+
+    [Fact]
+    public void Add_PersistsTagsRoundTrip_FilterSetEntry()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+
+        var entry = new LibraryEntryFilterSet
+        {
+            Name = "Tagged Set",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Tags = ["network", "dns"],
+            Filters = [filter],
+        };
+
+        store.Add(entry);
+        var result = store.LoadAll();
+
+        var loaded = Assert.IsType<LibraryEntryFilterSet>(Assert.Single(result));
+        Assert.Equal(["network", "dns"], loaded.Tags);
+    }
+
+    [Fact]
+    public void Add_PersistsTagsRoundTrip_SavedFilterEntry()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+
+        var entry = new LibraryEntrySavedFilter
+        {
+            Name = "Tagged",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Tags = ["exchange", "hub"],
+            Filter = filter,
+        };
+
+        store.Add(entry);
+        var result = store.LoadAll();
+
+        var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(result));
+        Assert.Equal(["exchange", "hub"], loaded.Tags);
     }
 
     [Fact]
@@ -336,6 +397,21 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     }
 
     [Fact]
+    public void Load_FromPreTagsSchema_AddsTagsColumnViaAlterTable_ExistingRowsGetEmptyTags()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var preTagsId = SeedPreTagsRow(dbPath);
+
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var result = store.LoadAll();
+
+        var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(result));
+        Assert.Equal(preTagsId, loaded.Id);
+        Assert.NotNull(loaded.Tags);
+        Assert.Empty(loaded.Tags);
+    }
+
+    [Fact]
     public void LoadAll_CreatesParentDirectoryIfMissing()
     {
         var nestedDir = Path.Combine(Path.GetTempPath(), $"FilterLibrarySqliteStoreTests_{Guid.NewGuid()}", "nested", "deeper");
@@ -563,6 +639,21 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     }
 
     [Fact]
+    public void Update_PersistsTagChanges()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var entry = BuildFilterEntry("Will-be-tagged");
+
+        store.Add(entry);
+        var withTags = entry with { Tags = ["new-tag"] };
+        store.Update(withTags);
+
+        var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(store.LoadAll()));
+        Assert.Equal(["new-tag"], loaded.Tags);
+    }
+
+    [Fact]
     public void Update_ReplacesExistingEntry()
     {
         var dbPath = CreateTempDatabasePath();
@@ -659,6 +750,39 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         insert.ExecuteNonQuery();
 
         return legacyId;
+    }
+
+    private static LibraryEntryId SeedPreTagsRow(string dbPath)
+    {
+        var preTagsId = LibraryEntryId.Create();
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        using (var create = connection.CreateCommand())
+        {
+            create.CommandText = """
+                CREATE TABLE library_entries (
+                    id              TEXT PRIMARY KEY,
+                    name            TEXT NOT NULL,
+                    created_utc     TEXT NOT NULL,
+                    kind            TEXT NOT NULL,
+                    payload         TEXT NOT NULL,
+                    is_favorite     INTEGER NOT NULL DEFAULT 0,
+                    last_used_utc   TEXT NULL,
+                    origin          TEXT NOT NULL DEFAULT 'UserSaved',
+                    comparison_text TEXT NULL,
+                    mode            TEXT NULL,
+                    is_excluded     INTEGER NULL
+                );
+                """;
+            create.ExecuteNonQuery();
+        }
+
+        using var insert = connection.CreateCommand();
+        insert.CommandText = $"INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, origin, comparison_text, mode, is_excluded) VALUES ('{preTagsId.Value:D}', 'Legacy', '2026-05-31T00:00:00.0000000+00:00', 'Filter', '{{\"Color\":0,\"ComparisonText\":\"Level == 4\",\"IsExcluded\":false,\"Mode\":\"Advanced\"}}', 0, 'UserSaved', 'Level == 4', 'Advanced', 0);";
+        insert.ExecuteNonQuery();
+
+        return preTagsId;
     }
 
     private string CreateTempDatabasePath()

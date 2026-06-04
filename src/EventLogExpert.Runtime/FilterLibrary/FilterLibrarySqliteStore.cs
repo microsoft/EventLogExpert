@@ -31,7 +31,8 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
                                               origin          TEXT NOT NULL DEFAULT 'UserSaved',
                                               comparison_text TEXT NULL,
                                               mode            TEXT NULL,
-                                              is_excluded     INTEGER NULL
+                                              is_excluded     INTEGER NULL,
+                                              tags            TEXT NULL
                                           );
                                           """;
 
@@ -51,7 +52,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         "DELETE FROM library_entries WHERE id = $id;";
 
     private const string FindAutoTrackedFilterByTupleSql = """
-                                                           SELECT id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded
+                                                           SELECT id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded, tags
                                                            FROM library_entries
                                                            WHERE kind = 'Filter' AND origin = 'AutoTracked'
                                                                AND lower(comparison_text) = lower($comparison_text)
@@ -61,23 +62,24 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
                                                            """;
 
     private const string InsertOrIgnoreSql = """
-                                             INSERT OR IGNORE INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded)
-                                             VALUES ($id, $name, $created, $kind, $payload, $is_favorite, $last_used_utc, $origin, $comparison_text, $mode, $is_excluded);
+                                             INSERT OR IGNORE INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded, tags)
+                                             VALUES ($id, $name, $created, $kind, $payload, $is_favorite, $last_used_utc, $origin, $comparison_text, $mode, $is_excluded, $tags);
                                              """;
 
     private const string InsertSql = """
-                                     INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded)
-                                     VALUES ($id, $name, $created, $kind, $payload, $is_favorite, $last_used_utc, $origin, $comparison_text, $mode, $is_excluded);
+                                     INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded, tags)
+                                     VALUES ($id, $name, $created, $kind, $payload, $is_favorite, $last_used_utc, $origin, $comparison_text, $mode, $is_excluded, $tags);
                                      """;
 
     private const string LoadAllSql =
-        "SELECT id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded FROM library_entries ORDER BY created_utc;";
+        "SELECT id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded, tags FROM library_entries ORDER BY created_utc;";
 
     private const string UpdateSql = """
                                      UPDATE library_entries
                                      SET name = $name, created_utc = $created, kind = $kind, payload = $payload,
                                          is_favorite = $is_favorite, last_used_utc = $last_used_utc, origin = $origin,
-                                         comparison_text = $comparison_text, mode = $mode, is_excluded = $is_excluded
+                                         comparison_text = $comparison_text, mode = $mode, is_excluded = $is_excluded,
+                                         tags = $tags
                                      WHERE id = $id;
                                      """;
 
@@ -89,6 +91,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         ("comparison_text", "TEXT NULL"),
         ("mode", "TEXT NULL"),
         ("is_excluded", "INTEGER NULL"),
+        ("tags", "TEXT NULL"),
     ];
 
     private readonly string _connectionString;
@@ -308,6 +311,11 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
                 ? lastUsed.ToString("O", CultureInfo.InvariantCulture)
                 : DBNull.Value);
         cmd.Parameters.AddWithValue("$origin", entry.Origin.ToString());
+        cmd.Parameters.AddWithValue(
+            "$tags",
+            entry.Tags.Count > 0
+                ? JsonSerializer.Serialize(entry.Tags)
+                : DBNull.Value);
 
         switch (entry)
         {
@@ -340,7 +348,8 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         string payload,
         bool isFavorite,
         DateTimeOffset? lastUsedUtc,
-        LibraryEntryOrigin origin)
+        LibraryEntryOrigin origin,
+        ImmutableList<string> tags)
     {
         return kind switch
         {
@@ -352,6 +361,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
                 IsFavorite = isFavorite,
                 LastUsedUtc = lastUsedUtc,
                 Origin = origin,
+                Tags = tags,
                 Filter = JsonSerializer.Deserialize<SavedFilter>(payload)
                     ?? throw new InvalidOperationException($"LibraryEntrySavedFilter '{id}' payload deserialized to null."),
             },
@@ -363,6 +373,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
                 IsFavorite = isFavorite,
                 LastUsedUtc = lastUsedUtc,
                 Origin = origin,
+                Tags = tags,
                 Filters = JsonSerializer.Deserialize<ImmutableList<SavedFilter>>(payload) ?? [],
             },
             _ => null,
@@ -418,7 +429,11 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
             ? LibraryEntryOrigin.UserSaved
             : ParseOrigin(reader.GetString(7));
 
-        return DeserializeEntry(id, name, createdUtc, kind, payload, isFavorite, lastUsedUtc, origin);
+        var tags = reader.IsDBNull(11)
+            ? []
+            : JsonSerializer.Deserialize<ImmutableList<string>>(reader.GetString(11)) ?? [];
+
+        return DeserializeEntry(id, name, createdUtc, kind, payload, isFavorite, lastUsedUtc, origin, tags);
     }
 
     private SqliteConnection OpenConnection()

@@ -20,6 +20,44 @@ public sealed class LibraryEntryPolymorphicJsonTests
     }
 
     [Fact]
+    public void Deserialize_TagsExplicitNull_GuardedToEmptyImmutableList()
+    {
+        var json = """
+            {"Kind":"Filter","Id":"00000000-0000-0000-0000-000000000011","Name":"NullTags","CreatedUtc":"2026-05-31T12:00:00+00:00","tags":null,"Filter":{"Color":0,"ComparisonText":"Level == 4","IsExcluded":false,"Mode":"Advanced"}}
+            """;
+
+        var restored = JsonSerializer.Deserialize<LibraryEntry>(json);
+
+        var typed = Assert.IsType<LibraryEntrySavedFilter>(restored);
+        Assert.NotNull(typed.Tags);
+        Assert.Empty(typed.Tags);
+    }
+
+    [Fact]
+    public void Deserialize_TagsNonStringArrayElement_ThrowsJsonException()
+    {
+        var json = """
+            {"Kind":"Filter","Id":"00000000-0000-0000-0000-000000000013","Name":"BadTags","CreatedUtc":"2026-05-31T12:00:00+00:00","tags":["valid",42],"Filter":{"Color":0,"ComparisonText":"Level == 4","IsExcluded":false,"Mode":"Advanced"}}
+            """;
+
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
+    }
+
+    [Fact]
+    public void Deserialize_TagsPropertyMissing_DefaultsToEmptyImmutableList()
+    {
+        var json = """
+            {"Kind":"Filter","Id":"00000000-0000-0000-0000-000000000010","Name":"NoTags","CreatedUtc":"2026-05-31T12:00:00+00:00","Filter":{"Color":0,"ComparisonText":"Level == 4","IsExcluded":false,"Mode":"Advanced"}}
+            """;
+
+        var restored = JsonSerializer.Deserialize<LibraryEntry>(json);
+
+        var typed = Assert.IsType<LibraryEntrySavedFilter>(restored);
+        Assert.NotNull(typed.Tags);
+        Assert.Empty(typed.Tags);
+    }
+
+    [Fact]
     public void Deserialize_UnknownKind_ThrowsJsonException()
     {
         var json = """
@@ -142,5 +180,28 @@ public sealed class LibraryEntryPolymorphicJsonTests
         Assert.True(restoredFilter.Filter.IsExcluded);
         Assert.NotNull(restoredFilter.Filter.Compiled);
         Assert.Contains("\"Kind\":\"Filter\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RoundTrip_TagsPreservedInOrder()
+    {
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+
+        LibraryEntry entry = new LibraryEntrySavedFilter
+        {
+            Id = new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-000000000012")),
+            Name = "Tagged",
+            CreatedUtc = new DateTimeOffset(2026, 5, 31, 12, 0, 0, TimeSpan.Zero),
+            Tags = ["zeta", "alpha", "mike"],
+            Filter = filter,
+        };
+
+        var json = JsonSerializer.Serialize(entry);
+        var restored = JsonSerializer.Deserialize<LibraryEntry>(json);
+
+        var typed = Assert.IsType<LibraryEntrySavedFilter>(restored);
+        Assert.Equal(["zeta", "alpha", "mike"], typed.Tags);
+        Assert.Contains("\"tags\":[\"zeta\",\"alpha\",\"mike\"]", json, StringComparison.Ordinal);
     }
 }

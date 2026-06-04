@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Collections.Immutable;
 using System.Text.Json.Serialization;
 
 namespace EventLogExpert.Runtime.FilterLibrary;
@@ -22,4 +23,8 @@ public abstract record LibraryEntry
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public LibraryEntryOrigin Origin { get; init; } = LibraryEntryOrigin.UserSaved;
+
+    [JsonPropertyName("tags")]
+    [JsonConverter(typeof(NullToEmptyImmutableStringListConverter))]
+    public ImmutableList<string> Tags { get; init; } = [];
 }
