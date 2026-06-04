@@ -34,6 +34,18 @@ public sealed record ImportPreflight
         ToUpdate = toUpdate;
         AmbiguousMatches = ambiguousMatches;
         Error = error;
+        InvalidLegacyNames = [];
+    }
+
+    public static ImportPreflight Blocked(IReadOnlyList<string> invalidLegacyNames)
+    {
+        ArgumentNullException.ThrowIfNull(invalidLegacyNames);
+
+        return new ImportPreflight([], [], [], [], [])
+        {
+            ImportBlocked = true,
+            InvalidLegacyNames = invalidLegacyNames,
+        };
     }
 
     public IReadOnlyList<LibraryEntry> ToAdd { get; }
@@ -47,4 +59,8 @@ public sealed record ImportPreflight
     public IReadOnlyList<(IReadOnlyList<LibraryEntry> Candidates, LibraryEntry Incoming)> AmbiguousMatches { get; }
 
     public string? Error { get; }
+
+    public bool ImportBlocked { get; init; }
+
+    public IReadOnlyList<string> InvalidLegacyNames { get; init; }
 }

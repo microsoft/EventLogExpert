@@ -34,6 +34,55 @@ public sealed class FilterLibraryExportServiceTests
     }
 
     [Fact]
+    public void Deserialize_FeatureDisabled_ExistingBackslashEntry_StillMatchesIncomingMigratedEquivalent()
+    {
+        var existing = BuildSavedEntry(@"Network\DNS", comparisonText: "Level == 4");
+        var incomingMigrated = BuildSavedEntry("DNS", comparisonText: "Level == 4") with
+        {
+            Tags = ["network"],
+        };
+        var json = _service.Serialize([incomingMigrated]);
+
+        using var _ = BackslashMigrationFeature.Override(false);
+
+        var preflight = _service.Deserialize(json, [existing]);
+
+        Assert.False(preflight.ImportBlocked);
+        Assert.Empty(preflight.ToAdd);
+        Assert.Single(preflight.SkippedDuplicates);
+    }
+
+    [Fact]
+    public void Deserialize_FeatureDisabled_IncomingCleanNames_ProceedsNormally()
+    {
+        var clean = BuildSavedEntry("CleanName");
+        var json = _service.Serialize([clean]);
+
+        using var _ = BackslashMigrationFeature.Override(false);
+
+        var preflight = _service.Deserialize(json, []);
+
+        Assert.False(preflight.ImportBlocked);
+        Assert.Single(preflight.ToAdd);
+    }
+
+    [Fact]
+    public void Deserialize_FeatureDisabled_IncomingHasBackslashName_ReturnsBlockedPreflight()
+    {
+        var dirty = BuildSavedEntry(@"Network\DNS");
+        var json = _service.Serialize([dirty]);
+
+        using var _ = BackslashMigrationFeature.Override(false);
+
+        var preflight = _service.Deserialize(json, []);
+
+        Assert.True(preflight.ImportBlocked);
+        Assert.Single(preflight.InvalidLegacyNames);
+        Assert.Equal(@"Network\DNS", preflight.InvalidLegacyNames[0]);
+        Assert.Empty(preflight.ToAdd);
+    }
+
+    [Fact]
     public void Deserialize_IncomingIdCollidesWithExistingId_RegeneratesIdToAvoidCrash()
     {
         var existing = BuildSavedEntry("existing-name", comparisonText: "Level == 4");

@@ -66,7 +66,15 @@ internal sealed class LegacyFilterMigrator(ILegacyPreferences preferences, ITrac
 
             if (favoritesSucceeded)
             {
-                builder.AddRange(localFavoriteEntries.Select(LibraryEntryTagNormalizer.MigrateBackslashName));
+                if (BackslashMigrationFeature.IsEnabled)
+                {
+                    builder.AddRange(localFavoriteEntries.Select(LibraryEntryTagNormalizer.MigrateBackslashName));
+                }
+                else
+                {
+                    builder.AddRange(localFavoriteEntries);
+                }
+
                 successful |= LegacyMigrationSections.Favorites;
             }
         }
@@ -106,7 +114,22 @@ internal sealed class LegacyFilterMigrator(ILegacyPreferences preferences, ITrac
             return new LegacyMigrationResult(builder.ToImmutable(), successful);
         }
 
-        builder.AddRange(localGroupEntries.Select(LibraryEntryTagNormalizer.MigrateBackslashName));
+        if (BackslashMigrationFeature.IsEnabled)
+        {
+            builder.AddRange(localGroupEntries.Select(LibraryEntryTagNormalizer.MigrateBackslashName));
+        }
+        else
+        {
+            var rejected = localGroupEntries.Where(e => e.Name.Contains('\\')).ToList();
+
+            if (rejected.Count > 0)
+            {
+                logger.Warning($"Skipped {rejected.Count} legacy filter groups with invalid names containing '\\'.");
+            }
+
+            builder.AddRange(localGroupEntries.Where(e => !e.Name.Contains('\\')));
+        }
+
         successful |= LegacyMigrationSections.Groups;
 
         return new LegacyMigrationResult(builder.ToImmutable(), successful);

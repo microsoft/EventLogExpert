@@ -13,19 +13,21 @@ namespace EventLogExpert.Runtime.FilterLibrary;
 ///         existing <c>FilterLibrary.Effects</c> ctor injection.
 ///     </para>
 ///     <para>
-///         TODO (removal target): once telemetry / release-window confirms the install base has completed legacy migration
-///         (typically 2+ release cycles after this commit ships), perform the mechanical removal:
+///         Staged-deletion contract: every <c>if (IsEnabled) { ... } else { ... }</c> wrapping introduced for this feature
+///         places the deletable migration code in the <c>then</c> branch and the permanent post-deletion behaviour in the
+///         <c>else</c> branch. The mechanical removal procedure is:
 ///         <list type="number">
 ///             <item>Flip <see cref="Enabled" /> to <see langword="false" /> as a smoke test.</item>
 ///             <item>
-///                 Delete: <see cref="ILegacyFilterMigrator" />, <see cref="LegacyFilterMigrator" />,
-///                 <see cref="NoOpLegacyFilterMigrator" />, <c>ILegacyPreferences</c>, <c>MauiLegacyPreferencesAdapter</c>
-///                 , <c>AddLegacyFilterMigration</c> extension.
+///                 Delete every <c>if (LegacyMigrationFeature.IsEnabled) { ... } else { ... }</c> wrapper, keeping the
+///                 <c>else</c> branch contents only (NoOp registration becomes the sole DI shape).
 ///             </item>
 ///             <item>
-///                 Strip the conditional <c>ILegacyPreferences</c> registration in <c>MauiProgram</c> and the
-///                 <c>legacyMigrator</c> ctor parameter + <c>HandleLoadLibrary</c> migration branch in
-///                 <see cref="Effects" />.
+///                 Delete: <see cref="ILegacyFilterMigrator" />, <see cref="LegacyFilterMigrator" />,
+///                 <see cref="NoOpLegacyFilterMigrator" />, <c>ILegacyPreferences</c>, <c>MauiLegacyPreferencesAdapter</c>
+///                 , the <c>AddLegacyFilterMigration</c> DI extension, the conditional <c>ILegacyPreferences</c> branch in
+///                 <c>MauiProgram</c>, and the <c>legacyMigrator</c> ctor parameter + <c>HandleLoadLibrary</c> migration
+///                 branch in <see cref="Effects" />.
 ///             </item>
 ///             <item>Delete this file.</item>
 ///         </list>
@@ -33,7 +35,21 @@ namespace EventLogExpert.Runtime.FilterLibrary;
 /// </remarks>
 public static class LegacyMigrationFeature
 {
-    // static readonly (NOT const) so the if/else around DI registration does not produce
-    // CS0162 "unreachable code" when the value is flipped to false at deletion time.
     public static readonly bool Enabled = true;
+
+    private static readonly AsyncLocal<bool?> s_testOverride = new();
+
+    internal static bool IsEnabled => s_testOverride.Value ?? Enabled;
+
+    internal static IDisposable Override(bool value)
+    {
+        s_testOverride.Value = value;
+
+        return new OverrideScope();
+    }
+
+    private sealed class OverrideScope : IDisposable
+    {
+        public void Dispose() => s_testOverride.Value = null;
+    }
 }

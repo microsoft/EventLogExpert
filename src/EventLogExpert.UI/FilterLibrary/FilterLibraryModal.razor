@@ -34,6 +34,21 @@
                 Tabs="@CurrentTabLabels"
                 TTab="LibraryTab">
                 <TabContent Context="tab">
+                    @if (AllLibraryTags.Count > 0)
+                    {
+                        <div aria-label="Filter by tag" class="library-tag-filter-bar" role="group">
+                            @foreach (var tag in AllLibraryTags)
+                            {
+                                var isSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.Ordinal);
+                                <button aria-pressed="@(isSelected ? "true" : "false")"
+                                    class="library-tag-filter-chip @(isSelected ? "library-tag-filter-chip-selected" : null)"
+                                    @onclick="@(() => ToggleTagFilter(tag))"
+                                    type="button">
+                                    @tag
+                                </button>
+                            }
+                        </div>
+                    }
                     @switch (tab)
                     {
                         case LibraryTab.Saved:

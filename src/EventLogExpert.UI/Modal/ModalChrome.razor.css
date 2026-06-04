@@ -53,9 +53,13 @@ dialog:not(:modal) {
 .dialog-body {
     display: flex;
     flex-direction: column;
-    flex: 1 1 0;
+    flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
+}
+
+dialog[data-body-layout="flex"] .dialog-body {
+    flex: 1 1 0;
 }
 
 dialog[data-body-layout="flex"]:not([style*="--modal-height"]) .dialog-body {

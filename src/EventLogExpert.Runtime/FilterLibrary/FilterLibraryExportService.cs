@@ -90,7 +90,26 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
         IReadOnlyList<LibraryEntry> incoming,
         IReadOnlyList<LibraryEntry> existing)
     {
-        var migratedIncoming = incoming.Select(LibraryEntryTagNormalizer.MigrateBackslashName).ToList();
+        List<LibraryEntry> migratedIncoming;
+
+        if (BackslashMigrationFeature.IsEnabled)
+        {
+            migratedIncoming = incoming.Select(LibraryEntryTagNormalizer.MigrateBackslashName).ToList();
+        }
+        else
+        {
+            var invalidNames = incoming
+                .Where(e => e.Name.Contains('\\'))
+                .Select(e => e.Name)
+                .ToList();
+
+            if (invalidNames.Count > 0)
+            {
+                return ImportPreflight.Blocked(invalidNames);
+            }
+
+            migratedIncoming = incoming.ToList();
+        }
 
         var existingByStrictKey = new Dictionary<string, LibraryEntry>(StringComparer.Ordinal);
         var existingByRelaxedKey = new Dictionary<string, List<LibraryEntry>>(StringComparer.Ordinal);
