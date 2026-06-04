@@ -7,7 +7,6 @@ using EventLogExpert.DependencyInjection;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Files;
-using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
@@ -67,9 +66,11 @@ public static class MauiProgram
         builder.Services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
         builder.Services.AddTransient<IEventResolver, EventResolver>();
 
-        // FilterLibrary persistence + gated legacy migration (see LegacyMigrationFeature for the removal contract)
+        // FilterLibrary persistence + JSON export/import + gated legacy migration (see LegacyMigrationFeature for the removal contract)
         builder.Services.AddFilterLibrarySqliteStore(
             Path.Combine(FileSystem.AppDataDirectory, "filter-library.db"));
+
+        builder.Services.AddFilterLibraryExport();
 
         if (LegacyMigrationFeature.Enabled)
         {

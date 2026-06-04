@@ -7,7 +7,6 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
 using System.Collections.Immutable;
-using System.Text;
 
 namespace EventLogExpert.Runtime.FilterLibrary;
 
@@ -469,23 +468,6 @@ internal sealed class Effects(
         return Task.CompletedTask;
     }
 
-    private static void AppendLengthPrefixed(StringBuilder sb, string s) =>
-        sb.Append(s.Length).Append(':').Append(s);
-
-    private static string BuildFilterSetIdentityKey(LibraryEntryFilterSet filterSet)
-    {
-        var sb = new StringBuilder();
-        AppendLengthPrefixed(sb, filterSet.Name.ToLowerInvariant());
-
-        foreach (var f in filterSet.Filters)
-        {
-            AppendLengthPrefixed(sb, f.ComparisonText.ToLowerInvariant());
-            sb.Append('|').Append(f.Mode).Append('|').Append(f.IsExcluded);
-        }
-
-        return sb.ToString();
-    }
-
     private static ImmutableList<LibraryEntry> DedupMigrationEntriesAgainstExisting(
         ImmutableList<LibraryEntry> candidates,
         ImmutableList<LibraryEntry> existing)
@@ -499,14 +481,14 @@ internal sealed class Effects(
         // Filter-set dedup: name + ordered filter-content fingerprint. Name-only would drop legacy
         // filter sets that share a display name with a user-created filter set but carry different filters.
         var existingFilterSetKeys = new HashSet<string>(
-            existing.OfType<LibraryEntryFilterSet>().Select(BuildFilterSetIdentityKey));
+            existing.OfType<LibraryEntryFilterSet>().Select(FilterLibraryDedupKeys.ForFilterSet));
 
         return [.. candidates.Where(entry => entry switch
         {
             LibraryEntrySavedFilter sf =>
                 !existingFilterKeys.Contains((sf.Filter.ComparisonText.ToLowerInvariant(), sf.Filter.Mode, sf.Filter.IsExcluded)),
             LibraryEntryFilterSet filterSet =>
-                !existingFilterSetKeys.Contains(BuildFilterSetIdentityKey(filterSet)),
+                !existingFilterSetKeys.Contains(FilterLibraryDedupKeys.ForFilterSet(filterSet)),
             _ => true,
         })];
     }
