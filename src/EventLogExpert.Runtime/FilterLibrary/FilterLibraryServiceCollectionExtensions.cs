@@ -27,6 +27,20 @@ public static class FilterLibraryServiceCollectionExtensions
         }
 
         /// <summary>
+        ///     Registers <see cref="IFilterLibraryExportService" /> backed by the internal-sealed implementation. Keeps the
+        ///     JSON-envelope and content-fingerprint logic encapsulated in the runtime assembly; UI consumers depend on the public
+        ///     interface only.
+        /// </summary>
+        public IServiceCollection AddFilterLibraryExport()
+        {
+            ArgumentNullException.ThrowIfNull(services);
+
+            services.AddSingleton<IFilterLibraryExportService, FilterLibraryExportService>();
+
+            return services;
+        }
+
+        /// <summary>
         ///     Registers the legacy-filter migration singleton. When <see cref="LegacyMigrationFeature.Enabled" /> is
         ///     <see langword="true" /> (default), the real <see cref="LegacyFilterMigrator" /> is registered and the host MUST
         ///     also register <see cref="ILegacyPreferences" />. When <see langword="false" />, a
