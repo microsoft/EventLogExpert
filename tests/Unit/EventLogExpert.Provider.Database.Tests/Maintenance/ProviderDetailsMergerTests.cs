@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.TestUtils;
-using EventLogExpert.Provider.Models;
+using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Provider.Schema;
 using EventLogExpert.ProviderDatabase.Maintenance;
 

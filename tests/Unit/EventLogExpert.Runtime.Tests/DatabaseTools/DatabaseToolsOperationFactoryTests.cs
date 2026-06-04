@@ -1,9 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.DatabaseTools.Contracts;
-using EventLogExpert.DatabaseTools.Operations;
-using EventLogExpert.Runtime.DatabaseTools;
+using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.DatabaseTools.CreateDatabase;
+using EventLogExpert.DatabaseTools.DiffDatabase;
+using EventLogExpert.DatabaseTools.MergeDatabase;
+using EventLogExpert.DatabaseTools.ShowProviders;
+using EventLogExpert.DatabaseTools.UpgradeDatabase;
 
 namespace EventLogExpert.Runtime.Tests.DatabaseTools;
 

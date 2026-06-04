@@ -1,7 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.DatabaseTools.Contracts;
+using EventLogExpert.DatabaseTools.Common.Ipc;
+using EventLogExpert.DatabaseTools.Common.Operations;
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
@@ -158,13 +159,6 @@ internal static class ProgramEntry
         return 0;
     }
 
-    private static async Task TryWriteTerminalAsync(IpcEnvelopeWriter writer, DatabaseToolsIpcEnvelope envelope)
-    {
-        try { await writer.WriteAsync(envelope, CancellationToken.None); }
-        catch (IOException) { /* runner disconnected before terminal envelope was written; not a helper crash */ }
-        catch (ObjectDisposedException) { /* pipe disposed by runner; same as above */ }
-    }
-
     private static async Task<int> RunPipeModeAsync(string pipeName, bool probe)
     {
         await using var pipe = new NamedPipeClientStream(
@@ -217,6 +211,13 @@ internal static class ProgramEntry
 
             return 5;
         }
+    }
+
+    private static async Task TryWriteTerminalAsync(IpcEnvelopeWriter writer, DatabaseToolsIpcEnvelope envelope)
+    {
+        try { await writer.WriteAsync(envelope, CancellationToken.None); }
+        catch (IOException) { /* runner disconnected before terminal envelope was written; not a helper crash */ }
+        catch (ObjectDisposedException) { /* pipe disposed by runner; same as above */ }
     }
 
     private static async Task WriteCrashLogAsync(Exception ex, string[] args)

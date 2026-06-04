@@ -23,6 +23,7 @@ using EventLogExpert.WindowsPlatform;
 using Fluxor;
 using Application = Microsoft.Maui.Controls.Application;
 using IDispatcher = Fluxor.IDispatcher;
+using MauiFilePicker = Microsoft.Maui.Storage.FilePicker;
 
 namespace EventLogExpert.Adapters.Menu;
 
@@ -158,7 +159,7 @@ public sealed class MauiMenuActionService(
                 new Dictionary<DevicePlatform, IEnumerable<string>> { { DevicePlatform.WinUI, [".evtx"] } })
         };
 
-        var files = await FilePicker.Default.PickMultipleAsync(options);
+        var files = await MauiFilePicker.Default.PickMultipleAsync(options);
 
         if (!files.Any()) { return; }
 

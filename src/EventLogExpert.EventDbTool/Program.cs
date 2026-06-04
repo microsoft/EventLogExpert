@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.DependencyInjection;
 using EventLogExpert.EventDbTool.Commands;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Sinks;
@@ -16,6 +17,7 @@ internal class Program
     internal static ServiceProvider BuildServiceProvider(bool verbose) =>
         new ServiceCollection()
             .AddSingleton<ITraceLogger>(new TraceLogger(verbose ? LogLevel.Trace : LogLevel.Information))
+            .AddDatabaseToolsServices()
             .BuildServiceProvider();
 
     private static bool IsElevated()

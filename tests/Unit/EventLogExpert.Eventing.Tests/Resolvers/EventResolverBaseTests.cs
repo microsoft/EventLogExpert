@@ -7,7 +7,7 @@ using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Provider.Models;
+using EventLogExpert.Provider.Resolution;
 using NSubstitute;
 using System.Collections.Concurrent;
 

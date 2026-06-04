@@ -82,7 +82,7 @@ Add-AppxPackage -Path "src/EventLogExpert/bin/Debug/.../EventLogExpert_0.9.0.0_x
 
 ## Smoke recipe
 
-Run after any change touching the manifest, the activation pipeline, the native shell extension DLL, or `MauiMenuActionService.OpenFolderAsync`. Automated tests cover manifest structural invariants (`ManifestSchemaTests`), folder enumeration (`EvtxFolderEnumeratorTests`), CLI parsing (`CommandLineToArgvWHelperTests`), and token classification (`ActivationTokenClassifierTests`) but cannot verify Explorer integration end-to-end.
+Run after any change touching the manifest, the activation pipeline, the native shell extension DLL, or `MauiMenuActionService.OpenFolderAsync`. Automated tests cover manifest structural invariants (`ManifestSchemaTests`), folder enumeration (`EvtxFolderEnumeratorTests`), CLI parsing (`Win32CommandLineParserTests`), and token classification (`ActivationTokenClassifierTests`) but cannot verify Explorer integration end-to-end.
 
 **Prerequisites:**
 - Windows 11 (the only target — Win10 dropped per scope decision since OOS in Oct 2025).

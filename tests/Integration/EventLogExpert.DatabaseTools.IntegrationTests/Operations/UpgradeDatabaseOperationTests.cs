@@ -1,8 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.DatabaseTools.Contracts;
-using EventLogExpert.DatabaseTools.Operations;
+using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
