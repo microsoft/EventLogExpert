@@ -10,17 +10,25 @@ using EventLogExpert.UI.Focus;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterLibrary;
 
 public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 {
+    private const int MaxVisibleTagChips = 5;
+
+    private readonly string _tagsRegionId = $"library-entry-tags-{Guid.NewGuid().ToString()[..8]}";
+    
+    private bool _isEditingTags;
     private ElementReference _moreMenuButtonRef;
     private long _moreMenuId;
 
     [Parameter][EditorRequired] public LibraryTab ActiveTab { get; set; }
 
     [Parameter][EditorRequired] public required IReadOnlyList<LibraryEntryFilterSet> AllFilterSets { get; set; }
+
+    [Parameter] public IReadOnlyList<string> AllLibraryTags { get; set; } = [];
 
     [Parameter][EditorRequired] public required LibraryEntry Entry { get; set; }
 
@@ -58,6 +66,8 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
+    private bool IsFavoritable => Entry is LibraryEntrySavedFilter;
+
     private bool IsMoreMenuOpen =>
         _moreMenuId != 0 && MenuService.ActiveMenuId == _moreMenuId && MenuService.ActiveItems is not null;
 
@@ -73,26 +83,6 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     private bool ShowSaveToLibraryItem =>
         Entry is { Origin: LibraryEntryOrigin.AutoTracked, IsFavorite: false };
-
-    private string StatusBadgeKind
-    {
-        get
-        {
-            if (Entry.IsFavorite) { return "favorite"; }
-
-            return Entry is { Origin: LibraryEntryOrigin.AutoTracked, LastUsedUtc: not null } ? "previously-used" : "saved";
-        }
-    }
-
-    private string StatusBadgeText
-    {
-        get
-        {
-            if (Entry.IsFavorite) { return "Favorite"; }
-
-            return Entry is { Origin: LibraryEntryOrigin.AutoTracked, LastUsedUtc: not null } ? "Previously used" : "Saved";
-        }
-    }
 
     public ValueTask DisposeAsync()
     {
@@ -237,7 +227,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     {
         var name = await AlertDialogService.DisplayPrompt(
             "Filter set name",
-            "What would you like to name this filter set? (use \\ for folder paths)",
+            "What would you like to name this filter set?",
             "New Filter Set");
 
         if (string.IsNullOrWhiteSpace(name)) { return; }
@@ -250,7 +240,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     {
         var newName = await AlertDialogService.DisplayPrompt(
             "Rename entry",
-            "What would you like to rename this entry to? (use \\ for folder paths)",
+            "What would you like to rename this entry to?",
             Entry.Name);
 
         if (string.IsNullOrWhiteSpace(newName)) { return; }
@@ -293,12 +283,28 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         AnnouncementService.Announce($"Saved {Entry.Name} to library");
     }
 
+    private async Task OnTagsChangedAsync(ImmutableList<string> tags)
+    {
+        var updated = Entry switch
+        {
+            LibraryEntrySavedFilter f => f with { Tags = tags },
+            LibraryEntryFilterSet fs => fs with { Tags = tags },
+            _ => Entry,
+        };
+
+        FilterLibraryCommands.UpdateEntry(updated);
+        await Task.CompletedTask;
+    }
+
     private async Task OnToggleFavoriteAsync()
     {
+        if (!IsFavoritable) { return; }
+
         var newIsFavorite = !Entry.IsFavorite;
         var willLeaveActiveTab =
             (ActiveTab == LibraryTab.Favorites && Entry.IsFavorite) ||
-            (ActiveTab == LibraryTab.PreviouslyUsed && newIsFavorite);
+            (ActiveTab == LibraryTab.PreviouslyUsed && newIsFavorite) ||
+            (ActiveTab == LibraryTab.Saved && newIsFavorite && Entry.Origin == LibraryEntryOrigin.UserSaved);
 
         if (willLeaveActiveTab) { await OnRequestPendingFocus.InvokeAsync(Entry.Id); }
 
@@ -307,6 +313,8 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
             ? $"Marked {Entry.Name} as favorite"
             : $"Removed {Entry.Name} from favorites");
     }
+
+    private void ToggleEditTagsMode() => _isEditingTags = !_isEditingTags;
 
     private async Task ToggleMoreMenuAsync()
     {

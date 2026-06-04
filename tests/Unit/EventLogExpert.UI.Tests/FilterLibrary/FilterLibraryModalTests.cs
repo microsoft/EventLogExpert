@@ -217,6 +217,25 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public void Render_FavoritesTab_OnlySavedFilterEntries_ExcludesFilterSet()
+    {
+        var favoritedFilter = BuildSavedFilter("FavFilter") with { IsFavorite = true };
+        var favoritedFilterSet = new LibraryEntryFilterSet
+        {
+            Name = "FavSet",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = [],
+            IsFavorite = true,
+        };
+        SetState(new FilterLibraryState { Entries = [favoritedFilter, favoritedFilterSet], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        var tabs = component.FindAll("[role='tab']");
+        Assert.Contains("Favorites (1)", tabs[1].TextContent);
+    }
+
+    [Fact]
     public void Render_HiddenTabpanel_DoesNotRenderRowChildren()
     {
         var saved = BuildSavedFilter("S");
@@ -226,6 +245,19 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         // Only the active (Saved) tab should render its row; the other two tabpanels are empty.
         Assert.Single(component.FindAll(".library-entry-row"));
+    }
+
+    [Fact]
+    public void Render_PreviouslyUsedTab_RequiresOriginAutoTracked_ExcludesUserSavedWithLastUsedUtc()
+    {
+        var autoTracked = BuildAutoTrackedFilterEntry("Recent");
+        var userSavedWithLastUsed = BuildSavedFilter("UserWithLastUsed") with { LastUsedUtc = DateTimeOffset.UtcNow };
+        SetState(new FilterLibraryState { Entries = [autoTracked, userSavedWithLastUsed], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        var tabs = component.FindAll("[role='tab']");
+        Assert.Contains("Previously Used (1)", tabs[2].TextContent);
     }
 
     [Fact]
@@ -240,10 +272,22 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var tabs = component.FindAll("[role='tab']");
         Assert.Equal(3, tabs.Count);
-        // saved + fav both have Origin=UserSaved (BuildFilterEntry default) → 2 in Saved
-        Assert.Contains("Saved (2)", tabs[0].TextContent);
+        Assert.Contains("Saved (1)", tabs[0].TextContent);
         Assert.Contains("Favorites (1)", tabs[1].TextContent);
         Assert.Contains("Previously Used (1)", tabs[2].TextContent);
+    }
+
+    [Fact]
+    public void Render_SavedTab_ExcludesFavoritedUserSavedEntries()
+    {
+        var notFav = BuildSavedFilter("NotFav");
+        var fav = BuildSavedFilter("Fav") with { IsFavorite = true };
+        SetState(new FilterLibraryState { Entries = [notFav, fav], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        var names = component.FindAll(".sidebar-tabs-tabpanel.active .library-entry-name-text").Select(n => n.TextContent.Trim()).ToList();
+        Assert.Equal(["NotFav"], names);
     }
 
     [Fact]

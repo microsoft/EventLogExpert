@@ -201,18 +201,28 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public async Task FavoriteOnSavedTab_DoesNotInvokePendingFocus()
+    public async Task FavoriteOnSavedTab_UserSavedFilter_InvokesPendingFocusBeforeToggle()
     {
         var entry = BuildSavedFilter("X");
-        var focusCalled = false;
+        var calls = new List<string>();
         var component = RenderRow(
             entry,
             activeTab: LibraryTab.Saved,
-            onRequestPendingFocus: id => { focusCalled = true; return Task.CompletedTask; });
+            onRequestPendingFocus: id => { calls.Add("focus"); return Task.CompletedTask; },
+            onToggleFavorite: i => { calls.Add("toggle"); return Task.CompletedTask; });
 
         await component.Find("button.button-yellow").ClickAsync(new MouseEventArgs());
 
-        Assert.False(focusCalled);
+        Assert.Equal(["focus", "toggle"], calls);
+    }
+
+    [Fact]
+    public void FilterSetEntry_DoesNotRenderFavoriteButton()
+    {
+        var filterSet = BuildFilterSet("P");
+        var component = RenderRow(filterSet);
+
+        Assert.Empty(component.FindAll("button.button-yellow"));
     }
 
     [Fact]
@@ -221,7 +231,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         var entry = BuildSavedFilter("X");
         var component = RenderRow(entry);
 
-        var more = component.FindAll("button.icon-button").Last();
+        var more = component.Find("button[aria-label^='More actions for']");
         Assert.Contains("More actions for X", more.GetAttribute("aria-label"));
         Assert.Equal("menu", more.GetAttribute("aria-haspopup"));
         Assert.Equal("false", more.GetAttribute("aria-expanded"));
@@ -233,7 +243,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         var entry = BuildSavedFilter("X");
         var component = RenderRow(entry);
 
-        await component.FindAll("button.icon-button").Last().ClickAsync(new MouseEventArgs());
+        await component.Find("button[aria-label^='More actions for']").ClickAsync(new MouseEventArgs());
 
         _menuService.Received(1).OpenAt(
             Arg.Any<double>(),
@@ -329,13 +339,12 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_FilterEntry_ShowsKindIconAndStatusBadge()
+    public void Render_FilterEntry_ShowsKindIcon()
     {
         var entry = BuildSavedFilter("F");
         var component = RenderRow(entry);
 
         Assert.Contains("bi-funnel", component.Find("i.library-entry-kind-icon").GetAttribute("class"));
-        Assert.Equal("Saved", component.Find(".library-entry-status-badge").TextContent.Trim());
     }
 
     [Fact]
@@ -393,21 +402,6 @@ public sealed class LibraryEntryRowTests : BunitContext
 
         Assert.True(invoked);
         _announcements.Received(1).Announce(Arg.Is<string>(s => s.Contains("Saved X to library")));
-    }
-
-    [Theory]
-    [InlineData(LibraryEntryOrigin.UserSaved, false, null, "Saved", "saved")]
-    [InlineData(LibraryEntryOrigin.AutoTracked, false, "2025-01-01", "Previously used", "previously-used")]
-    [InlineData(LibraryEntryOrigin.UserSaved, true, null, "Favorite", "favorite")]
-    public void StatusBadge_ReflectsEntryState(LibraryEntryOrigin origin, bool isFav, string? lastUsedString, string expectedText, string expectedKind)
-    {
-        DateTimeOffset? lastUsed = lastUsedString is null ? null : DateTimeOffset.Parse(lastUsedString);
-        var entry = BuildFilterEntry("X") with { Origin = origin, IsFavorite = isFav, LastUsedUtc = lastUsed };
-        var component = RenderRow(entry);
-
-        var badge = component.Find(".library-entry-status-badge");
-        Assert.Equal(expectedText, badge.TextContent.Trim());
-        Assert.Equal(expectedKind, badge.GetAttribute("data-status"));
     }
 
     [Fact]
@@ -475,7 +469,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         IReadOnlyList<MenuItem>? captured = null;
         _menuService.WhenForAnyArgs(s => s.OpenAt(0, 0, null!, false, false))
             .Do(call => captured = (IReadOnlyList<MenuItem>)call[2]!);
-        await component.FindAll("button.icon-button").Last().ClickAsync(new MouseEventArgs());
+        await component.Find("button[aria-label^='More actions for']").ClickAsync(new MouseEventArgs());
         Assert.NotNull(captured);
         return captured;
     }
