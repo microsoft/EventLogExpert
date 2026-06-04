@@ -8,7 +8,7 @@ namespace EventLogExpert.Provider.Models;
 ///     https://msdn.microsoft.com/en-us/library/windows/desktop/aa363669(v=vs.85).aspx for more about Message Files). This
 ///     could be an Event, a Task (category), or something else.
 /// </summary>
-public class MessageModel
+public sealed class MessageModel
 {
     /// <summary>The log name that this event will appear in.</summary>
     public string? LogLink { get; set; }

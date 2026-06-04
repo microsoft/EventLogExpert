@@ -14,8 +14,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="EventLogExpert.DatabaseTools.Tests" />
     <InternalsVisibleTo Include="EventLogExpert.DatabaseTools.IntegrationTests" />
-      <!-- TODO: Remove this once the runtime tests are migrated to use the public API of the database tools. -->
-      <InternalsVisibleTo Include="EventLogExpert.Runtime" />
     <InternalsVisibleTo Include="EventLogExpert.Runtime.Tests" />
   </ItemGroup>
 
