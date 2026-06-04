@@ -8,7 +8,6 @@ using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.UI.Modal;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
-using System.Collections.Immutable;
 using System.Security;
 
 namespace EventLogExpert.UI.FilterLibrary;
@@ -37,6 +36,12 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             .OfType<LibraryEntryFilterSet>()
             .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)];
 
+    private IReadOnlyList<string> AllLibraryTags =>
+        [.. FilterLibraryState.Value.Entries
+            .SelectMany(e => e.Tags)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(t => t, StringComparer.Ordinal)];
+
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
     private IReadOnlyList<(LibraryTab Tab, string Label)> CurrentTabLabels =>
@@ -50,7 +55,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private IReadOnlyList<LibraryEntry> FavoriteEntries =>
         [.. FilterLibraryState.Value.Entries
-            .Where(e => e.IsFavorite)
+            .Where(e => e is LibraryEntrySavedFilter && e.IsFavorite)
             .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
 
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
@@ -61,20 +66,14 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private IReadOnlyList<LibraryEntry> PreviouslyUsedEntries =>
         [.. FilterLibraryState.Value.Entries
-            .Where(e => e.LastUsedUtc is not null)
+            .Where(e => e.Origin == LibraryEntryOrigin.AutoTracked && !e.IsFavorite)
             .OrderByDescending(e => e.LastUsedUtc!.Value)
             .Take(50)];
 
-    private IReadOnlyList<LibraryEntry> SavedDirectEntries =>
-        LibraryEntrySectionNode.BuildFlatRootEntries(SavedEntries);
-
     private IReadOnlyList<LibraryEntry> SavedEntries =>
         [.. FilterLibraryState.Value.Entries
-            .Where(e => e.Origin == LibraryEntryOrigin.UserSaved)
+            .Where(e => e.Origin == LibraryEntryOrigin.UserSaved && !e.IsFavorite)
             .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
-
-    private ImmutableList<LibraryEntrySectionNode> SavedSectionTree =>
-        [.. LibraryEntrySectionNode.BuildTree(SavedEntries)];
 
     internal static (LibraryEntryId? TargetId, bool FallbackToActiveTab) DecidePendingFocusAfterRemoval(
         IReadOnlyList<LibraryEntry> snapshot,
@@ -214,23 +213,40 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private static string BuildPreflightSummary(ImportPreflight preflight)
     {
-        var conflictList = preflight.ToReplace.Count == 0
-            ? string.Empty
-            : "\nNames being overwritten:\n  \u2022 " +
-              string.Join("\n  \u2022 ", preflight.ToReplace.Select(p => p.Incoming.Name).Take(10)) +
-              (preflight.ToReplace.Count > 10
-                  ? $"\n  \u2022 ...and {preflight.ToReplace.Count - 10} more"
-                  : string.Empty);
-
-        if (preflight.ToReplace.Count == 0)
+        var lines = new List<string>
         {
-            return $"Import preview:\n  \u2022 {preflight.ToAdd.Count} new entries will be added\n  \u2022 {preflight.SkippedDuplicates.Count} exact duplicates will be skipped";
+            $"  \u2022 {preflight.ToAdd.Count} new entries will be added",
+        };
+
+        if (preflight.ToReplace.Count > 0)
+        {
+            var conflictList = "\nNames being overwritten:\n  \u2022 " +
+                string.Join("\n  \u2022 ", preflight.ToReplace.Select(p => p.Incoming.Name).Take(10)) +
+                (preflight.ToReplace.Count > 10
+                    ? $"\n  \u2022 ...and {preflight.ToReplace.Count - 10} more"
+                    : string.Empty);
+
+            lines.Add($"  \u2022 {preflight.ToReplace.Count} existing entries WILL BE OVERWRITTEN (current filter content will be lost){conflictList}");
         }
 
-        return
-            $"Import preview:\n  \u2022 {preflight.ToAdd.Count} new entries will be added\n" +
-            $"  \u2022 {preflight.ToReplace.Count} existing entries WILL BE OVERWRITTEN (current filter content will be lost){conflictList}\n" +
-            $"  \u2022 {preflight.SkippedDuplicates.Count} exact duplicates will be skipped";
+        if (preflight.ToUpdate.Count > 0)
+        {
+            var renameCount = preflight.ToUpdate.Count(t => t.Existing.Name.Contains('\\'));
+            lines.Add($"  \u2022 {preflight.ToUpdate.Count} entries will be updated with tag changes");
+            if (renameCount > 0)
+            {
+                lines.Add($"  \u2022 {renameCount} existing entries will also be renamed (folder paths \u2192 tags)");
+            }
+        }
+
+        if (preflight.AmbiguousMatches.Count > 0)
+        {
+            lines.Add($"  \u2022 {preflight.AmbiguousMatches.Count} entries require manual conflict resolution (use Convert backslash names button after import)");
+        }
+
+        lines.Add($"  \u2022 {preflight.SkippedDuplicates.Count} exact duplicates will be skipped");
+
+        return "Import preview:\n" + string.Join('\n', lines);
     }
 
     private static string GetEmptyStateMessage(LibraryTab tab) => tab switch
@@ -361,8 +377,29 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             FilterLibraryCommands.UpdateEntry(incoming with { Id = existing.Id });
         }
 
+        foreach (var (existing, incoming) in preflight.ToUpdate)
+        {
+            var existingMigrated = LibraryEntryTagNormalizer.MigrateBackslashName(existing);
+            var unionedTags = LibraryEntryTagNormalizer.Normalize(existingMigrated.Tags.Concat(incoming.Tags));
+
+            var updated = existing switch
+            {
+                LibraryEntrySavedFilter f => f with { Name = existingMigrated.Name, Tags = unionedTags },
+                LibraryEntryFilterSet fs => fs with { Name = existingMigrated.Name, Tags = unionedTags },
+                _ => existing,
+            };
+
+            FilterLibraryCommands.UpdateEntry(updated);
+        }
+
+        var ambiguousCount = preflight.AmbiguousMatches.Count;
+
         AnnouncementService.Announce(
-            $"Imported {preflight.ToAdd.Count} new, replaced {preflight.ToReplace.Count}, skipped {preflight.SkippedDuplicates.Count}");
+            $"Imported {preflight.ToAdd.Count} new, " +
+            $"replaced {preflight.ToReplace.Count}, " +
+            $"updated {preflight.ToUpdate.Count} tags, " +
+            $"skipped {preflight.SkippedDuplicates.Count}" +
+            (ambiguousCount > 0 ? $" ({ambiguousCount} require manual resolution via Convert button)" : string.Empty));
     }
 
     private void PruneStaleRowRefs()

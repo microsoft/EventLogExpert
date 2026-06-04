@@ -37,21 +37,13 @@
                     @switch (tab)
                     {
                         case LibraryTab.Saved:
-                            @if (SavedDirectEntries.Count == 0 && SavedSectionTree.Count == 0)
+                            @if (SavedEntries.Count == 0)
                             {
                                 <p class="library-empty-state">@GetEmptyStateMessage(tab)</p>
                             }
                             else
                             {
-                                @foreach (var section in SavedSectionTree)
-                                {
-                                    <LibraryEntrySection ChildSections="@section.ChildSections"
-                                        DirectEntries="@section.DirectEntries"
-                                        EntryTemplate="@(entry => RenderEntryRow(tab, entry))"
-                                        SectionName="@section.SectionName" />
-                                }
-
-                                @foreach (var entry in SavedDirectEntries)
+                                @foreach (var entry in SavedEntries)
                                 {
                                     @RenderEntryRow(tab, entry)
                                 }
@@ -93,6 +85,7 @@
         {
             <LibraryEntryRow ActiveTab="@tab"
                 AllFilterSets="@AllFilterSets"
+                AllLibraryTags="@AllLibraryTags"
                 Entry="@entry"
                 @key="entry.Id"
                 OnAddToFilterSet="@HandleAddToFilterSetAsync"

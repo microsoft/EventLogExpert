@@ -761,6 +761,18 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
+    public async Task HandleRecordEntryApplied_FilterSetEntry_IsNoOp_NoLastUsedBump()
+    {
+        var filterSet = BuildFilterSetEntry("FilterSetName");
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [filterSet] });
+
+        await effects.HandleRecordEntryApplied(new RecordEntryAppliedAction(filterSet.Id), dispatcher);
+
+        store.DidNotReceive().TryBumpLastUsedIfNotFavorite(Arg.Any<LibraryEntryId>(), Arg.Any<DateTimeOffset>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
     public async Task HandleRecordEntryApplied_NotFavoriteBumpSucceeds_DispatchesUpdate()
     {
         var entry = BuildFilterEntry("First") with { Origin = LibraryEntryOrigin.AutoTracked };

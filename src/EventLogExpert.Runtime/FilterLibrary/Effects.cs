@@ -246,7 +246,7 @@ internal sealed class Effects(
         var entries = state.Value.Entries;
         var entry = entries.FirstOrDefault(e => e.Id == action.EntryId);
 
-        if (entry is null || entry.IsFavorite) { return Task.CompletedTask; }
+        if (entry is not LibraryEntrySavedFilter || entry.IsFavorite) { return Task.CompletedTask; }
 
         var nowUtc = DateTimeOffset.UtcNow;
         bool bumped;

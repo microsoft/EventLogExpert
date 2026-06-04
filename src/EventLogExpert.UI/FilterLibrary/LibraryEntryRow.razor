@@ -13,8 +13,6 @@
         }
     </div>
 
-    <span class="library-entry-status-badge" data-status="@StatusBadgeKind">@StatusBadgeText</span>
-
     <button aria-label="@($"Apply {Entry.Name} additively to current filters")"
         class="button button-green"
         @onclick="OnApplyAsync"
@@ -22,14 +20,17 @@
         <i aria-hidden="true" class="bi bi-plus-circle"></i> Apply
     </button>
 
-    <button aria-label="@FavoriteAriaLabel"
-        aria-pressed="@(Entry.IsFavorite ? "true" : "false")"
-        class="button button-yellow icon-button"
-        @onclick="OnToggleFavoriteAsync"
-        title="@FavoriteTitle"
-        type="button">
-        <i aria-hidden="true" class="@FavoriteIconClass"></i>
-    </button>
+    @if (IsFavoritable)
+    {
+        <button aria-label="@FavoriteAriaLabel"
+            aria-pressed="@(Entry.IsFavorite ? "true" : "false")"
+            class="button button-yellow icon-button"
+            @onclick="OnToggleFavoriteAsync"
+            title="@FavoriteTitle"
+            type="button">
+            <i aria-hidden="true" class="@FavoriteIconClass"></i>
+        </button>
+    }
 
     <button aria-expanded="@(IsMoreMenuOpen ? "true" : "false")"
         aria-haspopup="menu"
@@ -42,3 +43,65 @@
         <i aria-hidden="true" class="bi bi-three-dots-vertical"></i>
     </button>
 </div>
+
+<div aria-controls="@_tagsRegionId" class="library-entry-tags-region" id="@_tagsRegionId">
+    @if (_isEditingTags)
+    {
+        <TagPicker AriaLabel="@($"Tags for {Entry.Name}")"
+            SuggestionSource="@AllLibraryTags"
+            Value="@Entry.Tags"
+            ValueChanged="@OnTagsChangedAsync" />
+
+        <button aria-label="Done editing tags"
+            class="button icon-button library-entry-tags-done"
+            @onclick="ToggleEditTagsMode"
+            title="Done"
+            type="button">
+            <i aria-hidden="true" class="bi bi-check2"></i>
+        </button>
+    }
+    else if (Entry.Tags.Count > 0)
+    {
+        <div class="library-entry-tag-chips" role="list">
+            @{
+                var visibleCount = Math.Min(Entry.Tags.Count, MaxVisibleTagChips);
+                var hiddenCount = Entry.Tags.Count - visibleCount;
+            }
+            @for (int i = 0; i < visibleCount; i++)
+            {
+                <span class="library-entry-tag-chip" role="listitem">@Entry.Tags[i]</span>
+            }
+            @if (hiddenCount > 0)
+            {
+                <button aria-label="@($"Show all {Entry.Tags.Count} tags")"
+                    class="button library-entry-tag-chip-more"
+                    @onclick="ToggleEditTagsMode"
+                    title="@string.Join(", ", Entry.Tags.Skip(visibleCount))"
+                    type="button">
+                    +@hiddenCount more
+                </button>
+            }
+        </div>
+        <button aria-label="@($"Edit tags for {Entry.Name}")"
+            class="button icon-button library-entry-tags-edit"
+            @onclick="ToggleEditTagsMode"
+            title="Edit tags"
+            type="button">
+            <i aria-hidden="true" class="bi bi-tags"></i>
+        </button>
+    }
+    else
+    {
+        <button aria-label="@($"Add tags to {Entry.Name}")"
+            class="button library-entry-tags-add"
+            @onclick="ToggleEditTagsMode"
+            type="button">
+            <i aria-hidden="true" class="bi bi-plus"></i> Add tags
+        </button>
+    }
+</div>
+
+@if (Entry is LibraryEntryFilterSet filterSetEntry)
+{
+    <LibraryEntryFilterEditor FilterSet="@filterSetEntry" />
+}
