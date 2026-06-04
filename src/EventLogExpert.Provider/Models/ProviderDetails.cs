@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.Provider.Models;
 
-public class ProviderDetails
+public sealed class ProviderDetails
 {
     private IReadOnlyList<EventModel> _events = [];
     private Dictionary<long, List<EventModel>>? _eventsByIdLookup;

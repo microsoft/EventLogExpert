@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.Provider.Models;
 
-public class EventModel
+public sealed class EventModel
 {
     public string? Description { get; set; }
 

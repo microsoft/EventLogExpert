@@ -7,7 +7,7 @@ using EventLogExpert.Filtering.Common.Filtering;
 
 namespace EventLogExpert.Filtering.EventData;
 
-public static class EventLogDataQueryExtensions
+internal static class EventLogDataQueryExtensions
 {
     /// <summary>Gets a distinct list of values for the specified <paramref name="property" />.</summary>
     public static IEnumerable<string> GetEventValues(this EventLogData log, EventProperty property) =>
