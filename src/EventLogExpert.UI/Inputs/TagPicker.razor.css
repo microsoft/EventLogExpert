@@ -1,0 +1,95 @@
+.tag-picker {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.tag-picker-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem;
+    align-items: center;
+    min-height: 1.75rem;
+    padding: .25rem;
+    border: 1px solid var(--clr-statusbar);
+    border-radius: .2rem;
+    background-color: var(--background-dark);
+}
+
+.tag-picker-chips:focus-within {
+    border-color: var(--clr-lightblue);
+}
+
+.tag-picker-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .125rem;
+    padding: 0 .125rem 0 .375rem;
+    color: var(--text-primary);
+    background-color: var(--background-medium);
+    border-radius: .2rem;
+    font-size: .85rem;
+    line-height: 1.4;
+}
+
+.tag-picker-chip-label {
+    white-space: nowrap;
+}
+
+.tag-picker-chip-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    padding: 0;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.tag-picker-chip-remove:hover {
+    color: var(--clr-red);
+}
+
+.tag-picker-input {
+    flex: 1 1 auto;
+    min-width: 4rem;
+    padding: 0 .25rem;
+    color: var(--text-primary);
+    background: transparent;
+    border: 0;
+    outline: 0;
+    font-size: .9rem;
+}
+
+.tag-picker-listbox {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    max-height: 12rem;
+    margin: .125rem 0 0 0;
+    padding: .125rem 0;
+    list-style: none;
+    overflow-y: auto;
+    background-color: var(--background-dark);
+    border: 1px solid var(--clr-statusbar);
+    border-radius: .2rem;
+    box-shadow: var(--shadow-dropdown, 0 .25rem .5rem rgba(0, 0, 0, .25));
+}
+
+.tag-picker-option {
+    padding: .25rem .5rem;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-size: .9rem;
+}
+
+.tag-picker-option:hover,
+.tag-picker-option-active {
+    background-color: var(--background-medium);
+}
