@@ -14,3 +14,33 @@
     padding: 1rem 0;
     text-align: center;
 }
+
+.library-tag-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem;
+    padding: .25rem .5rem .5rem;
+    border-bottom: 1px solid var(--clr-statusbar, transparent);
+    margin-bottom: .25rem;
+}
+
+.library-tag-filter-chip {
+    padding: 0 .375rem;
+    color: var(--text-primary);
+    background-color: var(--background-medium);
+    border: 1px solid transparent;
+    border-radius: .2rem;
+    font-size: .8rem;
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+.library-tag-filter-chip:hover {
+    border-color: var(--clr-statusbar);
+}
+
+.library-tag-filter-chip-selected {
+    color: var(--background-medium);
+    background-color: var(--text-primary);
+    border-color: var(--text-primary);
+}

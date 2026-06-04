@@ -67,6 +67,18 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public void BuildPreflightSummary_ImportBlocked_ReturnsGenericMessageWithInvalidNames()
+    {
+        var preflight = ImportPreflight.Blocked([@"Network\DNS", @"Mail\SMTP"]);
+
+        var summary = FilterLibraryModal.BuildPreflightSummary(preflight);
+
+        Assert.Contains("cannot be imported", summary);
+        Assert.Contains(@"Network\DNS", summary);
+        Assert.Contains(@"Mail\SMTP", summary);
+    }
+
+    [Fact]
     public void DecidePendingFocusAfterRemoval_LastRow_TargetsPrevious()
     {
         var a = BuildSavedFilter("A");
@@ -248,6 +260,16 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public void Render_NoLibraryTags_TagFilterBarNotRendered()
+    {
+        SetState(new FilterLibraryState { Entries = [BuildSavedFilter("S")], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        Assert.Empty(component.FindAll(".library-tag-filter-bar"));
+    }
+
+    [Fact]
     public void Render_PreviouslyUsedTab_RequiresOriginAutoTracked_ExcludesUserSavedWithLastUsedUtc()
     {
         var autoTracked = BuildAutoTrackedFilterEntry("Recent");
@@ -358,6 +380,21 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public void Render_WithLibraryTags_TagFilterBarRenderedWithChipPerTag()
+    {
+        var entry = BuildSavedFilter("S") with { Tags = ["alpha", "beta"] };
+        SetState(new FilterLibraryState { Entries = [entry], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        var activePanel = component.Find("[role='tabpanel'].active");
+        var chipsInActivePanel = activePanel.QuerySelectorAll(".library-tag-filter-chip");
+        Assert.Equal(2, chipsInActivePanel.Length);
+        Assert.Equal("alpha", chipsInActivePanel[0].TextContent.Trim());
+        Assert.Equal("beta", chipsInActivePanel[1].TextContent.Trim());
+    }
+
+    [Fact]
     public async Task RetryButton_DispatchesLoadLibrary()
     {
         SetState(new FilterLibraryState { LoadError = true, IsLoaded = true });
@@ -393,6 +430,115 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var tabs = component.FindAll("[role='tab']");
         Assert.Equal("true", tabs[expectedTabIndex].GetAttribute("aria-selected"));
+    }
+
+    [Fact]
+    public async Task TagFilter_AllTagsSelectedButNoEntryCarriesAll_ShowsFilteredEmptyMessage()
+    {
+        var onlyAlpha = BuildSavedFilter("onlyAlpha") with { Tags = ["alpha"] };
+        var onlyBeta = BuildSavedFilter("onlyBeta") with { Tags = ["beta"] };
+        SetState(new FilterLibraryState { Entries = [onlyAlpha, onlyBeta], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        var chips = component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-tag-filter-chip");
+        await chips[0].ClickAsync(new MouseEventArgs());
+        await component.Find("[role='tabpanel'].active")
+            .QuerySelectorAll(".library-tag-filter-chip")[1]
+            .ClickAsync(new MouseEventArgs());
+
+        var empty = component.Find("[role='tabpanel'].active .library-empty-state");
+        Assert.Contains("No entries match the selected tags", empty.TextContent);
+    }
+
+    [Fact]
+    public async Task TagFilter_PreviouslyUsedTab_AppliesBeforeTake50()
+    {
+        var entries = new List<LibraryEntry>();
+        var now = DateTimeOffset.UtcNow;
+        for (int i = 0; i < 60; i++)
+        {
+            entries.Add(BuildAutoTrackedFilterEntry($"recent-{i}", now.AddMinutes(-i)));
+        }
+        var oldTagged = BuildAutoTrackedFilterEntry("ancient-tagged", now.AddDays(-30)) with { Tags = ["special"] };
+        entries.Add(oldTagged);
+
+        SetState(new FilterLibraryState { Entries = [.. entries], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        await component.FindAll("[role='tab']")[2].ClickAsync(new MouseEventArgs());
+
+        var puPanel = component.Find("[role='tabpanel'].active");
+        var specialChip = puPanel.QuerySelectorAll(".library-tag-filter-chip")
+            .Single(c => c.TextContent.Trim() == "special");
+        await specialChip.ClickAsync(new MouseEventArgs());
+
+        var rows = component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry-row");
+        Assert.Single(rows);
+        Assert.Contains("ancient-tagged", rows[0].TextContent);
+    }
+
+    [Fact]
+    public async Task TagFilterChip_PerTabIndependence_SavedSelectionDoesNotAffectFavorites()
+    {
+        var savedAlpha = BuildSavedFilter("savedAlpha") with { Tags = ["alpha"] };
+        var favBeta = BuildSavedFilter("favBeta") with { IsFavorite = true, Tags = ["beta"] };
+        SetState(new FilterLibraryState { Entries = [savedAlpha, favBeta], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        var savedPanel = component.Find("[role='tabpanel'].active");
+        var savedAlphaChip = savedPanel.QuerySelectorAll(".library-tag-filter-chip")[0];
+        await savedAlphaChip.ClickAsync(new MouseEventArgs());
+
+        await component.FindAll("[role='tab']")[1].ClickAsync(new MouseEventArgs());
+
+        var favPanel = component.Find("[role='tabpanel'].active");
+        var favChips = favPanel.QuerySelectorAll(".library-tag-filter-chip");
+        foreach (var chip in favChips)
+        {
+            Assert.Equal("false", chip.GetAttribute("aria-pressed"));
+        }
+        Assert.Single(favPanel.QuerySelectorAll(".library-entry-row"));
+    }
+
+    [Fact]
+    public async Task TagFilterChip_SelectedThenCleared_RestoresFullTab()
+    {
+        var alpha = BuildSavedFilter("alphaEntry") with { Tags = ["alpha"] };
+        var beta = BuildSavedFilter("betaEntry") with { Tags = ["beta"] };
+        SetState(new FilterLibraryState { Entries = [alpha, beta], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        var activePanel = component.Find("[role='tabpanel'].active");
+        var alphaChip = activePanel.QuerySelectorAll(".library-tag-filter-chip")[0];
+
+        await alphaChip.ClickAsync(new MouseEventArgs());
+        await component.Find("[role='tabpanel'].active")
+            .QuerySelectorAll(".library-tag-filter-chip")[0]
+            .ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(2, component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry-row").Length);
+    }
+
+    [Fact]
+    public async Task TagFilterChip_Selection_NarrowsTabToEntriesCarryingTag()
+    {
+        var alpha = BuildSavedFilter("alphaEntry") with { Tags = ["alpha"] };
+        var beta = BuildSavedFilter("betaEntry") with { Tags = ["beta"] };
+        SetState(new FilterLibraryState { Entries = [alpha, beta], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        Assert.Equal(2, component.FindAll(".library-entry-row").Count);
+
+        var activePanel = component.Find("[role='tabpanel'].active");
+        var alphaChip = activePanel.QuerySelectorAll(".library-tag-filter-chip")[0];
+        await alphaChip.ClickAsync(new MouseEventArgs());
+
+        var visibleRows = component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry-row");
+        Assert.Single(visibleRows);
+        Assert.Contains("alphaEntry", visibleRows[0].TextContent);
     }
 
     private static LibraryEntrySavedFilter BuildAutoTrackedFilterEntry(string name, DateTimeOffset? lastUsed = null)

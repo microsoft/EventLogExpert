@@ -51,7 +51,7 @@ public static class FilterLibraryServiceCollectionExtensions
         {
             ArgumentNullException.ThrowIfNull(services);
 
-            if (LegacyMigrationFeature.Enabled)
+            if (LegacyMigrationFeature.IsEnabled)
             {
                 services.AddSingleton<ILegacyFilterMigrator, LegacyFilterMigrator>();
             }
@@ -67,7 +67,7 @@ public static class FilterLibraryServiceCollectionExtensions
         {
             ArgumentNullException.ThrowIfNull(services);
 
-            if (BackslashMigrationFeature.Enabled)
+            if (BackslashMigrationFeature.IsEnabled)
             {
                 services.AddSingleton<IBackslashNameMigrator, BackslashNameMigrator>();
             }

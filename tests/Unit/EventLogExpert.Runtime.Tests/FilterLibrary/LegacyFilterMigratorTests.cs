@@ -240,6 +240,43 @@ public sealed class LegacyFilterMigratorTests
     }
 
     [Fact]
+    public void BuildEntriesFromLegacy_FeatureDisabled_FavoriteNameWithBackslash_IsPreservedAsIs()
+    {
+        var favoritesJson = JsonSerializer.Serialize(new List<string> { @"PathLike\Filter\Text == ""x""" });
+        var prefs = StubPreferences(favoritesJson: favoritesJson);
+        var sut = new LegacyFilterMigrator(prefs, Substitute.For<ITraceLogger>());
+
+        using var _ = BackslashMigrationFeature.Override(false);
+
+        var result = sut.BuildEntriesFromLegacy();
+
+        var entry = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(result.Entries));
+        Assert.Contains('\\', entry.Name);
+        Assert.Empty(entry.Tags);
+    }
+
+    [Fact]
+    public void BuildEntriesFromLegacy_FeatureDisabled_GroupNameWithBackslash_IsRejectedWithWarning()
+    {
+        var groupsJson = JsonSerializer.Serialize(new List<SavedFilterGroup>
+        {
+            new() { Name = @"Exchange\HUB", Filters = [SavedFilter.TryCreate("Level == 4")!] },
+            new() { Name = "CleanName", Filters = [SavedFilter.TryCreate("Level == 5")!] },
+        });
+        var prefs = StubPreferences(groupsJson: groupsJson);
+        var sut = new LegacyFilterMigrator(prefs, Substitute.For<ITraceLogger>());
+
+        using var _ = BackslashMigrationFeature.Override(false);
+
+        var result = sut.BuildEntriesFromLegacy();
+
+        var entry = Assert.IsType<LibraryEntryFilterSet>(Assert.Single(result.Entries));
+        Assert.Equal("CleanName", entry.Name);
+        Assert.Empty(entry.Tags);
+        Assert.True(result.SuccessfulSections.HasFlag(LegacyMigrationSections.Groups));
+    }
+
+    [Fact]
     public void BuildEntriesFromLegacy_GroupNameWithBackslash_AutoMigratedToFlatNameAndTags()
     {
         var groupsJson = JsonSerializer.Serialize(new List<SavedFilterGroup>

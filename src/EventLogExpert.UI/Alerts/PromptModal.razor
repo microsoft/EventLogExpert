@@ -9,10 +9,11 @@
     OnCancel="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
-    Title="@Title"
-    @ref="ChromeRef">
+    @ref="ChromeRef"
+    Title="@Title">
     <ChildContent>
         <p class="alert-modal-message" id="@_messageId">@Message</p>
+        <hr class="alert-modal-divider" />
         <input aria-labelledby="@_messageId"
             @bind="_value"
             @bind:event="oninput"

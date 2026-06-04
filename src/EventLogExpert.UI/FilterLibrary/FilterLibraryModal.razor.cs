@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.UI.Modal;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using System.Collections.Immutable;
 using System.Security;
 
 namespace EventLogExpert.UI.FilterLibrary;
@@ -22,6 +23,13 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     ];
 
     private readonly Dictionary<(LibraryTab Tab, LibraryEntryId Id), LibraryEntryRow?> _rowRefs = new();
+
+    private readonly Dictionary<LibraryTab, ImmutableList<string>> _selectedTagsByTab = new()
+    {
+        [LibraryTab.Saved] = [],
+        [LibraryTab.Favorites] = [],
+        [LibraryTab.PreviouslyUsed] = [],
+    };
 
     private LibraryTab _activeTab = LibraryTab.Saved;
     private LibraryTab? _pendingFocusSourceTab;
@@ -56,6 +64,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private IReadOnlyList<LibraryEntry> FavoriteEntries =>
         [.. FilterLibraryState.Value.Entries
             .Where(e => e is LibraryEntrySavedFilter && e.IsFavorite)
+            .Where(e => MatchesTagFilter(e, _selectedTagsByTab[LibraryTab.Favorites]))
             .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
 
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
@@ -67,13 +76,64 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private IReadOnlyList<LibraryEntry> PreviouslyUsedEntries =>
         [.. FilterLibraryState.Value.Entries
             .Where(e => e.Origin == LibraryEntryOrigin.AutoTracked && !e.IsFavorite)
+            .Where(e => MatchesTagFilter(e, _selectedTagsByTab[LibraryTab.PreviouslyUsed]))
             .OrderByDescending(e => e.LastUsedUtc!.Value)
             .Take(50)];
 
     private IReadOnlyList<LibraryEntry> SavedEntries =>
         [.. FilterLibraryState.Value.Entries
             .Where(e => e.Origin == LibraryEntryOrigin.UserSaved && !e.IsFavorite)
+            .Where(e => MatchesTagFilter(e, _selectedTagsByTab[LibraryTab.Saved]))
             .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
+
+    internal static string BuildPreflightSummary(ImportPreflight preflight)
+    {
+        if (preflight.ImportBlocked)
+        {
+            var preview = string.Join("\n  \u2022 ", preflight.InvalidLegacyNames.Take(10));
+            var more = preflight.InvalidLegacyNames.Count > 10
+                ? $"\n  \u2022 ...and {preflight.InvalidLegacyNames.Count - 10} more"
+                : string.Empty;
+
+            return "This file contains entries with names that cannot be imported:\n  \u2022 " +
+                preview + more;
+        }
+
+        var lines = new List<string>
+        {
+            $"  \u2022 {preflight.ToAdd.Count} new entries will be added",
+        };
+
+        if (preflight.ToReplace.Count > 0)
+        {
+            var conflictList = "\nNames being overwritten:\n  \u2022 " +
+                string.Join("\n  \u2022 ", preflight.ToReplace.Select(p => p.Incoming.Name).Take(10)) +
+                (preflight.ToReplace.Count > 10
+                    ? $"\n  \u2022 ...and {preflight.ToReplace.Count - 10} more"
+                    : string.Empty);
+
+            lines.Add($"  \u2022 {preflight.ToReplace.Count} existing entries WILL BE OVERWRITTEN (current filter content will be lost){conflictList}");
+        }
+
+        if (preflight.ToUpdate.Count > 0)
+        {
+            var renameCount = preflight.ToUpdate.Count(t => t.Existing.Name.Contains('\\'));
+            lines.Add($"  \u2022 {preflight.ToUpdate.Count} entries will be updated with tag changes");
+            if (renameCount > 0)
+            {
+                lines.Add($"  \u2022 {renameCount} existing entries will also be renamed (folder paths \u2192 tags)");
+            }
+        }
+
+        if (preflight.AmbiguousMatches.Count > 0)
+        {
+            lines.Add($"  \u2022 {preflight.AmbiguousMatches.Count} entries require manual conflict resolution");
+        }
+
+        lines.Add($"  \u2022 {preflight.SkippedDuplicates.Count} exact duplicates will be skipped");
+
+        return "Import preview:\n" + string.Join('\n', lines);
+    }
 
     internal static (LibraryEntryId? TargetId, bool FallbackToActiveTab) DecidePendingFocusAfterRemoval(
         IReadOnlyList<LibraryEntry> snapshot,
@@ -211,56 +271,26 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         }
     }
 
-    private static string BuildPreflightSummary(ImportPreflight preflight)
-    {
-        var lines = new List<string>
-        {
-            $"  \u2022 {preflight.ToAdd.Count} new entries will be added",
-        };
-
-        if (preflight.ToReplace.Count > 0)
-        {
-            var conflictList = "\nNames being overwritten:\n  \u2022 " +
-                string.Join("\n  \u2022 ", preflight.ToReplace.Select(p => p.Incoming.Name).Take(10)) +
-                (preflight.ToReplace.Count > 10
-                    ? $"\n  \u2022 ...and {preflight.ToReplace.Count - 10} more"
-                    : string.Empty);
-
-            lines.Add($"  \u2022 {preflight.ToReplace.Count} existing entries WILL BE OVERWRITTEN (current filter content will be lost){conflictList}");
-        }
-
-        if (preflight.ToUpdate.Count > 0)
-        {
-            var renameCount = preflight.ToUpdate.Count(t => t.Existing.Name.Contains('\\'));
-            lines.Add($"  \u2022 {preflight.ToUpdate.Count} entries will be updated with tag changes");
-            if (renameCount > 0)
-            {
-                lines.Add($"  \u2022 {renameCount} existing entries will also be renamed (folder paths \u2192 tags)");
-            }
-        }
-
-        if (preflight.AmbiguousMatches.Count > 0)
-        {
-            lines.Add($"  \u2022 {preflight.AmbiguousMatches.Count} entries require manual conflict resolution (use Convert backslash names button after import)");
-        }
-
-        lines.Add($"  \u2022 {preflight.SkippedDuplicates.Count} exact duplicates will be skipped");
-
-        return "Import preview:\n" + string.Join('\n', lines);
-    }
-
-    private static string GetEmptyStateMessage(LibraryTab tab) => tab switch
-    {
-        LibraryTab.Favorites => "No favorited filters or filter sets yet. Star an entry to add it here.",
-        LibraryTab.PreviouslyUsed => "No filters have been applied recently.",
-        _ => "No saved filters or filter sets yet. Use \"Save as Filter Set\" from the filter pane.",
-    };
+    private static bool MatchesTagFilter(LibraryEntry entry, ImmutableList<string> selectedTags) =>
+        selectedTags.Count == 0 || selectedTags.All(t => entry.Tags.Contains(t, StringComparer.Ordinal));
 
     private static string SanitizeForFileName(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();
         var sanitized = new string(name.Select(c => invalid.Contains(c) ? '-' : c).ToArray());
         return sanitized.Length > 100 ? sanitized[..100] : sanitized;
+    }
+
+    private string GetEmptyStateMessage(LibraryTab tab)
+    {
+        if (_selectedTagsByTab[tab].Count > 0) { return "No entries match the selected tags."; }
+
+        return tab switch
+        {
+            LibraryTab.Favorites => "No favorited filters or filter sets yet. Star an entry to add it here.",
+            LibraryTab.PreviouslyUsed => "No filters have been applied recently.",
+            _ => "No saved filters or filter sets yet. Use \"Save as Filter Set\" from the filter pane.",
+        };
     }
 
     private IReadOnlyList<LibraryEntry> GetEntriesForTab(LibraryTab tab) => tab switch
@@ -345,6 +375,13 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private async Task PromptAndApplyImportAsync(ImportPreflight preflight)
     {
+        if (preflight.ImportBlocked)
+        {
+            await ShowImportExportErrorAsync("Import blocked", BuildPreflightSummary(preflight));
+
+            return;
+        }
+
         var summary = BuildPreflightSummary(preflight);
         var request = new InlineAlertRequest(
             Title: "Confirm import",
@@ -399,7 +436,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             $"replaced {preflight.ToReplace.Count}, " +
             $"updated {preflight.ToUpdate.Count} tags, " +
             $"skipped {preflight.SkippedDuplicates.Count}" +
-            (ambiguousCount > 0 ? $" ({ambiguousCount} require manual resolution via Convert button)" : string.Empty));
+            (ambiguousCount > 0 ? $" ({ambiguousCount} require manual resolution)" : string.Empty));
     }
 
     private void PruneStaleRowRefs()
@@ -440,5 +477,16 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         {
             // Modal torn down mid-prompt; safe to swallow.
         }
+    }
+
+    private void ToggleTagFilter(string tag)
+    {
+        var current = _selectedTagsByTab[_activeTab];
+
+        _selectedTagsByTab[_activeTab] = current.Contains(tag, StringComparer.Ordinal)
+            ? current.Remove(tag, StringComparer.Ordinal)
+            : current.Add(tag);
+
+        StateHasChanged();
     }
 }
