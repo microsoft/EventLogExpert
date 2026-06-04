@@ -3,6 +3,7 @@
 
 using EventLogExpert.Runtime.Common.Activation;
 using EventLogExpert.WindowsPlatform;
+using EventLogExpert.WindowsPlatform.Activation;
 using Microsoft.Windows.AppLifecycle;
 using Windows.ApplicationModel.Activation;
 using Windows.Storage;
@@ -37,7 +38,7 @@ internal static class ActivationArgsExtractor
     {
         var raw = cli?.Operation?.Arguments;
 
-        return string.IsNullOrWhiteSpace(raw) ? ActivationArgs.Empty : ClassifyTokens(CommandLineToArgvWHelper.Parse(raw));
+        return string.IsNullOrWhiteSpace(raw) ? ActivationArgs.Empty : ClassifyTokens(Win32CommandLineParser.Parse(raw));
     }
 
     private static ActivationArgs FromFile(IFileActivatedEventArgs? fileArgs)
@@ -75,6 +76,6 @@ internal static class ActivationArgsExtractor
             return ActivationArgs.Empty;
         }
 
-        return ClassifyTokens(CommandLineToArgvWHelper.Parse(launch.Arguments));
+        return ClassifyTokens(Win32CommandLineParser.Parse(launch.Arguments));
     }
 }

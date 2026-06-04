@@ -1,8 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.DatabaseTools.Contracts;
-using EventLogExpert.DatabaseTools.Operations;
+using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.DatabaseTools.CreateDatabase;
+using EventLogExpert.EventDbTool.Commands.Support;
 using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
@@ -60,7 +61,7 @@ public sealed class CreateDatabaseCommand
             await using var sp = Program.BuildServiceProvider(result.GetValue(verboseOption));
             var logger = sp.GetRequiredService<ITraceLogger>();
 
-            if (!RegexHelper.TryCreate(result.GetValue(filterOption), logger, out var regex)) { return; }
+            if (!FilterRegexFactory.TryCreate(result.GetValue(filterOption), logger, out var regex)) { return; }
 
             var request = new CreateDatabaseRequest(
                 result.GetRequiredValue(fileArgument),
@@ -68,7 +69,9 @@ public sealed class CreateDatabaseCommand
                 regex,
                 result.GetValue(skipProvidersInFileOption));
 
-            await new CreateDatabaseOperation(request).ExecuteAsync(logger, progress: null, CancellationToken.None);
+            var factory = sp.GetRequiredService<IDatabaseToolsOperationFactory>();
+
+            await factory.Create(request).ExecuteAsync(logger, progress: null, CancellationToken.None);
         });
 
         return createDatabaseCommand;

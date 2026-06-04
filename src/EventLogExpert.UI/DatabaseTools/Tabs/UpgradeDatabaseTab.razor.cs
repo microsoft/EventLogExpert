@@ -1,7 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.DatabaseTools.Contracts;
+using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.DatabaseTools.Tabs;

@@ -5,7 +5,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="EventLogExpert.Eventing" />
     <InternalsVisibleTo Include="EventLogExpert.Provider.Tests" />
   </ItemGroup>
 

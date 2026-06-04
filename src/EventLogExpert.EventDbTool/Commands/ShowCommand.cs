@@ -1,8 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.DatabaseTools.Contracts;
-using EventLogExpert.DatabaseTools.Operations;
+using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.DatabaseTools.ShowProviders;
+using EventLogExpert.EventDbTool.Commands.Support;
 using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
@@ -45,11 +46,13 @@ public class ShowCommand
             await using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
             var logger = sp.GetRequiredService<ITraceLogger>();
 
-            if (!RegexHelper.TryCreate(action.GetValue(filterOption), logger, out var regex)) { return; }
+            if (!FilterRegexFactory.TryCreate(action.GetValue(filterOption), logger, out var regex)) { return; }
 
             var request = new ShowProvidersRequest(action.GetValue(sourceArgument), regex);
 
-            await new ShowProvidersOperation(request).ExecuteAsync(logger, progress: null, CancellationToken.None);
+            var factory = sp.GetRequiredService<IDatabaseToolsOperationFactory>();
+
+            await factory.Create(request).ExecuteAsync(logger, progress: null, CancellationToken.None);
         });
 
         return showCommand;

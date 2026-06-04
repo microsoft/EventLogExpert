@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Readers;
-using EventLogExpert.Provider.Models;
+using EventLogExpert.Provider.Resolution;
 using static EventLogExpert.Eventing.TestUtils.Constants.Constants;
 
 namespace EventLogExpert.Eventing.TestUtils;

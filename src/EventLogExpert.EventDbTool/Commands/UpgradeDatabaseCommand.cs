@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.DatabaseTools.Contracts;
-using EventLogExpert.DatabaseTools.Operations;
+using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
@@ -37,7 +37,9 @@ public sealed class UpgradeDatabaseCommand
 
             var request = new UpgradeDatabaseRequest(action.GetRequiredValue(fileArgument));
 
-            await new UpgradeDatabaseOperation(request).ExecuteAsync(logger, progress: null, CancellationToken.None);
+            var factory = sp.GetRequiredService<IDatabaseToolsOperationFactory>();
+
+            await factory.Create(request).ExecuteAsync(logger, progress: null, CancellationToken.None);
         });
 
         return upgradeDatabaseCommand;

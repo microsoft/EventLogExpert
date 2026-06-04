@@ -8,7 +8,6 @@ using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
-using EventLogExpert.Provider.Models;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.ProviderDatabase.Context;
 using NSubstitute;

@@ -1,7 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.DatabaseTools.Contracts;
+using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.DatabaseTools.CreateDatabase;
+using EventLogExpert.DatabaseTools.DiffDatabase;
+using EventLogExpert.DatabaseTools.MergeDatabase;
+using EventLogExpert.DatabaseTools.ShowProviders;
+using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using EventLogExpert.ElevationHelper.IntegrationTests.TestUtils;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 
