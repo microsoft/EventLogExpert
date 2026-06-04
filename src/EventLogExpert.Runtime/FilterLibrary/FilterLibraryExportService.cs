@@ -94,13 +94,15 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
             existingByNameLower.TryAdd(key, entry);
         }
 
+        var existingIds = new HashSet<LibraryEntryId>(existing.Select(e => e.Id));
         var toAdd = new List<LibraryEntry>();
         var toReplace = new List<(LibraryEntry Existing, LibraryEntry Incoming)>();
         var skipped = new List<LibraryEntry>();
+        var incomingNamesSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var entry in incoming)
         {
-            if (IsExactDuplicate(entry, existingFilterSetKeys, existingSavedFilterKeys))
+            if (IsExactDuplicate(entry, existingFilterSetKeys, existingSavedFilterKeys) || !incomingNamesSeen.Add(entry.Name))
             {
                 skipped.Add(entry);
 
@@ -114,7 +116,8 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
                 continue;
             }
 
-            toAdd.Add(entry);
+            var addEntry = existingIds.Contains(entry.Id) ? entry with { Id = LibraryEntryId.Create() } : entry;
+            toAdd.Add(addEntry);
         }
 
         return new ImportPreflight(toAdd, toReplace, skipped);

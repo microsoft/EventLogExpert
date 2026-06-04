@@ -33,6 +33,20 @@ public sealed class FilterLibraryExportServiceTests
     }
 
     [Fact]
+    public void Deserialize_IncomingIdCollidesWithExistingId_RegeneratesIdToAvoidCrash()
+    {
+        var existing = BuildSavedEntry("existing-name", comparisonText: "Level == 4");
+        var incomingIdCollision = BuildSavedEntry("brand-new-name", comparisonText: "Level == 5") with { Id = existing.Id };
+        var json = _service.Serialize([incomingIdCollision]);
+
+        var preflight = _service.Deserialize(json, [existing]);
+
+        Assert.Null(preflight.Error);
+        Assert.Single(preflight.ToAdd);
+        Assert.NotEqual(existing.Id, preflight.ToAdd[0].Id);
+    }
+
+    [Fact]
     public void Deserialize_MalformedJson_ReturnsParseErrorWithoutThrowing()
     {
         var preflight = _service.Deserialize("{this is not valid json", []);
@@ -137,6 +151,21 @@ public sealed class FilterLibraryExportServiceTests
 
         Assert.Null(preflight.Error);
         Assert.Single(preflight.SkippedDuplicates);
+    }
+
+    [Fact]
+    public void Deserialize_WithDuplicateNamesWithinIncomingFile_KeepsFirst_SkipsLater()
+    {
+        var entry1 = BuildSavedEntry("duplicate", comparisonText: "Level == 4");
+        var entry2 = BuildSavedEntry("DUPLICATE", comparisonText: "Level == 5");
+        var json = _service.Serialize([entry1, entry2]);
+
+        var preflight = _service.Deserialize(json, []);
+
+        Assert.Null(preflight.Error);
+        Assert.Single(preflight.ToAdd);
+        Assert.Single(preflight.SkippedDuplicates);
+        Assert.Equal("duplicate", preflight.ToAdd[0].Name);
     }
 
     [Fact]
