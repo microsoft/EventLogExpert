@@ -8,12 +8,12 @@ using System.Diagnostics.CodeAnalysis;
 namespace EventLogExpert.Filtering;
 
 /// <summary>
-///     Single source of truth for compiling a filter expression string into a <see cref="CompiledFilter" />. Public
+///     Single source of truth for compiling a filter expression string into a <see cref="CompiledFilter" />. Internal
 ///     facade that delegates to the hand-rolled <see cref="FilterParser" /> pipeline (tokenizer + parser + lowerer +
-///     emitter); kept as the stable API surface for UI consumers (advanced row, saved filter loaders, filter service)
-///     while the internal pipeline evolves.
+///     emitter); kept as the stable compile-path for intra-assembly consumers (saved filter loaders, filter service,
+///     draft validators) while the internal pipeline evolves.
 /// </summary>
-public static class FilterCompiler
+internal static class FilterCompiler
 {
     /// <summary>
     ///     Validates an expression without retaining the compiled result. Used by editor flows that only need a yes/no

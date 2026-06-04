@@ -6,7 +6,7 @@ using EventLogExpert.Filtering.Persistence;
 
 namespace EventLogExpert.Filtering.Evaluation;
 
-public static class ResolvedEventExtensions
+internal static class ResolvedEventExtensions
 {
     extension(ResolvedEvent? @event)
     {

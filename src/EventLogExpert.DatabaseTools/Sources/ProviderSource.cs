@@ -18,7 +18,7 @@ namespace EventLogExpert.DatabaseTools.Sources;
 ///     When the path is a folder, all top-level *.db files are processed first (sorted), followed by all top-level *.evtx
 ///     files (sorted). Subdirectories are not searched.
 /// </summary>
-public static class ProviderSource
+internal static class ProviderSource
 {
     /// <summary>
     ///     Conservative cap on the number of parameters in a single <c>Where(... Contains)</c> SQL IN clause. SQLite's
