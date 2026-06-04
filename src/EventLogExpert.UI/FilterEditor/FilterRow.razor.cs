@@ -309,7 +309,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
             }
         }
 
-        AnnouncementService.Announce($"Switched to {target} filter mode");
+        AnnouncementService.Announce($"Switched to {GetFilterModeDisplayLabel(target)} filter mode");
         Filter.ApplyModeSwitch(target);
         ErrorMessage = string.Empty;
     }

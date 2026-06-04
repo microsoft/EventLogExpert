@@ -28,6 +28,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private LibraryTab? _pendingFocusSourceTab;
     private LibraryEntryId? _pendingFocusTargetEntryId;
     private bool _pendingFocusToActiveTab;
+    private SidebarTabs<LibraryTab>? _sidebarTabsRef;
 
     [Parameter] public LibraryTab? InitialTab { get; set; }
 
@@ -131,8 +132,11 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         if (!focused && _pendingFocusToActiveTab)
         {
             _pendingFocusToActiveTab = false;
-            // Active-tab focus restoration is now handled inside SidebarTabs via its OnAfterRender path.
-            // No-op here; flagged just so the field stays meaningful for any future routing changes.
+
+            if (_sidebarTabsRef is not null)
+            {
+                await _sidebarTabsRef.FocusActiveTabAsync();
+            }
         }
 
         await base.OnAfterRenderAsync(firstRender);

@@ -30,6 +30,7 @@
         {
             <SidebarTabs @bind-ActiveTab="_activeTab"
                 IsTabpanelFocusable="@IsTabpanelEmpty"
+                @ref="_sidebarTabsRef"
                 TablistAriaLabel="Filter library views"
                 Tabs="@CurrentTabLabels"
                 TTab="LibraryTab">

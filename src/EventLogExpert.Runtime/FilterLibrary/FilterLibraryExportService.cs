@@ -81,17 +81,18 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
         IReadOnlyList<LibraryEntry> incoming,
         IReadOnlyList<LibraryEntry> existing)
     {
-        var existingByFilterSetKey = existing
-            .OfType<LibraryEntryFilterSet>()
-            .ToDictionary(FilterLibraryDedupKeys.ForFilterSet, LibraryEntry (e) => e);
+        var existingFilterSetKeys = new HashSet<string>(
+            existing.OfType<LibraryEntryFilterSet>().Select(FilterLibraryDedupKeys.ForFilterSet));
 
-        var existingBySavedFilterKey = existing
-            .OfType<LibraryEntrySavedFilter>()
-            .ToDictionary(FilterLibraryDedupKeys.ForSavedFilter, LibraryEntry (e) => e);
+        var existingSavedFilterKeys = new HashSet<(string, FilterMode, bool)>(
+            existing.OfType<LibraryEntrySavedFilter>().Select(FilterLibraryDedupKeys.ForSavedFilter));
 
-        var existingByNameLower = existing
-            .GroupBy(e => e.Name.ToLowerInvariant())
-            .ToDictionary(g => g.Key, g => g.First());
+        var existingByNameLower = new Dictionary<string, LibraryEntry>();
+        foreach (var entry in existing)
+        {
+            var key = entry.Name.ToLowerInvariant();
+            existingByNameLower.TryAdd(key, entry);
+        }
 
         var toAdd = new List<LibraryEntry>();
         var toReplace = new List<(LibraryEntry Existing, LibraryEntry Incoming)>();
@@ -99,7 +100,7 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
 
         foreach (var entry in incoming)
         {
-            if (IsExactDuplicate(entry, existingByFilterSetKey, existingBySavedFilterKey))
+            if (IsExactDuplicate(entry, existingFilterSetKeys, existingSavedFilterKeys))
             {
                 skipped.Add(entry);
 
@@ -121,14 +122,14 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
 
     private static bool IsExactDuplicate(
         LibraryEntry entry,
-        IReadOnlyDictionary<string, LibraryEntry> existingByFilterSetKey,
-        IReadOnlyDictionary<(string, FilterMode, bool), LibraryEntry> existingBySavedFilterKey)
+        IReadOnlySet<string> existingFilterSetKeys,
+        IReadOnlySet<(string, FilterMode, bool)> existingSavedFilterKeys)
     {
         return entry switch
         {
-            LibraryEntryFilterSet fs => existingByFilterSetKey.ContainsKey(
+            LibraryEntryFilterSet fs => existingFilterSetKeys.Contains(
                 FilterLibraryDedupKeys.ForFilterSet(fs)),
-            LibraryEntrySavedFilter sf => existingBySavedFilterKey.ContainsKey(
+            LibraryEntrySavedFilter sf => existingSavedFilterKeys.Contains(
                 FilterLibraryDedupKeys.ForSavedFilter(sf)),
             _ => false,
         };
