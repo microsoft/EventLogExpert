@@ -1,26 +1,29 @@
 /*
- * Layout for the DBTools content was previously here as `.database-tools`, `.database-tools-tabs`,
- * `.database-tools-content`, and `.database-tools-content .tabpanel` rules. The vertical-sidebar
- * tablist layout is now owned by the shared `SidebarTabs<TTab>` component (see Modal/SidebarTabs.razor.css).
- * The selectors below target elements rendered inside CHILD tab components
- * (ShowProvidersTab, CreateDatabaseTab, etc.). Each child component has its
- * own CSS-isolation scope attribute, so the modal's scope alone will not
- * match those elements. The `::deep` pseudo-element preserves the modal's
- * outer scope on `.sidebar-tabs-tabpanel` but disables scoping for everything
- * after it, letting these rules cross the component boundary.
+ * The .db-tabs-container wrapper is owned by DatabaseToolsModal so DBTools-scope CSS isolation
+ * can target descendants of the tabs subtree (which is otherwise rendered by SidebarTabs<TTab>
+ * with a different CSS-isolation scope). The `::deep` pseudo-element preserves DBTools's outer
+ * scope on `.db-tabs-container` but disables scoping after it so these rules can reach into
+ * elements rendered by SidebarTabs and the per-tab child components.
  */
 
-.sidebar-tabs-tabpanel {
+.db-tabs-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+.db-tabs-container ::deep .sidebar-tabs-tabpanel {
     padding: 8px;
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab-placeholder {
+.db-tabs-container ::deep .db-tab-placeholder {
     padding: 16px;
     color: var(--text-secondary);
     font-style: italic;
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab {
+.db-tabs-container ::deep .db-tab {
     display: flex;
     flex-direction: column;
     flex: 1 1 0;
@@ -31,7 +34,7 @@
     gap: .5rem;
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab-form {
+.db-tabs-container ::deep .db-tab-form {
     display: grid;
     grid-template-columns: 12rem minmax(0, 1fr);
     column-gap: .5rem;
@@ -40,47 +43,47 @@
     flex: 0 0 auto;
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab-form .form-row {
+.db-tabs-container ::deep .db-tab-form .form-row {
     display: contents;
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab-form label {
+.db-tabs-container ::deep .db-tab-form label {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab-form .input,
-.sidebar-tabs-tabpanel ::deep .db-tab-form .path-input-group {
+.db-tabs-container ::deep .db-tab-form .input,
+.db-tabs-container ::deep .db-tab-form .path-input-group {
     min-width: 0;
 }
 
 /* Path / filter inputs need left-aligned content (global .input centers — appropriate for short values, awkward for paths). */
-.sidebar-tabs-tabpanel ::deep .db-tab-form .input {
+.db-tabs-container ::deep .db-tab-form .input {
     text-align: left;
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab-form .path-input-group {
+.db-tabs-container ::deep .db-tab-form .path-input-group {
     display: flex;
     align-items: center;
     gap: .5rem;
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab-form .path-input-group .input {
+.db-tabs-container ::deep .db-tab-form .path-input-group .input {
     flex: 1 1 auto;
     min-width: 0;
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab-form .path-input-group .button {
+.db-tabs-container ::deep .db-tab-form .path-input-group .button {
     flex: 0 0 auto;
     white-space: nowrap;
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab-form .input.invalid {
+.db-tabs-container ::deep .db-tab-form .input.invalid {
     border-color: var(--clr-red);
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab-form .filter-error {
+.db-tabs-container ::deep .db-tab-form .filter-error {
     grid-column: 2;
     /* Match the input's .5rem horizontal margin so the error text aligns with input content. */
     margin: 0 .5rem;
@@ -88,14 +91,14 @@
     min-height: 0;
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab-form .checkbox-label {
+.db-tabs-container ::deep .db-tab-form .checkbox-label {
     grid-column: 2;
     display: inline-flex;
     align-items: center;
     gap: .375rem;
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab-form .direction-row {
+.db-tabs-container ::deep .db-tab-form .direction-row {
     grid-column: 2;
     /* Match the input's .5rem horizontal margin so the italic text aligns with input content above. */
     margin: 0 .5rem;
@@ -103,11 +106,11 @@
     font-style: italic;
 }
 
-.sidebar-tabs-tabpanel ::deep .db-tab-form .elevation-warning-slot {
+.db-tabs-container ::deep .db-tab-form .elevation-warning-slot {
     grid-column: 1 / -1;
 }
 
-.sidebar-tabs-tabpanel ::deep .elevation-warning {
+.db-tabs-container ::deep .elevation-warning {
     display: flex;
     align-items: center;
     gap: .5rem;
@@ -118,21 +121,21 @@
     border-radius: .25rem;
 }
 
-.sidebar-tabs-tabpanel ::deep .elevation-warning > span {
+.db-tabs-container ::deep .elevation-warning > span {
     flex: 1 1 auto;
 }
 
-.sidebar-tabs-tabpanel ::deep .elevation-warning .button {
+.db-tabs-container ::deep .elevation-warning .button {
     --btn-color: var(--clr-on-status-fill);
 }
 
-.sidebar-tabs-tabpanel ::deep .elevation-error {
+.db-tabs-container ::deep .elevation-error {
     margin-top: .25rem;
     color: var(--clr-red);
 }
 
 .visually-hidden,
-.sidebar-tabs-tabpanel ::deep .visually-hidden {
+.db-tabs-container ::deep .visually-hidden {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -159,14 +162,13 @@
 }
 
 @media (max-width: 56rem) {
-    .sidebar-tabs-tabpanel ::deep .db-tab-form {
+    .db-tabs-container ::deep .db-tab-form {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .sidebar-tabs-tabpanel ::deep .db-tab-form .filter-error,
-    .sidebar-tabs-tabpanel ::deep .db-tab-form .checkbox-label,
-    .sidebar-tabs-tabpanel ::deep .db-tab-form .direction-row {
+    .db-tabs-container ::deep .db-tab-form .filter-error,
+    .db-tabs-container ::deep .db-tab-form .checkbox-label,
+    .db-tabs-container ::deep .db-tab-form .direction-row {
         grid-column: 1;
     }
 }
-
