@@ -2,6 +2,7 @@
     aria-labelledby="@(string.IsNullOrEmpty(Title) ? null : _titleId)"
     aria-modal="true"
     class="@DialogClass"
+    data-body-layout="@BodyLayout.ToString().ToLowerInvariant()"
     @oncancel="HandleCancelEventAsync"
     @oncancel:preventDefault="true"
     @onclose="HandleCloseEventAsync"

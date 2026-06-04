@@ -58,6 +58,10 @@ dialog:not(:modal) {
     overflow: hidden;
 }
 
+dialog[data-body-layout="flex"]:not([style*="--modal-height"]) .dialog-body {
+    min-height: min(60vh, 24rem);
+}
+
 .inline-alert-overlay {
     position: absolute;
     inset: 0;

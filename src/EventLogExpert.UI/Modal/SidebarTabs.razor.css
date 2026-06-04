@@ -1,0 +1,70 @@
+.sidebar-tabs {
+    display: flex;
+    flex-direction: row;
+    height: 100%;
+    min-height: 0;
+    gap: 12px;
+}
+
+.sidebar-tabs-list {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 200px;
+    gap: 2px;
+    padding: 8px 4px 8px 0;
+}
+
+.sidebar-tabs-list .tab {
+    text-align: left;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    border-left: 2px solid transparent;
+    border-radius: 0;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+}
+
+.sidebar-tabs-list .tab:hover {
+    background: var(--background-darkgray);
+}
+
+.sidebar-tabs-list .tab.active {
+    background: transparent;
+    border-left-color: var(--clr-lightblue);
+    color: var(--clr-lightblue);
+    font-weight: 600;
+}
+
+.sidebar-tabs-list .tab.active:hover {
+    background: var(--background-darkgray);
+}
+
+.sidebar-tabs-list .tab:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: -2px;
+}
+
+.sidebar-tabs-content {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-tabs-content .sidebar-tabs-tabpanel {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-tabs-content .sidebar-tabs-tabpanel:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: -2px;
+}
