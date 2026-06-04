@@ -62,5 +62,21 @@ public static class FilterLibraryServiceCollectionExtensions
 
             return services;
         }
+
+        public IServiceCollection AddBackslashNameMigration()
+        {
+            ArgumentNullException.ThrowIfNull(services);
+
+            if (BackslashMigrationFeature.Enabled)
+            {
+                services.AddSingleton<IBackslashNameMigrator, BackslashNameMigrator>();
+            }
+            else
+            {
+                services.AddSingleton<IBackslashNameMigrator, NoOpBackslashNameMigrator>();
+            }
+
+            return services;
+        }
     }
 }

@@ -257,6 +257,54 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
+    public async Task HandleLoadLibrary_BackslashMigratorRunsAfterLegacyMigrator()
+    {
+        var store = Substitute.For<IFilterLibraryStore>();
+        var entryWithBackslash = BuildFilterSetEntry(@"Network\DNS");
+        store.LoadAll().Returns([entryWithBackslash]);
+
+        var legacyMigrator = Substitute.For<ILegacyFilterMigrator>();
+        legacyMigrator.ShouldRunMigration().Returns(false);
+
+        var backslashMigrator = Substitute.For<IBackslashNameMigrator>();
+        backslashMigrator.ShouldRunMigration().Returns(true);
+        var migratedEntry = BuildFilterSetEntry("DNS") with { Tags = ["network"] };
+        backslashMigrator.BuildMigrationPlan(Arg.Any<IReadOnlyList<LibraryEntry>>())
+            .Returns(new BackslashMigrationResult([migratedEntry], 0));
+
+        var (effects, _, dispatcher, _, _, _) = CreateEffectsWithMigrator(
+            migrator: legacyMigrator,
+            store: store,
+            backslashMigrator: backslashMigrator);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        backslashMigrator.Received(1).BuildMigrationPlan(Arg.Any<IReadOnlyList<LibraryEntry>>());
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Name == "DNS"));
+        backslashMigrator.Received(1).MarkMigrationCompleted();
+        dispatcher.Received(1).Dispatch(Arg.Any<LoadLibrarySuccessAction>());
+    }
+
+    [Fact]
+    public async Task HandleLoadLibrary_BackslashMigratorShouldNotRun_SkipsMigration()
+    {
+        var backslashMigrator = Substitute.For<IBackslashNameMigrator>();
+        backslashMigrator.ShouldRunMigration().Returns(false);
+
+        var legacyMigrator = Substitute.For<ILegacyFilterMigrator>();
+        legacyMigrator.ShouldRunMigration().Returns(false);
+
+        var (effects, _, dispatcher, _, _, _) = CreateEffectsWithMigrator(
+            migrator: legacyMigrator,
+            backslashMigrator: backslashMigrator);
+
+        await effects.HandleLoadLibrary(dispatcher);
+
+        backslashMigrator.DidNotReceive().BuildMigrationPlan(Arg.Any<IReadOnlyList<LibraryEntry>>());
+        backslashMigrator.DidNotReceive().MarkMigrationCompleted();
+    }
+
+    [Fact]
     public async Task HandleLoadLibrary_BuildEntriesFromLegacyThrows_OuterCatchFires_GateReleased_SecondLoadSucceeds()
     {
         var shouldThrow = true;
@@ -544,7 +592,7 @@ public sealed class FilterLibraryEffectsTests
         // (fresh GUIDs but same content), and the migration must NOT re-insert them as content-duplicates.
         var existingFavorite = BuildFilterEntryWithText("Favorite", "Level == 4");
         var existingFilterSet = BuildFilterSetEntry("Errors");
-        var duplicateFavorite = BuildFilterEntryWithText("Favorite-rebuilt-fresh-id", "Level == 4"); // same ComparisonText
+        var duplicateFavorite = BuildFilterEntryWithText("Favorite", "Level == 4"); // same Name + ComparisonText
         var duplicateFilterSet = BuildFilterSetEntry("Errors"); // same Name
         var sections = LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents;
         var migrator = Substitute.For<ILegacyFilterMigrator>();
@@ -569,7 +617,7 @@ public sealed class FilterLibraryEffectsTests
     public async Task HandleLoadLibrary_NonEmptyStore_MigrationEntriesPartiallyOverlap_OnlyNonOverlappingPersisted()
     {
         var existing = BuildFilterEntryWithText("Existing", "Level == 4");
-        var dupeOverlap = BuildFilterEntryWithText("Overlap", "Level == 4"); // collides with existing
+        var dupeOverlap = BuildFilterEntryWithText("Existing", "Level == 4"); // same name + same filter → collides
         var newEntry = BuildFilterEntryWithText("New", "Level == 5"); // does not collide
         var sections = LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents;
         var migrator = Substitute.For<ILegacyFilterMigrator>();
@@ -1420,7 +1468,8 @@ public sealed class FilterLibraryEffectsTests
         ILegacyFilterMigrator? migrator = null,
         FilterLibraryState? state = null,
         FilterPaneState? paneState = null,
-        IFilterLibraryStore? store = null)
+        IFilterLibraryStore? store = null,
+        IBackslashNameMigrator? backslashMigrator = null)
     {
         var storeWasSupplied = store is not null;
         store ??= Substitute.For<IFilterLibraryStore>();
@@ -1442,9 +1491,11 @@ public sealed class FilterLibraryEffectsTests
                     LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents));
         }
 
+        backslashMigrator ??= Substitute.For<IBackslashNameMigrator>();
+
         var logger = Substitute.For<ITraceLogger>();
         var dispatcher = Substitute.For<IDispatcher>();
-        var effects = new Effects(store, stateMock, paneStateMock, migrator, logger);
+        var effects = new Effects(store, stateMock, paneStateMock, migrator, backslashMigrator, logger);
 
         return (effects, store, dispatcher, stateMock, migrator, logger);
     }

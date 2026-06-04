@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.FilterPane;
@@ -15,6 +14,7 @@ internal sealed class Effects(
     IState<FilterLibraryState> state,
     IState<FilterPaneState> filterPaneState,
     ILegacyFilterMigrator legacyMigrator,
+    IBackslashNameMigrator backslashMigrator,
     ITraceLogger logger)
 {
     private const int MaxAutoTrackedRecents = 50;
@@ -191,6 +191,40 @@ internal sealed class Effects(
                 // and DedupMigrationEntriesAgainstExisting filters them out against the now-non-empty store —
                 // so the SetString-throws path is idempotent rather than duplicating.
                 legacyMigrator.MarkMigrationCompleted(migrationResult.SuccessfulSections);
+            }
+
+            if (backslashMigrator.ShouldRunMigration())
+            {
+                var plan = backslashMigrator.BuildMigrationPlan(entries);
+
+                if (plan.UpdatedEntries.Count > 0)
+                {
+                    int writeFailures = 0;
+
+                    foreach (var updated in plan.UpdatedEntries)
+                    {
+                        try { store.Update(updated); }
+                        catch (Exception ex)
+                        {
+                            writeFailures++;
+
+                            logger.Warning($"FilterLibrary backslash migration Update failed for entry {updated.Id}: {ex.Message}");
+                        }
+                    }
+
+                    if (writeFailures < plan.UpdatedEntries.Count)
+                    {
+                        try { entries = store.LoadAll().ToImmutableList(); }
+                        catch (Exception ex)
+                        {
+                            logger.Warning($"FilterLibrary post-backslash-migration reload failed; using in-memory result. {ex.Message}");
+                        }
+
+                        logger.Information($"Backslash migration updated {plan.UpdatedEntries.Count - writeFailures}/{plan.UpdatedEntries.Count} entries.");
+                    }
+                }
+
+                backslashMigrator.MarkMigrationCompleted();
             }
 
             dispatcher.Dispatch(new LoadLibrarySuccessAction(entries));
@@ -474,19 +508,20 @@ internal sealed class Effects(
     {
         if (candidates.IsEmpty || existing.IsEmpty) { return candidates; }
 
-        var existingFilterKeys = new HashSet<(string ComparisonText, FilterMode Mode, bool IsExcluded)>(
+        var existingSavedFilterKeys = new HashSet<string>(
             existing.OfType<LibraryEntrySavedFilter>()
-                .Select(e => (e.Filter.ComparisonText.ToLowerInvariant(), e.Filter.Mode, e.Filter.IsExcluded)));
+                .Select(e => FilterLibraryDedupKeys.ForSavedFilter((LibraryEntrySavedFilter)LibraryEntryTagNormalizer.MigrateBackslashName(e))),
+            StringComparer.Ordinal);
 
-        // Filter-set dedup: name + ordered filter-content fingerprint. Name-only would drop legacy
-        // filter sets that share a display name with a user-created filter set but carry different filters.
         var existingFilterSetKeys = new HashSet<string>(
-            existing.OfType<LibraryEntryFilterSet>().Select(FilterLibraryDedupKeys.ForFilterSet));
+            existing.OfType<LibraryEntryFilterSet>()
+                .Select(e => FilterLibraryDedupKeys.ForFilterSet((LibraryEntryFilterSet)LibraryEntryTagNormalizer.MigrateBackslashName(e))),
+            StringComparer.Ordinal);
 
         return [.. candidates.Where(entry => entry switch
         {
             LibraryEntrySavedFilter sf =>
-                !existingFilterKeys.Contains((sf.Filter.ComparisonText.ToLowerInvariant(), sf.Filter.Mode, sf.Filter.IsExcluded)),
+                !existingSavedFilterKeys.Contains(FilterLibraryDedupKeys.ForSavedFilter(sf)),
             LibraryEntryFilterSet filterSet =>
                 !existingFilterSetKeys.Contains(FilterLibraryDedupKeys.ForFilterSet(filterSet)),
             _ => true,

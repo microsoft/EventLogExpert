@@ -66,7 +66,7 @@ internal sealed class LegacyFilterMigrator(ILegacyPreferences preferences, ITrac
 
             if (favoritesSucceeded)
             {
-                builder.AddRange(localFavoriteEntries);
+                builder.AddRange(localFavoriteEntries.Select(LibraryEntryTagNormalizer.MigrateBackslashName));
                 successful |= LegacyMigrationSections.Favorites;
             }
         }
@@ -106,7 +106,7 @@ internal sealed class LegacyFilterMigrator(ILegacyPreferences preferences, ITrac
             return new LegacyMigrationResult(builder.ToImmutable(), successful);
         }
 
-        builder.AddRange(localGroupEntries);
+        builder.AddRange(localGroupEntries.Select(LibraryEntryTagNormalizer.MigrateBackslashName));
         successful |= LegacyMigrationSections.Groups;
 
         return new LegacyMigrationResult(builder.ToImmutable(), successful);

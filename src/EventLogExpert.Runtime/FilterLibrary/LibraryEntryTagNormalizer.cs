@@ -44,6 +44,8 @@ internal static class LibraryEntryTagNormalizer
 
         foreach (var raw in tags)
         {
+            if (raw is null) { continue; }
+
             var trimmed = raw.Trim().ToLowerInvariant();
 
             if (trimmed.Length == 0) { continue; }
@@ -106,7 +108,9 @@ internal sealed class NullToEmptyImmutableStringListConverter : JsonConverter<Im
         ArgumentNullException.ThrowIfNull(value);
 
         writer.WriteStartArray();
+
         foreach (var tag in value) { writer.WriteStringValue(tag); }
+
         writer.WriteEndArray();
     }
 }

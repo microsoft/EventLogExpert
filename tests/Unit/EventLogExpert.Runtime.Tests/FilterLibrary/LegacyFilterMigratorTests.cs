@@ -240,6 +240,23 @@ public sealed class LegacyFilterMigratorTests
     }
 
     [Fact]
+    public void BuildEntriesFromLegacy_GroupNameWithBackslash_AutoMigratedToFlatNameAndTags()
+    {
+        var groupsJson = JsonSerializer.Serialize(new List<SavedFilterGroup>
+        {
+            new() { Name = @"Exchange\HUB", Filters = [SavedFilter.TryCreate("Level == 4")!] },
+        });
+        var prefs = StubPreferences(groupsJson: groupsJson);
+        var sut = new LegacyFilterMigrator(prefs, Substitute.For<ITraceLogger>());
+
+        var result = sut.BuildEntriesFromLegacy();
+
+        var entry = Assert.IsType<LibraryEntryFilterSet>(Assert.Single(result.Entries));
+        Assert.Equal("HUB", entry.Name);
+        Assert.Equal(["exchange"], entry.Tags);
+    }
+
+    [Fact]
     public void BuildEntriesFromLegacy_GroupsAlreadyCompleted_SkipsGroupsBuildEvenWhenLegacyKeyPresent()
     {
         var favoritesJson = JsonSerializer.Serialize(new List<string> { "Level == 4" });

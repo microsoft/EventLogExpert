@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
+using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -79,66 +79,129 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
         return JsonSerializer.Serialize(envelope, s_writeOptions);
     }
 
+    private static LibraryEntry CloneWithFreshId(LibraryEntry entry) => entry switch
+    {
+        LibraryEntrySavedFilter f => f with { Id = LibraryEntryId.Create() },
+        LibraryEntryFilterSet fs => fs with { Id = LibraryEntryId.Create() },
+        _ => entry,
+    };
+
     private static ImportPreflight ComputePreflight(
         IReadOnlyList<LibraryEntry> incoming,
         IReadOnlyList<LibraryEntry> existing)
     {
-        var existingFilterSetKeys = new HashSet<string>(
-            existing.OfType<LibraryEntryFilterSet>().Select(FilterLibraryDedupKeys.ForFilterSet));
+        var migratedIncoming = incoming.Select(LibraryEntryTagNormalizer.MigrateBackslashName).ToList();
 
-        var existingSavedFilterKeys = new HashSet<(string, FilterMode, bool)>(
-            existing.OfType<LibraryEntrySavedFilter>().Select(FilterLibraryDedupKeys.ForSavedFilter));
+        var existingByStrictKey = new Dictionary<string, LibraryEntry>(StringComparer.Ordinal);
+        var existingByRelaxedKey = new Dictionary<string, List<LibraryEntry>>(StringComparer.Ordinal);
+        var existingByNameLower = new Dictionary<string, List<LibraryEntry>>(StringComparer.OrdinalIgnoreCase);
+        var existingIds = new HashSet<LibraryEntryId>(existing.Select(e => e.Id));
 
-        var existingByNameLower = new Dictionary<string, LibraryEntry>();
         foreach (var entry in existing)
         {
-            var key = entry.Name.ToLowerInvariant();
-            existingByNameLower.TryAdd(key, entry);
+            var migratedView = LibraryEntryTagNormalizer.MigrateBackslashName(entry);
+
+            var strictKey = DedupKeyStrict(migratedView);
+            existingByStrictKey.TryAdd(strictKey, entry);
+
+            var relaxedKey = DedupKeyRelaxed(migratedView);
+
+            if (!existingByRelaxedKey.TryGetValue(relaxedKey, out var relaxedBucket))
+            {
+                relaxedBucket = [];
+                existingByRelaxedKey[relaxedKey] = relaxedBucket;
+            }
+
+            relaxedBucket.Add(entry);
+
+            var nameKey = migratedView.Name.ToLowerInvariant();
+
+            if (!existingByNameLower.TryGetValue(nameKey, out var nameBucket))
+            {
+                nameBucket = [];
+                existingByNameLower[nameKey] = nameBucket;
+            }
+
+            nameBucket.Add(entry);
         }
 
-        var existingIds = new HashSet<LibraryEntryId>(existing.Select(e => e.Id));
         var toAdd = new List<LibraryEntry>();
         var toReplace = new List<(LibraryEntry Existing, LibraryEntry Incoming)>();
         var skipped = new List<LibraryEntry>();
-        var incomingNamesSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var toUpdate = new List<(LibraryEntry Existing, LibraryEntry Incoming)>();
+        var ambiguous = new List<(IReadOnlyList<LibraryEntry> Candidates, LibraryEntry Incoming)>();
+        var incomingFingerprintsSeen = new HashSet<string>(StringComparer.Ordinal);
+        var incomingNamesClaimedForReplace = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var entry in incoming)
+        foreach (var entry in migratedIncoming)
         {
-            if (IsExactDuplicate(entry, existingFilterSetKeys, existingSavedFilterKeys) || !incomingNamesSeen.Add(entry.Name))
+            var strictKey = DedupKeyStrict(entry);
+
+            if (!incomingFingerprintsSeen.Add(strictKey) || existingByStrictKey.ContainsKey(strictKey))
             {
                 skipped.Add(entry);
 
                 continue;
             }
 
-            if (existingByNameLower.TryGetValue(entry.Name.ToLowerInvariant(), out var nameMatch))
+            var relaxedKey = DedupKeyRelaxed(entry);
+
+            if (existingByRelaxedKey.TryGetValue(relaxedKey, out var relaxedMatches))
             {
-                toReplace.Add((nameMatch, entry));
+                if (relaxedMatches.Count == 1)
+                {
+                    toUpdate.Add((relaxedMatches[0], entry));
+                }
+                else
+                {
+                    ambiguous.Add((relaxedMatches.ToImmutableList(), entry));
+                }
+                continue;
+            }
+
+            if (existingByNameLower.TryGetValue(entry.Name.ToLowerInvariant(), out var nameMatches))
+            {
+                if (!incomingNamesClaimedForReplace.Add(entry.Name))
+                {
+                    skipped.Add(entry);
+
+                    continue;
+                }
+
+                if (nameMatches.Count == 1)
+                {
+                    toReplace.Add((nameMatches[0], entry));
+                }
+                else
+                {
+                    ambiguous.Add((nameMatches.ToImmutableList(), entry));
+                }
 
                 continue;
             }
 
-            var addEntry = existingIds.Contains(entry.Id) ? entry with { Id = LibraryEntryId.Create() } : entry;
-            toAdd.Add(addEntry);
+            var finalEntry = existingIds.Contains(entry.Id)
+                ? CloneWithFreshId(entry)
+                : entry;
+            toAdd.Add(finalEntry);
         }
 
-        return new ImportPreflight(toAdd, toReplace, skipped);
+        return new ImportPreflight(toAdd, toReplace, skipped, toUpdate, ambiguous);
     }
 
-    private static bool IsExactDuplicate(
-        LibraryEntry entry,
-        IReadOnlySet<string> existingFilterSetKeys,
-        IReadOnlySet<(string, FilterMode, bool)> existingSavedFilterKeys)
+    private static string DedupKeyRelaxed(LibraryEntry entry) => entry switch
     {
-        return entry switch
-        {
-            LibraryEntryFilterSet fs => existingFilterSetKeys.Contains(
-                FilterLibraryDedupKeys.ForFilterSet(fs)),
-            LibraryEntrySavedFilter sf => existingSavedFilterKeys.Contains(
-                FilterLibraryDedupKeys.ForSavedFilter(sf)),
-            _ => false,
-        };
-    }
+        LibraryEntryFilterSet fs => FilterLibraryDedupKeys.ForFilterSetTagRelaxed(fs),
+        LibraryEntrySavedFilter sf => FilterLibraryDedupKeys.ForSavedFilterTagRelaxed(sf),
+        _ => throw new NotSupportedException($"Unknown LibraryEntry kind: {entry.GetType().Name}"),
+    };
+
+    private static string DedupKeyStrict(LibraryEntry entry) => entry switch
+    {
+        LibraryEntryFilterSet fs => FilterLibraryDedupKeys.ForFilterSet(fs),
+        LibraryEntrySavedFilter sf => FilterLibraryDedupKeys.ForSavedFilter(sf),
+        _ => throw new NotSupportedException($"Unknown LibraryEntry kind: {entry.GetType().Name}"),
+    };
 
     private static IReadOnlyList<LibraryEntry>? ReadBareArrayWithLegacyFallback(JsonElement root)
     {
