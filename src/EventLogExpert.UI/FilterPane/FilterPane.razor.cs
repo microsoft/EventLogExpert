@@ -16,7 +16,6 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.FilterEditor;
-using EventLogExpert.UI.FilterLibrary;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Modal;
 using Fluxor;
@@ -61,11 +60,6 @@ public sealed partial class FilterPane : IDisposable
 
     [Inject] private IState<FilterProgressState> FilterProgressState { get; init; } = null!;
 
-    private bool HasCachedFilters =>
-        FilterLibraryState.Value.IsLoaded
-        && !FilterLibraryState.Value.LoadError
-        && FilterLibraryState.Value.Entries.OfType<LibraryEntrySavedFilter>().Any(e => e.IsFavorite || e.LastUsedUtc is not null);
-
     private bool HasClearableFilters =>
         IsDateFilterVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
 
@@ -76,6 +70,11 @@ public sealed partial class FilterPane : IDisposable
         FilterLibraryState.Value.IsLoaded
         && !FilterLibraryState.Value.LoadError
         && FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().Any();
+
+    private bool HasRecentFilters =>
+        FilterLibraryState.Value.IsLoaded
+        && !FilterLibraryState.Value.LoadError
+        && FilterLibraryState.Value.Entries.OfType<LibraryEntrySavedFilter>().Any(e => e.IsFavorite || e.LastUsedUtc is not null);
 
     private bool HasSavableFilters => !FilterPaneState.Value.Filters.IsEmpty;
 
@@ -141,21 +140,21 @@ public sealed partial class FilterPane : IDisposable
         MenuItem.Item("Basic", AddBasicFilterFromMenu),
         MenuItem.Item("Advanced", AddAdvancedFilterFromMenu),
         MenuItem.Item(
-            "Cached",
-            AddCachedFilterFromMenu,
-            isEnabled: HasCachedFilters,
-            disabledReason: GetCachedDisabledReason()),
+            "Recent",
+            AddRecentFilterFromMenu,
+            isEnabled: HasRecentFilters,
+            disabledReason: GetRecentDisabledReason()),
     ];
 
-    internal string? GetCachedDisabledReason()
+    internal string? GetRecentDisabledReason()
     {
-        if (HasCachedFilters) { return null; }
+        if (HasRecentFilters) { return null; }
 
         if (FilterLibraryState.Value.LoadError) { return FilterPaneAnnouncements.LoadFailedRetryViaModal; }
 
         return !FilterLibraryState.Value.IsLoaded ?
             FilterPaneAnnouncements.LoadingTryAgain :
-            FilterPaneAnnouncements.CachedNoneAvailable;
+            FilterPaneAnnouncements.RecentNoneAvailable;
     }
 
     internal void OpenFilterSetPicker()
@@ -251,18 +250,6 @@ public sealed partial class FilterPane : IDisposable
         StateHasChanged();
     }
 
-    private void AddCachedFilter()
-    {
-        _pendingDrafts.Add(new FilterDraft { Mode = FilterMode.Cached });
-        _isFilterListVisible = true;
-    }
-
-    private void AddCachedFilterFromMenu()
-    {
-        AddCachedFilter();
-        StateHasChanged();
-    }
-
     private void AddDateFilter()
     {
         _currentTimeZone = Settings.TimeZoneInfo;
@@ -280,6 +267,18 @@ public sealed partial class FilterPane : IDisposable
     {
         _pendingDrafts.Add(new FilterDraft { Mode = FilterMode.Basic, IsExcluded = true });
         _isFilterListVisible = true;
+    }
+
+    private void AddRecentFilter()
+    {
+        _pendingDrafts.Add(new FilterDraft { Mode = FilterMode.Cached });
+        _isFilterListVisible = true;
+    }
+
+    private void AddRecentFilterFromMenu()
+    {
+        AddRecentFilter();
+        StateHasChanged();
     }
 
     private void ApplyDateFilter()
@@ -401,9 +400,7 @@ public sealed partial class FilterPane : IDisposable
         StateHasChanged();
     }
 
-    private Task OpenCachedFiltersModal() => ModalCoordinator.OpenFilterLibraryAsync(LibraryTab.Favorites);
-
-    private Task OpenSavedFiltersModal() => ModalCoordinator.OpenFilterLibraryAsync(LibraryTab.Saved);
+    private Task OpenFilterLibraryAsync() => ModalCoordinator.OpenFilterLibraryAsync();
 
     private void PruneStaleRowRefs()
     {

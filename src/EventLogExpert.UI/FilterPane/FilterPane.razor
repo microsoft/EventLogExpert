@@ -7,7 +7,7 @@
                 <button class="button split-button-primary"
                     @onclick="AddBasicFilter"
                     @ref="_addFilterButtonRef"
-                    title="Add Basic filter (use chevron for Advanced or Cached)"
+                    title="Add Basic filter (use chevron for Advanced or Recent)"
                     type="button">
                     <i aria-hidden="true" class="bi bi-plus-circle"></i> Add Filter
                 </button>
@@ -72,12 +72,12 @@
                 <i class="bi bi-trash"></i>
             </button>
 
-            <button aria-label="Manage Cached Filters" class="button icon-button" @onclick="OpenCachedFiltersModal" title="Manage Cached Filters" type="button">
-                <i class="bi bi-bookmark"></i>
-            </button>
-
-            <button aria-label="Manage Saved Filters" class="button icon-button" @onclick="OpenSavedFiltersModal" title="Manage Saved Filters" type="button">
-                <i class="bi bi-collection"></i>
+            <button aria-label="Open Filter Library"
+                class="button icon-button"
+                @onclick="OpenFilterLibraryAsync"
+                title="Open Filter Library"
+                type="button">
+                <i class="bi bi-bookmarks"></i>
             </button>
 
             <span class="visually-hidden" id="save-filters-empty-hint">

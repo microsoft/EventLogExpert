@@ -23,7 +23,7 @@
                     ValueChanged="TryChangeModeAsync">
                     @foreach (var mode in Enum.GetValues<FilterMode>())
                     {
-                        <ValueSelectItem T="FilterMode" Value="mode" />
+                        <ValueSelectItem T="FilterMode" Value="mode">@GetFilterModeDisplayLabel(mode)</ValueSelectItem>
                     }
                 </ValueSelect>
             </span>
@@ -54,7 +54,7 @@
                     break;
                 case FilterMode.Cached:
                     <span class="filter-row-cached">
-                        <ValueSelect AriaLabel="Cached Filter"
+                        <ValueSelect AriaLabel="Recent Filter"
                             CssClass="input cache-dropdown"
                             T="string"
                             Value="filter.ComparisonText"
