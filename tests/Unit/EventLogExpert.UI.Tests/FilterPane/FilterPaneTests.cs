@@ -134,11 +134,11 @@ public sealed class FilterPaneTests : BunitContext
         component.Instance.ApplyFilterSetSelection();
 
         _filterLibraryCommands.Received(1).ApplyEntry(filterSet.Id);
-        _announcements.DidNotReceiveWithAnyArgs().Announce(default!);
+        _announcements.DidNotReceiveWithAnyArgs().Announce(null!);
     }
 
     [Fact]
-    public void GetCachedDisabledReason_WhenEmpty_ReturnsCachedNoneAvailable()
+    public void GetRecentDisabledReason_WhenEmpty_ReturnsRecentNoneAvailable()
     {
         SetLibraryState(new FilterLibraryState
         {
@@ -147,13 +147,13 @@ public sealed class FilterPaneTests : BunitContext
         });
         var component = Render<UI.FilterPane.FilterPane>();
 
-        var reason = component.Instance.GetCachedDisabledReason();
+        var reason = component.Instance.GetRecentDisabledReason();
 
-        Assert.Equal(FilterPaneAnnouncements.CachedNoneAvailable, reason);
+        Assert.Equal(FilterPaneAnnouncements.RecentNoneAvailable, reason);
     }
 
     [Fact]
-    public void GetCachedDisabledReason_WhenHasFavoriteFilter_ReturnsNull()
+    public void GetRecentDisabledReason_WhenHasFavoriteFilter_ReturnsNull()
     {
         SetLibraryState(new FilterLibraryState
         {
@@ -162,13 +162,13 @@ public sealed class FilterPaneTests : BunitContext
         });
         var component = Render<UI.FilterPane.FilterPane>();
 
-        var reason = component.Instance.GetCachedDisabledReason();
+        var reason = component.Instance.GetRecentDisabledReason();
 
         Assert.Null(reason);
     }
 
     [Fact]
-    public void GetCachedDisabledReason_WhenHasNonFavoriteRecent_ReturnsNull()
+    public void GetRecentDisabledReason_WhenHasNonFavoriteRecent_ReturnsNull()
     {
         SetLibraryState(new FilterLibraryState
         {
@@ -178,7 +178,7 @@ public sealed class FilterPaneTests : BunitContext
         });
         var component = Render<UI.FilterPane.FilterPane>();
 
-        var reason = component.Instance.GetCachedDisabledReason();
+        var reason = component.Instance.GetRecentDisabledReason();
 
         Assert.Null(reason);
     }
@@ -187,7 +187,7 @@ public sealed class FilterPaneTests : BunitContext
     [InlineData(true, false, true, "Filter library failed to load. Open Filter Library to retry.")]
     [InlineData(false, false, false, "Filter library is still loading. Please try again.")]
     [InlineData(true, true, true, "Filter library failed to load. Open Filter Library to retry.")]
-    public void GetCachedDisabledReason_WhenLoadErrorOrLoading_ReturnsContextSpecificMessage(
+    public void GetRecentDisabledReason_WhenLoadErrorOrLoading_ReturnsContextSpecificMessage(
         bool isLoaded, bool hasEntries, bool loadError, string expectedReason)
     {
         var entries = hasEntries
@@ -201,7 +201,7 @@ public sealed class FilterPaneTests : BunitContext
         });
         var component = Render<UI.FilterPane.FilterPane>();
 
-        var reason = component.Instance.GetCachedDisabledReason();
+        var reason = component.Instance.GetRecentDisabledReason();
 
         Assert.Equal(expectedReason, reason);
     }
@@ -248,7 +248,7 @@ public sealed class FilterPaneTests : BunitContext
 
         Assert.True(component.Instance.IsFilterSetPickerVisible);
         Assert.Equal(default(LibraryEntryId), component.Instance.SelectedFilterSetId);
-        _announcements.DidNotReceiveWithAnyArgs().Announce(default!);
+        _announcements.DidNotReceiveWithAnyArgs().Announce(null!);
     }
 
     [Fact]

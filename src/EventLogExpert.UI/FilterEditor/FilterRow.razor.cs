@@ -175,6 +175,12 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
         ErrorMessage = string.Empty;
     }
 
+    private static string GetFilterModeDisplayLabel(FilterMode mode) => mode switch
+    {
+        FilterMode.Cached => "Recent",
+        _ => mode.ToString(),
+    };
+
     private async Task OnExclusionChangedAsync(bool isExcluded)
     {
         string label = isExcluded ? "Exclude" : "Include";
@@ -280,7 +286,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
             string message = (Filter.Mode, target) switch
             {
                 (_, FilterMode.Cached) =>
-                    "Switching to Cached will discard the current filter contents. Continue?",
+                    "Switching to Recent will discard the current filter contents. Continue?",
                 (FilterMode.Advanced, FilterMode.Basic) or (FilterMode.Cached, FilterMode.Basic) =>
                     "Switching to Basic will discard the current expression because it cannot be represented in the Basic editor. Continue?",
                 (FilterMode.Basic, FilterMode.Advanced) =>
