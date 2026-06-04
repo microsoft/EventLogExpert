@@ -47,6 +47,60 @@ public sealed class FilterLibraryExportServiceTests
     }
 
     [Fact]
+    public void Deserialize_LegacySavedFilterGroupArray_ConvertsToFilterSets()
+    {
+        var legacyJson = """
+            [
+                {
+                    "Name": "Exchange\\HUB",
+                    "Filters": [
+                        {
+                            "Color": "None",
+                            "ComparisonText": "Level == 4",
+                            "Mode": "Basic"
+                        }
+                    ]
+                },
+                {
+                    "Name": "Sharepoint",
+                    "Filters": [
+                        {
+                            "Color": "None",
+                            "ComparisonText": "Level == 5",
+                            "Mode": "Basic"
+                        }
+                    ]
+                }
+            ]
+            """;
+
+        var preflight = _service.Deserialize(legacyJson, []);
+
+        Assert.Null(preflight.Error);
+        Assert.Equal(2, preflight.ToAdd.Count);
+        Assert.All(preflight.ToAdd, e => Assert.IsType<LibraryEntryFilterSet>(e));
+        Assert.Contains(preflight.ToAdd, e => e.Name == "Exchange\\HUB");
+        Assert.Contains(preflight.ToAdd, e => e.Name == "Sharepoint");
+    }
+
+    [Fact]
+    public void Deserialize_LegacySavedFilterGroupArray_SkipsEmptyGroups()
+    {
+        var legacyJson = """
+            [
+                { "Name": "Empty", "Filters": [] },
+                { "Name": "HasFilter", "Filters": [{ "Color": "None", "ComparisonText": "Level == 4", "Mode": "Basic" }] }
+            ]
+            """;
+
+        var preflight = _service.Deserialize(legacyJson, []);
+
+        Assert.Null(preflight.Error);
+        Assert.Single(preflight.ToAdd);
+        Assert.Equal("HasFilter", preflight.ToAdd[0].Name);
+    }
+
+    [Fact]
     public void Deserialize_MalformedJson_ReturnsParseErrorWithoutThrowing()
     {
         var preflight = _service.Deserialize("{this is not valid json", []);

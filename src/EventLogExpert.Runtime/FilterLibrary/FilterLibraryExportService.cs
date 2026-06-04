@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Filtering.Persistence;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -57,7 +58,8 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
             }
             else
             {
-                incoming = document.RootElement.Deserialize<List<LibraryEntry>>() ?? [];
+                incoming = ReadBareArrayWithLegacyFallback(document.RootElement)
+                    ?? throw new JsonException("Unsupported import file shape.");
             }
         }
         catch (JsonException ex)
@@ -136,6 +138,41 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
                 FilterLibraryDedupKeys.ForSavedFilter(sf)),
             _ => false,
         };
+    }
+
+    private static IReadOnlyList<LibraryEntry>? ReadBareArrayWithLegacyFallback(JsonElement root)
+    {
+        try
+        {
+            return root.Deserialize<List<LibraryEntry>>() ?? [];
+        }
+        catch (NotSupportedException)
+        {
+            // The bare-array shape is missing the polymorphic discriminator ("Kind") that LibraryEntry
+            // requires. Fall back to the legacy SavedFilterGroup[] shape produced by the pre-FilterLibrary
+            // FilterGroupModal export (this is the only legacy export shape we promise to read).
+            var legacyGroups = root.Deserialize<List<SavedFilterGroup>>();
+            if (legacyGroups is null) { return null; }
+
+            var now = DateTimeOffset.UtcNow;
+            var converted = new List<LibraryEntry>(legacyGroups.Count);
+
+            foreach (var group in legacyGroups.Where(g => g.Filters.Count > 0))
+            {
+                converted.Add(new LibraryEntryFilterSet
+                {
+                    Id = LibraryEntryId.Create(),
+                    Name = string.IsNullOrWhiteSpace(group.Name) ? "(unnamed)" : group.Name,
+                    CreatedUtc = now,
+                    Filters = [.. group.Filters.Select(f => f with { Id = FilterId.Create(), IsEnabled = false })],
+                    IsFavorite = false,
+                    LastUsedUtc = null,
+                    Origin = LibraryEntryOrigin.UserSaved,
+                });
+            }
+
+            return converted;
+        }
     }
 
     private sealed record ExportEnvelope(
