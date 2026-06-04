@@ -1,0 +1,39 @@
+@typeparam TTab where TTab : struct, Enum
+
+<div class="sidebar-tabs">
+    <div aria-label="@TablistAriaLabel"
+        aria-orientation="vertical"
+        class="sidebar-tabs-list"
+        @ref="_tablistRef"
+        role="tablist">
+        @foreach (var (tab, label) in Tabs)
+        {
+            <button aria-controls="@($"sidebar-tabpanel-{TablistId}-{tab}")"
+                aria-selected="@(tab.Equals(ActiveTab) ? "true" : "false")"
+                class="@(tab.Equals(ActiveTab) ? "tab active" : "tab")"
+                id="@($"sidebar-tab-{TablistId}-{tab}")"
+                @onclick="() => SetActiveTabAsync(tab)"
+                @onkeydown="e => OnTabKeyDownAsync(e, tab)"
+                @ref="_tabButtonRefs[tab]"
+                role="tab"
+                tabindex="@(tab.Equals(ActiveTab) ? "0" : "-1")"
+                type="button">
+                @label
+            </button>
+        }
+    </div>
+
+    <div class="sidebar-tabs-content">
+        @foreach (var (tab, _) in Tabs)
+        {
+            <div aria-labelledby="@($"sidebar-tab-{TablistId}-{tab}")"
+                class="@(tab.Equals(ActiveTab) ? "sidebar-tabs-tabpanel active" : "sidebar-tabs-tabpanel")"
+                id="@($"sidebar-tabpanel-{TablistId}-{tab}")"
+                role="tabpanel"
+                style="@(tab.Equals(ActiveTab) ? "" : "display: none")"
+                tabindex="@(tab.Equals(ActiveTab) && (IsTabpanelFocusable?.Invoke(tab) ?? false) ? "0" : null)">
+                @TabContent(tab)
+            </div>
+        }
+    </div>
+</div>

@@ -1,86 +1,26 @@
-.database-tools {
-    display: flex;
-    flex-direction: row;
-    height: 100%;
-    min-height: 0;
-    gap: 12px;
-}
-
-.database-tools-tabs {
-    display: flex;
-    flex-direction: column;
-    flex: 0 0 200px;
-    gap: 2px;
-    padding: 8px 4px 8px 0;
-}
-
-.database-tools-tabs .tab {
-    text-align: left;
-    padding: 8px 12px;
-    background: transparent;
-    border: none;
-    border-left: 2px solid transparent;
-    border-radius: 0;
-    cursor: pointer;
-    color: inherit;
-    font: inherit;
-}
-
-.database-tools-tabs .tab:hover {
-    background: var(--background-darkgray);
-}
-
-.database-tools-tabs .tab.active {
-    background: transparent;
-    border-left-color: var(--clr-lightblue);
-    color: var(--clr-lightblue);
-    font-weight: 600;
-}
-
-.database-tools-tabs .tab.active:hover {
-    background: var(--background-darkgray);
-}
-
-.database-tools-tabs .tab:focus-visible {
-    outline: 2px solid var(--clr-lightblue);
-    outline-offset: -2px;
-}
-
-.database-tools-content {
-    flex: 1 1 0;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.database-tools-content .tabpanel {
-    flex: 1 1 0;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-}
-
 /*
+ * Layout for the DBTools content was previously here as `.database-tools`, `.database-tools-tabs`,
+ * `.database-tools-content`, and `.database-tools-content .tabpanel` rules. The vertical-sidebar
+ * tablist layout is now owned by the shared `SidebarTabs<TTab>` component (see Modal/SidebarTabs.razor.css).
  * The selectors below target elements rendered inside CHILD tab components
  * (ShowProvidersTab, CreateDatabaseTab, etc.). Each child component has its
  * own CSS-isolation scope attribute, so the modal's scope alone will not
  * match those elements. The `::deep` pseudo-element preserves the modal's
- * outer scope on `.tabpanel` but disables scoping for everything after it,
- * letting these rules cross the component boundary.
+ * outer scope on `.sidebar-tabs-tabpanel` but disables scoping for everything
+ * after it, letting these rules cross the component boundary.
  */
 
-.tabpanel ::deep .db-tab-placeholder {
+.sidebar-tabs-tabpanel {
+    padding: 8px;
+}
+
+.sidebar-tabs-tabpanel ::deep .db-tab-placeholder {
     padding: 16px;
     color: var(--text-secondary);
     font-style: italic;
 }
 
-.tabpanel ::deep .db-tab {
+.sidebar-tabs-tabpanel ::deep .db-tab {
     display: flex;
     flex-direction: column;
     flex: 1 1 0;
@@ -91,7 +31,7 @@
     gap: .5rem;
 }
 
-.tabpanel ::deep .db-tab-form {
+.sidebar-tabs-tabpanel ::deep .db-tab-form {
     display: grid;
     grid-template-columns: 12rem minmax(0, 1fr);
     column-gap: .5rem;
@@ -100,47 +40,47 @@
     flex: 0 0 auto;
 }
 
-.tabpanel ::deep .db-tab-form .form-row {
+.sidebar-tabs-tabpanel ::deep .db-tab-form .form-row {
     display: contents;
 }
 
-.tabpanel ::deep .db-tab-form label {
+.sidebar-tabs-tabpanel ::deep .db-tab-form label {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.tabpanel ::deep .db-tab-form .input,
-.tabpanel ::deep .db-tab-form .path-input-group {
+.sidebar-tabs-tabpanel ::deep .db-tab-form .input,
+.sidebar-tabs-tabpanel ::deep .db-tab-form .path-input-group {
     min-width: 0;
 }
 
 /* Path / filter inputs need left-aligned content (global .input centers — appropriate for short values, awkward for paths). */
-.tabpanel ::deep .db-tab-form .input {
+.sidebar-tabs-tabpanel ::deep .db-tab-form .input {
     text-align: left;
 }
 
-.tabpanel ::deep .db-tab-form .path-input-group {
+.sidebar-tabs-tabpanel ::deep .db-tab-form .path-input-group {
     display: flex;
     align-items: center;
     gap: .5rem;
 }
 
-.tabpanel ::deep .db-tab-form .path-input-group .input {
+.sidebar-tabs-tabpanel ::deep .db-tab-form .path-input-group .input {
     flex: 1 1 auto;
     min-width: 0;
 }
 
-.tabpanel ::deep .db-tab-form .path-input-group .button {
+.sidebar-tabs-tabpanel ::deep .db-tab-form .path-input-group .button {
     flex: 0 0 auto;
     white-space: nowrap;
 }
 
-.tabpanel ::deep .db-tab-form .input.invalid {
+.sidebar-tabs-tabpanel ::deep .db-tab-form .input.invalid {
     border-color: var(--clr-red);
 }
 
-.tabpanel ::deep .db-tab-form .filter-error {
+.sidebar-tabs-tabpanel ::deep .db-tab-form .filter-error {
     grid-column: 2;
     /* Match the input's .5rem horizontal margin so the error text aligns with input content. */
     margin: 0 .5rem;
@@ -148,14 +88,14 @@
     min-height: 0;
 }
 
-.tabpanel ::deep .db-tab-form .checkbox-label {
+.sidebar-tabs-tabpanel ::deep .db-tab-form .checkbox-label {
     grid-column: 2;
     display: inline-flex;
     align-items: center;
     gap: .375rem;
 }
 
-.tabpanel ::deep .db-tab-form .direction-row {
+.sidebar-tabs-tabpanel ::deep .db-tab-form .direction-row {
     grid-column: 2;
     /* Match the input's .5rem horizontal margin so the italic text aligns with input content above. */
     margin: 0 .5rem;
@@ -163,11 +103,11 @@
     font-style: italic;
 }
 
-.tabpanel ::deep .db-tab-form .elevation-warning-slot {
+.sidebar-tabs-tabpanel ::deep .db-tab-form .elevation-warning-slot {
     grid-column: 1 / -1;
 }
 
-.tabpanel ::deep .elevation-warning {
+.sidebar-tabs-tabpanel ::deep .elevation-warning {
     display: flex;
     align-items: center;
     gap: .5rem;
@@ -178,21 +118,21 @@
     border-radius: .25rem;
 }
 
-.tabpanel ::deep .elevation-warning > span {
+.sidebar-tabs-tabpanel ::deep .elevation-warning > span {
     flex: 1 1 auto;
 }
 
-.tabpanel ::deep .elevation-warning .button {
+.sidebar-tabs-tabpanel ::deep .elevation-warning .button {
     --btn-color: var(--clr-on-status-fill);
 }
 
-.tabpanel ::deep .elevation-error {
+.sidebar-tabs-tabpanel ::deep .elevation-error {
     margin-top: .25rem;
     color: var(--clr-red);
 }
 
 .visually-hidden,
-.tabpanel ::deep .visually-hidden {
+.sidebar-tabs-tabpanel ::deep .visually-hidden {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -219,13 +159,14 @@
 }
 
 @media (max-width: 56rem) {
-    .tabpanel ::deep .db-tab-form {
+    .sidebar-tabs-tabpanel ::deep .db-tab-form {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .tabpanel ::deep .db-tab-form .filter-error,
-    .tabpanel ::deep .db-tab-form .checkbox-label,
-    .tabpanel ::deep .db-tab-form .direction-row {
+    .sidebar-tabs-tabpanel ::deep .db-tab-form .filter-error,
+    .sidebar-tabs-tabpanel ::deep .db-tab-form .checkbox-label,
+    .sidebar-tabs-tabpanel ::deep .db-tab-form .direction-row {
         grid-column: 1;
     }
 }
+

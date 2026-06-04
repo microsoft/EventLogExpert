@@ -28,6 +28,8 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Parameter] public string? AriaLabel { get; set; }
 
+    [Parameter] public ModalBodyLayout BodyLayout { get; set; } = ModalBodyLayout.Content;
+
     [Parameter] public string CancelLabel { get; set; } = "Cancel";
 
     [Parameter] public RenderFragment? ChildContent { get; set; }

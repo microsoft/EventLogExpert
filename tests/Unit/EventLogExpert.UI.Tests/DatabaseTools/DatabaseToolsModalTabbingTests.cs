@@ -92,7 +92,7 @@ public sealed class DatabaseToolsModalTabbingTests : BunitContext
     }
 
     [Fact]
-    public async Task ArrowLeft_FromShow_ActivatesManage()
+    public async Task ArrowLeft_FromShow_IsIgnored_StaysOnShow()
     {
         var component = Render<DatabaseToolsModal>();
         await component.FindAll("[role='tab']")[1].ClickAsync(new MouseEventArgs());
@@ -100,18 +100,18 @@ public sealed class DatabaseToolsModalTabbingTests : BunitContext
         await component.FindAll("[role='tab']")[1]
             .KeyDownAsync(new KeyboardEventArgs { Key = "ArrowLeft" });
 
-        Assert.Equal("true", component.FindAll("[role='tab']")[0].GetAttribute("aria-selected"));
+        Assert.Equal("true", component.FindAll("[role='tab']")[1].GetAttribute("aria-selected"));
     }
 
     [Fact]
-    public async Task ArrowRight_FromManage_ActivatesShow()
+    public async Task ArrowRight_FromManage_IsIgnored_StaysOnManage()
     {
         var component = Render<DatabaseToolsModal>();
 
         await component.FindAll("[role='tab']")[0]
             .KeyDownAsync(new KeyboardEventArgs { Key = "ArrowRight" });
 
-        Assert.Equal("true", component.FindAll("[role='tab']")[1].GetAttribute("aria-selected"));
+        Assert.Equal("true", component.FindAll("[role='tab']")[0].GetAttribute("aria-selected"));
     }
 
     [Fact]

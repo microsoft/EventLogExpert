@@ -1,19 +1,18 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-// JS shim for DatabaseToolsModal. Suppresses the browser's default action ONLY for the
-// roving-focus keys the C# OnTabKeyDown handler consumes (Arrow/Home/End), so the dialog
-// no longer scrolls underneath the tab keyboard nav. Tab/Shift+Tab/Enter/Space are NOT
-// prevented — Tab still moves focus to the tabpanel per WAI-ARIA, Enter/Space activate.
+// Suppresses the browser's default action ONLY for the roving-focus keys the C# OnTabKeyDownAsync
+// handler consumes (ArrowUp/ArrowDown/Home/End), so the dialog no longer scrolls underneath the
+// vertical tablist keyboard nav. ArrowLeft/ArrowRight are intentionally NOT in the handled set
+// for vertical tablists per WAI-ARIA APG 1.2. Tab/Shift+Tab/Enter/Space are NOT prevented.
 
-const HANDLED_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"]);
+const HANDLED_KEYS = new Set(["ArrowUp", "ArrowDown", "Home", "End"]);
 
 const handlers = new WeakMap();
 
 export function attach(tablistElement) {
     if (!tablistElement) { return; }
 
-    // Remove prior listener so re-attach doesn't double-register.
     detach(tablistElement);
 
     const onKeyDown = (event) => {

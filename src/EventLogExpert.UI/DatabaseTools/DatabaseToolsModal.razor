@@ -2,6 +2,7 @@
 @inherits ModalBase<bool>
 
 <ModalChrome AriaLabel="Databases"
+    BodyLayout="ModalBodyLayout.Flex"
     Footer="FooterPreset.CloseOnly"
     Height="80%"
     InlineAlert="@CurrentInlineAlert"
@@ -15,64 +16,40 @@
     <ChildContent>
         <CascadingValue Name="VerboseLogging" Value="_verboseLogging">
             <CascadingValue IsFixed="true" Value="(IInlineAlertSurface)this">
-                <div class="database-tools">
-                    <div aria-orientation="vertical" class="database-tools-tabs" @ref="_tablistRef" role="tablist">
-                        @foreach (var (tab, label) in s_tabs)
+                <SidebarTabs @bind-ActiveTab="_activeTab"
+                    TablistAriaLabel="Database tools"
+                    Tabs="s_tabs"
+                    TTab="DatabaseToolsTab">
+                    <TabContent Context="tab">
+                        @switch (tab)
                         {
-                            <button aria-controls="@($"db-tabpanel-{tab}")"
-                                aria-selected="@(tab == _activeTab ? "true" : "false")"
-                                class="@(tab == _activeTab ? "tab active" : "tab")"
-                                id="@($"db-tab-{tab}")"
-                                @onclick="() => SetActiveTab(tab)"
-                                @onkeydown="e => OnTabKeyDown(e, tab)"
-                                @ref="_tabButtonRefs[tab]"
-                                role="tab"
-                                tabindex="@(tab == _activeTab ? "0" : "-1")"
-                                type="button">
-                                @label
-                            </button>
+                            case DatabaseToolsTab.Show:
+                                <ShowProvidersTab @ref="_showTab" />
+
+                                break;
+                            case DatabaseToolsTab.Create:
+                                <CreateDatabaseTab @ref="_createTab" />
+
+                                break;
+                            case DatabaseToolsTab.Merge:
+                                <MergeDatabaseTab @ref="_mergeTab" />
+
+                                break;
+                            case DatabaseToolsTab.Diff:
+                                <DiffDatabasesTab @ref="_diffTab" />
+
+                                break;
+                            case DatabaseToolsTab.Upgrade:
+                                <UpgradeDatabaseTab @ref="_upgradeTab" />
+
+                                break;
+                            case DatabaseToolsTab.Manage:
+                                <ManageDatabasesTab @ref="_manageTab" />
+
+                                break;
                         }
-                    </div>
-
-                    <div class="database-tools-content">
-                        @foreach (var (tab, _) in s_tabs)
-                        {
-                            <div aria-labelledby="@($"db-tab-{tab}")"
-                                class="@(tab == _activeTab ? "tabpanel active" : "tabpanel")"
-                                id="@($"db-tabpanel-{tab}")"
-                                role="tabpanel"
-                                style="@(tab == _activeTab ? "" : "display: none")">
-                                @switch (tab)
-                                {
-                                    case DatabaseToolsTab.Show:
-                                        <ShowProvidersTab @ref="_showTab" />
-
-                                        break;
-                                    case DatabaseToolsTab.Create:
-                                        <CreateDatabaseTab @ref="_createTab" />
-
-                                        break;
-                                    case DatabaseToolsTab.Merge:
-                                        <MergeDatabaseTab @ref="_mergeTab" />
-
-                                        break;
-                                    case DatabaseToolsTab.Diff:
-                                        <DiffDatabasesTab @ref="_diffTab" />
-
-                                        break;
-                                    case DatabaseToolsTab.Upgrade:
-                                        <UpgradeDatabaseTab @ref="_upgradeTab" />
-
-                                        break;
-                                    case DatabaseToolsTab.Manage:
-                                        <ManageDatabasesTab @ref="_manageTab" />
-
-                                        break;
-                                }
-                            </div>
-                        }
-                    </div>
-                </div>
+                    </TabContent>
+                </SidebarTabs>
             </CascadingValue>
         </CascadingValue>
     </ChildContent>
