@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 
 namespace EventLogExpert.Runtime.FilterLibrary;
 
-internal static class LibraryEntryTagNormalizer
+public static class LibraryEntryTagNormalizer
 {
     public const int MaxTagLength = 32;
 

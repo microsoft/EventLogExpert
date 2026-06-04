@@ -1,0 +1,59 @@
+<div class="tag-picker">
+    <div class="tag-picker-chips" role="list">
+        @for (int i = 0; i < Value.Count; i++)
+        {
+            var index = i;
+            var tag = Value[i];
+
+            <span class="tag-picker-chip" role="listitem">
+                <span class="tag-picker-chip-label">@tag</span>
+                <button aria-label="@($"Remove {tag}")"
+                    class="tag-picker-chip-remove"
+                    @onclick="() => RemoveTagAsync(index)"
+                    tabindex="-1"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-x"></i>
+                </button>
+            </span>
+        }
+
+        <input aria-activedescendant="@(_isDropdownOpen && _activeOptionIndex >= 0 ? OptionId(_activeOptionIndex) : null)"
+            aria-autocomplete="list"
+            aria-controls="@_listboxId"
+            aria-expanded="@(_isDropdownOpen ? "true" : "false")"
+            aria-haspopup="listbox"
+            aria-label="@AriaLabel"
+            @bind="_inputText"
+            @bind:after="OnInputChangedAsync"
+            @bind:event="oninput"
+            class="tag-picker-input"
+            @onblur="OnInputBlurAsync"
+            @onfocus="OnInputFocus"
+            @onkeydown="HandleKeyDownAsync"
+            @onkeydown:preventDefault="_preventNextDefault"
+            placeholder="@(Value.Count == 0 ? Placeholder : null)"
+            @ref="_inputRef"
+            role="combobox"
+            type="text" />
+    </div>
+
+    @if (_isDropdownOpen && _isInputFocused && _filteredSuggestions.Count > 0)
+    {
+        <ul class="tag-picker-listbox" id="@_listboxId" role="listbox">
+            @for (int i = 0; i < _filteredSuggestions.Count; i++)
+            {
+                var suggestion = _filteredSuggestions[i];
+                var isActive = i == _activeOptionIndex;
+
+                <li aria-selected="@(isActive ? "true" : "false")"
+                    class="@(isActive ? "tag-picker-option tag-picker-option-active" : "tag-picker-option")"
+                    id="@OptionId(i)"
+                    @onmousedown="() => OnSuggestionMouseDownAsync(suggestion)"
+                    @onmousedown:preventDefault="true"
+                    role="option">
+                    @suggestion
+                </li>
+            }
+        </ul>
+    }
+</div>
