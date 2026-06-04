@@ -1,8 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.DatabaseTools.Contracts;
-using EventLogExpert.DatabaseTools.Operations;
+using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.DatabaseTools.CreateDatabase;
+using EventLogExpert.DatabaseTools.DiffDatabase;
+using EventLogExpert.DatabaseTools.MergeDatabase;
+using EventLogExpert.DatabaseTools.ShowProviders;
+using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -14,9 +18,9 @@ namespace EventLogExpert.Runtime.DatabaseTools;
 ///     <see cref="Task.Run(System.Action)" /> so the calling (UI) thread is not blocked; wraps the Operation in a
 ///     <see cref="StreamingTraceLogger" /> bound to the caller-supplied <see cref="IProgress{T}" /> sink so log entries
 ///     stream as they are emitted; catches <see cref="OperationCanceledException" /> and other exceptions to produce an
-///     explicit <see cref="DatabaseToolsResult" /> rather than propagating into the UI's <see cref="Task" />.
-///     The operation construction is delegated to <see cref="IDatabaseToolsOperationFactory" /> so tests can substitute
-///     a fake factory and exercise this service's real dispatch + result-translation logic.
+///     explicit <see cref="DatabaseToolsResult" /> rather than propagating into the UI's <see cref="Task" />. The
+///     operation construction is delegated to <see cref="IDatabaseToolsOperationFactory" /> so tests can substitute a fake
+///     factory and exercise this service's real dispatch + result-translation logic.
 /// </summary>
 internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factory) : IDatabaseToolsService
 {

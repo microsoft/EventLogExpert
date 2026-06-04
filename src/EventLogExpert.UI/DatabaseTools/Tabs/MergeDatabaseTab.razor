@@ -1,4 +1,4 @@
-@using EventLogExpert.DatabaseTools.Contracts
+@using EventLogExpert.DatabaseTools.MergeDatabase
 @inherits DatabaseToolsTabBase<MergeDatabaseRequest>
 
 <div class="db-tab merge-database-tab">
@@ -39,11 +39,11 @@
 
         <div class="form-row">
             <label for="merge-overwrite-mode" id="merge-overwrite-mode-label">Existing providers</label>
-            <ValueSelect T="bool"
-                AriaLabelledBy="merge-overwrite-mode-label"
+            <ValueSelect AriaLabelledBy="merge-overwrite-mode-label"
+                @bind-Value="_overwrite"
                 CssClass="input filter-dropdown overwrite-mode-select"
-                ToStringFunc="@(v => v ? "Overwrite" : "Keep")"
-                @bind-Value="_overwrite">
+                T="bool"
+                ToStringFunc="@(v => v ? "Overwrite" : "Keep")">
                 <ValueSelectItem T="bool" Value="false">Keep — skip providers already in target</ValueSelectItem>
                 <ValueSelectItem T="bool" Value="true">Overwrite — replace providers already in target</ValueSelectItem>
             </ValueSelect>

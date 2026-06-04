@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Adapters.ClipboardAdapter;
+using EventLogExpert.Adapters.Clipboard;
 using EventLogExpert.Adapters.Elevation;
-using EventLogExpert.Adapters.FilePickerAdapter;
+using EventLogExpert.Adapters.FilePicker;
 using EventLogExpert.Adapters.FileSave;
 using EventLogExpert.Adapters.Identity;
 using EventLogExpert.Adapters.Lifecycle;
@@ -106,7 +106,7 @@ internal static class MauiProgramExtensions
             services.AddSingleton<IApplicationRestartService, WindowsApplicationRestartService>();
             services.AddSingleton<IMainThreadService, MauiMainThreadService>();
             services.AddSingleton<ITitleProvider, TitleProvider>();
-            services.AddSingleton<IClipboardService, ClipboardService>();
+            services.AddSingleton<IClipboardService, MauiClipboardService>();
             services.AddSingleton<IFileSaveService, MauiFileSaveService>();
             services.AddSingleton<IFilePickerService, MauiFilePickerService>();
             services.AddSingleton<IFolderPickerService, MauiFolderPickerService>();

@@ -6,7 +6,6 @@ using EventLogExpert.Eventing.PublisherMetadata;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Lookup;
-using EventLogExpert.Provider.Models;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Provider.Schema;
 using System.Collections.Concurrent;

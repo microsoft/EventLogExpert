@@ -5,7 +5,7 @@ using EventLogExpert.Runtime.Common.AppTitle;
 
 namespace EventLogExpert.Adapters.Window;
 
-public class TitleProvider : ITitleProvider
+internal sealed class TitleProvider : ITitleProvider
 {
     public string GetTitle()
     {

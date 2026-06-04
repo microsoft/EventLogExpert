@@ -8,8 +8,4 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
-  <ItemGroup>
-    <InternalsVisibleTo Include="EventLogExpert.Eventing" />
-  </ItemGroup>
-
 </Project>

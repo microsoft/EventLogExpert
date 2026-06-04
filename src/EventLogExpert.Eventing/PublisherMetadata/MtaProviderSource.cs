@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Provider.Models;
+using EventLogExpert.Provider.Resolution;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.PublisherMetadata;

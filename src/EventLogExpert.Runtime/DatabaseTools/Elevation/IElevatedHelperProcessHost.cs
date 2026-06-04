@@ -17,8 +17,8 @@ public interface IElevatedHelperProcessHost
     ///     <see cref="System.IO.Pipes.PipeOptions.CurrentUserOnly" /> ACL), and returns a handle exposing the duplex pipe
     ///     stream + process lifetime hooks. Implementations MUST surface a UAC decline as
     ///     <see cref="System.ComponentModel.Win32Exception" /> with <c>NativeErrorCode == 1223</c> so the caller can translate
-    ///     it to <see cref="EventLogExpert.DatabaseTools.Contracts.DatabaseToolsOutcome.Cancelled" /> rather than as a generic
-    ///     failure.
+    ///     it to <see cref="EventLogExpert.DatabaseTools.Common.Operations.DatabaseToolsOutcome.Cancelled" /> rather than as a
+    ///     generic failure.
     /// </summary>
     /// <param name="extraArgs">
     ///     Additional CLI arguments passed to the helper after the host-supplied

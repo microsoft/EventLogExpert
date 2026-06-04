@@ -1,0 +1,25 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+namespace EventLogExpert.Provider.Resolution;
+
+public sealed class EventModel
+{
+    public string? Description { get; set; }
+
+    public long Id { get; set; }
+
+    public required long[] Keywords { get; set; }
+
+    public int Level { get; set; }
+
+    public string? LogName { get; set; }
+
+    public int Opcode { get; set; }
+
+    public int Task { get; set; }
+
+    public string? Template { get; set; }
+
+    public byte Version { get; set; }
+}
