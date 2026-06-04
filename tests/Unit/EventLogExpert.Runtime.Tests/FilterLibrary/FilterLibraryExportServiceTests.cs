@@ -112,6 +112,34 @@ public sealed class FilterLibraryExportServiceTests
     }
 
     [Fact]
+    public void Deserialize_WithDuplicateExistingFilterSets_DoesNotThrow_RoutesIncomingToSkipped()
+    {
+        var existingA = BuildFilterSet("alpha", BuildSavedFilter("Level == 4"));
+        var existingB = BuildFilterSet("alpha", BuildSavedFilter("Level == 4"));
+        var incoming = BuildFilterSet("alpha", BuildSavedFilter("Level == 4"));
+        var json = _service.Serialize([incoming]);
+
+        var preflight = _service.Deserialize(json, [existingA, existingB]);
+
+        Assert.Null(preflight.Error);
+        Assert.Single(preflight.SkippedDuplicates);
+    }
+
+    [Fact]
+    public void Deserialize_WithDuplicateExistingSavedFilters_DoesNotThrow_RoutesIncomingToSkipped()
+    {
+        var existingA = BuildSavedEntry("first", comparisonText: "Level == 4");
+        var existingB = BuildSavedEntry("second", comparisonText: "Level == 4");
+        var incoming = BuildSavedEntry("third", comparisonText: "Level == 4");
+        var json = _service.Serialize([incoming]);
+
+        var preflight = _service.Deserialize(json, [existingA, existingB]);
+
+        Assert.Null(preflight.Error);
+        Assert.Single(preflight.SkippedDuplicates);
+    }
+
+    [Fact]
     public void RoundTrip_PreservesFilterSetEntry_AndKind()
     {
         var entry = BuildFilterSet("set", BuildSavedFilter("Level == 4"), BuildSavedFilter("Level == 5"));
