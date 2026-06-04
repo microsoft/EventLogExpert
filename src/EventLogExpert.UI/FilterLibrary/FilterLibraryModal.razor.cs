@@ -1,14 +1,15 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterLibrary;
-using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Modal;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
-using Microsoft.JSInterop;
+using System.Collections.Immutable;
+using System.Security;
 
 namespace EventLogExpert.UI.FilterLibrary;
 
@@ -20,17 +21,13 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         (LibraryTab.Favorites, "Favorites"),
         (LibraryTab.PreviouslyUsed, "Previously Used"),
     ];
-    private readonly Dictionary<LibraryEntryId, LibraryEntryRow?> _rowRefs = new();
 
-    private readonly Dictionary<LibraryTab, ElementReference> _tabButtonRefs = new();
+    private readonly Dictionary<(LibraryTab Tab, LibraryEntryId Id), LibraryEntryRow?> _rowRefs = new();
 
     private LibraryTab _activeTab = LibraryTab.Saved;
-    private LibraryTab? _pendingFocusTab;
+    private LibraryTab? _pendingFocusSourceTab;
     private LibraryEntryId? _pendingFocusTargetEntryId;
     private bool _pendingFocusToActiveTab;
-    private IJSObjectReference? _tabKeyModule;
-    private bool _tabKeyShimAttached;
-    private ElementReference _tablistRef;
 
     [Parameter] public LibraryTab? InitialTab { get; set; }
 
@@ -41,32 +38,25 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
-    private IReadOnlyList<LibraryEntry> CurrentTabEntries => _activeTab switch
-    {
-        LibraryTab.Favorites => FavoriteEntries,
-        LibraryTab.PreviouslyUsed => PreviouslyUsedEntries,
-        _ => SavedEntries,
-    };
+    private IReadOnlyList<(LibraryTab Tab, string Label)> CurrentTabLabels =>
+    [
+        (LibraryTab.Saved, $"Saved ({SavedEntries.Count})"),
+        (LibraryTab.Favorites, $"Favorites ({FavoriteEntries.Count})"),
+        (LibraryTab.PreviouslyUsed, $"Previously Used ({PreviouslyUsedEntries.Count})"),
+    ];
 
-    private string EmptyStateMessage => _activeTab switch
-    {
-        LibraryTab.Favorites => "No favorited filters or filter sets yet. Star an entry to add it here.",
-        LibraryTab.PreviouslyUsed => "No filters have been applied recently.",
-        _ => "No saved filters or filter sets yet. Use \"Save as Filter Set\" from the filter pane.",
-    };
+    [Inject] private IFilterLibraryExportService ExportService { get; init; } = null!;
 
     private IReadOnlyList<LibraryEntry> FavoriteEntries =>
         [.. FilterLibraryState.Value.Entries
             .Where(e => e.IsFavorite)
             .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
 
+    [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
+
     [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
 
     [Inject] private IState<FilterLibraryState> FilterLibraryState { get; init; } = null!;
-
-    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
-
-    private bool NeedsTabpanelFocus => CurrentTabEntries.Count == 0;
 
     private IReadOnlyList<LibraryEntry> PreviouslyUsedEntries =>
         [.. FilterLibraryState.Value.Entries
@@ -74,10 +64,16 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             .OrderByDescending(e => e.LastUsedUtc!.Value)
             .Take(50)];
 
+    private IReadOnlyList<LibraryEntry> SavedDirectEntries =>
+        LibraryEntrySectionNode.BuildFlatRootEntries(SavedEntries);
+
     private IReadOnlyList<LibraryEntry> SavedEntries =>
         [.. FilterLibraryState.Value.Entries
             .Where(e => e.Origin == LibraryEntryOrigin.UserSaved)
             .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
+
+    private ImmutableList<LibraryEntrySectionNode> SavedSectionTree =>
+        [.. LibraryEntrySectionNode.BuildTree(SavedEntries)];
 
     internal static (LibraryEntryId? TargetId, bool FallbackToActiveTab) DecidePendingFocusAfterRemoval(
         IReadOnlyList<LibraryEntry> snapshot,
@@ -99,128 +95,102 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         return (null, true);
     }
 
-    internal void RecordPendingFocusAfterRemoval(LibraryEntryId removedEntryId)
+    internal void RecordPendingFocusAfterRemoval(LibraryTab sourceTab, LibraryEntryId removedEntryId)
     {
-        var (targetId, fallback) = DecidePendingFocusAfterRemoval(CurrentTabEntries, removedEntryId);
+        var sourceTabEntries = GetEntriesForTab(sourceTab);
+        var (targetId, fallback) = DecidePendingFocusAfterRemoval(sourceTabEntries, removedEntryId);
 
+        _pendingFocusSourceTab = sourceTab;
         _pendingFocusTargetEntryId = targetId;
         _pendingFocusToActiveTab = fallback;
     }
 
-    protected override async ValueTask DisposeAsyncCore(bool disposing)
-    {
-        if (disposing && _tabKeyModule is not null)
-        {
-            try
-            {
-                await _tabKeyModule.InvokeVoidAsync("detach", _tablistRef);
-                await _tabKeyModule.DisposeAsync();
-            }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
-            catch (ObjectDisposedException) { }
-        }
-
-        await base.DisposeAsyncCore(disposing);
-    }
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            try
-            {
-                _tabKeyModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                    "import",
-                    "./_content/EventLogExpert.UI/FilterLibrary/FilterLibraryModal.js");
-            }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
-        }
-
-        bool tablistRendered = FilterLibraryState.Value.IsLoaded && !FilterLibraryState.Value.LoadError;
-
-        if (!tablistRendered)
-        {
-            if (_tabKeyShimAttached && _tabKeyModule is not null)
-            {
-                try
-                {
-                    await _tabKeyModule.InvokeVoidAsync("detach", _tablistRef);
-                }
-                catch (JSDisconnectedException) { }
-                catch (JSException) { }
-            }
-
-            _tabKeyShimAttached = false;
-        }
-        else if (_tabKeyModule is not null && !_tabKeyShimAttached)
-        {
-            try
-            {
-                await _tabKeyModule.InvokeVoidAsync("attach", _tablistRef);
-                _tabKeyShimAttached = true;
-            }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
-        }
-
         PruneStaleRowRefs();
 
         bool focused = false;
 
-        if (_pendingFocusTargetEntryId is { } entryId)
+        if (_pendingFocusTargetEntryId is { } entryId && _pendingFocusSourceTab is { } sourceTab)
         {
             _pendingFocusTargetEntryId = null;
+            _pendingFocusSourceTab = null;
 
-            if (_rowRefs.TryGetValue(entryId, out var rowRef) && rowRef is not null)
+            if (_rowRefs.TryGetValue((sourceTab, entryId), out var rowRef) && rowRef is not null)
             {
                 focused = await rowRef.FocusMoreActionsButtonAsync();
 
-                if (focused)
-                {
-                    _pendingFocusTab = null;
-                    _pendingFocusToActiveTab = false;
-                }
-                else
-                {
-                    _pendingFocusToActiveTab = true;
-                    _pendingFocusTab = null;
-                }
+                if (!focused) { _pendingFocusToActiveTab = true; }
             }
             else
             {
                 _pendingFocusToActiveTab = true;
-                _pendingFocusTab = null;
             }
         }
 
-        if (!focused)
+        if (!focused && _pendingFocusToActiveTab)
         {
-            if (_pendingFocusTab is { } tab)
-            {
-                _pendingFocusTab = null;
-
-                if (_tabButtonRefs.TryGetValue(tab, out var tabRef))
-                {
-                    focused = await ElementFocus.TrySafelyAsync(tabRef);
-                }
-
-                _pendingFocusToActiveTab = !focused;
-            }
-
-            if (!focused && _pendingFocusToActiveTab)
-            {
-                _pendingFocusToActiveTab = false;
-
-                if (_tabButtonRefs.TryGetValue(_activeTab, out var activeTabRef))
-                {
-                    await ElementFocus.SafelyAsync(activeTabRef);
-                }
-            }
+            _pendingFocusToActiveTab = false;
+            // Active-tab focus restoration is now handled inside SidebarTabs via its OnAfterRender path.
+            // No-op here; flagged just so the field stays meaningful for any future routing changes.
         }
 
         await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override async Task OnExportAsync()
+    {
+        try
+        {
+            var entries = FilterLibraryState.Value.Entries;
+            var json = ExportService.Serialize(entries);
+            var path = await FilePickerService.PickSaveAsync(
+                "Export Filter Library",
+                [".json"],
+                suggestedFileName: $"filter-library-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.json");
+
+            if (string.IsNullOrEmpty(path)) { return; }
+
+            await File.WriteAllTextAsync(path, json);
+            AnnouncementService.Announce($"Exported {entries.Count} entries");
+        }
+        catch (Exception ex) when (
+            ex is UnauthorizedAccessException or SecurityException or
+                PathTooLongException or DirectoryNotFoundException or IOException)
+        {
+            await ShowImportExportErrorAsync("Export failed", ex.Message);
+        }
+    }
+
+    protected override async Task OnImportAsync()
+    {
+        string? path;
+        string json;
+
+        try
+        {
+            path = await FilePickerService.PickAsync("Import Filter Library", [".json"]);
+            if (string.IsNullOrEmpty(path)) { return; }
+
+            json = await File.ReadAllTextAsync(path);
+        }
+        catch (Exception ex) when (
+            ex is UnauthorizedAccessException or SecurityException or
+                PathTooLongException or DirectoryNotFoundException or IOException)
+        {
+            await ShowImportExportErrorAsync("Import failed", ex.Message);
+            return;
+        }
+
+        var preflight = ExportService.Deserialize(json, FilterLibraryState.Value.Entries);
+
+        if (preflight.Error is not null)
+        {
+            await ShowImportExportErrorAsync("Import error", preflight.Error);
+            return;
+        }
+
+        await PromptAndApplyImportAsync(preflight);
     }
 
     protected override void OnInitialized()
@@ -238,25 +208,46 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         }
     }
 
-    private static LibraryTab NextTab(LibraryTab current)
+    private static string BuildPreflightSummary(ImportPreflight preflight)
     {
-        var index = Array.FindIndex(s_tabs, t => t.Tab == current);
+        var conflictList = preflight.ToReplace.Count == 0
+            ? string.Empty
+            : "\nNames being overwritten:\n  \u2022 " +
+              string.Join("\n  \u2022 ", preflight.ToReplace.Select(p => p.Incoming.Name).Take(10)) +
+              (preflight.ToReplace.Count > 10
+                  ? $"\n  \u2022 ...and {preflight.ToReplace.Count - 10} more"
+                  : string.Empty);
 
-        return index < s_tabs.Length - 1 ? s_tabs[index + 1].Tab : s_tabs[0].Tab;
+        if (preflight.ToReplace.Count == 0)
+        {
+            return $"Import preview:\n  \u2022 {preflight.ToAdd.Count} new entries will be added\n  \u2022 {preflight.SkippedDuplicates.Count} exact duplicates will be skipped";
+        }
+
+        return
+            $"Import preview:\n  \u2022 {preflight.ToAdd.Count} new entries will be added\n" +
+            $"  \u2022 {preflight.ToReplace.Count} existing entries WILL BE OVERWRITTEN (current filter content will be lost){conflictList}\n" +
+            $"  \u2022 {preflight.SkippedDuplicates.Count} exact duplicates will be skipped";
     }
 
-    private static LibraryTab PrevTab(LibraryTab current)
+    private static string GetEmptyStateMessage(LibraryTab tab) => tab switch
     {
-        var index = Array.FindIndex(s_tabs, t => t.Tab == current);
+        LibraryTab.Favorites => "No favorited filters or filter sets yet. Star an entry to add it here.",
+        LibraryTab.PreviouslyUsed => "No filters have been applied recently.",
+        _ => "No saved filters or filter sets yet. Use \"Save as Filter Set\" from the filter pane.",
+    };
 
-        return index > 0 ? s_tabs[index - 1].Tab : s_tabs[^1].Tab;
+    private static string SanitizeForFileName(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var sanitized = new string(name.Select(c => invalid.Contains(c) ? '-' : c).ToArray());
+        return sanitized.Length > 100 ? sanitized[..100] : sanitized;
     }
 
-    private int GetCount(LibraryTab tab) => tab switch
+    private IReadOnlyList<LibraryEntry> GetEntriesForTab(LibraryTab tab) => tab switch
     {
-        LibraryTab.Favorites => FavoriteEntries.Count,
-        LibraryTab.PreviouslyUsed => PreviouslyUsedEntries.Count,
-        _ => SavedEntries.Count,
+        LibraryTab.Favorites => FavoriteEntries,
+        LibraryTab.PreviouslyUsed => PreviouslyUsedEntries,
+        _ => SavedEntries,
     };
 
     private Task HandleAddToFilterSetAsync(AddToFilterSetIntent intent)
@@ -283,6 +274,33 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private void HandleDelete(LibraryEntryId id) => FilterLibraryCommands.DeleteEntry(id);
 
+    private async Task HandleExportEntryAsync(LibraryEntryId entryId)
+    {
+        var entry = FilterLibraryState.Value.Entries.FirstOrDefault(e => e.Id.Equals(entryId));
+        if (entry is null) { return; }
+
+        try
+        {
+            var json = ExportService.Serialize([entry]);
+            var suggested = $"{SanitizeForFileName(entry.Name)}-{DateTimeOffset.Now:yyyyMMdd}.json";
+            var path = await FilePickerService.PickSaveAsync(
+                "Export Filter Entry",
+                [".json"],
+                suggestedFileName: suggested);
+
+            if (string.IsNullOrEmpty(path)) { return; }
+
+            await File.WriteAllTextAsync(path, json);
+            AnnouncementService.Announce($"Exported '{entry.Name}'");
+        }
+        catch (Exception ex) when (
+            ex is UnauthorizedAccessException or SecurityException or
+                PathTooLongException or DirectoryNotFoundException or IOException)
+        {
+            await ShowImportExportErrorAsync("Export failed", ex.Message);
+        }
+    }
+
     private async Task HandleReplaceAsync(LibraryEntryId id)
     {
         FilterLibraryCommands.ReplaceWithEntry(id);
@@ -291,9 +309,9 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         await CompleteAsync(true);
     }
 
-    private Task HandleRequestPendingFocusAsync(LibraryEntryId entryId)
+    private Task HandleRequestPendingFocusAsync(LibraryTab sourceTab, LibraryEntryId entryId)
     {
-        RecordPendingFocusAfterRemoval(entryId);
+        RecordPendingFocusAfterRemoval(sourceTab, entryId);
 
         return Task.CompletedTask;
     }
@@ -303,54 +321,83 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private void HandleToggleFavorite(FavoriteToggleIntent intent) =>
         FilterLibraryCommands.SetIsFavorite(intent.EntryId, intent.NewIsFavorite);
 
-    private async Task OnTabKeyDown(KeyboardEventArgs e, LibraryTab tab)
-    {
-        LibraryTab target = tab;
-        bool handled = true;
+    private bool IsTabpanelEmpty(LibraryTab tab) => GetEntriesForTab(tab).Count == 0;
 
-        switch (e.Key)
+    private async Task PromptAndApplyImportAsync(ImportPreflight preflight)
+    {
+        var summary = BuildPreflightSummary(preflight);
+        var request = new InlineAlertRequest(
+            Title: "Confirm import",
+            Message: summary,
+            AcceptLabel: "Import",
+            CancelLabel: "Cancel",
+            IsPrompt: false,
+            PromptInitialValue: null);
+
+        InlineAlertResult result;
+
+        try
         {
-            case "ArrowRight":
-                target = NextTab(tab);
-                break;
-            case "ArrowLeft":
-                target = PrevTab(tab);
-                break;
-            case "Home":
-                target = s_tabs[0].Tab;
-                break;
-            case "End":
-                target = s_tabs[^1].Tab;
-                break;
-            default:
-                handled = false;
-                break;
+            result = await ((IInlineAlertHost)this).ShowInlineAlertAsync(request, CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
         }
 
-        if (!handled || target == tab) { return; }
+        if (!result.Accepted) { return; }
 
-        _activeTab = target;
-        _pendingFocusTab = target;
+        foreach (var entry in preflight.ToAdd)
+        {
+            FilterLibraryCommands.AddEntry(entry);
+        }
 
-        await Task.CompletedTask;
+        foreach (var (existing, incoming) in preflight.ToReplace)
+        {
+            FilterLibraryCommands.UpdateEntry(incoming with { Id = existing.Id });
+        }
+
+        AnnouncementService.Announce(
+            $"Imported {preflight.ToAdd.Count} new, replaced {preflight.ToReplace.Count}, skipped {preflight.SkippedDuplicates.Count}");
     }
 
     private void PruneStaleRowRefs()
     {
         if (_rowRefs.Count == 0) { return; }
 
-        var currentIds = new HashSet<LibraryEntryId>(CurrentTabEntries.Select(e => e.Id));
-        var stale = _rowRefs.Keys.Where(id => !currentIds.Contains(id)).ToList();
+        var liveByTab = new Dictionary<LibraryTab, HashSet<LibraryEntryId>>
+        {
+            [LibraryTab.Saved] = [.. SavedEntries.Select(e => e.Id)],
+            [LibraryTab.Favorites] = [.. FavoriteEntries.Select(e => e.Id)],
+            [LibraryTab.PreviouslyUsed] = [.. PreviouslyUsedEntries.Select(e => e.Id)],
+        };
 
-        foreach (var id in stale) { _rowRefs.Remove(id); }
+        var stale = _rowRefs.Keys
+            .Where(key => !liveByTab[key.Tab].Contains(key.Id))
+            .ToList();
+
+        foreach (var key in stale) { _rowRefs.Remove(key); }
     }
 
     private void RetryLoad() => FilterLibraryCommands.LoadLibrary();
 
-    private void SetActiveTab(LibraryTab tab)
+    private async Task ShowImportExportErrorAsync(string title, string message)
     {
-        if (_activeTab == tab) { return; }
+        var request = new InlineAlertRequest(
+            Title: title,
+            Message: message,
+            AcceptLabel: null,
+            CancelLabel: "OK",
+            IsPrompt: false,
+            PromptInitialValue: null);
 
-        _activeTab = tab;
+        try
+        {
+            await ((IInlineAlertHost)this).ShowInlineAlertAsync(request, CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            // Modal torn down mid-prompt; safe to swallow.
+        }
     }
 }

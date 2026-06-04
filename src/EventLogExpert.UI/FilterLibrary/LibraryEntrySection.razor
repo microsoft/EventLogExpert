@@ -1,0 +1,27 @@
+<div class="library-section" style="@($"--library-section-indent: {Depth}rem")">
+    <button aria-controls="@_panelId"
+        aria-expanded="@(_isExpanded ? "true" : "false")"
+        class="library-section-header"
+        @onclick="Toggle"
+        type="button">
+        <i aria-hidden="true" class="@(_isExpanded ? "bi bi-caret-down-fill" : "bi bi-caret-right-fill")"></i>
+        <span class="library-section-name">@SectionName</span>
+        <span class="library-section-count">(@DirectEntryCount + @ChildSectionCount section@(ChildSectionCount == 1 ? "" : "s"))</span>
+    </button>
+
+    <div class="library-section-body" hidden="@(!_isExpanded)" id="@_panelId">
+        @foreach (var child in ChildSections)
+        {
+            <LibraryEntrySection ChildSections="@child.ChildSections"
+                Depth="@(Depth + 1)"
+                DirectEntries="@child.DirectEntries"
+                EntryTemplate="@EntryTemplate"
+                SectionName="@child.SectionName" />
+        }
+
+        @foreach (var entry in DirectEntries)
+        {
+            @EntryTemplate(entry)
+        }
+    </div>
+</div>
