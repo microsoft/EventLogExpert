@@ -66,7 +66,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
         builder.Services.AddTransient<IEventResolver, EventResolver>();
 
-        // FilterLibrary persistence + JSON export/import + gated legacy migration (see LegacyMigrationFeature for the removal contract)
+        // FilterLibrary persistence
         builder.Services.AddFilterLibrarySqliteStore(
             Path.Combine(FileSystem.AppDataDirectory, "filter-library.db"));
 

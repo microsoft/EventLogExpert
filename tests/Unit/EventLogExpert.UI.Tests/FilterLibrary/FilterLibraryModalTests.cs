@@ -418,7 +418,7 @@ public sealed class FilterLibraryModalTests : BunitContext
 
     [Theory]
     [InlineData("ArrowDown", 1)]
-    [InlineData("ArrowUp", 2)] // wraps to End
+    [InlineData("ArrowUp", 2)]
     [InlineData("Home", 0)]
     [InlineData("End", 2)]
     public async Task TabKeydown_RotatesActiveTab(string key, int expectedTabIndex)

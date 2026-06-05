@@ -230,10 +230,8 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
         }
         catch (NotSupportedException)
         {
-            // The bare-array shape is missing the polymorphic discriminator ("Kind") that LibraryEntry
-            // requires. Fall back to the legacy SavedFilterGroup[] shape produced by the pre-FilterLibrary
-            // FilterGroupModal export (this is the only legacy export shape we promise to read).
             var legacyGroups = root.Deserialize<List<SavedFilterGroup>>();
+
             if (legacyGroups is null) { return null; }
 
             var now = DateTimeOffset.UtcNow;

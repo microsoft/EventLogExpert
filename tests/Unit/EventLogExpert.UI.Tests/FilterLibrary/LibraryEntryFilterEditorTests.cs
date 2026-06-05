@@ -5,10 +5,9 @@ using Bunit;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
-using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.UI.FilterLibrary;
-using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -17,191 +16,232 @@ namespace EventLogExpert.UI.Tests.FilterLibrary;
 public sealed class LibraryEntryFilterEditorTests : BunitContext
 {
     private readonly IAlertDialogService _alerts = Substitute.For<IAlertDialogService>();
+    private readonly IAnnouncementService _announcements = Substitute.For<IAnnouncementService>();
     private readonly IFilterLibraryCommands _commands = Substitute.For<IFilterLibraryCommands>();
-    private readonly IState<FilterPaneState> _paneStateMock = Substitute.For<IState<FilterPaneState>>();
-    private readonly FilterPaneState _paneStateValue = new();
 
     public LibraryEntryFilterEditorTests()
     {
         Services.AddSingleton(_alerts);
+        Services.AddSingleton(_announcements);
         Services.AddSingleton(_commands);
-
-        _paneStateMock.Value.Returns(_ => _paneStateValue);
-        Services.AddSingleton(_paneStateMock);
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
     [Fact]
-    public void AddFilterButton_CreatesPendingDraftRow()
+    public void AddFilter_ClickAddButton_RendersPendingLibraryFilterRow()
     {
-        var filterSet = BuildFilterSet("Set", BuildFilter("Level == 4"));
+        var filterSet = BuildFilterSet("Set");
 
-        var component = Render<LibraryEntryFilterEditor>(p => p.Add(x => x.FilterSet, filterSet));
-        component.Find(".library-entry-filter-editor-chevron").Click();
-        component.Find(".library-entry-filter-editor-header .button:not(.icon-button)").Click();
+        var component = Render<LibraryEntryFilterEditor>(p => p
+            .Add(x => x.FilterSet, filterSet)
+            .Add(x => x.IsExpanded, true));
+
+        Assert.Empty(component.FindComponents<LibraryFilterRow>());
 
         component.Find(".library-entry-filter-editor-add-button").Click();
 
-        Assert.Single(component.FindAll(".library-entry-filter-editor-row-pending"));
+        Assert.Single(component.FindComponents<LibraryFilterRow>());
     }
 
     [Fact]
-    public void CancelAfterEdit_DoesNotDispatchUpdateEntry()
+    public async Task AddFilter_ThenDiscardPendingDraft_RemovesPendingRowWithoutUpdate()
     {
-        var filterSet = BuildFilterSet("Set", BuildFilter("Level == 4"));
+        var filterSet = BuildFilterSet("Set");
 
-        var component = Render<LibraryEntryFilterEditor>(p => p.Add(x => x.FilterSet, filterSet));
-        component.Find(".library-entry-filter-editor-chevron").Click();
-        component.Find(".library-entry-filter-editor-header .button:not(.icon-button)").Click();
+        var component = Render<LibraryEntryFilterEditor>(p => p
+            .Add(x => x.FilterSet, filterSet)
+            .Add(x => x.IsExpanded, true));
 
-        component.Find(".library-entry-filter-editor-input").Input("Level == 99");
+        component.Find(".library-entry-filter-editor-add-button").Click();
 
-        component.FindAll(".library-entry-filter-editor-header .button")
-            .First(b => b.TextContent.Trim().Contains("Cancel", StringComparison.Ordinal))
-            .Click();
+        var pendingRow = component.FindComponents<LibraryFilterRow>()[0];
+        await component.InvokeAsync(() => pendingRow.Instance.OnPendingDiscard.InvokeAsync());
 
         _commands.DidNotReceive().UpdateEntry(Arg.Any<LibraryEntry>());
+
+        component.Render();
+        Assert.Empty(component.FindComponents<LibraryFilterRow>());
     }
 
     [Fact]
-    public void ChevronClick_ExpandsAndAriaExpandedToggles()
+    public async Task AddFilter_ThenSavePendingDraft_DispatchesUpdateEntryAndRemovesPendingRow()
+    {
+        var filterSet = BuildFilterSet("Set");
+        var built = BuildFilter("Level == 7");
+
+        var component = Render<LibraryEntryFilterEditor>(p => p
+            .Add(x => x.FilterSet, filterSet)
+            .Add(x => x.IsExpanded, true));
+
+        component.Find(".library-entry-filter-editor-add-button").Click();
+
+        var pendingRow = component.FindComponents<LibraryFilterRow>()[0];
+        await component.InvokeAsync(() => pendingRow.Instance.OnPendingSave.InvokeAsync(built));
+
+        var captured = CapturedUpdatedFilterSet();
+        Assert.Single(captured.Filters);
+        Assert.Equal("Level == 7", captured.Filters[0].ComparisonText);
+
+        component.Render();
+        Assert.Empty(component.FindComponents<LibraryFilterRow>());
+    }
+
+    [Fact]
+    public void IsExpanded_False_HidesFilterList()
     {
         var filterSet = BuildFilterSet("Set", BuildFilter("Level == 4"));
 
-        var component = Render<LibraryEntryFilterEditor>(p => p.Add(x => x.FilterSet, filterSet));
+        var component = Render<LibraryEntryFilterEditor>(p => p
+            .Add(x => x.FilterSet, filterSet)
+            .Add(x => x.IsExpanded, false));
 
-        component.Find(".library-entry-filter-editor-chevron").Click();
-
-        var chevron = component.Find(".library-entry-filter-editor-chevron");
-        Assert.Equal("true", chevron.GetAttribute("aria-expanded"));
-        Assert.NotNull(chevron.GetAttribute("aria-controls"));
-        Assert.Single(component.FindAll(".library-entry-filter-editor-list"));
-    }
-
-    [Fact]
-    public async Task CollapseWithUnsavedWork_PromptsConfirmation()
-    {
-        _alerts.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
-            .Returns(Task.FromResult(false));
-
-        var filterSet = BuildFilterSet("Set", BuildFilter("Level == 4"));
-
-        var component = Render<LibraryEntryFilterEditor>(p => p.Add(x => x.FilterSet, filterSet));
-        component.Find(".library-entry-filter-editor-chevron").Click();
-        component.Find(".library-entry-filter-editor-header .button:not(.icon-button)").Click();
-        component.Find(".library-entry-filter-editor-input").Input("Level == 99");
-
-        await component.InvokeAsync(() => component.Find(".library-entry-filter-editor-chevron").Click());
-
-        await _alerts.Received(1).ShowAlert(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<string>());
-
-        var chevron = component.Find(".library-entry-filter-editor-chevron");
-        Assert.Equal("true", chevron.GetAttribute("aria-expanded"));
-    }
-
-    [Fact]
-    public async Task CollapseWithUnsavedWork_UserConfirmsDiscard_Collapses()
-    {
-        _alerts.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
-            .Returns(Task.FromResult(true));
-
-        var filterSet = BuildFilterSet("Set", BuildFilter("Level == 4"));
-
-        var component = Render<LibraryEntryFilterEditor>(p => p.Add(x => x.FilterSet, filterSet));
-        component.Find(".library-entry-filter-editor-chevron").Click();
-        component.Find(".library-entry-filter-editor-header .button:not(.icon-button)").Click();
-        component.Find(".library-entry-filter-editor-input").Input("Level == 99");
-
-        await component.InvokeAsync(() => component.Find(".library-entry-filter-editor-chevron").Click());
-
-        var chevron = component.Find(".library-entry-filter-editor-chevron");
-        Assert.Equal("false", chevron.GetAttribute("aria-expanded"));
-    }
-
-    [Fact]
-    public void ExpandedReadOnlyView_ShowsComparisonTextPerFilter()
-    {
-        var filterSet = BuildFilterSet("Set", BuildFilter("Level == 4"), BuildFilter("Level == 5"));
-
-        var component = Render<LibraryEntryFilterEditor>(p => p.Add(x => x.FilterSet, filterSet));
-        component.Find(".library-entry-filter-editor-chevron").Click();
-
-        var comparisons = component.FindAll(".library-entry-filter-editor-comparison");
-        Assert.Equal(2, comparisons.Count);
-        Assert.Contains(comparisons, c => c.TextContent.Contains("Level == 4", StringComparison.Ordinal));
-        Assert.Contains(comparisons, c => c.TextContent.Contains("Level == 5", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void RemoveRow_MarksForRemoval_SaveOmitsThatFilter()
-    {
-        var keptFilter = BuildFilter("Level == 4");
-        var removedFilter = BuildFilter("Level == 5");
-        var filterSet = BuildFilterSet("Set", keptFilter, removedFilter);
-
-        var component = Render<LibraryEntryFilterEditor>(p => p.Add(x => x.FilterSet, filterSet));
-        component.Find(".library-entry-filter-editor-chevron").Click();
-        component.Find(".library-entry-filter-editor-header .button:not(.icon-button)").Click();
-
-        var removeButtons = component.FindAll(".library-entry-filter-editor-row .button-red");
-        removeButtons.Last().Click();
-
-        component.FindAll(".library-entry-filter-editor-header .button")
-            .First(b => b.TextContent.Trim().Contains("Save", StringComparison.Ordinal))
-            .Click();
-
-        _commands.Received(1).UpdateEntry(Arg.Is<LibraryEntry>(e =>
-            e is LibraryEntryFilterSet &&
-            ((LibraryEntryFilterSet)e).Filters.Count == 1 &&
-            ((LibraryEntryFilterSet)e).Filters[0].ComparisonText == "Level == 4"));
-    }
-
-    [Fact]
-    public void RendersCollapsedByDefault_FilterListNotShown()
-    {
-        var filterSet = BuildFilterSet("Set", BuildFilter("Level == 4"));
-
-        var component = Render<LibraryEntryFilterEditor>(p => p.Add(x => x.FilterSet, filterSet));
-
-        var chevron = component.Find(".library-entry-filter-editor-chevron");
-        Assert.Equal("false", chevron.GetAttribute("aria-expanded"));
         Assert.Empty(component.FindAll(".library-entry-filter-editor-list"));
     }
 
     [Fact]
-    public void SaveAfterEdit_DispatchesUpdateEntry_FilterPaneStateNotMutated()
+    public void IsExpanded_True_RendersOneLibraryFilterRowPerFilter()
     {
-        var originalFilter = BuildFilter("Level == 4");
-        var filterSet = BuildFilterSet("Set", originalFilter);
+        var filterSet = BuildFilterSet("Set", BuildFilter("Level == 4"), BuildFilter("Level == 5"));
 
-        var component = Render<LibraryEntryFilterEditor>(p => p.Add(x => x.FilterSet, filterSet));
-        component.Find(".library-entry-filter-editor-chevron").Click();
-        component.Find(".library-entry-filter-editor-header .button:not(.icon-button)").Click();
+        var component = Render<LibraryEntryFilterEditor>(p => p
+            .Add(x => x.FilterSet, filterSet)
+            .Add(x => x.IsExpanded, true));
 
-        var input = component.Find(".library-entry-filter-editor-input");
-        input.Input("Level == 5");
-
-        component.FindAll(".library-entry-filter-editor-header .button")
-            .First(b => b.TextContent.Trim().Contains("Save", StringComparison.Ordinal))
-            .Click();
-
-        _commands.Received(1).UpdateEntry(Arg.Is<LibraryEntry>(e =>
-            e.Id == filterSet.Id &&
-            e is LibraryEntryFilterSet &&
-            ((LibraryEntryFilterSet)e).Filters.Count == 1 &&
-            ((LibraryEntryFilterSet)e).Filters[0].ComparisonText == "Level == 5"));
-
-        Assert.Empty(_paneStateValue.Filters);
+        var rows = component.FindComponents<LibraryFilterRow>();
+        Assert.Equal(2, rows.Count);
     }
 
-    private static SavedFilter BuildFilter(string comparisonText)
+    [Fact]
+    public void IsExpanded_True_ShowsFilterList()
     {
-        var filter = SavedFilter.TryCreate(comparisonText, color: HighlightColor.None, mode: FilterMode.Advanced);
+        var filterSet = BuildFilterSet("Set", BuildFilter("Level == 4"));
+
+        var component = Render<LibraryEntryFilterEditor>(p => p
+            .Add(x => x.FilterSet, filterSet)
+            .Add(x => x.IsExpanded, true));
+
+        Assert.Single(component.FindAll(".library-entry-filter-editor-list"));
+    }
+
+    [Fact]
+    public async Task OnExclusionChangedForSaved_ImmediateCommit_DispatchesUpdateEntry()
+    {
+        var original = BuildFilter("Level == 4");
+        var filterSet = BuildFilterSet("Set", original);
+
+        var component = Render<LibraryEntryFilterEditor>(p => p
+            .Add(x => x.FilterSet, filterSet)
+            .Add(x => x.IsExpanded, true));
+
+        var row = component.FindComponents<LibraryFilterRow>()[0];
+        await component.InvokeAsync(() => row.Instance.OnExclusionChanged.InvokeAsync(true));
+
+        var captured = CapturedUpdatedFilterSet();
+        Assert.Single(captured.Filters);
+        Assert.True(captured.Filters[0].IsExcluded);
+    }
+
+    [Fact]
+    public async Task OnRemoveSaved_ImmediateCommit_DispatchesUpdateEntryWithoutFilter()
+    {
+        var kept = BuildFilter("Level == 4");
+        var removed = BuildFilter("Level == 5");
+        var filterSet = BuildFilterSet("Set", kept, removed);
+
+        var component = Render<LibraryEntryFilterEditor>(p => p
+            .Add(x => x.FilterSet, filterSet)
+            .Add(x => x.IsExpanded, true));
+
+        var rows = component.FindComponents<LibraryFilterRow>();
+        await component.InvokeAsync(() => rows[1].Instance.OnRemove.InvokeAsync());
+
+        var captured = CapturedUpdatedFilterSet();
+        Assert.Single(captured.Filters);
+        Assert.Equal("Level == 4", captured.Filters[0].ComparisonText);
+    }
+
+    [Fact]
+    public async Task OnSaveSavedFilter_ImmediateCommit_DispatchesUpdateEntry()
+    {
+        var original = BuildFilter("Level == 4");
+        var filterSet = BuildFilterSet("Set", original);
+        var updatedFilter = BuildFilter("Level == 5");
+
+        var component = Render<LibraryEntryFilterEditor>(p => p
+            .Add(x => x.FilterSet, filterSet)
+            .Add(x => x.IsExpanded, true));
+
+        var row = component.FindComponents<LibraryFilterRow>()[0];
+        await component.InvokeAsync(() => row.Instance.OnSave.InvokeAsync(updatedFilter));
+
+        var captured = CapturedUpdatedFilterSet();
+        Assert.Single(captured.Filters);
+        Assert.Equal("Level == 5", captured.Filters[0].ComparisonText);
+        Assert.Equal(original.Id, captured.Filters[0].Id);
+    }
+
+    [Fact]
+    public async Task OnToggleEnabledForSaved_ImmediateCommit_DispatchesUpdateEntryWithFlippedEnabledFlag()
+    {
+        var original = BuildFilter("Level == 4", isEnabled: false);
+        var filterSet = BuildFilterSet("Set", original);
+
+        var component = Render<LibraryEntryFilterEditor>(p => p
+            .Add(x => x.FilterSet, filterSet)
+            .Add(x => x.IsExpanded, true));
+
+        var row = component.FindComponents<LibraryFilterRow>()[0];
+        await component.InvokeAsync(() => row.Instance.OnToggleEnabled.InvokeAsync());
+
+        var captured = CapturedUpdatedFilterSet();
+        Assert.Single(captured.Filters);
+        Assert.True(captured.Filters[0].IsEnabled);
+    }
+
+    [Fact]
+    public void SetLevelEditSaveCancelButtons_AreNotRendered()
+    {
+        var filterSet = BuildFilterSet("Set", BuildFilter("Level == 4"));
+
+        var component = Render<LibraryEntryFilterEditor>(p => p
+            .Add(x => x.FilterSet, filterSet)
+            .Add(x => x.IsExpanded, true));
+
+        Assert.Empty(component.FindAll(".library-entry-filter-editor-header"));
+        Assert.Empty(component.FindAll(".library-entry-filter-editor-chevron"));
+        Assert.Empty(component.FindAll(".library-entry-filter-editor-summary"));
+    }
+
+    [Fact]
+    public async Task TwoPendingDrafts_SaveOne_OtherPreserved()
+    {
+        var filterSet = BuildFilterSet("Set");
+        var builtA = BuildFilter("Level == 7");
+
+        var component = Render<LibraryEntryFilterEditor>(p => p
+            .Add(x => x.FilterSet, filterSet)
+            .Add(x => x.IsExpanded, true));
+
+        component.Find(".library-entry-filter-editor-add-button").Click();
+        component.Find(".library-entry-filter-editor-add-button").Click();
+
+        Assert.Equal(2, component.FindComponents<LibraryFilterRow>().Count);
+
+        var rows = component.FindComponents<LibraryFilterRow>();
+        await component.InvokeAsync(() => rows[0].Instance.OnPendingSave.InvokeAsync(builtA));
+
+        component.Render();
+        Assert.Single(component.FindComponents<LibraryFilterRow>());
+    }
+
+    private static SavedFilter BuildFilter(string comparisonText, bool isEnabled = true)
+    {
+        var filter = SavedFilter.TryCreate(
+            comparisonText,
+            color: HighlightColor.None,
+            isEnabled: isEnabled,
+            mode: FilterMode.Advanced);
         Assert.NotNull(filter);
         return filter;
     }
@@ -213,4 +253,12 @@ public sealed class LibraryEntryFilterEditorTests : BunitContext
             CreatedUtc = DateTimeOffset.UtcNow,
             Filters = [.. filters],
         };
+
+    private LibraryEntryFilterSet CapturedUpdatedFilterSet()
+    {
+        var call = _commands.ReceivedCalls()
+            .Single(c => c.GetMethodInfo().Name == nameof(IFilterLibraryCommands.UpdateEntry));
+        var entry = (LibraryEntry)call.GetArguments()[0]!;
+        return Assert.IsType<LibraryEntryFilterSet>(entry);
+    }
 }

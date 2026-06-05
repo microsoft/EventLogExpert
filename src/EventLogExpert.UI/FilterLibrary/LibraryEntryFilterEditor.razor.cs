@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.FilterLibrary;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
@@ -12,169 +12,59 @@ namespace EventLogExpert.UI.FilterLibrary;
 
 public sealed partial class LibraryEntryFilterEditor : ComponentBase
 {
-    private readonly List<FilterPendingDraft> _pendingDrafts = [];
-    private readonly HashSet<FilterId> _removedIds = [];
-    private readonly List<FilterRowDraft> _rowDrafts = [];
+    private readonly List<FilterDraft> _pendingDrafts = [];
 
     private string _filterListId = string.Empty;
-    private bool _isEditing;
-    private bool _isExpanded;
-    private LibraryEntryFilterSet? _lastSeenFilterSet;
 
     [Parameter][EditorRequired] public required LibraryEntryFilterSet FilterSet { get; set; }
 
-    [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
+    [Parameter] public bool IsExpanded { get; set; }
 
     [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
-
-    private bool HasUnsavedWork =>
-        _removedIds.Count > 0
-        || _pendingDrafts.Any(p => !string.IsNullOrWhiteSpace(p.ComparisonText))
-        || _rowDrafts.Any(d => !_removedIds.Contains(d.Id) && d.IsDirty);
 
     protected override void OnInitialized()
     {
         _filterListId = $"library-entry-filter-editor-{FilterSet.Id.Value:N}";
-        SyncDraftsFromFilterSet();
     }
 
-    protected override void OnParametersSet()
+    private void AddPendingDraft() => _pendingDrafts.Add(new FilterDraft { Mode = FilterMode.Advanced });
+
+    private void DiscardPendingDraft(FilterDraft draft) => _pendingDrafts.Remove(draft);
+
+    private void OnExclusionChangedForSaved(FilterId existingId, bool isExcluded)
     {
-        if (!ReferenceEquals(_lastSeenFilterSet, FilterSet) && !_isEditing)
-        {
-            SyncDraftsFromFilterSet();
-        }
+        var newFilters = FilterSet.Filters
+            .Select(f => f.Id.Equals(existingId) ? f with { IsExcluded = isExcluded } : f)
+            .ToImmutableList();
+        FilterLibraryCommands.UpdateEntry(FilterSet with { Filters = newFilters });
     }
 
-    private void AddPendingDraft() => _pendingDrafts.Add(new FilterPendingDraft());
-
-    private Task CancelAsync()
+    private void OnRemoveSaved(FilterId existingId)
     {
-        CancelInternal();
-        return Task.CompletedTask;
+        var newFilters = FilterSet.Filters.Where(f => !f.Id.Equals(existingId)).ToImmutableList();
+        FilterLibraryCommands.UpdateEntry(FilterSet with { Filters = newFilters });
     }
 
-    private void CancelInternal()
+    private void OnSaveSavedFilter(FilterId existingId, SavedFilter updated)
     {
-        SyncDraftsFromFilterSet();
-        _isEditing = false;
+        var newFilters = FilterSet.Filters
+            .Select(f => f.Id.Equals(existingId) ? updated with { Id = existingId } : f)
+            .ToImmutableList();
+        FilterLibraryCommands.UpdateEntry(FilterSet with { Filters = newFilters });
     }
 
-    private void DiscardPendingDraft(FilterPendingDraft draft) => _pendingDrafts.Remove(draft);
-
-    private void EnterEditMode() => _isEditing = true;
-
-    private void MarkRowForRemoval(FilterId filterId) => _removedIds.Add(filterId);
-
-    private async Task SaveAsync()
+    private void OnToggleEnabledForSaved(FilterId existingId)
     {
-        var newFilters = ImmutableList.CreateBuilder<SavedFilter>();
-
-        foreach (var draft in _rowDrafts)
-        {
-            if (_removedIds.Contains(draft.Id)) { continue; }
-
-            var trimmed = draft.ComparisonText?.Trim() ?? string.Empty;
-
-            if (trimmed.Length == 0) { continue; }
-
-            var created = SavedFilter.TryCreate(
-                trimmed,
-                basicFilter: null,
-                color: draft.Color,
-                isExcluded: draft.IsExcluded,
-                isEnabled: draft.IsEnabled,
-                mode: draft.Mode);
-
-            if (created is null) { continue; }
-
-            newFilters.Add(created with { Id = draft.Id });
-        }
-
-        foreach (var pending in _pendingDrafts)
-        {
-            var trimmed = pending.ComparisonText?.Trim() ?? string.Empty;
-
-            if (trimmed.Length == 0) { continue; }
-
-            var created = SavedFilter.TryCreate(trimmed);
-
-            if (created is null) { continue; }
-
-            newFilters.Add(created);
-        }
-
-        var updated = FilterSet with { Filters = newFilters.ToImmutable() };
-
-        FilterLibraryCommands.UpdateEntry(updated);
-
-        _isEditing = false;
-
-        await Task.CompletedTask;
+        var newFilters = FilterSet.Filters
+            .Select(f => f.Id.Equals(existingId) ? f with { IsEnabled = !f.IsEnabled } : f)
+            .ToImmutableList();
+        FilterLibraryCommands.UpdateEntry(FilterSet with { Filters = newFilters });
     }
 
-    private void SyncDraftsFromFilterSet()
+    private void SavePendingDraft(FilterDraft draft, SavedFilter built)
     {
-        _rowDrafts.Clear();
-        _pendingDrafts.Clear();
-        _removedIds.Clear();
-
-        foreach (var filter in FilterSet.Filters)
-        {
-            _rowDrafts.Add(new FilterRowDraft
-            {
-                Id = filter.Id,
-                Color = filter.Color,
-                Mode = filter.Mode,
-                IsExcluded = filter.IsExcluded,
-                IsEnabled = filter.IsEnabled,
-                OriginalComparisonText = filter.ComparisonText,
-                ComparisonText = filter.ComparisonText,
-            });
-        }
-
-        _lastSeenFilterSet = FilterSet;
-    }
-
-    private async Task ToggleExpandAsync()
-    {
-        if (_isExpanded && HasUnsavedWork)
-        {
-            var confirmed = await AlertDialogService.ShowAlert(
-                "Discard changes?",
-                "Collapsing will discard unsaved edits to this filter set.",
-                "Discard",
-                "Cancel");
-
-            if (!confirmed) { return; }
-
-            CancelInternal();
-        }
-
-        _isExpanded = !_isExpanded;
-    }
-
-    private sealed class FilterPendingDraft
-    {
-        public string ComparisonText { get; set; } = string.Empty;
-    }
-
-    private sealed class FilterRowDraft
-    {
-        public required HighlightColor Color { get; init; }
-
-        public string ComparisonText { get; set; } = string.Empty;
-
-        public required FilterId Id { get; init; }
-
-        public bool IsDirty => !string.Equals(OriginalComparisonText, ComparisonText, StringComparison.Ordinal);
-
-        public required bool IsEnabled { get; init; }
-
-        public required bool IsExcluded { get; init; }
-
-        public required FilterMode Mode { get; init; }
-
-        public required string OriginalComparisonText { get; init; }
+        var newFilters = FilterSet.Filters.Add(built with { Id = FilterId.Create() });
+        FilterLibraryCommands.UpdateEntry(FilterSet with { Filters = newFilters });
+        _pendingDrafts.Remove(draft);
     }
 }

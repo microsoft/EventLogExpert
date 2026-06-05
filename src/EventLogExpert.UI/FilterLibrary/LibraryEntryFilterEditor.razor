@@ -1,95 +1,37 @@
 <div class="library-entry-filter-editor">
-    <div class="library-entry-filter-editor-header">
-        <button aria-controls="@_filterListId"
-            aria-expanded="@(_isExpanded ? "true" : "false")"
-            class="button icon-button library-entry-filter-editor-chevron"
-            @onclick="ToggleExpandAsync"
-            title="@(_isExpanded ? "Collapse" : "Expand")"
-            type="button">
-            <i aria-hidden="true" class="@(_isExpanded ? "bi bi-chevron-down" : "bi bi-chevron-right")"></i>
-        </button>
-        <span class="library-entry-filter-editor-summary">
-            @FilterSet.Filters.Count filter@(FilterSet.Filters.Count == 1 ? "" : "s")
-        </span>
-        @if (_isExpanded && _isEditing)
-        {
-            <button class="button button-green" @onclick="SaveAsync" type="button">
-                <i aria-hidden="true" class="bi bi-check2"></i> Save
-            </button>
-            <button class="button" @onclick="CancelAsync" type="button">
-                <i aria-hidden="true" class="bi bi-x"></i> Cancel
-            </button>
-        }
-        else if (_isExpanded)
-        {
-            <button class="button" @onclick="EnterEditMode" type="button">
-                <i aria-hidden="true" class="bi bi-pencil"></i> Edit
-            </button>
-        }
-    </div>
-
-    @if (_isExpanded)
+    @if (IsExpanded)
     {
         <div class="library-entry-filter-editor-list" id="@_filterListId">
-            @if (_rowDrafts.Count == 0 && _pendingDrafts.Count == 0)
+            @if (FilterSet.Filters.Count == 0 && _pendingDrafts.Count == 0)
             {
                 <p class="library-entry-filter-editor-empty">No filters in this set.</p>
             }
-            else
+
+            @foreach (var saved in FilterSet.Filters)
             {
-                @foreach (var draft in _rowDrafts)
-                {
-                    <div class="library-entry-filter-editor-row" @key="draft.Id">
-                        <span class="library-entry-filter-editor-color-box" data-color="@draft.Color.ToString()" title="@draft.Color"></span>
-                        @if (_isEditing)
-                        {
-                            <input aria-label="@($"Comparison text for filter {draft.OriginalComparisonText}")"
-                                @bind="draft.ComparisonText"
-                                @bind:event="oninput"
-                                class="input library-entry-filter-editor-input"
-                                type="text" />
-                            <button aria-label="@($"Remove filter {draft.OriginalComparisonText}")"
-                                class="button button-red icon-button"
-                                @onclick="() => MarkRowForRemoval(draft.Id)"
-                                type="button">
-                                <i aria-hidden="true" class="bi bi-x"></i>
-                            </button>
-                        }
-                        else
-                        {
-                            @if (draft.IsExcluded) { <span class="library-entry-filter-editor-excluded">Exclude:</span> }
-
-                            <span class="library-entry-filter-editor-comparison">@draft.ComparisonText</span>
-                        }
-                    </div>
-                }
-
-                @foreach (var pending in _pendingDrafts)
-                {
-                    <div class="library-entry-filter-editor-row library-entry-filter-editor-row-pending" @key="pending">
-                        <span class="library-entry-filter-editor-color-box" data-color="None"></span>
-                        <input aria-label="New filter comparison text"
-                            @bind="pending.ComparisonText"
-                            @bind:event="oninput"
-                            class="input library-entry-filter-editor-input"
-                            placeholder="e.g. Level == 4"
-                            type="text" />
-                        <button aria-label="Discard pending filter"
-                            class="button icon-button"
-                            @onclick="() => DiscardPendingDraft(pending)"
-                            type="button">
-                            <i aria-hidden="true" class="bi bi-x"></i>
-                        </button>
-                    </div>
-                }
+                <LibraryFilterRow Id="@($"lef-{saved.Id.Value:N}")"
+                    @key="saved.Id"
+                    OnExclusionChanged="@(e => OnExclusionChangedForSaved(saved.Id, e))"
+                    OnRemove="@(() => OnRemoveSaved(saved.Id))"
+                    OnSave="@(updated => OnSaveSavedFilter(saved.Id, updated))"
+                    OnToggleEnabled="@(() => OnToggleEnabledForSaved(saved.Id))"
+                    Value="saved" />
             }
 
-            @if (_isEditing)
+            @foreach (var draft in _pendingDrafts)
             {
-                <button class="button library-entry-filter-editor-add-button" @onclick="AddPendingDraft" type="button">
-                    <i aria-hidden="true" class="bi bi-plus"></i> Add filter
-                </button>
+                <LibraryFilterRow Id="@($"lef-pending-{draft.Id.Value:N}")"
+                    @key="draft.Id"
+                    OnPendingDiscard="@(() => DiscardPendingDraft(draft))"
+                    OnPendingSave="@(built => SavePendingDraft(draft, built))"
+                    PendingDraft="draft" />
             }
+
+            <button class="button library-entry-filter-editor-add-button"
+                @onclick="AddPendingDraft"
+                type="button">
+                <i aria-hidden="true" class="bi bi-plus"></i> Add filter
+            </button>
         </div>
     }
 </div>

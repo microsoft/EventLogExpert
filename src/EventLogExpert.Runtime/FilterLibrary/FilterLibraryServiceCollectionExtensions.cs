@@ -10,11 +10,6 @@ public static class FilterLibraryServiceCollectionExtensions
 {
     extension(IServiceCollection services)
     {
-        /// <summary>
-        ///     Registers the SQLite-backed <see cref="IFilterLibraryStore" /> implementation at <paramref name="dbPath" />.
-        ///     The concrete <c>FilterLibrarySqliteStore</c> type stays internal to the runtime assembly; consumers depend on
-        ///     <see cref="IFilterLibraryStore" /> only.
-        /// </summary>
         public IServiceCollection AddFilterLibrarySqliteStore(string dbPath)
         {
             ArgumentNullException.ThrowIfNull(services);
@@ -26,11 +21,6 @@ public static class FilterLibraryServiceCollectionExtensions
             return services;
         }
 
-        /// <summary>
-        ///     Registers <see cref="IFilterLibraryExportService" /> backed by the internal-sealed implementation. Keeps the
-        ///     JSON-envelope and content-fingerprint logic encapsulated in the runtime assembly; UI consumers depend on the public
-        ///     interface only.
-        /// </summary>
         public IServiceCollection AddFilterLibraryExport()
         {
             ArgumentNullException.ThrowIfNull(services);
@@ -40,13 +30,6 @@ public static class FilterLibraryServiceCollectionExtensions
             return services;
         }
 
-        /// <summary>
-        ///     Registers the legacy-filter migration singleton. When <see cref="LegacyMigrationFeature.Enabled" /> is
-        ///     <see langword="true" /> (default), the real <see cref="LegacyFilterMigrator" /> is registered and the host MUST
-        ///     also register <see cref="ILegacyPreferences" />. When <see langword="false" />, a
-        ///     <see cref="NoOpLegacyFilterMigrator" /> is registered instead and <see cref="ILegacyPreferences" /> is not
-        ///     required.
-        /// </summary>
         public IServiceCollection AddLegacyFilterMigration()
         {
             ArgumentNullException.ThrowIfNull(services);

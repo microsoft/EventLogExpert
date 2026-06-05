@@ -562,7 +562,7 @@ public sealed class FilterLibraryEffectsTests
         Assert.NotNull(migratedFilter);
         var migratedPreset = new LibraryEntryFilterSet
         {
-            Name = "Errors", // same name
+            Name = "Errors",
             CreatedUtc = DateTimeOffset.UtcNow,
             Filters = ImmutableList.Create(migratedFilter), // different filters
         };
@@ -592,8 +592,8 @@ public sealed class FilterLibraryEffectsTests
         // (fresh GUIDs but same content), and the migration must NOT re-insert them as content-duplicates.
         var existingFavorite = BuildFilterEntryWithText("Favorite", "Level == 4");
         var existingFilterSet = BuildFilterSetEntry("Errors");
-        var duplicateFavorite = BuildFilterEntryWithText("Favorite", "Level == 4"); // same Name + ComparisonText
-        var duplicateFilterSet = BuildFilterSetEntry("Errors"); // same Name
+        var duplicateFavorite = BuildFilterEntryWithText("Favorite", "Level == 4");
+        var duplicateFilterSet = BuildFilterSetEntry("Errors");
         var sections = LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents;
         var migrator = Substitute.For<ILegacyFilterMigrator>();
         migrator.ShouldRunMigration().Returns(true);
@@ -617,7 +617,7 @@ public sealed class FilterLibraryEffectsTests
     public async Task HandleLoadLibrary_NonEmptyStore_MigrationEntriesPartiallyOverlap_OnlyNonOverlappingPersisted()
     {
         var existing = BuildFilterEntryWithText("Existing", "Level == 4");
-        var dupeOverlap = BuildFilterEntryWithText("Existing", "Level == 4"); // same name + same filter → collides
+        var dupeOverlap = BuildFilterEntryWithText("Existing", "Level == 4");
         var newEntry = BuildFilterEntryWithText("New", "Level == 5"); // does not collide
         var sections = LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents;
         var migrator = Substitute.For<ILegacyFilterMigrator>();

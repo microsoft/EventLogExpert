@@ -49,7 +49,6 @@ public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
         catch (ObjectDisposedException) { }
     }
 
-    /// <summary>Focus the currently-active tab button. Caller no-ops if focus restoration is unavailable.</summary>
     public async ValueTask<bool> FocusActiveTabAsync()
     {
         if (!_tabButtonRefs.TryGetValue(ActiveTab, out var elementRef)) { return false; }
