@@ -475,7 +475,6 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         }
         catch (OperationCanceledException)
         {
-            // Modal torn down mid-prompt; safe to swallow.
         }
     }
 

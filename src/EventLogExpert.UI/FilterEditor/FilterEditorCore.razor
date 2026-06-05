@@ -1,0 +1,94 @@
+<FilterRowShell ErrorMessage="@ErrorMessage"
+    Filter="Filter"
+    IsPending="IsPending"
+    OnCancel="CancelHandler"
+    OnEdit="EditHandler"
+    OnExclusionChanged="ExclusionHandler"
+    OnRemove="RemoveHandler"
+    OnSave="SaveHandler"
+    OnToggleEnabled="ToggleEnabledHandler"
+    @ref="_shellRef"
+    Value="Value">
+    <ModeSelector>
+        @if (Filter is { } filter)
+        {
+            <span class="filter-row-mode">
+                <label aria-label="Filter Mode" id="@($"{Id}_Mode")">Mode: </label>
+                <ValueSelect AriaLabelledBy="@($"{Id}_Mode")"
+                    CssClass="input filter-dropdown"
+                    T="FilterMode"
+                    Value="filter.Mode"
+                    ValueChanged="TryChangeModeAsync">
+                    @foreach (var mode in GetAvailableModes(filter))
+                    {
+                        <ValueSelectItem T="FilterMode" Value="mode">@GetFilterModeDisplayLabel(mode)</ValueSelectItem>
+                    }
+                </ValueSelect>
+            </span>
+        }
+    </ModeSelector>
+    <MainContent>
+        @if (Filter is { } filter)
+        {
+            @switch (filter.Mode)
+            {
+                case FilterMode.Basic:
+                    <span class="filter-row-structured">
+                        <FilterComparisonEditor Comparison="filter.Comparison" Id="@($"{Id}_main")" />
+                        <FilterPredicateList Predicates="filter.Predicates" />
+                    </span>
+                    break;
+                case FilterMode.Advanced:
+                    <span class="filter-row-text">
+                        <input aria-label="@(filter.IsExcluded ? "Exclude Expression" : "Expression")"
+                            class="advanced-filter input"
+                            id="@Id"
+                            @oninput="OnAdvancedTextInput"
+                            placeholder='(Id == 1000 || Id == 1001) && Description.Contains("Fault")'
+                            type="text"
+                            value="@filter.ComparisonText" />
+                    </span>
+                    break;
+                case FilterMode.Cached:
+                    @if (CachedOptions is { Count: > 0 } options)
+                    {
+                        <span class="filter-row-cached">
+                            <ValueSelect AriaLabel="Recent Filter"
+                                CssClass="input cache-dropdown"
+                                T="string"
+                                Value="filter.ComparisonText"
+                                ValueChanged="OnCachedSelectionChanged">
+                                @foreach (var option in options)
+                                {
+                                    <ValueSelectItem T="string" Value="option.Value">
+                                        @if (option.IsFavorite)
+                                        {
+                                            <i aria-label="Favorite" class="bi bi-star-fill cached-favorite-icon"></i>
+                                        }
+                                        else
+                                        {
+                                            <span aria-hidden="true" class="cached-favorite-icon-placeholder"></span>
+                                        }
+                                        <span class="cached-option-text">@option.Value</span>
+                                    </ValueSelectItem>
+                                }
+                            </ValueSelect>
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="filter-row-cached">
+                            <input aria-label="Recent filter (read-only)"
+                                class="advanced-filter input"
+                                readonly
+                                type="text"
+                                value="@filter.ComparisonText" />
+                            <span class="filter-row-hint">No recent options available here</span>
+                        </span>
+                    }
+
+                    break;
+            }
+        }
+    </MainContent>
+</FilterRowShell>
