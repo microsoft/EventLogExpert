@@ -182,6 +182,17 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public void OnInitialized_RegistersComponentAsIInlineAlertHost()
+    {
+        SetState(new FilterLibraryState { IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        _modalCoordinator.Received(1).RegisterModal(Arg.Is<ModalRegistration>(r =>
+            r.InlineAlertHost == component.Instance));
+    }
+
+    [Fact]
     public async Task PreviouslyUsedTab_ProjectsOnlyWithLastUsedUtc_OrderedDescTop50()
     {
         var older = BuildAutoTrackedFilterEntry("Old", DateTimeOffset.UtcNow.AddDays(-2));
