@@ -367,6 +367,28 @@ public sealed class FilterLibraryExportServiceTests
     }
 
     [Fact]
+    public void Deserialize_VersionedEntryMissingKindDiscriminator_ReturnsErrorWithoutThrowing()
+    {
+        var json = """{"schemaVersion": 1, "entries": [{"Name": "x"}]}""";
+
+        var preflight = _service.Deserialize(json, []);
+
+        Assert.NotNull(preflight.Error);
+        Assert.Empty(preflight.ToAdd);
+    }
+
+    [Fact]
+    public void Deserialize_VersionedNullEntry_ReturnsErrorWithoutThrowing()
+    {
+        var json = """{"schemaVersion": 1, "entries": [null]}""";
+
+        var preflight = _service.Deserialize(json, []);
+
+        Assert.NotNull(preflight.Error);
+        Assert.Empty(preflight.ToAdd);
+    }
+
+    [Fact]
     public void Deserialize_WithDuplicateExistingFilterSets_DoesNotThrow_RoutesIncomingToSkipped()
     {
         var existingA = BuildFilterSet("alpha", BuildSavedFilter("Level == 4"));

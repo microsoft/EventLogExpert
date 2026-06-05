@@ -114,8 +114,17 @@ public sealed class TagPickerTests : BunitContext
         Assert.Equal("combobox", input.GetAttribute("role"));
         Assert.Equal("listbox", input.GetAttribute("aria-haspopup"));
         Assert.Equal("list", input.GetAttribute("aria-autocomplete"));
-        Assert.False(string.IsNullOrEmpty(input.GetAttribute("aria-controls")));
         Assert.Equal("Tag picker for testing", input.GetAttribute("aria-label"));
+
+        Assert.Equal("false", input.GetAttribute("aria-expanded"));
+        Assert.True(string.IsNullOrEmpty(input.GetAttribute("aria-controls")));
+
+        input.Focus();
+
+        var listbox = component.Find(".tag-picker-listbox");
+        input = component.Find(".tag-picker-input");
+        Assert.Equal("true", input.GetAttribute("aria-expanded"));
+        Assert.Equal(listbox.GetAttribute("id"), input.GetAttribute("aria-controls"));
     }
 
     [Fact]
@@ -164,6 +173,24 @@ public sealed class TagPickerTests : BunitContext
         Assert.Equal(2, chips.Count);
         Assert.Contains(chips, c => c.TextContent.Contains("alpha", StringComparison.Ordinal));
         Assert.Contains(chips, c => c.TextContent.Contains("beta", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SeparatorInput_CommitsTypedTextAndClearsSeparator()
+    {
+        ImmutableList<string>? lastValue = null;
+
+        var component = Render<TagPicker>(parameters => parameters
+            .Add(p => p.Value, ImmutableList<string>.Empty)
+            .Add(p => p.SuggestionSource, [])
+            .Add(p => p.ValueChanged, EventCallback.Factory.Create<ImmutableList<string>>(this, v => lastValue = v)));
+
+        var input = component.Find(".tag-picker-input");
+        input.Input("Beta,");
+
+        Assert.NotNull(lastValue);
+        Assert.Equal(["beta"], lastValue);
+        Assert.Equal(string.Empty, input.GetAttribute("value"));
     }
 
     [Fact]

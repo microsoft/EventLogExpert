@@ -226,7 +226,7 @@ public sealed partial class FilterPane : IDisposable
         base.OnInitialized();
     }
 
-    private static string FormatFilterSetLabel(LibraryEntryFilterSet set)
+    private static string FormatFilterSetDetail(LibraryEntryFilterSet set)
     {
         var detail = $"{set.Filters.Count} filter{(set.Filters.Count == 1 ? string.Empty : "s")}";
 
@@ -235,8 +235,11 @@ public sealed partial class FilterPane : IDisposable
             detail = $"{detail} · {string.Join(", ", set.Tags)}";
         }
 
-        return $"{set.Name}  ({detail})";
+        return detail;
     }
+
+    private static string FormatFilterSetLabel(LibraryEntryFilterSet set) =>
+        $"{set.Name} ({FormatFilterSetDetail(set)})";
 
     private void AddAdvancedFilter()
     {

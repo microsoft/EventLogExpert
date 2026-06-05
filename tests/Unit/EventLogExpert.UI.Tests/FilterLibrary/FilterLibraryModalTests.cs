@@ -12,9 +12,12 @@ using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.FilterLibrary;
 using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using System.Collections.Immutable;
+using System.Reflection;
 
 namespace EventLogExpert.UI.Tests.FilterLibrary;
 
@@ -64,6 +67,105 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         _commands.Received(1).ApplyEntry(entry.Id);
         _modalService.Received(1).Complete(_modalId, Arg.Is<object?>(v => Equals(v, true)));
+    }
+
+    [Fact]
+    public void ApplyImportPreflight_AmbiguousMatches_AddsIncomingAsNewWithNormalizedTags()
+    {
+        var existing = BuildSavedFilter("Existing");
+        var incoming = BuildSavedFilter("Incoming") with { Id = existing.Id, Tags = [" Alpha ", "alpha", "Beta"] };
+        LibraryEntry? added = null;
+        _commands.When(c => c.AddEntry(Arg.Any<LibraryEntry>())).Do(call => added = call.Arg<LibraryEntry>());
+        var preflight = new ImportPreflight(
+            [],
+            [],
+            [],
+            [],
+            [([existing], incoming)]);
+
+        FilterLibraryModal.ApplyImportPreflight(preflight, _commands, [existing]);
+
+        _commands.Received(1).AddEntry(Arg.Any<LibraryEntry>());
+        Assert.NotNull(added);
+        Assert.NotEqual(existing.Id, added.Id);
+        Assert.Equal(["alpha", "beta"], added.Tags);
+    }
+
+    [Fact]
+    public void ApplyImportPreflight_Replace_PreservesUserStateAndNormalizesTags()
+    {
+        var lastUsed = DateTimeOffset.UtcNow.AddHours(-4);
+        var existing = BuildSavedFilter("Existing") with
+        {
+            IsFavorite = true,
+            LastUsedUtc = lastUsed,
+            Tags = ["old"],
+        };
+        var incoming = BuildFilterEntry("Imported", "Level == 3") with
+        {
+            Origin = LibraryEntryOrigin.AutoTracked,
+            IsFavorite = false,
+            LastUsedUtc = DateTimeOffset.UtcNow,
+            Tags = [" Alpha ", "alpha", "Beta"],
+        };
+        LibraryEntry? updated = null;
+        _commands.When(c => c.UpdateEntry(Arg.Any<LibraryEntry>())).Do(call => updated = call.Arg<LibraryEntry>());
+        var preflight = new ImportPreflight(
+            [],
+            [(existing, incoming)],
+            []);
+
+        FilterLibraryModal.ApplyImportPreflight(preflight, _commands, [existing]);
+
+        _commands.Received(1).UpdateEntry(Arg.Any<LibraryEntry>());
+        var savedFilter = Assert.IsType<LibraryEntrySavedFilter>(updated);
+        Assert.Equal(existing.Id, savedFilter.Id);
+        Assert.Equal("Imported", savedFilter.Name);
+        Assert.Equal("Level == 3", savedFilter.Filter.ComparisonText);
+        Assert.Equal(LibraryEntryOrigin.UserSaved, savedFilter.Origin);
+        Assert.True(savedFilter.IsFavorite);
+        Assert.Equal(lastUsed, savedFilter.LastUsedUtc);
+        Assert.Equal(["alpha", "beta"], savedFilter.Tags);
+    }
+
+    [Fact]
+    public void ApplyImportPreflight_Update_CoalescesDuplicateExistingMatches()
+    {
+        var existing = BuildSavedFilter("Existing") with { Tags = ["old"] };
+        var incomingA = BuildSavedFilter("IncomingA") with { Tags = [" Alpha "] };
+        var incomingB = BuildSavedFilter("IncomingB") with { Tags = ["Beta"] };
+        LibraryEntry? updated = null;
+        _commands.When(c => c.UpdateEntry(Arg.Any<LibraryEntry>())).Do(call => updated = call.Arg<LibraryEntry>());
+        var preflight = new ImportPreflight(
+            [],
+            [],
+            [],
+            [(existing, incomingA), (existing, incomingB)],
+            []);
+
+        FilterLibraryModal.ApplyImportPreflight(preflight, _commands, [existing]);
+
+        _commands.Received(1).UpdateEntry(Arg.Any<LibraryEntry>());
+        Assert.NotNull(updated);
+        Assert.Equal(["old", "alpha", "beta"], updated.Tags);
+    }
+
+    [Fact]
+    public void BuildPreflightSummary_AmbiguousMatches_SaysEntriesWillBeImportedAsNew()
+    {
+        var existing = BuildSavedFilter("Existing");
+        var incoming = BuildSavedFilter("Incoming");
+        var preflight = new ImportPreflight(
+            [],
+            [],
+            [],
+            [],
+            [([existing], incoming)]);
+
+        var summary = FilterLibraryModal.BuildPreflightSummary(preflight);
+
+        Assert.Contains("ambiguous entries will be imported as new", summary);
+        Assert.DoesNotContain("manual", summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -428,6 +530,18 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public void SavedTabHeader_RendersOnSavedTabOnly()
+    {
+        var entry = BuildSavedFilter("X");
+        SetState(new FilterLibraryState { Entries = [entry], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        var savedPanel = component.Find("[role='tabpanel'].active");
+
+        Assert.NotNull(savedPanel.QuerySelector(".library-saved-tab-new-button"));
+    }
+
+    [Fact]
     public async Task TabClick_SwitchesActiveTab()
     {
         SetState(new FilterLibraryState { IsLoaded = true });
@@ -452,6 +566,25 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var tabs = component.FindAll("[role='tab']");
         Assert.Equal("true", tabs[expectedTabIndex].GetAttribute("aria-selected"));
+    }
+
+    [Fact]
+    public async Task TagDelete_RemovesFromSelectedTagsByTab()
+    {
+        var alpha = BuildSavedFilter("a") with { Tags = ["alpha"] };
+        SetState(new FilterLibraryState { Entries = [alpha], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        var alphaChip = component.Find("[role='tabpanel'].active .library-tag-filter-chip");
+        await alphaChip.ClickAsync(new MouseEventArgs());
+
+        await component.Find(".library-tag-management-trigger").ClickAsync(new MouseEventArgs());
+        var deleteButton = component.Find(".library-tag-management-row").QuerySelectorAll(".button-red")[0];
+        await deleteButton.ClickAsync(new MouseEventArgs());
+        await component.Find(".library-tag-management-row .button-red.icon-button").ClickAsync(new MouseEventArgs());
+
+        var selectedAfter = GetSelectedTagsForTab(component, LibraryTab.Saved);
+        Assert.DoesNotContain("alpha", selectedAfter, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -634,6 +767,47 @@ public sealed class FilterLibraryModalTests : BunitContext
         Assert.Contains("alphaEntry", visibleRows[0].TextContent);
     }
 
+    [Fact]
+    public async Task TagManagementTrigger_Click_TogglesPanelVisibility()
+    {
+        var alpha = BuildSavedFilter("alphaEntry") with { Tags = ["alpha"] };
+        SetState(new FilterLibraryState { Entries = [alpha], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        Assert.Empty(component.FindAll(".library-tag-management-panel"));
+
+        await component.Find(".library-tag-management-trigger").ClickAsync(new MouseEventArgs());
+
+        Assert.NotNull(component.Find(".library-tag-management-panel"));
+
+        await component.Find(".library-tag-management-trigger").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(component.FindAll(".library-tag-management-panel"));
+    }
+
+    [Fact]
+    public async Task TagRename_PrunesSelectedTagsByTab()
+    {
+        var alpha = BuildSavedFilter("a") with { Tags = ["alpha"] };
+        SetState(new FilterLibraryState { Entries = [alpha], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        var alphaChip = component.Find("[role='tabpanel'].active .library-tag-filter-chip");
+        await alphaChip.ClickAsync(new MouseEventArgs());
+
+        await component.Find(".library-tag-management-trigger").ClickAsync(new MouseEventArgs());
+        var renameButton = component.Find(".library-tag-management-row").QuerySelectorAll(".icon-button")[0];
+        await renameButton.ClickAsync(new MouseEventArgs());
+        var editInput = component.Find(".library-tag-management-row-edit-input");
+        await editInput.InputAsync(new ChangeEventArgs { Value = "renamed" });
+        await component.Find(".library-tag-management-row .button-green").ClickAsync(new MouseEventArgs());
+
+        var selectedAfter = GetSelectedTagsForTab(component, LibraryTab.Saved);
+        Assert.DoesNotContain("alpha", selectedAfter, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("renamed", selectedAfter, StringComparer.OrdinalIgnoreCase);
+    }
+
     private static LibraryEntrySavedFilter BuildAutoTrackedFilterEntry(string name, DateTimeOffset? lastUsed = null)
     {
         var filter = SavedFilter.TryCreate("Level == 4");
@@ -649,9 +823,9 @@ public sealed class FilterLibraryModalTests : BunitContext
         };
     }
 
-    private static LibraryEntrySavedFilter BuildFilterEntry(string name)
+    private static LibraryEntrySavedFilter BuildFilterEntry(string name, string comparisonText = "Level == 4")
     {
-        var filter = SavedFilter.TryCreate("Level == 4");
+        var filter = SavedFilter.TryCreate(comparisonText);
         Assert.NotNull(filter);
 
         return new LibraryEntrySavedFilter
@@ -664,6 +838,16 @@ public sealed class FilterLibraryModalTests : BunitContext
 
     private static LibraryEntrySavedFilter BuildSavedFilter(string name) =>
         BuildFilterEntry(name) with { Origin = LibraryEntryOrigin.UserSaved };
+
+    private static ImmutableList<string> GetSelectedTagsForTab(IRenderedComponent<FilterLibraryModal> component, LibraryTab tab)
+    {
+        var dict = (IDictionary<LibraryTab, ImmutableList<string>>?)component.Instance
+            .GetType().GetField("_selectedTagsByTab", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?.GetValue(component.Instance);
+
+        Assert.NotNull(dict);
+        return dict[tab];
+    }
 
     private void SetState(FilterLibraryState state)
     {

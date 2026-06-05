@@ -257,6 +257,57 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
+    public async Task HandleDeleteTag_EmptyName_NoOp()
+    {
+        var entry = BuildFilterEntry("E") with { Tags = ["bug"] };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [entry] });
+
+        await effects.HandleDeleteTag(new DeleteTagAction("  "), dispatcher);
+
+        store.DidNotReceive().Update(Arg.Any<LibraryEntry>());
+    }
+
+    [Fact]
+    public async Task HandleDeleteTag_MatchesMixedCaseStoredTag_RemovesIt()
+    {
+        var entry = BuildFilterEntry("E") with { Tags = ["BUG", "perf"] };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [entry] });
+
+        await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
+
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Tags.SequenceEqual(new[] { "perf" })));
+    }
+
+    [Fact]
+    public async Task HandleDeleteTag_RemovesFromAllMatchingEntries()
+    {
+        var a = BuildFilterEntry("A") with { Tags = ["bug", "perf"] };
+        var b = BuildFilterEntry("B") with { Tags = ["bug"] };
+        var c = BuildFilterEntry("C") with { Tags = ["perf"] };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [a, b, c] });
+
+        await effects.HandleDeleteTag(new DeleteTagAction("BUG"), dispatcher);
+
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Id == a.Id && e.Tags.SequenceEqual(new[] { "perf" })));
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Id == b.Id && e.Tags.IsEmpty));
+        store.DidNotReceive().Update(Arg.Is<LibraryEntry>(e => e.Id == c.Id));
+    }
+
+    [Fact]
+    public async Task HandleDeleteTag_StoreFailureSkipsOneEntryButContinues()
+    {
+        var a = BuildFilterEntry("A") with { Tags = ["bug"] };
+        var b = BuildFilterEntry("B") with { Tags = ["bug"] };
+        var (effects, store, dispatcher, _, logger) = CreateEffects(state: new FilterLibraryState { Entries = [a, b] });
+        store.When(s => s.Update(Arg.Is<LibraryEntry>(e => e.Id == a.Id))).Do(_ => throw new InvalidOperationException("boom"));
+
+        await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == b.Id));
+        logger.ReceivedWithAnyArgs(1).Warning(default);
+    }
+
+    [Fact]
     public async Task HandleLoadLibrary_BackslashMigratorRunsAfterLegacyMigrator()
     {
         var store = Substitute.For<IFilterLibraryStore>();
@@ -1158,6 +1209,125 @@ public sealed class FilterLibraryEffectsTests
         store.Received(1).TryBumpLastUsedIfNotFavorite(existing.Id, Arg.Any<DateTimeOffset>());
         store.DidNotReceive().AddOrReturnExistingFilter(Arg.Any<LibraryEntrySavedFilter>());
         dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a => a.Entry.Id == existing.Id));
+    }
+
+    [Fact]
+    public async Task HandleRenameTag_CollidingTags_DedupesPreservingNewCanonical()
+    {
+        var entry = BuildFilterEntry("E") with { Tags = ["bug", "defect"] };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [entry] });
+
+        await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
+
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Tags.SequenceEqual(new[] { "defect" })));
+    }
+
+    [Fact]
+    public async Task HandleRenameTag_EmptyNewName_NoOp()
+    {
+        var entry = BuildFilterEntry("E") with { Tags = ["bug"] };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [entry] });
+
+        await effects.HandleRenameTag(new RenameTagAction("bug", "  "), dispatcher);
+
+        store.DidNotReceive().Update(Arg.Any<LibraryEntry>());
+    }
+
+    [Fact]
+    public async Task HandleRenameTag_FilterSetEntry_RewritesTagsViaReplaceTagsHelper()
+    {
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+        var fs = new LibraryEntryFilterSet
+        {
+            Name = "FS",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = [filter],
+            Tags = ["bug"],
+        };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [fs] });
+
+        await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
+
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e is LibraryEntryFilterSet && e.Tags.SequenceEqual(new[] { "defect" })));
+    }
+
+    [Fact]
+    public async Task HandleRenameTag_MatchesMixedCaseStoredTag_HealsToCanonical()
+    {
+        var entry = BuildFilterEntry("E") with { Tags = ["BUG"] };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [entry] });
+
+        await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
+
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Tags.SequenceEqual(new[] { "defect" })));
+        dispatcher.Received(1).Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
+    public async Task HandleRenameTag_NoOpWhenNormalizedOldAndNewAreEqual()
+    {
+        var entry = BuildFilterEntry("E") with { Tags = ["bug"] };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [entry] });
+
+        await effects.HandleRenameTag(new RenameTagAction("bug", "BUG"), dispatcher);
+
+        store.DidNotReceive().Update(Arg.Any<LibraryEntry>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
+    public async Task HandleRenameTag_NormalizesBothNames_StoresLowercase()
+    {
+        var entry = BuildFilterEntry("E") with { Tags = ["bug"] };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [entry] });
+
+        await effects.HandleRenameTag(new RenameTagAction("  BUG  ", "Defect "), dispatcher);
+
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Tags.SequenceEqual(new[] { "defect" })));
+    }
+
+    [Fact]
+    public async Task HandleRenameTag_RewritesAllMatchingEntries_DispatchesSuccessPerEntry()
+    {
+        var a = BuildFilterEntry("A") with { Tags = ["bug", "perf"] };
+        var b = BuildFilterEntry("B") with { Tags = ["bug"] };
+        var c = BuildFilterEntry("C") with { Tags = ["perf"] };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [a, b, c] });
+
+        await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
+
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Id == a.Id && e.Tags.SequenceEqual(new[] { "defect", "perf" })));
+        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Id == b.Id && e.Tags.SequenceEqual(new[] { "defect" })));
+        store.DidNotReceive().Update(Arg.Is<LibraryEntry>(e => e.Id == c.Id));
+        dispatcher.Received(2).Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
+    public async Task HandleRenameTag_SkipsEntriesWithoutTag()
+    {
+        var withTag = BuildFilterEntry("A") with { Tags = ["bug"] };
+        var withoutTag = BuildFilterEntry("B");
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [withTag, withoutTag] });
+
+        await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
+
+        store.Received(1).Update(Arg.Any<LibraryEntry>());
+    }
+
+    [Fact]
+    public async Task HandleRenameTag_StoreFailureSkipsOneEntryButContinues()
+    {
+        var a = BuildFilterEntry("A") with { Tags = ["bug"] };
+        var b = BuildFilterEntry("B") with { Tags = ["bug"] };
+        var (effects, store, dispatcher, _, logger) = CreateEffects(state: new FilterLibraryState { Entries = [a, b] });
+        store.When(s => s.Update(Arg.Is<LibraryEntry>(e => e.Id == a.Id))).Do(_ => throw new InvalidOperationException("boom"));
+
+        await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == b.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == a.Id));
+        logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
     [Fact]

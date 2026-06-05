@@ -35,9 +35,11 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         [LibraryTab.PreviouslyUsed] = [],
     };
 
+    private readonly string _tagManagementPanelId = $"tag-mgmt-{Guid.NewGuid():N}";
     private readonly string _tagOverflowRegionId = $"tag-overflow-{Guid.NewGuid():N}";
 
     private LibraryTab _activeTab = LibraryTab.Saved;
+    private bool _isTagManagementExpanded;
     private bool _isTagOverflowExpanded;
     private bool _justClearedTags;
     private LibraryTab? _pendingFocusSourceTab;
@@ -55,8 +57,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private IReadOnlyList<string> AllLibraryTags =>
         [.. FilterLibraryState.Value.Entries
             .SelectMany(e => e.Tags)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(t => t, StringComparer.Ordinal)];
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)];
 
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
@@ -84,8 +86,9 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private IReadOnlyList<LibraryEntry> PreviouslyUsedEntries =>
         [.. FilterLibraryState.Value.Entries
             .Where(e => e.Origin == LibraryEntryOrigin.AutoTracked && !e.IsFavorite)
+            .Where(e => e.LastUsedUtc.HasValue)
             .Where(e => MatchesTagFilter(e, _selectedTagsByTab[LibraryTab.PreviouslyUsed]))
-            .OrderByDescending(e => e.LastUsedUtc!.Value)
+            .OrderByDescending(e => e.LastUsedUtc.GetValueOrDefault())
             .Take(50)];
 
     private IReadOnlyList<LibraryEntry> SavedEntries =>
@@ -93,6 +96,58 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             .Where(e => e.Origin == LibraryEntryOrigin.UserSaved && !e.IsFavorite)
             .Where(e => MatchesTagFilter(e, _selectedTagsByTab[LibraryTab.Saved]))
             .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
+
+    private IReadOnlyList<LibraryEntrySavedFilter> SavedFilterEntries =>
+        [.. FilterLibraryState.Value.Entries.OfType<LibraryEntrySavedFilter>()];
+
+    internal static void ApplyImportPreflight(
+        ImportPreflight preflight,
+        IFilterLibraryCommands commands,
+        IReadOnlyList<LibraryEntry> existingEntries)
+    {
+        var knownIds = existingEntries.Select(e => e.Id).ToHashSet();
+
+        foreach (var entry in preflight.ToAdd)
+        {
+            commands.AddEntry(PrepareEntryForAdd(entry, knownIds));
+        }
+
+        foreach (var (existing, incoming) in preflight.ToReplace)
+        {
+            var updated = incoming with
+            {
+                Id = existing.Id,
+                IsFavorite = existing.IsFavorite,
+                LastUsedUtc = existing.LastUsedUtc,
+                Origin = existing.Origin,
+                Tags = LibraryEntryTagNormalizer.Normalize(incoming.Tags),
+            };
+
+            commands.UpdateEntry(updated);
+        }
+
+        foreach (var group in preflight.ToUpdate.GroupBy(t => t.Existing.Id))
+        {
+            var existing = group.First().Existing;
+            var existingMigrated = LibraryEntryTagNormalizer.MigrateBackslashName(existing);
+            var incomingTags = group.SelectMany(t => t.Incoming.Tags);
+            var unionedTags = LibraryEntryTagNormalizer.Normalize(existingMigrated.Tags.Concat(incomingTags));
+
+            var updated = existing switch
+            {
+                LibraryEntrySavedFilter f => f with { Name = existingMigrated.Name, Tags = unionedTags },
+                LibraryEntryFilterSet fs => fs with { Name = existingMigrated.Name, Tags = unionedTags },
+                _ => existing,
+            };
+
+            commands.UpdateEntry(updated);
+        }
+
+        foreach (var ambiguous in preflight.AmbiguousMatches)
+        {
+            commands.AddEntry(PrepareEntryForAdd(ambiguous.Incoming, knownIds));
+        }
+    }
 
     internal static string BuildPreflightSummary(ImportPreflight preflight)
     {
@@ -126,7 +181,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         if (preflight.ToUpdate.Count > 0)
         {
             var renameCount = preflight.ToUpdate.Count(t => t.Existing.Name.Contains('\\'));
-            lines.Add($"  \u2022 {preflight.ToUpdate.Count} entries will be updated with tag changes");
+            lines.Add($"  \u2022 {CountDistinctUpdates(preflight)} entries will be updated with tag changes");
             if (renameCount > 0)
             {
                 lines.Add($"  \u2022 {renameCount} existing entries will also be renamed (folder paths \u2192 tags)");
@@ -135,13 +190,16 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
         if (preflight.AmbiguousMatches.Count > 0)
         {
-            lines.Add($"  \u2022 {preflight.AmbiguousMatches.Count} entries require manual conflict resolution");
+            lines.Add($"  \u2022 {preflight.AmbiguousMatches.Count} ambiguous entries will be imported as new");
         }
 
         lines.Add($"  \u2022 {preflight.SkippedDuplicates.Count} exact duplicates will be skipped");
 
         return "Import preview:\n" + string.Join('\n', lines);
     }
+
+    internal static int CountDistinctUpdates(ImportPreflight preflight) =>
+        preflight.ToUpdate.Select(t => t.Existing.Id).Distinct().Count();
 
     internal static (LibraryEntryId? TargetId, bool FallbackToActiveTab) DecidePendingFocusAfterRemoval(
         IReadOnlyList<LibraryEntry> snapshot,
@@ -161,6 +219,25 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         if (idx > 0) { return (snapshot[idx - 1].Id, false); }
 
         return (null, true);
+    }
+
+    internal static LibraryEntry PrepareEntryForAdd(LibraryEntry entry, ISet<LibraryEntryId> knownIds)
+    {
+        var id = entry.Id;
+
+        while (!knownIds.Add(id))
+        {
+            id = new LibraryEntryId(Guid.CreateVersion7());
+        }
+
+        var tags = LibraryEntryTagNormalizer.Normalize(entry.Tags);
+
+        return entry switch
+        {
+            LibraryEntrySavedFilter f => f with { Id = id, Tags = tags },
+            LibraryEntryFilterSet fs => fs with { Id = id, Tags = tags },
+            _ => entry,
+        };
     }
 
     internal void RecordPendingFocusAfterRemoval(LibraryTab sourceTab, LibraryEntryId removedEntryId)
@@ -292,7 +369,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     }
 
     private static bool MatchesTagFilter(LibraryEntry entry, ImmutableList<string> selectedTags) =>
-        selectedTags.Count == 0 || selectedTags.All(t => entry.Tags.Contains(t, StringComparer.Ordinal));
+        selectedTags.Count == 0 || selectedTags.All(t => entry.Tags.Contains(t, StringComparer.OrdinalIgnoreCase));
 
     private static string SanitizeForFileName(string name)
     {
@@ -319,6 +396,10 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         LibraryTab.PreviouslyUsed => PreviouslyUsedEntries,
         _ => SavedEntries,
     };
+
+    private string GetTagManagementPanelId(LibraryTab tab) => $"{_tagManagementPanelId}-{tab}";
+
+    private string GetTagOverflowRegionId(LibraryTab tab) => $"{_tagOverflowRegionId}-{tab}";
 
     private Task HandleAddToFilterSetAsync(AddToFilterSetIntent intent)
     {
@@ -388,6 +469,15 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private void HandleSaveToLibrary(LibraryEntryId id) => FilterLibraryCommands.SaveEntry(id);
 
+    private void HandleTagDeleted(string name)
+    {
+        foreach (var tab in _selectedTagsByTab.Keys.ToList())
+        {
+            _selectedTagsByTab[tab] = _selectedTagsByTab[tab]
+                .RemoveAll(t => string.Equals(t, name, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
     private void HandleTagFilterBarKeyDown(KeyboardEventArgs e)
     {
         if (e.Key != "Escape") { return; }
@@ -398,6 +488,22 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         _justClearedTags = true;
         AnnouncementService.Announce("Tag filters cleared");
         StateHasChanged();
+    }
+
+    private void HandleTagRenamed((string OldName, string NewName) e)
+    {
+        foreach (var tab in _selectedTagsByTab.Keys.ToList())
+        {
+            var current = _selectedTagsByTab[tab];
+            var index = current.IndexOf(e.OldName, StringComparer.OrdinalIgnoreCase);
+
+            if (index < 0) { continue; }
+
+            var without = current.RemoveAt(index);
+            _selectedTagsByTab[tab] = without.Contains(e.NewName, StringComparer.OrdinalIgnoreCase)
+                ? without
+                : without.Insert(index, e.NewName);
+        }
     }
 
     private void HandleToggleFavorite(FavoriteToggleIntent intent) =>
@@ -436,55 +542,31 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
         if (!result.Accepted) { return; }
 
-        foreach (var entry in preflight.ToAdd)
-        {
-            FilterLibraryCommands.AddEntry(entry);
-        }
-
-        foreach (var (existing, incoming) in preflight.ToReplace)
-        {
-            FilterLibraryCommands.UpdateEntry(incoming with { Id = existing.Id });
-        }
-
-        foreach (var (existing, incoming) in preflight.ToUpdate)
-        {
-            var existingMigrated = LibraryEntryTagNormalizer.MigrateBackslashName(existing);
-            var unionedTags = LibraryEntryTagNormalizer.Normalize(existingMigrated.Tags.Concat(incoming.Tags));
-
-            var updated = existing switch
-            {
-                LibraryEntrySavedFilter f => f with { Name = existingMigrated.Name, Tags = unionedTags },
-                LibraryEntryFilterSet fs => fs with { Name = existingMigrated.Name, Tags = unionedTags },
-                _ => existing,
-            };
-
-            FilterLibraryCommands.UpdateEntry(updated);
-        }
+        ApplyImportPreflight(preflight, FilterLibraryCommands, FilterLibraryState.Value.Entries);
 
         var ambiguousCount = preflight.AmbiguousMatches.Count;
+        var updatedCount = CountDistinctUpdates(preflight);
 
         AnnouncementService.Announce(
             $"Imported {preflight.ToAdd.Count} new, " +
             $"replaced {preflight.ToReplace.Count}, " +
-            $"updated {preflight.ToUpdate.Count} tags, " +
+            $"updated {updatedCount} tags, " +
             $"skipped {preflight.SkippedDuplicates.Count}" +
-            (ambiguousCount > 0 ? $" ({ambiguousCount} require manual resolution)" : string.Empty));
+            (ambiguousCount > 0 ? $", imported {ambiguousCount} ambiguous as new" : string.Empty));
     }
 
     private void PruneStaleRowRefs()
     {
         if (_rowRefs.Count == 0) { return; }
 
-        var liveByTab = new Dictionary<LibraryTab, HashSet<LibraryEntryId>>
-        {
-            [LibraryTab.Saved] = [.. SavedEntries.Select(e => e.Id)],
-            [LibraryTab.Favorites] = [.. FavoriteEntries.Select(e => e.Id)],
-            [LibraryTab.PreviouslyUsed] = [.. PreviouslyUsedEntries.Select(e => e.Id)],
-        };
+        List<(LibraryTab Tab, LibraryEntryId Id)>? stale = null;
 
-        var stale = _rowRefs.Keys
-            .Where(key => !liveByTab[key.Tab].Contains(key.Id))
-            .ToList();
+        foreach (var rowRef in _rowRefs)
+        {
+            if (rowRef.Value is null) { (stale ??= []).Add(rowRef.Key); }
+        }
+
+        if (stale is null) { return; }
 
         foreach (var key in stale) { _rowRefs.Remove(key); }
     }
@@ -513,11 +595,16 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private void ToggleTagFilter(string tag)
     {
         var current = _selectedTagsByTab[_activeTab];
-        _selectedTagsByTab[_activeTab] = current.Contains(tag, StringComparer.Ordinal)
-            ? current.Remove(tag, StringComparer.Ordinal)
+        _selectedTagsByTab[_activeTab] = current.Contains(tag, StringComparer.OrdinalIgnoreCase)
+            ? current.Remove(tag, StringComparer.OrdinalIgnoreCase)
             : current.Add(tag);
 
         StateHasChanged();
+    }
+
+    private void ToggleTagManagement()
+    {
+        _isTagManagementExpanded = !_isTagManagementExpanded;
     }
 
     private void ToggleTagOverflowExpanded()

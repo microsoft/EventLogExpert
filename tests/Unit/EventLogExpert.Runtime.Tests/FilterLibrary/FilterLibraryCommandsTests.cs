@@ -177,6 +177,28 @@ public sealed class FilterLibraryCommandsTests
         dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntryAction>(a => ReferenceEquals(a.Entry, entry)));
     }
 
+    [Fact]
+    public void RenameTag_Dispatches()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+        var sut = new FilterLibraryCommands(dispatcher);
+
+        sut.RenameTag("bug", "defect");
+
+        dispatcher.Received(1).Dispatch(Arg.Is<RenameTagAction>(a => a.OldName == "bug" && a.NewName == "defect"));
+    }
+
+    [Fact]
+    public void DeleteTag_Dispatches()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+        var sut = new FilterLibraryCommands(dispatcher);
+
+        sut.DeleteTag("bug");
+
+        dispatcher.Received(1).Dispatch(Arg.Is<DeleteTagAction>(a => a.Name == "bug"));
+    }
+
     private static LibraryEntry BuildEntry()
     {
         var filter = SavedFilter.TryCreate("Level == 4");

@@ -21,9 +21,14 @@ internal sealed class FilterLibraryCommands(IDispatcher dispatcher) : IFilterLib
 
     public void DeleteEntry(LibraryEntryId entryId) => dispatcher.Dispatch(new DeleteLibraryEntryAction(entryId));
 
+    public void DeleteTag(string name) => dispatcher.Dispatch(new DeleteTagAction(name));
+
     public void LoadLibrary() => dispatcher.Dispatch(new LoadLibraryAction());
 
     public void RecordFilterApplied(SavedFilter filter) => dispatcher.Dispatch(new RecordFilterAppliedAction(filter));
+
+    public void RenameTag(string oldName, string newName) =>
+        dispatcher.Dispatch(new RenameTagAction(oldName, newName));
 
     public void ReplaceWithEntry(LibraryEntryId entryId) => dispatcher.Dispatch(new ReplaceWithLibraryEntryAction(entryId));
 

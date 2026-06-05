@@ -23,11 +23,11 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
             return new ImportPreflight([], [], [], error: "Import file is empty.");
         }
 
-        IReadOnlyList<LibraryEntry> incoming;
-
         try
         {
             using var document = JsonDocument.Parse(json);
+
+            IReadOnlyList<LibraryEntry> incoming;
 
             if (document.RootElement.ValueKind == JsonValueKind.Object &&
                 document.RootElement.TryGetProperty("schemaVersion", out var versionElement))
@@ -61,13 +61,15 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
                 incoming = ReadBareArrayWithLegacyFallback(document.RootElement)
                     ?? throw new JsonException("Unsupported import file shape.");
             }
+
+            return incoming.Any(e => e?.Name is null) ?
+                new ImportPreflight([], [], [], error: "Import file contains an entry with a missing name.") :
+                ComputePreflight(incoming, existingEntries);
         }
-        catch (JsonException ex)
+        catch (Exception ex)
         {
             return new ImportPreflight([], [], [], error: ex.Message);
         }
-
-        return ComputePreflight(incoming, existingEntries);
     }
 
     public string Serialize(IReadOnlyList<LibraryEntry> entries)
@@ -202,6 +204,7 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
             var finalEntry = existingIds.Contains(entry.Id)
                 ? CloneWithFreshId(entry)
                 : entry;
+            existingIds.Add(finalEntry.Id);
             toAdd.Add(finalEntry);
         }
 

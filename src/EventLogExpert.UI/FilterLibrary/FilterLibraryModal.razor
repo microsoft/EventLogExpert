@@ -34,6 +34,10 @@
                 Tabs="@CurrentTabLabels"
                 TTab="LibraryTab">
                 <TabContent Context="tab">
+                    @{
+                        var tagManagementPanelId = GetTagManagementPanelId(tab);
+                        var tagOverflowRegionId = GetTagOverflowRegionId(tab);
+                    }
                     @if (AllLibraryTags.Count > 0)
                     {
                         <div aria-label="Filter by tag"
@@ -41,13 +45,22 @@
                             @onkeydown="HandleTagFilterBarKeyDown"
                             role="group">
                             <span class="library-tag-filter-bar-label">Tags:</span>
+                            <button aria-controls="@(_isTagManagementExpanded ? tagManagementPanelId : null)"
+                                aria-expanded="@(_isTagManagementExpanded ? "true" : "false")"
+                                aria-label="@(_isTagManagementExpanded ? "Hide tag management" : "Manage tags")"
+                                class="button icon-button library-tag-management-trigger"
+                                @onclick="ToggleTagManagement"
+                                title="Manage tags"
+                                type="button">
+                                <i aria-hidden="true" class="bi bi-gear"></i>
+                            </button>
                             @{
                                 var visibleTags = AllLibraryTags.Take(TagFilterBarMaxVisible).ToList();
                                 var hiddenTagsCount = AllLibraryTags.Count - visibleTags.Count;
                             }
                             @foreach (var tag in visibleTags)
                             {
-                                var isSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.Ordinal);
+                                var isSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.OrdinalIgnoreCase);
                                 <button aria-pressed="@(isSelected ? "true" : "false")"
                                     class="library-tag-filter-chip"
                                     @onclick="@(() => ToggleTagFilter(tag))"
@@ -57,7 +70,7 @@
                             }
                             @if (hiddenTagsCount > 0)
                             {
-                                <button aria-controls="@_tagOverflowRegionId"
+                                <button aria-controls="@(_isTagOverflowExpanded ? tagOverflowRegionId : null)"
                                     aria-expanded="@(_isTagOverflowExpanded ? "true" : "false")"
                                     aria-label="@(_isTagOverflowExpanded ? "Hide additional tags" : $"Show {hiddenTagsCount} additional tags")"
                                     class="library-tag-filter-chip-overflow"
@@ -68,10 +81,10 @@
                             }
                             @if (_isTagOverflowExpanded && hiddenTagsCount > 0)
                             {
-                                <div class="library-tag-filter-bar-overflow" id="@_tagOverflowRegionId">
+                                <div class="library-tag-filter-bar-overflow" id="@tagOverflowRegionId">
                                     @foreach (var tag in AllLibraryTags.Skip(TagFilterBarMaxVisible))
                                     {
-                                        var isOverflowSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.Ordinal);
+                                        var isOverflowSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.OrdinalIgnoreCase);
                                         <button aria-pressed="@(isOverflowSelected ? "true" : "false")"
                                             class="library-tag-filter-chip"
                                             @onclick="@(() => ToggleTagFilter(tag))"
@@ -82,10 +95,22 @@
                                 </div>
                             }
                         </div>
+
+                        @if (_isTagManagementExpanded)
+                        {
+                            <TagManagementPanel AllEntries="@FilterLibraryState.Value.Entries"
+                                AllLibraryTags="@AllLibraryTags"
+                                Id="@tagManagementPanelId"
+                                OnTagDeleted="HandleTagDeleted"
+                                OnTagRenamed="HandleTagRenamed" />
+                        }
                     }
                     @switch (tab)
                     {
                         case LibraryTab.Saved:
+                            <LibrarySavedTabHeader AllLibraryTags="@AllLibraryTags"
+                                ExistingSavedFilters="@SavedFilterEntries" />
+
                             @if (SavedEntries.Count == 0)
                             {
                                 <p class="library-empty-state">@GetEmptyStateMessage(tab)</p>

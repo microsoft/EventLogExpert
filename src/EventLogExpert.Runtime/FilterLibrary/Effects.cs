@@ -134,6 +134,35 @@ internal sealed class Effects(
         return Task.CompletedTask;
     }
 
+    [EffectMethod]
+    public Task HandleDeleteTag(DeleteTagAction action, IDispatcher dispatcher)
+    {
+        var normalized = LibraryEntryTagNormalizer.Normalize([action.Name]).FirstOrDefault();
+
+        if (string.IsNullOrEmpty(normalized)) { return Task.CompletedTask; }
+
+        foreach (var entry in state.Value.Entries)
+        {
+            var canonicalTags = LibraryEntryTagNormalizer.Normalize(entry.Tags);
+            var index = canonicalTags.IndexOf(normalized);
+
+            if (index < 0) { continue; }
+
+            var updatedEntry = ReplaceTagsOnEntry(entry, canonicalTags.RemoveAt(index));
+
+            try { store.Update(updatedEntry); }
+            catch (Exception ex)
+            {
+                logger.Warning($"FilterLibrary DeleteTag failed for entry {entry.Id}. {ex.Message}");
+                continue;
+            }
+
+            dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(updatedEntry));
+        }
+
+        return Task.CompletedTask;
+    }
+
     [EffectMethod(typeof(LoadLibraryAction))]
     public async Task HandleLoadLibrary(IDispatcher dispatcher)
     {
@@ -222,9 +251,20 @@ internal sealed class Effects(
 
                         logger.Information($"Backslash migration updated {plan.UpdatedEntries.Count - writeFailures}/{plan.UpdatedEntries.Count} entries.");
                     }
-                }
 
-                backslashMigrator.MarkMigrationCompleted();
+                    if (writeFailures == 0)
+                    {
+                        backslashMigrator.MarkMigrationCompleted();
+                    }
+                    else
+                    {
+                        logger.Warning($"FilterLibrary backslash migration: {writeFailures}/{plan.UpdatedEntries.Count} updates failed; will retry next launch.");
+                    }
+                }
+                else
+                {
+                    backslashMigrator.MarkMigrationCompleted();
+                }
             }
 
             dispatcher.Dispatch(new LoadLibrarySuccessAction(entries));
@@ -368,6 +408,43 @@ internal sealed class Effects(
 
         dispatcher.Dispatch(new AddLibraryEntrySuccessAction(collisionEntry));
         PruneFromSnapshot(collisionProjected, dispatcher);
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod]
+    public Task HandleRenameTag(RenameTagAction action, IDispatcher dispatcher)
+    {
+        var oldNormalized = LibraryEntryTagNormalizer.Normalize([action.OldName]).FirstOrDefault();
+        var newNormalized = LibraryEntryTagNormalizer.Normalize([action.NewName]).FirstOrDefault();
+
+        if (string.IsNullOrEmpty(oldNormalized) ||
+            string.IsNullOrEmpty(newNormalized) ||
+            string.Equals(oldNormalized, newNormalized, StringComparison.Ordinal)) { return Task.CompletedTask; }
+
+        foreach (var entry in state.Value.Entries)
+        {
+            var canonicalTags = LibraryEntryTagNormalizer.Normalize(entry.Tags);
+            var oldIndex = canonicalTags.IndexOf(oldNormalized);
+
+            if (oldIndex < 0) { continue; }
+
+            var without = canonicalTags.RemoveAt(oldIndex);
+            var updatedTags = without.Contains(newNormalized)
+                ? without
+                : without.Insert(oldIndex, newNormalized);
+
+            var updatedEntry = ReplaceTagsOnEntry(entry, updatedTags);
+
+            try { store.Update(updatedEntry); }
+            catch (Exception ex)
+            {
+                logger.Warning($"FilterLibrary RenameTag failed for entry {entry.Id}. {ex.Message}");
+                continue;
+            }
+
+            dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(updatedEntry));
+        }
 
         return Task.CompletedTask;
     }
@@ -536,7 +613,22 @@ internal sealed class Effects(
             _ => throw new InvalidOperationException($"Unhandled LibraryEntry type '{entry.GetType().FullName}'."),
         };
 
-    private static string TruncateForDisplay(string text) => text.Length <= 80 ? text : text[..77] + "...";
+    private static LibraryEntry ReplaceTagsOnEntry(LibraryEntry entry, ImmutableList<string> tags) =>
+        entry switch
+        {
+            LibraryEntrySavedFilter f => f with { Tags = tags },
+            LibraryEntryFilterSet fs => fs with { Tags = tags },
+            _ => entry,
+        };
+
+    private static string TruncateForDisplay(string text)
+    {
+        if (text.Length <= 80) { return text; }
+
+        var cut = char.IsHighSurrogate(text[76]) ? 76 : 77;
+
+        return text[..cut] + "...";
+    }
 
     private Task PersistAddAsync(LibraryEntry entry, IDispatcher dispatcher)
     {

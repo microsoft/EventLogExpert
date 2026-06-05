@@ -158,13 +158,16 @@
       <!-- nuget restore source selection:
            - $(RestoreConfigFile) is set when the caller passes the dotnet configfile flag
              (the locked-down ADO pipeline pattern; the file points at the internal mirror).
-             Use -ConfigFile to honor it, and omit -Source so nuget doesn't bypass the config.
-           - Otherwise (dev), use the public nuget.org feed directly. -->
+             Use -ConfigFile to honor it.
+           - Otherwise omit -Source entirely so nuget.exe resolves the ambient/global
+             nuget.config — the same feed `dotnet restore` already uses (internal mirror in
+             air-gapped CI such as OneBranch, public nuget.org by default in dev). Pinning
+             -Source https://api.nuget.org here previously bypassed the mirror and broke
+             air-gapped CI restores. -->
       <PropertyGroup>
         <_NugetRestoreConfigArg Condition="'$(RestoreConfigFile)' != '' AND Exists('$(RestoreConfigFile)')">-ConfigFile &quot;$(RestoreConfigFile)&quot;</_NugetRestoreConfigArg>
-        <_NugetRestoreSourceArg Condition="'$(_NugetRestoreConfigArg)' == ''">-Source https://api.nuget.org/v3/index.json</_NugetRestoreSourceArg>
       </PropertyGroup>
-      <Exec Command="&quot;$(_NugetExePath)&quot; restore &quot;$(ExplorerExtensionNativeDir)packages.config&quot; -PackagesDirectory &quot;$(ExplorerExtensionPackagesDir)&quot; $(_NugetRestoreConfigArg) $(_NugetRestoreSourceArg) -NonInteractive"
+      <Exec Command="&quot;$(_NugetExePath)&quot; restore &quot;$(ExplorerExtensionNativeDir)packages.config&quot; -PackagesDirectory &quot;$(ExplorerExtensionPackagesDir)&quot; $(_NugetRestoreConfigArg) -NonInteractive"
             ContinueOnError="false" />
       <Exec Command="&quot;$(VsMSBuildPath)&quot; &quot;$(ExplorerExtensionNativeProject)&quot; /p:Configuration=$(Configuration) /p:Platform=$(ExplorerExtensionNativePlatform) /nologo /v:minimal"
             ContinueOnError="false" />

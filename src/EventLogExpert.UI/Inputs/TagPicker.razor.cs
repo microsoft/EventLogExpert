@@ -18,9 +18,12 @@ public sealed partial class TagPicker : ComponentBase
     private string _inputText = string.Empty;
     private bool _isDropdownOpen;
     private bool _isInputFocused;
-    private bool _preventNextDefault;
+
+    private bool IsListboxOpen => _isDropdownOpen && _isInputFocused && _filteredSuggestions.Count > 0;
 
     [Parameter] public string? AriaLabel { get; set; }
+
+    private string EffectiveAriaLabel => string.IsNullOrWhiteSpace(AriaLabel) ? "Tags" : AriaLabel;
 
     [Parameter] public string? Placeholder { get; set; } = "Add tag…";
 
@@ -59,10 +62,11 @@ public sealed partial class TagPicker : ComponentBase
 
         var normalized = LibraryEntryTagNormalizer.Normalize(Value.Concat([candidate]));
 
-        if (normalized.Count == Value.Count) { return; }
-
-        Value = normalized;
-        await ValueChanged.InvokeAsync(Value);
+        if (!normalized.SequenceEqual(Value, StringComparer.Ordinal))
+        {
+            Value = normalized;
+            await ValueChanged.InvokeAsync(Value);
+        }
 
         RecomputeFilteredSuggestions();
         _activeOptionIndex = _filteredSuggestions.Count > 0 ? 0 : -1;
@@ -74,10 +78,11 @@ public sealed partial class TagPicker : ComponentBase
 
         var normalized = LibraryEntryTagNormalizer.Normalize(Value.Concat([suggestion]));
 
-        if (normalized.Count == Value.Count) { return; }
-
-        Value = normalized;
-        await ValueChanged.InvokeAsync(Value);
+        if (!normalized.SequenceEqual(Value, StringComparer.Ordinal))
+        {
+            Value = normalized;
+            await ValueChanged.InvokeAsync(Value);
+        }
 
         RecomputeFilteredSuggestions();
         _activeOptionIndex = _filteredSuggestions.Count > 0 ? 0 : -1;
@@ -85,12 +90,9 @@ public sealed partial class TagPicker : ComponentBase
 
     private async Task HandleKeyDownAsync(KeyboardEventArgs args)
     {
-        _preventNextDefault = false;
-
         switch (args.Key)
         {
             case "ArrowDown":
-                _preventNextDefault = true;
                 _isDropdownOpen = true;
                 if (_filteredSuggestions.Count > 0)
                 {
@@ -99,7 +101,6 @@ public sealed partial class TagPicker : ComponentBase
                 return;
 
             case "ArrowUp":
-                _preventNextDefault = true;
                 _isDropdownOpen = true;
                 if (_filteredSuggestions.Count > 0)
                 {
@@ -110,7 +111,6 @@ public sealed partial class TagPicker : ComponentBase
                 return;
 
             case "Enter":
-                _preventNextDefault = true;
                 if (_isDropdownOpen && _activeOptionIndex >= 0 && _activeOptionIndex < _filteredSuggestions.Count)
                 {
                     await CommitSuggestionAsync(_filteredSuggestions[_activeOptionIndex]);
@@ -123,12 +123,10 @@ public sealed partial class TagPicker : ComponentBase
 
             case ",":
             case ";":
-                _preventNextDefault = true;
                 await CommitInputAsTagAsync();
                 return;
 
             case "Escape":
-                _preventNextDefault = true;
                 _isDropdownOpen = false;
                 _activeOptionIndex = -1;
                 return;
@@ -158,6 +156,14 @@ public sealed partial class TagPicker : ComponentBase
 
     private Task OnInputChangedAsync()
     {
+        var separatorIndex = _inputText.IndexOfAny([',', ';']);
+
+        if (separatorIndex >= 0)
+        {
+            _inputText = _inputText[..separatorIndex];
+            return CommitInputAsTagAsync();
+        }
+
         _isDropdownOpen = true;
         RecomputeFilteredSuggestions();
         _activeOptionIndex = _filteredSuggestions.Count > 0 ? 0 : -1;

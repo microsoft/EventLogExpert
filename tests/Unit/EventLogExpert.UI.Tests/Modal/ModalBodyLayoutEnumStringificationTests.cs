@@ -10,12 +10,12 @@ public sealed class ModalBodyLayoutEnumStringificationTests
     [Fact]
     public void Content_ToStringLowerInvariant_ProducesLiteralContent()
     {
-        Assert.Equal("content", nameof(ModalBodyLayout.Content).ToLowerInvariant());
+        Assert.Equal("content", ModalBodyLayout.Content.ToString().ToLowerInvariant());
     }
 
     [Fact]
     public void Flex_ToStringLowerInvariant_ProducesLiteralFlex()
     {
-        Assert.Equal("flex", nameof(ModalBodyLayout.Flex).ToLowerInvariant());
+        Assert.Equal("flex", ModalBodyLayout.Flex.ToString().ToLowerInvariant());
     }
 }

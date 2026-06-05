@@ -13,14 +13,15 @@ namespace EventLogExpert.Runtime.FilterLibrary;
 ///         migration path is inert and import boundaries reject entries whose names contain <c>\</c>.
 ///     </para>
 ///     <para>
-///         Staged-deletion contract: every <c>if (IsEnabled) { ... } else { ... }</c> wrapping introduced for this feature
-///         places the deletable migration code in the <c>then</c> branch and the permanent post-deletion behaviour in the
-///         <c>else</c> branch. The mechanical removal procedure is:
+///         Staged-deletion contract: every <c>if (IsEnabled)</c> / <c>if (Enabled)</c> wrapping introduced for this
+///         feature places the deletable migration code in the <c>then</c> branch and the permanent post-deletion behaviour
+///         in the <c>else</c> branch. The mechanical removal procedure is:
 ///         <list type="number">
 ///             <item>Flip <see cref="Enabled" /> to <see langword="false" /> as a smoke test.</item>
 ///             <item>
-///                 Delete every <c>if (BackslashMigrationFeature.IsEnabled) { ... } else { ... }</c> wrapper, keeping
-///                 the <c>else</c> branch contents only.
+///                 Delete every <c>if (BackslashMigrationFeature.IsEnabled)</c> (runtime paths) or
+///                 <c>if (BackslashMigrationFeature.Enabled)</c> (build-time DI selection in <c>MauiProgram</c>) wrapper,
+///                 keeping the <c>else</c> branch contents only.
 ///             </item>
 ///             <item>
 ///                 Delete: <see cref="IBackslashNameMigrator" />, <see cref="BackslashNameMigrator" />,

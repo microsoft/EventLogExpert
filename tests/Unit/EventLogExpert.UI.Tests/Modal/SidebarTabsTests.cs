@@ -5,6 +5,7 @@ using Bunit;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using System.Reflection;
 
 namespace EventLogExpert.UI.Tests.Modal;
 
@@ -148,5 +149,21 @@ public sealed class SidebarTabsTests : BunitContext
         await component.FindAll("[role='tab']")[1].KeyDownAsync(new KeyboardEventArgs { Key = key });
 
         Assert.Equal(expected, captured);
+    }
+
+    [Fact]
+    public async Task TabKeydown_WithNoTabs_DoesNotThrow()
+    {
+        var component = Render<SidebarTabs<TestTab>>(parameters => parameters
+            .Add(p => p.Tabs, [])
+            .Add(p => p.ActiveTab, TestTab.First)
+            .Add(p => p.TabContent, _ => builder => { }));
+        var method = typeof(SidebarTabs<TestTab>).GetMethod(
+            "OnTabKeyDownAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+        var task = (Task)method.Invoke(component.Instance, [new KeyboardEventArgs { Key = "Home" }, TestTab.First])!;
+        await task;
     }
 }

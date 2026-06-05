@@ -21,7 +21,7 @@ public static class LibraryEntryTagNormalizer
 
         var segments = entry.Name.Split('\\', StringSplitOptions.RemoveEmptyEntries);
 
-        if (segments.Length <= 1) { return entry; }
+        if (segments.Length <= 1 || !segments.All(LooksLikeHierarchyLabel)) { return entry; }
 
         var newName = segments[^1];
         var promotedTags = segments[..^1];
@@ -50,7 +50,11 @@ public static class LibraryEntryTagNormalizer
 
             if (trimmed.Length == 0) { continue; }
 
-            if (trimmed.Length > MaxTagLength) { trimmed = trimmed[..MaxTagLength]; }
+            if (trimmed.Length > MaxTagLength)
+            {
+                var cut = char.IsHighSurrogate(trimmed[MaxTagLength - 1]) ? MaxTagLength - 1 : MaxTagLength;
+                trimmed = trimmed[..cut];
+            }
 
             if (!seen.Add(trimmed)) { continue; }
 
@@ -61,6 +65,9 @@ public static class LibraryEntryTagNormalizer
 
         return result.ToImmutable();
     }
+
+    private static bool LooksLikeHierarchyLabel(string segment) =>
+        segment.Length > 0 && segment.All(static ch => char.IsLetterOrDigit(ch) || ch is ' ' or '_' or '-');
 }
 
 internal sealed class NullToEmptyImmutableStringListConverter : JsonConverter<ImmutableList<string>>

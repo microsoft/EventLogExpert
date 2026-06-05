@@ -79,6 +79,16 @@ public sealed class LibraryEntryTagNormalizerTests
     }
 
     [Fact]
+    public void MigrateBackslashName_PathLikeNameWithDriveLetter_ReturnsUnchanged()
+    {
+        var entry = BuildFilterSet(@"C:\Windows\System32", []);
+
+        var result = LibraryEntryTagNormalizer.MigrateBackslashName(entry);
+
+        Assert.Same(entry, result);
+    }
+
+    [Fact]
     public void MigrateBackslashName_PreservesExistingTagsAndUnionsWithSegments()
     {
         var entry = BuildFilterSet(@"Network\DNS", ["existing-tag"]);

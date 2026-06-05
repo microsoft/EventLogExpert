@@ -110,6 +110,8 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
 
     public void Add(LibraryEntry entry)
     {
+        ArgumentNullException.ThrowIfNull(entry);
+
         using var connection = OpenConnection();
         using var cmd = connection.CreateCommand();
         cmd.CommandText = InsertSql;
@@ -292,6 +294,8 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
 
     public void Update(LibraryEntry entry)
     {
+        ArgumentNullException.ThrowIfNull(entry);
+
         using var connection = OpenConnection();
         using var cmd = connection.CreateCommand();
         cmd.CommandText = UpdateSql;
@@ -311,10 +315,11 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
                 ? lastUsed.ToString("O", CultureInfo.InvariantCulture)
                 : DBNull.Value);
         cmd.Parameters.AddWithValue("$origin", entry.Origin.ToString());
+        var normalizedTags = LibraryEntryTagNormalizer.Normalize(entry.Tags);
         cmd.Parameters.AddWithValue(
             "$tags",
-            entry.Tags.Count > 0
-                ? JsonSerializer.Serialize(entry.Tags)
+            normalizedTags.Count > 0
+                ? JsonSerializer.Serialize(normalizedTags)
                 : DBNull.Value);
 
         switch (entry)
