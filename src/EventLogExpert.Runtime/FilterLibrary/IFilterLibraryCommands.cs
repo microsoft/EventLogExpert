@@ -35,6 +35,19 @@ public interface IFilterLibraryCommands
     /// <summary>Auto-tracks a filter that was just applied via FilterPane (or bumps LastUsedUtc on an existing match).</summary>
     void RecordFilterApplied(SavedFilter filter);
 
+    /// <summary>
+    ///     Removes <paramref name="name" /> from every library entry that carries it (case-insensitive match after
+    ///     <see cref="LibraryEntryTagNormalizer" /> normalization).
+    /// </summary>
+    void DeleteTag(string name);
+
+    /// <summary>
+    ///     Renames a tag across every library entry that carries it. Both names are normalized via
+    ///     <see cref="LibraryEntryTagNormalizer" />. Entries containing both old and new tags retain only the canonical
+    ///     new tag (dedup). No-op when normalized old and new are equal.
+    /// </summary>
+    void RenameTag(string oldName, string newName);
+
     /// <summary>Destructively replaces the FilterPane's filter list with the library entry's filters.</summary>
     void ReplaceWithEntry(LibraryEntryId entryId);
 

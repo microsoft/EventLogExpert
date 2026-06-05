@@ -1,0 +1,42 @@
+@if (!_isExpanded)
+{
+    <button class="button library-saved-tab-new-button"
+        @onclick="ExpandAsync"
+        type="button">
+        <i aria-hidden="true" class="bi bi-plus-circle"></i> New saved filter
+    </button>
+}
+else
+{
+    <div aria-label="New saved filter draft"
+        class="library-saved-tab-new-draft"
+        role="region">
+        <div class="library-saved-tab-new-draft-name">
+            <label for="@_nameInputId">Name</label>
+            <input @bind="_draftName"
+                @bind:after="OnNameChanged"
+                @bind:event="oninput"
+                id="@_nameInputId"
+                placeholder="Enter a name…"
+                @ref="_nameInputRef"
+                type="text" />
+        </div>
+
+        @if (_validationError is not null)
+        {
+            <span class="library-saved-tab-new-draft-error" role="alert">@_validationError</span>
+        }
+
+        <LibraryFilterRow Id="@_filterRowId"
+            OnPendingDiscard="DiscardAsync"
+            OnPendingSave="OnPendingSaveAsync"
+            PendingDraft="_pendingDraft" />
+
+        <div class="library-saved-tab-new-draft-tags">
+            <TagPicker AriaLabel="Tags for new saved filter"
+                SuggestionSource="@AllLibraryTags"
+                Value="@_draftTags"
+                ValueChanged="@OnDraftTagsChangedAsync" />
+        </div>
+    </div>
+}

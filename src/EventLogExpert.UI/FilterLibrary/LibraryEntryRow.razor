@@ -1,4 +1,4 @@
-<article class="library-entry" data-entry-id="@Entry.Id">
+<article class="library-entry" data-entry-id="@Entry.Id" @ref="_articleRef">
     <div class="library-entry-row-main">
         <i aria-label="@KindAriaLabel" class="@KindIconClass" role="img"></i>
 
@@ -35,29 +35,50 @@
             }
         </div>
 
-        @if (Entry.Tags.Count > 0 && !_isEditingTags)
+        @if (!_isEditingTags)
         {
             <div class="library-entry-tag-chips-inline-wrapper">
-                <div class="library-entry-tag-chips-inline" role="list">
-                    @{
-                        var inlineVisible = Math.Min(Entry.Tags.Count, InlineTagChipCap);
-                        var inlineHidden = Entry.Tags.Count - inlineVisible;
-                    }
-                    @for (int i = 0; i < inlineVisible; i++)
-                    {
-                        <span class="library-entry-tag-chip" role="listitem">@Entry.Tags[i]</span>
-                    }
-                </div>
-                @if (inlineHidden > 0)
+                @if (Entry.Tags.Count > 0)
                 {
-                    <button aria-label="@($"Show all {Entry.Tags.Count} tags")"
-                        class="button library-entry-tag-chip-more"
-                        @onclick="ToggleEditTagsMode"
-                        title="@string.Join(", ", Entry.Tags.Skip(inlineVisible))"
-                        type="button">
-                        +@inlineHidden more
-                    </button>
+                    <div class="library-entry-tag-chips-inline" role="list">
+                        @{
+                            var inlineVisible = Math.Min(Entry.Tags.Count, InlineTagChipCap);
+                            var inlineHidden = Entry.Tags.Count - inlineVisible;
+                        }
+                        @for (int i = 0; i < inlineVisible; i++)
+                        {
+                            var tag = Entry.Tags[i];
+                            <span class="library-entry-tag-chip" role="listitem">
+                                <span class="library-entry-tag-chip-label">@tag</span>
+                                <button aria-label="@($"Remove tag {tag}")"
+                                    class="library-entry-tag-chip-remove"
+                                    @onclick="@(() => OnRemoveTagAsync(tag))"
+                                    @onclick:stopPropagation="true"
+                                    type="button">
+                                    <i aria-hidden="true" class="bi bi-x"></i>
+                                </button>
+                            </span>
+                        }
+                    </div>
+
+                    @if (inlineHidden > 0)
+                    {
+                        <button aria-label="@($"Show all {Entry.Tags.Count} tags")"
+                            class="button library-entry-tag-chip-more"
+                            @onclick="ToggleEditTagsMode"
+                            title="@string.Join(", ", Entry.Tags.Skip(inlineVisible))"
+                            type="button">
+                            +@inlineHidden more
+                        </button>
+                    }
                 }
+                <button aria-label="@(Entry.Tags.Count == 0 ? $"Add tags to {Entry.Name}" : $"Edit tags for {Entry.Name}")"
+                    class="button icon-button library-entry-tag-add-inline"
+                    @onclick="ToggleEditTagsMode"
+                    title="@(Entry.Tags.Count == 0 ? "Add tags" : "Edit tags")"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-plus-circle"></i>
+                </button>
             </div>
         }
 
@@ -92,40 +113,31 @@
         </button>
     </div>
 
-    @if (_isEditingTags || Entry.Tags.Count == 0)
+    @if (_isEditingTags)
     {
         <div class="library-entry-row-tags-edit">
-            @if (_isEditingTags)
-            {
-                <TagPicker AriaLabel="@($"Tags for {Entry.Name}")"
-                    SuggestionSource="@AllLibraryTags"
-                    Value="@Entry.Tags"
-                    ValueChanged="@OnTagsChangedAsync" />
+            <TagPicker AriaLabel="@($"Tags for {Entry.Name}")"
+                SuggestionSource="@AllLibraryTags"
+                Value="@Entry.Tags"
+                ValueChanged="@OnTagsChangedAsync" />
 
-                <button aria-label="Done editing tags"
-                    class="button icon-button library-entry-tags-done"
-                    @onclick="ToggleEditTagsMode"
-                    title="Done"
-                    type="button">
-                    <i aria-hidden="true" class="bi bi-check2"></i>
-                </button>
-            }
-            else
-            {
-                <button aria-label="@($"Add tags to {Entry.Name}")"
-                    class="button library-entry-tags-add"
-                    @onclick="ToggleEditTagsMode"
-                    type="button">
-                    <i aria-hidden="true" class="bi bi-plus"></i> Add tags
-                </button>
-            }
+            <button aria-label="Done editing tags"
+                class="button icon-button library-entry-tags-done"
+                @onclick="ToggleEditTagsMode"
+                title="Done"
+                type="button">
+                <i aria-hidden="true" class="bi bi-check2"></i>
+            </button>
         </div>
     }
 
-    @if (Entry is LibraryEntryFilterSet expandedSet && _isExpanded)
+    @if (Entry is LibraryEntryFilterSet expandedSet)
     {
-        <div class="library-entry-row-expanded" id="@_filterEditorRegionId">
-            <LibraryEntryFilterEditor FilterSet="@expandedSet" IsExpanded="true" />
+        <div class="library-entry-row-expanded" hidden="@(!_isExpanded)" id="@_filterEditorRegionId">
+            @if (_isExpanded)
+            {
+                <LibraryEntryFilterEditor FilterSet="@expandedSet" IsExpanded="true" />
+            }
         </div>
     }
 </article>

@@ -11,6 +11,8 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 0.5rem;
+
+    min-height: var(--control-height);
 }
 
 .filter-edit-panel-content {
@@ -31,6 +33,7 @@
     gap: 0.5rem;
 
     flex: 0 0 auto;
+    margin-left: auto;
 }
 
 /* Save is the primary action in edit mode \u2014 elevate from the global ghost-style

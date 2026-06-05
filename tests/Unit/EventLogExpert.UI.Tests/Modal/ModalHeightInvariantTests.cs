@@ -8,7 +8,7 @@ namespace EventLogExpert.UI.Tests.Modal;
 public sealed class ModalHeightInvariantTests
 {
     private static readonly Regex s_flexBodyLayoutRegex = new(
-        @"\bBodyLayout\s*=\s*""ModalBodyLayout\.Flex""",
+        @"\bBodyLayout\s*=\s*""@?ModalBodyLayout\.Flex""",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private static readonly Regex s_heightAttrRegex = new(

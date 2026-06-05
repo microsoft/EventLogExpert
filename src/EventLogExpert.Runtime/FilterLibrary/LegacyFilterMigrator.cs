@@ -66,14 +66,7 @@ internal sealed class LegacyFilterMigrator(ILegacyPreferences preferences, ITrac
 
             if (favoritesSucceeded)
             {
-                if (BackslashMigrationFeature.IsEnabled)
-                {
-                    builder.AddRange(localFavoriteEntries.Select(LibraryEntryTagNormalizer.MigrateBackslashName));
-                }
-                else
-                {
-                    builder.AddRange(localFavoriteEntries);
-                }
+                builder.AddRange(localFavoriteEntries);
 
                 successful |= LegacyMigrationSections.Favorites;
             }

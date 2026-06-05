@@ -110,10 +110,28 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
-    private string? ValidationError =>
-        InlineAlert is { IsPrompt: true, Validate: { } validator }
-            ? validator(_inlineAlertPromptValue ?? string.Empty)
-            : null;
+    private InlineAlertRequest? _validationCacheAlert;
+    private string? _validationCacheValue;
+    private string? _validationCacheError;
+
+    private string? ValidationError
+    {
+        get
+        {
+            if (InlineAlert is not { IsPrompt: true, Validate: { } validator }) { return null; }
+
+            var value = _inlineAlertPromptValue;
+
+            if (!ReferenceEquals(_validationCacheAlert, InlineAlert) || _validationCacheValue != value)
+            {
+                _validationCacheAlert = InlineAlert;
+                _validationCacheValue = value;
+                _validationCacheError = validator(value);
+            }
+
+            return _validationCacheError;
+        }
+    }
 
     public async Task CloseAsync()
     {

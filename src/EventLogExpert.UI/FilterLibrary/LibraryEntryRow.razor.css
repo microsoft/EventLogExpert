@@ -77,15 +77,64 @@
 }
 
 .library-entry-tag-chip {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     align-self: center;
+    height: 22px;
     padding: 0 .375rem;
     color: var(--text-primary);
-    background-color: var(--background-darkgray);
-    border-radius: .2rem;
-    font-size: .8rem;
-    line-height: 1.4;
+    background-color: color-mix(in srgb, currentColor 8%, transparent);
+    border-radius: 4px;
+    font-size: .75rem;
+    font-weight: 500;
+    line-height: 1;
     white-space: nowrap;
+    transition: background-color 120ms ease;
+}
+
+.library-entry-tag-chip:hover {
+    background-color: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.library-entry-tag-chip-label {
+    margin-right: .125rem;
+}
+
+.library-entry-tag-chip-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0;
+    height: 16px;
+    padding: 0;
+    margin: 0;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    opacity: 0;
+    overflow: hidden;
+    transition: width 120ms ease, opacity 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.library-entry-tag-chip:hover .library-entry-tag-chip-remove,
+.library-entry-tag-chip:focus-within .library-entry-tag-chip-remove {
+    width: 16px;
+    opacity: 0.6;
+    margin-left: 2px;
+}
+
+.library-entry-tag-chip-remove:hover {
+    opacity: 1;
+    color: var(--clr-red);
+    background: color-mix(in srgb, var(--clr-red) 14%, transparent);
+}
+
+.library-entry-tag-chip-remove:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--clr-statusbar);
+    outline-offset: 1px;
 }
 
 .library-entry-tag-chip-more {
@@ -93,21 +142,52 @@
     padding: 0 .375rem;
     font-size: .75rem;
     color: var(--text-secondary);
-    border: 1px dashed var(--clr-statusbar);
+    background: transparent;
+    border: none;
     border-radius: .2rem;
+}
+
+.library-entry-tag-chip-more:hover {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.library-entry-tag-add-inline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    padding: 0;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.library-entry-tag-add-inline > .bi {
+    font-size: 14px;
+    line-height: 1;
+}
+
+.library-entry-tag-add-inline:hover,
+.library-entry-tag-add-inline:focus-visible {
+    color: var(--clr-statusbar);
+    background: color-mix(in srgb, var(--clr-statusbar) 10%, transparent);
+}
+
+.library-entry-tag-add-inline:focus-visible {
+    outline: 2px solid var(--clr-statusbar);
+    outline-offset: 1px;
 }
 
 .library-entry-tags-done {
     padding: 0 .25rem;
     flex-shrink: 0;
-}
-
-.library-entry-tags-add {
-    padding: 0 .375rem;
-    font-size: .75rem;
-    color: var(--text-secondary);
-    border: 1px dashed var(--clr-statusbar);
-    border-radius: .2rem;
 }
 
 .library-entry-row-tags-edit {
@@ -119,6 +199,94 @@
 
 .library-entry-row-expanded {
     padding: .25rem .5rem;
-    margin: .25rem 0 0 1.75rem;
+    margin: .25rem 0 0 0;
     border-left: 2px solid var(--clr-statusbar);
+}
+
+.library-entry-row-expanded ::deep .filter-edit-panel-row {
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+}
+
+.library-entry-row-expanded ::deep .dropdown-input {
+    margin: 0;
+}
+
+.library-entry-row-expanded ::deep .input.advanced-filter {
+    flex: 1 1 auto;
+    min-width: 280px;
+    width: 100%;
+    max-width: none;
+}
+
+.library-entry-row-expanded ::deep .filter-row-text {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.library-entry-row-expanded ::deep .filter-edit-panel-content {
+    flex-wrap: wrap;
+    align-items: center;
+    min-width: 0;
+    gap: .5rem;
+}
+
+.library-entry-row-expanded ::deep .filter-row-structured {
+    display: contents;
+}
+
+.library-entry-row-expanded ::deep .input.advanced-filter {
+    flex: 1 1 auto;
+    min-width: 280px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+}
+
+.library-entry-row-expanded ::deep .input {
+    margin: 0;
+}
+
+.library-entry-row-expanded ::deep .filter-row-text {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.library-entry-row-expanded ::deep .filter-row-structured > .dropdown-input {
+    flex: 0 0 auto;
+}
+
+.library-entry-row-expanded ::deep .filter-row-structured > .dropdown-input:has(.filter-value-dropdown),
+.library-entry-row-expanded ::deep .filter-row-structured > .dropdown-input:has(.filter-multiselect-dropdown),
+.library-entry-row-expanded ::deep .filter-row-structured > .input.filter-description {
+    flex: 0 0 auto;
+}
+
+.library-entry-row-expanded ::deep .filter-row-structured > .dropdown-input:has(.filter-value-dropdown) > .input.filter-value-dropdown,
+.library-entry-row-expanded ::deep .filter-row-structured > .dropdown-input:has(.filter-multiselect-dropdown) > .input.filter-multiselect-dropdown {
+    width: 180px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.library-entry-row-expanded ::deep .filter-predicate-list-wrapper .filter-predicate-editing {
+    flex: 1 1 100%;
+    order: 20;
+}
+
+.library-entry-row-expanded ::deep .filter-row-structured > .filter-predicate-list-wrapper:has(.filter-predicate-list > :nth-child(2)) {
+    flex: 1 1 100%;
+    order: 10;
+    margin-top: .25rem;
+}
+
+.library-entry-row-expanded ::deep .filter-edit-panel-actions {
+    align-self: stretch;
+    justify-content: flex-end;
+    min-height: var(--control-height);
+    align-items: center;
+    margin-left: 0;
 }

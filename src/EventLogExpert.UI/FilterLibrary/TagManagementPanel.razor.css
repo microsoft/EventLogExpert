@@ -1,0 +1,52 @@
+.library-tag-management-panel {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: .375rem;
+    padding: .5rem;
+    margin-top: .25rem;
+    border: 1px solid var(--border-divider);
+    border-radius: .25rem;
+    background: var(--background-darkgray);
+}
+
+.library-tag-management-search input {
+    width: 100%;
+}
+
+.library-tag-management-rows {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.library-tag-management-row {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+    padding: .125rem .25rem;
+}
+
+.library-tag-management-row-name {
+    flex: 0 1 auto;
+    min-width: 6rem;
+    color: var(--text-primary);
+}
+
+.library-tag-management-row-count {
+    color: var(--text-secondary);
+    font-size: .8rem;
+}
+
+.library-tag-management-row-confirm {
+    color: var(--text-error);
+    font-size: .8rem;
+    margin-left: auto;
+}
+
+.library-tag-management-row-edit-input {
+    flex: 0 1 auto;
+    min-width: 8rem;
+}

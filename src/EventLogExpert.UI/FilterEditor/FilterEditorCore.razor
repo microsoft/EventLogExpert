@@ -13,9 +13,9 @@
         @if (Filter is { } filter)
         {
             <span class="filter-row-mode">
-                <label aria-label="Filter Mode" id="@($"{Id}_Mode")">Mode: </label>
+                <label class="visually-hidden" id="@($"{Id}_Mode")">Filter mode</label>
                 <ValueSelect AriaLabelledBy="@($"{Id}_Mode")"
-                    CssClass="input filter-dropdown"
+                    CssClass="input filter-dropdown filter-mode-dropdown"
                     T="FilterMode"
                     ToStringFunc="@(GetFilterModeDisplayLabel)"
                     Value="filter.Mode"

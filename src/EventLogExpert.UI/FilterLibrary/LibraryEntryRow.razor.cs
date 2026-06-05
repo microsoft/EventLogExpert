@@ -21,12 +21,14 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     private readonly string _filterEditorRegionId = $"lefr-{Guid.NewGuid():N}";
     private readonly string _tagsRegionId = $"library-entry-tags-{Guid.NewGuid().ToString()[..8]}";
+    private ElementReference _articleRef;
 
     private bool _isEditingTags;
     private bool _isExpanded;
     private ElementReference _moreMenuButtonRef;
     private long _moreMenuId;
     private bool _pendingFocusMoreButton;
+    private bool _pendingScrollEditIntoView;
 
     [Parameter][EditorRequired] public LibraryTab ActiveTab { get; set; }
 
@@ -103,6 +105,15 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         {
             _pendingFocusMoreButton = false;
             await FocusMoreActionsButtonAsync();
+        }
+
+        if (_pendingScrollEditIntoView)
+        {
+            _pendingScrollEditIntoView = false;
+
+            try { await JSRuntime.InvokeVoidAsync("scrollElementIntoView", _articleRef); }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -262,6 +273,25 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         AnnouncementService.Announce($"Added filter to new filter set '{name}'");
     }
 
+    private Task OnRemoveTagAsync(string tag)
+    {
+        var newTags = Entry.Tags.RemoveAll(t => string.Equals(t, tag, StringComparison.Ordinal));
+
+        if (newTags.Count == Entry.Tags.Count) { return Task.CompletedTask; }
+
+        var updated = Entry switch
+        {
+            LibraryEntrySavedFilter f => f with { Tags = newTags },
+            LibraryEntryFilterSet fs => fs with { Tags = newTags },
+            _ => Entry,
+        };
+
+        FilterLibraryCommands.UpdateEntry(updated);
+        AnnouncementService.Announce($"Removed tag '{tag}' from {Entry.Name}");
+
+        return Task.CompletedTask;
+    }
+
     private async Task OnRenameAsync()
     {
         var newName = await AlertDialogService.DisplayPrompt(
@@ -345,7 +375,12 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
             : $"Removed {Entry.Name} from favorites");
     }
 
-    private void ToggleEditTagsMode() => _isEditingTags = !_isEditingTags;
+    private void ToggleEditTagsMode()
+    {
+        _isEditingTags = !_isEditingTags;
+
+        if (_isEditingTags) { _pendingScrollEditIntoView = true; }
+    }
 
     private void ToggleExpand() => _isExpanded = !_isExpanded;
 

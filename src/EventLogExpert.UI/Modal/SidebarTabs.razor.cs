@@ -106,11 +106,15 @@ public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
     {
         var index = FindTabIndex(current);
 
+        if (index < 0) { return Tabs[0].Tab; }
+
         return index < Tabs.Count - 1 ? Tabs[index + 1].Tab : Tabs[0].Tab;
     }
 
     private async Task OnTabKeyDownAsync(KeyboardEventArgs e, TTab tab)
     {
+        if (Tabs.Count == 0) { return; }
+
         TTab? target = e.Key switch
         {
             "ArrowDown" => NextTab(tab),
@@ -128,6 +132,8 @@ public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
     private TTab PrevTab(TTab current)
     {
         var index = FindTabIndex(current);
+
+        if (index < 0) { return Tabs[^1].Tab; }
 
         return index > 0 ? Tabs[index - 1].Tab : Tabs[^1].Tab;
     }

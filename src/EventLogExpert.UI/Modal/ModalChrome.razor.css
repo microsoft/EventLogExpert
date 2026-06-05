@@ -127,7 +127,7 @@ dialog[data-body-layout="flex"]:not([style*="--modal-height"]) .dialog-body {
     padding: .25rem .375rem;
 
     color: var(--text-error);
-    background: rgba(192, 57, 43, 0.08);
+    background: color-mix(in srgb, var(--clr-red) 8%, transparent);
     border-radius: .2rem;
     font-size: .85rem;
 }

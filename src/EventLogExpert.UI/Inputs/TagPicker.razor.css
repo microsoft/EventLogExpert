@@ -54,6 +54,10 @@
     color: var(--clr-red);
 }
 
+.tag-picker-input-wrapper {
+    display: contents;
+}
+
 .tag-picker-input {
     flex: 1 1 auto;
     min-width: 4rem;

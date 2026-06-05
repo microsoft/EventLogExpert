@@ -297,6 +297,8 @@ input[type="text"].input { padding: 0; }
 
 .input.filter-dropdown { width: 120px; }
 
+.input.filter-mode-dropdown { width: 90px; }
+
 .input.timezone-dropdown { width: 350px; }
 
 .input.cache-dropdown,

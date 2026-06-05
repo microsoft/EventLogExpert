@@ -11,7 +11,7 @@ internal static class FilterLibraryDedupKeys
     {
         ArgumentNullException.ThrowIfNull(filterSet);
 
-        var sb = new StringBuilder();
+        var sb = new StringBuilder("fs|");
         AppendLengthPrefixed(sb, filterSet.Name.ToLowerInvariant());
 
         foreach (var f in filterSet.Filters)
@@ -29,7 +29,7 @@ internal static class FilterLibraryDedupKeys
     {
         ArgumentNullException.ThrowIfNull(filterSet);
 
-        var sb = new StringBuilder();
+        var sb = new StringBuilder("fs|");
         AppendLengthPrefixed(sb, filterSet.Name.ToLowerInvariant());
 
         foreach (var f in filterSet.Filters)
@@ -45,7 +45,7 @@ internal static class FilterLibraryDedupKeys
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        var sb = new StringBuilder();
+        var sb = new StringBuilder("sf|");
         AppendLengthPrefixed(sb, entry.Name.ToLowerInvariant());
         AppendLengthPrefixed(sb, entry.Filter.ComparisonText.ToLowerInvariant());
         sb.Append('|').Append(entry.Filter.Mode).Append('|').Append(entry.Filter.IsExcluded);
@@ -59,7 +59,7 @@ internal static class FilterLibraryDedupKeys
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        var sb = new StringBuilder();
+        var sb = new StringBuilder("sf|");
         AppendLengthPrefixed(sb, entry.Name.ToLowerInvariant());
         AppendLengthPrefixed(sb, entry.Filter.ComparisonText.ToLowerInvariant());
         sb.Append('|').Append(entry.Filter.Mode).Append('|').Append(entry.Filter.IsExcluded);

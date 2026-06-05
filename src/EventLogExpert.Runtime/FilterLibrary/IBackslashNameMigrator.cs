@@ -5,7 +5,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.FilterLibrary;
 
-public interface IBackslashNameMigrator
+internal interface IBackslashNameMigrator
 {
     BackslashMigrationResult BuildMigrationPlan(IReadOnlyList<LibraryEntry> currentEntries);
 
@@ -14,6 +14,6 @@ public interface IBackslashNameMigrator
     bool ShouldRunMigration();
 }
 
-public sealed record BackslashMigrationResult(
+internal sealed record BackslashMigrationResult(
     ImmutableList<LibraryEntry> UpdatedEntries,
     int CollisionsDisambiguated);

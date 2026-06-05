@@ -339,6 +339,19 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
+    public async Task RemovingInlineTagChip_DispatchesUpdateEntryWithoutThatTag()
+    {
+        var entry = BuildSavedFilter("X") with { Tags = ["bug", "perf"] };
+        var component = RenderRow(entry);
+
+        await component.Find("button[aria-label='Remove tag bug']").ClickAsync(new MouseEventArgs());
+
+        _commands.Received(1).UpdateEntry(Arg.Is<LibraryEntry>(
+            e => e.Id == entry.Id && e.Tags.SequenceEqual(new[] { "perf" })));
+        _announcements.Received(1).Announce("Removed tag 'bug' from X");
+    }
+
+    [Fact]
     public void Render_FilterEntry_ShowsKindIcon()
     {
         var entry = BuildSavedFilter("F");
