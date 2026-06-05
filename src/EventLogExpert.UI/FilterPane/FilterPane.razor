@@ -166,7 +166,17 @@
                             ValueChanged="id => SelectedFilterSetId = id">
                             @foreach (var filterSet in FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
                             {
-                                <ValueSelectItem T="LibraryEntryId" Value="filterSet.Id">@filterSet.Name</ValueSelectItem>
+                                var tagDetail = filterSet.Tags.Count > 0 ? $" · {string.Join(", ", filterSet.Tags)}" : "";
+                                var rowTitle = $"{filterSet.Name} ({filterSet.Filters.Count} filter{(filterSet.Filters.Count == 1 ? "" : "s")}{tagDetail})";
+
+                                <ValueSelectItem T="LibraryEntryId" Value="filterSet.Id">
+                                    <span class="filter-set-option-row" title="@rowTitle">
+                                        <span class="filter-set-option-name">@filterSet.Name</span>
+                                        <span class="filter-set-option-meta">
+                                            (@filterSet.Filters.Count filter@(filterSet.Filters.Count == 1 ? "" : "s")@tagDetail)
+                                        </span>
+                                    </span>
+                                </ValueSelectItem>
                             }
                         </ValueSelect>
                     </span>

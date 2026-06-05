@@ -72,3 +72,31 @@
     font-style: italic;
     padding: 0.25rem 0.5rem;
 }
+
+.filter-set-option-row {
+    display: flex;
+    align-items: baseline;
+    gap: .375rem;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.filter-set-option-name {
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.filter-set-option-meta {
+    flex: 0 1 auto;
+    color: currentColor;
+    opacity: 0.75;
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+

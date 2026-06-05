@@ -26,19 +26,3 @@
 .filter-row-structured ::deep .input.filter-description {
     width: 280px;
 }
-
-::deep .cached-favorite-icon,
-::deep .cached-favorite-icon-placeholder {
-    display: inline-block;
-    width: 1rem;
-    margin-right: 0.4rem;
-    text-align: center;
-}
-
-::deep .cached-favorite-icon { color: var(--clr-yellow); }
-
-::deep .cached-option-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
