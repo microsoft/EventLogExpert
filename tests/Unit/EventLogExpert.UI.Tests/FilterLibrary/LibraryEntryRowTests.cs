@@ -314,7 +314,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         var entry = BuildSavedFilter("X");
         bool invoked = false;
         var component = RenderRow(entry, OnAddToFilterSet: _ => { invoked = true; return Task.CompletedTask; });
-        _alerts.DisplayPrompt(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns("");
+        _alerts.DisplayPrompt(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Func<string, string?>>()).Returns("");
 
         var items = await CapturedMoreMenuItemsAsync(component);
         await items.First(i => i.Label == "Add to filter set...").Children!.First().OnClickAsync!.Invoke();
@@ -328,7 +328,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         var entry = BuildSavedFilter("X");
         AddToFilterSetIntent? captured = null;
         var component = RenderRow(entry, OnAddToFilterSet: i => { captured = i; return Task.CompletedTask; });
-        _alerts.DisplayPrompt(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns("My Preset");
+        _alerts.DisplayPrompt(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Func<string, string?>>()).Returns("My Preset");
 
         var items = await CapturedMoreMenuItemsAsync(component);
         await items.First(i => i.Label == "Add to filter set...").Children!.First().OnClickAsync!.Invoke();

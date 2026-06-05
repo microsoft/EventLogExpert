@@ -60,7 +60,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         SetState(new FilterLibraryState { Entries = [entry], IsLoaded = true });
 
         var component = Render<FilterLibraryModal>();
-        await component.Find(".library-entry-row button.button-green").ClickAsync(new MouseEventArgs());
+        await component.Find(".library-entry button.button-green").ClickAsync(new MouseEventArgs());
 
         _commands.Received(1).ApplyEntry(entry.Id);
         _modalService.Received(1).Complete(_modalId, Arg.Is<object?>(v => Equals(v, true)));
@@ -149,6 +149,17 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var names = component.FindAll(".sidebar-tabs-tabpanel.active .library-entry-name-text").Select(n => n.TextContent.Trim()).ToList();
         Assert.Equal(["Alpha", "Beta"], names);
+    }
+
+    [Fact]
+    public void FilterLibraryModal_RegistersAsInlineAlertHost()
+    {
+        var entry = BuildSavedFilter("S");
+        SetState(new FilterLibraryState { Entries = [entry], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        _modalCoordinator.Received().RegisterModal(Arg.Is<ModalRegistration>(r => r.InlineAlertHost == component.Instance));
     }
 
     [Fact]
@@ -267,7 +278,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         var component = Render<FilterLibraryModal>();
 
         // Only the active (Saved) tab should render its row; the other two tabpanels are empty.
-        Assert.Single(component.FindAll(".library-entry-row"));
+        Assert.Single(component.FindAll(".library-entry"));
     }
 
     [Fact]
@@ -484,9 +495,80 @@ public sealed class FilterLibraryModalTests : BunitContext
             .Single(c => c.TextContent.Trim() == "special");
         await specialChip.ClickAsync(new MouseEventArgs());
 
-        var rows = component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry-row");
+        var rows = component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry");
         Assert.Single(rows);
         Assert.Contains("ancient-tagged", rows[0].TextContent);
+    }
+
+    [Fact]
+    public async Task TagFilterBar_EscWithActiveTags_ClearsTagsAndVetoesClose()
+    {
+        var alpha = BuildSavedFilter("alphaEntry") with { Tags = ["alpha"] };
+        var beta = BuildSavedFilter("betaEntry") with { Tags = ["beta"] };
+        SetState(new FilterLibraryState { Entries = [alpha, beta], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        var alphaChip = component.Find("[role='tabpanel'].active .library-tag-filter-chip");
+        await alphaChip.ClickAsync(new MouseEventArgs());
+
+        Assert.Single(component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry"));
+
+        var bar = component.Find(".library-tag-filter-bar");
+        await bar.KeyDownAsync(new KeyboardEventArgs { Key = "Escape" });
+
+        Assert.Equal(2, component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry").Length);
+        _announcements.Received().Announce(Arg.Is<string>(s => s.Contains("Tag filters cleared")));
+    }
+
+    [Fact]
+    public async Task TagFilterBar_EscWithNoActiveTags_DoesNotAnnounceClear()
+    {
+        var alpha = BuildSavedFilter("alphaEntry") with { Tags = ["alpha"] };
+        SetState(new FilterLibraryState { Entries = [alpha], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        var bar = component.Find(".library-tag-filter-bar");
+        await bar.KeyDownAsync(new KeyboardEventArgs { Key = "Escape" });
+
+        _announcements.DidNotReceive().Announce(Arg.Is<string>(s => s.Contains("Tag filters cleared")));
+    }
+
+    [Fact]
+    public async Task TagFilterBar_MoreThan10Tags_OverflowButtonRendered()
+    {
+        var entries = Enumerable.Range(1, 12)
+            .Select(i => BuildSavedFilter($"entry{i}") with { Tags = [$"tag{i:D2}"] })
+            .ToList();
+        SetState(new FilterLibraryState { Entries = [.. entries], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        var bar = component.Find(".library-tag-filter-bar");
+        var visibleChips = bar.QuerySelectorAll(".library-tag-filter-chip");
+        var overflowButton = bar.QuerySelector(".library-tag-filter-chip-overflow");
+
+        Assert.Equal(10, visibleChips.Length);
+        Assert.NotNull(overflowButton);
+        Assert.Contains("+2 more", overflowButton.TextContent);
+        Assert.Equal("false", overflowButton.GetAttribute("aria-expanded"));
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task TagFilterBar_OverflowButton_Click_ExpandsAndRendersRemainingChips()
+    {
+        var entries = Enumerable.Range(1, 12)
+            .Select(i => BuildSavedFilter($"entry{i}") with { Tags = [$"tag{i:D2}"] })
+            .ToList();
+        SetState(new FilterLibraryState { Entries = [.. entries], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        var overflowButton = component.Find(".library-tag-filter-chip-overflow");
+        await overflowButton.ClickAsync(new MouseEventArgs());
+
+        var expandedOverflow = component.Find(".library-tag-filter-bar-overflow");
+        var overflowChips = expandedOverflow.QuerySelectorAll(".library-tag-filter-chip");
+        Assert.Equal(2, overflowChips.Length);
+        Assert.Equal("true", component.Find(".library-tag-filter-chip-overflow").GetAttribute("aria-expanded"));
     }
 
     [Fact]
@@ -510,7 +592,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         {
             Assert.Equal("false", chip.GetAttribute("aria-pressed"));
         }
-        Assert.Single(favPanel.QuerySelectorAll(".library-entry-row"));
+        Assert.Single(favPanel.QuerySelectorAll(".library-entry"));
     }
 
     [Fact]
@@ -529,7 +611,7 @@ public sealed class FilterLibraryModalTests : BunitContext
             .QuerySelectorAll(".library-tag-filter-chip")[0]
             .ClickAsync(new MouseEventArgs());
 
-        Assert.Equal(2, component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry-row").Length);
+        Assert.Equal(2, component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry").Length);
     }
 
     [Fact]
@@ -541,13 +623,13 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var component = Render<FilterLibraryModal>();
 
-        Assert.Equal(2, component.FindAll(".library-entry-row").Count);
+        Assert.Equal(2, component.FindAll(".library-entry").Count);
 
         var activePanel = component.Find("[role='tabpanel'].active");
         var alphaChip = activePanel.QuerySelectorAll(".library-tag-filter-chip")[0];
         await alphaChip.ClickAsync(new MouseEventArgs());
 
-        var visibleRows = component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry-row");
+        var visibleRows = component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry");
         Assert.Single(visibleRows);
         Assert.Contains("alphaEntry", visibleRows[0].TextContent);
     }

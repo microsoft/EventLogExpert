@@ -5,9 +5,11 @@ using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterLibrary;
+using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.Modal;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using System.Collections.Immutable;
 using System.Security;
 
@@ -15,6 +17,8 @@ namespace EventLogExpert.UI.FilterLibrary;
 
 public sealed partial class FilterLibraryModal : ModalBase<bool>
 {
+    private const int TagFilterBarMaxVisible = 10;
+
     private static readonly (LibraryTab Tab, string Label)[] s_tabs =
     [
         (LibraryTab.Saved, "Saved"),
@@ -31,7 +35,11 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         [LibraryTab.PreviouslyUsed] = [],
     };
 
+    private readonly string _tagOverflowRegionId = $"tag-overflow-{Guid.NewGuid():N}";
+
     private LibraryTab _activeTab = LibraryTab.Saved;
+    private bool _isTagOverflowExpanded;
+    private bool _justClearedTags;
     private LibraryTab? _pendingFocusSourceTab;
     private LibraryEntryId? _pendingFocusTargetEntryId;
     private bool _pendingFocusToActiveTab;
@@ -271,6 +279,18 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         }
     }
 
+    protected override Task<bool> OnRequestCloseAsync(ModalCloseRequest request)
+    {
+        if (request.Reason != ModalCloseReason.UserDismiss || !_justClearedTags)
+        {
+            return base.OnRequestCloseAsync(request);
+        }
+
+        _justClearedTags = false;
+
+        return Task.FromResult(false);
+    }
+
     private static bool MatchesTagFilter(LibraryEntry entry, ImmutableList<string> selectedTags) =>
         selectedTags.Count == 0 || selectedTags.All(t => entry.Tags.Contains(t, StringComparer.Ordinal));
 
@@ -367,6 +387,18 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     }
 
     private void HandleSaveToLibrary(LibraryEntryId id) => FilterLibraryCommands.SaveEntry(id);
+
+    private void HandleTagFilterBarKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key != "Escape") { return; }
+
+        if (!_selectedTagsByTab.TryGetValue(_activeTab, out var current) || current.Count == 0) { return; }
+
+        _selectedTagsByTab[_activeTab] = ImmutableList<string>.Empty;
+        _justClearedTags = true;
+        AnnouncementService.Announce("Tag filters cleared");
+        StateHasChanged();
+    }
 
     private void HandleToggleFavorite(FavoriteToggleIntent intent) =>
         FilterLibraryCommands.SetIsFavorite(intent.EntryId, intent.NewIsFavorite);
@@ -481,11 +513,15 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private void ToggleTagFilter(string tag)
     {
         var current = _selectedTagsByTab[_activeTab];
-
         _selectedTagsByTab[_activeTab] = current.Contains(tag, StringComparer.Ordinal)
             ? current.Remove(tag, StringComparer.Ordinal)
             : current.Add(tag);
 
         StateHasChanged();
+    }
+
+    private void ToggleTagOverflowExpanded()
+    {
+        _isTagOverflowExpanded = !_isTagOverflowExpanded;
     }
 }

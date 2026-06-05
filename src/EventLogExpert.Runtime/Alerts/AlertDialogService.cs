@@ -23,10 +23,13 @@ public sealed class AlertDialogService(
     private readonly Func<IReadOnlyDictionary<string, object?>, Task<string>> _openStandalonePrompt =
         openStandalonePrompt;
 
-    public Task<string> DisplayPrompt(string title, string message) => DisplayPromptCore(title, message, null);
+    public Task<string> DisplayPrompt(string title, string message) => DisplayPromptCore(title, message, null, null);
 
     public Task<string> DisplayPrompt(string title, string message, string initialValue) =>
-        DisplayPromptCore(title, message, initialValue);
+        DisplayPromptCore(title, message, initialValue, null);
+
+    public Task<string> DisplayPrompt(string title, string message, string initialValue, Func<string, string?>? validate) =>
+        DisplayPromptCore(title, message, initialValue, validate);
 
     public Task ShowAlert(string title, string message, string cancel) =>
         ShowAlert(title, message, cancel, AlertPresentation.Auto);
@@ -62,7 +65,7 @@ public sealed class AlertDialogService(
         return Task.CompletedTask;
     }
 
-    private Task<string> DisplayPromptCore(string title, string message, string? initialValue) =>
+    private Task<string> DisplayPromptCore(string title, string message, string? initialValue, Func<string, string?>? validate) =>
         InvokeOnMainThreadAsync(async () =>
         {
             if (!_modalCoordinator.TryGetInlineAlertHost(out var host))
@@ -78,7 +81,10 @@ public sealed class AlertDialogService(
             try
             {
                 InlineAlertResult result = await host.ShowInlineAlertAsync(
-                    new InlineAlertRequest(title, message, "OK", "Cancel", true, initialValue),
+                    new InlineAlertRequest(title, message, "OK", "Cancel", true, initialValue)
+                    {
+                        Validate = validate,
+                    },
                     CancellationToken.None);
 
                 return result.Accepted ? result.PromptValue ?? string.Empty : string.Empty;
