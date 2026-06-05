@@ -1,10 +1,12 @@
 .toggle {
-    /* WCAG 2.5.5 AA: 24x24px minimum hit target (visible track is 36x18). */
+    /* WCAG 2.5.5 AA: 24x24px minimum hit target (visible track is 36x20). */
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 24px;
+    box-sizing: border-box;
+    height: var(--control-height);
     padding: 4px;
+    line-height: 1;
 
     cursor: pointer;
     user-select: none;
@@ -24,26 +26,28 @@
     white-space: nowrap;
 }
 
-/* Track: 36x18 border-box (1px borders included); inner box = 34x16. */
+/* Track: 36x20 border-box (1px borders included); inner box = 34x18. */
 .toggle-track {
     box-sizing: border-box;
     position: relative;
 
     display: inline-block;
     width: 36px;
-    height: 18px;
+    height: 20px;
 
     background-color: var(--background-darkgray);
     border: 1px solid var(--border-divider);
-    border-radius: 9px;
+    border-radius: 10px;
     transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-/* Knob: 14x14, translateX(18px) when checked = symmetric 2px gaps inside the 34x16 inner area. */
+/* Knob: 14x14 centered inside the 34x18 padding box (2px gap on every side).
+   top/left reference the padding box per CSS spec (inside borders), so values
+   are computed as (padding_box_dim - knob_dim) / 2 = (18-14)/2 = 2. */
 .toggle-knob {
     position: absolute;
-    top: 1px;
-    left: 1px;
+    top: 2px;
+    left: 2px;
 
     width: 14px;
     height: 14px;
@@ -59,7 +63,7 @@
 }
 
 .toggle-input:checked + .toggle-track .toggle-knob {
-    transform: translateX(18px);
+    transform: translateX(16px);
     background-color: var(--accent-on-fill);
 }
 

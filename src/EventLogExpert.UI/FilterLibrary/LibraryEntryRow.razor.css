@@ -50,6 +50,7 @@
 
 .library-entry-tracked-badge {
     flex-shrink: 0;
+    align-self: center;
     padding: 0 .25rem;
     background: var(--background-darkgray);
     color: var(--text-secondary);
@@ -77,6 +78,7 @@
 
 .library-entry-tag-chip {
     display: inline-block;
+    align-self: center;
     padding: 0 .375rem;
     color: var(--text-primary);
     background-color: var(--background-darkgray);
@@ -116,7 +118,7 @@
 }
 
 .library-entry-row-expanded {
-    background: var(--surface-inset);
     padding: .25rem .5rem;
     margin: .25rem 0 0 1.75rem;
+    border-left: 2px solid var(--clr-statusbar);
 }

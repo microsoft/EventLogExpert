@@ -17,6 +17,7 @@
                 <ValueSelect AriaLabelledBy="@($"{Id}_Mode")"
                     CssClass="input filter-dropdown"
                     T="FilterMode"
+                    ToStringFunc="@(GetFilterModeDisplayLabel)"
                     Value="filter.Mode"
                     ValueChanged="TryChangeModeAsync">
                     @foreach (var mode in GetAvailableModes(filter))

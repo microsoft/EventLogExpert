@@ -40,6 +40,11 @@
        the bar strip stays clickable while a menu is open. */
     --menu-bar-height: 28px;
 
+    /* Shared height for inline interactive controls (Toggle, icon-button). All
+       inline controls share this so align-items:center in a flex row produces
+       perfect geometric alignment regardless of internal glyph metrics. */
+    --control-height: 32px;
+
     /* Semantic tokens. */
     /* Text color shown on top of an accent fill (e.g. selected rows / menu items
        whose background is var(--clr-lightblue)). */
@@ -359,10 +364,30 @@ input[type="text"].input { padding: 0; }
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    box-sizing: border-box;
 
-    min-width: 24px;
-    min-height: 24px;
+    min-width: var(--control-height);
+    height: var(--control-height);
     padding: 4px;
+    line-height: 1;
+}
+
+/* Bypass Bootstrap Icons' baseline shift (vertical-align: -.125em on ::before) in
+   icon-only contexts so glyphs sit at geometric center alongside other icon buttons
+   and toggles. */
+.button.icon-button > .bi,
+.button.icon-button > i {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    vertical-align: 0;
+}
+
+.button.icon-button > .bi::before,
+.button.icon-button > i::before {
+    vertical-align: 0;
+    line-height: 0;
 }
 
 .split-button {
@@ -390,4 +415,20 @@ input[type="text"].input { padding: 0; }
     border: 1px solid var(--clr-lightblue);
     text-indent: 100%;
     background-color: var(--hl-bg, var(--background-dark));
+}
+
+.cached-favorite-icon,
+.cached-favorite-icon-placeholder {
+    display: inline-block;
+    width: 1rem;
+    margin-right: 0.4rem;
+    text-align: center;
+}
+
+.cached-favorite-icon { color: var(--clr-yellow); }
+
+.cached-option-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }

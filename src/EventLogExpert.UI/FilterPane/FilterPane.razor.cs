@@ -226,6 +226,18 @@ public sealed partial class FilterPane : IDisposable
         base.OnInitialized();
     }
 
+    private static string FormatFilterSetLabel(LibraryEntryFilterSet set)
+    {
+        var detail = $"{set.Filters.Count} filter{(set.Filters.Count == 1 ? string.Empty : "s")}";
+
+        if (set.Tags.Count > 0)
+        {
+            detail = $"{detail} · {string.Join(", ", set.Tags)}";
+        }
+
+        return $"{set.Name}  ({detail})";
+    }
+
     private void AddAdvancedFilter()
     {
         _pendingDrafts.Add(new FilterDraft { Mode = FilterMode.Advanced });
@@ -331,8 +343,12 @@ public sealed partial class FilterPane : IDisposable
         return count;
     }
 
-    private string GetFilterSetName(LibraryEntryId id) =>
-        FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().FirstOrDefault(p => p.Id.Equals(id))?.Name ?? string.Empty;
+    private string GetFilterSetName(LibraryEntryId id)
+    {
+        var set = FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().FirstOrDefault(p => p.Id.Equals(id));
+
+        return set is null ? string.Empty : FormatFilterSetLabel(set);
+    }
 
     private async Task HandleAddFilterChevronKeyDownAsync(KeyboardEventArgs e)
     {
