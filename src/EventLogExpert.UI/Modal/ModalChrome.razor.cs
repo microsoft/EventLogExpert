@@ -12,6 +12,7 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 {
     private readonly string _inlineAlertMessageId = $"modal-inline-alert-message-{Guid.NewGuid():N}";
     private readonly string _inlineAlertTitleId = $"modal-inline-alert-title-{Guid.NewGuid():N}";
+    private readonly string _inlineAlertValidationErrorId = $"modal-inline-alert-validation-{Guid.NewGuid():N}";
     private readonly string _titleId = $"modal-title-{Guid.NewGuid():N}";
 
     private ElementReference _dialogRef;
@@ -108,6 +109,11 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     private bool HasInlineAlert => InlineAlert is not null;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    private string? ValidationError =>
+        InlineAlert is { IsPrompt: true, Validate: { } validator }
+            ? validator(_inlineAlertPromptValue ?? string.Empty)
+            : null;
 
     public async Task CloseAsync()
     {

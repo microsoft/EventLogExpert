@@ -150,12 +150,23 @@
 
             @if (InlineAlert.IsPrompt)
             {
-                <input aria-label="@(string.IsNullOrEmpty(InlineAlert.Title) ? InlineAlert.Message : InlineAlert.Title)"
+                <input aria-describedby="@(ValidationError is not null ? _inlineAlertValidationErrorId : null)"
+                    aria-invalid="@(ValidationError is not null ? "true" : null)"
+                    aria-label="@(string.IsNullOrEmpty(InlineAlert.Title) ? InlineAlert.Message : InlineAlert.Title)"
                     @bind="_inlineAlertPromptValue"
                     @bind:event="oninput"
                     class="inline-alert-input"
                     @ref="_inlineAlertInputRef"
                     type="text" />
+
+                @if (ValidationError is not null)
+                {
+                    <p aria-live="polite"
+                        class="inline-alert-validation-error"
+                        id="@_inlineAlertValidationErrorId">
+                        @ValidationError
+                    </p>
+                }
             }
 
             <div class="inline-alert-buttons">
@@ -163,6 +174,7 @@
                 {
                     <button autofocus="@(!InlineAlert.IsPrompt)"
                         class="button button-green"
+                        disabled="@(ValidationError is not null)"
                         @onclick="HandleInlineAlertAcceptAsync"
                         @ref="_inlineAlertAcceptButtonRef"
                         type="button">

@@ -16,6 +16,7 @@
     --clr-lightblue:    light-dark(#155A9E, #9CDCFE);
     --clr-lightgray:    light-dark(#4A4A4A, #A4B9C0);
     --clr-red:          light-dark(#C0392B, #EF523B);
+    --text-error:       light-dark(#A02020, var(--clr-red));
     --clr-green:        light-dark(#1E7E34, #5AC358);
     --clr-yellow:       light-dark(#8A6D00, #F8C84B);
     --clr-placeholder:  light-dark(#6B6B6B, #A3A1A1);
