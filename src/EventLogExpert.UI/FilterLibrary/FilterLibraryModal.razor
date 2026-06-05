@@ -36,16 +36,50 @@
                 <TabContent Context="tab">
                     @if (AllLibraryTags.Count > 0)
                     {
-                        <div aria-label="Filter by tag" class="library-tag-filter-bar" role="group">
-                            @foreach (var tag in AllLibraryTags)
+                        <div aria-label="Filter by tag"
+                            class="library-tag-filter-bar"
+                            @onkeydown="HandleTagFilterBarKeyDown"
+                            role="group">
+                            <span class="library-tag-filter-bar-label">Tags:</span>
+                            @{
+                                var visibleTags = AllLibraryTags.Take(TagFilterBarMaxVisible).ToList();
+                                var hiddenTagsCount = AllLibraryTags.Count - visibleTags.Count;
+                            }
+                            @foreach (var tag in visibleTags)
                             {
                                 var isSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.Ordinal);
                                 <button aria-pressed="@(isSelected ? "true" : "false")"
-                                    class="library-tag-filter-chip @(isSelected ? "library-tag-filter-chip-selected" : null)"
+                                    class="library-tag-filter-chip"
                                     @onclick="@(() => ToggleTagFilter(tag))"
                                     type="button">
                                     @tag
                                 </button>
+                            }
+                            @if (hiddenTagsCount > 0)
+                            {
+                                <button aria-controls="@_tagOverflowRegionId"
+                                    aria-expanded="@(_isTagOverflowExpanded ? "true" : "false")"
+                                    aria-label="@(_isTagOverflowExpanded ? "Hide additional tags" : $"Show {hiddenTagsCount} additional tags")"
+                                    class="library-tag-filter-chip-overflow"
+                                    @onclick="ToggleTagOverflowExpanded"
+                                    type="button">
+                                    @(_isTagOverflowExpanded ? "− less" : $"+{hiddenTagsCount} more")
+                                </button>
+                            }
+                            @if (_isTagOverflowExpanded && hiddenTagsCount > 0)
+                            {
+                                <div class="library-tag-filter-bar-overflow" id="@_tagOverflowRegionId">
+                                    @foreach (var tag in AllLibraryTags.Skip(TagFilterBarMaxVisible))
+                                    {
+                                        var isOverflowSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.Ordinal);
+                                        <button aria-pressed="@(isOverflowSelected ? "true" : "false")"
+                                            class="library-tag-filter-chip"
+                                            @onclick="@(() => ToggleTagFilter(tag))"
+                                            type="button">
+                                            @tag
+                                        </button>
+                                    }
+                                </div>
                             }
                         </div>
                     }

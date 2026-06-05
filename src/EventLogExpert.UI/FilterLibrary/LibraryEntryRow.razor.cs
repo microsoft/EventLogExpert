@@ -16,13 +16,17 @@ namespace EventLogExpert.UI.FilterLibrary;
 
 public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 {
+    private const int InlineTagChipCap = 2;
     private const int MaxVisibleTagChips = 5;
 
+    private readonly string _filterEditorRegionId = $"lefr-{Guid.NewGuid():N}";
     private readonly string _tagsRegionId = $"library-entry-tags-{Guid.NewGuid().ToString()[..8]}";
-    
+
     private bool _isEditingTags;
+    private bool _isExpanded;
     private ElementReference _moreMenuButtonRef;
     private long _moreMenuId;
+    private bool _pendingFocusMoreButton;
 
     [Parameter][EditorRequired] public LibraryTab ActiveTab { get; set; }
 
@@ -92,6 +96,17 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     }
 
     internal ValueTask<bool> FocusMoreActionsButtonAsync() => ElementFocus.TrySafelyAsync(_moreMenuButtonRef);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingFocusMoreButton)
+        {
+            _pendingFocusMoreButton = false;
+            await FocusMoreActionsButtonAsync();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
 
     protected override void OnInitialized()
     {
@@ -228,7 +243,18 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         var name = await AlertDialogService.DisplayPrompt(
             "Filter set name",
             "What would you like to name this filter set?",
-            "New Filter Set");
+            "New Filter Set",
+            candidate =>
+            {
+                var trimmed = candidate?.Trim() ?? string.Empty;
+
+                if (string.IsNullOrEmpty(trimmed)) { return "Name cannot be empty."; }
+
+                return AllFilterSets.Any(fs => string.Equals(fs.Name, trimmed, StringComparison.OrdinalIgnoreCase)) ?
+                    $"A filter set named '{trimmed}' already exists." : null;
+            });
+
+        _pendingFocusMoreButton = true;
 
         if (string.IsNullOrWhiteSpace(name)) { return; }
 
@@ -241,20 +267,25 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         var newName = await AlertDialogService.DisplayPrompt(
             "Rename entry",
             "What would you like to rename this entry to?",
-            Entry.Name);
+            Entry.Name,
+            candidate =>
+            {
+                var trimmed = candidate?.Trim() ?? string.Empty;
+
+                if (string.IsNullOrEmpty(trimmed)) { return "Name cannot be empty."; }
+
+                if (string.Equals(trimmed, Entry.Name, StringComparison.Ordinal)) { return null; }
+
+                return HasDuplicateNameOfSameKind(trimmed) ? $"An entry named '{trimmed}' already exists." : null;
+            });
+
+        _pendingFocusMoreButton = true;
 
         if (string.IsNullOrWhiteSpace(newName)) { return; }
 
         var trimmed = newName.Trim();
 
         if (string.Equals(trimmed, Entry.Name, StringComparison.Ordinal)) { return; }
-
-        if (HasDuplicateNameOfSameKind(trimmed))
-        {
-            AnnouncementService.Announce($"An entry of the same kind named '{trimmed}' already exists.");
-
-            return;
-        }
 
         FilterLibraryCommands.UpdateEntry(Entry with { Name = trimmed });
         AnnouncementService.Announce($"Renamed entry to '{trimmed}'");
@@ -315,6 +346,8 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     }
 
     private void ToggleEditTagsMode() => _isEditingTags = !_isEditingTags;
+
+    private void ToggleExpand() => _isExpanded = !_isExpanded;
 
     private async Task ToggleMoreMenuAsync()
     {
