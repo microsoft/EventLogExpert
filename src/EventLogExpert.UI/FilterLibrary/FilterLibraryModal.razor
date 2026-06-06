@@ -165,6 +165,7 @@
                 OnAddToFilterSet="@HandleAddToFilterSetAsync"
                 OnApply="@HandleApplyAsync"
                 OnDelete="@HandleDelete"
+                OnDisposed="@OnRowDisposed"
                 OnExportEntry="@HandleExportEntryAsync"
                 OnReplace="@HandleReplaceAsync"
                 OnRequestPendingFocus="@(id => HandleRequestPendingFocusAsync(tab, id))"

@@ -409,6 +409,22 @@ public sealed partial class FilterPane : IDisposable
     // re-renders so the chevron's aria-expanded reflects open/close state.
     private void OnMenuServiceStateChanged() => _ = InvokeAsync(StateHasChanged);
 
+    private void OnRowDisposed(FilterRow row)
+    {
+        FilterId? match = null;
+
+        foreach (var kvp in _rowRefs)
+        {
+            if (ReferenceEquals(kvp.Value, row))
+            {
+                match = kvp.Key;
+                break;
+            }
+        }
+
+        if (match is { } id) { _rowRefs.Remove(id); }
+    }
+
     private async Task OpenAddFilterMenuAsync() => await OpenAddFilterMenuAtAsync(true);
 
     private async Task OpenAddFilterMenuAtAsync(bool focusFirst)
@@ -436,7 +452,7 @@ public sealed partial class FilterPane : IDisposable
         var liveIds = liveFilters.Select(f => f.Id).ToHashSet();
 
         var stale = _rowRefs
-            .Where(kvp => !liveIds.Contains(kvp.Key) || kvp.Value is null)
+            .Where(kvp => kvp.Value is null || !liveIds.Contains(kvp.Key))
             .Select(kvp => kvp.Key)
             .ToList();
 

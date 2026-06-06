@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
@@ -240,7 +241,7 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
 
         backslashMigrator ??= Substitute.For<IBackslashNameMigrator>();
 
-        return new Effects(store, libraryState, paneState, migrator, backslashMigrator, Substitute.For<ITraceLogger>());
+        return new Effects(store, libraryState, paneState, migrator, backslashMigrator, Substitute.For<IAnnouncementService>(), Substitute.For<ITraceLogger>());
     }
 
     private string CreateTempDatabasePath()
@@ -288,5 +289,7 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
             inner.TryDeleteAutoTrackedIfNotFavorite(entryId);
 
         public void Update(LibraryEntry entry) => inner.Update(entry);
+
+        public IReadOnlyList<LibraryEntryId> UpdateRange(IReadOnlyList<LibraryEntry> entries) => inner.UpdateRange(entries);
     }
 }

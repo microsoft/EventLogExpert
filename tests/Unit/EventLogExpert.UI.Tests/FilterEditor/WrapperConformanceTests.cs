@@ -19,6 +19,7 @@ public sealed class WrapperConformanceTests
         "OnPendingSave",
         "OnRemoved",
         "OnEditingChanged",
+        "OnDisposed",
     };
 
     private static readonly HashSet<string> s_expectedLibraryFilterRowParameterNames = new(StringComparer.Ordinal)

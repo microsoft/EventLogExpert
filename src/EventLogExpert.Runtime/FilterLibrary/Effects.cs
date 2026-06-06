@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
 using System.Collections.Immutable;
@@ -15,6 +16,7 @@ internal sealed class Effects(
     IState<FilterPaneState> filterPaneState,
     ILegacyFilterMigrator legacyMigrator,
     IBackslashNameMigrator backslashMigrator,
+    IAnnouncementService announcementService,
     ITraceLogger logger)
 {
     private const int MaxAutoTrackedRecents = 50;
@@ -141,6 +143,8 @@ internal sealed class Effects(
 
         if (string.IsNullOrEmpty(normalized)) { return Task.CompletedTask; }
 
+        var updatedEntries = new List<LibraryEntry>();
+
         foreach (var entry in state.Value.Entries)
         {
             var canonicalTags = LibraryEntryTagNormalizer.Normalize(entry.Tags);
@@ -148,17 +152,10 @@ internal sealed class Effects(
 
             if (index < 0) { continue; }
 
-            var updatedEntry = ReplaceTagsOnEntry(entry, canonicalTags.RemoveAt(index));
-
-            try { store.Update(updatedEntry); }
-            catch (Exception ex)
-            {
-                logger.Warning($"FilterLibrary DeleteTag failed for entry {entry.Id}. {ex.Message}");
-                continue;
-            }
-
-            dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(updatedEntry));
+            updatedEntries.Add(ReplaceTagsOnEntry(entry, canonicalTags.RemoveAt(index)));
         }
+
+        ApplyBulkTagUpdate(updatedEntries, dispatcher, count => $"Removed tag '{normalized}' from {count} {EntriesWord(count)}");
 
         return Task.CompletedTask;
     }
@@ -422,6 +419,8 @@ internal sealed class Effects(
             string.IsNullOrEmpty(newNormalized) ||
             string.Equals(oldNormalized, newNormalized, StringComparison.Ordinal)) { return Task.CompletedTask; }
 
+        var updatedEntries = new List<LibraryEntry>();
+
         foreach (var entry in state.Value.Entries)
         {
             var canonicalTags = LibraryEntryTagNormalizer.Normalize(entry.Tags);
@@ -434,17 +433,10 @@ internal sealed class Effects(
                 ? without
                 : without.Insert(oldIndex, newNormalized);
 
-            var updatedEntry = ReplaceTagsOnEntry(entry, updatedTags);
-
-            try { store.Update(updatedEntry); }
-            catch (Exception ex)
-            {
-                logger.Warning($"FilterLibrary RenameTag failed for entry {entry.Id}. {ex.Message}");
-                continue;
-            }
-
-            dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(updatedEntry));
+            updatedEntries.Add(ReplaceTagsOnEntry(entry, updatedTags));
         }
+
+        ApplyBulkTagUpdate(updatedEntries, dispatcher, count => $"Renamed tag '{oldNormalized}' to '{newNormalized}' in {count} {EntriesWord(count)}");
 
         return Task.CompletedTask;
     }
@@ -605,6 +597,8 @@ internal sealed class Effects(
         })];
     }
 
+    private static string EntriesWord(int count) => count == 1 ? "entry" : "entries";
+
     private static ImmutableList<SavedFilter> ExtractFilters(LibraryEntry entry) =>
         entry switch
         {
@@ -628,6 +622,56 @@ internal sealed class Effects(
         var cut = char.IsHighSurrogate(text[76]) ? 76 : 77;
 
         return text[..cut] + "...";
+    }
+
+    private void ApplyBulkTagUpdate(
+        IReadOnlyList<LibraryEntry> updatedEntries,
+        IDispatcher dispatcher,
+        Func<int, string> buildAnnouncement)
+    {
+        if (updatedEntries.Count == 0) { return; }
+
+        IReadOnlyList<LibraryEntryId> updatedIds;
+
+        try
+        {
+            updatedIds = store.UpdateRange(updatedEntries);
+        }
+        catch (Exception ex)
+        {
+            logger.Warning($"FilterLibrary bulk tag update failed; reloading library. {ex.Message}");
+            announcementService.Announce("Couldn't update tags. The library was reloaded.");
+            dispatcher.Dispatch(new LoadLibraryAction());
+            dispatcher.Dispatch(new TagBulkUpdateFailedAction());
+
+            return;
+        }
+
+        if (updatedIds.Count == 0)
+        {
+            announcementService.Announce("Couldn't update tags. The library was reloaded.");
+            dispatcher.Dispatch(new LoadLibraryAction());
+            dispatcher.Dispatch(new TagBulkUpdateFailedAction());
+
+            return;
+        }
+
+        var updatedIdSet = updatedIds.ToHashSet();
+
+        foreach (var entry in updatedEntries)
+        {
+            if (updatedIdSet.Contains(entry.Id))
+            {
+                dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(entry));
+            }
+        }
+
+        if (updatedIds.Count < updatedEntries.Count)
+        {
+            dispatcher.Dispatch(new LoadLibraryAction());
+        }
+
+        announcementService.Announce(buildAnnouncement(updatedIds.Count));
     }
 
     private Task PersistAddAsync(LibraryEntry entry, IDispatcher dispatcher)

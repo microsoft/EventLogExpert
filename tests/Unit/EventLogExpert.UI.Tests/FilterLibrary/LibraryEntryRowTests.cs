@@ -12,6 +12,7 @@ using EventLogExpert.UI.FilterLibrary;
 using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.JSInterop;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.FilterLibrary;
@@ -132,12 +133,52 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
+    public async Task DisposeAsync_InvokesOnDisposedWithSelf()
+    {
+        LibraryEntryRow? disposed = null;
+        var entry = BuildSavedFilter("X");
+        var component = Render<LibraryEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.ActiveTab, LibraryTab.Saved)
+            .Add(p => p.AllFilterSets, Array.Empty<LibraryEntryFilterSet>())
+            .Add(p => p.OnApply, _ => Task.CompletedTask)
+            .Add(p => p.OnReplace, _ => Task.CompletedTask)
+            .Add(p => p.OnDelete, _ => Task.CompletedTask)
+            .Add(p => p.OnToggleFavorite, _ => Task.CompletedTask)
+            .Add(p => p.OnSaveToLibrary, _ => Task.CompletedTask)
+            .Add(p => p.OnAddToFilterSet, _ => Task.CompletedTask)
+            .Add(p => p.OnRequestPendingFocus, _ => Task.CompletedTask)
+            .Add(p => p.OnDisposed, row => disposed = row));
+
+        await component.Instance.DisposeAsync();
+
+        Assert.NotNull(disposed);
+        Assert.Equal(entry.Id, disposed.Entry.Id);
+    }
+
+    [Fact]
     public void DisposeAsync_UnsubscribesFromMenuServiceStateChanged()
     {
         var entry = BuildSavedFilter("X");
         var component = RenderRow(entry);
         component.Dispose();
         _menuService.StateChanged += Raise.Event<Action>();
+    }
+
+    [Fact]
+    public async Task EnterTagEditMode_ScrollInteropDisconnected_IsSwallowed()
+    {
+        JSInterop.SetupVoid("scrollElementIntoView", _ => true)
+            .SetException(new JSDisconnectedException("Circuit disconnected."));
+        var entry = BuildSavedFilter("X") with { Tags = ["bug"] };
+        var component = RenderRow(entry);
+
+        var exception = await Record.ExceptionAsync(() =>
+            component.Find(".library-entry-tag-add-inline").ClickAsync(new MouseEventArgs()));
+
+        Assert.Null(exception);
+        JSInterop.VerifyInvoke("scrollElementIntoView");
+        Assert.NotNull(component.Find(".library-entry-tags-done"));
     }
 
     [Fact]

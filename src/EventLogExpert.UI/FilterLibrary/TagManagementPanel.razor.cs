@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
 using Microsoft.AspNetCore.Components;
 
@@ -28,8 +27,6 @@ public sealed partial class TagManagementPanel : ComponentBase
     [Parameter] public EventCallback<string> OnTagDeleted { get; set; }
 
     [Parameter] public EventCallback<(string OldName, string NewName)> OnTagRenamed { get; set; }
-
-    [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
     [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
 
@@ -93,10 +90,9 @@ public sealed partial class TagManagementPanel : ComponentBase
         if (_deleteConfirmTag is null) { return; }
 
         var tag = _deleteConfirmTag;
-        FilterLibraryCommands.DeleteTag(tag);
-        AnnouncementService.Announce($"Deleted tag '{tag}' from library");
 
         await OnTagDeleted.InvokeAsync(NormalizeForCallback(tag));
+        FilterLibraryCommands.DeleteTag(tag);
         CancelDelete();
     }
 
@@ -106,10 +102,9 @@ public sealed partial class TagManagementPanel : ComponentBase
 
         var oldName = _editingTag;
         var target = _mergeTargetTag;
-        FilterLibraryCommands.RenameTag(oldName, target);
-        AnnouncementService.Announce($"Merged tag '{oldName}' into '{target}'");
 
         await OnTagRenamed.InvokeAsync((NormalizeForCallback(oldName), NormalizeForCallback(target)));
+        FilterLibraryCommands.RenameTag(oldName, target);
         CancelEdit();
     }
 
@@ -138,10 +133,8 @@ public sealed partial class TagManagementPanel : ComponentBase
             return;
         }
 
-        FilterLibraryCommands.RenameTag(oldName, newName);
-        AnnouncementService.Announce($"Renamed tag '{oldName}' to '{newName}'");
-
         await OnTagRenamed.InvokeAsync((NormalizeForCallback(oldName), NormalizeForCallback(newName)));
+        FilterLibraryCommands.RenameTag(oldName, newName);
         CancelEdit();
     }
 

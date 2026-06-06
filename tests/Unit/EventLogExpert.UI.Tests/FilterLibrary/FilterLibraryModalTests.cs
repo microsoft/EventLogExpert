@@ -321,6 +321,28 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public void PruneStaleRowRefs_RemovesNullRefForLiveEntry()
+    {
+        var entry = BuildSavedFilter("Keep");
+        SetState(new FilterLibraryState { Entries = [entry], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        var rowRefs = (Dictionary<(LibraryTab, LibraryEntryId), LibraryEntryRow?>)typeof(FilterLibraryModal)
+            .GetField("_rowRefs", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(component.Instance)!;
+
+        // Blazor cleared a row's @ref (disposed before OnRowDisposed's scan) while the entry id stays
+        // live, so only the value-null check can prune the dangling entry.
+        rowRefs[(LibraryTab.Saved, entry.Id)] = null;
+
+        typeof(FilterLibraryModal)
+            .GetMethod("PruneStaleRowRefs", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(component.Instance, null);
+
+        Assert.DoesNotContain((LibraryTab.Saved, entry.Id), rowRefs.Keys);
+    }
+
+    [Fact]
     public void Render_ActiveTab_HasAriaSelectedTrueAndTabindexZero_OthersInert()
     {
         SetState(new FilterLibraryState { IsLoaded = true });
@@ -634,6 +656,28 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public async Task TagFilter_StaleSelectionAfterUnappliedRename_IsIgnored_EntryStillShown()
+    {
+        var alpha = BuildSavedFilter("a") with { Tags = ["alpha"] };
+        SetState(new FilterLibraryState { Entries = [alpha], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        var alphaChip = component.Find("[role='tabpanel'].active .library-tag-filter-chip");
+        await alphaChip.ClickAsync(new MouseEventArgs());
+        Assert.Single(component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry"));
+
+        await component.Find(".library-tag-management-trigger").ClickAsync(new MouseEventArgs());
+        var renameButton = component.Find(".library-tag-management-row").QuerySelectorAll(".icon-button")[0];
+        await renameButton.ClickAsync(new MouseEventArgs());
+        var editInput = component.Find(".library-tag-management-row-edit-input");
+        await editInput.InputAsync(new ChangeEventArgs { Value = "renamed" });
+        await component.Find(".library-tag-management-row .button-green").ClickAsync(new MouseEventArgs());
+
+        Assert.Contains("renamed", GetSelectedTagsForTab(component, LibraryTab.Saved), StringComparer.OrdinalIgnoreCase);
+        Assert.Single(component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry"));
+    }
+
+    [Fact]
     public async Task TagFilterBar_EscWithActiveTags_ClearsTagsAndVetoesClose()
     {
         var alpha = BuildSavedFilter("alphaEntry") with { Tags = ["alpha"] };
@@ -768,6 +812,32 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public async Task TagManagementAndOverflow_RenderUniqueIdsAcrossTabpanels()
+    {
+        var tags = Enumerable.Range(0, 12).Select(i => $"tag{i:D2}").ToArray();
+        var entry = BuildSavedFilter("withTags") with { Tags = [.. tags] };
+        SetState(new FilterLibraryState { Entries = [entry], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        await component.Find(".library-tag-management-trigger").ClickAsync(new MouseEventArgs());
+        await component.Find(".library-tag-filter-chip-overflow").ClickAsync(new MouseEventArgs());
+
+        var panelIds = component.FindAll("[id^='tag-mgmt-']").Select(e => e.Id).ToList();
+        Assert.True(panelIds.Count >= 2);
+        Assert.Equal(panelIds.Count, panelIds.Distinct().Count());
+
+        var overflowIds = component.FindAll("[id^='tag-overflow-']").Select(e => e.Id).ToList();
+        Assert.True(overflowIds.Count >= 2);
+        Assert.Equal(overflowIds.Count, overflowIds.Distinct().Count());
+
+        var triggerTargets = component.FindAll(".library-tag-management-trigger[aria-controls]")
+            .Select(e => e.GetAttribute("aria-controls")!).ToList();
+        Assert.True(triggerTargets.Count >= 2);
+        Assert.Equal(triggerTargets.Count, triggerTargets.Distinct().Count());
+    }
+
+    [Fact]
     public async Task TagManagementTrigger_Click_TogglesPanelVisibility()
     {
         var alpha = BuildSavedFilter("alphaEntry") with { Tags = ["alpha"] };
@@ -806,6 +876,33 @@ public sealed class FilterLibraryModalTests : BunitContext
         var selectedAfter = GetSelectedTagsForTab(component, LibraryTab.Saved);
         Assert.DoesNotContain("alpha", selectedAfter, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("renamed", selectedAfter, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task TagRenameFailure_RollsBackOptimisticSelection()
+    {
+        var alpha = BuildSavedFilter("a") with { Tags = ["alpha"] };
+        SetState(new FilterLibraryState { Entries = [alpha], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        await component.InvokeAsync(() => Services.GetRequiredService<IStore>().InitializeAsync());
+        var dispatcher = Services.GetRequiredService<IDispatcher>();
+        _commands.When(c => c.RenameTag(Arg.Any<string>(), Arg.Any<string>()))
+            .Do(_ => dispatcher.Dispatch(new TagBulkUpdateFailedAction()));
+
+        var alphaChip = component.Find("[role='tabpanel'].active .library-tag-filter-chip");
+        await alphaChip.ClickAsync(new MouseEventArgs());
+
+        await component.Find(".library-tag-management-trigger").ClickAsync(new MouseEventArgs());
+        var renameButton = component.Find(".library-tag-management-row").QuerySelectorAll(".icon-button")[0];
+        await renameButton.ClickAsync(new MouseEventArgs());
+        var editInput = component.Find(".library-tag-management-row-edit-input");
+        await editInput.InputAsync(new ChangeEventArgs { Value = "renamed" });
+        await component.Find(".library-tag-management-row .button-green").ClickAsync(new MouseEventArgs());
+
+        var selection = GetSelectedTagsForTab(component, LibraryTab.Saved);
+        Assert.Contains("alpha", selection, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("renamed", selection, StringComparer.OrdinalIgnoreCase);
     }
 
     private static LibraryEntrySavedFilter BuildAutoTrackedFilterEntry(string name, DateTimeOffset? lastUsed = null)

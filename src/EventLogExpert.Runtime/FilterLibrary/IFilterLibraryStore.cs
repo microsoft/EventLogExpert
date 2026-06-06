@@ -55,4 +55,13 @@ public interface IFilterLibraryStore
 
     /// <summary>Updates an existing library entry in the persistent store (matched by <see cref="LibraryEntry.Id" />).</summary>
     void Update(LibraryEntry entry);
+
+    /// <summary>
+    ///     Updates every entry in <paramref name="entries" /> within a single transaction (each matched by
+    ///     <see cref="LibraryEntry.Id" />). Returns the ids of the rows that were actually updated, in input order; an entry
+    ///     whose row no longer exists is skipped and its id is omitted from the result. On any failure the transaction is
+    ///     rolled back so no partial writes persist, and the exception propagates. Returns an empty list when
+    ///     <paramref name="entries" /> is empty.
+    /// </summary>
+    IReadOnlyList<LibraryEntryId> UpdateRange(IReadOnlyList<LibraryEntry> entries);
 }

@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Banner;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EventLogExpert.Runtime.FilterLibrary;
@@ -16,7 +17,7 @@ public static class FilterLibraryServiceCollectionExtensions
             ArgumentNullException.ThrowIfNull(dbPath);
 
             services.AddSingleton<IFilterLibraryStore>(sp =>
-                new FilterLibrarySqliteStore(dbPath, sp.GetRequiredService<ITraceLogger>()));
+                new FilterLibrarySqliteStore(dbPath, sp.GetRequiredService<ITraceLogger>(), sp.GetService<IErrorBannerService>()));
 
             return services;
         }

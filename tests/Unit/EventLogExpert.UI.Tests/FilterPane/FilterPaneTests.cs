@@ -12,12 +12,14 @@ using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.UI.FilterPane;
 using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
+using System.Reflection;
 
 namespace EventLogExpert.UI.Tests.FilterPane;
 
@@ -27,6 +29,7 @@ public sealed class FilterPaneTests : BunitContext
     private readonly IFilterLibraryCommands _filterLibraryCommands = Substitute.For<IFilterLibraryCommands>();
     private readonly IFilterPaneCommands _filterPaneCommands = Substitute.For<IFilterPaneCommands>();
     private readonly IState<FilterLibraryState> _libraryStateMock = Substitute.For<IState<FilterLibraryState>>();
+    private readonly IState<FilterPaneState> _paneStateMock = Substitute.For<IState<FilterPaneState>>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
 
     public FilterPaneTests()
@@ -43,7 +46,7 @@ public sealed class FilterPaneTests : BunitContext
         Services.AddSingleton(Substitute.For<IModalCoordinator>());
         Services.AddSingleton(Substitute.For<IMenuActionService>());
 
-        var paneState = Substitute.For<IState<FilterPaneState>>();
+        var paneState = _paneStateMock;
         paneState.Value.Returns(new FilterPaneState());
         Services.AddSingleton(paneState);
 
@@ -207,6 +210,24 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public void OnRowDisposed_RemovesMatchingRowRef()
+    {
+        var pane = new UI.FilterPane.FilterPane();
+        var rowRefs = (Dictionary<FilterId, FilterRow?>)typeof(UI.FilterPane.FilterPane)
+            .GetField("_rowRefs", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(pane)!;
+        var row = new FilterRow();
+        var id = SavedFilter.TryCreate("Level == 4")!.Id;
+        rowRefs[id] = row;
+
+        typeof(UI.FilterPane.FilterPane)
+            .GetMethod("OnRowDisposed", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(pane, [row]);
+
+        Assert.DoesNotContain(id, rowRefs.Keys);
+    }
+
+    [Fact]
     public void OpenFilterSetPicker_PreSelectsFirstFilterSetCaseInsensitive()
     {
         var filterSetZ = BuildFilterSet("ZebraGroup");
@@ -262,6 +283,32 @@ public sealed class FilterPaneTests : BunitContext
         _announcements.Received(1).Announce(FilterPaneAnnouncements.LoadingTryAgain);
     }
 
+    [Fact]
+    public void PruneStaleRowRefs_RemovesNullRefForLiveFilter()
+    {
+        var filter = SavedFilter.TryCreate("Level == 4")!;
+        SetPaneState(new FilterPaneState { Filters = [filter] });
+
+        var pane = new UI.FilterPane.FilterPane();
+        typeof(UI.FilterPane.FilterPane)
+            .GetProperty("FilterPaneState", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(pane, _paneStateMock);
+
+        var rowRefs = (Dictionary<FilterId, FilterRow?>)typeof(UI.FilterPane.FilterPane)
+            .GetField("_rowRefs", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(pane)!;
+
+        // Live filter id, but its @ref was cleared to null: only the value-null check can prune it
+        // (the id is still live, and a non-empty filter list skips the clear-all fast path).
+        rowRefs[filter.Id] = null;
+
+        typeof(UI.FilterPane.FilterPane)
+            .GetMethod("PruneStaleRowRefs", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(pane, null);
+
+        Assert.DoesNotContain(filter.Id, rowRefs.Keys);
+    }
+
     private static LibraryEntryFilterSet BuildFilterSet(string name) =>
         new()
         {
@@ -286,4 +333,6 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     private void SetLibraryState(FilterLibraryState state) => _libraryStateMock.Value.Returns(state);
+
+    private void SetPaneState(FilterPaneState state) => _paneStateMock.Value.Returns(state);
 }
