@@ -45,6 +45,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private LibraryTab? _pendingFocusSourceTab;
     private LibraryEntryId? _pendingFocusTargetEntryId;
     private bool _pendingFocusToActiveTab;
+
+    private Dictionary<LibraryTab, ImmutableList<string>>? _selectedTagsBeforeTagOp;
     private SidebarTabs<LibraryTab>? _sidebarTabsRef;
 
     [Parameter] public LibraryTab? InitialTab { get; set; }
@@ -71,11 +73,18 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     [Inject] private IFilterLibraryExportService ExportService { get; init; } = null!;
 
-    private IReadOnlyList<LibraryEntry> FavoriteEntries =>
-        [.. FilterLibraryState.Value.Entries
-            .Where(e => e is LibraryEntrySavedFilter && e.IsFavorite)
-            .Where(e => MatchesTagFilter(e, _selectedTagsByTab[LibraryTab.Favorites]))
-            .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
+    private IReadOnlyList<LibraryEntry> FavoriteEntries
+    {
+        get
+        {
+            var selected = SelectedTagsInLibrary(LibraryTab.Favorites);
+
+            return [.. FilterLibraryState.Value.Entries
+                .Where(e => e is LibraryEntrySavedFilter && e.IsFavorite)
+                .Where(e => MatchesTagFilter(e, selected))
+                .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
+        }
+    }
 
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
 
@@ -83,19 +92,33 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     [Inject] private IState<FilterLibraryState> FilterLibraryState { get; init; } = null!;
 
-    private IReadOnlyList<LibraryEntry> PreviouslyUsedEntries =>
-        [.. FilterLibraryState.Value.Entries
-            .Where(e => e.Origin == LibraryEntryOrigin.AutoTracked && !e.IsFavorite)
-            .Where(e => e.LastUsedUtc.HasValue)
-            .Where(e => MatchesTagFilter(e, _selectedTagsByTab[LibraryTab.PreviouslyUsed]))
-            .OrderByDescending(e => e.LastUsedUtc.GetValueOrDefault())
-            .Take(50)];
+    private IReadOnlyList<LibraryEntry> PreviouslyUsedEntries
+    {
+        get
+        {
+            var selected = SelectedTagsInLibrary(LibraryTab.PreviouslyUsed);
 
-    private IReadOnlyList<LibraryEntry> SavedEntries =>
-        [.. FilterLibraryState.Value.Entries
-            .Where(e => e.Origin == LibraryEntryOrigin.UserSaved && !e.IsFavorite)
-            .Where(e => MatchesTagFilter(e, _selectedTagsByTab[LibraryTab.Saved]))
-            .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
+            return [.. FilterLibraryState.Value.Entries
+                .Where(e => e is { Origin: LibraryEntryOrigin.AutoTracked, IsFavorite: false })
+                .Where(e => e.LastUsedUtc.HasValue)
+                .Where(e => MatchesTagFilter(e, selected))
+                .OrderByDescending(e => e.LastUsedUtc.GetValueOrDefault())
+                .Take(50)];
+        }
+    }
+
+    private IReadOnlyList<LibraryEntry> SavedEntries
+    {
+        get
+        {
+            var selected = SelectedTagsInLibrary(LibraryTab.Saved);
+
+            return [.. FilterLibraryState.Value.Entries
+                .Where(e => e is { Origin: LibraryEntryOrigin.UserSaved, IsFavorite: false })
+                .Where(e => MatchesTagFilter(e, selected))
+                .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
+        }
+    }
 
     private IReadOnlyList<LibraryEntrySavedFilter> SavedFilterEntries =>
         [.. FilterLibraryState.Value.Entries.OfType<LibraryEntrySavedFilter>()];
@@ -345,6 +368,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     {
         base.OnInitialized();
 
+        SubscribeToAction<TagBulkUpdateFailedAction>(_ => RevertOptimisticTagSelection());
+
         if (InitialTab is { } tab)
         {
             _activeTab = tab;
@@ -380,7 +405,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private string GetEmptyStateMessage(LibraryTab tab)
     {
-        if (_selectedTagsByTab[tab].Count > 0) { return "No entries match the selected tags."; }
+        if (SelectedTagsInLibrary(tab).Count > 0) { return "No entries match the selected tags."; }
 
         return tab switch
         {
@@ -471,6 +496,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private void HandleTagDeleted(string name)
     {
+        SnapshotSelectedTags();
+
         foreach (var tab in _selectedTagsByTab.Keys.ToList())
         {
             _selectedTagsByTab[tab] = _selectedTagsByTab[tab]
@@ -492,6 +519,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private void HandleTagRenamed((string OldName, string NewName) e)
     {
+        SnapshotSelectedTags();
+
         foreach (var tab in _selectedTagsByTab.Keys.ToList())
         {
             var current = _selectedTagsByTab[tab];
@@ -510,6 +539,18 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         FilterLibraryCommands.SetIsFavorite(intent.EntryId, intent.NewIsFavorite);
 
     private bool IsTabpanelEmpty(LibraryTab tab) => GetEntriesForTab(tab).Count == 0;
+
+    private void OnRowDisposed(LibraryEntryRow row)
+    {
+        (LibraryTab Tab, LibraryEntryId Id)? match = null;
+
+        foreach (var rowRef in _rowRefs)
+        {
+            if (ReferenceEquals(rowRef.Value, row)) { match = rowRef.Key; break; }
+        }
+
+        if (match is { } key) { _rowRefs.Remove(key); }
+    }
 
     private async Task PromptAndApplyImportAsync(ImportPreflight preflight)
     {
@@ -559,11 +600,13 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     {
         if (_rowRefs.Count == 0) { return; }
 
+        var liveIds = FilterLibraryState.Value.Entries.Select(e => e.Id).ToHashSet();
+
         List<(LibraryTab Tab, LibraryEntryId Id)>? stale = null;
 
-        foreach (var rowRef in _rowRefs)
+        foreach (var (key, value) in _rowRefs.ToList())
         {
-            if (rowRef.Value is null) { (stale ??= []).Add(rowRef.Key); }
+            if (value is null || !liveIds.Contains(key.Id)) { (stale ??= []).Add(key); }
         }
 
         if (stale is null) { return; }
@@ -572,6 +615,26 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     }
 
     private void RetryLoad() => FilterLibraryCommands.LoadLibrary();
+
+    private void RevertOptimisticTagSelection()
+    {
+        if (_selectedTagsBeforeTagOp is null) { return; }
+
+        foreach (var (tab, tags) in _selectedTagsBeforeTagOp)
+        {
+            _selectedTagsByTab[tab] = tags;
+        }
+
+        _selectedTagsBeforeTagOp = null;
+        StateHasChanged();
+    }
+
+    private ImmutableList<string> SelectedTagsInLibrary(LibraryTab tab)
+    {
+        var available = AllLibraryTags;
+
+        return [.. _selectedTagsByTab[tab].Where(t => available.Contains(t, StringComparer.OrdinalIgnoreCase))];
+    }
 
     private async Task ShowImportExportErrorAsync(string title, string message)
     {
@@ -591,6 +654,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         {
         }
     }
+
+    private void SnapshotSelectedTags() => _selectedTagsBeforeTagOp = new(_selectedTagsByTab);
 
     private void ToggleTagFilter(string tag)
     {

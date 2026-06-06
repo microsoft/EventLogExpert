@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Banner;
 using Microsoft.Data.Sqlite;
 using System.Collections.Immutable;
 using System.Data;
@@ -51,6 +52,13 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
     private const string DeleteSql =
         "DELETE FROM library_entries WHERE id = $id;";
 
+    private const string DeleteUnloadableSql =
+        "DELETE FROM library_entries WHERE id = $id AND kind = $kind AND payload = $payload;";
+
+    private const string FilterKind = "Filter";
+
+    private const string FilterSetKind = "FilterSet";
+
     private const string FindAutoTrackedFilterByTupleSql = """
                                                            SELECT id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded, tags
                                                            FROM library_entries
@@ -74,6 +82,8 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
     private const string LoadAllSql =
         "SELECT id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded, tags FROM library_entries ORDER BY created_utc;";
 
+    private const int MinSystemicUnloadableRowCount = 2;
+
     private const string UpdateSql = """
                                      UPDATE library_entries
                                      SET name = $name, created_utc = $created, kind = $kind, payload = $payload,
@@ -96,15 +106,19 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
 
     private readonly string _connectionString;
     private readonly string _dbPath;
+    private readonly IErrorBannerService? _errorBannerService;
     private readonly ITraceLogger _logger;
 
-    public FilterLibrarySqliteStore(string dbPath, ITraceLogger logger)
+    private int _systemicUnloadableReported;
+
+    public FilterLibrarySqliteStore(string dbPath, ITraceLogger logger, IErrorBannerService? errorBannerService = null)
     {
         ArgumentNullException.ThrowIfNull(dbPath);
         ArgumentNullException.ThrowIfNull(logger);
 
         _dbPath = dbPath;
         _logger = logger;
+        _errorBannerService = errorBannerService;
         _connectionString = $"Data Source={dbPath}";
     }
 
@@ -242,32 +256,69 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         using var connection = OpenConnection();
 
         var entries = ImmutableList.CreateBuilder<LibraryEntry>();
+        List<(string Id, string Kind, string Payload)>? unloadable = null;
+        var unknownKindCount = 0;
 
-        using var cmd = connection.CreateCommand();
-        cmd.CommandText = LoadAllSql;
-
-        using var reader = cmd.ExecuteReader();
-
-        while (reader.Read())
+        using (var cmd = connection.CreateCommand())
         {
-            var id = reader.IsDBNull(0) ? "<unknown>" : reader.GetString(0);
-            try
-            {
-                var entry = ReadEntry(reader);
+            cmd.CommandText = LoadAllSql;
 
-                if (entry is not null)
-                {
-                    entries.Add(entry);
-                }
-                else
-                {
-                    _logger.Warning($"FilterLibrary skipped row id={id} with unknown Kind.");
-                }
-            }
-            catch (Exception ex)
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
             {
-                _logger.Warning($"FilterLibrary skipped row id={id}: {ex.Message}");
+                var id = reader.IsDBNull(0) ? "<unknown>" : reader.GetString(0);
+
+                try
+                {
+                    var entry = ReadEntry(reader);
+
+                    if (entry is not null)
+                    {
+                        entries.Add(entry);
+                    }
+                    else
+                    {
+                        unknownKindCount++;
+                        _logger.Warning($"FilterLibrary skipped row id={id} with unknown Kind (kept as forward-version data).");
+                    }
+                }
+                catch (Exception ex) when (ex is JsonException or FormatException or InvalidOperationException)
+                {
+                    _logger.Warning($"FilterLibrary found unloadable row id={id}: {ex.Message}");
+
+                    if (!reader.IsDBNull(0) && !reader.IsDBNull(3) && !reader.IsDBNull(4))
+                    {
+                        (unloadable ??= []).Add((reader.GetString(0), reader.GetString(3), reader.GetString(4)));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warning($"FilterLibrary skipped row id={id}: {ex.Message}");
+                }
             }
+        }
+
+        if (unloadable is null)
+        {
+            return entries.ToImmutable();
+        }
+
+        // Ratio is over rows this version can interpret (known kinds), so kept unknown-kind rows don't
+        // dilute it and suppress the breaker; any unknown-kind row is itself forward-version evidence.
+        var knownKindRows = entries.Count + unloadable.Count;
+        var systemic = unloadable.Count >= MinSystemicUnloadableRowCount && unloadable.Count * 2 >= knownKindRows;
+        var forwardVersionEvidence = unknownKindCount > 0;
+
+        if (systemic || forwardVersionEvidence)
+        {
+            _logger.Warning(
+                $"FilterLibrary withholding deletion of {unloadable.Count} of {knownKindRows} unloadable known-kind rows ({unknownKindCount} unknown-kind rows present; possible newer-version library).");
+            ReportSystemicUnloadable(unloadable.Count);
+        }
+        else
+        {
+            DeleteUnloadableRows(connection, unloadable);
         }
 
         return entries.ToImmutable();
@@ -303,6 +354,47 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         cmd.ExecuteNonQuery();
     }
 
+    public IReadOnlyList<LibraryEntryId> UpdateRange(IReadOnlyList<LibraryEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        if (entries.Count == 0) { return []; }
+
+        using var connection = OpenConnection();
+        using var tx = connection.BeginTransaction();
+
+        try
+        {
+            var updated = ImmutableList.CreateBuilder<LibraryEntryId>();
+
+            using var cmd = connection.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = UpdateSql;
+
+            foreach (var entry in entries)
+            {
+                cmd.Parameters.Clear();
+                BindEntry(cmd, entry);
+
+                if (cmd.ExecuteNonQuery() == 1) { updated.Add(entry.Id); }
+            }
+
+            tx.Commit();
+
+            return updated.ToImmutable();
+        }
+        catch
+        {
+            try { tx.Rollback(); }
+            catch (Exception rollbackEx)
+            {
+                _logger.Warning($"FilterLibrary UpdateRange rollback failed after batch update error: {rollbackEx.Message}");
+            }
+
+            throw;
+        }
+    }
+
     private static void BindEntry(SqliteCommand cmd, LibraryEntry entry)
     {
         cmd.Parameters.AddWithValue("$id", entry.Id.Value.ToString("D"));
@@ -325,7 +417,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         switch (entry)
         {
             case LibraryEntrySavedFilter f:
-                cmd.Parameters.AddWithValue("$kind", "Filter");
+                cmd.Parameters.AddWithValue("$kind", FilterKind);
                 cmd.Parameters.AddWithValue("$payload", JsonSerializer.Serialize(f.Filter));
                 cmd.Parameters.AddWithValue("$comparison_text", f.Filter.ComparisonText);
                 cmd.Parameters.AddWithValue("$mode", f.Filter.Mode.ToString());
@@ -333,7 +425,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
                 break;
 
             case LibraryEntryFilterSet p:
-                cmd.Parameters.AddWithValue("$kind", "FilterSet");
+                cmd.Parameters.AddWithValue("$kind", FilterSetKind);
                 cmd.Parameters.AddWithValue("$payload", JsonSerializer.Serialize(p.Filters));
                 cmd.Parameters.AddWithValue("$comparison_text", DBNull.Value);
                 cmd.Parameters.AddWithValue("$mode", DBNull.Value);
@@ -358,7 +450,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
     {
         return kind switch
         {
-            "Filter" => new LibraryEntrySavedFilter
+            FilterKind => new LibraryEntrySavedFilter
             {
                 Id = id,
                 Name = name,
@@ -370,7 +462,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
                 Filter = JsonSerializer.Deserialize<SavedFilter>(payload)
                     ?? throw new InvalidOperationException($"LibraryEntrySavedFilter '{id}' payload deserialized to null."),
             },
-            "FilterSet" => new LibraryEntryFilterSet
+            FilterSetKind => new LibraryEntryFilterSet
             {
                 Id = id,
                 Name = name,
@@ -421,10 +513,13 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
 
     private static LibraryEntry? ReadEntry(SqliteDataReader reader)
     {
+        var kind = reader.IsDBNull(3) ? null : reader.GetString(3);
+
+        if (kind is not (FilterKind or FilterSetKind)) { return null; }
+
         var id = new LibraryEntryId(Guid.Parse(reader.GetString(0)));
         var name = reader.GetString(1);
         var createdUtc = DateTimeOffset.Parse(reader.GetString(2), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
-        var kind = reader.GetString(3);
         var payload = reader.GetString(4);
         var isFavorite = !reader.IsDBNull(5) && reader.GetInt64(5) != 0;
         DateTimeOffset? lastUsedUtc = reader.IsDBNull(6)
@@ -434,11 +529,37 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
             ? LibraryEntryOrigin.UserSaved
             : ParseOrigin(reader.GetString(7));
 
-        var tags = reader.IsDBNull(11)
-            ? []
-            : JsonSerializer.Deserialize<ImmutableList<string>>(reader.GetString(11)) ?? [];
+        ImmutableList<string> tags = [];
+
+        if (reader.IsDBNull(11))
+        {
+            return DeserializeEntry(id, name, createdUtc, kind, payload, isFavorite, lastUsedUtc, origin, tags);
+        }
+
+        try { tags = JsonSerializer.Deserialize<ImmutableList<string>>(reader.GetString(11)) ?? []; }
+        catch (JsonException) { tags = []; }
 
         return DeserializeEntry(id, name, createdUtc, kind, payload, isFavorite, lastUsedUtc, origin, tags);
+    }
+
+    private void DeleteUnloadableRows(SqliteConnection connection, List<(string Id, string Kind, string Payload)> rows)
+    {
+        foreach (var (id, kind, payload) in rows)
+        {
+            try
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = DeleteUnloadableSql;
+                cmd.Parameters.AddWithValue("$id", id);
+                cmd.Parameters.AddWithValue("$kind", kind);
+                cmd.Parameters.AddWithValue("$payload", payload);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warning($"FilterLibrary failed to remove unloadable row id={id}: {ex.Message}");
+            }
+        }
     }
 
     private SqliteConnection OpenConnection()
@@ -471,5 +592,16 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         {
             connection?.Dispose();
         }
+    }
+
+    private void ReportSystemicUnloadable(int unloadableCount)
+    {
+        if (_errorBannerService is null) { return; }
+
+        if (Interlocked.Exchange(ref _systemicUnloadableReported, 1) != 0) { return; }
+
+        _errorBannerService.ReportError(
+            "Filter library not fully loaded",
+            $"{unloadableCount} library entries couldn't be read and were left in place to avoid data loss. This usually means the library was written by a newer version of the app.");
     }
 }

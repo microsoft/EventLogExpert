@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.FilterLibrary;
 using Microsoft.Data.Sqlite;
 using NSubstitute;
@@ -412,6 +413,33 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     }
 
     [Fact]
+    public void LoadAll_CorruptTagsKnownKind_KeepsEntryWithEmptyTags()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var seed = BuildFilterEntry("Seed");
+        store.Add(seed);
+        store.Delete(seed.Id);
+
+        var entry = BuildFilterEntry("HasCorruptTags");
+        store.Add(entry);
+
+        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"UPDATE library_entries SET tags = 'not valid json' WHERE id = '{entry.Id.Value:D}';";
+            cmd.ExecuteNonQuery();
+        }
+
+        var result = store.LoadAll();
+
+        var loaded = Assert.Single(result);
+        Assert.Equal(entry.Id, loaded.Id);
+        Assert.Empty(loaded.Tags);
+    }
+
+    [Fact]
     public void LoadAll_CreatesParentDirectoryIfMissing()
     {
         var nestedDir = Path.Combine(Path.GetTempPath(), $"FilterLibrarySqliteStoreTests_{Guid.NewGuid()}", "nested", "deeper");
@@ -428,6 +456,107 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     }
 
     [Fact]
+    public void LoadAll_ForwardVersionEvidenceWithMinorityUnloadable_WithholdsBelowSystemicRatio()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var banner = Substitute.For<IErrorBannerService>();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>(), banner);
+
+        // 5 good known-kind rows make the unloadable rows a MINORITY of known kinds: with 3 unloadable of
+        // 8 known-kind, the systemic ratio (3*2 = 6 >= 8) is false. The single unknown-kind row is the
+        // only thing that trips the breaker (forward-version evidence), so this isolates that path — drop
+        // the forward-version-evidence check and the 3 reformatted rows would be wrongly deleted.
+        for (var i = 0; i < 5; i++) { store.Add(BuildFilterEntry($"Good{i}")); }
+
+        var unloadableIds = new[]
+        {
+            "00000000-0000-0000-0000-0000000000a1", "00000000-0000-0000-0000-0000000000a2",
+            "00000000-0000-0000-0000-0000000000a3",
+        };
+        const string unknownId = "00000000-0000-0000-0000-0000000000b9";
+
+        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+            foreach (var id in unloadableIds)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded) VALUES ('{id}', 'Bad', '2026-05-31T00:00:00.0000000+00:00', 'Filter', 'not valid json', 0, NULL, 'UserSaved', NULL, NULL, NULL);";
+                cmd.ExecuteNonQuery();
+            }
+
+            using var unknownCmd = connection.CreateCommand();
+            unknownCmd.CommandText = $"INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded) VALUES ('{unknownId}', 'Future', '2026-05-31T00:00:00.0000000+00:00', 'SomeFutureKind', '{{}}', 0, NULL, 'UserSaved', NULL, NULL, NULL);";
+            unknownCmd.ExecuteNonQuery();
+        }
+
+        var result = store.LoadAll();
+
+        Assert.Equal(5, result.Count);
+        foreach (var id in unloadableIds)
+        {
+            Assert.Equal(1L, CountRows(dbPath, new LibraryEntryId(Guid.Parse(id))));
+        }
+
+        banner.ReceivedWithAnyArgs(1).ReportError(default!, default!);
+    }
+
+    [Fact]
+    public void LoadAll_ForwardVersionUnknownKindsPresent_WithholdsUnloadableKnownKindDeletion()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var banner = Substitute.For<IErrorBannerService>();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>(), banner);
+        var seed = BuildFilterEntry("Seed");
+        store.Add(seed);
+        store.Delete(seed.Id);
+
+        // Forward-version DB: a newer app wrote 6 unknown-kind rows AND reformatted Filter payloads so
+        // 4 known-kind rows are now unparseable. Over all 10 rows, 4*2 = 8 < 10 would (wrongly) delete
+        // the 4 known-kind rows; the breaker must count only known-kind rows / treat the unknown kinds
+        // as forward-version evidence and withhold.
+        var unknownIds = new[]
+        {
+            "00000000-0000-0000-0000-0000000000e1", "00000000-0000-0000-0000-0000000000e2",
+            "00000000-0000-0000-0000-0000000000e3", "00000000-0000-0000-0000-0000000000e4",
+            "00000000-0000-0000-0000-0000000000e5", "00000000-0000-0000-0000-0000000000e6",
+        };
+        var unloadableIds = new[]
+        {
+            "00000000-0000-0000-0000-0000000000f1", "00000000-0000-0000-0000-0000000000f2",
+            "00000000-0000-0000-0000-0000000000f3", "00000000-0000-0000-0000-0000000000f4",
+        };
+
+        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+            foreach (var id in unknownIds)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded) VALUES ('{id}', 'Future', '2026-05-31T00:00:00.0000000+00:00', 'SomeFutureKind', '{{}}', 0, NULL, 'UserSaved', NULL, NULL, NULL);";
+                cmd.ExecuteNonQuery();
+            }
+
+            foreach (var id in unloadableIds)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded) VALUES ('{id}', 'Bad', '2026-05-31T00:00:00.0000000+00:00', 'Filter', 'not valid json', 0, NULL, 'UserSaved', NULL, NULL, NULL);";
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        var result = store.LoadAll();
+
+        Assert.Empty(result);
+        foreach (var id in unloadableIds)
+        {
+            Assert.Equal(1L, CountRows(dbPath, new LibraryEntryId(Guid.Parse(id))));
+        }
+
+        banner.ReceivedWithAnyArgs(1).ReportError(default!, default!);
+    }
+
+    [Fact]
     public void LoadAll_FreshDatabase_ReturnsEmpty()
     {
         var dbPath = CreateTempDatabasePath();
@@ -439,7 +568,40 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     }
 
     [Fact]
-    public void LoadAll_MalformedPayload_SkipsRowAndLogs()
+    public void LoadAll_HalfUnloadable_WithholdsDeletionAndLoadsGoodRows()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var banner = Substitute.For<IErrorBannerService>();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>(), banner);
+        store.Add(BuildFilterEntry("GoodA"));
+        store.Add(BuildFilterEntry("GoodB"));
+
+        var badIds = new[]
+        {
+            new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-0000000000d1")),
+            new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-0000000000d2")),
+        };
+
+        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+            foreach (var id in badIds)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded) VALUES ('{id.Value:D}', 'Bad', '2026-05-31T00:00:00.0000000+00:00', 'Filter', 'not valid json', 0, NULL, 'UserSaved', NULL, NULL, NULL);";
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        var result = store.LoadAll();
+
+        Assert.Equal(2, result.Count);
+        foreach (var id in badIds) { Assert.Equal(1L, CountRows(dbPath, id)); }
+        banner.ReceivedWithAnyArgs(1).ReportError(default!, default!);
+    }
+
+    [Fact]
+    public void LoadAll_MalformedPayloadKnownKind_DeletesRowAndLogs()
     {
         var dbPath = CreateTempDatabasePath();
         var logger = Substitute.For<ITraceLogger>();
@@ -470,10 +632,46 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         Assert.Single(result);
         Assert.Equal(good.Id, result[0].Id);
         logger.ReceivedWithAnyArgs(1).Warning(default);
+        Assert.Equal(0L, CountRows(dbPath, badId));
     }
 
     [Fact]
-    public void LoadAll_UnknownKind_SkipsRowAndLogs()
+    public void LoadAll_SystemicUnloadableRows_WithholdsDeletionAndReportsBanner()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var banner = Substitute.For<IErrorBannerService>();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>(), banner);
+        var seed = BuildFilterEntry("Seed");
+        store.Add(seed);
+        store.Delete(seed.Id);
+
+        var ids = new[]
+        {
+            new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-0000000000c1")),
+            new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-0000000000c2")),
+            new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-0000000000c3")),
+        };
+
+        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+            foreach (var id in ids)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded) VALUES ('{id.Value:D}', 'Bad', '2026-05-31T00:00:00.0000000+00:00', 'Filter', 'not valid json', 0, NULL, 'UserSaved', NULL, NULL, NULL);";
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        var result = store.LoadAll();
+
+        Assert.Empty(result);
+        foreach (var id in ids) { Assert.Equal(1L, CountRows(dbPath, id)); }
+        banner.ReceivedWithAnyArgs(1).ReportError(default!, default!);
+    }
+
+    [Fact]
+    public void LoadAll_UnknownKind_SkipsRowAndKeepsIt()
     {
         var dbPath = CreateTempDatabasePath();
         var logger = Substitute.For<ITraceLogger>();
@@ -496,6 +694,32 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
 
         Assert.Empty(result);
         logger.ReceivedWithAnyArgs(1).Warning(default);
+        Assert.Equal(1L, CountRows(dbPath, unknownId));
+    }
+
+    [Fact]
+    public void LoadAll_UnknownKindWithUnparseableColumns_KeepsRow()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var seed = BuildFilterEntry("Seed");
+        store.Add(seed);
+        store.Delete(seed.Id);
+
+        var unknownId = new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-0000000000aa"));
+
+        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded) VALUES ('{unknownId.Value:D}', 'FutureRow', 'not-a-date', 'SomeFutureKind', '{{}}', 0, NULL, 'UserSaved', NULL, NULL, NULL);";
+            cmd.ExecuteNonQuery();
+        }
+
+        var result = store.LoadAll();
+
+        Assert.Empty(result);
+        Assert.Equal(1L, CountRows(dbPath, unknownId));
     }
 
     [Fact]
@@ -676,6 +900,43 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         Assert.Equal("First (renamed)", result[0].Name);
     }
 
+    [Fact]
+    public void UpdateRange_SkipsAbsentRow_ReturnsOnlyPresentIds()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var present = BuildFilterEntry("Present");
+        var absent = BuildFilterEntry("Absent");
+        store.Add(present);
+
+        var ids = store.UpdateRange([present with { Tags = ["x"] }, absent with { Tags = ["y"] }]);
+
+        Assert.Single(ids);
+        Assert.Contains(present.Id, ids);
+        Assert.DoesNotContain(absent.Id, ids);
+    }
+
+    [Fact]
+    public void UpdateRange_UpdatesAllPresentRows_ReturnsTheirIds()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var a = BuildFilterEntry("A");
+        var b = BuildFilterEntry("B");
+        store.Add(a);
+        store.Add(b);
+
+        var ids = store.UpdateRange([a with { Tags = ["x"] }, b with { Tags = ["y"] }]);
+
+        Assert.Equal(2, ids.Count);
+        Assert.Contains(a.Id, ids);
+        Assert.Contains(b.Id, ids);
+
+        var afterLoad = store.LoadAll();
+        Assert.Contains(afterLoad, e => e.Id == a.Id && e.Tags.SequenceEqual(new[] { "x" }));
+        Assert.Contains(afterLoad, e => e.Id == b.Id && e.Tags.SequenceEqual(new[] { "y" }));
+    }
+
     private static LibraryEntrySavedFilter BuildAutoTrackedFilterEntry(string comparisonText, FilterMode mode = FilterMode.Advanced)
     {
         var filter = SavedFilter.TryCreate(comparisonText, mode: mode);
@@ -705,6 +966,16 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
             CreatedUtc = DateTimeOffset.UtcNow,
             Filter = filter,
         };
+    }
+
+    private static long CountRows(string dbPath, LibraryEntryId id)
+    {
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM library_entries WHERE id = $id;";
+        cmd.Parameters.AddWithValue("$id", id.Value.ToString("D"));
+        return (long)cmd.ExecuteScalar()!;
     }
 
     private static List<string> ReadColumnNames(SqliteConnection connection)

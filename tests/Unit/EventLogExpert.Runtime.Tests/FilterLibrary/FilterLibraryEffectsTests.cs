@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
@@ -275,7 +276,22 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
 
-        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Tags.SequenceEqual(new[] { "perf" })));
+        store.Received(1).UpdateRange(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+            list.Count == 1 && list[0].Tags.SequenceEqual(new[] { "perf" })));
+    }
+
+    [Fact]
+    public async Task HandleDeleteTag_NoMatchingEntries_NoStoreCall_NoAnnounce()
+    {
+        var entry = BuildFilterEntry("E") with { Tags = ["perf"] };
+        var announcer = Substitute.For<IAnnouncementService>();
+        var (effects, store, dispatcher, _, _) = CreateEffects(
+            state: new FilterLibraryState { Entries = [entry] }, announcementService: announcer);
+
+        await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
+
+        store.DidNotReceiveWithAnyArgs().UpdateRange(default!);
+        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
     }
 
     [Fact]
@@ -288,23 +304,80 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleDeleteTag(new DeleteTagAction("BUG"), dispatcher);
 
-        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Id == a.Id && e.Tags.SequenceEqual(new[] { "perf" })));
-        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Id == b.Id && e.Tags.IsEmpty));
-        store.DidNotReceive().Update(Arg.Is<LibraryEntry>(e => e.Id == c.Id));
+        store.Received(1).UpdateRange(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+            list.Count == 2 &&
+            list.Any(e => e.Id == a.Id && e.Tags.SequenceEqual(new[] { "perf" })) &&
+            list.Any(e => e.Id == b.Id && e.Tags.IsEmpty) &&
+            list.All(e => e.Id != c.Id)));
     }
 
     [Fact]
-    public async Task HandleDeleteTag_StoreFailureSkipsOneEntryButContinues()
+    public async Task HandleDeleteTag_StorePersistsNoRows_ReloadsLibrary_AnnouncesFailure_DispatchesFailedAction()
     {
         var a = BuildFilterEntry("A") with { Tags = ["bug"] };
-        var b = BuildFilterEntry("B") with { Tags = ["bug"] };
-        var (effects, store, dispatcher, _, logger) = CreateEffects(state: new FilterLibraryState { Entries = [a, b] });
-        store.When(s => s.Update(Arg.Is<LibraryEntry>(e => e.Id == a.Id))).Do(_ => throw new InvalidOperationException("boom"));
+        var announcer = Substitute.For<IAnnouncementService>();
+        var (effects, store, dispatcher, _, _) = CreateEffects(
+            state: new FilterLibraryState { Entries = [a] }, announcementService: announcer);
+        store.UpdateRange(Arg.Any<IReadOnlyList<LibraryEntry>>()).Returns([]);
 
         await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == b.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+        dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
+        dispatcher.Received(1).Dispatch(Arg.Any<TagBulkUpdateFailedAction>());
+        announcer.Received(1).Announce("Couldn't update tags. The library was reloaded.");
+    }
+
+    [Fact]
+    public async Task HandleDeleteTag_StoreSkipsAlreadyGoneRow_DispatchesUpdatedOnly_ReloadsAndAnnouncesSingular()
+    {
+        var a = BuildFilterEntry("A") with { Tags = ["bug"] };
+        var b = BuildFilterEntry("B") with { Tags = ["bug"] };
+        var announcer = Substitute.For<IAnnouncementService>();
+        var (effects, store, dispatcher, _, _) = CreateEffects(
+            state: new FilterLibraryState { Entries = [a, b] }, announcementService: announcer);
+        store.UpdateRange(Arg.Any<IReadOnlyList<LibraryEntry>>()).Returns([a.Id]);
+
+        await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == a.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == b.Id));
+        dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
+        announcer.Received(1).Announce("Removed tag 'bug' from 1 entry");
+    }
+
+    [Fact]
+    public async Task HandleDeleteTag_StoreThrows_NoSuccessDispatched_ReloadsLibrary_AnnouncesFailure()
+    {
+        var a = BuildFilterEntry("A") with { Tags = ["bug"] };
+        var b = BuildFilterEntry("B") with { Tags = ["bug"] };
+        var announcer = Substitute.For<IAnnouncementService>();
+        var (effects, store, dispatcher, _, logger) = CreateEffects(
+            state: new FilterLibraryState { Entries = [a, b] }, announcementService: announcer);
+        store.When(s => s.UpdateRange(Arg.Any<IReadOnlyList<LibraryEntry>>())).Do(_ => throw new InvalidOperationException("boom"));
+
+        await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+        dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
+        dispatcher.Received(1).Dispatch(Arg.Any<TagBulkUpdateFailedAction>());
+        announcer.Received(1).Announce("Couldn't update tags. The library was reloaded.");
         logger.ReceivedWithAnyArgs(1).Warning(default);
+    }
+
+    [Fact]
+    public async Task HandleDeleteTag_Success_AnnouncesAffectedCount_PluralAndDispatchesPerEntry()
+    {
+        var a = BuildFilterEntry("A") with { Tags = ["bug"] };
+        var b = BuildFilterEntry("B") with { Tags = ["bug", "perf"] };
+        var announcer = Substitute.For<IAnnouncementService>();
+        var (effects, _, dispatcher, _, _) = CreateEffects(
+            state: new FilterLibraryState { Entries = [a, b] }, announcementService: announcer);
+
+        await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
+
+        announcer.Received(1).Announce("Removed tag 'bug' from 2 entries");
+        dispatcher.Received(2).Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
     }
 
     [Fact]
@@ -1219,7 +1292,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
 
-        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Tags.SequenceEqual(new[] { "defect" })));
+        store.Received(1).UpdateRange(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+            list.Count == 1 && list[0].Tags.SequenceEqual(new[] { "defect" })));
     }
 
     [Fact]
@@ -1230,7 +1304,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "  "), dispatcher);
 
-        store.DidNotReceive().Update(Arg.Any<LibraryEntry>());
+        store.DidNotReceiveWithAnyArgs().UpdateRange(default!);
     }
 
     [Fact]
@@ -1249,7 +1323,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
 
-        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e is LibraryEntryFilterSet && e.Tags.SequenceEqual(new[] { "defect" })));
+        store.Received(1).UpdateRange(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+            list.Count == 1 && list[0] is LibraryEntryFilterSet && list[0].Tags.SequenceEqual(new[] { "defect" })));
     }
 
     [Fact]
@@ -1260,7 +1335,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
 
-        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Tags.SequenceEqual(new[] { "defect" })));
+        store.Received(1).UpdateRange(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+            list.Count == 1 && list[0].Tags.SequenceEqual(new[] { "defect" })));
         dispatcher.Received(1).Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
     }
 
@@ -1272,7 +1348,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "BUG"), dispatcher);
 
-        store.DidNotReceive().Update(Arg.Any<LibraryEntry>());
+        store.DidNotReceiveWithAnyArgs().UpdateRange(default!);
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
     }
 
@@ -1284,7 +1360,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("  BUG  ", "Defect "), dispatcher);
 
-        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Tags.SequenceEqual(new[] { "defect" })));
+        store.Received(1).UpdateRange(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+            list.Count == 1 && list[0].Tags.SequenceEqual(new[] { "defect" })));
     }
 
     [Fact]
@@ -1297,9 +1374,11 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
 
-        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Id == a.Id && e.Tags.SequenceEqual(new[] { "defect", "perf" })));
-        store.Received(1).Update(Arg.Is<LibraryEntry>(e => e.Id == b.Id && e.Tags.SequenceEqual(new[] { "defect" })));
-        store.DidNotReceive().Update(Arg.Is<LibraryEntry>(e => e.Id == c.Id));
+        store.Received(1).UpdateRange(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+            list.Count == 2 &&
+            list.Any(e => e.Id == a.Id && e.Tags.SequenceEqual(new[] { "defect", "perf" })) &&
+            list.Any(e => e.Id == b.Id && e.Tags.SequenceEqual(new[] { "defect" })) &&
+            list.All(e => e.Id != c.Id)));
         dispatcher.Received(2).Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
     }
 
@@ -1312,22 +1391,59 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
 
-        store.Received(1).Update(Arg.Any<LibraryEntry>());
+        store.Received(1).UpdateRange(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+            list.Count == 1 && list[0].Id == withTag.Id));
     }
 
     [Fact]
-    public async Task HandleRenameTag_StoreFailureSkipsOneEntryButContinues()
+    public async Task HandleRenameTag_StoreSkipsAlreadyGoneRow_DispatchesUpdatedOnly_ReloadsAndAnnouncesSingular()
     {
         var a = BuildFilterEntry("A") with { Tags = ["bug"] };
         var b = BuildFilterEntry("B") with { Tags = ["bug"] };
-        var (effects, store, dispatcher, _, logger) = CreateEffects(state: new FilterLibraryState { Entries = [a, b] });
-        store.When(s => s.Update(Arg.Is<LibraryEntry>(e => e.Id == a.Id))).Do(_ => throw new InvalidOperationException("boom"));
+        var announcer = Substitute.For<IAnnouncementService>();
+        var (effects, store, dispatcher, _, _) = CreateEffects(
+            state: new FilterLibraryState { Entries = [a, b] }, announcementService: announcer);
+        store.UpdateRange(Arg.Any<IReadOnlyList<LibraryEntry>>()).Returns([a.Id]);
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == b.Id));
-        dispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == a.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == a.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == b.Id));
+        dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
+        announcer.Received(1).Announce("Renamed tag 'bug' to 'defect' in 1 entry");
+    }
+
+    [Fact]
+    public async Task HandleRenameTag_StoreThrows_NoSuccessDispatched_ReloadsLibrary_AnnouncesFailure()
+    {
+        var a = BuildFilterEntry("A") with { Tags = ["bug"] };
+        var b = BuildFilterEntry("B") with { Tags = ["bug"] };
+        var announcer = Substitute.For<IAnnouncementService>();
+        var (effects, store, dispatcher, _, logger) = CreateEffects(
+            state: new FilterLibraryState { Entries = [a, b] }, announcementService: announcer);
+        store.When(s => s.UpdateRange(Arg.Any<IReadOnlyList<LibraryEntry>>())).Do(_ => throw new InvalidOperationException("boom"));
+
+        await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+        dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
+        dispatcher.Received(1).Dispatch(Arg.Any<TagBulkUpdateFailedAction>());
+        announcer.Received(1).Announce("Couldn't update tags. The library was reloaded.");
         logger.ReceivedWithAnyArgs(1).Warning(default);
+    }
+
+    [Fact]
+    public async Task HandleRenameTag_Success_AnnouncesRenamedWithCount()
+    {
+        var a = BuildFilterEntry("A") with { Tags = ["bug"] };
+        var b = BuildFilterEntry("B") with { Tags = ["bug"] };
+        var announcer = Substitute.For<IAnnouncementService>();
+        var (effects, _, dispatcher, _, _) = CreateEffects(
+            state: new FilterLibraryState { Entries = [a, b] }, announcementService: announcer);
+
+        await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
+
+        announcer.Received(1).Announce("Renamed tag 'bug' to 'defect' in 2 entries");
     }
 
     [Fact]
@@ -1636,12 +1752,14 @@ public sealed class FilterLibraryEffectsTests
 
     private static (Effects effects, IFilterLibraryStore store, IDispatcher dispatcher, IState<FilterLibraryState> stateMock, ITraceLogger logger) CreateEffects(
         FilterLibraryState? state = null,
-        FilterPaneState? paneState = null)
+        FilterPaneState? paneState = null,
+        IAnnouncementService? announcementService = null)
     {
         var (effects, store, dispatcher, stateMock, _, logger) = CreateEffectsWithMigrator(
             migrator: null,
             state: state,
-            paneState: paneState);
+            paneState: paneState,
+            announcementService: announcementService);
 
         return (effects, store, dispatcher, stateMock, logger);
     }
@@ -1651,11 +1769,16 @@ public sealed class FilterLibraryEffectsTests
         FilterLibraryState? state = null,
         FilterPaneState? paneState = null,
         IFilterLibraryStore? store = null,
-        IBackslashNameMigrator? backslashMigrator = null)
+        IBackslashNameMigrator? backslashMigrator = null,
+        IAnnouncementService? announcementService = null)
     {
         var storeWasSupplied = store is not null;
         store ??= Substitute.For<IFilterLibraryStore>();
-        if (!storeWasSupplied) { store.LoadAll().Returns([]); }
+        if (!storeWasSupplied)
+        {
+            store.LoadAll().Returns([]);
+            store.UpdateRange(default!).ReturnsForAnyArgs(ci => ((IReadOnlyList<LibraryEntry>)ci[0]).Select(e => e.Id).ToList());
+        }
 
         var stateMock = Substitute.For<IState<FilterLibraryState>>();
         stateMock.Value.Returns(state ?? new FilterLibraryState());
@@ -1674,10 +1797,11 @@ public sealed class FilterLibraryEffectsTests
         }
 
         backslashMigrator ??= Substitute.For<IBackslashNameMigrator>();
+        announcementService ??= Substitute.For<IAnnouncementService>();
 
         var logger = Substitute.For<ITraceLogger>();
         var dispatcher = Substitute.For<IDispatcher>();
-        var effects = new Effects(store, stateMock, paneStateMock, migrator, backslashMigrator, logger);
+        var effects = new Effects(store, stateMock, paneStateMock, migrator, backslashMigrator, announcementService, logger);
 
         return (effects, store, dispatcher, stateMock, migrator, logger);
     }

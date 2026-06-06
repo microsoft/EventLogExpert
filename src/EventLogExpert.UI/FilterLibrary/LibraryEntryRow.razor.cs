@@ -44,6 +44,8 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     [Parameter][EditorRequired] public EventCallback<LibraryEntryId> OnDelete { get; set; }
 
+    [Parameter] public Action<LibraryEntryRow>? OnDisposed { get; set; }
+
     [Parameter] public EventCallback<LibraryEntryId> OnExportEntry { get; set; }
 
     [Parameter][EditorRequired] public EventCallback<LibraryEntryId> OnReplace { get; set; }
@@ -93,6 +95,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     public ValueTask DisposeAsync()
     {
         MenuService.StateChanged -= OnMenuServiceStateChanged;
+        OnDisposed?.Invoke(this);
 
         return ValueTask.CompletedTask;
     }

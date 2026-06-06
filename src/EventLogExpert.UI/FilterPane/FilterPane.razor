@@ -204,7 +204,7 @@
 
         @foreach (var item in FilterPaneState.Value.Filters)
         {
-            <FilterRow @key="item.Id" OnRemoved="HandleRemovedFilter" @ref="_rowRefs[item.Id]" Value="item" />
+            <FilterRow @key="item.Id" OnDisposed="@OnRowDisposed" OnRemoved="HandleRemovedFilter" @ref="_rowRefs[item.Id]" Value="item" />
         }
 
         @foreach (var draft in _pendingDrafts)

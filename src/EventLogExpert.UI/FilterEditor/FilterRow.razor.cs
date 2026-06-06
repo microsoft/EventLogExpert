@@ -10,9 +10,11 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.FilterEditor;
 
-public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
+public sealed partial class FilterRow : FilterRowBase<SavedFilter?>, IDisposable
 {
     private FilterEditorCore? _coreRef;
+
+    [Parameter] public Action<FilterRow>? OnDisposed { get; set; }
 
     [Parameter] public EventCallback<(FilterId Id, bool IsEditing)> OnEditingChanged { get; set; }
 
@@ -62,6 +64,8 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
     [Inject] private IState<FilterLibraryState> FilterLibraryState { get; init; } = null!;
 
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
+
+    public void Dispose() => OnDisposed?.Invoke(this);
 
     internal ValueTask FocusEditAsync() => _coreRef?.FocusEditAsync() ?? ValueTask.CompletedTask;
 
