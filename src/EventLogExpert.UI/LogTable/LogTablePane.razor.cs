@@ -130,6 +130,7 @@ public sealed partial class LogTablePane
                 catch (JSDisconnectedException) { /* Circuit gone — JS resource already torn down. */ }
                 catch (JSException) { }
                 catch (ObjectDisposedException) { }
+                catch (TaskCanceledException) { }
 
                 _tableModule = null;
             }

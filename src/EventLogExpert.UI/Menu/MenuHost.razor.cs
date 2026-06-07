@@ -67,6 +67,7 @@ public sealed partial class MenuHost : IAsyncDisposable
             catch (JSDisconnectedException) { }
             catch (JSException) { }
             catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
         }
     }
 

@@ -46,7 +46,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     [Parameter][EditorRequired] public EventCallback<LibraryEntryId> OnDelete { get; set; }
 
-    [Parameter] public Action<LibraryEntryRow>? OnDisposed { get; set; }
+    [Parameter] public Action<(LibraryTab Tab, LibraryEntryId Id)>? OnDisposed { get; set; }
 
     [Parameter] public EventCallback<LibraryEntryId> OnExportEntry { get; set; }
 
@@ -97,7 +97,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         MenuService.StateChanged -= OnMenuServiceStateChanged;
-        OnDisposed?.Invoke(this);
+        OnDisposed?.Invoke((ActiveTab, Entry.Id));
 
         if (_rowModule is not null)
         {
@@ -105,6 +105,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
             catch (JSDisconnectedException) { }
             catch (JSException) { }
             catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
         }
 
         if (_menuAnchorModule is not null)
@@ -113,6 +114,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
             catch (JSDisconnectedException) { }
             catch (JSException) { }
             catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
         }
     }
 

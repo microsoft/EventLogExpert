@@ -62,6 +62,7 @@ public sealed partial class MenuBar
                 catch (JSDisconnectedException) { }
                 catch (JSException) { }
                 catch (ObjectDisposedException) { }
+                catch (TaskCanceledException) { }
             }
         }
 

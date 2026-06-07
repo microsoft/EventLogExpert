@@ -47,6 +47,7 @@ public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
         catch (JSDisconnectedException) { }
         catch (JSException) { }
         catch (ObjectDisposedException) { }
+        catch (TaskCanceledException) { }
     }
 
     public async ValueTask<bool> FocusActiveTabAsync()
