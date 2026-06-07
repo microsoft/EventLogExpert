@@ -56,14 +56,9 @@ public sealed partial class MenuBar
             MenuService.StateChanged -= OnMenuServiceStateChanged;
             MenuService.NavigateBarRequested -= OnNavigateBarRequested;
 
-            if (_menuAnchorModule is not null)
-            {
-                try { await _menuAnchorModule.DisposeAsync(); }
-                catch (JSDisconnectedException) { }
-                catch (JSException) { }
-                catch (ObjectDisposedException) { }
-                catch (TaskCanceledException) { }
-            }
+            await JsModuleInterop.DisposeModuleSafelyAsync(_menuAnchorModule);
+
+            _menuAnchorModule = null;
         }
 
         await base.DisposeAsyncCore(disposing);

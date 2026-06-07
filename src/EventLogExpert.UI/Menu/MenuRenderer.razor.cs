@@ -69,23 +69,13 @@ public sealed partial class MenuRenderer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_menuOverlayModule is not null)
-        {
-            try { await _menuOverlayModule.DisposeAsync(); }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
-            catch (ObjectDisposedException) { }
-            catch (TaskCanceledException) { }
-        }
+        await JsModuleInterop.DisposeModuleSafelyAsync(_menuOverlayModule);
 
-        if (_rendererModule is not null)
-        {
-            try { await _rendererModule.DisposeAsync(); }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
-            catch (ObjectDisposedException) { }
-            catch (TaskCanceledException) { }
-        }
+        _menuOverlayModule = null;
+
+        await JsModuleInterop.DisposeModuleSafelyAsync(_rendererModule);
+
+        _rendererModule = null;
     }
 
     /// <summary>Programmatically focus the first/last item; called by hosts after the popup is in the DOM.</summary>

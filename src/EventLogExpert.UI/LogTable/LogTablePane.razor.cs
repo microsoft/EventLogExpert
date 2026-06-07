@@ -120,20 +120,11 @@ public sealed partial class LogTablePane
     {
         if (disposing)
         {
-            if (_tableModule is not null)
-            {
-                try
-                {
-                    await _tableModule.InvokeVoidAsync("disposeTableEvents");
-                    await _tableModule.DisposeAsync();
-                }
-                catch (JSDisconnectedException) { /* Circuit gone — JS resource already torn down. */ }
-                catch (JSException) { }
-                catch (ObjectDisposedException) { }
-                catch (TaskCanceledException) { }
+            await JsModuleInterop.DisposeModuleSafelyAsync(
+                _tableModule,
+                static module => module.InvokeVoidAsync("disposeTableEvents"));
 
-                _tableModule = null;
-            }
+            _tableModule = null;
 
             _dotNetRef?.Dispose();
         }

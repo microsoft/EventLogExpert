@@ -27,13 +27,11 @@ public sealed partial class LogTabBar
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
-        if (disposing && _logTabBarModule is not null)
+        if (disposing)
         {
-            try { await _logTabBarModule.DisposeAsync(); }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
-            catch (ObjectDisposedException) { }
-            catch (TaskCanceledException) { }
+            await JsModuleInterop.DisposeModuleSafelyAsync(_logTabBarModule);
+
+            _logTabBarModule = null;
         }
 
         await base.DisposeAsyncCore(disposing);

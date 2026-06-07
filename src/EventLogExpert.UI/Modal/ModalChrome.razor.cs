@@ -25,7 +25,6 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     private bool _isClosingByCancel;
     private IJSObjectReference? _modalModule;
     private InlineAlertRequest? _previouslyRenderedInlineAlert;
-
     private InlineAlertRequest? _validationCacheAlert;
     private string? _validationCacheError;
     private string? _validationCacheValue;
@@ -157,14 +156,9 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         CycleState.SetModalContentDisplayed(false);
         await CloseAsync();
 
-        if (_modalModule is not null)
-        {
-            try { await _modalModule.DisposeAsync(); }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
-            catch (ObjectDisposedException) { }
-            catch (TaskCanceledException) { }
-        }
+        await JsModuleInterop.DisposeModuleSafelyAsync(_modalModule);
+
+        _modalModule = null;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
