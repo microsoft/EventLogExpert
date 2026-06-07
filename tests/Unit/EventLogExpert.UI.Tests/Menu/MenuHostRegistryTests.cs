@@ -1,8 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Runtime.Menu;
+using EventLogExpert.Runtime.Modal;
+using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Keyboard;
 using EventLogExpert.UI.Menu;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Menu;
 
@@ -42,6 +47,21 @@ public sealed class MenuHostRegistryTests
         var registry = provider.GetRequiredService<IMenuHostRegistry>();
 
         Assert.IsType<MenuHostRegistry>(registry);
+    }
+
+    [Fact]
+    public async Task AddEventLogUiServices_RegistersKeyboardShortcutService()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(Substitute.For<IMenuActionService>());
+        services.AddSingleton(Substitute.For<IModalCoordinator>());
+        services.AddSingleton(Substitute.For<ISettingsService>());
+        services.AddEventLogUiServices();
+
+        await using var provider = services.BuildServiceProvider();
+        var service = provider.GetRequiredService<KeyboardShortcutService>();
+
+        Assert.NotNull(service);
     }
 
     [Fact]
