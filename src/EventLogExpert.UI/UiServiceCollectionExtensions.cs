@@ -13,11 +13,14 @@ public static class UiServiceCollectionExtensions
         /// <summary>Registers the EventLogExpert UI-library services into the host container.</summary>
         /// <remarks>
         ///     The registered <see cref="KeyboardShortcutService" /> resolves <c>IMenuActionService</c>,
-        ///     <c>IModalCoordinator</c>, and <c>ISettingsService</c> from the container — the host must also register the Runtime
-        ///     layer (e.g. <c>AddEventLogRuntime</c>) and platform adapters, or resolving them throws.
+        ///     <c>IModalCoordinator</c>, and <c>ISettingsService</c> from the container — the host must register those
+        ///     abstractions (the Runtime layer via <c>AddEventLogRuntime</c> plus the host's menu adapter) before resolving UI
+        ///     services.
         /// </remarks>
         public IServiceCollection AddEventLogUiServices()
         {
+            ArgumentNullException.ThrowIfNull(services);
+
             services.AddSingleton<IMenuHostRegistry, MenuHostRegistry>();
             services.AddSingleton<KeyboardShortcutService>();
 

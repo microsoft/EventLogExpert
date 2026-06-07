@@ -176,11 +176,16 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
                     "import",
                     "./_content/EventLogExpert.UI/Modal/ModalChrome.razor.js");
 
-                if (!_isClosed)
+                if (_isClosed)
                 {
-                    await _modalModule.InvokeVoidAsync("showModal", _dialogRef);
-                    CycleState.SetModalContentDisplayed(true);
+                    await _modalModule.DisposeAsync();
+                    _modalModule = null;
+
+                    return;
                 }
+
+                await _modalModule.InvokeVoidAsync("showModal", _dialogRef);
+                CycleState.SetModalContentDisplayed(true);
             }
             catch
             {

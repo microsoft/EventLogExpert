@@ -124,7 +124,7 @@ th.dragging {
     opacity: 0.5;
 }
 
-/* event_table.js dynamically injects these resize handles into header cells,
+/* LogTablePane.razor.js dynamically injects these resize handles into header cells,
    so the JS-created elements never get a scoped attribute. ::deep on the
    ancestor lets the rule target unscoped descendants. */
 table ::deep div.table-divider {
