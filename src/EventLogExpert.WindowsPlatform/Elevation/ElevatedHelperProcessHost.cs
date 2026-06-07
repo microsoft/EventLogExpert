@@ -8,16 +8,16 @@ using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 
-namespace EventLogExpert.Adapters.Elevation;
+namespace EventLogExpert.WindowsPlatform.Elevation;
 
 /// <summary>
-///     MAUI/Windows implementation of <see cref="IElevatedHelperProcessHost" />. Spawns the packaged
+///     Windows implementation of <see cref="IElevatedHelperProcessHost" />. Spawns the packaged
 ///     <c>eventlogexpert-elevated.exe</c> via <c>ShellExecute</c> with verb <c>runas</c> (the only Win32 path that
 ///     triggers UAC), then accepts the helper's connect-back on a host-owned <see cref="NamedPipeServerStream" />. PID
 ///     verification uses <c>GetNamedPipeClientProcessId</c>: any client whose PID does not match the spawned helper is
 ///     rejected. The pipe ACL itself is restricted to the current user via <see cref="PipeOptions.CurrentUserOnly" />.
 /// </summary>
-internal sealed class MauiElevatedHelperProcessHost(ITraceLogger logger) : IElevatedHelperProcessHost
+internal sealed class ElevatedHelperProcessHost(ITraceLogger logger) : IElevatedHelperProcessHost
 {
     private const int PipeBufferSize = 65536;
 
@@ -69,7 +69,7 @@ internal sealed class MauiElevatedHelperProcessHost(ITraceLogger logger) : IElev
             // response time is unbounded by design. A Win32Exception with NativeErrorCode==1223 signals decline.
             helperProcess = Process.Start(psi) ?? throw new InvalidOperationException("Process.Start returned null without throwing.");
 
-            logger.Information($"{nameof(MauiElevatedHelperProcessHost)}: spawned helper PID {helperProcess.Id} (pipe={pipeName}, args=[{arguments}])");
+            logger.Information($"{nameof(ElevatedHelperProcessHost)}: spawned helper PID {helperProcess.Id} (pipe={pipeName}, args=[{arguments}])");
 
             // Connect-back: caller's CT + 30s deadline. CancelAfter merges both into the same token via linked source.
             using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -89,7 +89,7 @@ internal sealed class MauiElevatedHelperProcessHost(ITraceLogger logger) : IElev
             // to race a connect to this GUID-named pipe AND already be running with our exact PID — not feasible.
             VerifyClientPid(pipeServer, expectedPid: helperProcess.Id);
 
-            var handle = new MauiElevatedHelperProcess(helperProcess, pipeServer, logger);
+            var handle = new ElevatedHelperProcess(helperProcess, pipeServer, logger);
             helperProcess = null;  // Ownership transferred.
 
             return handle;

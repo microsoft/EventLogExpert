@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 // We are defining some win32 types in this file, so we
 // are not following the usual C# naming conventions.
 
-namespace EventLogExpert.Adapters.Lifecycle;
+namespace EventLogExpert.WindowsPlatform.Restart;
 
 internal static partial class NativeMethods
 {
