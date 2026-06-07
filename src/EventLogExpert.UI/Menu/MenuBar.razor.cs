@@ -16,12 +16,13 @@ using System.Text;
 
 namespace EventLogExpert.UI.Menu;
 
-public sealed partial class MenuBar : IDisposable
+public sealed partial class MenuBar
 {
     private readonly List<TopLevel> _bars = [];
 
     private ElementReference[] _barElements = [];
     private int _focusedBarIndex;
+    private IJSObjectReference? _menuAnchorModule;
     private long _openRequestId;
 
     [Inject] private IMenuActionService Actions { get; init; } = null!;
@@ -45,13 +46,26 @@ public sealed partial class MenuBar : IDisposable
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
-    public void Dispose()
+    protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
-        InvalidatePendingOpen();
+        if (disposing)
+        {
+            InvalidatePendingOpen();
 
-        Settings.CopyFormatChanged -= OnSettingsChanged;
-        MenuService.StateChanged -= OnMenuServiceStateChanged;
-        MenuService.NavigateBarRequested -= OnNavigateBarRequested;
+            Settings.CopyFormatChanged -= OnSettingsChanged;
+            MenuService.StateChanged -= OnMenuServiceStateChanged;
+            MenuService.NavigateBarRequested -= OnNavigateBarRequested;
+
+            if (_menuAnchorModule is not null)
+            {
+                try { await _menuAnchorModule.DisposeAsync(); }
+                catch (JSDisconnectedException) { }
+                catch (JSException) { }
+                catch (ObjectDisposedException) { }
+            }
+        }
+
+        await base.DisposeAsyncCore(disposing);
     }
 
     protected override void OnInitialized()
@@ -345,7 +359,10 @@ public sealed partial class MenuBar : IDisposable
         var requestId = Interlocked.Increment(ref _openRequestId);
 
         // Anchor the dropdown to the bottom-left of the trigger button.
-        var rect = await JSRuntime.InvokeAsync<MenuAnchorRect>(
+        _menuAnchorModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
+
+        var rect = await _menuAnchorModule.InvokeAsync<MenuAnchorRect>(
             "getMenuElementRect",
             _barElements[index]);
 

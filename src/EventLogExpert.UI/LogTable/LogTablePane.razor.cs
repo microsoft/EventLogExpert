@@ -64,6 +64,7 @@ public sealed partial class LogTablePane
     // and any keyboard nav that establishes a single selection. Reused for
     // Shift+Click and Shift+Arrow to compute the range.
     private ResolvedEvent? _selectionAnchor;
+    private IJSObjectReference? _tableModule;
     private TimeZoneInfo _timeZoneSettings = null!;
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
@@ -119,11 +120,19 @@ public sealed partial class LogTablePane
     {
         if (disposing)
         {
-            try
+            if (_tableModule is not null)
             {
-                await JSRuntime.InvokeVoidAsync("disposeTableEvents");
+                try
+                {
+                    await _tableModule.InvokeVoidAsync("disposeTableEvents");
+                    await _tableModule.DisposeAsync();
+                }
+                catch (JSDisconnectedException) { /* Circuit gone — JS resource already torn down. */ }
+                catch (JSException) { }
+                catch (ObjectDisposedException) { }
+
+                _tableModule = null;
             }
-            catch (JSDisconnectedException) { /* Circuit gone — JS resource already torn down. */ }
 
             _dotNetRef?.Dispose();
         }
@@ -153,7 +162,7 @@ public sealed partial class LogTablePane
         {
             try
             {
-                int measured = await JSRuntime.InvokeAsync<int>("getEventTablePageSize");
+                int measured = _tableModule is not null ? await _tableModule.InvokeAsync<int>("getEventTablePageSize") : 0;
 
                 if (measured > 0) { _pageSize = measured; }
             }
@@ -430,7 +439,7 @@ public sealed partial class LogTablePane
 
         try
         {
-            await JSRuntime.InvokeVoidAsync("focusEventTableRow", index);
+            if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("focusEventTableRow", index); }
         }
         catch (JSDisconnectedException) { /* Circuit gone — focus best-effort during teardown. */ }
         catch (Exception e)
@@ -610,7 +619,12 @@ public sealed partial class LogTablePane
     {
         _dotNetRef?.Dispose();
         _dotNetRef = DotNetObjectReference.Create(this);
-        await JSRuntime.InvokeVoidAsync("initializeTableEvents", _dotNetRef);
+
+        _tableModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import",
+            "./_content/EventLogExpert.UI/LogTable/LogTablePane.razor.js");
+
+        await _tableModule.InvokeVoidAsync("initializeTableEvents", _dotNetRef);
     }
 
     private void InvokeContextMenu(MouseEventArgs args)
@@ -790,7 +804,7 @@ public sealed partial class LogTablePane
                 continue;
             }
 
-            await JSRuntime.InvokeVoidAsync("scrollToRow", index);
+            if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("scrollToRow", index); }
 
             return;
         }
@@ -965,7 +979,7 @@ public sealed partial class LogTablePane
     {
         try
         {
-            int measured = await JSRuntime.InvokeAsync<int>("getEventTablePageSize");
+            int measured = _tableModule is not null ? await _tableModule.InvokeAsync<int>("getEventTablePageSize") : 0;
 
             if (measured > 0) { _pageSize = measured; }
 

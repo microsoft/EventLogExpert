@@ -13,8 +13,8 @@ namespace EventLogExpert.UI.LogTable;
 
 public sealed partial class LogTabBar
 {
+    private IJSObjectReference? _logTabBarModule;
     private LogTableState _logTableState = null!;
-
     private List<LogView> _sortedTabs = [];
 
     [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
@@ -25,11 +25,33 @@ public sealed partial class LogTabBar
 
     [Inject] private IState<LogTableState> LogTableState { get; init; } = null!;
 
+    protected override async ValueTask DisposeAsyncCore(bool disposing)
+    {
+        if (disposing && _logTabBarModule is not null)
+        {
+            try { await _logTabBarModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            catch (ObjectDisposedException) { }
+        }
+
+        await base.DisposeAsyncCore(disposing);
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await JSRuntime.InvokeVoidAsync("registerLogTabBarEvents");
+            try
+            {
+                _logTabBarModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/EventLogExpert.UI/LogTable/LogTabBar.razor.js");
+
+                await _logTabBarModule.InvokeVoidAsync("registerLogTabBarEvents");
+            }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
         }
 
         await base.OnAfterRenderAsync(firstRender);

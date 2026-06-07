@@ -73,7 +73,7 @@ public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
             {
                 _tabKeyModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
                     "import",
-                    "./_content/EventLogExpert.UI/Modal/SidebarTabs.js");
+                    "./_content/EventLogExpert.UI/Modal/SidebarTabs.razor.js");
 
                 await _tabKeyModule.InvokeVoidAsync("attach", _tablistRef);
             }

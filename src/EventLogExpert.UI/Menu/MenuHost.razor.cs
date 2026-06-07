@@ -13,6 +13,7 @@ public sealed partial class MenuHost : IAsyncDisposable
 {
     private bool _disposed;
     private long _focusedMenuId;
+    private IJSObjectReference? _menuOverlayModule;
     private bool _ownedViewportListeners;
     private ElementReference _popupElement;
 
@@ -53,11 +54,19 @@ public sealed partial class MenuHost : IAsyncDisposable
 
         if (_focusedMenuId != 0 || _ownedViewportListeners)
         {
-            try { await JSRuntime.InvokeVoidAsync("detachMenuViewportListeners"); }
+            try { await (await GetMenuOverlayAsync()).InvokeVoidAsync("detachMenuViewportListeners"); }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
 
             await ReleaseFocusReturnAsync();
             _ownedViewportListeners = false;
+        }
+
+        if (_menuOverlayModule is not null)
+        {
+            try { await _menuOverlayModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            catch (ObjectDisposedException) { }
         }
     }
 
@@ -73,7 +82,7 @@ public sealed partial class MenuHost : IAsyncDisposable
         // Re-clamp every render — popup is hidden until clampMenuPopup reveals it within the viewport.
         if (MenuService.ActiveItems is not null)
         {
-            try { await JSRuntime.InvokeVoidAsync("clampMenuPopup", _popupElement); }
+            try { await (await GetMenuOverlayAsync()).InvokeVoidAsync("clampMenuPopup", _popupElement); }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
         }
 
@@ -88,6 +97,10 @@ public sealed partial class MenuHost : IAsyncDisposable
         SyncMenuOwnershipMirror();
         base.OnInitialized();
     }
+
+    private async ValueTask<IJSObjectReference> GetMenuOverlayAsync() =>
+        _menuOverlayModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/EventLogExpert.UI/Menu/MenuOverlay.js");
 
     private void HandleActivated() => MenuService.Close();
 
@@ -138,7 +151,7 @@ public sealed partial class MenuHost : IAsyncDisposable
                 // the element that triggered the menu, not an item the renderer is about to focus.
                 if (MenuService.ActiveCaptureOpener)
                 {
-                    try { await JSRuntime.InvokeVoidAsync("captureMenuOpener"); }
+                    try { await (await GetMenuOverlayAsync()).InvokeVoidAsync("captureMenuOpener"); }
                     catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
                 }
 
@@ -146,7 +159,7 @@ public sealed partial class MenuHost : IAsyncDisposable
                 {
                     try
                     {
-                        await JSRuntime.InvokeVoidAsync("attachMenuViewportListeners");
+                        await (await GetMenuOverlayAsync()).InvokeVoidAsync("attachMenuViewportListeners");
                         _ownedViewportListeners = true;
                     }
                     catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
@@ -158,7 +171,7 @@ public sealed partial class MenuHost : IAsyncDisposable
 
                 try
                 {
-                    await JSRuntime.InvokeVoidAsync("detachMenuViewportListeners");
+                    await (await GetMenuOverlayAsync()).InvokeVoidAsync("detachMenuViewportListeners");
                     _ownedViewportListeners = false;
                 }
                 catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
@@ -172,7 +185,7 @@ public sealed partial class MenuHost : IAsyncDisposable
 
     private async ValueTask ReleaseFocusReturnAsync()
     {
-        try { await JSRuntime.InvokeVoidAsync("restoreMenuOpenerFocus"); }
+        try { await (await GetMenuOverlayAsync()).InvokeVoidAsync("restoreMenuOpenerFocus"); }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
     }
 

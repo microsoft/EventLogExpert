@@ -8,7 +8,7 @@ using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Menu;
 
-public sealed partial class MenuRenderer
+public sealed partial class MenuRenderer : IAsyncDisposable
 {
     // Constant rather than method-level call because Blazor's @onkeydown:preventDefault must
     // resolve at render time. Tab is handled in HandleListKeyDown so it can close the menu first.
@@ -20,13 +20,15 @@ public sealed partial class MenuRenderer
     private static long s_rendererIdCounter;
 
     private readonly long _rendererId = Interlocked.Increment(ref s_rendererIdCounter);
-    private bool _focusOnNextRender;
     private int _focusedIndex = -1;
+    private bool _focusOnNextRender;
     private ElementReference[] _itemElements = [];
+    private IJSObjectReference? _menuOverlayModule;
     private MenuItem? _openItem;
     private bool _openSubmenuFocusesFirstChild;
     private IReadOnlyList<MenuItem>? _previousItems;
     private bool _previousSuppressInitialFocus;
+    private IJSObjectReference? _rendererModule;
     private IReadOnlyList<MenuItem>? _resolvedChildren;
     private ElementReference _submenuElement;
     private string _typeAheadBuffer = string.Empty;
@@ -65,6 +67,25 @@ public sealed partial class MenuRenderer
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
+    public async ValueTask DisposeAsync()
+    {
+        if (_menuOverlayModule is not null)
+        {
+            try { await _menuOverlayModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            catch (ObjectDisposedException) { }
+        }
+
+        if (_rendererModule is not null)
+        {
+            try { await _rendererModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            catch (ObjectDisposedException) { }
+        }
+    }
+
     /// <summary>Programmatically focus the first/last item; called by hosts after the popup is in the DOM.</summary>
     public Task FocusInitialAsync(bool focusFirst)
     {
@@ -96,7 +117,13 @@ public sealed partial class MenuRenderer
 
         if (_openItem is not null && _resolvedChildren is not null)
         {
-            try { await JSRuntime.InvokeVoidAsync("positionMenuSubmenu", _submenuElement); }
+            try
+            {
+                _menuOverlayModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import", "./_content/EventLogExpert.UI/Menu/MenuOverlay.js");
+
+                await _menuOverlayModule.InvokeVoidAsync("positionMenuSubmenu", _submenuElement);
+            }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
         }
 
@@ -457,7 +484,13 @@ public sealed partial class MenuRenderer
             // preventScroll keeps the page steady; scrollMenuItemIntoView scrolls within the menu panel.
             await _itemElements[_focusedIndex].FocusAsync(true);
 
-            try { await JSRuntime.InvokeVoidAsync("scrollMenuItemIntoView", _itemElements[_focusedIndex]); }
+            try
+            {
+                _rendererModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import", "./_content/EventLogExpert.UI/Menu/MenuRenderer.razor.js");
+
+                await _rendererModule.InvokeVoidAsync("scrollMenuItemIntoView", _itemElements[_focusedIndex]);
+            }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
         }
         catch

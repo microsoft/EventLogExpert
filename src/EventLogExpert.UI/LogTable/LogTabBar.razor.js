@@ -1,12 +1,15 @@
-window.registerLogTabBarEvents = () => {
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+export function registerLogTabBarEvents() {
     const logTabBar = document.querySelector(".log-tab-bar");
 
     if (!logTabBar) { return; }
 
     registerLogTabBarScroller(logTabBar);
-};
+}
 
-window.registerLogTabBarScroller = (logTabBar) => {
+function registerLogTabBarScroller(logTabBar) {
     let canDrag, isScrolling = false;
     let startPos, currentPos;
 
