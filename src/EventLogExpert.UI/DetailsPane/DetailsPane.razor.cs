@@ -66,18 +66,11 @@ public sealed partial class DetailsPane
 
             _xmlResolveCts?.Dispose();
 
-            if (_detailsPaneModule is not null)
-            {
-                try
-                {
-                    await _detailsPaneModule.InvokeVoidAsync("disposeDetailsPaneResizer");
-                    await _detailsPaneModule.DisposeAsync();
-                }
-                catch (JSDisconnectedException) { /* Circuit gone — JS resource already torn down. */ }
-                catch (JSException) { }
-                catch (ObjectDisposedException) { }
-                catch (TaskCanceledException) { }
-            }
+            await JsModuleInterop.DisposeModuleSafelyAsync(
+                _detailsPaneModule,
+                static module => module.InvokeVoidAsync("disposeDetailsPaneResizer"));
+
+            _detailsPaneModule = null;
 
             _dotNetRef?.Dispose();
         }

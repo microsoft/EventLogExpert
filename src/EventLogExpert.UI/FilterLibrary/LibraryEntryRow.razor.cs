@@ -99,23 +99,13 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         MenuService.StateChanged -= OnMenuServiceStateChanged;
         OnDisposed?.Invoke((ActiveTab, Entry.Id));
 
-        if (_rowModule is not null)
-        {
-            try { await _rowModule.DisposeAsync(); }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
-            catch (ObjectDisposedException) { }
-            catch (TaskCanceledException) { }
-        }
+        await JsModuleInterop.DisposeModuleSafelyAsync(_rowModule);
 
-        if (_menuAnchorModule is not null)
-        {
-            try { await _menuAnchorModule.DisposeAsync(); }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
-            catch (ObjectDisposedException) { }
-            catch (TaskCanceledException) { }
-        }
+        _rowModule = null;
+
+        await JsModuleInterop.DisposeModuleSafelyAsync(_menuAnchorModule);
+
+        _menuAnchorModule = null;
     }
 
     internal ValueTask<bool> FocusMoreActionsButtonAsync() => ElementFocus.TrySafelyAsync(_moreMenuButtonRef);

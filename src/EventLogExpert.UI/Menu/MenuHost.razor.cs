@@ -61,14 +61,9 @@ public sealed partial class MenuHost : IAsyncDisposable
             _ownedViewportListeners = false;
         }
 
-        if (_menuOverlayModule is not null)
-        {
-            try { await _menuOverlayModule.DisposeAsync(); }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
-            catch (ObjectDisposedException) { }
-            catch (TaskCanceledException) { }
-        }
+        await JsModuleInterop.DisposeModuleSafelyAsync(_menuOverlayModule);
+
+        _menuOverlayModule = null;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

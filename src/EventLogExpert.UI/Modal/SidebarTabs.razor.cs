@@ -37,17 +37,11 @@ public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_tabKeyModule is null) { return; }
+        await JsModuleInterop.DisposeModuleSafelyAsync(
+            _tabKeyModule,
+            module => module.InvokeVoidAsync("detach", _tablistRef));
 
-        try
-        {
-            await _tabKeyModule.InvokeVoidAsync("detach", _tablistRef);
-            await _tabKeyModule.DisposeAsync();
-        }
-        catch (JSDisconnectedException) { }
-        catch (JSException) { }
-        catch (ObjectDisposedException) { }
-        catch (TaskCanceledException) { }
+        _tabKeyModule = null;
     }
 
     public async ValueTask<bool> FocusActiveTabAsync()

@@ -109,21 +109,11 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
     {
         _disposed = true;
 
-        if (_dropdownModule is not null)
-        {
-            try
-            {
-                await _dropdownModule.InvokeVoidAsync("unregisterDropdown", _selectComponent);
-                await _dropdownModule.DisposeAsync();
-            }
-            catch (JSDisconnectedException)
-            {
-                // Expected during app shutdown
-            }
-            catch (JSException) { }
-            catch (ObjectDisposedException) { }
-            catch (TaskCanceledException) { }
-        }
+        await JsModuleInterop.DisposeModuleSafelyAsync(
+            _dropdownModule,
+            module => module.InvokeVoidAsync("unregisterDropdown", _selectComponent));
+
+        _dropdownModule = null;
 
         _selfRef?.Dispose();
     }

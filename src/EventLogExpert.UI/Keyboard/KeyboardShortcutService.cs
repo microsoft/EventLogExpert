@@ -31,7 +31,8 @@ public sealed class KeyboardShortcutService(
 
         if (_keyboardModule is not null)
         {
-            await DisposeModuleSafelyAsync(_keyboardModule);
+            await JsModuleInterop.DisposeModuleSafelyAsync(_keyboardModule);
+
             _keyboardModule = null;
         }
     }
@@ -57,7 +58,7 @@ public sealed class KeyboardShortcutService(
 
             if (newModule is not null)
             {
-                await DisposeModuleSafelyAsync(newModule);
+                await JsModuleInterop.DisposeModuleSafelyAsync(newModule);
             }
 
             return;
@@ -73,7 +74,7 @@ public sealed class KeyboardShortcutService(
 
         if (previousModule is not null && !ReferenceEquals(previousModule, newModule))
         {
-            await DisposeModuleSafelyAsync(previousModule);
+            await JsModuleInterop.DisposeModuleSafelyAsync(previousModule);
         }
     }
 
@@ -125,14 +126,5 @@ public sealed class KeyboardShortcutService(
 
         _selfRef.Dispose();
         _selfRef = null;
-    }
-
-    private static async ValueTask DisposeModuleSafelyAsync(IJSObjectReference module)
-    {
-        try { await module.DisposeAsync(); }
-        catch (JSDisconnectedException) { }
-        catch (JSException) { }
-        catch (ObjectDisposedException) { }
-        catch (TaskCanceledException) { }
     }
 }
