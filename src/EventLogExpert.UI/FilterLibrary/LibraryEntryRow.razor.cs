@@ -25,10 +25,12 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     private bool _isEditingTags;
     private bool _isExpanded;
+    private IJSObjectReference? _menuAnchorModule;
     private ElementReference _moreMenuButtonRef;
     private long _moreMenuId;
     private bool _pendingFocusMoreButton;
     private bool _pendingScrollEditIntoView;
+    private IJSObjectReference? _rowModule;
 
     [Parameter][EditorRequired] public LibraryTab ActiveTab { get; set; }
 
@@ -92,12 +94,26 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     private bool ShowSaveToLibraryItem =>
         Entry is { Origin: LibraryEntryOrigin.AutoTracked, IsFavorite: false };
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         MenuService.StateChanged -= OnMenuServiceStateChanged;
         OnDisposed?.Invoke(this);
 
-        return ValueTask.CompletedTask;
+        if (_rowModule is not null)
+        {
+            try { await _rowModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            catch (ObjectDisposedException) { }
+        }
+
+        if (_menuAnchorModule is not null)
+        {
+            try { await _menuAnchorModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            catch (ObjectDisposedException) { }
+        }
     }
 
     internal ValueTask<bool> FocusMoreActionsButtonAsync() => ElementFocus.TrySafelyAsync(_moreMenuButtonRef);
@@ -114,7 +130,13 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         {
             _pendingScrollEditIntoView = false;
 
-            try { await JSRuntime.InvokeVoidAsync("scrollElementIntoView", _articleRef); }
+            try
+            {
+                _rowModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import", "./_content/EventLogExpert.UI/FilterLibrary/LibraryEntryRow.razor.js");
+
+                await _rowModule.InvokeVoidAsync("scrollElementIntoView", _articleRef);
+            }
             catch (JSDisconnectedException) { }
             catch (JSException) { }
         }
@@ -393,7 +415,10 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
         try
         {
-            var rect = await JSRuntime.InvokeAsync<MenuAnchorRect>("getMenuElementRect", _moreMenuButtonRef);
+            _menuAnchorModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
+
+            var rect = await _menuAnchorModule.InvokeAsync<MenuAnchorRect>("getMenuElementRect", _moreMenuButtonRef);
             MenuService.OpenAt(rect.Left, rect.Bottom, BuildMoreMenu(), focusFirst: true);
             _moreMenuId = MenuService.ActiveMenuId;
             StateHasChanged();

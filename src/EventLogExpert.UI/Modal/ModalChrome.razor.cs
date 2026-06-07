@@ -23,7 +23,12 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     private string _inlineAlertPromptValue = string.Empty;
     private bool _isClosed;
     private bool _isClosingByCancel;
+    private IJSObjectReference? _modalModule;
     private InlineAlertRequest? _previouslyRenderedInlineAlert;
+
+    private InlineAlertRequest? _validationCacheAlert;
+    private string? _validationCacheError;
+    private string? _validationCacheValue;
 
     [Parameter] public string AcceptLabel { get; set; } = "OK";
 
@@ -110,10 +115,6 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
-    private InlineAlertRequest? _validationCacheAlert;
-    private string? _validationCacheValue;
-    private string? _validationCacheError;
-
     private string? ValidationError
     {
         get
@@ -139,9 +140,11 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
         _isClosed = true;
 
+        if (_modalModule is null) { return; }
+
         try
         {
-            await JSRuntime.InvokeVoidAsync("closeModal", _dialogRef);
+            await _modalModule.InvokeVoidAsync("closeModal", _dialogRef);
         }
         catch
         {
@@ -153,6 +156,14 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     {
         CycleState.SetModalContentDisplayed(false);
         await CloseAsync();
+
+        if (_modalModule is not null)
+        {
+            try { await _modalModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            catch (ObjectDisposedException) { }
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -161,10 +172,13 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         {
             try
             {
-                await JSRuntime.InvokeVoidAsync("showModal", _dialogRef);
+                _modalModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/EventLogExpert.UI/Modal/ModalChrome.razor.js");
 
                 if (!_isClosed)
                 {
+                    await _modalModule.InvokeVoidAsync("showModal", _dialogRef);
                     CycleState.SetModalContentDisplayed(true);
                 }
             }

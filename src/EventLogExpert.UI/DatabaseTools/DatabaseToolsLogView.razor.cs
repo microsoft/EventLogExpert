@@ -150,7 +150,7 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
             {
                 _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
                     "import",
-                    "./_content/EventLogExpert.UI/DatabaseTools/DatabaseToolsLogView.js");
+                    "./_content/EventLogExpert.UI/DatabaseTools/DatabaseToolsLogView.razor.js");
 
                 await _jsModule.InvokeVoidAsync("attach", _logViewRef, _selfRef);
                 _lastRenderedCount = Entries.Count;

@@ -26,7 +26,7 @@ using FilterMode = EventLogExpert.Filtering.Evaluation.FilterMode;
 
 namespace EventLogExpert.UI.FilterPane;
 
-public sealed partial class FilterPane : IDisposable
+public sealed partial class FilterPane
 {
     internal bool IsFilterSetPickerVisible;
     internal LibraryEntryId SelectedFilterSetId;
@@ -43,6 +43,7 @@ public sealed partial class FilterPane : IDisposable
     private bool _focusAddButtonAfterRemove;
     private FilterId? _focusTargetAfterRemove;
     private bool _isFilterListVisible;
+    private IJSObjectReference? _menuAnchorModule;
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
@@ -94,12 +95,6 @@ public sealed partial class FilterPane : IDisposable
     [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
-
-    public void Dispose()
-    {
-        Settings.TimeZoneChanged -= UpdateFilterDateTimeZone;
-        MenuService.StateChanged -= OnMenuServiceStateChanged;
-    }
 
     internal void ApplyFilterSetSelection()
     {
@@ -183,6 +178,25 @@ public sealed partial class FilterPane : IDisposable
                 .First().Id
             : default;
         _isFilterListVisible = true;
+    }
+
+    protected override async ValueTask DisposeAsyncCore(bool disposing)
+    {
+        if (disposing)
+        {
+            Settings.TimeZoneChanged -= UpdateFilterDateTimeZone;
+            MenuService.StateChanged -= OnMenuServiceStateChanged;
+
+            if (_menuAnchorModule is not null)
+            {
+                try { await _menuAnchorModule.DisposeAsync(); }
+                catch (JSDisconnectedException) { }
+                catch (JSException) { }
+                catch (ObjectDisposedException) { }
+            }
+        }
+
+        await base.DisposeAsyncCore(disposing);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -429,7 +443,10 @@ public sealed partial class FilterPane : IDisposable
 
     private async Task OpenAddFilterMenuAtAsync(bool focusFirst)
     {
-        var rect = await JSRuntime.InvokeAsync<MenuAnchorRect>("getMenuElementRect", _addFilterChevronRef);
+        _menuAnchorModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
+
+        var rect = await _menuAnchorModule.InvokeAsync<MenuAnchorRect>("getMenuElementRect", _addFilterChevronRef);
         MenuService.OpenAt(rect.Left, rect.Bottom, BuildAddFilterMenu(), focusFirst);
         _addFilterMenuId = MenuService.ActiveMenuId;
         StateHasChanged();

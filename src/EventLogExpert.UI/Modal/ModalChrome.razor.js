@@ -1,7 +1,10 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
 // Capture the previously focused element on open and restore it on close so closing a modal
 // (Esc, native cancel, footer buttons) returns keyboard focus to the trigger that opened it,
 // matching native dialog accessibility expectations (WAI-ARIA Authoring Practices: Dialog).
-window.openModal = (ref) => {
+export function showModal(ref) {
     if (ref == null || ref.open) { return; }
 
     // Stash on the dialog element so close can restore even if the host component is torn down
@@ -12,11 +15,9 @@ window.openModal = (ref) => {
         : null;
 
     ref.showModal();
-};
+}
 
-window.showModal = window.openModal;
-
-window.closeModal = (ref) => {
+export function closeModal(ref) {
     if (ref == null) { return; }
 
     const returnTarget = ref._returnFocusElement;
@@ -32,4 +33,5 @@ window.closeModal = (ref) => {
             catch { /* element detached between frames; nothing to restore */ }
         });
     }
-};
+}
+

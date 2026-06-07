@@ -43,7 +43,8 @@ public sealed class LibraryEntryRowTests : BunitContext
         Services.AddSingleton(libraryStateMock);
 
         JSInterop.Mode = JSRuntimeMode.Loose;
-        JSInterop.Setup<MenuAnchorRect>("getMenuElementRect", _ => true)
+        JSInterop.SetupModule("./_content/EventLogExpert.UI/Menu/MenuAnchor.js")
+            .Setup<MenuAnchorRect>("getMenuElementRect", _ => true)
             .SetResult(new MenuAnchorRect(0, 0, 0, 0, 0, 0));
     }
 
@@ -168,7 +169,8 @@ public sealed class LibraryEntryRowTests : BunitContext
     [Fact]
     public async Task EnterTagEditMode_ScrollInteropDisconnected_IsSwallowed()
     {
-        JSInterop.SetupVoid("scrollElementIntoView", _ => true)
+        var rowModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/FilterLibrary/LibraryEntryRow.razor.js");
+        rowModule.SetupVoid("scrollElementIntoView", _ => true)
             .SetException(new JSDisconnectedException("Circuit disconnected."));
         var entry = BuildSavedFilter("X") with { Tags = ["bug"] };
         var component = RenderRow(entry);
@@ -177,7 +179,7 @@ public sealed class LibraryEntryRowTests : BunitContext
             component.Find(".library-entry-tag-add-inline").ClickAsync(new MouseEventArgs()));
 
         Assert.Null(exception);
-        JSInterop.VerifyInvoke("scrollElementIntoView");
+        rowModule.VerifyInvoke("scrollElementIntoView");
         Assert.NotNull(component.Find(".library-entry-tags-done"));
     }
 

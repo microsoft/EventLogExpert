@@ -18,6 +18,7 @@ namespace EventLogExpert.UI.DetailsPane;
 
 public sealed partial class DetailsPane
 {
+    private IJSObjectReference? _detailsPaneModule;
     private DotNetObjectReference<DetailsPane>? _dotNetRef;
     private bool _hasOpened;
     private bool _isVisible;
@@ -65,11 +66,17 @@ public sealed partial class DetailsPane
 
             _xmlResolveCts?.Dispose();
 
-            try
+            if (_detailsPaneModule is not null)
             {
-                await JSRuntime.InvokeVoidAsync("disposeDetailsPaneResizer");
+                try
+                {
+                    await _detailsPaneModule.InvokeVoidAsync("disposeDetailsPaneResizer");
+                    await _detailsPaneModule.DisposeAsync();
+                }
+                catch (JSDisconnectedException) { /* Circuit gone — JS resource already torn down. */ }
+                catch (JSException) { }
+                catch (ObjectDisposedException) { }
             }
-            catch (JSDisconnectedException) { /* Circuit gone — JS resource already torn down. */ }
 
             _dotNetRef?.Dispose();
         }
@@ -82,7 +89,12 @@ public sealed partial class DetailsPane
         if (firstRender)
         {
             _dotNetRef = DotNetObjectReference.Create(this);
-            await JSRuntime.InvokeVoidAsync(
+
+            _detailsPaneModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/EventLogExpert.UI/DetailsPane/DetailsPane.razor.js");
+
+            await _detailsPaneModule.InvokeVoidAsync(
                 "enableDetailsPaneResizer",
                 _dotNetRef,
                 PreferencesProvider.DetailsPaneHeightPreference);

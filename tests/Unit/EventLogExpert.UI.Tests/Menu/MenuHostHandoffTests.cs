@@ -14,10 +14,12 @@ namespace EventLogExpert.UI.Tests.Menu;
 public sealed class MenuHostHandoffTests : BunitContext
 {
     private readonly FakeMenuService _menuService = new();
+    private readonly BunitJSModuleInterop _overlayModule;
 
     public MenuHostHandoffTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
+        _overlayModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Menu/MenuOverlay.js");
 
         Services.AddBannerHostDependencies();
         Services.AddSingleton<IMenuService>(_menuService);
@@ -37,7 +39,7 @@ public sealed class MenuHostHandoffTests : BunitContext
 
         await firstModal.InvokeAsync(() => _menuService.Open(MakeItems()));
         await WaitForJsInvocationAsync("attachMenuViewportListeners");
-        Assert.Equal(1, JSInterop.Invocations.Count(i => i.Identifier == "attachMenuViewportListeners"));
+        Assert.Equal(1, _overlayModule.Invocations.Count(i => i.Identifier == "attachMenuViewportListeners"));
 
         var secondModal = Render<ModalChrome>(parameters => parameters
             .Add(p => p.Title, "second")
@@ -48,7 +50,7 @@ public sealed class MenuHostHandoffTests : BunitContext
         await secondModal.InvokeAsync(() => _menuService.Close());
         await WaitForJsInvocationAsync("detachMenuViewportListeners");
 
-        Assert.Equal(1, JSInterop.Invocations.Count(i => i.Identifier == "detachMenuViewportListeners"));
+        Assert.Equal(1, _overlayModule.Invocations.Count(i => i.Identifier == "detachMenuViewportListeners"));
     }
 
     [Fact]
@@ -74,11 +76,11 @@ public sealed class MenuHostHandoffTests : BunitContext
         await secondModal.InvokeAsync(() => _menuService.Close());
         await WaitForJsInvocationAsync("detachMenuViewportListeners");
 
-        var detachAfterClose = JSInterop.Invocations.Count(i => i.Identifier == "detachMenuViewportListeners");
+        var detachAfterClose = _overlayModule.Invocations.Count(i => i.Identifier == "detachMenuViewportListeners");
 
         await hostA!.DisposeAsync();
 
-        var detachAfterDispose = JSInterop.Invocations.Count(i => i.Identifier == "detachMenuViewportListeners");
+        var detachAfterDispose = _overlayModule.Invocations.Count(i => i.Identifier == "detachMenuViewportListeners");
         Assert.Equal(detachAfterClose, detachAfterDispose);
     }
 
@@ -90,10 +92,10 @@ public sealed class MenuHostHandoffTests : BunitContext
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
         while (DateTime.UtcNow < deadline)
         {
-            if (JSInterop.Invocations.Any(i => i.Identifier == identifier)) { return; }
+            if (_overlayModule.Invocations.Any(i => i.Identifier == identifier)) { return; }
             await Task.Delay(25, TestContext.Current.CancellationToken);
         }
-        Assert.Fail($"Expected '{identifier}' JS interop call did not occur within timeout. Observed: [{string.Join(",", JSInterop.Invocations.Select(i => i.Identifier))}]");
+        Assert.Fail($"Expected '{identifier}' JS interop call did not occur within timeout. Observed: [{string.Join(",", _overlayModule.Invocations.Select(i => i.Identifier))}]");
     }
 
     private sealed class FakeMenuService : IMenuService

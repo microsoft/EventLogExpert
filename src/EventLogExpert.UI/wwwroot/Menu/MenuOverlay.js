@@ -1,29 +1,15 @@
-// DOM helpers for the menu system: anchor dropdowns to triggers, clamp popups to the viewport,
-// and capture/restore opener focus across menu open/close.
-window.getMenuElementRect = (element) => {
-    if (!element) {
-        return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
-    }
-    const rect = element.getBoundingClientRect();
-    return {
-        left: rect.left,
-        top: rect.top,
-        right: rect.right,
-        bottom: rect.bottom,
-        width: rect.width,
-        height: rect.height,
-    };
-};
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
 
 let menuOpenerElement = null;
 
 // Skip <body> so we don't restore focus to the document root on close.
-window.captureMenuOpener = () => {
+export function captureMenuOpener() {
     const candidate = document.activeElement;
     menuOpenerElement = (candidate instanceof HTMLElement && candidate !== document.body) ? candidate : null;
-};
+}
 
-window.restoreMenuOpenerFocus = () => {
+export function restoreMenuOpenerFocus() {
     const target = menuOpenerElement;
     menuOpenerElement = null;
 
@@ -39,11 +25,11 @@ window.restoreMenuOpenerFocus = () => {
         } catch { /* element detached between frames */  }
 
     });
-};
+}
 
 // Positions a fixed-position .submenu next to its parent <li>, flipping left when it would
 // clip the right edge and clamping vertically. Hidden until menu-submenu-positioned is set.
-window.positionMenuSubmenu = (submenu) => {
+export function positionMenuSubmenu(submenu) {
     if (!submenu) { return; }
 
     const parentLi = submenu.parentElement && submenu.parentElement.closest("li.menu-item");
@@ -91,11 +77,11 @@ window.positionMenuSubmenu = (submenu) => {
     submenu.style.left = `${left}px`;
     submenu.style.top = `${top}px`;
     submenu.classList.add("menu-submenu-positioned");
-};
+}
 
 // Clamps the top-level popup into the viewport. Measures from the anchored position set by
 // MenuHost; only mutates left/top when clamping is actually needed.
-window.clampMenuPopup = (popup) => {
+export function clampMenuPopup(popup) {
     if (!popup) { return; }
 
     const margin = 4;
@@ -118,25 +104,25 @@ window.clampMenuPopup = (popup) => {
     if (left !== popupRect.left) { popup.style.left = `${left}px`; }
     if (top !== popupRect.top) { popup.style.top = `${top}px`; }
     popup.classList.add("menu-popup-positioned");
-};
+}
 
-window.repositionOpenMenuSubmenus = () => {
+export function repositionOpenMenuSubmenus() {
     const popups = document.getElementsByClassName("menu-host-popup");
     for (let index = 0; index < popups.length; index++) {
-        window.clampMenuPopup(popups[index]);
+        clampMenuPopup(popups[index]);
     }
 
     const submenus = document.getElementsByClassName("submenu");
     for (let index = 0; index < submenus.length; index++) {
-        window.positionMenuSubmenu(submenus[index]);
+        positionMenuSubmenu(submenus[index]);
     }
-};
+}
 
 let menuViewportListener = null;
 
 // Capture-phase scroll catches inner-element scrolling (.menu-host-popup, .submenu) without
 // per-element bindings. RAF coalesces rapid wheel input to one reposition per frame.
-window.attachMenuViewportListeners = () => {
+export function attachMenuViewportListeners() {
     if (menuViewportListener) { return; }
 
     let frameScheduled = false;
@@ -145,26 +131,18 @@ window.attachMenuViewportListeners = () => {
         frameScheduled = true;
         requestAnimationFrame(() => {
             frameScheduled = false;
-            window.repositionOpenMenuSubmenus();
+            repositionOpenMenuSubmenus();
         });
     };
 
     window.addEventListener("scroll", menuViewportListener, true);
     window.addEventListener("resize", menuViewportListener);
-};
+}
 
-window.detachMenuViewportListeners = () => {
+export function detachMenuViewportListeners() {
     if (!menuViewportListener) { return; }
 
     window.removeEventListener("scroll", menuViewportListener, true);
     window.removeEventListener("resize", menuViewportListener);
     menuViewportListener = null;
-};
-
-// Used after FocusAsync(preventScroll: true) so keyboard nav still scrolls the focused item
-// into view inside its menu panel without jumping the page.
-window.scrollMenuItemIntoView = (element) => {
-    if (!element || typeof element.scrollIntoView !== "function") { return; }
-    element.scrollIntoView({ block: "nearest", inline: "nearest" });
-};
-
+}

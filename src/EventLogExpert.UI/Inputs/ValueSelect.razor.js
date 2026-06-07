@@ -1,4 +1,7 @@
-window.registerDropdown = (root, dotNetRef) => {
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+export function registerDropdown(root, dotNetRef) {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
     const input = root.getElementsByTagName("input")[0];
     const controller = new AbortController();
@@ -22,7 +25,7 @@ window.registerDropdown = (root, dotNetRef) => {
         });
     };
 
-    const scrollToSelectedItem = () => {
+    const scrollToSelected = () => {
         const item = dropdown.querySelector("[aria-selected='true']");
         item?.scrollIntoView({ block: "nearest" });
     };
@@ -41,10 +44,10 @@ window.registerDropdown = (root, dotNetRef) => {
         // Notify C# of JS-driven open. .catch handles disposal race (rejection is async, not sync).
         dotNetRef?.invokeMethodAsync("OnIsOpenChanged", true)?.catch(() => {});
 
-        scrollToSelectedItem();
+        scrollToSelected();
     }
 
-    const toggleDropdown = (e) => {
+    const toggle = (e) => {
         if (dropdown.hasAttribute("data-toggle")) {
             closeDropdown(e, true);
         } else {
@@ -55,20 +58,20 @@ window.registerDropdown = (root, dotNetRef) => {
     input.addEventListener("mousedown", (e) => {
         e.stopPropagation();
 
-        toggleDropdown(e);
+        toggle(e);
     }, { signal: controller.signal });
 
     input.addEventListener("blur", (e) => closeDropdown(e), { signal: controller.signal });
     dropdown.addEventListener("blur", (e) => closeDropdown(e), { signal: controller.signal });
 
     root._dropdownController = controller;
-};
+}
 
-window.unregisterDropdown = (root) => {
+export function unregisterDropdown(root) {
     root?._dropdownController?.abort();
-};
+}
 
-window.closeDropdown = (root) => {
+export function closeDropdown(root) {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
 
     dropdown.removeAttribute("data-toggle");
@@ -78,9 +81,9 @@ window.closeDropdown = (root) => {
     dropdown.style.top = "";
     dropdown.style.left = "";
     dropdown.style.width = "";
-};
+}
 
-window.openDropdown = (root) => {
+export function openDropdown(root) {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
     const bounds = root.getBoundingClientRect();
 
@@ -94,27 +97,27 @@ window.openDropdown = (root) => {
     dropdown.setAttribute("data-toggle", "");
     dropdown.setAttribute("aria-hidden", "false");
 
-    window.scrollToSelectedItem(root);
-};
+    scrollToSelectedItem(root);
+}
 
-window.scrollToHighlightedItem = (root) => {
+export function scrollToHighlightedItem(root) {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
     const item = dropdown.querySelector("[highlighted]");
     item?.scrollIntoView({ block: "nearest" });
-};
+}
 
-window.scrollToSelectedItem = (root) => {
+export function scrollToSelectedItem(root) {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
     const item = dropdown.querySelector("[aria-selected='true']");
     item?.scrollIntoView({ block: "nearest" });
-};
+}
 
-window.toggleDropdown = (root) => {
+export function toggleDropdown(root) {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
 
     if (dropdown.hasAttribute("data-toggle")) {
-        window.closeDropdown(root);
+        closeDropdown(root);
     } else {
-        window.openDropdown(root);
+        openDropdown(root);
     }
-};
+}
