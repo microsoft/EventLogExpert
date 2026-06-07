@@ -122,6 +122,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
             }
             catch (JSException) { }
             catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
         }
 
         _selfRef?.Dispose();

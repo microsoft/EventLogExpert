@@ -75,6 +75,7 @@ public sealed partial class MenuRenderer : IAsyncDisposable
             catch (JSDisconnectedException) { }
             catch (JSException) { }
             catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
         }
 
         if (_rendererModule is not null)
@@ -83,6 +84,7 @@ public sealed partial class MenuRenderer : IAsyncDisposable
             catch (JSDisconnectedException) { }
             catch (JSException) { }
             catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
         }
     }
 

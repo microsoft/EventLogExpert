@@ -134,9 +134,9 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public async Task DisposeAsync_InvokesOnDisposedWithSelf()
+    public async Task DisposeAsync_InvokesOnDisposedWithTabAndEntryId()
     {
-        LibraryEntryRow? disposed = null;
+        (LibraryTab Tab, LibraryEntryId Id)? disposed = null;
         var entry = BuildSavedFilter("X");
         var component = Render<LibraryEntryRow>(parameters => parameters
             .Add(p => p.Entry, entry)
@@ -149,12 +149,13 @@ public sealed class LibraryEntryRowTests : BunitContext
             .Add(p => p.OnSaveToLibrary, _ => Task.CompletedTask)
             .Add(p => p.OnAddToFilterSet, _ => Task.CompletedTask)
             .Add(p => p.OnRequestPendingFocus, _ => Task.CompletedTask)
-            .Add(p => p.OnDisposed, row => disposed = row));
+            .Add(p => p.OnDisposed, key => disposed = key));
 
         await component.Instance.DisposeAsync();
 
-        Assert.NotNull(disposed);
-        Assert.Equal(entry.Id, disposed.Entry.Id);
+        Assert.True(disposed.HasValue);
+        Assert.Equal(LibraryTab.Saved, disposed.Value.Tab);
+        Assert.Equal(entry.Id, disposed.Value.Id);
     }
 
     [Fact]

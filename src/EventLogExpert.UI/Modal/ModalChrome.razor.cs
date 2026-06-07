@@ -146,10 +146,10 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         {
             await _modalModule.InvokeVoidAsync("closeModal", _dialogRef);
         }
-        catch
-        {
-            // Best-effort: JS runtime may be gone or element detached during teardown.
-        }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
+        catch (ObjectDisposedException) { }
+        catch (TaskCanceledException) { }
     }
 
     public async ValueTask DisposeAsync()
@@ -163,6 +163,7 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
             catch (JSDisconnectedException) { }
             catch (JSException) { }
             catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
         }
     }
 

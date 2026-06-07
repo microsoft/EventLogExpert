@@ -222,7 +222,7 @@ public sealed class FilterPaneTests : BunitContext
 
         typeof(UI.FilterPane.FilterPane)
             .GetMethod("OnRowDisposed", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .Invoke(pane, [row]);
+            .Invoke(pane, [id]);
 
         Assert.DoesNotContain(id, rowRefs.Keys);
     }

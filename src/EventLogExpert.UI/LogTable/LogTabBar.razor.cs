@@ -33,6 +33,7 @@ public sealed partial class LogTabBar
             catch (JSDisconnectedException) { }
             catch (JSException) { }
             catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
         }
 
         await base.DisposeAsyncCore(disposing);

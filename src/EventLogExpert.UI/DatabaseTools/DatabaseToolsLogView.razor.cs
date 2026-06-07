@@ -110,6 +110,9 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
                 await _jsModule.DisposeAsync();
             }
             catch (JSDisconnectedException) { /* Circuit gone — nothing to clean. */ }
+            catch (JSException) { }
+            catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
         }
 
         _selfRef.Dispose();

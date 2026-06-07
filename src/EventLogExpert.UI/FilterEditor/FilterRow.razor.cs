@@ -14,7 +14,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>, IDisposable
 {
     private FilterEditorCore? _coreRef;
 
-    [Parameter] public Action<FilterRow>? OnDisposed { get; set; }
+    [Parameter] public Action<FilterId>? OnDisposed { get; set; }
 
     [Parameter] public EventCallback<(FilterId Id, bool IsEditing)> OnEditingChanged { get; set; }
 
@@ -65,7 +65,10 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>, IDisposable
 
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
-    public void Dispose() => OnDisposed?.Invoke(this);
+    public void Dispose()
+    {
+        if (Value is { } filter) { OnDisposed?.Invoke(filter.Id); }
+    }
 
     internal ValueTask FocusEditAsync() => _coreRef?.FocusEditAsync() ?? ValueTask.CompletedTask;
 

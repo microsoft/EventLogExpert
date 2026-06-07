@@ -193,6 +193,7 @@ public sealed partial class FilterPane
                 catch (JSDisconnectedException) { }
                 catch (JSException) { }
                 catch (ObjectDisposedException) { }
+                catch (TaskCanceledException) { }
             }
         }
 
@@ -423,21 +424,7 @@ public sealed partial class FilterPane
     // re-renders so the chevron's aria-expanded reflects open/close state.
     private void OnMenuServiceStateChanged() => _ = InvokeAsync(StateHasChanged);
 
-    private void OnRowDisposed(FilterRow row)
-    {
-        FilterId? match = null;
-
-        foreach (var kvp in _rowRefs)
-        {
-            if (ReferenceEquals(kvp.Value, row))
-            {
-                match = kvp.Key;
-                break;
-            }
-        }
-
-        if (match is { } id) { _rowRefs.Remove(id); }
-    }
+    private void OnRowDisposed(FilterId id) => _rowRefs.Remove(id);
 
     private async Task OpenAddFilterMenuAsync() => await OpenAddFilterMenuAtAsync(true);
 

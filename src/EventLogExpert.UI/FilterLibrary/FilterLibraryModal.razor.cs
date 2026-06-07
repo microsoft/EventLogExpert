@@ -540,17 +540,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private bool IsTabpanelEmpty(LibraryTab tab) => GetEntriesForTab(tab).Count == 0;
 
-    private void OnRowDisposed(LibraryEntryRow row)
-    {
-        (LibraryTab Tab, LibraryEntryId Id)? match = null;
-
-        foreach (var rowRef in _rowRefs)
-        {
-            if (ReferenceEquals(rowRef.Value, row)) { match = rowRef.Key; break; }
-        }
-
-        if (match is { } key) { _rowRefs.Remove(key); }
-    }
+    private void OnRowDisposed((LibraryTab Tab, LibraryEntryId Id) key) => _rowRefs.Remove(key);
 
     private async Task PromptAndApplyImportAsync(ImportPreflight preflight)
     {
@@ -631,9 +621,11 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private ImmutableList<string> SelectedTagsInLibrary(LibraryTab tab)
     {
-        var available = AllLibraryTags;
+        var available = FilterLibraryState.Value.Entries
+            .SelectMany(e => e.Tags)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        return [.. _selectedTagsByTab[tab].Where(t => available.Contains(t, StringComparer.OrdinalIgnoreCase))];
+        return [.. _selectedTagsByTab[tab].Where(available.Contains)];
     }
 
     private async Task ShowImportExportErrorAsync(string title, string message)
