@@ -1,14 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Adapters.Input;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
+using EventLogExpert.UI.Keyboard;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
-namespace EventLogExpert.Components.Layout;
+namespace EventLogExpert.UI.Layout;
 
 public sealed partial class MainLayout : IAsyncDisposable
 {
@@ -22,11 +22,30 @@ public sealed partial class MainLayout : IAsyncDisposable
 
     [Inject] private IUpdateService UpdateService { get; init; } = null!;
 
+    private Task<IJSObjectReference>? _themeModuleLoad;
+    private bool _disposed;
+
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
         Settings.ThemeChanged -= OnThemeChanged;
 
         await KeyboardShortcutService.UnregisterAsync();
+
+        if (_themeModuleLoad is not null)
+        {
+            try
+            {
+                var module = await _themeModuleLoad;
+                await module.DisposeAsync();
+            }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
+
+            _themeModuleLoad = null;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -50,8 +69,30 @@ public sealed partial class MainLayout : IAsyncDisposable
         await base.OnInitializedAsync();
     }
 
-    private async Task ApplyThemeAsync() =>
-        await JSRuntime.InvokeVoidAsync("setTheme", Settings.Theme.ToString().ToLowerInvariant());
+    private async Task ApplyThemeAsync()
+    {
+        if (_disposed) { return; }
+
+        var load = _themeModuleLoad ??= JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/EventLogExpert.UI/Layout/MainLayout.razor.js").AsTask();
+
+        try
+        {
+            var module = await load;
+            await module.InvokeVoidAsync("setTheme", Settings.Theme.ToString().ToLowerInvariant());
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or JSException or ObjectDisposedException or TaskCanceledException)
+        {
+            ClearFailedThemeLoad(load);
+        }
+    }
+
+    private void ClearFailedThemeLoad(Task<IJSObjectReference> load)
+    {
+        if (!load.IsCompletedSuccessfully && ReferenceEquals(_themeModuleLoad, load))
+        {
+            _themeModuleLoad = null;
+        }
+    }
 
     private void OnThemeChanged() => _ = InvokeAsync(ApplyThemeAsync);
 }

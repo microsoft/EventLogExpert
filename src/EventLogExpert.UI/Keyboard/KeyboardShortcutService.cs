@@ -6,7 +6,7 @@ using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using Microsoft.JSInterop;
 
-namespace EventLogExpert.Adapters.Input;
+namespace EventLogExpert.UI.Keyboard;
 
 /// <summary>
 ///     Hosts the .NET side of the JS keydown bridge. Webview JS calls <see cref="HandleShortcutAsync" /> for any
@@ -22,43 +22,58 @@ public sealed class KeyboardShortcutService(
     private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
     private readonly ISettingsService _settings = settings;
 
-    private IJSRuntime? _jsRuntime;
-    private bool _registered;
-
+    private IJSObjectReference? _keyboardModule;
     private DotNetObjectReference<KeyboardShortcutService>? _selfRef;
 
-    public async ValueTask DisposeAsync() => await UnregisterAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await UnregisterAsync();
+
+        if (_keyboardModule is not null)
+        {
+            await DisposeModuleSafelyAsync(_keyboardModule);
+            _keyboardModule = null;
+        }
+    }
 
     public async Task EnsureRegisteredAsync(IJSRuntime jsRuntime)
     {
         // The JS bridge is idempotent on re-register and refreshes its DotNetObjectReference, so we
         // always invoke it. This keeps shortcuts working after WebView reloads / circuit restarts /
-        // hot reload, even though this service is a DI singleton whose _registered flag would
-        // otherwise cause us to skip re-registration when the JS side has lost its listener.
-        var previousJsRuntime = _jsRuntime;
+        // hot reload.
         var previousSelfRef = _selfRef;
-        var previousRegistered = _registered;
+        var previousModule = _keyboardModule;
         var newSelfRef = DotNetObjectReference.Create(this);
+        IJSObjectReference? newModule = null;
 
         try
         {
-            await jsRuntime.InvokeVoidAsync("registerKeyboardShortcuts", newSelfRef);
-
-            _jsRuntime = jsRuntime;
-            _selfRef = newSelfRef;
-            _registered = true;
-
-            if (previousSelfRef is not null && !ReferenceEquals(previousSelfRef, newSelfRef))
-            {
-                previousSelfRef.Dispose();
-            }
+            newModule = await jsRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/EventLogExpert.UI/Keyboard/Keyboard.js");
+            await newModule.InvokeVoidAsync("registerKeyboardShortcuts", newSelfRef);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or JSException or TaskCanceledException)
         {
             newSelfRef.Dispose();
-            _jsRuntime = previousJsRuntime;
-            _selfRef = previousSelfRef;
-            _registered = previousRegistered;
+
+            if (newModule is not null)
+            {
+                await DisposeModuleSafelyAsync(newModule);
+            }
+
+            return;
+        }
+
+        _selfRef = newSelfRef;
+        _keyboardModule = newModule;
+
+        if (previousSelfRef is not null && !ReferenceEquals(previousSelfRef, newSelfRef))
+        {
+            previousSelfRef.Dispose();
+        }
+
+        if (previousModule is not null && !ReferenceEquals(previousModule, newModule))
+        {
+            await DisposeModuleSafelyAsync(previousModule);
         }
     }
 
@@ -97,18 +112,27 @@ public sealed class KeyboardShortcutService(
     {
         if (_selfRef is null) { return; }
 
-        if (_jsRuntime is not null)
+        if (_keyboardModule is not null)
         {
             try
             {
-                await _jsRuntime.InvokeVoidAsync("unregisterKeyboardShortcuts");
+                await _keyboardModule.InvokeVoidAsync("unregisterKeyboardShortcuts");
             }
             catch (JSDisconnectedException) { /* Circuit gone — listener already detached. */ }
             catch (TaskCanceledException) { /* Teardown cancellation; nothing to do. */ }
+            catch (ObjectDisposedException) { }
         }
 
         _selfRef.Dispose();
         _selfRef = null;
-        _registered = false;
+    }
+
+    private static async ValueTask DisposeModuleSafelyAsync(IJSObjectReference module)
+    {
+        try { await module.DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
+        catch (ObjectDisposedException) { }
+        catch (TaskCanceledException) { }
     }
 }

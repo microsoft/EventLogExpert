@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Adapters.Input;
 using EventLogExpert.Adapters.Settings;
 using EventLogExpert.DependencyInjection;
 using EventLogExpert.Eventing.Resolvers;
@@ -95,7 +94,6 @@ public static class MauiProgram
         builder.Services.AddMauiAlertDialogService();
 
         builder.Services.AddSingleton<IBannerCycleStateService, BannerCycleStateService>();
-        builder.Services.AddSingleton<KeyboardShortcutService>();
         builder.Services.AddSingleton<DatabaseRecoveryHost>();
 
         var mauiApp = builder.Build();

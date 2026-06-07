@@ -18,7 +18,7 @@ const shouldSkipCopyShortcut = (e) => {
     return false;
 };
 
-window.registerKeyboardShortcuts = (ref) => {
+export function registerKeyboardShortcuts(ref) {
     // Always update the DotNetObjectReference so a re-register from .NET (hot reload, circuit
     // restart, WebView reuse) doesn't leave the bridge holding a stale reference whose invoke
     // calls would silently fail. The listener itself reads the latest ref via the closure-bound
@@ -61,12 +61,12 @@ window.registerKeyboardShortcuts = (ref) => {
             .catch(() => { /* ignore — .NET side may be tearing down */ });
     };
     document.addEventListener("keydown", keyboardShortcutListener, true);
-};
+}
 
-window.unregisterKeyboardShortcuts = () => {
+export function unregisterKeyboardShortcuts() {
     if (keyboardShortcutListener) {
         document.removeEventListener("keydown", keyboardShortcutListener, true);
         keyboardShortcutListener = null;
     }
     keyboardShortcutRef = null;
-};
+}
