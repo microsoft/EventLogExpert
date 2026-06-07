@@ -6,16 +6,15 @@ using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using System.Diagnostics;
 using System.IO.Pipes;
 
-namespace EventLogExpert.Adapters.Elevation;
+namespace EventLogExpert.WindowsPlatform.Elevation;
 
 /// <summary>
 ///     Concrete <see cref="IElevatedHelperProcess" /> wrapping a spawned helper <see cref="Process" /> + its
-///     connected <see cref="NamedPipeServerStream" />. Owned by <see cref="MauiElevatedHelperProcessHost" />; callers
-///     receive it from <c>StartAsync</c> and dispose when done. Disposal closes the pipe (which signals the helper to exit
-///     if it's still listening) but does NOT kill the helper — callers SHOULD await exit or call <see cref="Kill" />
-///     first.
+///     connected <see cref="NamedPipeServerStream" />. Owned by <see cref="ElevatedHelperProcessHost" />; callers receive
+///     it from <c>StartAsync</c> and dispose when done. Disposal closes the pipe (which signals the helper to exit if it's
+///     still listening) but does NOT kill the helper — callers SHOULD await exit or call <see cref="Kill" /> first.
 /// </summary>
-internal sealed class MauiElevatedHelperProcess(Process process, NamedPipeServerStream pipe, ITraceLogger logger) : IElevatedHelperProcess
+internal sealed class ElevatedHelperProcess(Process process, NamedPipeServerStream pipe, ITraceLogger logger) : IElevatedHelperProcess
 {
     private int _disposed;
 
@@ -47,7 +46,7 @@ internal sealed class MauiElevatedHelperProcess(Process process, NamedPipeServer
         }
         catch (Exception ex)
         {
-            logger.Warning($"{nameof(MauiElevatedHelperProcess)}.{nameof(Kill)} threw: {ex}");
+            logger.Warning($"{nameof(ElevatedHelperProcess)}.{nameof(Kill)} threw: {ex}");
         }
     }
 

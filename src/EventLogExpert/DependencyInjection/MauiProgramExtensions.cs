@@ -2,11 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Adapters.Clipboard;
-using EventLogExpert.Adapters.Elevation;
 using EventLogExpert.Adapters.FilePicker;
 using EventLogExpert.Adapters.FileSave;
-using EventLogExpert.Adapters.Identity;
-using EventLogExpert.Adapters.Lifecycle;
 using EventLogExpert.Adapters.Menu;
 using EventLogExpert.Adapters.Settings;
 using EventLogExpert.Adapters.Threading;
@@ -19,11 +16,8 @@ using EventLogExpert.Runtime.Common.Activation;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
-using EventLogExpert.Runtime.Common.Identity;
-using EventLogExpert.Runtime.Common.Restart;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Database;
-using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
@@ -103,15 +97,12 @@ internal static class MauiProgramExtensions
 
         public IServiceCollection AddMauiPlatformAdapters()
         {
-            services.AddSingleton<IApplicationRestartService, WindowsApplicationRestartService>();
             services.AddSingleton<IMainThreadService, MauiMainThreadService>();
             services.AddSingleton<ITitleProvider, TitleProvider>();
             services.AddSingleton<IClipboardService, MauiClipboardService>();
             services.AddSingleton<IFileSaveService, MauiFileSaveService>();
             services.AddSingleton<IFilePickerService, MauiFilePickerService>();
             services.AddSingleton<IFolderPickerService, MauiFolderPickerService>();
-            services.AddSingleton<IWindowsIdentityProvider, WindowsIdentityProvider>();
-            services.AddSingleton<IElevatedHelperProcessHost, MauiElevatedHelperProcessHost>();
 
             return services;
         }

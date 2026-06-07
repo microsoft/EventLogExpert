@@ -89,6 +89,7 @@ public static class MauiProgram
         // Host-side DI groupings (see MauiProgramExtensions for membership)
         builder.Services.AddMauiPreferenceAdapters();
         builder.Services.AddMauiPlatformAdapters();
+        builder.Services.AddWindowsPlatformAdapters();
         builder.Services.AddMauiMenuServices();
         builder.Services.AddMauiActivationDispatcher();
         builder.Services.AddMauiAlertDialogService();

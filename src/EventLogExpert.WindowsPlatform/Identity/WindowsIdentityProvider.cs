@@ -4,7 +4,7 @@
 using EventLogExpert.Runtime.Common.Identity;
 using System.Security.Principal;
 
-namespace EventLogExpert.Adapters.Identity;
+namespace EventLogExpert.WindowsPlatform.Identity;
 
 internal sealed class WindowsIdentityProvider : IWindowsIdentityProvider
 {

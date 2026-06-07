@@ -5,7 +5,7 @@
 // We are defining some win32 types in this file, so we
 // are not following the usual C# naming conventions.
 
-namespace EventLogExpert.Adapters.Lifecycle;
+namespace EventLogExpert.WindowsPlatform.Restart;
 
 /// <summary>Flags for the RegisterApplicationRestart function</summary>
 [Flags]

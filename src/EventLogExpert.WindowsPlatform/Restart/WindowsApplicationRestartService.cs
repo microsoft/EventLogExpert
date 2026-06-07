@@ -5,7 +5,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Restart;
 using Windows.ApplicationModel.Core;
 
-namespace EventLogExpert.Adapters.Lifecycle;
+namespace EventLogExpert.WindowsPlatform.Restart;
 
 internal sealed class WindowsApplicationRestartService(ITraceLogger traceLogger) : IApplicationRestartService
 {
@@ -14,6 +14,7 @@ internal sealed class WindowsApplicationRestartService(ITraceLogger traceLogger)
     public bool RegisterApplicationRestart()
     {
         uint result = NativeMethods.RegisterApplicationRestart(null, RestartFlags.NONE);
+
         return result == 0;
     }
 
@@ -31,11 +32,13 @@ internal sealed class WindowsApplicationRestartService(ITraceLogger traceLogger)
             }
 
             _traceLogger.Error($"{nameof(WindowsApplicationRestartService)}.{nameof(TryRestartAsync)}: restart denied: {reason}");
+
             return false;
         }
         catch (Exception ex)
         {
             _traceLogger.Error($"{nameof(WindowsApplicationRestartService)}.{nameof(TryRestartAsync)}: restart threw: {ex}");
+
             return false;
         }
     }
