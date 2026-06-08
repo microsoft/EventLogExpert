@@ -36,6 +36,7 @@
   <Folder Name="/tests/Unit/">
     <Project Path="tests/Unit/EventLogExpert.UI.Tests/EventLogExpert.UI.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Windows.Tests/EventLogExpert.Windows.Tests.csproj" />
+    <Project Path="tests/Unit/EventLogExpert.DatabaseTools.Tests/EventLogExpert.DatabaseTools.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.EventDbTool.Tests/EventLogExpert.EventDbTool.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Eventing.Tests/EventLogExpert.Eventing.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Logging.Tests/EventLogExpert.Logging.Tests.csproj" />

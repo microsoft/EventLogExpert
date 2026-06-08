@@ -6,7 +6,7 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
-namespace EventLogExpert.Runtime.Tests.DatabaseTools.Elevation;
+namespace EventLogExpert.DatabaseTools.Tests.Common.Ipc;
 
 public sealed class IpcMessageRoundTripTests
 {

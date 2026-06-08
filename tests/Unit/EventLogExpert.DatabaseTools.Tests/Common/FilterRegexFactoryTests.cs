@@ -3,7 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common;
 
-namespace EventLogExpert.UI.Tests.DatabaseTools;
+namespace EventLogExpert.DatabaseTools.Tests.Common;
 
 public sealed class FilterRegexFactoryTests
 {
