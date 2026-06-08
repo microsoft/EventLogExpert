@@ -3,7 +3,7 @@
 
 using EventLogExpert.Windows.Tests.TestUtils;
 using EventLogExpert.Windows.Tests.TestUtils.Constants;
-using EventLogExpert.WindowsPlatform;
+using EventLogExpert.WindowsPlatform.Activation;
 using Xunit;
 
 namespace EventLogExpert.Windows.Tests;

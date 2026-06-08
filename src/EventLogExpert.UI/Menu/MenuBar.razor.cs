@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Common.Interop;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -204,7 +205,7 @@ public sealed partial class MenuBar
 
     private IReadOnlyList<MenuItem> BuildTools() =>
     [
-        MenuItem.Item("Databases…", () => Actions.OpenDatabaseToolsAsync()),
+        MenuItem.Item("Databases...", () => Actions.OpenDatabaseToolsAsync()),
         MenuItem.Separator(),
         MenuItem.Item("Settings", () => Actions.OpenSettingsAsync()),
     ];
@@ -220,7 +221,7 @@ public sealed partial class MenuBar
 
     private IReadOnlyList<MenuItem> BuildView()
     {
-        // Snapshot state at open time. Live updates aren't pushed into an open menu — the next open will reflect any change.
+        // Snapshot state at open time. Live updates aren't pushed into an open menu - the next open will reflect any change.
         bool isFilterEnabled = FilterPaneIsEnabled.Value;
         bool isContinuouslyUpdating = ContinuouslyUpdate.Value;
 
@@ -289,7 +290,7 @@ public sealed partial class MenuBar
 
     private async Task OnBarHover(TopLevel bar, int index)
     {
-        // Only switch on hover when another menu is already open — matches Win32 menubar behavior.
+        // Only switch on hover when another menu is already open - matches Win32 menubar behavior.
         if (MenuService.ActiveItems is null || ReferenceEquals(ActiveBar, bar)) { return; }
 
         await OpenBarAsync(bar, index, captureOpener: false);
@@ -315,7 +316,7 @@ public sealed partial class MenuBar
                 return;
             case "ArrowDown":
                 // Enter/Space are intentionally not handled here so the browser's native button
-                // click fires once — handling them on keydown would toggle the menu shut.
+                // click fires once - handling them on keydown would toggle the menu shut.
                 await OpenBarAsync(_bars[index], index);
                 return;
             case "ArrowUp":

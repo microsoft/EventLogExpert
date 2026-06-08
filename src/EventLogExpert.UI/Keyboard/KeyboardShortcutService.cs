@@ -4,6 +4,7 @@
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Common.Interop;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Keyboard;
@@ -81,7 +82,7 @@ public sealed class KeyboardShortcutService(
     /// <summary>
     ///     Runs the requested shortcut action when applicable. The JS bridge has already synchronously called
     ///     <c>preventDefault</c>/<c>stopPropagation</c> in capture phase before invoking this method, so the return value
-    ///     would be ignored — this method is intentionally <see cref="Task" /> rather than <c>Task&lt;bool&gt;</c>. When a
+    ///     would be ignored - this method is intentionally <see cref="Task" /> rather than <c>Task&lt;bool&gt;</c>. When a
     ///     modal is active, the action is skipped (no-op) so modal keybindings stay isolated; the browser default has still
     ///     been suppressed by the bridge.
     /// </summary>
@@ -119,7 +120,7 @@ public sealed class KeyboardShortcutService(
             {
                 await _keyboardModule.InvokeVoidAsync("unregisterKeyboardShortcuts");
             }
-            catch (JSDisconnectedException) { /* Circuit gone — listener already detached. */ }
+            catch (JSDisconnectedException) { /* Circuit gone - listener already detached. */ }
             catch (TaskCanceledException) { /* Teardown cancellation; nothing to do. */ }
             catch (ObjectDisposedException) { }
         }

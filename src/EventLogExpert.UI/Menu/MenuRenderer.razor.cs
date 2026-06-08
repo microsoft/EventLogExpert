@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.Menu;
+using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
@@ -60,7 +61,7 @@ public sealed partial class MenuRenderer : IAsyncDisposable
     /// <summary>
     ///     When true, the renderer will not set <c>_focusedIndex</c> from <see cref="InitialFocusIndex" /> on parameter
     ///     changes and will not auto-focus the first enabled item on first render. Used for hover-opened submenus so keyboard
-    ///     focus stays on the parent item per WAI-ARIA menu guidance — focus only enters the submenu when the user explicitly
+    ///     focus stays on the parent item per WAI-ARIA menu guidance - focus only enters the submenu when the user explicitly
     ///     opens it via Enter/Space/ArrowRight.
     /// </summary>
     [Parameter] public bool SuppressInitialFocus { get; set; }
@@ -148,7 +149,7 @@ public sealed partial class MenuRenderer : IAsyncDisposable
         }
         else if (_previousSuppressInitialFocus && !SuppressInitialFocus && _focusedIndex < 0 && Items is not null)
         {
-            // SuppressInitialFocus flipped false while Items stayed the same reference — user
+            // SuppressInitialFocus flipped false while Items stayed the same reference - user
             // stepped into a hover-opened submenu, so move focus into it.
             _focusedIndex = InitialFocusIndex == 0
                 ? FindEnabledIndex(0, +1)

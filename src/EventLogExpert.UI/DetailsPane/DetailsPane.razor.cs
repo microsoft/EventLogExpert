@@ -7,6 +7,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Common.Interop;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -210,7 +211,7 @@ public sealed partial class DetailsPane
                 {
                     TraceLogger.Error($"DetailsPane: XML resolution failed for selected event: {ex}");
 
-                    // Only surface the failure if we're still the current selection — otherwise
+                    // Only surface the failure if we're still the current selection - otherwise
                     // a newer selection has taken over and owns _resolvedXml.
                     if (ReferenceEquals(_selectedEvent, selectedEvent) && ReferenceEquals(_xmlResolveCts, cts))
                     {
@@ -220,7 +221,7 @@ public sealed partial class DetailsPane
                     return;
                 }
 
-                // Selection changed while the fetch was in flight — discard the stale result.
+                // Selection changed while the fetch was in flight - discard the stale result.
                 if (cts.IsCancellationRequested || !ReferenceEquals(_selectedEvent, selectedEvent))
                 {
                     return;

@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.WindowsPlatform;
+namespace EventLogExpert.WindowsPlatform.Activation;
 
 /// <summary>
 ///     Discriminated record hierarchy for <see cref="EvtxFolderEnumerator.EnumerateEvtxTopLevel" /> so callers can

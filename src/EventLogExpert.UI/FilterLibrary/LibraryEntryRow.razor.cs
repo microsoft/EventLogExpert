@@ -6,6 +6,7 @@ using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Menu;
+using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.Focus;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -150,9 +151,9 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         if (diff.TotalSeconds < 60) { return "just now"; }
 
         if (diff.TotalMinutes < 60) { return $"{(int)diff.TotalMinutes}m ago"; }
-        
+
         if (diff.TotalHours < 24) { return $"{(int)diff.TotalHours}h ago"; }
-        
+
         return diff.TotalDays < 7 ?
             $"{(int)diff.TotalDays}d ago" :
             lastUsed.ToLocalTime().ToString("yyyy-MM-dd");

@@ -5,13 +5,13 @@ using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Parsing;
 using System.Diagnostics.CodeAnalysis;
 
-namespace EventLogExpert.Filtering;
+namespace EventLogExpert.Filtering.Compilation;
 
 /// <summary>
 ///     Single source of truth for compiling a filter expression string into a <see cref="CompiledFilter" />. Internal
 ///     facade that delegates to the hand-rolled <see cref="FilterParser" /> pipeline (tokenizer + parser + lowerer +
-///     emitter); kept as the stable compile-path for intra-assembly consumers (saved filter loaders, filter service,
-///     draft validators) while the internal pipeline evolves.
+///     emitter); kept as the stable compile-path for intra-assembly consumers (saved filter loaders, filter service, draft
+///     validators) while the internal pipeline evolves.
 /// </summary>
 internal static class FilterCompiler
 {

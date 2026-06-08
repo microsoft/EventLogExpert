@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Basic;
+using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using System.Diagnostics.CodeAnalysis;
@@ -18,7 +19,7 @@ public sealed class FilterDraft
 
     /// <summary>
     ///     <see langword="true" /> when the primary <see cref="Comparison" /> has user-supplied input or any predicate
-    ///     exists. Used by the row's mode-switch + Basic-mode save validation as the "structure carries data" signal —
+    ///     exists. Used by the row's mode-switch + Basic-mode save validation as the "structure carries data" signal -
     ///     <see cref="FilterComparisonDraft.Property" /> defaulting to the first enum value (the dropdown's initial selection)
     ///     does NOT count as meaningful input on its own.
     /// </summary>
@@ -91,7 +92,7 @@ public sealed class FilterDraft
                     // Strict first so a clean structured shape produces clean text. Lenient fallback covers the
                     // user-confirmed data-loss path (the row only reaches the lossy branch after
                     // WouldLoseDataSwitchingTo returned true and the user accepted the prompt). When neither
-                    // formatter produces text — empty structure or all predicates unprintable — fall back to the
+                    // formatter produces text - empty structure or all predicates unprintable - fall back to the
                     // existing ComparisonText (preserves the degraded-persisted-Basic recovery surface).
                     if (HasMeaningfulStructure && BasicFilterFormatter.TryFormat(ToBasicFilter(), true, out var strict))
                     {
@@ -138,9 +139,9 @@ public sealed class FilterDraft
 
     /// <summary>
     ///     Builds a <see cref="SavedFilter" /> from this draft per <see cref="Mode" />. Returns <see langword="false" />
-    ///     with a populated <paramref name="error" /> when the draft cannot be saved (empty input, incomplete Basic
-    ///     predicate, or compile failure on the resulting text). Pure (does not mutate the draft) so the caller can surface
-    ///     the error inline and let the user repair.
+    ///     with a populated <paramref name="error" /> when the draft cannot be saved (empty input, incomplete Basic predicate,
+    ///     or compile failure on the resulting text). Pure (does not mutate the draft) so the caller can surface the error
+    ///     inline and let the user repair.
     /// </summary>
     public bool TryBuildSavedFilter([NotNullWhen(true)] out SavedFilter? saved, out string error)
     {
@@ -217,7 +218,7 @@ public sealed class FilterDraft
         switch (target)
         {
             case FilterMode.Cached:
-                // Cached can't accept arbitrary text — switching from Basic with structure OR from
+                // Cached can't accept arbitrary text - switching from Basic with structure OR from
                 // Basic/Advanced with a non-empty expression discards the user's input.
                 return Mode == FilterMode.Basic
                     ? HasMeaningfulStructure || !string.IsNullOrEmpty(ComparisonText)

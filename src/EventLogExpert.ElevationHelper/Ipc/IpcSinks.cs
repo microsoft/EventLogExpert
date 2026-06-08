@@ -4,7 +4,7 @@
 using EventLogExpert.DatabaseTools.Common.Ipc;
 using EventLogExpert.DatabaseTools.Common.Operations;
 
-namespace EventLogExpert.ElevationHelper;
+namespace EventLogExpert.ElevationHelper.Ipc;
 
 /// <summary>
 ///     Helper-side <see cref="IProgress{T}" /> implementation for <see cref="DatabaseToolsLogEntry" />. Each
@@ -20,7 +20,7 @@ internal sealed class IpcLogEntrySink(IpcEnvelopeWriter writer) : IProgress<Data
 {
     public void Report(DatabaseToolsLogEntry value)
     {
-        // Report is synchronous by contract — block briefly on the writer rather than fire-and-forget so the
+        // Report is synchronous by contract - block briefly on the writer rather than fire-and-forget so the
         // operation back-pressures naturally when the pipe is congested (i.e., the runner is slow to drain).
         // Using GetAwaiter().GetResult() is acceptable here because the writer is a small async wait on a
         // semaphore + a pipe write; no deadlock surface unless the runner stops reading entirely (in which

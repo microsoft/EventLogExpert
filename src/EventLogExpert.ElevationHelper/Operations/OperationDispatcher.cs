@@ -3,10 +3,11 @@
 
 using EventLogExpert.DatabaseTools.Common.Ipc;
 using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.ElevationHelper.Ipc;
 using EventLogExpert.Runtime.DatabaseTools;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace EventLogExpert.ElevationHelper;
+namespace EventLogExpert.ElevationHelper.Operations;
 
 /// <summary>
 ///     Helper-side operation dispatcher. Given an already-deserialized <see cref="DatabaseToolsIpcRequest" />,

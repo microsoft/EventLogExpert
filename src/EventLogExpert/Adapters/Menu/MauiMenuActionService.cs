@@ -19,7 +19,7 @@ using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
-using EventLogExpert.WindowsPlatform;
+using EventLogExpert.WindowsPlatform.Activation;
 using Fluxor;
 using Application = Microsoft.Maui.Controls.Application;
 using IDispatcher = Fluxor.IDispatcher;
@@ -101,7 +101,7 @@ public sealed class MauiMenuActionService(
         }
         catch (ObjectDisposedException)
         {
-            // Already disposed — continue tearing down remaining resources.
+            // Already disposed - continue tearing down remaining resources.
         }
 
         _logNamesLock.Dispose();

@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.Common.Activation;
-using EventLogExpert.WindowsPlatform;
 using EventLogExpert.WindowsPlatform.Activation;
 using Microsoft.Windows.AppLifecycle;
 using Windows.ApplicationModel.Activation;

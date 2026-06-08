@@ -8,7 +8,7 @@ using EventLogExpert.Runtime.Common.Activation;
 using EventLogExpert.Runtime.Common.Threading;
 using System.Threading.Channels;
 
-namespace EventLogExpert.WindowsPlatform;
+namespace EventLogExpert.WindowsPlatform.Activation;
 
 /// <summary>
 ///     Owns a single-reader <see cref="Channel{T}" /> that serializes activation requests so concurrent right-clicks
@@ -60,7 +60,7 @@ public sealed class ActivationDispatcher : IActivationDispatcher
     {
         ArgumentNullException.ThrowIfNull(openBatch);
 
-        // Guard against duplicate subscriptions — MainPage subscribes from two places.
+        // Guard against duplicate subscriptions - MainPage subscribes from two places.
         if (Interlocked.Exchange(ref _started, 1) == 1) { return; }
 
         try
@@ -71,7 +71,7 @@ public sealed class ActivationDispatcher : IActivationDispatcher
                 {
                     await ProcessBatchAsync(args, openBatch, cancellationToken);
                 }
-                // Cancellation during a batch is a clean shutdown, not a dispatch error — re-throw
+                // Cancellation during a batch is a clean shutdown, not a dispatch error - re-throw
                 // so the outer await-foreach loop exits via its own OperationCanceledException catch.
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {

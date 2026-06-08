@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.UI.Common.Interop;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;

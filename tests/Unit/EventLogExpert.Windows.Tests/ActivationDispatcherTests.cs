@@ -7,7 +7,7 @@ using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Activation;
 using EventLogExpert.Runtime.Common.Threading;
-using EventLogExpert.WindowsPlatform;
+using EventLogExpert.WindowsPlatform.Activation;
 using NSubstitute;
 using System.Threading.Channels;
 using Xunit;
@@ -16,6 +16,24 @@ namespace EventLogExpert.Windows.Tests;
 
 public sealed class ActivationDispatcherTests
 {
+    [Fact]
+    public void Enqueue_OnCompletedChannel_LogsWarning_AndDoesNotThrow()
+    {
+        var logger = Substitute.For<ITraceLogger>();
+        var (dispatcher, channel) = CreateDispatcher(logger: logger);
+
+        channel.Writer.Complete();
+
+        // TryWrite returns false on a completed unbounded channel; Enqueue must observe the
+        // rejection and surface it via the logger - silent drop hides "Explorer activation did
+        // nothing" failures in the field.
+        var exception = Record.Exception(() =>
+            dispatcher.Enqueue(new ActivationArgs([@"E:\Data\one.evtx"], [])));
+
+        Assert.Null(exception);
+        logger.Received(1).Warning(Arg.Any<WarningLogHandler>());
+    }
+
     [Fact]
     public async Task Enqueue_OnEmptyArgs_DoesNotInvokeOpenBatch()
     {
@@ -32,24 +50,6 @@ public sealed class ActivationDispatcherTests
         await consumerTask;
 
         Assert.Equal(0, invocations);
-    }
-
-    [Fact]
-    public void Enqueue_OnCompletedChannel_LogsWarning_AndDoesNotThrow()
-    {
-        var logger = Substitute.For<ITraceLogger>();
-        var (dispatcher, channel) = CreateDispatcher(logger: logger);
-
-        channel.Writer.Complete();
-
-        // TryWrite returns false on a completed unbounded channel; Enqueue must observe the
-        // rejection and surface it via the logger — silent drop hides "Explorer activation did
-        // nothing" failures in the field.
-        var exception = Record.Exception(() =>
-            dispatcher.Enqueue(new ActivationArgs([@"E:\Data\one.evtx"], [])));
-
-        Assert.Null(exception);
-        logger.Received(1).Warning(Arg.Any<WarningLogHandler>());
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public sealed class ActivationDispatcherTests
             },
             cts.Token);
 
-        // Cancel BEFORE enqueueing — the channel reader will throw OperationCanceledException
+        // Cancel BEFORE enqueueing - the channel reader will throw OperationCanceledException
         // and the consumer exits without ever invoking openBatch.
         await cts.CancelAsync();
         dispatcher.Enqueue(new ActivationArgs([@"E:\Data\one.evtx"], []));
@@ -188,7 +188,7 @@ public sealed class ActivationDispatcherTests
 
         await cts.CancelAsync();
 
-        // No exception should escape — the dispatcher swallows OperationCanceledException on shutdown.
+        // No exception should escape - the dispatcher swallows OperationCanceledException on shutdown.
         await consumerTask;
     }
 
