@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
-using EventLogExpert.EventDbTool.Commands.Support;
 using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
@@ -61,7 +61,14 @@ public sealed class CreateDatabaseCommand
             await using var sp = Program.BuildServiceProvider(result.GetValue(verboseOption));
             var logger = sp.GetRequiredService<ITraceLogger>();
 
-            if (!FilterRegexFactory.TryCreate(result.GetValue(filterOption), logger, out var regex)) { return; }
+            var filterValue = result.GetValue(filterOption);
+
+            if (!FilterRegexFactory.TryCreate(filterValue, out var regex, out var error))
+            {
+                logger.Error($"Invalid --filter regex '{filterValue}': {error}");
+
+                return;
+            }
 
             var request = new CreateDatabaseRequest(
                 result.GetRequiredValue(fileArgument),

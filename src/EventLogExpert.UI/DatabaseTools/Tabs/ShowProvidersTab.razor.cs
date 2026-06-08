@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.Logging.Abstractions;
@@ -13,7 +14,6 @@ namespace EventLogExpert.UI.DatabaseTools.Tabs;
 
 public sealed partial class ShowProvidersTab : DatabaseToolsTabBase<ShowProvidersRequest>
 {
-    private static readonly TimeSpan s_filterCompileTimeout = TimeSpan.FromSeconds(1);
     private static readonly IReadOnlyList<string> s_sourceExtensions = [".db", ".evtx"];
 
     private Regex? _compiledFilter;
@@ -50,24 +50,7 @@ public sealed partial class ShowProvidersTab : DatabaseToolsTabBase<ShowProvider
         var pattern = e.Value?.ToString() ?? string.Empty;
         _filterText = pattern;
 
-        if (string.IsNullOrEmpty(pattern))
-        {
-            _compiledFilter = null;
-            _filterError = null;
-
-            return;
-        }
-
-        try
-        {
-            _compiledFilter = new Regex(pattern, RegexOptions.IgnoreCase, s_filterCompileTimeout);
-            _filterError = null;
-        }
-        catch (ArgumentException ex)
-        {
-            _compiledFilter = null;
-            _filterError = $"Invalid regex: {ex.Message}";
-        }
+        _filterError = FilterRegexFactory.TryCreate(pattern, out _compiledFilter, out var error) ? null : $"Invalid regex: {error}";
     }
 
     private async Task PickSourceAsync()
