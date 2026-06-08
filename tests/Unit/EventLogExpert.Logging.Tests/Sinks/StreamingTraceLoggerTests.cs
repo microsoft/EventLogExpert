@@ -1,13 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Runtime.DatabaseTools;
+using EventLogExpert.Logging.Sinks;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 
-namespace EventLogExpert.Runtime.Tests.DatabaseTools;
+namespace EventLogExpert.Logging.Tests.Sinks;
 
 public sealed class StreamingTraceLoggerTests
 {
@@ -16,20 +15,20 @@ public sealed class StreamingTraceLoggerTests
     {
         // IProgress<T> via Progress<T> dispatches via SynchronizationContext if present, else
         // thread-pool. With a synchronous sink, dispatch is inline so all 10,000 entries are observed.
-        var captured = new ConcurrentQueue<DatabaseToolsLogEntry>();
-        var sink = new SynchronousProgress<DatabaseToolsLogEntry>(captured.Enqueue);
+        var captured = new ConcurrentQueue<LogRecord>();
+        var sink = new SynchronousProgress<LogRecord>(captured.Enqueue);
         ITraceLogger logger = new StreamingTraceLogger(sink);
 
-        const int threadCount = 100;
-        const int perThread = 100;
-        var tasks = new Task[threadCount];
+        const int ThreadCount = 100;
+        const int PerThread = 100;
+        var tasks = new Task[ThreadCount];
 
-        for (var t = 0; t < threadCount; t++)
+        for (var t = 0; t < ThreadCount; t++)
         {
             var threadId = t;
             tasks[t] = Task.Run(() =>
             {
-                for (var i = 0; i < perThread; i++)
+                for (var i = 0; i < PerThread; i++)
                 {
                     logger.Information($"t{threadId} i{i}");
                 }
@@ -38,14 +37,14 @@ public sealed class StreamingTraceLoggerTests
 
         await Task.WhenAll(tasks);
 
-        Assert.Equal(threadCount * perThread, captured.Count);
+        Assert.Equal(ThreadCount * PerThread, captured.Count);
     }
 
     [Fact]
     public void Emit_AtDefaultMinimumLevel_DropsTraceAndDebug_KeepsInformationAndAbove()
     {
-        var captured = new List<DatabaseToolsLogEntry>();
-        var sink = new SynchronousProgress<DatabaseToolsLogEntry>(captured.Add);
+        var captured = new List<LogRecord>();
+        var sink = new SynchronousProgress<LogRecord>(captured.Add);
         ITraceLogger logger = new StreamingTraceLogger(sink);
 
         logger.Trace($"trace");
@@ -65,8 +64,8 @@ public sealed class StreamingTraceLoggerTests
     [Fact]
     public void Emit_PreservesInsertionOrder_OnSingleThread()
     {
-        var captured = new List<DatabaseToolsLogEntry>();
-        var sink = new SynchronousProgress<DatabaseToolsLogEntry>(captured.Add);
+        var captured = new List<LogRecord>();
+        var sink = new SynchronousProgress<LogRecord>(captured.Add);
         ITraceLogger logger = new StreamingTraceLogger(sink);
 
         for (var i = 0; i < 100; i++)
@@ -85,8 +84,8 @@ public sealed class StreamingTraceLoggerTests
     public void MinimumLevel_DefaultsToInformation_SoTraceAndDebugAreFiltered()
     {
         // Default Information level keeps verbose provider/reader chatter out of the UI log.
-        var captured = new List<DatabaseToolsLogEntry>();
-        ITraceLogger logger = new StreamingTraceLogger(new Progress<DatabaseToolsLogEntry>(captured.Add));
+        var captured = new List<LogRecord>();
+        ITraceLogger logger = new StreamingTraceLogger(new Progress<LogRecord>(captured.Add));
 
         Assert.Equal(LogLevel.Information, logger.MinimumLevel);
     }
@@ -94,8 +93,8 @@ public sealed class StreamingTraceLoggerTests
     [Fact]
     public void MinimumLevel_HonorsConstructorArgument_WhenVerboseRequested()
     {
-        var captured = new List<DatabaseToolsLogEntry>();
-        ITraceLogger logger = new StreamingTraceLogger(new Progress<DatabaseToolsLogEntry>(captured.Add), LogLevel.Trace);
+        var captured = new List<LogRecord>();
+        ITraceLogger logger = new StreamingTraceLogger(new Progress<LogRecord>(captured.Add), LogLevel.Trace);
 
         Assert.Equal(LogLevel.Trace, logger.MinimumLevel);
     }
@@ -103,9 +102,9 @@ public sealed class StreamingTraceLoggerTests
     [Fact]
     public void SeverityMapping_EachHandlerRoutesToCorrectLogLevel()
     {
-        var captured = new List<DatabaseToolsLogEntry>();
+        var captured = new List<LogRecord>();
         // Synchronous sink so we can assert without waiting for a synchronization-context post.
-        var sink = new SynchronousProgress<DatabaseToolsLogEntry>(captured.Add);
+        var sink = new SynchronousProgress<LogRecord>(captured.Add);
         ITraceLogger logger = new StreamingTraceLogger(sink, LogLevel.Trace);
 
         logger.Trace($"trace");
@@ -127,8 +126,8 @@ public sealed class StreamingTraceLoggerTests
     [Fact]
     public void Timestamp_IsCapturedAtCallTime()
     {
-        var captured = new List<DatabaseToolsLogEntry>();
-        var sink = new SynchronousProgress<DatabaseToolsLogEntry>(captured.Add);
+        var captured = new List<LogRecord>();
+        var sink = new SynchronousProgress<LogRecord>(captured.Add);
         ITraceLogger logger = new StreamingTraceLogger(sink);
 
         var before = DateTime.UtcNow;

@@ -8,6 +8,7 @@ using EventLogExpert.Provider.Schema;
 using EventLogExpert.ProviderDatabase.Context;
 using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -35,13 +36,19 @@ internal static class ProviderSource
     ///     <paramref name="regex" /> to filter names. Case sensitivity follows the caller's <see cref="RegexOptions" />. Does
     ///     not load full provider details.
     /// </summary>
-    public static IReadOnlyList<string> LoadProviderNames(string path, ITraceLogger logger, Regex? regex = null)
+    public static async Task<IReadOnlyList<string>> LoadProviderNamesAsync(
+        string path,
+        ITraceLogger logger,
+        Regex? regex = null,
+        CancellationToken cancellationToken = default)
     {
         var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var file in EnumerateSourceFiles(path, logger))
         {
-            foreach (var name in LoadNamesFromFile(file, logger))
+            cancellationToken.ThrowIfCancellationRequested();
+
+            foreach (var name in await LoadNamesFromFileAsync(file, logger, cancellationToken))
             {
                 names.Add(name);
             }
@@ -50,13 +57,14 @@ internal static class ProviderSource
         return regex is null ? names.ToList() : names.Where(n => regex.IsMatch(n)).ToList();
     }
 
-    public static IEnumerable<ProviderDetails> LoadProviders(
+    public static IAsyncEnumerable<ProviderDetails> LoadProvidersAsync(
         string path,
         ITraceLogger logger,
         Regex? regex = null,
         IReadOnlySet<string>? skipProviderNames = null,
-        IReadOnlyList<string>? preDiscoveredProviderNames = null) =>
-        LoadProvidersIterator(path, logger, regex, skipProviderNames, preDiscoveredProviderNames);
+        IReadOnlyList<string>? preDiscoveredProviderNames = null,
+        CancellationToken cancellationToken = default) =>
+        LoadProvidersIteratorAsync(path, logger, regex, skipProviderNames, preDiscoveredProviderNames, cancellationToken);
 
     /// <summary>Validates that <paramref name="path" /> exists and has a recognized form.</summary>
     public static bool TryValidate(string path, ITraceLogger logger)
@@ -96,12 +104,14 @@ internal static class ProviderSource
         return false;
     }
 
-    public static bool ValidateSourceSchemas(string path, ITraceLogger logger)
+    public static async Task<bool> ValidateSourceSchemasAsync(string path, ITraceLogger logger, CancellationToken cancellationToken = default)
     {
         var allOk = true;
 
         foreach (var file in EnumerateSourceFiles(path, logger))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (!string.Equals(Path.GetExtension(file), DbExtension, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
@@ -109,7 +119,7 @@ internal static class ProviderSource
 
             try
             {
-                using var providerContext = new ProviderDbContext(file, true, false, logger);
+                await using var providerContext = new ProviderDbContext(file, true, false, logger);
 
                 if (!IsSourceSchemaCurrent(providerContext, file, logger))
                 {
@@ -193,83 +203,70 @@ internal static class ProviderSource
         return false;
     }
 
-    private static IEnumerable<ProviderDetails> LoadDetailsFromFile(
+    private static async Task<IReadOnlyList<ProviderDetails>> LoadDbDetailsAsync(
         string file,
         ITraceLogger logger,
         Regex? regex,
         IReadOnlySet<string>? skipProviderNames,
         HashSet<string> seen,
-        IReadOnlyList<string>? preDiscoveredProviderNames = null)
+        CancellationToken cancellationToken)
     {
-        var ext = Path.GetExtension(file);
-
-        if (string.Equals(ext, DbExtension, StringComparison.OrdinalIgnoreCase))
+        try
         {
-            try
+            await using var context = new ProviderDbContext(file, true, false, logger);
+
+            if (!IsSourceSchemaCurrent(context, file, logger)) { return []; }
+
+            context.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
+
+            // Filter by name without mutating `seen` so that a subsequent catch does not
+            // permanently mark these names as loaded when they were never successfully read.
+            var allNames = await context.ProviderDetails.Select(p => p.ProviderName).ToListAsync(cancellationToken);
+            var namesToLoad = allNames
+                .Where(name =>
+                {
+                    if (seen.Contains(name)) { return false; }
+
+                    if (regex is not null && !regex.IsMatch(name)) { return false; }
+
+                    return skipProviderNames is null || !skipProviderNames.Contains(name);
+                })
+                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (namesToLoad.Count == 0) { return []; }
+
+            // Chunk the IN-clause to stay below SQLite's parameter limit (default 999).
+            var loaded = new List<ProviderDetails>(namesToLoad.Count);
+
+            for (var offset = 0; offset < namesToLoad.Count; offset += MaxInClauseParameters)
             {
-                using var context = new ProviderDbContext(file, true, false, logger);
-
-                if (!IsSourceSchemaCurrent(context, file, logger)) { return []; }
-
-                context.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
-
-                // Filter by name without mutating `seen` so that a subsequent catch does not
-                // permanently mark these names as loaded when they were never successfully read.
-                var allNames = context.ProviderDetails.Select(p => p.ProviderName).ToList();
-                var namesToLoad = allNames
-                    .Where(name =>
-                    {
-                        if (seen.Contains(name)) { return false; }
-
-                        if (regex is not null && !regex.IsMatch(name)) { return false; }
-
-                        return skipProviderNames is null || !skipProviderNames.Contains(name);
-                    })
-                    .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                var chunk = namesToLoad
+                    .Skip(offset)
+                    .Take(MaxInClauseParameters)
                     .ToList();
 
-                if (namesToLoad.Count == 0) { return []; }
-
-                // Chunk the IN-clause to stay below SQLite's parameter limit (default 999).
-                var loaded = new List<ProviderDetails>(namesToLoad.Count);
-
-                for (var offset = 0; offset < namesToLoad.Count; offset += MaxInClauseParameters)
-                {
-                    var chunk = namesToLoad
-                        .Skip(offset)
-                        .Take(MaxInClauseParameters)
-                        .ToList();
-
-                    loaded.AddRange(context.ProviderDetails
-                        .Where(p => chunk.Contains(p.ProviderName))
-                        .OrderBy(p => p.ProviderName));
-                }
-
-                // Mark as seen only after a successful load so a catch for a corrupt file does
-                // not prevent the same provider names from being loaded from a later source file.
-                foreach (var name in namesToLoad) { seen.Add(name); }
-
-                return loaded;
+                loaded.AddRange(await context.ProviderDetails
+                    .Where(p => chunk.Contains(p.ProviderName))
+                    .OrderBy(p => p.ProviderName)
+                    .ToListAsync(cancellationToken));
             }
-            catch (Exception ex) when (ex is DbException or JsonException or InvalidDataException)
-            {
-                logger.Warning($"Skipping invalid database file '{file}': {ex.Message}");
 
-                return [];
-            }
+            // Mark as seen only after a successful load so a catch for a corrupt file does
+            // not prevent the same provider names from being loaded from a later source file.
+            foreach (var name in namesToLoad) { seen.Add(name); }
+
+            return loaded;
         }
-
-        if (string.Equals(ext, EvtxExtension, StringComparison.OrdinalIgnoreCase))
+        catch (Exception ex) when (ex is DbException or JsonException or InvalidDataException)
         {
-            return MtaProviderSource.LoadProviders(file, logger, regex, skipProviderNames, seen, preDiscoveredProviderNames);
+            logger.Warning($"Skipping invalid database file '{file}': {ex.Message}");
+
+            return [];
         }
-
-        logger.Warning($"Skipping unsupported source file: {file}");
-
-        return [];
     }
 
-    private static IEnumerable<string> LoadNamesFromFile(string file, ITraceLogger logger)
+    private static async Task<IReadOnlyList<string>> LoadNamesFromFileAsync(string file, ITraceLogger logger, CancellationToken cancellationToken)
     {
         var ext = Path.GetExtension(file);
 
@@ -277,10 +274,10 @@ internal static class ProviderSource
         {
             try
             {
-                using var providerContext = new ProviderDbContext(file, true, false, logger);
+                await using var providerContext = new ProviderDbContext(file, true, false, logger);
 
                 return !IsSourceSchemaCurrent(providerContext, file, logger) ? [] :
-                    providerContext.ProviderDetails.AsNoTracking().Select(p => p.ProviderName).ToList();
+                    await providerContext.ProviderDetails.AsNoTracking().Select(p => p.ProviderName).ToListAsync(cancellationToken);
             }
             catch (DbException ex)
             {
@@ -300,17 +297,18 @@ internal static class ProviderSource
         return [];
     }
 
-    private static IEnumerable<ProviderDetails> LoadProvidersIterator(
+    private static async IAsyncEnumerable<ProviderDetails> LoadProvidersIteratorAsync(
         string path,
         ITraceLogger logger,
         Regex? regex,
         IReadOnlySet<string>? skipProviderNames,
-        IReadOnlyList<string>? preDiscoveredProviderNames = null)
+        IReadOnlyList<string>? preDiscoveredProviderNames,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var files = EnumerateSourceFiles(path, logger).ToList();
 
-        // preDiscoveredProviderNames optimization only applies for single-file .evtx sources — for folders and .db
+        // preDiscoveredProviderNames optimization only applies for single-file .evtx sources. For folders and .db
         // sources, name attribution is per-file or not the bottleneck, so we ignore the hint and fall back to per-file
         // discovery. This keeps the optimization scope-local and safe.
         var canUsePreDiscovered = preDiscoveredProviderNames is not null
@@ -319,10 +317,32 @@ internal static class ProviderSource
 
         foreach (var file in files)
         {
-            var hint = canUsePreDiscovered ? preDiscoveredProviderNames : null;
-            foreach (var details in LoadDetailsFromFile(file, logger, regex, skipProviderNames, seen, hint))
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var ext = Path.GetExtension(file);
+
+            if (string.Equals(ext, DbExtension, StringComparison.OrdinalIgnoreCase))
             {
-                yield return details;
+                // Materialize the full per-file result before yielding so a mid-read DbException yields nothing for
+                // this file and does not corrupt the cross-file `seen` set. C# also forbids `yield` inside try/catch.
+                var loaded = await LoadDbDetailsAsync(file, logger, regex, skipProviderNames, seen, cancellationToken);
+
+                foreach (var details in loaded) { yield return details; }
+            }
+            else if (string.Equals(ext, EvtxExtension, StringComparison.OrdinalIgnoreCase))
+            {
+                var hint = canUsePreDiscovered ? preDiscoveredProviderNames : null;
+
+                foreach (var details in MtaProviderSource.LoadProviders(file, logger, regex, skipProviderNames, seen, hint))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    yield return details;
+                }
+            }
+            else
+            {
+                logger.Warning($"Skipping unsupported source file: {file}");
             }
         }
     }

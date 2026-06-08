@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.MergeDatabase;
+using EventLogExpert.Logging.Abstractions;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.DatabaseTools.Tabs;
@@ -24,7 +25,7 @@ public sealed partial class MergeDatabaseTab : DatabaseToolsTabBase<MergeDatabas
 
     protected override Task<DatabaseToolsResult> DispatchAsync(
         MergeDatabaseRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         CancellationToken cancellationToken) =>
         DatabaseToolsService.MergeAsync(request, logSink, progress: null, cancellationToken, VerboseLogging);
 

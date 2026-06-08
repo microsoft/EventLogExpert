@@ -4,6 +4,7 @@
 using EventLogExpert.DatabaseTools.Common.Ipc;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.ElevationHelper.Ipc;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.DatabaseTools;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -45,16 +46,16 @@ internal static class OperationDispatcher
     private static Task<DatabaseToolsResult> RawDispatchAsync(
         IDatabaseToolsService service,
         DatabaseToolsIpcRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
-        IProgress<DatabaseToolsProgress> progressSink,
+        IProgress<LogRecord> logRecord,
+        IProgress<DatabaseToolsProgress> progress,
         CancellationToken cancellationToken)
         => request switch
         {
-            ShowProvidersIpcRequest s => service.ShowAsync(s.Request, logSink, progressSink, cancellationToken, s.Verbose),
-            CreateDatabaseIpcRequest c => service.CreateAsync(c.Request, logSink, progressSink, cancellationToken, c.Verbose),
-            MergeDatabaseIpcRequest m => service.MergeAsync(m.Request, logSink, progressSink, cancellationToken, m.Verbose),
-            DiffDatabaseIpcRequest d => service.DiffAsync(d.Request, logSink, progressSink, cancellationToken, d.Verbose),
-            UpgradeDatabaseIpcRequest u => service.UpgradeAsync(u.Request, logSink, progressSink, cancellationToken, u.Verbose),
+            ShowProvidersIpcRequest s => service.ShowAsync(s.Request, logRecord, progress, cancellationToken, s.Verbose),
+            CreateDatabaseIpcRequest c => service.CreateAsync(c.Request, logRecord, progress, cancellationToken, c.Verbose),
+            MergeDatabaseIpcRequest m => service.MergeAsync(m.Request, logRecord, progress, cancellationToken, m.Verbose),
+            DiffDatabaseIpcRequest d => service.DiffAsync(d.Request, logRecord, progress, cancellationToken, d.Verbose),
+            UpgradeDatabaseIpcRequest u => service.UpgradeAsync(u.Request, logRecord, progress, cancellationToken, u.Verbose),
             _ => Task.FromResult(new DatabaseToolsResult(DatabaseToolsOutcome.Failed, $"Unknown request type: {request.GetType().Name}", TimeSpan.Zero))
         };
 }

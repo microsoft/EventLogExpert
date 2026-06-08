@@ -16,7 +16,7 @@ internal sealed class ShowProvidersOperation(ShowProvidersRequest request) : Ope
 {
     private const int HeaderBatchSize = 100;
 
-    public Task<DatabaseToolsOutcome> ExecuteAsync(
+    public async Task<DatabaseToolsOutcome> ExecuteAsync(
         ITraceLogger logger,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken)
@@ -32,23 +32,23 @@ internal sealed class ShowProvidersOperation(ShowProvidersRequest request) : Ope
 
         try
         {
-            IEnumerable<ProviderDetails> providers;
+            IAsyncEnumerable<ProviderDetails> providers;
 
             if (string.IsNullOrEmpty(request.SourcePath))
             {
-                providers = LoadLocalProviders(logger, filterRegex);
+                providers = LoadLocalProvidersAsync(logger, filterRegex, cancellationToken: cancellationToken);
             }
             else
             {
                 if (!ProviderSource.TryValidate(request.SourcePath, logger))
                 {
-                    return Task.FromResult(DatabaseToolsOutcome.Failed);
+                    return DatabaseToolsOutcome.Failed;
                 }
 
-                providers = ProviderSource.LoadProviders(request.SourcePath, logger, filterRegex);
+                providers = ProviderSource.LoadProvidersAsync(request.SourcePath, logger, filterRegex, cancellationToken: cancellationToken);
             }
 
-            foreach (var details in providers)
+            await foreach (var details in providers.WithCancellation(cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -82,7 +82,7 @@ internal sealed class ShowProvidersOperation(ShowProvidersRequest request) : Ope
                 logger.Warning($"No providers found.");
             }
 
-            return Task.FromResult(DatabaseToolsOutcome.Succeeded);
+            return DatabaseToolsOutcome.Succeeded;
         }
         catch (OperationCanceledException)
         {
@@ -92,13 +92,13 @@ internal sealed class ShowProvidersOperation(ShowProvidersRequest request) : Ope
                 FlushHeaderAndBuffer(logger, pendingForHeader);
             }
 
-            return Task.FromResult(DatabaseToolsOutcome.Cancelled);
+            return DatabaseToolsOutcome.Cancelled;
         }
         catch (RegexMatchTimeoutException)
         {
             logger.Error($"The provider-name regex timed out. The pattern may cause catastrophic backtracking.");
 
-            return Task.FromResult(DatabaseToolsOutcome.Failed);
+            return DatabaseToolsOutcome.Failed;
         }
     }
 

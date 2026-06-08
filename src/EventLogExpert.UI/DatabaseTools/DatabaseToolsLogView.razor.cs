@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
@@ -31,7 +32,7 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 
     public DatabaseToolsLogView() => _selfRef = DotNetObjectReference.Create(this);
 
-    [Parameter] public ImmutableList<DatabaseToolsLogEntry> Entries { get; set; } = ImmutableList<DatabaseToolsLogEntry>.Empty;
+    [Parameter] public ImmutableList<LogRecord> Entries { get; set; } = ImmutableList<LogRecord>.Empty;
 
     [Parameter] public string FileNamePrefix { get; set; } = "database-tools";
 
@@ -189,7 +190,7 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
         }
     }
 
-    private static string FormatEntry(DatabaseToolsLogEntry entry) =>
+    private static string FormatEntry(LogRecord entry) =>
         $"[{entry.TimestampUtc:HH:mm:ss.fff}] [{entry.Level}] {entry.Message}";
 
     private static string SeverityClass(LogLevel level) => level switch

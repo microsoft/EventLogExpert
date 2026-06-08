@@ -1,17 +1,16 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using Microsoft.Extensions.Logging;
 
-namespace EventLogExpert.Runtime.DatabaseTools;
+namespace EventLogExpert.Logging.Sinks;
 
 /// <summary>
-///     <see cref="ITraceLogger" /> implementation that streams every emitted message as a
-///     <see cref="DatabaseToolsLogEntry" /> through an <see cref="IProgress{T}" /> sink. Used by
-///     <see cref="DatabaseToolsService" /> to forward operation output to the UI in real time.
+///     <see cref="ITraceLogger" /> implementation that streams every emitted message as a <see cref="LogRecord" />
+///     through an <see cref="IProgress{T}" /> sink, forwarding operation output to a consumer (for example a UI) in real
+///     time.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -22,16 +21,15 @@ namespace EventLogExpert.Runtime.DatabaseTools;
 ///     </para>
 ///     <para>
 ///         Callers MUST pass an <see cref="IProgress{T}" /> sink whose concurrency model matches the production
-///         scenario. <see cref="DatabaseToolsService" /> always wires <see cref="Progress{T}" />, which captures the
-///         <see cref="SynchronizationContext" /> at construction (the UI thread when registered from MAUI) and posts
-///         callbacks there — concurrent <c>Report</c> calls from worker threads end up serialized through that SC. If no
-///         <c>SynchronizationContext</c> is captured (e.g. constructed from a thread-pool thread),
-///         <see cref="Progress{T}" /> instead queues each callback on the thread-pool with NO serialization. Custom
-///         <see cref="IProgress{T}" /> implementations passed by other callers MUST provide their own concurrency
-///         discipline — this logger does not serialize calls internally.
+///         scenario. A <see cref="Progress{T}" /> sink captures the <see cref="SynchronizationContext" /> at construction
+///         (the UI thread when registered from MAUI) and posts callbacks there, so concurrent <c>Report</c> calls from
+///         worker threads end up serialized through that SC. If no <c>SynchronizationContext</c> is captured (e.g.
+///         constructed from a thread-pool thread), <see cref="Progress{T}" /> instead queues each callback on the
+///         thread-pool with NO serialization. Custom <see cref="IProgress{T}" /> implementations passed by other callers
+///         MUST provide their own concurrency discipline; this logger does not serialize calls internally.
 ///     </para>
 /// </remarks>
-internal sealed class StreamingTraceLogger(IProgress<DatabaseToolsLogEntry> sink, LogLevel minimumLevel = LogLevel.Information) : ITraceLogger
+public sealed class StreamingTraceLogger(IProgress<LogRecord> logSink, LogLevel minimumLevel = LogLevel.Information) : ITraceLogger
 {
     public LogLevel MinimumLevel { get; } = minimumLevel;
 
@@ -53,6 +51,6 @@ internal sealed class StreamingTraceLogger(IProgress<DatabaseToolsLogEntry> sink
 
         if (string.IsNullOrEmpty(message)) { return; }
 
-        sink.Report(new DatabaseToolsLogEntry(DateTime.UtcNow, level, message));
+        logSink.Report(new LogRecord(DateTime.UtcNow, level, message));
     }
 }

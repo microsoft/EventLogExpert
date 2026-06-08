@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.ShowProviders;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.DatabaseTools;
 using Microsoft.AspNetCore.Components;
@@ -27,8 +28,9 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 {
     private const int FlushIntervalMs = 50;
 
-    private readonly List<DatabaseToolsLogEntry> _pendingEntries = [];
+    private readonly List<LogRecord> _pendingEntries = [];
     private readonly Lock _pendingLock = new();
+
     private volatile bool _disposed;
     private bool _flushScheduled;
 
@@ -50,7 +52,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
     protected bool IsCancelling { get; set; }
 
-    protected ImmutableList<DatabaseToolsLogEntry> LogEntries { get; set; } = ImmutableList<DatabaseToolsLogEntry>.Empty;
+    protected ImmutableList<LogRecord> LogEntries { get; set; } = ImmutableList<LogRecord>.Empty;
 
     protected DatabaseToolsResult? Outcome { get; set; }
 
@@ -81,7 +83,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     ///     invoke after <see cref="Dispose" /> — late Progress-sink callbacks (e.g., the operation completing after the user
     ///     closes the modal) are dropped silently rather than throwing <see cref="ObjectDisposedException" />.
     /// </summary>
-    protected void AppendEntry(DatabaseToolsLogEntry entry)
+    protected void AppendEntry(LogRecord entry)
     {
         if (_disposed) { return; }
 
@@ -136,7 +138,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
             _ => string.Empty
         };
 
-        AppendEntry(new DatabaseToolsLogEntry(DateTime.UtcNow, level, message));
+        AppendEntry(new LogRecord(DateTime.UtcNow, level, message));
     }
 
     /// <summary>Build the operation-specific request record from the tab's current field state.</summary>
@@ -159,7 +161,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     /// <summary>Dispatch the operation against the configured <see cref="IDatabaseToolsService" />.</summary>
     protected abstract Task<DatabaseToolsResult> DispatchAsync(
         TRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         CancellationToken cancellationToken);
 
     /// <summary>
@@ -199,7 +201,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     /// </summary>
     protected Task RunAsync() => RunCoreAsync((request, logSink, ct) => DispatchAsync(request, logSink, ct));
 
-    protected Task RunElevatedAsync(Func<TRequest, IProgress<DatabaseToolsLogEntry>, CancellationToken, Task<DatabaseToolsResult>> elevatedDispatcher) =>
+    protected Task RunElevatedAsync(Func<TRequest, IProgress<LogRecord>, CancellationToken, Task<DatabaseToolsResult>> elevatedDispatcher) =>
         RunCoreAsync(elevatedDispatcher);
 
     /// <summary>
@@ -210,7 +212,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     {
         if (_disposed) { return; }
 
-        DatabaseToolsLogEntry[] batch;
+        LogRecord[] batch;
 
         lock (_pendingLock)
         {
@@ -231,13 +233,13 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         StateHasChanged();
     }
 
-    private async Task RunCoreAsync(Func<TRequest, IProgress<DatabaseToolsLogEntry>, CancellationToken, Task<DatabaseToolsResult>> dispatcher)
+    private async Task RunCoreAsync(Func<TRequest, IProgress<LogRecord>, CancellationToken, Task<DatabaseToolsResult>> dispatcher)
     {
         if (IsRunning || !CanRun) { return; }
 
         var request = BuildRequest();
 
-        LogEntries = ImmutableList<DatabaseToolsLogEntry>.Empty;
+        LogEntries = ImmutableList<LogRecord>.Empty;
         Outcome = null;
         IsRunning = true;
         IsCancelling = false;
@@ -249,7 +251,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
             _flushScheduled = false;
         }
 
-        var logSink = new Progress<DatabaseToolsLogEntry>(AppendEntry);
+        var logSink = new Progress<LogRecord>(AppendEntry);
         var startTimestamp = Stopwatch.GetTimestamp();
 
         try
@@ -262,10 +264,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         {
             var failedOutcome = new DatabaseToolsResult(DatabaseToolsOutcome.Failed, ex.Message, Stopwatch.GetElapsedTime(startTimestamp));
             Outcome = failedOutcome;
-            AppendEntry(new DatabaseToolsLogEntry(
-                DateTime.UtcNow,
-                LogLevel.Error,
-                $"Unexpected error: {ex.Message}"));
+            AppendEntry(new LogRecord(DateTime.UtcNow, LogLevel.Error, $"Unexpected error: {ex.Message}"));
             AppendOutcome(failedOutcome);
         }
         finally
@@ -280,9 +279,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
                 await FlushPendingEntriesAsync();
 
                 try { await InvokeAsync(StateHasChanged); }
-                catch (ObjectDisposedException)
-                {
-                }
+                catch (ObjectDisposedException) { }
             }
         }
     }

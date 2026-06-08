@@ -70,13 +70,6 @@ public static class RuntimeServiceCollectionExtensions
         ///     settings, etc.) — those would require host services (file pickers, modal coordinators) that don't exist in a
         ///     console helper.
         /// </summary>
-        /// <remarks>
-        ///     The caller must also register an <see cref="EventLogExpert.Logging.Abstractions.ITraceLogger" /> if any code
-        ///     this extension wires up resolves one transitively. <see cref="DatabaseToolsService" /> itself does NOT — it
-        ///     constructs its own <c>StreamingTraceLogger</c> per operation against the caller-supplied
-        ///     <c>IProgress&lt;DatabaseToolsLogEntry&gt;</c> sink. No additional ITraceLogger registration is required for the
-        ///     helper's normal operation path.
-        /// </remarks>
         public IServiceCollection AddDatabaseToolsRuntime()
         {
             ArgumentNullException.ThrowIfNull(services);

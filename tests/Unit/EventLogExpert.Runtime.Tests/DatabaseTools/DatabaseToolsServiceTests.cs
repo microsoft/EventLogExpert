@@ -26,7 +26,7 @@ public sealed class DatabaseToolsServiceTests
             return Task.FromResult(DatabaseToolsOutcome.Succeeded);
         });
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         await service.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None);
@@ -47,7 +47,7 @@ public sealed class DatabaseToolsServiceTests
             return DatabaseToolsOutcome.Succeeded;
         });
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         var result = await service.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None);
@@ -60,7 +60,7 @@ public sealed class DatabaseToolsServiceTests
     {
         var fake = new RecordingOperation(DatabaseToolsOutcome.Succeeded);
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         var result = await service.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None);
@@ -74,7 +74,7 @@ public sealed class DatabaseToolsServiceTests
     {
         var fake = new RecordingOperation(_ => throw new InvalidOperationException("boom"));
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         var result = await service.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None);
@@ -89,7 +89,7 @@ public sealed class DatabaseToolsServiceTests
     {
         var fake = new RecordingOperation(_ => throw new OperationCanceledException());
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         var result = await service.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None);
@@ -103,7 +103,7 @@ public sealed class DatabaseToolsServiceTests
     {
         var fake = new RecordingOperation(DatabaseToolsOutcome.Succeeded);
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
         var cts = new CancellationTokenSource();
         cts.Cancel();
 
@@ -129,7 +129,7 @@ public sealed class DatabaseToolsServiceTests
             mergeOperation: () => fake,
             diffOperation: () => fake,
             upgradeOperation: () => fake);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         switch (method)
         {
@@ -174,7 +174,7 @@ public sealed class DatabaseToolsServiceTests
             return Task.FromResult(DatabaseToolsOutcome.Succeeded);
         });
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         await service.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None, verbose: verbose);

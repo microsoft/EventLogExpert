@@ -38,7 +38,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runner = CreateRunner(host, logger);
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
         using var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
@@ -80,7 +80,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runner = CreateRunner(host, logger);
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
         var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
@@ -156,7 +156,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
 
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
         var progressSink = new ListProgress<DatabaseToolsProgress>();
 
         await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
@@ -202,7 +202,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
 
@@ -231,7 +231,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         var runTask = runner.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, ct);
@@ -256,7 +256,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         var runTask = runner.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, ct);
@@ -280,7 +280,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
         var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
@@ -317,7 +317,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             throw new FileNotFoundException(@"Could not find eventlogexpert-elevated.exe at expected path."));
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         var result = await runner.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, ct);
@@ -338,7 +338,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
 
@@ -365,7 +365,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
         using var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
@@ -397,7 +397,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
         var progressSink = new ListProgress<DatabaseToolsProgress>();
 
         await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
@@ -454,7 +454,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         });
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         var result = await runner.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, preCancelledCts.Token);
@@ -472,7 +472,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
-        var throwingSink = new ThrowingProgress<DatabaseToolsLogEntry>("sink-boom");
+        var throwingSink = new ThrowingProgress<LogRecord>("sink-boom");
 
         await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
         using var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
@@ -502,7 +502,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             throw new Win32Exception(1223, "The operation was canceled by the user."));
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         var result = await runner.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, ct);
@@ -521,7 +521,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
         using var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
@@ -545,7 +545,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
     }
 
     private static async Task AssertHappyPathOperationAsync(
-        Func<IElevatedDatabaseToolsRunner, ListProgress<DatabaseToolsLogEntry>, CancellationToken, Task<DatabaseToolsResult>> invoke,
+        Func<IElevatedDatabaseToolsRunner, ListProgress<LogRecord>, CancellationToken, Task<DatabaseToolsResult>> invoke,
         Type expectedRequestType,
         bool expectVerbose)
     {
@@ -555,7 +555,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
         using var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);

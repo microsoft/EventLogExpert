@@ -38,7 +38,7 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
         }
 
         var sourceNames = new HashSet<string>(
-            ProviderSource.LoadProviderNames(request.SourcePath, logger),
+            await ProviderSource.LoadProviderNamesAsync(request.SourcePath, logger, cancellationToken: cancellationToken),
             StringComparer.OrdinalIgnoreCase);
 
         if (sourceNames.Count == 0)
@@ -93,10 +93,11 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
                     .ToList();
 
                 targetMatchingNames.AddRange(
-                    targetContext.ProviderDetails
+                    await targetContext.ProviderDetails
                         .AsNoTracking()
                         .Where(p => chunk.Contains(p.ProviderName))
-                        .Select(p => p.ProviderName));
+                        .Select(p => p.ProviderName)
+                        .ToListAsync(cancellationToken));
             }
 
             var providerNamesInTarget = new HashSet<string>(targetMatchingNames, StringComparer.OrdinalIgnoreCase);
@@ -152,12 +153,13 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
             var copiedCount = 0;
             var pendingBatch = new List<ProviderDetails>(BatchSize);
 
-            foreach (var provider in ProviderSource.LoadProviders(
+            await foreach (var provider in ProviderSource.LoadProvidersAsync(
                 request.SourcePath,
                 logger,
                 regex: null,
                 skipProviderNames: skipForLoad,
-                preDiscoveredProviderNames: sourceNamesList))
+                preDiscoveredProviderNames: sourceNamesList,
+                cancellationToken: cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 

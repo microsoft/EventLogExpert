@@ -8,6 +8,7 @@ using EventLogExpert.DatabaseTools.MergeDatabase;
 using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Sinks;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
@@ -26,7 +27,7 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
 {
     public Task<DatabaseToolsResult> CreateAsync(
         CreateDatabaseRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
@@ -34,7 +35,7 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
 
     public Task<DatabaseToolsResult> DiffAsync(
         DiffDatabaseRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
@@ -42,7 +43,7 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
 
     public Task<DatabaseToolsResult> MergeAsync(
         MergeDatabaseRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
@@ -50,7 +51,7 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
 
     public Task<DatabaseToolsResult> ShowAsync(
         ShowProvidersRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
@@ -58,7 +59,7 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
 
     public Task<DatabaseToolsResult> UpgradeAsync(
         UpgradeDatabaseRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
@@ -66,7 +67,7 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
 
     private static async Task<DatabaseToolsResult> RunAsync(
         IDatabaseToolsOperation operation,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose)

@@ -38,6 +38,7 @@
     <Project Path="tests/Unit/EventLogExpert.Windows.Tests/EventLogExpert.Windows.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.EventDbTool.Tests/EventLogExpert.EventDbTool.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Eventing.Tests/EventLogExpert.Eventing.Tests.csproj" />
+    <Project Path="tests/Unit/EventLogExpert.Logging.Tests/EventLogExpert.Logging.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Runtime.Tests/EventLogExpert.Runtime.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Filtering.Tests/EventLogExpert.Filtering.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Provider.Database.Tests/EventLogExpert.Provider.Database.Tests.csproj" />

@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using Microsoft.AspNetCore.Components;
@@ -44,7 +45,7 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
 
     protected override Task<DatabaseToolsResult> DispatchAsync(
         CreateDatabaseRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         CancellationToken cancellationToken) =>
         DatabaseToolsService.CreateAsync(request, logSink, progress: null, cancellationToken, VerboseLogging);
 

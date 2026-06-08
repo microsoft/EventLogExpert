@@ -7,6 +7,7 @@ using EventLogExpert.DatabaseTools.DiffDatabase;
 using EventLogExpert.DatabaseTools.MergeDatabase;
 using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
+using EventLogExpert.Logging.Abstractions;
 
 namespace EventLogExpert.Runtime.DatabaseTools;
 
@@ -26,35 +27,35 @@ public interface IDatabaseToolsService
 {
     Task<DatabaseToolsResult> CreateAsync(
         CreateDatabaseRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);
 
     Task<DatabaseToolsResult> DiffAsync(
         DiffDatabaseRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);
 
     Task<DatabaseToolsResult> MergeAsync(
         MergeDatabaseRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);
 
     Task<DatabaseToolsResult> ShowAsync(
         ShowProvidersRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);
 
     Task<DatabaseToolsResult> UpgradeAsync(
         UpgradeDatabaseRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);
