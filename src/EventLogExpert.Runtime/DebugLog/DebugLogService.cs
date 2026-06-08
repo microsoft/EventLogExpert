@@ -113,9 +113,14 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, 
             _writer = null;
         }
 
-        if (writer is not null) { await writer.DisposeAsync(); }
-
-        _interprocessMutex.Dispose();
+        try
+        {
+            if (writer is not null) { await writer.DisposeAsync(); }
+        }
+        finally
+        {
+            _interprocessMutex.Dispose();
+        }
     }
 
     public void Error([InterpolatedStringHandlerArgument("")] ErrorLogHandler handler)

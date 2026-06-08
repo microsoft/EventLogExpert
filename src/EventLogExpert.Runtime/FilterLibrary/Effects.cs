@@ -704,7 +704,18 @@ internal sealed class Effects(
             return;
         }
 
-        dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(promoted));
+        var latest = state.Value.Entries.FirstOrDefault(e => e.Id == id);
+
+        if (latest is null) { return; }
+
+        LibraryEntry latestPromoted = latest switch
+        {
+            LibraryEntrySavedFilter f => f with { Origin = LibraryEntryOrigin.UserSaved },
+            LibraryEntryFilterSet p => p with { Origin = LibraryEntryOrigin.UserSaved },
+            _ => latest,
+        };
+
+        dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(latestPromoted));
     }
 
     private async Task PruneFromSnapshot(ImmutableList<LibraryEntry> snapshot, IDispatcher dispatcher)
