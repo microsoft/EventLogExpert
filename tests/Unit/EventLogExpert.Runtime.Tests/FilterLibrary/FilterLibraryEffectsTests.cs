@@ -528,7 +528,7 @@ public sealed class FilterLibraryEffectsTests
         finally
         {
             // Always release the migrator so the load tasks unblock even if an assertion or polling timeout
-            // throws — otherwise xUnit's per-test cleanup hangs waiting for the still-running load tasks.
+            // throws - otherwise xUnit's per-test cleanup hangs waiting for the still-running load tasks.
             migratorReleaser.Release();
             if (load2 is not null) { await Task.WhenAll(load1, load2); }
             else { await load1; }
@@ -731,7 +731,7 @@ public sealed class FilterLibraryEffectsTests
 
         // Both migration entries collide with existing store content → AddRange must NOT be called with them.
         await store.DidNotReceive().AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>());
-        // Bitmask still advances — the section is "complete" from the persistence perspective.
+        // Bitmask still advances - the section is "complete" from the persistence perspective.
         migrator.Received(1).MarkMigrationCompleted(sections);
         // Loaded entries reflect the existing store (no duplicates).
         dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 2));
@@ -968,8 +968,8 @@ public sealed class FilterLibraryEffectsTests
             });
         }
 
-        // The 51st entry — about to be bumped (will project into the prune snapshot).
-        // Pre-bump LastUsedUtc doesn't affect the prune order — the effect overwrites it with UtcNow
+        // The 51st entry - about to be bumped (will project into the prune snapshot).
+        // Pre-bump LastUsedUtc doesn't affect the prune order - the effect overwrites it with UtcNow
         // and that's the value that lands in the snapshot before PruneFromSnapshot runs.
         var bumpTarget = new LibraryEntrySavedFilter
         {
@@ -1071,7 +1071,7 @@ public sealed class FilterLibraryEffectsTests
             });
         }
 
-        // The "already in state" collision target — distinct ComparisonText so in-memory match misses.
+        // The "already in state" collision target - distinct ComparisonText so in-memory match misses.
         var alreadyInState = new LibraryEntrySavedFilter
         {
             Name = "already-in-state",

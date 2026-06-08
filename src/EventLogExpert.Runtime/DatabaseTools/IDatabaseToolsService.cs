@@ -16,7 +16,7 @@ namespace EventLogExpert.Runtime.DatabaseTools;
 ///     method dispatches the matching
 ///     <see cref="EventLogExpert.DatabaseTools.Common.Operations.IDatabaseToolsOperation" /> on a worker thread, streams
 ///     log entries via <paramref name="logSink" /> as they are emitted (not batched at end), and returns the final outcome
-///     + duration. Cancellation is cooperative — see the Operation contract for the per-step cancellation semantics.
+///     + duration. Cancellation is cooperative - see the Operation contract for the per-step cancellation semantics.
 /// </summary>
 /// <remarks>
 ///     The <c>verbose</c> parameter mirrors EventDbTool's <c>--verbose</c> CLI flag: when <c>false</c> (default), the

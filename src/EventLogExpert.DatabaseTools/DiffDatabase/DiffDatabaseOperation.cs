@@ -105,7 +105,7 @@ internal sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Opera
         }
         catch (Exception ex)
         {
-            // Any non-cancellation failure (e.g., EF/SQLite errors mid-save) — no stub .db.
+            // Any non-cancellation failure (e.g., EF/SQLite errors mid-save) - no stub .db.
             logger.Error($"Unexpected error diffing databases: {ex.Message}");
             await CleanupPartialDatabaseAsync(logger, newDbContext, request.NewDatabasePath);
             newDbContext = null;

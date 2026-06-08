@@ -464,7 +464,7 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
 
         // 5 good known-kind rows make the unloadable rows a MINORITY of known kinds: with 3 unloadable of
         // 8 known-kind, the systemic ratio (3*2 = 6 >= 8) is false. The single unknown-kind row is the
-        // only thing that trips the breaker (forward-version evidence), so this isolates that path — drop
+        // only thing that trips the breaker (forward-version evidence), so this isolates that path - drop
         // the forward-version-evidence check and the 3 reformatted rows would be wrongly deleted.
         for (var i = 0; i < 5; i++) { await store.AddAsync(BuildFilterEntry($"Good{i}"), TestContext.Current.CancellationToken); }
 

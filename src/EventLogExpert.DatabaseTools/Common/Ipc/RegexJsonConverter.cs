@@ -12,7 +12,7 @@ namespace EventLogExpert.DatabaseTools.Common.Ipc;
 ///     so the helper-side reconstructed regex behaves identically to the UI-side compiled regex.
 ///     <see cref="Regex.InfiniteMatchTimeout" /> is encoded as a JSON <c>null</c> in <c>matchTimeoutMs</c>; a null
 ///     <see cref="Regex" /> reference is encoded as JSON <c>null</c> at the message level (this converter is not invoked
-///     for that case — the surrounding <see cref="JsonConverter{T}" /> infrastructure handles it via the
+///     for that case - the surrounding <see cref="JsonConverter{T}" /> infrastructure handles it via the
 ///     <see cref="JsonConverter{T}.HandleNull" /> protocol).
 /// </summary>
 internal sealed class RegexJsonConverter : JsonConverter<Regex>

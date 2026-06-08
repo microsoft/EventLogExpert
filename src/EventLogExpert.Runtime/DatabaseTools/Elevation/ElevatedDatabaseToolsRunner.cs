@@ -471,7 +471,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             {
                 if (!killState.HelperKilled)
                 {
-                    _traceLogger.Warning($"{ElevatedHelperTag} Helper did not exit within {_exitGrace.TotalSeconds:N0}s after IPC drained — force-killing.");
+                    _traceLogger.Warning($"{ElevatedHelperTag} Helper did not exit within {_exitGrace.TotalSeconds:N0}s after IPC drained - force-killing.");
                     process.Kill();
                     killState.MarkKilled();
                 }

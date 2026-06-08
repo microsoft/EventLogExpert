@@ -67,7 +67,7 @@ public static class RuntimeServiceCollectionExtensions
         ///     Helper-friendly subset of <see cref="AddEventLogRuntime" />. Registers ONLY
         ///     <see cref="IDatabaseToolsService" /> and its operation factory dependency. Used by the packaged elevation helper
         ///     which needs to run DatabaseTools operations but must NOT pull in the rest of the runtime (Fluxor, banner services,
-        ///     settings, etc.) — those would require host services (file pickers, modal coordinators) that don't exist in a
+        ///     settings, etc.) - those would require host services (file pickers, modal coordinators) that don't exist in a
         ///     console helper.
         /// </summary>
         public IServiceCollection AddDatabaseToolsRuntime()
@@ -99,20 +99,20 @@ public static class RuntimeServiceCollectionExtensions
         ///     Registers the runtime tier's services. Callers MUST also register:
         ///     <list type="bullet">
         ///         <item>
-        ///             <c>AddFluxor(...)</c> — effect classes and state selectors depend on <c>IDispatcher</c>,
+        ///             <c>AddFluxor(...)</c> - effect classes and state selectors depend on <c>IDispatcher</c>,
         ///             <c>IState&lt;T&gt;</c>, etc.
         ///         </item>
-        ///         <item><c>AddEventLogFiltering()</c> — effect classes depend on <c>IFilterService</c>.</item>
+        ///         <item><c>AddEventLogFiltering()</c> - effect classes depend on <c>IFilterService</c>.</item>
         ///         <item>
-        ///             <c>AddEventLogProviderDatabase()</c> — database sub-services depend on
+        ///             <c>AddEventLogProviderDatabase()</c> - database sub-services depend on
         ///             <c>IProviderDatabaseMaintenance</c>.
         ///         </item>
         ///         <item>
-        ///             <c>IFilePickerService</c> — <c>DatabaseOperationCoordinator</c> depends on it for Import. Host registers
+        ///             <c>IFilePickerService</c> - <c>DatabaseOperationCoordinator</c> depends on it for Import. Host registers
         ///             a concrete implementation (e.g., <c>MauiFilePickerService</c>).
         ///         </item>
         ///         <item>
-        ///             <c>IFilterLibraryStore</c> — <c>FilterLibrary</c> effects depend on it. Register the default
+        ///             <c>IFilterLibraryStore</c> - <c>FilterLibrary</c> effects depend on it. Register the default
         ///             SQLite-backed store via <c>services.AddFilterLibrarySqliteStore(<i>dbPath</i>)</c>, or supply a custom
         ///             implementation.
         ///         </item>

@@ -168,7 +168,7 @@ internal sealed class Effects(
                 // as on the happy path.
                 var migrationResult = legacyMigrator.BuildEntriesFromLegacy();
 
-                // Dedup against the already-loaded entries before AddRange — the per-section flag check in
+                // Dedup against the already-loaded entries before AddRange - the per-section flag check in
                 // BuildEntriesFromLegacy short-circuits already-completed sections, but on the bitmask-not-advanced
                 // path (e.g., MarkMigrationCompleted SetString throws after a successful AddRange) the next launch
                 // would re-read the still-present legacy keys and produce content-duplicate rows because migration
@@ -204,7 +204,7 @@ internal sealed class Effects(
 
                 // Not wrapped: a SetString failure surfaces via the outer catch (LoadLibraryFailure). On the next
                 // launch ShouldRunMigration returns true again, BuildEntriesFromLegacy re-emits the same entries,
-                // and DedupMigrationEntriesAgainstExisting filters them out against the now-non-empty store —
+                // and DedupMigrationEntriesAgainstExisting filters them out against the now-non-empty store -
                 // so the SetString-throws path is idempotent rather than duplicating.
                 legacyMigrator.MarkMigrationCompleted(migrationResult.SuccessfulSections);
             }

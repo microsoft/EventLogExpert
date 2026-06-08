@@ -104,7 +104,7 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
 
             // Wrap the destructive phase (overwrite delete + provider copy) in a transaction so a cancel mid-flight
             // does not leave the target with permanently-missing providers. The non-overwrite path is also wrapped
-            // so partial copies don't persist on failure — re-running merge produces the intended end state regardless.
+            // so partial copies don't persist on failure - re-running merge produces the intended end state regardless.
             await using var transaction = await targetContext.Database.BeginTransactionAsync(cancellationToken);
 
             if (targetMatchingNames.Count > 0)
