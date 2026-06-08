@@ -122,18 +122,20 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         _connectionString = $"Data Source={dbPath}";
     }
 
-    public void Add(LibraryEntry entry)
+    public async Task AddAsync(LibraryEntry entry, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        using var connection = OpenConnection();
-        using var cmd = connection.CreateCommand();
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand();
         cmd.CommandText = InsertSql;
         BindEntry(cmd, entry);
-        cmd.ExecuteNonQuery();
+        await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public (LibraryEntry Entry, bool WasInserted) AddOrReturnExistingFilter(LibraryEntrySavedFilter candidate)
+    public async Task<(LibraryEntry Entry, bool WasInserted)> AddOrReturnExistingFilterAsync(
+        LibraryEntrySavedFilter candidate,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(candidate);
 
@@ -143,40 +145,41 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         if (candidate.Origin != LibraryEntryOrigin.AutoTracked)
         {
             throw new ArgumentException(
-                $"{nameof(AddOrReturnExistingFilter)} requires candidate.Origin == {nameof(LibraryEntryOrigin.AutoTracked)}; got '{candidate.Origin}'.",
+                $"{nameof(AddOrReturnExistingFilterAsync)} requires candidate.Origin == {nameof(LibraryEntryOrigin.AutoTracked)}; got '{candidate.Origin}'.",
                 nameof(candidate));
         }
 
         if (string.IsNullOrWhiteSpace(candidate.Filter.ComparisonText))
         {
             throw new ArgumentException(
-                $"{nameof(AddOrReturnExistingFilter)} requires non-empty candidate.Filter.ComparisonText for dedup tuple lookup.",
+                $"{nameof(AddOrReturnExistingFilterAsync)} requires non-empty candidate.Filter.ComparisonText for dedup tuple lookup.",
                 nameof(candidate));
         }
 
-        using var connection = OpenConnection();
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         // BEGIN IMMEDIATE acquires a RESERVED write lock for the duration of the transaction so a
         // concurrent prune/delete on another connection cannot land between our INSERT OR IGNORE
         // (collision detection) and the follow-up tuple SELECT. Without it, the row could be
         // deleted in the gap and the SELECT would surface zero rows for a "we just saw a collision"
-        // path — a benign concurrent delete becomes an exception.
-        using var tx = connection.BeginTransaction(IsolationLevel.Serializable);
+        // path - a benign concurrent delete becomes an exception.
+        await using var tx = (SqliteTransaction)(await connection
+            .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false));
 
-        using (var cmd = connection.CreateCommand())
+        await using (var cmd = connection.CreateCommand())
         {
             cmd.Transaction = tx;
             cmd.CommandText = InsertOrIgnoreSql;
             BindEntry(cmd, candidate);
 
-            if (cmd.ExecuteNonQuery() == 1)
+            if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) == 1)
             {
-                tx.Commit();
+                await tx.CommitAsync(cancellationToken).ConfigureAwait(false);
 
                 return (candidate, true);
             }
         }
 
-        using (var findCmd = connection.CreateCommand())
+        await using (var findCmd = connection.CreateCommand())
         {
             findCmd.Transaction = tx;
             findCmd.CommandText = FindAutoTrackedFilterByTupleSql;
@@ -184,8 +187,8 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
             findCmd.Parameters.AddWithValue("$mode", candidate.Filter.Mode.ToString());
             findCmd.Parameters.AddWithValue("$is_excluded", candidate.Filter.IsExcluded ? 1 : 0);
 
-            using var reader = findCmd.ExecuteReader();
-            if (!reader.Read())
+            await using var reader = await findCmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 throw new InvalidOperationException(
                     $"FilterLibrary AddOrReturnExistingFilter: INSERT OR IGNORE for '{candidate.Filter.ComparisonText}' collided but no existing row matched the tuple inside the transaction.");
@@ -198,12 +201,12 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
                     $"FilterLibrary AddOrReturnExistingFilter: collision row had unknown Kind for '{candidate.Filter.ComparisonText}'.");
             }
 
-            tx.Commit();
+            await tx.CommitAsync(cancellationToken).ConfigureAwait(false);
             return (existing, false);
         }
     }
 
-    public void AddRange(IEnumerable<LibraryEntry> entries)
+    public async Task AddRangeAsync(IEnumerable<LibraryEntry> entries, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entries);
 
@@ -211,12 +214,12 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
 
         if (materialized.Count == 0) { return; }
 
-        using var connection = OpenConnection();
-        using var tx = connection.BeginTransaction();
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var tx = (SqliteTransaction)(await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false));
 
         try
         {
-            using var cmd = connection.CreateCommand();
+            await using var cmd = connection.CreateCommand();
             cmd.Transaction = tx;
             cmd.CommandText = InsertSql;
 
@@ -224,15 +227,15 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
             {
                 cmd.Parameters.Clear();
                 BindEntry(cmd, entry);
-                cmd.ExecuteNonQuery();
+                await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            tx.Commit();
+            await tx.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch
         {
             // Guard Rollback so its exception doesn't mask the original insert failure.
-            try { tx.Rollback(); }
+            try { await tx.RollbackAsync(CancellationToken.None).ConfigureAwait(false); }
             catch (Exception rollbackEx)
             {
                 _logger.Warning($"FilterLibrary AddRange rollback failed after batch insert error: {rollbackEx.Message}");
@@ -242,30 +245,30 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         }
     }
 
-    public void Delete(LibraryEntryId entryId)
+    public async Task DeleteAsync(LibraryEntryId entryId, CancellationToken cancellationToken = default)
     {
-        using var connection = OpenConnection();
-        using var cmd = connection.CreateCommand();
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand();
         cmd.CommandText = DeleteSql;
         cmd.Parameters.AddWithValue("$id", entryId.Value.ToString("D"));
-        cmd.ExecuteNonQuery();
+        await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public IReadOnlyList<LibraryEntry> LoadAll()
+    public async Task<IReadOnlyList<LibraryEntry>> LoadAllAsync(CancellationToken cancellationToken = default)
     {
-        using var connection = OpenConnection();
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
         var entries = ImmutableList.CreateBuilder<LibraryEntry>();
         List<(string Id, string Kind, string Payload)>? unloadable = null;
         var unknownKindCount = 0;
 
-        using (var cmd = connection.CreateCommand())
+        await using (var cmd = connection.CreateCommand())
         {
             cmd.CommandText = LoadAllSql;
 
-            using var reader = cmd.ExecuteReader();
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
-            while (reader.Read())
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 var id = reader.IsDBNull(0) ? "<unknown>" : reader.GetString(0);
 
@@ -318,56 +321,70 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         }
         else
         {
-            DeleteUnloadableRows(connection, unloadable);
+            await DeleteUnloadableRowsAsync(connection, unloadable, cancellationToken).ConfigureAwait(false);
         }
 
         return entries.ToImmutable();
     }
 
-    public bool TryBumpLastUsedIfNotFavorite(LibraryEntryId entryId, DateTimeOffset lastUsedUtc)
+    public async Task<bool> TryBumpLastUsedIfNotFavoriteAsync(
+        LibraryEntryId entryId,
+        DateTimeOffset lastUsedUtc,
+        CancellationToken cancellationToken = default)
     {
-        using var connection = OpenConnection();
-        using var cmd = connection.CreateCommand();
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand();
+
         cmd.CommandText = BumpLastUsedIfNotFavoriteSql;
         cmd.Parameters.AddWithValue("$id", entryId.Value.ToString("D"));
         cmd.Parameters.AddWithValue("$last_used_utc", lastUsedUtc.ToString("O", CultureInfo.InvariantCulture));
-        return cmd.ExecuteNonQuery() > 0;
+
+        return await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) > 0;
     }
 
-    public bool TryDeleteAutoTrackedIfNotFavorite(LibraryEntryId entryId)
+    public async Task<bool> TryDeleteAutoTrackedIfNotFavoriteAsync(
+        LibraryEntryId entryId,
+        CancellationToken cancellationToken = default)
     {
-        using var connection = OpenConnection();
-        using var cmd = connection.CreateCommand();
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand();
+
         cmd.CommandText = DeleteAutoTrackedIfNotFavoriteSql;
         cmd.Parameters.AddWithValue("$id", entryId.Value.ToString("D"));
-        return cmd.ExecuteNonQuery() > 0;
+
+        return await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) > 0;
     }
 
-    public void Update(LibraryEntry entry)
+    public async Task UpdateAsync(LibraryEntry entry, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        using var connection = OpenConnection();
-        using var cmd = connection.CreateCommand();
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand();
+
         cmd.CommandText = UpdateSql;
         BindEntry(cmd, entry);
-        cmd.ExecuteNonQuery();
+
+        await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public IReadOnlyList<LibraryEntryId> UpdateRange(IReadOnlyList<LibraryEntry> entries)
+    public async Task<IReadOnlyList<LibraryEntryId>> UpdateRangeAsync(
+        IReadOnlyList<LibraryEntry> entries,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entries);
 
         if (entries.Count == 0) { return []; }
 
-        using var connection = OpenConnection();
-        using var tx = connection.BeginTransaction();
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var tx = (SqliteTransaction)(await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false));
 
         try
         {
             var updated = ImmutableList.CreateBuilder<LibraryEntryId>();
 
-            using var cmd = connection.CreateCommand();
+            await using var cmd = connection.CreateCommand();
+
             cmd.Transaction = tx;
             cmd.CommandText = UpdateSql;
 
@@ -376,16 +393,16 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
                 cmd.Parameters.Clear();
                 BindEntry(cmd, entry);
 
-                if (cmd.ExecuteNonQuery() == 1) { updated.Add(entry.Id); }
+                if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) == 1) { updated.Add(entry.Id); }
             }
 
-            tx.Commit();
+            await tx.CommitAsync(cancellationToken).ConfigureAwait(false);
 
             return updated.ToImmutable();
         }
         catch
         {
-            try { tx.Rollback(); }
+            try { await tx.RollbackAsync(CancellationToken.None).ConfigureAwait(false); }
             catch (Exception rollbackEx)
             {
                 _logger.Warning($"FilterLibrary UpdateRange rollback failed after batch update error: {rollbackEx.Message}");
@@ -477,16 +494,16 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         };
     }
 
-    private static void EnsureSchemaColumns(SqliteConnection connection)
+    private static async Task EnsureSchemaColumnsAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
         var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        using (var probe = connection.CreateCommand())
+        await using (var probe = connection.CreateCommand())
         {
             probe.CommandText = "PRAGMA table_info(library_entries);";
-            using var reader = probe.ExecuteReader();
+            await using var reader = await probe.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
-            while (reader.Read())
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 existing.Add(reader.GetString(1));
             }
@@ -496,14 +513,14 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         {
             if (existing.Contains(column)) { continue; }
 
-            using var alter = connection.CreateCommand();
+            await using var alter = connection.CreateCommand();
             alter.CommandText = $"ALTER TABLE library_entries ADD COLUMN {column} {definition};";
-            alter.ExecuteNonQuery();
+            await alter.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        using var indexCmd = connection.CreateCommand();
+        await using var indexCmd = connection.CreateCommand();
         indexCmd.CommandText = CreateUniqueIndexSql;
-        indexCmd.ExecuteNonQuery();
+        await indexCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static LibraryEntryOrigin ParseOrigin(string raw) =>
@@ -542,18 +559,21 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         return DeserializeEntry(id, name, createdUtc, kind, payload, isFavorite, lastUsedUtc, origin, tags);
     }
 
-    private void DeleteUnloadableRows(SqliteConnection connection, List<(string Id, string Kind, string Payload)> rows)
+    private async Task DeleteUnloadableRowsAsync(
+        SqliteConnection connection,
+        List<(string Id, string Kind, string Payload)> rows,
+        CancellationToken cancellationToken)
     {
         foreach (var (id, kind, payload) in rows)
         {
             try
             {
-                using var cmd = connection.CreateCommand();
+                await using var cmd = connection.CreateCommand();
                 cmd.CommandText = DeleteUnloadableSql;
                 cmd.Parameters.AddWithValue("$id", id);
                 cmd.Parameters.AddWithValue("$kind", kind);
                 cmd.Parameters.AddWithValue("$payload", payload);
-                cmd.ExecuteNonQuery();
+                await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -562,7 +582,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         }
     }
 
-    private SqliteConnection OpenConnection()
+    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
         var dir = Path.GetDirectoryName(_dbPath);
 
@@ -573,15 +593,15 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         try
         {
             connection = new SqliteConnection(_connectionString);
-            connection.Open();
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            using (var schemaCmd = connection.CreateCommand())
+            await using (var schemaCmd = connection.CreateCommand())
             {
                 schemaCmd.CommandText = CreateTableSql;
-                schemaCmd.ExecuteNonQuery();
+                await schemaCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            EnsureSchemaColumns(connection);
+            await EnsureSchemaColumnsAsync(connection, cancellationToken).ConfigureAwait(false);
 
             var result = connection;
             connection = null;
@@ -590,7 +610,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         }
         finally
         {
-            connection?.Dispose();
+            if (connection is not null) { await connection.DisposeAsync().ConfigureAwait(false); }
         }
     }
 

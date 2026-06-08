@@ -6,7 +6,7 @@ namespace EventLogExpert.Runtime.FilterLibrary;
 public interface IFilterLibraryStore
 {
     /// <summary>Inserts a new library entry into the persistent store.</summary>
-    void Add(LibraryEntry entry);
+    Task AddAsync(LibraryEntry entry, CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Inserts <paramref name="candidate" /> only if no AutoTracked filter entry with the same
@@ -14,34 +14,39 @@ public interface IFilterLibraryStore
     ///     newly persisted, or <c>(existing, false)</c> when a same-tuple AutoTracked filter row was already present. The
     ///     returned entry's <see cref="LibraryEntry.Id" /> may differ from the candidate's Id when collision occurs.
     /// </summary>
-    (LibraryEntry Entry, bool WasInserted) AddOrReturnExistingFilter(LibraryEntrySavedFilter candidate);
+    Task<(LibraryEntry Entry, bool WasInserted)> AddOrReturnExistingFilterAsync(
+        LibraryEntrySavedFilter candidate,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Inserts multiple library entries into the persistent store. The default implementation calls
-    ///     <see cref="Add" /> per entry; production implementations should override with a transactional batch.
+    ///     <see cref="AddAsync" /> per entry; production implementations should override with a transactional batch.
     /// </summary>
-    void AddRange(IEnumerable<LibraryEntry> entries)
+    async Task AddRangeAsync(IEnumerable<LibraryEntry> entries, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entries);
 
-        foreach (var entry in entries) { Add(entry); }
+        foreach (var entry in entries) { await AddAsync(entry, cancellationToken).ConfigureAwait(false); }
     }
 
     /// <summary>Removes the library entry with <paramref name="entryId" /> from the persistent store.</summary>
-    void Delete(LibraryEntryId entryId);
+    Task DeleteAsync(LibraryEntryId entryId, CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Reads all library entries from the persistent store. Throws on connection/schema failures (FilterLibrary
     ///     Effects catch and dispatch failure action).
     /// </summary>
-    IReadOnlyList<LibraryEntry> LoadAll();
+    Task<IReadOnlyList<LibraryEntry>> LoadAllAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Bumps <see cref="LibraryEntry.LastUsedUtc" /> on the entry with <paramref name="entryId" /> only when the
     ///     entry exists and is not favorited. Returns <c>true</c> when the bump succeeded; <c>false</c> when no row matched
     ///     (entry missing OR favorited).
     /// </summary>
-    bool TryBumpLastUsedIfNotFavorite(LibraryEntryId entryId, DateTimeOffset lastUsedUtc);
+    Task<bool> TryBumpLastUsedIfNotFavoriteAsync(
+        LibraryEntryId entryId,
+        DateTimeOffset lastUsedUtc,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Deletes the library entry with <paramref name="entryId" /> ONLY when the row is still an AutoTracked filter
@@ -51,10 +56,10 @@ public interface IFilterLibraryStore
     ///     path to avoid losing data when a concurrent <c>SetIsFavorite</c> / <c>SaveEntry</c> has changed the row's
     ///     classification after the snapshot was taken.
     /// </summary>
-    bool TryDeleteAutoTrackedIfNotFavorite(LibraryEntryId entryId);
+    Task<bool> TryDeleteAutoTrackedIfNotFavoriteAsync(LibraryEntryId entryId, CancellationToken cancellationToken = default);
 
     /// <summary>Updates an existing library entry in the persistent store (matched by <see cref="LibraryEntry.Id" />).</summary>
-    void Update(LibraryEntry entry);
+    Task UpdateAsync(LibraryEntry entry, CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Updates every entry in <paramref name="entries" /> within a single transaction (each matched by
@@ -63,5 +68,7 @@ public interface IFilterLibraryStore
     ///     rolled back so no partial writes persist, and the exception propagates. Returns an empty list when
     ///     <paramref name="entries" /> is empty.
     /// </summary>
-    IReadOnlyList<LibraryEntryId> UpdateRange(IReadOnlyList<LibraryEntry> entries);
+    Task<IReadOnlyList<LibraryEntryId>> UpdateRangeAsync(
+        IReadOnlyList<LibraryEntry> entries,
+        CancellationToken cancellationToken = default);
 }
