@@ -47,17 +47,17 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null),
             logSink, progress: null, cts.Token);
 
-        await WriteEnvelopeAsync(clientWriter, new HelloEnvelope(4242, 1), ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(4242, 1), ct);
 
-        var requestEnvelope = await ReadRequestEnvelopeAsync(clientReader, ct);
-        Assert.IsType<ShowProvidersIpcRequest>(requestEnvelope);
+        var request = await ReadRequestAsync(clientReader, ct);
+        Assert.IsType<ShowProvidersIpcRequest>(request);
 
         cts.Cancel();
 
-        var nextEnvelope = await ReadEnvelopeAsync(clientReader, ct);
-        Assert.IsType<CancelEnvelope>(nextEnvelope);
+        var nextMessage = await ReadMessageAsync(clientReader, ct);
+        Assert.IsType<CancelMessage>(nextMessage);
 
-        await WriteEnvelopeAsync(clientWriter, new ResultEnvelope(DatabaseToolsOutcome.Cancelled, "operation cancelled", 100), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Cancelled, "operation cancelled", 100), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
@@ -91,10 +91,10 @@ public sealed class ElevatedDatabaseToolsRunnerTests
                 new ShowProvidersRequest(null, null),
                 logSink, progress: null, cts.Token);
 
-            await WriteEnvelopeAsync(clientWriter, new HelloEnvelope(5252, 1), ct);
+            await WriteMessageAsync(clientWriter, new HelloMessage(5252, 1), ct);
 
-            var requestEnvelope = await ReadRequestEnvelopeAsync(clientReader, ct);
-            Assert.IsType<ShowProvidersIpcRequest>(requestEnvelope);
+            var request = await ReadRequestAsync(clientReader, ct);
+            Assert.IsType<ShowProvidersIpcRequest>(request);
 
             cts.Cancel();
 
@@ -147,7 +147,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
     }
 
     [Fact]
-    public async Task HappyPath_StreamsLogAndProgressEnvelopesToCallerSinksInOrder()
+    public async Task HappyPath_StreamsLogAndProgressMessagesToCallerSinksInOrder()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
@@ -165,16 +165,16 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runTask = runner.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progressSink, ct);
 
-        await WriteEnvelopeAsync(clientWriter, new HelloEnvelope(9999, 1), ct);
-        await ReadRequestEnvelopeAsync(clientReader, ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(9999, 1), ct);
+        await ReadRequestAsync(clientReader, ct);
 
         var ts1 = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var ts2 = ts1.AddSeconds(1);
 
-        await WriteEnvelopeAsync(clientWriter, new LogEnvelope(ts1, LogLevel.Information, "first"), ct);
-        await WriteEnvelopeAsync(clientWriter, new ProgressEnvelope(1, 10, "item-1"), ct);
-        await WriteEnvelopeAsync(clientWriter, new LogEnvelope(ts2, LogLevel.Warning, "second"), ct);
-        await WriteEnvelopeAsync(clientWriter, new ResultEnvelope(DatabaseToolsOutcome.Succeeded, null, 250), ct);
+        await WriteMessageAsync(clientWriter, new LogMessage(ts1, LogLevel.Information, "first"), ct);
+        await WriteMessageAsync(clientWriter, new ProgressMessage(1, 10, "item-1"), ct);
+        await WriteMessageAsync(clientWriter, new LogMessage(ts2, LogLevel.Warning, "second"), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, null, 250), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
@@ -194,7 +194,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
     }
 
     [Fact]
-    public async Task HelloEnvelopeWithUnexpectedProtocolVersion_RunnerReturnsFailedWithMismatchMessage()
+    public async Task HelloMessageWithUnexpectedProtocolVersion_RunnerReturnsFailedWithMismatchMessage()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
@@ -209,8 +209,8 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runTask = runner.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, ct);
 
-        var futureVersion = HelloEnvelope.CurrentProtocolVersion + 1;
-        await WriteEnvelopeAsync(clientWriter, new HelloEnvelope(9090, futureVersion), ct);
+        var futureVersion = HelloMessage.CurrentProtocolVersion + 1;
+        await WriteMessageAsync(clientWriter, new HelloMessage(9090, futureVersion), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
@@ -219,7 +219,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         Assert.NotNull(result.FailureSummary);
         Assert.Contains("protocol version mismatch", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(futureVersion.ToString(), result.FailureSummary);
-        Assert.Contains(HelloEnvelope.CurrentProtocolVersion.ToString(), result.FailureSummary);
+        Assert.Contains(HelloMessage.CurrentProtocolVersion.ToString(), result.FailureSummary);
     }
 
     [Fact]
@@ -242,7 +242,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
         Assert.NotNull(result.FailureSummary);
-        Assert.Contains("did not send Hello envelope within", result.FailureSummary);
+        Assert.Contains("did not send Hello message within", result.FailureSummary);
 
         await client.DisposeAsync();
     }
@@ -290,8 +290,8 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             var runTask = runner.ShowAsync(
                 new ShowProvidersRequest(null, null), logSink, progress: null, ct);
 
-            await WriteEnvelopeAsync(clientWriter, new HelloEnvelope(8484, 1), ct);
-            await ReadRequestEnvelopeAsync(clientReader, ct);
+            await WriteMessageAsync(clientWriter, new HelloMessage(8484, 1), ct);
+            await ReadRequestAsync(clientReader, ct);
 
             client.Dispose();
             fakeProcess.SignalExited(42);
@@ -330,7 +330,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
     }
 
     [Fact]
-    public async Task HelperSendsNonHelloFirst_RunnerReturnsFailedWithFirstEnvelopeMessage()
+    public async Task HelperSendsNonHelloFirst_RunnerReportsFirstMessageType()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
@@ -345,15 +345,15 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runTask = runner.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, ct);
 
-        await WriteEnvelopeAsync(clientWriter,
-            new LogEnvelope(DateTime.UtcNow, LogLevel.Information, "premature log"), ct);
+        await WriteMessageAsync(clientWriter,
+            new LogMessage(DateTime.UtcNow, LogLevel.Information, "premature log"), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
         Assert.NotNull(result.FailureSummary);
-        Assert.Contains("LogEnvelope instead of HelloEnvelope", result.FailureSummary);
+        Assert.Contains("LogMessage instead of HelloMessage", result.FailureSummary);
     }
 
     [Fact]
@@ -373,8 +373,8 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runTask = runner.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, ct);
 
-        await WriteEnvelopeAsync(clientWriter, new HelloEnvelope(1111, 1), ct);
-        await ReadRequestEnvelopeAsync(clientReader, ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(1111, 1), ct);
+        await ReadRequestAsync(clientReader, ct);
 
         await clientWriter.WriteLineAsync("{not valid json");
         await clientWriter.FlushAsync(ct);
@@ -385,11 +385,11 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
         Assert.NotNull(result.FailureSummary);
         Assert.Contains("Helper threw System.Text.Json.JsonException", result.FailureSummary);
-        Assert.Contains("Malformed envelope from helper", result.FailureSummary);
+        Assert.Contains("Malformed message from helper", result.FailureSummary);
     }
 
     [Fact]
-    public async Task MirrorEnvelopeToDebugLog_LogAndProgressEnvelopes_AreNotMirroredToTraceLogger()
+    public async Task MirrorMessageToDebugLog_LogAndProgressMessages_AreNotMirroredToTraceLogger()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
@@ -406,18 +406,18 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runTask = runner.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progressSink, ct);
 
-        await WriteEnvelopeAsync(clientWriter, new HelloEnvelope(2222, 1), ct);
-        await ReadRequestEnvelopeAsync(clientReader, ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(2222, 1), ct);
+        await ReadRequestAsync(clientReader, ct);
 
         for (var i = 0; i < 20; i++)
         {
-            await WriteEnvelopeAsync(clientWriter,
-                new LogEnvelope(DateTime.UtcNow, LogLevel.Information, $"OPERATION_LOG_LINE_{i:000}"), ct);
-            await WriteEnvelopeAsync(clientWriter,
-                new ProgressEnvelope(i, 20, $"OPERATION_PROGRESS_ITEM_{i:000}"), ct);
+            await WriteMessageAsync(clientWriter,
+                new LogMessage(DateTime.UtcNow, LogLevel.Information, $"OPERATION_LOG_LINE_{i:000}"), ct);
+            await WriteMessageAsync(clientWriter,
+                new ProgressMessage(i, 20, $"OPERATION_PROGRESS_ITEM_{i:000}"), ct);
         }
 
-        await WriteEnvelopeAsync(clientWriter, new ResultEnvelope(DatabaseToolsOutcome.Succeeded, null, 100), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, null, 100), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
@@ -480,12 +480,12 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runTask = runner.ShowAsync(
             new ShowProvidersRequest(null, null), throwingSink, progress: null, ct);
 
-        await WriteEnvelopeAsync(clientWriter, new HelloEnvelope(3333, 1), ct);
-        await ReadRequestEnvelopeAsync(clientReader, ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(3333, 1), ct);
+        await ReadRequestAsync(clientReader, ct);
 
-        await WriteEnvelopeAsync(clientWriter,
-            new LogEnvelope(DateTime.UtcNow, LogLevel.Information, "boom-trigger"), ct);
-        await WriteEnvelopeAsync(clientWriter, new ResultEnvelope(DatabaseToolsOutcome.Succeeded, null, 100), ct);
+        await WriteMessageAsync(clientWriter,
+            new LogMessage(DateTime.UtcNow, LogLevel.Information, "boom-trigger"), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, null, 100), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
@@ -513,7 +513,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
     }
 
     [Fact]
-    public async Task VerboseFlag_PropagatesIntoRequestEnvelopeSentToHelper()
+    public async Task VerboseFlag_PropagatesIntoRequestSentToHelper()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
@@ -530,14 +530,14 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new CreateDatabaseRequest(@"C:\out.db", null, null, null),
             logSink, progress: null, ct, verbose: true);
 
-        await WriteEnvelopeAsync(clientWriter, new HelloEnvelope(4444, 1), ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(4444, 1), ct);
 
-        var requestEnvelope = await ReadRequestEnvelopeAsync(clientReader, ct);
-        var create = Assert.IsType<CreateDatabaseIpcRequest>(requestEnvelope);
+        var request = await ReadRequestAsync(clientReader, ct);
+        var create = Assert.IsType<CreateDatabaseIpcRequest>(request);
         Assert.True(create.Verbose);
         Assert.Equal(@"C:\out.db", create.Request.TargetPath);
 
-        await WriteEnvelopeAsync(clientWriter, new ResultEnvelope(DatabaseToolsOutcome.Succeeded, null, 50), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, null, 50), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
@@ -562,13 +562,13 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         var runTask = invoke(runner, logSink, ct);
 
-        await WriteEnvelopeAsync(clientWriter, new HelloEnvelope(1234, 1), ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(1234, 1), ct);
 
-        var requestEnvelope = await ReadRequestEnvelopeAsync(clientReader, ct);
-        Assert.IsType(expectedRequestType, requestEnvelope);
-        Assert.Equal(expectVerbose, requestEnvelope.Verbose);
+        var request = await ReadRequestAsync(clientReader, ct);
+        Assert.IsType(expectedRequestType, request);
+        Assert.Equal(expectVerbose, request.Verbose);
 
-        await WriteEnvelopeAsync(clientWriter, new ResultEnvelope(DatabaseToolsOutcome.Succeeded, null, 100), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, null, 100), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
@@ -586,35 +586,35 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         catch (IOException) { /* pipe broke during flush-on-dispose */ }
     }
 
-    private static async Task<DatabaseToolsIpcEnvelope> ReadEnvelopeAsync(StreamReader reader, CancellationToken ct)
+    private static async Task<DatabaseToolsIpcMessage> ReadMessageAsync(StreamReader reader, CancellationToken ct)
     {
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(s_testReadTimeout);
 
         var line = await reader.ReadLineAsync(timeoutCts.Token);
-        Assert.False(string.IsNullOrEmpty(line), "Expected an envelope but the pipe returned EOF or empty.");
+        Assert.False(string.IsNullOrEmpty(line), "Expected a message but the pipe returned EOF or empty.");
 
-        var envelope = JsonSerializer.Deserialize<DatabaseToolsIpcEnvelope>(line, DatabaseToolsIpcSerializer.Options);
-        Assert.NotNull(envelope);
-        return envelope;
+        var message = JsonSerializer.Deserialize<DatabaseToolsIpcMessage>(line, DatabaseToolsIpcSerializer.Options);
+        Assert.NotNull(message);
+        return message;
     }
 
-    private static async Task<DatabaseToolsIpcRequest> ReadRequestEnvelopeAsync(StreamReader reader, CancellationToken ct)
+    private static async Task<DatabaseToolsIpcRequest> ReadRequestAsync(StreamReader reader, CancellationToken ct)
     {
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(s_testReadTimeout);
 
         var line = await reader.ReadLineAsync(timeoutCts.Token);
-        Assert.False(string.IsNullOrEmpty(line), "Expected a request envelope but the pipe returned EOF or empty.");
+        Assert.False(string.IsNullOrEmpty(line), "Expected a request but the pipe returned EOF or empty.");
 
         var request = JsonSerializer.Deserialize<DatabaseToolsIpcRequest>(line, DatabaseToolsIpcSerializer.Options);
         Assert.NotNull(request);
         return request;
     }
 
-    private static async Task WriteEnvelopeAsync(StreamWriter writer, DatabaseToolsIpcEnvelope envelope, CancellationToken ct)
+    private static async Task WriteMessageAsync(StreamWriter writer, DatabaseToolsIpcMessage message, CancellationToken ct)
     {
-        var json = JsonSerializer.Serialize(envelope, DatabaseToolsIpcSerializer.Options);
+        var json = JsonSerializer.Serialize(message, DatabaseToolsIpcSerializer.Options);
         await writer.WriteLineAsync(json.AsMemory(), ct);
         await writer.FlushAsync(ct);
     }

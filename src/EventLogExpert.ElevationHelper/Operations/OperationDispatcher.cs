@@ -20,13 +20,13 @@ namespace EventLogExpert.ElevationHelper.Operations;
 /// <remarks>
 ///     Request reading happens in <see cref="ProgramEntry" /> (so the helper can start a control-reader task on the
 ///     same pipe AFTER the request is consumed and BEFORE this dispatch starts; that control reader watches for
-///     <see cref="CancelEnvelope" /> and cancels the operation CT).
+///     <see cref="CancelMessage" /> and cancels the operation CT).
 /// </remarks>
 internal static class OperationDispatcher
 {
     public static async Task<DatabaseToolsResult> DispatchAsync(
         DatabaseToolsIpcRequest request,
-        IpcEnvelopeWriter writer,
+        IpcMessageWriter writer,
         CancellationToken cancellationToken)
     {
         await using var services = new ServiceCollection()
@@ -34,7 +34,7 @@ internal static class OperationDispatcher
             .BuildServiceProvider();
 
         var service = services.GetRequiredService<IDatabaseToolsService>();
-        var logSink = new IpcLogEntrySink(writer);
+        var logSink = new IpcLogSink(writer);
         var progressSink = new IpcProgressSink(writer);
 
         return await DestructiveRecovery.WrapAsync(

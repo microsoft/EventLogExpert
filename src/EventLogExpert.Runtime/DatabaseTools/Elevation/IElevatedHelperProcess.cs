@@ -13,9 +13,9 @@ namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 ///         <b>Concurrency model for <see cref="Pipe" />:</b> the underlying duplex named pipe has independent OS-level
 ///         buffers per direction. A SINGLE reader on the incoming direction concurrent with a SINGLE writer on the
 ///         outgoing direction is supported by the .NET async pipe-stream implementation (overlapped I/O via
-///         <c>ThreadPoolBoundHandle</c>) — used by <c>ElevatedDatabaseToolsRunner</c> which simultaneously (a) reads
-///         envelopes from the helper and (b) writes <c>CancelEnvelope</c> on cancellation. Concurrent READS on the same
-///         direction (or concurrent WRITES on the same direction) are NOT supported — callers must serialize
+///         <c>ThreadPoolBoundHandle</c>) - used by <c>ElevatedDatabaseToolsRunner</c> which simultaneously (a) reads
+///         messages from the helper and (b) writes <c>CancelMessage</c> on cancellation. Concurrent READS on the same
+///         direction (or concurrent WRITES on the same direction) are NOT supported - callers must serialize
 ///         same-direction operations (e.g., with a <see cref="SemaphoreSlim" />).
 ///     </para>
 ///     <para>
@@ -29,8 +29,8 @@ namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 public interface IElevatedHelperProcess : IAsyncDisposable
 {
     /// <summary>
-    ///     The duplex pipe stream connecting runner ↔ helper. The runner reads envelopes via this stream and writes
-    ///     control envelopes (cancel) through it. Implementations guarantee the stream is connected and authenticated before
+    ///     The duplex pipe stream connecting runner-to-helper. The runner reads messages via this stream and writes
+    ///     control messages (cancel) through it. Implementations guarantee the stream is connected and authenticated before
     ///     this property is first observed. See remarks on the interface for the concurrency model.
     /// </summary>
     Stream Pipe { get; }
@@ -40,7 +40,7 @@ public interface IElevatedHelperProcess : IAsyncDisposable
 
     /// <summary>
     ///     Hard-terminates the helper process. Used as the last-resort cancellation fallback when the cooperative
-    ///     <c>CancelEnvelope</c> + grace window does not produce a clean exit. Does NOT throw if the process has already
+    ///     <c>CancelMessage</c> + grace window does not produce a clean exit. Does NOT throw if the process has already
     ///     exited.
     /// </summary>
     void Kill();

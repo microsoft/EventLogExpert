@@ -8,7 +8,6 @@ using EventLogExpert.ElevationHelper.Ipc;
 using EventLogExpert.ElevationHelper.Operations;
 using System.IO.Pipes;
 using System.Text;
-using System.Text.Json;
 
 namespace EventLogExpert.ElevationHelper;
 
@@ -25,8 +24,8 @@ namespace EventLogExpert.ElevationHelper;
 ///         <item>
 ///             <c>--pipe &lt;name&gt;</c> (no <c>--probe</c>) - operation mode. Reads a
 ///             <see cref="DatabaseToolsIpcRequest" /> from the pipe, dispatches via <see cref="OperationDispatcher" /> +
-///             <see cref="DestructiveRecovery" />, streams Log/Progress envelopes during execution, emits a terminal
-///             Result envelope, exits 0.
+///             <see cref="DestructiveRecovery" />, streams Log/Progress messages during execution, emits a terminal Result
+///             message, exits 0.
 ///         </item>
 ///     </list>
 /// </summary>
@@ -62,9 +61,9 @@ internal static class ProgramEntry
         }
     }
 
-    private static async Task<int> RunOperationModeAsync(IpcEnvelopeReader reader, IpcEnvelopeWriter writer)
+    private static async Task<int> RunOperationModeAsync(IpcMessageReader reader, IpcMessageWriter writer)
     {
-        // 1) Read request envelope (with deadline). The control reader cannot start until we've consumed it
+        // 1) Read request (with deadline). The control reader cannot start until we've consumed it
         //    because they share the same StreamReader.
         DatabaseToolsIpcRequest? request;
 
@@ -75,28 +74,28 @@ internal static class ProgramEntry
         }
         catch (OperationCanceledException)
         {
-            await TryWriteTerminalAsync(writer, new FatalEnvelope("System.TimeoutException", "Runner did not send request envelope within 10s.", string.Empty));
+            await TryWriteTerminalAsync(writer, new FatalMessage("System.TimeoutException", "Runner did not send request within 10s.", string.Empty));
 
             return 8;
         }
         catch (Exception ex)
         {
-            await TryWriteTerminalAsync(writer, new FatalEnvelope(ex.GetType().FullName ?? ex.GetType().Name, $"Request read failed: {ex.Message}", ex.StackTrace ?? string.Empty));
+            await TryWriteTerminalAsync(writer, new FatalMessage(ex.GetType().FullName ?? ex.GetType().Name, $"Request read failed: {ex.Message}", ex.StackTrace ?? string.Empty));
 
             return 9;
         }
 
         if (request is null)
         {
-            await TryWriteTerminalAsync(writer, new FatalEnvelope("System.IO.EndOfStreamException", "Pipe closed before runner sent request.", string.Empty));
+            await TryWriteTerminalAsync(writer, new FatalMessage("System.IO.EndOfStreamException", "Pipe closed before runner sent request.", string.Empty));
 
             return 10;
         }
 
-        // 2) Set up operation cancellation. The control reader cancels this on receipt of a CancelEnvelope.
+        // 2) Set up operation cancellation. The control reader cancels this on receipt of a CancelMessage.
         using var operationCts = new CancellationTokenSource();
 
-        // 3) Start the control reader. Loops on the same StreamReader until either (a) it sees a CancelEnvelope
+        // 3) Start the control reader. Loops on the same StreamReader until either (a) it sees a CancelMessage
         //    (cancels operationCts and returns), (b) the pipe closes (returns), or (c) the operation completes
         //    and the main flow disposes the reader.
         var controlReaderTask = Task.Run(async () =>
@@ -105,24 +104,24 @@ internal static class ProgramEntry
             {
                 while (!operationCts.IsCancellationRequested)
                 {
-                    DatabaseToolsIpcEnvelope? env;
+                    DatabaseToolsIpcMessage? message;
                     try
                     {
-                        env = await reader.ReadEnvelopeAsync(operationCts.Token);
+                        message = await reader.ReadMessageAsync(operationCts.Token);
                     }
                     catch (OperationCanceledException) { return; }
                     catch (IOException) { return; }
                     catch (ObjectDisposedException) { return; }
 
-                    if (env is null) { return; } // EOF
+                    if (message is null) { return; } // EOF
 
-                    if (env is CancelEnvelope)
+                    if (message is CancelMessage)
                     {
                         operationCts.Cancel();
                         return;
                     }
 
-                    // Other envelopes are unexpected on the runner→helper direction during operation; ignore.
+                    // Other messages are unexpected on the runner-to-helper direction during operation; ignore.
                 }
             }
             catch
@@ -145,19 +144,19 @@ internal static class ProgramEntry
             try { await controlReaderTask.WaitAsync(TimeSpan.FromSeconds(1)); } catch { /* swallow */ }
 
             await TryWriteTerminalAsync(writer,
-                new FatalEnvelope(ex.GetType().FullName ?? ex.GetType().Name, ex.Message, ex.StackTrace ?? string.Empty));
+                new FatalMessage(ex.GetType().FullName ?? ex.GetType().Name, ex.Message, ex.StackTrace ?? string.Empty));
 
             return 11;
         }
 
-        // 5) Stop the control reader. operationCts.Cancel() makes the inner ReadEnvelopeAsync throw
+        // 5) Stop the control reader. operationCts.Cancel() makes the inner ReadMessageAsync throw
         //    OperationCanceledException; the catch in the loop returns.
         operationCts.Cancel();
         try { await controlReaderTask.WaitAsync(TimeSpan.FromSeconds(1)); } catch { /* swallow */ }
 
-        // 6) Emit the terminal Result envelope.
+        // 6) Emit the terminal Result message.
         await TryWriteTerminalAsync(writer,
-            new ResultEnvelope(result.Outcome, result.FailureSummary, (long)result.Duration.TotalMilliseconds));
+            new ResultMessage(result.Outcome, result.FailureSummary, (long)result.Duration.TotalMilliseconds));
 
         return 0;
     }
@@ -188,10 +187,10 @@ internal static class ProgramEntry
             return 4;
         }
 
-        await using var writer = new IpcEnvelopeWriter(pipe);
-        using var reader = new IpcEnvelopeReader(pipe);
+        await using var writer = new IpcMessageWriter(pipe);
+        using var reader = new IpcMessageReader(pipe);
 
-        await writer.WriteAsync(new HelloEnvelope(Environment.ProcessId, HelloEnvelope.CurrentProtocolVersion), CancellationToken.None);
+        await writer.WriteAsync(new HelloMessage(Environment.ProcessId, HelloMessage.CurrentProtocolVersion), CancellationToken.None);
 
         if (!probe)
         {
@@ -200,26 +199,26 @@ internal static class ProgramEntry
 
         try
         {
-            var probeEnvelope = ProbeMode.Capture();
-            await writer.WriteAsync(probeEnvelope, CancellationToken.None);
-            await writer.WriteAsync(new ResultEnvelope(DatabaseToolsOutcome.Succeeded, FailureSummary: null, DurationMs: 0), CancellationToken.None);
+            var probeMessage = ProbeMode.Capture();
+            await writer.WriteAsync(probeMessage, CancellationToken.None);
+            await writer.WriteAsync(new ResultMessage(DatabaseToolsOutcome.Succeeded, FailureSummary: null, DurationMs: 0), CancellationToken.None);
 
             return 0;
         }
         catch (Exception ex)
         {
             await writer.WriteAsync(
-                new FatalEnvelope(ex.GetType().FullName ?? ex.GetType().Name, ex.Message, ex.StackTrace ?? string.Empty),
+                new FatalMessage(ex.GetType().FullName ?? ex.GetType().Name, ex.Message, ex.StackTrace ?? string.Empty),
                 CancellationToken.None);
 
             return 5;
         }
     }
 
-    private static async Task TryWriteTerminalAsync(IpcEnvelopeWriter writer, DatabaseToolsIpcEnvelope envelope)
+    private static async Task TryWriteTerminalAsync(IpcMessageWriter writer, DatabaseToolsIpcMessage message)
     {
-        try { await writer.WriteAsync(envelope, CancellationToken.None); }
-        catch (IOException) { /* runner disconnected before terminal envelope was written; not a helper crash */ }
+        try { await writer.WriteAsync(message, CancellationToken.None); }
+        catch (IOException) { /* runner disconnected before terminal message was written; not a helper crash */ }
         catch (ObjectDisposedException) { /* pipe disposed by runner; same as above */ }
     }
 
@@ -277,41 +276,5 @@ internal sealed record HelperArgs(string? PipeName, bool Probe)
         }
 
         return new HelperArgs(pipeName, probe);
-    }
-}
-
-/// <summary>
-///     Writes <see cref="DatabaseToolsIpcEnvelope" /> instances as line-delimited UTF-8 JSON through a stream. Each
-///     <see cref="WriteAsync" /> call is serialized via an internal <see cref="SemaphoreSlim" /> so concurrent writes from
-///     different tasks don't interleave on the wire.
-/// </summary>
-internal sealed class IpcEnvelopeWriter(Stream destination) : IAsyncDisposable
-{
-    private static readonly UTF8Encoding s_utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
-    private readonly SemaphoreSlim _writeLock = new(initialCount: 1, maxCount: 1);
-    private readonly StreamWriter _writer = new(destination, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { NewLine = "\n", AutoFlush = false };
-
-    public async ValueTask DisposeAsync()
-    {
-        try { await _writer.FlushAsync(); } catch { /* best effort during dispose */ }
-        await _writer.DisposeAsync();
-        _writeLock.Dispose();
-    }
-
-    public async Task WriteAsync(DatabaseToolsIpcEnvelope envelope, CancellationToken cancellationToken)
-    {
-        var json = JsonSerializer.Serialize(envelope, DatabaseToolsIpcSerializer.Options);
-
-        await _writeLock.WaitAsync(cancellationToken);
-
-        try
-        {
-            await _writer.WriteLineAsync(json.AsMemory(), cancellationToken);
-            await _writer.FlushAsync(cancellationToken);
-        }
-        finally
-        {
-            _writeLock.Release();
-        }
     }
 }

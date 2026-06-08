@@ -18,19 +18,18 @@ using System.Threading.Channels;
 namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 
 /// <summary>
-///     Production <see cref="IElevatedDatabaseToolsRunner" /> implementation. For each request: spawn helper → wait
-///     for Hello envelope (10s) → send request → drain envelopes through a bounded <see cref="Channel{T}" /> → forward
-///     Log/Progress to caller sinks + mirror to <see cref="ITraceLogger" /> with <c>[ElevatedHelper]</c> prefix → capture
-///     terminal Result/Fatal → await helper exit (5s grace, then force-kill) → translate to
+///     Production <see cref="IElevatedDatabaseToolsRunner" /> implementation. For each request: spawn helper -> wait
+///     for Hello message (10s) -> send request -> drain messages through a bounded <see cref="Channel{T}" /> -> forward
+///     Log/Progress to caller sinks + mirror to <see cref="ITraceLogger" /> with <c>[ElevatedHelper]</c> prefix -> capture
+///     terminal Result/Fatal -> await helper exit (5s grace, then force-kill) -> translate to
 ///     <see cref="DatabaseToolsResult" />.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Cancellation flow:</b> caller cancels → runner writes <see cref="CancelEnvelope" /> to the pipe
-///         (best-effort) and starts a 30s grace timer. Helper observes the envelope, cancels its operation CTS, and emits
-///         a <see cref="ResultEnvelope" /> with <see cref="DatabaseToolsOutcome.Cancelled" />. If the helper does NOT emit
-///         a result within the grace window, the runner force-kills the process and returns a synthesized Cancelled
-///         outcome.
+///         <b>Cancellation flow:</b> caller cancels -> runner writes <see cref="CancelMessage" /> to the pipe
+///         (best-effort) and starts a 30s grace timer. Helper observes the message, cancels its operation CTS, and emits a
+///         <see cref="ResultMessage" /> with <see cref="DatabaseToolsOutcome.Cancelled" />. If the helper does NOT emit a
+///         result within the grace window, the runner force-kills the process and returns a synthesized Cancelled outcome.
 ///     </para>
 ///     <para>
 ///         <b>Concurrency invariants:</b>
@@ -108,7 +107,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
     public Task<DatabaseToolsResult> UpgradeAsync(UpgradeDatabaseRequest request, IProgress<LogRecord> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
         => RunAsync(new UpgradeDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
 
-    private static async Task DrainPipeAsync(Stream pipe, ChannelWriter<DatabaseToolsIpcEnvelope> writer, CancellationToken cancellationToken)
+    private static async Task DrainPipeAsync(Stream pipe, ChannelWriter<DatabaseToolsIpcMessage> writer, CancellationToken cancellationToken)
     {
         using var reader = new StreamReader(pipe, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
 
@@ -139,24 +138,24 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
                 if (string.IsNullOrWhiteSpace(line)) { continue; }
 
-                DatabaseToolsIpcEnvelope envelope;
+                DatabaseToolsIpcMessage message;
 
                 try
                 {
-                    envelope = JsonSerializer.Deserialize<DatabaseToolsIpcEnvelope>(line, DatabaseToolsIpcSerializer.Options)
-                        ?? throw new JsonException("Deserialized envelope was null.");
+                    message = JsonSerializer.Deserialize<DatabaseToolsIpcMessage>(line, DatabaseToolsIpcSerializer.Options)
+                        ?? throw new JsonException("Deserialized message was null.");
                 }
                 catch (Exception ex)
                 {
-                    envelope = new FatalEnvelope(
+                    message = new FatalMessage(
                         ex.GetType().FullName ?? ex.GetType().Name,
-                        $"Malformed envelope from helper: {ex.Message} (line: {Truncate(line, 200)})",
+                        $"Malformed message from helper: {ex.Message} (line: {Truncate(line, 200)})",
                         ex.StackTrace ?? string.Empty);
                 }
 
                 try
                 {
-                    await writer.WriteAsync(envelope, cancellationToken);
+                    await writer.WriteAsync(message, cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -175,14 +174,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
     }
 
     private static string Truncate(string s, int max) =>
-        s.Length <= max ? s : s[..max] + "…";
-
-    private static async Task WriteEnvelopeAsync(Stream pipe, SemaphoreSlim writeLock, DatabaseToolsIpcEnvelope envelope, CancellationToken cancellationToken)
-    {
-        var json = JsonSerializer.Serialize(envelope, DatabaseToolsIpcSerializer.Options);
-
-        await WriteJsonLineAsync(pipe, writeLock, json, cancellationToken);
-    }
+        s.Length <= max ? s : s[..max] + "...";
 
     private static async Task WriteJsonLineAsync(Stream pipe, SemaphoreSlim writeLock, string json, CancellationToken cancellationToken)
     {
@@ -201,6 +193,13 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         }
     }
 
+    private static async Task WriteMessageAsync(Stream pipe, SemaphoreSlim writeLock, DatabaseToolsIpcMessage message, CancellationToken cancellationToken)
+    {
+        var json = JsonSerializer.Serialize(message, DatabaseToolsIpcSerializer.Options);
+
+        await WriteJsonLineAsync(pipe, writeLock, json, cancellationToken);
+    }
+
     private static async Task WriteRequestAsync(Stream pipe, SemaphoreSlim writeLock, DatabaseToolsIpcRequest request, CancellationToken cancellationToken)
     {
         var json = JsonSerializer.Serialize(request, DatabaseToolsIpcSerializer.Options);
@@ -212,17 +211,17 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
     {
         if (!killState.MarkCancelRequested()) { return; }
 
-        _traceLogger.Information($"{ElevatedHelperTag} Caller cancellation requested; sending CancelEnvelope to helper and starting {_cancellationGrace.TotalSeconds:N0}s grace window.");
+        _traceLogger.Information($"{ElevatedHelperTag} Caller cancellation requested; sending CancelMessage to helper and starting {_cancellationGrace.TotalSeconds:N0}s grace window.");
 
         _ = Task.Run(async () =>
         {
             try
             {
-                await WriteEnvelopeAsync(pipeStream, writeLock, new CancelEnvelope(), CancellationToken.None);
+                await WriteMessageAsync(pipeStream, writeLock, new CancelMessage(), CancellationToken.None);
             }
             catch (Exception ex)
             {
-                _traceLogger.Trace($"{ElevatedHelperTag} CancelEnvelope write threw {ex.GetType().Name}: {ex.Message} (likely helper already exited)");
+                _traceLogger.Trace($"{ElevatedHelperTag} CancelMessage write threw {ex.GetType().Name}: {ex.Message} (likely helper already exited)");
             }
         });
 
@@ -235,7 +234,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             {
                 await Task.Delay(_cancellationGrace, graceCts.Token);
 
-                _traceLogger.Warning($"{ElevatedHelperTag} Helper did not respond with a Result envelope within {_cancellationGrace.TotalSeconds:N0}s of CancelEnvelope — force-killing.");
+                _traceLogger.Warning($"{ElevatedHelperTag} Helper did not respond with a Result message within {_cancellationGrace.TotalSeconds:N0}s of CancelMessage - force-killing.");
                 process.Kill();
                 killState.MarkKilled();
             }
@@ -247,27 +246,27 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         });
     }
 
-    private void MirrorEnvelopeToDebugLog(DatabaseToolsIpcEnvelope envelope)
+    private void MirrorMessageToDebugLog(DatabaseToolsIpcMessage message)
     {
-        switch (envelope)
+        switch (message)
         {
-            case HelloEnvelope h:
+            case HelloMessage h:
                 _traceLogger.Trace($"{ElevatedHelperTag} Hello: helperPid={h.HelperProcessId}, protocol={h.ProtocolVersion}");
                 break;
 
-            case ResultEnvelope { Outcome: DatabaseToolsOutcome.Succeeded } r:
+            case ResultMessage { Outcome: DatabaseToolsOutcome.Succeeded } r:
                 _traceLogger.Trace($"{ElevatedHelperTag} Result: Succeeded ({r.DurationMs} ms).");
                 break;
 
-            case ResultEnvelope { Outcome: DatabaseToolsOutcome.Cancelled } r:
+            case ResultMessage { Outcome: DatabaseToolsOutcome.Cancelled } r:
                 _traceLogger.Information($"{ElevatedHelperTag} Result: Cancelled ({r.DurationMs} ms). {r.FailureSummary}");
                 break;
 
-            case ResultEnvelope r:
+            case ResultMessage r:
                 _traceLogger.Error($"{ElevatedHelperTag} Result: Failed ({r.DurationMs} ms). {r.FailureSummary}");
                 break;
 
-            case FatalEnvelope f:
+            case FatalMessage f:
                 _traceLogger.Error($"{ElevatedHelperTag} Fatal: {f.ExceptionType}: {f.Message}");
 
                 if (!string.IsNullOrWhiteSpace(f.StackTrace))
@@ -277,12 +276,12 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
                 break;
 
-            case ProbeEnvelope p:
-                _traceLogger.Warning($"{ElevatedHelperTag} (unexpected) Probe envelope received during operation path: processPath={p.ProcessPath}, integrity={p.IntegrityLevel}, packageIdentityOk={p.PackageIdentityOk}");
+            case ProbeMessage p:
+                _traceLogger.Warning($"{ElevatedHelperTag} (unexpected) Probe message received during operation path: processPath={p.ProcessPath}, integrity={p.IntegrityLevel}, packageIdentityOk={p.PackageIdentityOk}");
                 break;
 
-            case CancelEnvelope:
-                _traceLogger.Warning($"{ElevatedHelperTag} (unexpected) CancelEnvelope received from helper. CancelEnvelope is a runner-to-helper control message; helpers must not emit it.");
+            case CancelMessage:
+                _traceLogger.Warning($"{ElevatedHelperTag} (unexpected) CancelMessage received from helper. CancelMessage is a runner-to-helper control message; helpers must not emit it.");
                 break;
         }
     }
@@ -302,7 +301,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         SemaphoreSlim? writeLock = null;
         CancellationTokenRegistration cancelRegistration = default;
 
-        _traceLogger.Trace($"{ElevatedHelperTag} Starting {request.GetType().Name} (verbose={request.Verbose})…");
+        _traceLogger.Trace($"{ElevatedHelperTag} Starting {request.GetType().Name} (verbose={request.Verbose})...");
 
         try
         {
@@ -334,8 +333,8 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
             writeLock = new SemaphoreSlim(initialCount: 1, maxCount: 1);
 
-            // 2) Set up the pipe-reader → bounded channel pipeline.
-            var channel = Channel.CreateBounded<DatabaseToolsIpcEnvelope>(
+            // 2) Set up the pipe-reader -> bounded channel pipeline.
+            var channel = Channel.CreateBounded<DatabaseToolsIpcMessage>(
                 new BoundedChannelOptions(ChannelCapacity)
                 {
                     SingleReader = true,
@@ -350,27 +349,27 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 () => DrainPipeAsync(pipeStream, channel.Writer, readerStopCts.Token),
                 readerStopCts.Token);
 
-            // 3) Wait for Hello envelope (deadline).
+            // 3) Wait for Hello message (deadline).
             try
             {
                 using var helloCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 helloCts.CancelAfter(_helloTimeout);
 
                 var first = await channel.Reader.ReadAsync(helloCts.Token);
-                MirrorEnvelopeToDebugLog(first);
+                MirrorMessageToDebugLog(first);
 
-                if (first is HelloEnvelope hello)
+                if (first is HelloMessage hello)
                 {
                     if (hello.HelperProcessId != process.ProcessId)
                     {
                         _traceLogger.Warning($"{ElevatedHelperTag} Hello.HelperProcessId={hello.HelperProcessId} does not match spawned PID={process.ProcessId}; continuing (PID was already verified at pipe-accept time).");
                     }
 
-                    if (hello.ProtocolVersion != HelloEnvelope.CurrentProtocolVersion)
+                    if (hello.ProtocolVersion != HelloMessage.CurrentProtocolVersion)
                     {
                         return new DatabaseToolsResult(
                             DatabaseToolsOutcome.Failed,
-                            $"Helper IPC protocol version mismatch: helper sent {hello.ProtocolVersion}, runner expected {HelloEnvelope.CurrentProtocolVersion}. The helper EXE may be from a different app version — reinstall the MSIX so the main app and helper ship together.",
+                            $"Helper IPC protocol version mismatch: helper sent {hello.ProtocolVersion}, runner expected {HelloMessage.CurrentProtocolVersion}. The helper EXE may be from a different app version - reinstall the MSIX so the main app and helper ship together.",
                             stopwatch.Elapsed);
                     }
                 }
@@ -378,7 +377,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 {
                     return new DatabaseToolsResult(
                         DatabaseToolsOutcome.Failed,
-                        $"Helper sent {first.GetType().Name} instead of HelloEnvelope as its first envelope.",
+                        $"Helper sent {first.GetType().Name} instead of HelloMessage as its first message.",
                         stopwatch.Elapsed);
                 }
             }
@@ -390,14 +389,14 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             {
                 return new DatabaseToolsResult(
                     DatabaseToolsOutcome.Failed,
-                    $"Helper did not send Hello envelope within {_helloTimeout.TotalSeconds:N0}s.",
+                    $"Helper did not send Hello message within {_helloTimeout.TotalSeconds:N0}s.",
                     stopwatch.Elapsed);
             }
             catch (ChannelClosedException)
             {
                 return new DatabaseToolsResult(
                     DatabaseToolsOutcome.Failed,
-                    "Pipe closed before helper sent Hello envelope (helper likely crashed during startup).",
+                    "Pipe closed before helper sent Hello message (helper likely crashed during startup).",
                     stopwatch.Elapsed);
             }
 
@@ -411,39 +410,39 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, "Cancelled while sending request to helper.", stopwatch.Elapsed);
             }
 
-            // 5) Wire caller-cancellation → CancelEnvelope + grace timer.
+            // 5) Wire caller-cancellation -> CancelMessage + grace timer.
             if (cancellationToken.CanBeCanceled)
             {
                 cancelRegistration = cancellationToken.Register(() => HandleCallerCancellation(pipeStream, writeLock, process, killState));
             }
 
-            // 6) Drain envelopes until Result or Fatal arrives (or pipe closes).
-            ResultEnvelope? result = null;
-            FatalEnvelope? fatal = null;
+            // 6) Drain messages until Result or Fatal arrives (or pipe closes).
+            ResultMessage? result = null;
+            FatalMessage? fatal = null;
 
             try
             {
                 while (await channel.Reader.WaitToReadAsync(CancellationToken.None))
                 {
-                    if (!channel.Reader.TryRead(out var envelope)) { continue; }
+                    if (!channel.Reader.TryRead(out var message)) { continue; }
 
-                    MirrorEnvelopeToDebugLog(envelope);
+                    MirrorMessageToDebugLog(message);
 
-                    switch (envelope)
+                    switch (message)
                     {
-                        case LogEnvelope log:
+                        case LogMessage log:
                             SafeReport(logSink, new LogRecord(log.TimestampUtc, log.Level, log.Message));
                             break;
 
-                        case ProgressEnvelope prog when progressSink is not null:
+                        case ProgressMessage prog when progressSink is not null:
                             SafeReport(progressSink, new DatabaseToolsProgress(prog.Processed, prog.Total, prog.CurrentItem));
                             break;
 
-                        case ResultEnvelope r:
+                        case ResultMessage r:
                             result = r;
                             break;
 
-                        case FatalEnvelope f:
+                        case FatalMessage f:
                             fatal = f;
                             break;
                     }
@@ -456,7 +455,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 await cancelRegistration.DisposeAsync();
             }
 
-            // Helper sent a terminal envelope (or pipe closed). Cancel the kill-timer so it doesn't fire on a clean finish.
+            // Helper sent a terminal message (or pipe closed). Cancel the kill-timer so it doesn't fire on a clean finish.
             killState.CancelGraceTimer();
 
             // 7) Wait for helper to exit (grace, then force-kill).
@@ -532,8 +531,8 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
     }
 
     private DatabaseToolsResult TranslateOutcome(
-        ResultEnvelope? result,
-        FatalEnvelope? fatal,
+        ResultMessage? result,
+        FatalMessage? fatal,
         int exitCode,
         bool helperKilled,
         CancellationToken cancellationToken,
@@ -560,14 +559,14 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             return new DatabaseToolsResult(
                 DatabaseToolsOutcome.Cancelled,
                 helperKilled
-                    ? "Cancelled (helper did not respond to CancelEnvelope within grace window; force-killed). If you ran an Upgrade, a .bak of the original target may remain next to it — rename it to recover."
+                    ? "Cancelled (helper did not respond to CancelMessage within grace window; force-killed). If you ran an Upgrade, a .bak of the original target may remain next to it - rename it to recover."
                     : "Cancelled.",
                 elapsed);
         }
 
         return new DatabaseToolsResult(
             DatabaseToolsOutcome.Failed,
-            $"Helper exited (code {exitCode}) without sending a Result envelope.",
+            $"Helper exited (code {exitCode}) without sending a Result message.",
             elapsed);
     }
 
