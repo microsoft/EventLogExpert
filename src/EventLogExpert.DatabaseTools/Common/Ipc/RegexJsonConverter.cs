@@ -11,7 +11,7 @@ namespace EventLogExpert.DatabaseTools.Common.Ipc;
 ///     Serializes a <see cref="Regex" /> to a JSON object preserving the original pattern, options, and match timeout
 ///     so the helper-side reconstructed regex behaves identically to the UI-side compiled regex.
 ///     <see cref="Regex.InfiniteMatchTimeout" /> is encoded as a JSON <c>null</c> in <c>matchTimeoutMs</c>; a null
-///     <see cref="Regex" /> reference is encoded as JSON <c>null</c> at the envelope level (this converter is not invoked
+///     <see cref="Regex" /> reference is encoded as JSON <c>null</c> at the message level (this converter is not invoked
 ///     for that case — the surrounding <see cref="JsonConverter{T}" /> infrastructure handles it via the
 ///     <see cref="JsonConverter{T}.HandleNull" /> protocol).
 /// </summary>

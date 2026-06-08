@@ -9,15 +9,15 @@ namespace EventLogExpert.ElevationHelper.Ipc;
 
 /// <summary>
 ///     Helper-side <see cref="IProgress{T}" /> implementation for <see cref="LogRecord" />. Each
-///     <see cref="Report" /> call wraps the entry in a <see cref="LogEnvelope" /> and writes it to the IPC pipe via the
-///     shared semaphore-guarded <see cref="IpcEnvelopeWriter" />.
+///     <see cref="Report" /> call wraps the entry in a <see cref="LogMessage" /> and writes it to the IPC pipe via the
+///     shared semaphore-guarded <see cref="IpcMessageWriter" />.
 /// </summary>
 /// <remarks>
 ///     <see cref="DatabaseToolsService" /> reports log entries from worker threads (operations run on <c>Task.Run</c>
 ///     ). The underlying writer's semaphore serializes the writes so concurrent log entries from different operation
 ///     phases (or the operation thread + the control reader's fault-emission path) cannot interleave on the wire.
 /// </remarks>
-internal sealed class IpcLogEntrySink(IpcEnvelopeWriter writer) : IProgress<LogRecord>
+internal sealed class IpcLogSink(IpcMessageWriter writer) : IProgress<LogRecord>
 {
     public void Report(LogRecord value)
     {
@@ -28,7 +28,7 @@ internal sealed class IpcLogEntrySink(IpcEnvelopeWriter writer) : IProgress<LogR
         // case the runner's grace-then-kill path resolves it).
         try
         {
-            writer.WriteAsync(new LogEnvelope(value.TimestampUtc, value.Level, value.Message), CancellationToken.None)
+            writer.WriteAsync(new LogMessage(value.TimestampUtc, value.Level, value.Message), CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();
         }
@@ -41,15 +41,15 @@ internal sealed class IpcLogEntrySink(IpcEnvelopeWriter writer) : IProgress<LogR
 
 /// <summary>
 ///     Helper-side <see cref="IProgress{T}" /> implementation for <see cref="DatabaseToolsProgress" />. Same contract
-///     as <see cref="IpcLogEntrySink" />.
+///     as <see cref="IpcLogSink" />.
 /// </summary>
-internal sealed class IpcProgressSink(IpcEnvelopeWriter writer) : IProgress<DatabaseToolsProgress>
+internal sealed class IpcProgressSink(IpcMessageWriter writer) : IProgress<DatabaseToolsProgress>
 {
     public void Report(DatabaseToolsProgress value)
     {
         try
         {
-            writer.WriteAsync(new ProgressEnvelope(value.Processed, value.Total, value.CurrentItem), CancellationToken.None)
+            writer.WriteAsync(new ProgressMessage(value.Processed, value.Total, value.CurrentItem), CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();
         }

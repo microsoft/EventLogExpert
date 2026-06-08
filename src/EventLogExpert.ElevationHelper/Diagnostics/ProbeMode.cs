@@ -8,7 +8,7 @@ using Windows.ApplicationModel;
 namespace EventLogExpert.ElevationHelper.Diagnostics;
 
 /// <summary>
-///     Environment-probe collector. Returns a <see cref="ProbeEnvelope" /> describing facts the medium-IL parent
+///     Environment-probe collector. Returns a <see cref="ProbeMessage" /> describing facts the medium-IL parent
 ///     process cannot directly observe: this elevated process's path, integrity level, and whether packaged-app identity
 ///     is present. Used to verify that the helper actually launches AND behaves correctly when elevated from inside the
 ///     MSIX install.
@@ -21,14 +21,14 @@ namespace EventLogExpert.ElevationHelper.Diagnostics;
 /// </remarks>
 internal static class ProbeMode
 {
-    public static ProbeEnvelope Capture()
+    public static ProbeMessage Capture()
     {
         var processPath = Environment.ProcessPath ?? "(null)";
         var integrityLevel = TryGetIntegrityLevel();
 
         var (packageIdentityOk, packageIdentityError) = TryGetPackageIdentity();
 
-        return new ProbeEnvelope(
+        return new ProbeMessage(
             ProcessPath: processPath,
             IntegrityLevel: integrityLevel,
             PackageIdentityOk: packageIdentityOk,

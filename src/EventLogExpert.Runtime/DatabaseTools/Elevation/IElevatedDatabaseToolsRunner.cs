@@ -19,10 +19,10 @@ namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 /// </summary>
 /// <remarks>
 ///     Implementations spawn the packaged elevation helper EXE via <see cref="IElevatedHelperProcessHost" />, forward
-///     the request through the named-pipe IPC channel, stream incoming <c>LogEnvelope</c> / <c>ProgressEnvelope</c>
-///     records into the caller-supplied <see cref="IProgress{T}" /> sinks, await the terminal <c>ResultEnvelope</c>, and
-///     translate UAC-decline into <see cref="DatabaseToolsOutcome.Cancelled" />. Cancellation is cooperative — see
-///     <c>ElevatedDatabaseToolsRunner</c>'s remarks for the cancel envelope / 30s grace / force-kill sequence.
+///     the request through the named-pipe IPC channel, stream incoming <c>LogMessage</c> / <c>ProgressMessage</c> records
+///     into the caller-supplied <see cref="IProgress{T}" /> sinks, await the terminal <c>ResultMessage</c>, and translate
+///     UAC-decline into <see cref="DatabaseToolsOutcome.Cancelled" />. Cancellation is cooperative - see
+///     <c>ElevatedDatabaseToolsRunner</c>'s remarks for the cancel message / 30s grace / force-kill sequence.
 /// </remarks>
 public interface IElevatedDatabaseToolsRunner
 {
