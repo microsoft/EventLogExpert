@@ -24,11 +24,11 @@ internal sealed class Effects(
     private readonly SemaphoreSlim _migrationGate = new(initialCount: 1, maxCount: 1);
 
     [EffectMethod]
-    public Task HandleAddFilterToExistingFilterSet(AddFilterToExistingFilterSetAction action, IDispatcher dispatcher)
+    public async Task HandleAddFilterToExistingFilterSet(AddFilterToExistingFilterSetAction action, IDispatcher dispatcher)
     {
         var filterSet = state.Value.Entries.OfType<LibraryEntryFilterSet>().FirstOrDefault(p => p.Id == action.FilterSetId);
 
-        if (filterSet is null) { return Task.CompletedTask; }
+        if (filterSet is null) { return; }
 
         // Dedup tuple matches the SQL UNIQUE INDEX scope: (lower(ComparisonText), Mode, IsExcluded).
         // Distinct Mode values are intentional per the mode-drift policy.
@@ -41,31 +41,29 @@ internal sealed class Effects(
             f.Mode == addMode &&
             f.IsExcluded == addExcluded))
         {
-            PromoteSourceIfAutoTracked(action.SourceEntryId, dispatcher);
-            return Task.CompletedTask;
+            await PromoteSourceIfAutoTracked(action.SourceEntryId, dispatcher).ConfigureAwait(false);
+            return;
         }
 
         var newFilter = action.Filter with { Id = FilterId.Create(), IsEnabled = false };
         var updatedFilterSet = filterSet with { Filters = filterSet.Filters.Add(newFilter) };
 
-        try { store.Update(updatedFilterSet); }
+        try { await store.UpdateAsync(updatedFilterSet).ConfigureAwait(false); }
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Update (add to filter set) failed for {filterSet.Id}. {ex.Message}");
 
-            return Task.CompletedTask;
+            return;
         }
 
         dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(updatedFilterSet));
-        PromoteSourceIfAutoTracked(action.SourceEntryId, dispatcher);
-
-        return Task.CompletedTask;
+        await PromoteSourceIfAutoTracked(action.SourceEntryId, dispatcher).ConfigureAwait(false);
     }
 
     [EffectMethod]
-    public Task HandleAddFilterToNewFilterSet(AddFilterToNewFilterSetAction action, IDispatcher dispatcher)
+    public async Task HandleAddFilterToNewFilterSet(AddFilterToNewFilterSetAction action, IDispatcher dispatcher)
     {
-        if (string.IsNullOrWhiteSpace(action.NewFilterSetName)) { return Task.CompletedTask; }
+        if (string.IsNullOrWhiteSpace(action.NewFilterSetName)) { return; }
 
         var created = new LibraryEntryFilterSet
         {
@@ -75,34 +73,30 @@ internal sealed class Effects(
             Origin = LibraryEntryOrigin.UserSaved,
         };
 
-        try { store.Add(created); }
+        try { await store.AddAsync(created).ConfigureAwait(false); }
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Add (new filter set) failed for {created.Id}. {ex.Message}");
 
-            return Task.CompletedTask;
+            return;
         }
 
         dispatcher.Dispatch(new AddLibraryEntrySuccessAction(created));
-        PromoteSourceIfAutoTracked(action.SourceEntryId, dispatcher);
-
-        return Task.CompletedTask;
+        await PromoteSourceIfAutoTracked(action.SourceEntryId, dispatcher).ConfigureAwait(false);
     }
 
     [EffectMethod]
-    public Task HandleAddLibraryEntry(AddLibraryEntryAction action, IDispatcher dispatcher)
+    public async Task HandleAddLibraryEntry(AddLibraryEntryAction action, IDispatcher dispatcher)
     {
         try
         {
-            store.Add(action.Entry);
+            await store.AddAsync(action.Entry).ConfigureAwait(false);
             dispatcher.Dispatch(new AddLibraryEntrySuccessAction(action.Entry));
         }
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Add failed for entry {action.Entry.Id}. {ex.Message}");
         }
-
-        return Task.CompletedTask;
     }
 
     [EffectMethod]
@@ -121,27 +115,25 @@ internal sealed class Effects(
     }
 
     [EffectMethod]
-    public Task HandleDeleteLibraryEntry(DeleteLibraryEntryAction action, IDispatcher dispatcher)
+    public async Task HandleDeleteLibraryEntry(DeleteLibraryEntryAction action, IDispatcher dispatcher)
     {
         try
         {
-            store.Delete(action.EntryId);
+            await store.DeleteAsync(action.EntryId).ConfigureAwait(false);
             dispatcher.Dispatch(new DeleteLibraryEntrySuccessAction(action.EntryId));
         }
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Delete failed for entry {action.EntryId}. {ex.Message}");
         }
-
-        return Task.CompletedTask;
     }
 
     [EffectMethod]
-    public Task HandleDeleteTag(DeleteTagAction action, IDispatcher dispatcher)
+    public async Task HandleDeleteTag(DeleteTagAction action, IDispatcher dispatcher)
     {
         var normalized = LibraryEntryTagNormalizer.Normalize([action.Name]).FirstOrDefault();
 
-        if (string.IsNullOrEmpty(normalized)) { return Task.CompletedTask; }
+        if (string.IsNullOrEmpty(normalized)) { return; }
 
         var updatedEntries = new List<LibraryEntry>();
 
@@ -155,9 +147,7 @@ internal sealed class Effects(
             updatedEntries.Add(ReplaceTagsOnEntry(entry, canonicalTags.RemoveAt(index)));
         }
 
-        ApplyBulkTagUpdate(updatedEntries, dispatcher, count => $"Removed tag '{normalized}' from {count} {EntriesWord(count)}");
-
-        return Task.CompletedTask;
+        await ApplyBulkTagUpdate(updatedEntries, dispatcher, count => $"Removed tag '{normalized}' from {count} {EntriesWord(count)}").ConfigureAwait(false);
     }
 
     [EffectMethod(typeof(LoadLibraryAction))]
@@ -169,7 +159,7 @@ internal sealed class Effects(
 
         try
         {
-            var entries = store.LoadAll().ToImmutableList();
+            var entries = (await store.LoadAllAsync().ConfigureAwait(false)).ToImmutableList();
 
             if (legacyMigrator.ShouldRunMigration())
             {
@@ -189,7 +179,7 @@ internal sealed class Effects(
                 {
                     try
                     {
-                        store.AddRange(entriesToAdd);
+                        await store.AddRangeAsync(entriesToAdd).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
@@ -201,7 +191,7 @@ internal sealed class Effects(
 
                     try
                     {
-                        entries = store.LoadAll().ToImmutableList();
+                        entries = (await store.LoadAllAsync().ConfigureAwait(false)).ToImmutableList();
                     }
                     catch (Exception ex)
                     {
@@ -229,7 +219,7 @@ internal sealed class Effects(
 
                     foreach (var updated in plan.UpdatedEntries)
                     {
-                        try { store.Update(updated); }
+                        try { await store.UpdateAsync(updated).ConfigureAwait(false); }
                         catch (Exception ex)
                         {
                             writeFailures++;
@@ -240,7 +230,7 @@ internal sealed class Effects(
 
                     if (writeFailures < plan.UpdatedEntries.Count)
                     {
-                        try { entries = store.LoadAll().ToImmutableList(); }
+                        try { entries = (await store.LoadAllAsync().ConfigureAwait(false)).ToImmutableList(); }
                         catch (Exception ex)
                         {
                             logger.Warning($"FilterLibrary post-backslash-migration reload failed; using in-memory result. {ex.Message}");
@@ -278,25 +268,25 @@ internal sealed class Effects(
     }
 
     [EffectMethod]
-    public Task HandleRecordEntryApplied(RecordEntryAppliedAction action, IDispatcher dispatcher)
+    public async Task HandleRecordEntryApplied(RecordEntryAppliedAction action, IDispatcher dispatcher)
     {
         var entries = state.Value.Entries;
         var entry = entries.FirstOrDefault(e => e.Id == action.EntryId);
 
-        if (entry is not LibraryEntrySavedFilter || entry.IsFavorite) { return Task.CompletedTask; }
+        if (entry is not LibraryEntrySavedFilter || entry.IsFavorite) { return; }
 
         var nowUtc = DateTimeOffset.UtcNow;
         bool bumped;
 
-        try { bumped = store.TryBumpLastUsedIfNotFavorite(entry.Id, nowUtc); }
+        try { bumped = await store.TryBumpLastUsedIfNotFavoriteAsync(entry.Id, nowUtc).ConfigureAwait(false); }
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary TryBumpLastUsed failed for {entry.Id}. {ex.Message}");
 
-            return Task.CompletedTask;
+            return;
         }
 
-        if (!bumped) { return Task.CompletedTask; }
+        if (!bumped) { return; }
 
         LibraryEntry bumpedEntry = entry switch
         {
@@ -307,17 +297,15 @@ internal sealed class Effects(
 
         var projected = entries.Replace(entry, bumpedEntry);
         dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(bumpedEntry));
-        PruneFromSnapshot(projected, dispatcher);
-
-        return Task.CompletedTask;
+        await PruneFromSnapshot(projected, dispatcher).ConfigureAwait(false);
     }
 
     [EffectMethod]
-    public Task HandleRecordFilterApplied(RecordFilterAppliedAction action, IDispatcher dispatcher)
+    public async Task HandleRecordFilterApplied(RecordFilterAppliedAction action, IDispatcher dispatcher)
     {
         var filter = action.Filter;
 
-        if (string.IsNullOrWhiteSpace(filter.ComparisonText)) { return Task.CompletedTask; }
+        if (string.IsNullOrWhiteSpace(filter.ComparisonText)) { return; }
 
         var entries = state.Value.Entries;
 
@@ -330,26 +318,26 @@ internal sealed class Effects(
 
         if (existing is not null)
         {
-            if (existing.IsFavorite) { return Task.CompletedTask; }
+            if (existing.IsFavorite) { return; }
 
             var nowUtc = DateTimeOffset.UtcNow;
             bool bumped;
 
-            try { bumped = store.TryBumpLastUsedIfNotFavorite(existing.Id, nowUtc); }
+            try { bumped = await store.TryBumpLastUsedIfNotFavoriteAsync(existing.Id, nowUtc).ConfigureAwait(false); }
             catch (Exception ex)
             {
                 logger.Warning($"FilterLibrary TryBumpLastUsed failed for {existing.Id}. {ex.Message}");
-                return Task.CompletedTask;
+                return;
             }
 
-            if (!bumped) { return Task.CompletedTask; }
+            if (!bumped) { return; }
 
             var bumpedEntry = existing with { LastUsedUtc = nowUtc };
             var projected = entries.Replace(existing, bumpedEntry);
             dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(bumpedEntry));
-            PruneFromSnapshot(projected, dispatcher);
+            await PruneFromSnapshot(projected, dispatcher).ConfigureAwait(false);
 
-            return Task.CompletedTask;
+            return;
         }
 
         var candidate = new LibraryEntrySavedFilter
@@ -363,39 +351,39 @@ internal sealed class Effects(
 
         (LibraryEntry Entry, bool WasInserted) result;
 
-        try { result = store.AddOrReturnExistingFilter(candidate); }
+        try { result = await store.AddOrReturnExistingFilterAsync(candidate).ConfigureAwait(false); }
         catch (Exception ex)
         {
             logger.Warning(
                 $"FilterLibrary AddOrReturnExistingFilter failed for '{filter.ComparisonText}'. {ex.Message}");
 
-            return Task.CompletedTask;
+            return;
         }
 
         if (result.WasInserted)
         {
             var projected = entries.Add(candidate);
             dispatcher.Dispatch(new AddLibraryEntrySuccessAction(candidate));
-            PruneFromSnapshot(projected, dispatcher);
+            await PruneFromSnapshot(projected, dispatcher).ConfigureAwait(false);
 
-            return Task.CompletedTask;
+            return;
         }
 
-        if (result.Entry.IsFavorite) { return Task.CompletedTask; }
+        if (result.Entry.IsFavorite) { return; }
 
         var collisionNowUtc = DateTimeOffset.UtcNow;
         bool collisionBumped;
 
-        try { collisionBumped = store.TryBumpLastUsedIfNotFavorite(result.Entry.Id, collisionNowUtc); }
+        try { collisionBumped = await store.TryBumpLastUsedIfNotFavoriteAsync(result.Entry.Id, collisionNowUtc).ConfigureAwait(false); }
         catch (Exception ex)
         {
             logger.Warning(
                 $"FilterLibrary TryBumpLastUsed (collision path) failed for {result.Entry.Id}. {ex.Message}");
 
-            return Task.CompletedTask;
+            return;
         }
 
-        if (!collisionBumped) { return Task.CompletedTask; }
+        if (!collisionBumped) { return; }
 
         var collisionEntry = (LibraryEntrySavedFilter)result.Entry with { LastUsedUtc = collisionNowUtc };
         var existingIndex = entries.FindIndex(e => e.Id == collisionEntry.Id);
@@ -404,20 +392,18 @@ internal sealed class Effects(
             : entries.Add(collisionEntry);
 
         dispatcher.Dispatch(new AddLibraryEntrySuccessAction(collisionEntry));
-        PruneFromSnapshot(collisionProjected, dispatcher);
-
-        return Task.CompletedTask;
+        await PruneFromSnapshot(collisionProjected, dispatcher).ConfigureAwait(false);
     }
 
     [EffectMethod]
-    public Task HandleRenameTag(RenameTagAction action, IDispatcher dispatcher)
+    public async Task HandleRenameTag(RenameTagAction action, IDispatcher dispatcher)
     {
         var oldNormalized = LibraryEntryTagNormalizer.Normalize([action.OldName]).FirstOrDefault();
         var newNormalized = LibraryEntryTagNormalizer.Normalize([action.NewName]).FirstOrDefault();
 
         if (string.IsNullOrEmpty(oldNormalized) ||
             string.IsNullOrEmpty(newNormalized) ||
-            string.Equals(oldNormalized, newNormalized, StringComparison.Ordinal)) { return Task.CompletedTask; }
+            string.Equals(oldNormalized, newNormalized, StringComparison.Ordinal)) { return; }
 
         var updatedEntries = new List<LibraryEntry>();
 
@@ -436,9 +422,7 @@ internal sealed class Effects(
             updatedEntries.Add(ReplaceTagsOnEntry(entry, updatedTags));
         }
 
-        ApplyBulkTagUpdate(updatedEntries, dispatcher, count => $"Renamed tag '{oldNormalized}' to '{newNormalized}' in {count} {EntriesWord(count)}");
-
-        return Task.CompletedTask;
+        await ApplyBulkTagUpdate(updatedEntries, dispatcher, count => $"Renamed tag '{oldNormalized}' to '{newNormalized}' in {count} {EntriesWord(count)}").ConfigureAwait(false);
     }
 
     [EffectMethod]
@@ -556,19 +540,17 @@ internal sealed class Effects(
     }
 
     [EffectMethod]
-    public Task HandleUpdateLibraryEntry(UpdateLibraryEntryAction action, IDispatcher dispatcher)
+    public async Task HandleUpdateLibraryEntry(UpdateLibraryEntryAction action, IDispatcher dispatcher)
     {
         try
         {
-            store.Update(action.Entry);
+            await store.UpdateAsync(action.Entry).ConfigureAwait(false);
             dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(action.Entry));
         }
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Update failed for entry {action.Entry.Id}. {ex.Message}");
         }
-
-        return Task.CompletedTask;
     }
 
     private static ImmutableList<LibraryEntry> DedupMigrationEntriesAgainstExisting(
@@ -624,7 +606,7 @@ internal sealed class Effects(
         return text[..cut] + "...";
     }
 
-    private void ApplyBulkTagUpdate(
+    private async Task ApplyBulkTagUpdate(
         IReadOnlyList<LibraryEntry> updatedEntries,
         IDispatcher dispatcher,
         Func<int, string> buildAnnouncement)
@@ -635,7 +617,7 @@ internal sealed class Effects(
 
         try
         {
-            updatedIds = store.UpdateRange(updatedEntries);
+            updatedIds = await store.UpdateRangeAsync(updatedEntries).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -674,36 +656,32 @@ internal sealed class Effects(
         announcementService.Announce(buildAnnouncement(updatedIds.Count));
     }
 
-    private Task PersistAddAsync(LibraryEntry entry, IDispatcher dispatcher)
+    private async Task PersistAddAsync(LibraryEntry entry, IDispatcher dispatcher)
     {
-        try { store.Add(entry); }
+        try { await store.AddAsync(entry).ConfigureAwait(false); }
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Add failed for {entry.Id}. {ex.Message}");
-            return Task.CompletedTask;
+            return;
         }
 
         dispatcher.Dispatch(new AddLibraryEntrySuccessAction(entry));
-
-        return Task.CompletedTask;
     }
 
-    private Task PersistUpdateAsync(LibraryEntry entry, IDispatcher dispatcher)
+    private async Task PersistUpdateAsync(LibraryEntry entry, IDispatcher dispatcher)
     {
-        try { store.Update(entry); }
+        try { await store.UpdateAsync(entry).ConfigureAwait(false); }
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Update failed for {entry.Id}. {ex.Message}");
 
-            return Task.CompletedTask;
+            return;
         }
 
         dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(entry));
-
-        return Task.CompletedTask;
     }
 
-    private void PromoteSourceIfAutoTracked(LibraryEntryId? sourceEntryId, IDispatcher dispatcher)
+    private async Task PromoteSourceIfAutoTracked(LibraryEntryId? sourceEntryId, IDispatcher dispatcher)
     {
         if (sourceEntryId is not { } id) { return; }
 
@@ -718,7 +696,7 @@ internal sealed class Effects(
             _ => source,
         };
 
-        try { store.Update(promoted); }
+        try { await store.UpdateAsync(promoted).ConfigureAwait(false); }
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Update (promote source) failed for {promoted.Id}. {ex.Message}");
@@ -729,7 +707,7 @@ internal sealed class Effects(
         dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(promoted));
     }
 
-    private void PruneFromSnapshot(ImmutableList<LibraryEntry> snapshot, IDispatcher dispatcher)
+    private async Task PruneFromSnapshot(ImmutableList<LibraryEntry> snapshot, IDispatcher dispatcher)
     {
         var autoTrackedRecents = snapshot
             .OfType<LibraryEntrySavedFilter>()
@@ -751,7 +729,7 @@ internal sealed class Effects(
             // (Origin=UserSaved or IsFavorite=true) after the snapshot was projected.
             bool deleted;
 
-            try { deleted = store.TryDeleteAutoTrackedIfNotFavorite(entry.Id); }
+            try { deleted = await store.TryDeleteAutoTrackedIfNotFavoriteAsync(entry.Id).ConfigureAwait(false); }
             catch (Exception ex)
             {
                 logger.Warning($"FilterLibrary TryDeleteAutoTrackedIfNotFavorite (prune) failed for {entry.Id}. {ex.Message}");

@@ -60,7 +60,7 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
 
         await effects.HandleLoadLibrary(dispatcher);
 
-        Assert.Empty(realStore.LoadAll());
+        Assert.Empty(await realStore.LoadAllAsync(TestContext.Current.CancellationToken));
         Assert.True(prefs.ContainsKey(FavoriteFiltersKey));
         Assert.False(prefs.ContainsKey(MigrationSectionsKey));
         dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.IsEmpty));
@@ -91,7 +91,7 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
         await effects.HandleLoadLibrary(dispatcher);
 
         spyMigrator.Received(2).BuildEntriesFromLegacy();
-        Assert.Empty(store.LoadAll());
+        Assert.Empty(await store.LoadAllAsync(TestContext.Current.CancellationToken));
         Assert.Equal("4", prefs.GetString(MigrationSectionsKey));
     }
 
@@ -118,7 +118,7 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
         await Task.WhenAll(t1, t2);
 
         spyMigrator.Received(1).BuildEntriesFromLegacy();
-        var loaded = store.LoadAll();
+        var loaded = await store.LoadAllAsync(TestContext.Current.CancellationToken);
         Assert.Single(loaded);
         dispatcher.Received(2).Dispatch(Arg.Any<LoadLibrarySuccessAction>());
     }
@@ -154,7 +154,7 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
         // Both loads invoke the migrator because ShouldRunMigration stays true while Groups remains unmigrated.
         spyMigrator.Received(2).BuildEntriesFromLegacy();
         // Favorite migrated exactly once (dedup prevents duplicate on retry).
-        Assert.Single(store.LoadAll());
+        Assert.Single(await store.LoadAllAsync(TestContext.Current.CancellationToken));
         // Bitmask: Favorites (1) | Recents (4) = 5; Groups (2) stays unset because the JSON is still corrupt.
         Assert.Equal("5", prefs.GetString(MigrationSectionsKey));
         // Corrupt Groups JSON preserved for future fix attempt.
@@ -187,7 +187,7 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
 
         await effects.HandleLoadLibrary(dispatcher);
 
-        var loaded = store.LoadAll();
+        var loaded = await store.LoadAllAsync(TestContext.Current.CancellationToken);
         Assert.Equal(3, loaded.Count);
         var favorites = loaded.OfType<LibraryEntrySavedFilter>().ToList();
         Assert.Equal(2, favorites.Count);
@@ -271,25 +271,25 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
 
     private sealed class ThrowingAddRangeStoreWrapper(IFilterLibraryStore inner) : IFilterLibraryStore
     {
-        public void Add(LibraryEntry entry) => inner.Add(entry);
+        public Task AddAsync(LibraryEntry entry, CancellationToken cancellationToken = default) => inner.AddAsync(entry, cancellationToken);
 
-        public (LibraryEntry Entry, bool WasInserted) AddOrReturnExistingFilter(LibraryEntrySavedFilter candidate) =>
-            inner.AddOrReturnExistingFilter(candidate);
+        public Task<(LibraryEntry Entry, bool WasInserted)> AddOrReturnExistingFilterAsync(LibraryEntrySavedFilter candidate, CancellationToken cancellationToken = default) =>
+            inner.AddOrReturnExistingFilterAsync(candidate, cancellationToken);
 
-        public void AddRange(IEnumerable<LibraryEntry> entries) => throw new SqliteException("simulated AddRange failure", 1);
+        public Task AddRangeAsync(IEnumerable<LibraryEntry> entries, CancellationToken cancellationToken = default) => throw new SqliteException("simulated AddRange failure", 1);
 
-        public void Delete(LibraryEntryId entryId) => inner.Delete(entryId);
+        public Task DeleteAsync(LibraryEntryId entryId, CancellationToken cancellationToken = default) => inner.DeleteAsync(entryId, cancellationToken);
 
-        public IReadOnlyList<LibraryEntry> LoadAll() => inner.LoadAll();
+        public Task<IReadOnlyList<LibraryEntry>> LoadAllAsync(CancellationToken cancellationToken = default) => inner.LoadAllAsync(cancellationToken);
 
-        public bool TryBumpLastUsedIfNotFavorite(LibraryEntryId entryId, DateTimeOffset lastUsedUtc) =>
-            inner.TryBumpLastUsedIfNotFavorite(entryId, lastUsedUtc);
+        public Task<bool> TryBumpLastUsedIfNotFavoriteAsync(LibraryEntryId entryId, DateTimeOffset lastUsedUtc, CancellationToken cancellationToken = default) =>
+            inner.TryBumpLastUsedIfNotFavoriteAsync(entryId, lastUsedUtc, cancellationToken);
 
-        public bool TryDeleteAutoTrackedIfNotFavorite(LibraryEntryId entryId) =>
-            inner.TryDeleteAutoTrackedIfNotFavorite(entryId);
+        public Task<bool> TryDeleteAutoTrackedIfNotFavoriteAsync(LibraryEntryId entryId, CancellationToken cancellationToken = default) =>
+            inner.TryDeleteAutoTrackedIfNotFavoriteAsync(entryId, cancellationToken);
 
-        public void Update(LibraryEntry entry) => inner.Update(entry);
+        public Task UpdateAsync(LibraryEntry entry, CancellationToken cancellationToken = default) => inner.UpdateAsync(entry, cancellationToken);
 
-        public IReadOnlyList<LibraryEntryId> UpdateRange(IReadOnlyList<LibraryEntry> entries) => inner.UpdateRange(entries);
+        public Task<IReadOnlyList<LibraryEntryId>> UpdateRangeAsync(IReadOnlyList<LibraryEntry> entries, CancellationToken cancellationToken = default) => inner.UpdateRangeAsync(entries, cancellationToken);
     }
 }
