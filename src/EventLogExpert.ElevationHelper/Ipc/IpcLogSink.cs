@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.Common.Ipc;
-using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Logging.Abstractions;
 
 namespace EventLogExpert.ElevationHelper.Ipc;
@@ -35,27 +34,6 @@ internal sealed class IpcLogSink(IpcMessageWriter writer) : IProgress<LogRecord>
         catch
         {
             // Pipe closed mid-write (runner gone). Drop the entry; the runner has already moved on.
-        }
-    }
-}
-
-/// <summary>
-///     Helper-side <see cref="IProgress{T}" /> implementation for <see cref="DatabaseToolsProgress" />. Same contract
-///     as <see cref="IpcLogSink" />.
-/// </summary>
-internal sealed class IpcProgressSink(IpcMessageWriter writer) : IProgress<DatabaseToolsProgress>
-{
-    public void Report(DatabaseToolsProgress value)
-    {
-        try
-        {
-            writer.WriteAsync(new ProgressMessage(value.Processed, value.Total, value.CurrentItem), CancellationToken.None)
-                .GetAwaiter()
-                .GetResult();
-        }
-        catch
-        {
-            // Pipe closed mid-write (runner gone). Drop the report.
         }
     }
 }
