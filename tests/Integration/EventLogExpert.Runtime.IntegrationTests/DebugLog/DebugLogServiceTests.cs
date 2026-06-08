@@ -209,6 +209,24 @@ public sealed class DebugLogServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task DisposeAsync_ShouldCleanupWithoutError()
+    {
+        // Arrange
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+
+        var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
+        TraceAtLevel(debugLogService, "before dispose", LogLevel.Information);
+
+        // Act - DisposeAsync should complete without throwing and release the log-file handle
+        var exception = await Record.ExceptionAsync(async () => await debugLogService.DisposeAsync());
+
+        // Assert
+        Assert.Null(exception);
+        Assert.Null(Record.Exception(() => File.Delete(_testLogPath)));
+    }
+
+    [Fact]
     public async Task LoadAsync_WhenLogFileDeletedDuringRead_ShouldAllowDeletion()
     {
         // Arrange
@@ -328,37 +346,6 @@ public sealed class DebugLogServiceTests : IDisposable
 
         // Assert updated
         Assert.Equal(LogLevel.Warning, debugLogService.MinimumLevel);
-    }
-
-    [Fact]
-    public void TraceIfEnabled_WhenLogLevelChangedAtRuntime_ShouldRespectNewLevel()
-    {
-        // Arrange
-        var (mockSettingsService, setLogLevel) = CreateMockSettingsServiceWithDynamicLogLevel(LogLevel.Debug);
-
-        using var debugLogService = new DebugLogService(
-            new FileLocationOptions(_testDirectory),
-            mockSettingsService);
-
-        // Act - write at Debug (should succeed)
-        debugLogService.Debug($"debug message before change");
-        var contentBefore = ReadLogFile();
-        Assert.Contains("debug message before change", contentBefore);
-
-        // Change level to Warning
-        setLogLevel(LogLevel.Warning);
-
-        // Write at Debug (should be filtered by handler)
-        debugLogService.Debug($"debug message after change");
-
-        // Write at Warning (should succeed)
-        debugLogService.Warning($"warning message after change");
-
-        // Assert
-        var content = ReadLogFile();
-        Assert.Contains("debug message before change", content);
-        Assert.DoesNotContain("debug message after change", content);
-        Assert.Contains("warning message after change", content);
     }
 
     [Fact]
@@ -613,6 +600,37 @@ public sealed class DebugLogServiceTests : IDisposable
         var content = ReadLogFile();
         Assert.Contains("[Information]", content);
         Assert.Contains(Constants.DebugLogDefaultLevelMessage, content);
+    }
+
+    [Fact]
+    public void TraceIfEnabled_WhenLogLevelChangedAtRuntime_ShouldRespectNewLevel()
+    {
+        // Arrange
+        var (mockSettingsService, setLogLevel) = CreateMockSettingsServiceWithDynamicLogLevel(LogLevel.Debug);
+
+        using var debugLogService = new DebugLogService(
+            new FileLocationOptions(_testDirectory),
+            mockSettingsService);
+
+        // Act - write at Debug (should succeed)
+        debugLogService.Debug($"debug message before change");
+        var contentBefore = ReadLogFile();
+        Assert.Contains("debug message before change", contentBefore);
+
+        // Change level to Warning
+        setLogLevel(LogLevel.Warning);
+
+        // Write at Debug (should be filtered by handler)
+        debugLogService.Debug($"debug message after change");
+
+        // Write at Warning (should succeed)
+        debugLogService.Warning($"warning message after change");
+
+        // Assert
+        var content = ReadLogFile();
+        Assert.Contains("debug message before change", content);
+        Assert.DoesNotContain("debug message after change", content);
+        Assert.Contains("warning message after change", content);
     }
 
     [Fact]

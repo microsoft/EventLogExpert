@@ -12,7 +12,7 @@ using System.Text;
 
 namespace EventLogExpert.Runtime.DebugLog;
 
-internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable
+internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, IAsyncDisposable
 {
     private const long MaxLogSize = 10 * 1024 * 1024;
 
@@ -24,6 +24,7 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable
     private readonly Lock _writeLock = new();
 
     private volatile LogLevel _cachedLogLevel;
+    private bool _disposed;
     private StreamWriter? _writer;
 
     public DebugLogService(FileLocationOptions fileLocationOptions, ISettingsService settings)
@@ -46,6 +47,8 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable
     {
         using (_writeLock.EnterScope())
         {
+            if (_disposed) { return Task.CompletedTask; }
+
             CloseWriter();
 
             WithInterprocessLock(
@@ -82,14 +85,35 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable
 
     public void Dispose()
     {
-        AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
-
-        _settings.LogLevelChanged -= OnLogLevelChanged;
+        DetachEvents();
 
         using (_writeLock.EnterScope())
         {
+            if (_disposed) { return; }
+
+            _disposed = true;
             CloseWriter();
         }
+
+        _interprocessMutex.Dispose();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        DetachEvents();
+
+        StreamWriter? writer;
+
+        using (_writeLock.EnterScope())
+        {
+            if (_disposed) { return; }
+
+            _disposed = true;
+            writer = _writer;
+            _writer = null;
+        }
+
+        if (writer is not null) { await writer.DisposeAsync(); }
 
         _interprocessMutex.Dispose();
     }
@@ -174,6 +198,12 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable
         _writer = null;
     }
 
+    private void DetachEvents()
+    {
+        AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
+        _settings.LogLevelChanged -= OnLogLevelChanged;
+    }
+
     private void EnsureWriter()
     {
         if (_writer is not null) { return; }
@@ -249,6 +279,8 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable
     {
         using (_writeLock.EnterScope())
         {
+            if (_disposed) { return; }
+
             string output = $"[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}";
 
             EnsureWriter();
