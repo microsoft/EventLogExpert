@@ -46,6 +46,19 @@ public sealed class JsModuleInteropTests
     }
 
     [Fact]
+    public async Task DisposeModuleSafelyAsync_PreDisposeThrowsUnexpected_Propagates()
+    {
+        var module = Substitute.For<IJSObjectReference>();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await JsModuleInterop.DisposeModuleSafelyAsync(
+                module,
+                _ => ValueTask.FromException(new InvalidOperationException("unexpected"))));
+
+        await module.DidNotReceive().DisposeAsync();
+    }
+
+    [Fact]
     public async Task DisposeModuleSafelyAsync_PropagatesUnexpectedException()
     {
         var module = Substitute.For<IJSObjectReference>();

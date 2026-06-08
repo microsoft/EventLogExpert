@@ -20,9 +20,23 @@ internal sealed class IpcMessageWriter(Stream destination) : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        try { await _writer.FlushAsync(); } catch { /* best effort during dispose */ }
-        await _writer.DisposeAsync();
-        _writeLock.Dispose();
+        // Acquire the write lock first so any in-flight WriteAsync completes before we tear the
+        // writer down. Concurrent writers blocked on the semaphore are intentionally drained by
+        // the runner's grace-then-kill ordering; if a writer is genuinely stuck we still want
+        // disposal to make progress, so this wait is unbounded by design (the helper process
+        // is about to exit either way).
+        await _writeLock.WaitAsync().ConfigureAwait(false);
+
+        try
+        {
+            try { await _writer.FlushAsync(); } catch { /* best effort during dispose */ }
+            await _writer.DisposeAsync();
+        }
+        finally
+        {
+            _writeLock.Release();
+            _writeLock.Dispose();
+        }
     }
 
     public async Task WriteAsync(DatabaseToolsIpcMessage message, CancellationToken cancellationToken)
