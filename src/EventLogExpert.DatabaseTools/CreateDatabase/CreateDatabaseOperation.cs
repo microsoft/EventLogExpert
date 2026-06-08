@@ -151,7 +151,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
         catch (Exception ex)
         {
-            // Any non-cancellation, non-regex-timeout failure (e.g., EF/SQLite errors mid-save) — no stub .db.
+            // Any non-cancellation, non-regex-timeout failure (e.g., EF/SQLite errors mid-save) - no stub .db.
             logger.Error($"Unexpected error creating database: {ex.Message}");
             await CleanupPartialDatabaseAsync(logger, dbContext, request.TargetPath);
             dbContext = null;

@@ -387,7 +387,7 @@ public sealed class DebugLogServiceTests : IDisposable
     [Fact]
     public async Task Trace_WhenCalledFromMultipleThreadsConcurrently_ShouldProduceOrderedAndCompleteOutput()
     {
-        // Arrange — exercises the writer's synchronization boundary: timestamp capture, prefix formatting,
+        // Arrange - exercises the writer's synchronization boundary: timestamp capture, prefix formatting,
         // and the underlying StreamWriter call all happen INSIDE _writeLock.EnterScope(). A regression that
         // moves any of those steps back outside the lock will surface as either (a) interleaved/garbled
         // lines that fail to parse, (b) timestamps that go backwards within the file, or (c) lost or
@@ -429,7 +429,7 @@ public sealed class DebugLogServiceTests : IDisposable
         foreach (var line in lines)
         {
             // Use the production parser directly so the test enforces the actual producer/consumer
-            // contract — if the prefix shape changes in DebugLogService.WriteTrace, the parser's
+            // contract - if the prefix shape changes in DebugLogService.WriteTrace, the parser's
             // regex changes alongside it, and this assertion follows automatically.
             Assert.True(
                 DebugLogEntryParser.TryParseLine(line, out var entry),

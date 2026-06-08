@@ -14,7 +14,7 @@ namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 /// <summary>
 ///     Runner facade for executing a DatabaseTools operation in an elevated child process. Mirrors the
 ///     <see cref="IDatabaseToolsService" /> shape so a tab's dispatch site can choose between in-process (medium-IL)
-///     execution and elevated (high-IL) execution by selecting one of the two facades — same request types, same outcome
+///     execution and elevated (high-IL) execution by selecting one of the two facades - same request types, same outcome
 ///     record, same streaming-log/progress callbacks.
 /// </summary>
 /// <remarks>

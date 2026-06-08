@@ -14,8 +14,8 @@ using System.Diagnostics;
 namespace EventLogExpert.UI.DatabaseTools.Tabs;
 
 /// <summary>
-///     Shared base for the five DatabaseTools tab components. Captures the cross-tab plumbing — run/cancel/cancelling
-///     state, log streaming, outcome handling, verbose-cascading-parameter, and the <c>RunAsync</c> dispatch shell — so
+///     Shared base for the five DatabaseTools tab components. Captures the cross-tab plumbing - run/cancel/cancelling
+///     state, log streaming, outcome handling, verbose-cascading-parameter, and the <c>RunAsync</c> dispatch shell - so
 ///     each concrete tab only has to express the operation-specific request shape, validation, and service call.
 /// </summary>
 /// <typeparam name="TRequest">
@@ -60,7 +60,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     public void CancelIfRunning()
     {
         try { Cts?.Cancel(); }
-        catch (ObjectDisposedException) { /* Already disposed — nothing to cancel. */ }
+        catch (ObjectDisposedException) { /* Already disposed - nothing to cancel. */ }
     }
 
     public virtual void Dispose()
@@ -80,7 +80,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     /// <summary>
     ///     Thread-safe log-entry append. Buffers entries on a 50ms flush window so a high-rate operation
     ///     (Create/Merge/Diff can emit thousands of entries) renders in one batch per window instead of per entry. Safe to
-    ///     invoke after <see cref="Dispose" /> — late Progress-sink callbacks (e.g., the operation completing after the user
+    ///     invoke after <see cref="Dispose" /> - late Progress-sink callbacks (e.g., the operation completing after the user
     ///     closes the modal) are dropped silently rather than throwing <see cref="ObjectDisposedException" />.
     /// </summary>
     protected void AppendEntry(LogRecord entry)
@@ -145,7 +145,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     protected abstract TRequest BuildRequest();
 
     /// <summary>
-    ///     Marks the active run as cancelling and signals the token. The visible button switches to "Cancelling…" until
+    ///     Marks the active run as cancelling and signals the token. The visible button switches to "Cancelling..." until
     ///     the operation observes cancellation and the <c>finally</c> in <see cref="RunAsync" /> clears state.
     /// </summary>
     protected void CancelRun()
@@ -180,16 +180,16 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     }
 
     /// <summary>
-    ///     Convenience for tabs that have a Browse… button next to a path field. Returns the picked path (or <c>null</c>
-    ///     if cancelled) without mutating state — the caller decides which field to update.
+    ///     Convenience for tabs that have a Browse... button next to a path field. Returns the picked path (or <c>null</c>
+    ///     if cancelled) without mutating state - the caller decides which field to update.
     /// </summary>
     protected Task<string?> PickFileAsync(string pickerTitle, IReadOnlyList<string> extensions) =>
         FilePickerService.PickAsync(pickerTitle, extensions);
 
     /// <summary>
-    ///     Convenience for tabs whose Browse… button picks a SAVE destination (i.e. a path that doesn't have to exist
+    ///     Convenience for tabs whose Browse... button picks a SAVE destination (i.e. a path that doesn't have to exist
     ///     yet). The dialog prompts before overwriting existing files. Returns the picked path (or <c>null</c> if cancelled)
-    ///     without mutating state — the caller decides which field to update.
+    ///     without mutating state - the caller decides which field to update.
     /// </summary>
     protected Task<string?> PickSaveFileAsync(string pickerTitle, IReadOnlyList<string> extensions, string? suggestedFileName = null) =>
         FilePickerService.PickSaveAsync(pickerTitle, extensions, suggestedFileName);
