@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.DiffDatabase;
+using EventLogExpert.Logging.Abstractions;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.DatabaseTools.Tabs;
@@ -26,7 +27,7 @@ public sealed partial class DiffDatabasesTab : DatabaseToolsTabBase<DiffDatabase
 
     protected override Task<DatabaseToolsResult> DispatchAsync(
         DiffDatabaseRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         CancellationToken cancellationToken) =>
         DatabaseToolsService.DiffAsync(request, logSink, progress: null, cancellationToken, VerboseLogging);
 

@@ -52,7 +52,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 return DatabaseToolsOutcome.Failed;
             }
 
-            foreach (var name in ProviderSource.LoadProviderNames(request.SkipProvidersInFile, logger))
+            foreach (var name in await ProviderSource.LoadProviderNamesAsync(request.SkipProvidersInFile, logger, cancellationToken: cancellationToken))
             {
                 skipProviderNames.Add(name);
             }
@@ -74,11 +74,11 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
         try
         {
-            IEnumerable<ProviderDetails> providersToAdd = request.SourcePath is null
-                ? LoadLocalProviders(logger, filterRegex, skipProviderNames)
-                : ProviderSource.LoadProviders(request.SourcePath, logger, filterRegex, skipProviderNames);
+            IAsyncEnumerable<ProviderDetails> providersToAdd = request.SourcePath is null
+                ? LoadLocalProvidersAsync(logger, filterRegex, skipProviderNames, cancellationToken)
+                : ProviderSource.LoadProvidersAsync(request.SourcePath, logger, filterRegex, skipProviderNames, cancellationToken: cancellationToken);
 
-            foreach (var details in providersToAdd)
+            await foreach (var details in providersToAdd.WithCancellation(cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -136,25 +136,31 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
         catch (OperationCanceledException)
         {
-            CleanupPartialDatabase(logger, ref dbContext, request.TargetPath);
+            await CleanupPartialDatabaseAsync(logger, dbContext, request.TargetPath);
+            dbContext = null;
+
             return DatabaseToolsOutcome.Cancelled;
         }
         catch (RegexMatchTimeoutException)
         {
             logger.Error($"The provider-name regex timed out. The pattern may cause catastrophic backtracking.");
-            CleanupPartialDatabase(logger, ref dbContext, request.TargetPath);
+            await CleanupPartialDatabaseAsync(logger, dbContext, request.TargetPath);
+            dbContext = null;
+
             return DatabaseToolsOutcome.Failed;
         }
         catch (Exception ex)
         {
             // Any non-cancellation, non-regex-timeout failure (e.g., EF/SQLite errors mid-save) — no stub .db.
             logger.Error($"Unexpected error creating database: {ex.Message}");
-            CleanupPartialDatabase(logger, ref dbContext, request.TargetPath);
+            await CleanupPartialDatabaseAsync(logger, dbContext, request.TargetPath);
+            dbContext = null;
+
             return DatabaseToolsOutcome.Failed;
         }
         finally
         {
-            dbContext?.Dispose();
+            if (dbContext is not null) { await dbContext.DisposeAsync(); }
         }
     }
 

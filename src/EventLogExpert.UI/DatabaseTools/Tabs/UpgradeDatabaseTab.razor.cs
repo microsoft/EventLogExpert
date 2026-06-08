@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
+using EventLogExpert.Logging.Abstractions;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.DatabaseTools.Tabs;
@@ -19,7 +20,7 @@ public sealed partial class UpgradeDatabaseTab : DatabaseToolsTabBase<UpgradeDat
 
     protected override Task<DatabaseToolsResult> DispatchAsync(
         UpgradeDatabaseRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         CancellationToken cancellationToken) =>
         DatabaseToolsService.UpgradeAsync(request, logSink, progress: null, cancellationToken, VerboseLogging);
 

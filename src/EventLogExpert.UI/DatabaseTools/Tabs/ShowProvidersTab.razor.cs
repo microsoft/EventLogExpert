@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.ShowProviders;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using Microsoft.AspNetCore.Components;
@@ -40,7 +41,7 @@ public sealed partial class ShowProvidersTab : DatabaseToolsTabBase<ShowProvider
 
     protected override Task<DatabaseToolsResult> DispatchAsync(
         ShowProvidersRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         CancellationToken cancellationToken) =>
         DatabaseToolsService.ShowAsync(request, logSink, progress: null, cancellationToken, VerboseLogging);
 

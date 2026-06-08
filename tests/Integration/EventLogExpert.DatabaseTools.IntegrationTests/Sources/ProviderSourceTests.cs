@@ -29,7 +29,7 @@ public sealed class ProviderSourceTests : IDisposable
     }
 
     [Fact]
-    public void ValidateSourceSchemas_WithCurrentSchemaDatabase_ReturnsTrue()
+    public async Task ValidateSourceSchemas_WithCurrentSchemaDatabase_ReturnsTrue()
     {
         // Arrange
         var dbPath = CreateTempDb();
@@ -37,7 +37,7 @@ public sealed class ProviderSourceTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        var result = ProviderSource.ValidateSourceSchemas(dbPath, logger);
+        var result = await ProviderSource.ValidateSourceSchemasAsync(dbPath, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(result);
@@ -45,9 +45,9 @@ public sealed class ProviderSourceTests : IDisposable
     }
 
     [Fact]
-    public void ValidateSourceSchemas_WithDirectoryContainingAnyInvalidDatabase_ReturnsFalse()
+    public async Task ValidateSourceSchemas_WithDirectoryContainingAnyInvalidDatabase_ReturnsFalse()
     {
-        // Arrange — one valid, one Unknown shape. The whole directory must fail.
+        // Arrange - one valid, one Unknown shape. The whole directory must fail.
         var dir = CreateTempDir();
         var good = Path.Combine(dir, "good.db");
         var bad = Path.Combine(dir, "bad.db");
@@ -56,7 +56,7 @@ public sealed class ProviderSourceTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        var result = ProviderSource.ValidateSourceSchemas(dir, logger);
+        var result = await ProviderSource.ValidateSourceSchemasAsync(dir, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.False(result);
@@ -66,9 +66,9 @@ public sealed class ProviderSourceTests : IDisposable
     }
 
     [Fact]
-    public void ValidateSourceSchemas_WithDirectoryMixingDbAndEvtx_OnlyValidatesDb()
+    public async Task ValidateSourceSchemas_WithDirectoryMixingDbAndEvtx_OnlyValidatesDb()
     {
-        // Arrange — only the .db files participate in schema validation; the evtx is ignored.
+        // Arrange - only the .db files participate in schema validation; the evtx is ignored.
         var dir = CreateTempDir();
         var dbPath = Path.Combine(dir, "valid.db");
         var evtxPath = Path.Combine(dir, "ignored.evtx");
@@ -77,7 +77,7 @@ public sealed class ProviderSourceTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        var result = ProviderSource.ValidateSourceSchemas(dir, logger);
+        var result = await ProviderSource.ValidateSourceSchemasAsync(dir, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(result);
@@ -85,7 +85,7 @@ public sealed class ProviderSourceTests : IDisposable
     }
 
     [Fact]
-    public void ValidateSourceSchemas_WithDirectoryOfValidDatabases_ReturnsTrue()
+    public async Task ValidateSourceSchemas_WithDirectoryOfValidDatabases_ReturnsTrue()
     {
         // Arrange
         var dir = CreateTempDir();
@@ -96,7 +96,7 @@ public sealed class ProviderSourceTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        var result = ProviderSource.ValidateSourceSchemas(dir, logger);
+        var result = await ProviderSource.ValidateSourceSchemasAsync(dir, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(result);
@@ -104,16 +104,16 @@ public sealed class ProviderSourceTests : IDisposable
     }
 
     [Fact]
-    public void ValidateSourceSchemas_WithEvtxFile_IsSkipped()
+    public async Task ValidateSourceSchemas_WithEvtxFile_IsSkipped()
     {
-        // Arrange — .evtx files have no schema concept; ValidateSourceSchemas should ignore them
+        // Arrange - .evtx files have no schema concept; ValidateSourceSchemas should ignore them
         // entirely (the evtx-specific load path goes through MtaProviderSource elsewhere).
         var evtxPath = CreateTempPath(".evtx");
         File.WriteAllBytes(evtxPath, new byte[] { 0x00 });
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        var result = ProviderSource.ValidateSourceSchemas(evtxPath, logger);
+        var result = await ProviderSource.ValidateSourceSchemasAsync(evtxPath, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(result);
@@ -121,7 +121,7 @@ public sealed class ProviderSourceTests : IDisposable
     }
 
     [Fact]
-    public void ValidateSourceSchemas_WithObsoleteV3Database_ReturnsFalseAndLogsError()
+    public async Task ValidateSourceSchemas_WithObsoleteV3Database_ReturnsFalseAndLogsError()
     {
         // Arrange
         var dbPath = CreateTempDb();
@@ -129,7 +129,7 @@ public sealed class ProviderSourceTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        var result = ProviderSource.ValidateSourceSchemas(dbPath, logger);
+        var result = await ProviderSource.ValidateSourceSchemasAsync(dbPath, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.False(result);
@@ -140,7 +140,7 @@ public sealed class ProviderSourceTests : IDisposable
     }
 
     [Fact]
-    public void ValidateSourceSchemas_WithUnknownSchemaDatabase_ReturnsFalseAndLogsError()
+    public async Task ValidateSourceSchemas_WithUnknownSchemaDatabase_ReturnsFalseAndLogsError()
     {
         // Arrange
         var dbPath = CreateTempDb();
@@ -148,7 +148,7 @@ public sealed class ProviderSourceTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        var result = ProviderSource.ValidateSourceSchemas(dbPath, logger);
+        var result = await ProviderSource.ValidateSourceSchemasAsync(dbPath, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.False(result);

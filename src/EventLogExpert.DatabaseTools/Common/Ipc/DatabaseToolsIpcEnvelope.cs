@@ -60,7 +60,7 @@ public sealed record ProbeEnvelope(
     string? LocalProviderEnumerationError,
     int LocalProviderCount) : DatabaseToolsIpcEnvelope;
 
-/// <summary>Streamed log entry from a helper-side operation. Mirrors <see cref="DatabaseToolsLogEntry" /> contents.</summary>
+/// <summary>Streamed log entry from a helper-side operation. Mirrors <see cref="LogRecord" /> contents.</summary>
 /// <param name="TimestampUtc">When the entry was emitted.</param>
 /// <param name="Level">Severity level.</param>
 /// <param name="Message">Materialized message text.</param>

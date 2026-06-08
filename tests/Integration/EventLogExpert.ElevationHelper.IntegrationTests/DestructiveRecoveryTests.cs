@@ -6,6 +6,7 @@ using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.DatabaseTools.DiffDatabase;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using EventLogExpert.ElevationHelper.IntegrationTests.TestUtils;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 
 namespace EventLogExpert.ElevationHelper.IntegrationTests;
@@ -25,7 +26,7 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         try
         {
@@ -56,7 +57,7 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         try
         {
@@ -89,7 +90,7 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         try
         {
@@ -129,7 +130,7 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         try
         {
@@ -161,7 +162,7 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         try
         {
@@ -198,7 +199,7 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         try
         {
@@ -231,7 +232,7 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         try
         {

@@ -81,7 +81,9 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         ArgumentNullException.ThrowIfNull(traceLogger);
 
         if (helloTimeout <= TimeSpan.Zero) { throw new ArgumentOutOfRangeException(nameof(helloTimeout), helloTimeout, "Must be positive."); }
+
         if (cancellationGrace <= TimeSpan.Zero) { throw new ArgumentOutOfRangeException(nameof(cancellationGrace), cancellationGrace, "Must be positive."); }
+
         if (exitGrace <= TimeSpan.Zero) { throw new ArgumentOutOfRangeException(nameof(exitGrace), exitGrace, "Must be positive."); }
 
         _host = host;
@@ -91,19 +93,19 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         _exitGrace = exitGrace;
     }
 
-    public Task<DatabaseToolsResult> CreateAsync(CreateDatabaseRequest request, IProgress<DatabaseToolsLogEntry> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
+    public Task<DatabaseToolsResult> CreateAsync(CreateDatabaseRequest request, IProgress<LogRecord> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
         => RunAsync(new CreateDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
 
-    public Task<DatabaseToolsResult> DiffAsync(DiffDatabaseRequest request, IProgress<DatabaseToolsLogEntry> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
+    public Task<DatabaseToolsResult> DiffAsync(DiffDatabaseRequest request, IProgress<LogRecord> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
         => RunAsync(new DiffDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
 
-    public Task<DatabaseToolsResult> MergeAsync(MergeDatabaseRequest request, IProgress<DatabaseToolsLogEntry> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
+    public Task<DatabaseToolsResult> MergeAsync(MergeDatabaseRequest request, IProgress<LogRecord> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
         => RunAsync(new MergeDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
 
-    public Task<DatabaseToolsResult> ShowAsync(ShowProvidersRequest request, IProgress<DatabaseToolsLogEntry> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
+    public Task<DatabaseToolsResult> ShowAsync(ShowProvidersRequest request, IProgress<LogRecord> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
         => RunAsync(new ShowProvidersIpcRequest(request, verbose), logSink, progress, cancellationToken);
 
-    public Task<DatabaseToolsResult> UpgradeAsync(UpgradeDatabaseRequest request, IProgress<DatabaseToolsLogEntry> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
+    public Task<DatabaseToolsResult> UpgradeAsync(UpgradeDatabaseRequest request, IProgress<LogRecord> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
         => RunAsync(new UpgradeDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
 
     private static async Task DrainPipeAsync(Stream pipe, ChannelWriter<DatabaseToolsIpcEnvelope> writer, CancellationToken cancellationToken)
@@ -134,6 +136,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 }
 
                 if (line is null) { break; }
+
                 if (string.IsNullOrWhiteSpace(line)) { continue; }
 
                 DatabaseToolsIpcEnvelope envelope;
@@ -271,6 +274,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 {
                     _traceLogger.Error($"{ElevatedHelperTag} Fatal stack: {f.StackTrace}");
                 }
+
                 break;
 
             case ProbeEnvelope p:
@@ -280,15 +284,12 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             case CancelEnvelope:
                 _traceLogger.Warning($"{ElevatedHelperTag} (unexpected) CancelEnvelope received from helper. CancelEnvelope is a runner-to-helper control message; helpers must not emit it.");
                 break;
-
-            // LogEnvelope and ProgressEnvelope: intentionally not mirrored — operation output flows only to
-            // the caller's IProgress<> sinks (modal log view), matching the non-elevated path.
         }
     }
 
     private async Task<DatabaseToolsResult> RunAsync(
         DatabaseToolsIpcRequest request,
-        IProgress<DatabaseToolsLogEntry> logSink,
+        IProgress<LogRecord> logSink,
         IProgress<DatabaseToolsProgress>? progressSink,
         CancellationToken cancellationToken)
     {
@@ -431,7 +432,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                     switch (envelope)
                     {
                         case LogEnvelope log:
-                            SafeReport(logSink, new DatabaseToolsLogEntry(log.TimestampUtc, log.Level, log.Message));
+                            SafeReport(logSink, new LogRecord(log.TimestampUtc, log.Level, log.Message));
                             break;
 
                         case ProgressEnvelope prog when progressSink is not null:
@@ -452,7 +453,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             }
             finally
             {
-                cancelRegistration.Dispose();
+                await cancelRegistration.DisposeAsync();
             }
 
             // Helper sent a terminal envelope (or pipe closed). Cancel the kill-timer so it doesn't fire on a clean finish.

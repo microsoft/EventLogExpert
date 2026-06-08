@@ -22,8 +22,8 @@ internal sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Opera
     {
         if (!ProviderSource.TryValidate(request.FirstSourcePath, logger) ||
             !ProviderSource.TryValidate(request.SecondSourcePath, logger) ||
-            !ProviderSource.ValidateSourceSchemas(request.FirstSourcePath, logger) ||
-            !ProviderSource.ValidateSourceSchemas(request.SecondSourcePath, logger))
+            !await ProviderSource.ValidateSourceSchemasAsync(request.FirstSourcePath, logger, cancellationToken) ||
+            !await ProviderSource.ValidateSourceSchemasAsync(request.SecondSourcePath, logger, cancellationToken))
         {
             return DatabaseToolsOutcome.Failed;
         }
@@ -43,7 +43,7 @@ internal sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Opera
         }
 
         var firstProviderNames = new HashSet<string>(
-            ProviderSource.LoadProviderNames(request.FirstSourcePath, logger),
+            await ProviderSource.LoadProviderNamesAsync(request.FirstSourcePath, logger, cancellationToken: cancellationToken),
             StringComparer.OrdinalIgnoreCase);
 
         var providersCopied = new List<ProviderDetails>();
@@ -55,10 +55,11 @@ internal sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Opera
 
         try
         {
-            foreach (var details in ProviderSource.LoadProviders(request.SecondSourcePath,
+            await foreach (var details in ProviderSource.LoadProvidersAsync(request.SecondSourcePath,
                 logger,
                 regex: null,
-                skipProviderNames: firstProviderNames))
+                skipProviderNames: firstProviderNames,
+                cancellationToken: cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -97,19 +98,23 @@ internal sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Opera
         }
         catch (OperationCanceledException)
         {
-            CleanupPartialDatabase(logger, ref newDbContext, request.NewDatabasePath);
+            await CleanupPartialDatabaseAsync(logger, newDbContext, request.NewDatabasePath);
+            newDbContext = null;
+
             return DatabaseToolsOutcome.Cancelled;
         }
         catch (Exception ex)
         {
             // Any non-cancellation failure (e.g., EF/SQLite errors mid-save) — no stub .db.
             logger.Error($"Unexpected error diffing databases: {ex.Message}");
-            CleanupPartialDatabase(logger, ref newDbContext, request.NewDatabasePath);
+            await CleanupPartialDatabaseAsync(logger, newDbContext, request.NewDatabasePath);
+            newDbContext = null;
+
             return DatabaseToolsOutcome.Failed;
         }
         finally
         {
-            newDbContext?.Dispose();
+            if (newDbContext is not null) { await newDbContext.DisposeAsync(); }
         }
     }
 }

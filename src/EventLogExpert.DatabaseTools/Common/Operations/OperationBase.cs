@@ -7,6 +7,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.ProviderDatabase.Context;
 using Microsoft.Data.Sqlite;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.DatabaseTools.Common.Operations;
@@ -25,21 +26,22 @@ internal abstract class OperationBase
     ///     Cleans up a partially-created .db file after an operation aborts (cancellation, fatal exception). EF Core's
     ///     SqliteConnection pool keeps the file handle alive across <c>DbContext.Dispose</c>, so a naive <c>File.Delete</c>
     ///     hits a sharing violation on Windows. Mirrors the codebase pattern at
-    ///     <c>ProviderDatabaseMaintenance.PrepareForFileDeletion()</c>: dispose context → clear pool → best-effort delete.
-    ///     Sets the ref-context to <c>null</c> after dispose so the calling <c>finally</c> arm's <c>dbContext?.Dispose()</c>
-    ///     is a safe no-op. Best-effort: catches <see cref="IOException" /> and <see cref="UnauthorizedAccessException" />
-    ///     with a logger.Warning so the user has signal if the partial file persists.
+    ///     <c>ProviderDatabaseMaintenance.PrepareForFileDeletion()</c>: dispose context, clear pool, best-effort delete.
+    ///     Callers pass the context by value and null their own local afterward so the surrounding <c>finally</c> does not
+    ///     dispose twice. Best-effort: catches <see cref="IOException" /> and <see cref="UnauthorizedAccessException" /> with
+    ///     a logger.Warning so the user has signal if the partial file persists.
     /// </summary>
-    protected static void CleanupPartialDatabase(
+    protected static async Task CleanupPartialDatabaseAsync(
         ITraceLogger logger,
-        ref ProviderDbContext? dbContext,
+        ProviderDbContext? dbContext,
         string targetPath)
     {
-        dbContext?.Dispose();
-        dbContext = null;
+        if (dbContext is not null) { await dbContext.DisposeAsync(); }
+
         if (!File.Exists(targetPath)) { return; }
 
         SqliteConnection.ClearAllPools();
+
         try { File.Delete(targetPath); }
         catch (IOException ex)
         {
@@ -84,13 +86,21 @@ internal abstract class OperationBase
     ///     Yields <see cref="ProviderDetails" /> for each local provider, applying the optional regex filter and skip set
     ///     before metadata is resolved.
     /// </summary>
-    protected static IEnumerable<ProviderDetails> LoadLocalProviders(
+    protected static async IAsyncEnumerable<ProviderDetails> LoadLocalProvidersAsync(
         ITraceLogger logger,
         Regex? regex,
-        IReadOnlySet<string>? skipProviderNames = null)
+        IReadOnlySet<string>? skipProviderNames = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        // Local-provider resolution is synchronous (registry/metadata reads). This wrapper exposes it as an
+        // IAsyncEnumerable so callers can stream local and file-source providers through one await foreach; the
+        // await keeps it a valid async iterator without scheduling an extra continuation.
+        await Task.CompletedTask;
+
         foreach (var providerName in GetLocalProviderNames(regex))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (skipProviderNames is not null && skipProviderNames.Contains(providerName)) { continue; }
 
             yield return new EventMessageProvider(providerName, logger: logger).LoadProviderDetails();
@@ -104,6 +114,7 @@ internal abstract class OperationBase
     protected void LogProviderDetailHeader(ITraceLogger logger, IEnumerable<string> providerNames)
     {
         var maxNameLength = providerNames.Any() ? providerNames.Max(p => p.Length) : 14;
+
         if (maxNameLength < 14) { maxNameLength = 14; }
 
         _providerDetailFormat = "{0, -" + maxNameLength + "} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8} {6, 8}";

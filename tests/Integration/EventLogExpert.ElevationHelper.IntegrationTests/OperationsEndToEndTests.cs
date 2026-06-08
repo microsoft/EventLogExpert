@@ -8,6 +8,7 @@ using EventLogExpert.DatabaseTools.MergeDatabase;
 using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using EventLogExpert.ElevationHelper.IntegrationTests.TestUtils;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 
 namespace EventLogExpert.ElevationHelper.IntegrationTests;
@@ -24,7 +25,7 @@ public sealed class OperationsEndToEndTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         try
         {
@@ -54,7 +55,7 @@ public sealed class OperationsEndToEndTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         try
         {
@@ -91,7 +92,7 @@ public sealed class OperationsEndToEndTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         try
         {
@@ -125,7 +126,7 @@ public sealed class OperationsEndToEndTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         var result = await runner.ShowAsync(
             new ShowProvidersRequest(SourcePath: null, FilterRegex: null),
@@ -147,7 +148,7 @@ public sealed class OperationsEndToEndTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+        var logSink = new ListProgress<LogRecord>();
 
         try
         {
