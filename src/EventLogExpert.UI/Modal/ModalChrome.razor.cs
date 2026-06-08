@@ -3,6 +3,7 @@
 
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.UI.Banner;
+using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 

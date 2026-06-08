@@ -5,6 +5,7 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
+using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
@@ -102,8 +103,8 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
             {
                 await _jsModule.InvokeVoidAsync("detach", _logViewRef);
             }
-            catch (JSDisconnectedException) { /* Circuit gone — listener already implicitly detached. */ }
-            catch (JSException) { /* detach() unavailable in legacy module — best-effort cleanup. */ }
+            catch (JSDisconnectedException) { /* Circuit gone - listener already implicitly detached. */ }
+            catch (JSException) { /* detach() unavailable in legacy module - best-effort cleanup. */ }
 
             await JsModuleInterop.DisposeModuleSafelyAsync(_jsModule);
 
@@ -154,8 +155,8 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
                 await _jsModule.InvokeVoidAsync("attach", _logViewRef, _selfRef);
                 _lastRenderedCount = Entries.Count;
             }
-            catch (JSDisconnectedException) { /* Closed mid-import — ignore. */ }
-            catch (JSException) { /* Stale module/ref — best-effort attach. */ }
+            catch (JSDisconnectedException) { /* Closed mid-import - ignore. */ }
+            catch (JSException) { /* Stale module/ref - best-effort attach. */ }
 
             return;
         }
@@ -183,7 +184,7 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
                 {
                     await _jsModule.InvokeVoidAsync("scrollToBottom", _logViewRef);
                 }
-                catch (JSDisconnectedException) { /* Circuit gone — ignore. */ }
+                catch (JSDisconnectedException) { /* Circuit gone - ignore. */ }
             }
         }
     }
@@ -246,6 +247,6 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
         {
             await _jsModule.InvokeVoidAsync("scrollToBottom", _logViewRef);
         }
-        catch (JSDisconnectedException) { /* Circuit gone — ignore. */ }
+        catch (JSDisconnectedException) { /* Circuit gone - ignore. */ }
     }
 }

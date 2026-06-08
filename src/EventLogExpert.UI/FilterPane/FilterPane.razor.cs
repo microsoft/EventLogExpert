@@ -15,6 +15,7 @@ using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Modal;
@@ -110,7 +111,7 @@ public sealed partial class FilterPane
         {
             AnnouncementService.Announce(FilterPaneAnnouncements.LoadingTryAgain);
             CancelFilterSetPicker();
-            
+
             return;
         }
 
@@ -122,7 +123,7 @@ public sealed partial class FilterPane
             SelectedFilterSetId = filterSets
                 .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
                 .FirstOrDefault()?.Id ?? default;
-            
+
             return;
         }
 

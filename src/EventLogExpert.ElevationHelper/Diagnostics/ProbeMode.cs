@@ -5,7 +5,7 @@ using EventLogExpert.DatabaseTools.Common.Ipc;
 using System.Security.Principal;
 using Windows.ApplicationModel;
 
-namespace EventLogExpert.ElevationHelper;
+namespace EventLogExpert.ElevationHelper.Diagnostics;
 
 /// <summary>
 ///     Environment-probe collector. Returns a <see cref="ProbeEnvelope" /> describing facts the medium-IL parent
@@ -14,7 +14,7 @@ namespace EventLogExpert.ElevationHelper;
 ///     MSIX install.
 /// </summary>
 /// <remarks>
-///     The probe deliberately skips the local-provider enumeration check — that requires either the custom
+///     The probe deliberately skips the local-provider enumeration check - that requires either the custom
 ///     <c>EventLogExpert.Eventing.Readers.EventLogSession</c> (which transitively pulls Eventing/Provider into the helper)
 ///     or a direct EvtOpenSession P/Invoke. Either path is more risk than value at smoke-test time; the integrity-level +
 ///     package-identity facts are the meaningful diagnostics.
@@ -34,7 +34,7 @@ internal static class ProbeMode
             PackageIdentityOk: packageIdentityOk,
             PackageIdentityError: packageIdentityError,
             LocalProviderEnumerationOk: false,
-            LocalProviderEnumerationError: "Skipped in Phase 0 — see ProbeMode remarks.",
+            LocalProviderEnumerationError: "Skipped in Phase 0 - see ProbeMode remarks.",
             LocalProviderCount: 0);
     }
 

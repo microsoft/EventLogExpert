@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Basic;
+using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Filtering.Evaluation;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
@@ -120,7 +121,7 @@ public sealed record SavedFilter
         {
             // Try fresh decompose first (canonical, drift-resistant). When that refuses, fall back to the persisted
             // blob if the caller supplied one. This means hand-edited / partial-write JSON whose Mode=Basic but
-            // BasicFilter blob is missing still gets a recovery attempt — without it the row would reopen with an
+            // BasicFilter blob is missing still gets a recovery attempt - without it the row would reopen with an
             // empty Basic editor while the raw text stays hidden, and the next save would silently wipe the text.
             if (BasicFilterDecomposer.TryDecompose(text, out var fresh))
             {

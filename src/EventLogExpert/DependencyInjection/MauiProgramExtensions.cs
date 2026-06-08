@@ -24,7 +24,7 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Alerts;
-using EventLogExpert.WindowsPlatform;
+using EventLogExpert.WindowsPlatform.Activation;
 
 namespace EventLogExpert.DependencyInjection;
 

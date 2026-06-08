@@ -16,6 +16,7 @@ using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Common.Interop;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -60,7 +61,7 @@ public sealed partial class LogTablePane
     private ResolvedEvent? _selectedEvent;
     private ImmutableList<ResolvedEvent> _selectedEvents = [];
     private HashSet<ResolvedEvent> _selectedSet = new(ReferenceEqualityComparer.Instance);
-    // The fixed end of a range selection — set on plain click, Ctrl+Click,
+    // The fixed end of a range selection - set on plain click, Ctrl+Click,
     // and any keyboard nav that establishes a single selection. Reused for
     // Shift+Click and Shift+Arrow to compute the range.
     private ResolvedEvent? _selectionAnchor;
@@ -158,7 +159,7 @@ public sealed partial class LogTablePane
 
                 if (measured > 0) { _pageSize = measured; }
             }
-            catch (JSDisconnectedException) { /* Circuit gone — fall back to default page size. */ }
+            catch (JSDisconnectedException) { /* Circuit gone - fall back to default page size. */ }
             catch (Exception e)
             {
                 TraceLogger.Warning($"Failed to measure table page size, using default {DefaultPageSize}: {e}");
@@ -298,7 +299,7 @@ public sealed partial class LogTablePane
         {
             if (ReferenceEquals(evt, candidate)) { return evt; }
 
-            // Skip key-based matching when either side has no RecordId —
+            // Skip key-based matching when either side has no RecordId -
             // null == null is true for nullable longs, which would falsely
             // collapse distinct error-read events that share TimeCreated.
             if (evt.RecordId is null || candidate.RecordId is null) { continue; }
@@ -433,7 +434,7 @@ public sealed partial class LogTablePane
         {
             if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("focusEventTableRow", index); }
         }
-        catch (JSDisconnectedException) { /* Circuit gone — focus best-effort during teardown. */ }
+        catch (JSDisconnectedException) { /* Circuit gone - focus best-effort during teardown. */ }
         catch (Exception e)
         {
             TraceLogger.Warning($"Failed to focus active table row: {e}");
@@ -760,7 +761,7 @@ public sealed partial class LogTablePane
     private void ResortSelectionForCurrentTable()
     {
         // Re-publish the current selection in the new sort order. The dispatch
-        // is idempotent — ReduceSetSelectedEvents short-circuits when both the
+        // is idempotent - ReduceSetSelectedEvents short-circuits when both the
         // selection and active event are unchanged by reference, so this is
         // safe to call after every DisplayedEvents reference change.
         DispatchSetSelection(_selectedEvents, _localCursor ?? _selectedEvent);
@@ -769,7 +770,7 @@ public sealed partial class LogTablePane
     private async Task ScrollToSelectedEvent()
     {
         // Target the active event (focused row) rather than the last selected
-        // event — selection is now in sort order, so "last in selection" no
+        // event - selection is now in sort order, so "last in selection" no
         // longer corresponds to "the row the user is interacting with".
         var target = _localCursor ?? _selectedEvent ?? _selectedEvents.LastOrDefault();
 
@@ -779,7 +780,7 @@ public sealed partial class LogTablePane
 
         if (displayedEvents.Count == 0) { return; }
 
-        // Match on OwningLog (the per-source identifier — file path for
+        // Match on OwningLog (the per-source identifier - file path for
         // exported logs, channel name for live logs) in addition to LogName
         // and RecordId so we don't scroll to a value-equal row from a
         // different open log when multiple sources share the same channel

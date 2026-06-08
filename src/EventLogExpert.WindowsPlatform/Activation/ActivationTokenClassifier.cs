@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.WindowsPlatform;
+namespace EventLogExpert.WindowsPlatform.Activation;
 
 public static class ActivationTokenClassifier
 {
@@ -46,7 +46,7 @@ public static class ActivationTokenClassifier
             }
             catch (Exception)
             {
-                // Per-token isolation — drop bad tokens, keep classifying the rest.
+                // Per-token isolation - drop bad tokens, keep classifying the rest.
             }
         }
 

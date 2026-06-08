@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.WindowsPlatform;
+namespace EventLogExpert.WindowsPlatform.Activation;
 
 public static class EvtxFolderEnumerator
 {

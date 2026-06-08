@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.Menu;
+using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
@@ -36,14 +37,14 @@ public sealed partial class MenuHost : IAsyncDisposable
 
         _disposed = true;
 
-        // Unsubscribe BEFORE Close() — Close() synchronously raises StateChanged,
+        // Unsubscribe BEFORE Close() - Close() synchronously raises StateChanged,
         // which would re-enter OnStateChanged and queue an InvokeAsync that runs
         // after dispose completes.
         MenuService.StateChanged -= OnStateChanged;
         Registry.ActiveHostChanged -= OnActiveHostChanged;
 
         // Close on live MenuService state, not on the queued-lambda-mutated
-        // _focusedMenuId — that mirror can lag the singleton when dispose
+        // _focusedMenuId - that mirror can lag the singleton when dispose
         // races a fresh OpenAt.
         if (IsActive && MenuService.ActiveItems is not null)
         {
@@ -75,7 +76,7 @@ public sealed partial class MenuHost : IAsyncDisposable
             return;
         }
 
-        // Re-clamp every render — popup is hidden until clampMenuPopup reveals it within the viewport.
+        // Re-clamp every render - popup is hidden until clampMenuPopup reveals it within the viewport.
         if (MenuService.ActiveItems is not null)
         {
             try { await (await GetMenuOverlayAsync()).InvokeVoidAsync("clampMenuPopup", _popupElement); }
@@ -129,7 +130,7 @@ public sealed partial class MenuHost : IAsyncDisposable
         // active topmost host owns the menu lifecycle.
         if (_disposed || !IsActive) { return; }
 
-        // StateChanged may fire from arbitrary threads — marshal through the renderer dispatcher.
+        // StateChanged may fire from arbitrary threads - marshal through the renderer dispatcher.
         _ = InvokeAsync(async () =>
         {
             if (_disposed || !IsActive) { return; }

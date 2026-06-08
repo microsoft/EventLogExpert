@@ -9,7 +9,7 @@ using EventLogExpert.DatabaseTools.MergeDatabase;
 using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
 
-namespace EventLogExpert.ElevationHelper;
+namespace EventLogExpert.ElevationHelper.Operations;
 
 /// <summary>
 ///     Wraps an operation dispatch with destructive-recovery semantics specific to each request type. Runs ENTIRELY
@@ -22,7 +22,7 @@ namespace EventLogExpert.ElevationHelper;
 ///             <c>CreateDatabaseOperation</c> / <c>DiffDatabaseOperation</c> fail-fast with <c>Failed</c> when the output
 ///             path already exists (preserving the user's existing file) and self-clean their own partials via
 ///             <c>OperationBase.CleanupPartialDatabase</c> on cancellation / runtime failure. A second-layer wrapper here
-///             would delete the pre-existing file on the "already-exists" Failed path — data loss the operations
+///             would delete the pre-existing file on the "already-exists" Failed path - data loss the operations
 ///             themselves take care to avoid.
 ///         </item>
 ///         <item>
@@ -36,7 +36,7 @@ namespace EventLogExpert.ElevationHelper;
 ///             an EF transaction (MergeDatabaseOperation.cs:108) that rolls back on cancellation via
 ///             dispose-without-commit.
 ///         </item>
-///         <item><see cref="ShowProvidersRequest" />: read-only — no cleanup needed.</item>
+///         <item><see cref="ShowProvidersRequest" />: read-only - no cleanup needed.</item>
 ///     </list>
 ///     The Upgrade wrapper inspects <see cref="DatabaseToolsResult.Outcome" /> rather than relying on
 ///     <see cref="OperationCanceledException" /> because <c>DatabaseToolsService</c> catches that exception internally and
@@ -132,7 +132,7 @@ internal static class DestructiveRecovery
         }
         catch (Exception ex)
         {
-            return AppendToSummary(result, $"Restore from backup failed: {ex.GetType().Name}: {ex.Message}. Backup remains at {backupPath} — rename manually to recover.");
+            return AppendToSummary(result, $"Restore from backup failed: {ex.GetType().Name}: {ex.Message}. Backup remains at {backupPath} - rename manually to recover.");
         }
     }
 }

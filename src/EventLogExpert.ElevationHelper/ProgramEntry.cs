@@ -3,6 +3,9 @@
 
 using EventLogExpert.DatabaseTools.Common.Ipc;
 using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.ElevationHelper.Diagnostics;
+using EventLogExpert.ElevationHelper.Ipc;
+using EventLogExpert.ElevationHelper.Operations;
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
@@ -13,14 +16,14 @@ namespace EventLogExpert.ElevationHelper;
 ///     Entry point of the elevation helper. Two production-relevant invocation modes:
 ///     <list type="bullet">
 ///         <item>
-///             <c>--pipe &lt;name&gt; --probe</c> — connect to the host's duplex named pipe, emit a Hello, then a Probe
+///             <c>--pipe &lt;name&gt; --probe</c> - connect to the host's duplex named pipe, emit a Hello, then a Probe
 ///             (environment diagnostics: process path, integrity level, package-identity status), then a Succeeded Result.
 ///             Exits 0. Manual diagnostic facility for verifying that a packaged helper still launches correctly after a
 ///             deploy (no in-tree caller, but invokable via direct <c>ShellExecute("runas")</c> + a one-off named-pipe
 ///             listener to re-validate the elevation path post-update).
 ///         </item>
 ///         <item>
-///             <c>--pipe &lt;name&gt;</c> (no <c>--probe</c>) — operation mode. Reads a
+///             <c>--pipe &lt;name&gt;</c> (no <c>--probe</c>) - operation mode. Reads a
 ///             <see cref="DatabaseToolsIpcRequest" /> from the pipe, dispatches via <see cref="OperationDispatcher" /> +
 ///             <see cref="DestructiveRecovery" />, streams Log/Progress envelopes during execution, emits a terminal
 ///             Result envelope, exits 0.
@@ -168,7 +171,7 @@ internal static class ProgramEntry
             // PipeOptions.CurrentUserOnly is INTENTIONALLY OMITTED on the client side. It triggers
             // NamedPipeClientStream.ValidateRemotePipeUser() which compares the server's pipe owner SID against
             // the client's current-user SID. For an elevated client connecting to a medium-IL server (same user,
-            // different token), the comparison fails with UnauthorizedAccessException — the limited-token SID
+            // different token), the comparison fails with UnauthorizedAccessException - the limited-token SID
             // attached to the server pipe is not bit-identical to the full-token SID the elevated client uses.
             // Authentication is still safe: the SERVER pipe has CurrentUserOnly (DACL restricted to same user)
             // AND the server PID-verifies the connected client via GetNamedPipeClientProcessId.
@@ -231,7 +234,7 @@ internal static class ProgramEntry
             $"eventlogexpert-elevated-crash-{Environment.ProcessId}-{DateTime.UtcNow:yyyyMMddTHHmmssfff}.log");
 
         var content = new StringBuilder();
-        content.AppendLine("EventLogExpert elevation helper — crash log");
+        content.AppendLine("EventLogExpert elevation helper - crash log");
         content.AppendLine("============================================");
         content.AppendLine($"Timestamp UTC : {DateTime.UtcNow:O}");
         content.AppendLine($"Process Id    : {Environment.ProcessId}");
@@ -269,7 +272,7 @@ internal sealed record HelperArgs(string? PipeName, bool Probe)
                     probe = true;
 
                     break;
-                // Unknown args: ignore.
+                    // Unknown args: ignore.
             }
         }
 

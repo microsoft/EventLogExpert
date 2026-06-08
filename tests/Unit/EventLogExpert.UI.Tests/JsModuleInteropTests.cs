@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common.Interop;
 using Microsoft.JSInterop;
 using NSubstitute;
 

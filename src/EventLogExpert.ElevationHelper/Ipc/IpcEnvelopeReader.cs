@@ -6,7 +6,7 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 
-namespace EventLogExpert.ElevationHelper;
+namespace EventLogExpert.ElevationHelper.Ipc;
 
 /// <summary>
 ///     Helper-side reader for the incoming direction of the duplex IPC pipe. Reads line-delimited JSON envelopes OR a
