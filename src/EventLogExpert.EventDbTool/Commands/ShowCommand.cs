@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.ShowProviders;
-using EventLogExpert.EventDbTool.Commands.Support;
 using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
@@ -46,7 +46,14 @@ public class ShowCommand
             await using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
             var logger = sp.GetRequiredService<ITraceLogger>();
 
-            if (!FilterRegexFactory.TryCreate(action.GetValue(filterOption), logger, out var regex)) { return; }
+            var filterValue = action.GetValue(filterOption);
+
+            if (!FilterRegexFactory.TryCreate(filterValue, out var regex, out var error))
+            {
+                logger.Error($"Invalid --filter regex '{filterValue}': {error}");
+
+                return;
+            }
 
             var request = new ShowProvidersRequest(action.GetValue(sourceArgument), regex);
 
