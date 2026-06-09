@@ -15,15 +15,24 @@ namespace EventLogExpert.ElevationHelper.Ipc;
 internal sealed class IpcMessageWriter(Stream destination) : IAsyncDisposable
 {
     private static readonly UTF8Encoding s_utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
+
     private readonly SemaphoreSlim _writeLock = new(initialCount: 1, maxCount: 1);
     private readonly StreamWriter _writer = new(destination, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { NewLine = "\n", AutoFlush = false };
-    private bool _disposed;
+
+    private volatile bool _disposed;
 
     public async ValueTask DisposeAsync()
     {
         if (_disposed) { return; }
 
-        await _writeLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await _writeLock.WaitAsync().ConfigureAwait(false);
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
 
         try
         {
@@ -31,13 +40,13 @@ internal sealed class IpcMessageWriter(Stream destination) : IAsyncDisposable
 
             _disposed = true;
 
-            try { await _writer.FlushAsync(); } catch { /* best effort during dispose */ }
-            await _writer.DisposeAsync();
+            try { await _writer.FlushAsync().ConfigureAwait(false); } catch { /* best effort during dispose */ }
+
+            await _writer.DisposeAsync().ConfigureAwait(false);
         }
         finally
         {
-            _writeLock.Release();
-            _writeLock.Dispose();
+            try { _writeLock.Release(); } catch (ObjectDisposedException) { }
         }
     }
 
@@ -49,11 +58,10 @@ internal sealed class IpcMessageWriter(Stream destination) : IAsyncDisposable
 
         try
         {
-            await _writeLock.WaitAsync(cancellationToken);
+            await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (ObjectDisposedException)
         {
-            // Lock was disposed by a concurrent DisposeAsync; writer is gone, drop the write.
             return;
         }
 
@@ -61,12 +69,12 @@ internal sealed class IpcMessageWriter(Stream destination) : IAsyncDisposable
         {
             if (_disposed) { return; }
 
-            await _writer.WriteLineAsync(json.AsMemory(), cancellationToken);
-            await _writer.FlushAsync(cancellationToken);
+            await _writer.WriteLineAsync(json.AsMemory(), cancellationToken).ConfigureAwait(false);
+            await _writer.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            try { _writeLock.Release(); } catch (ObjectDisposedException) { /* disposed between WaitAsync and Release */ }
+            try { _writeLock.Release(); } catch (ObjectDisposedException) { }
         }
     }
 }

@@ -488,8 +488,9 @@ internal sealed class Effects(
         if (entry is null || entry.IsFavorite == action.IsFavorite) { return Task.CompletedTask; }
 
         var setIsFavorite = action.IsFavorite;
+        var unfavoriteTimestamp = DateTimeOffset.UtcNow;
 
-        return PersistAndDispatchAsync(action.EntryId, e => ApplyFavoriteToggle(e, setIsFavorite), dispatcher);
+        return PersistAndDispatchAsync(action.EntryId, e => ApplyFavoriteToggle(e, setIsFavorite, unfavoriteTimestamp), dispatcher);
     }
 
     [EffectMethod]
@@ -512,7 +513,7 @@ internal sealed class Effects(
         _ => entry,
     };
 
-    private static LibraryEntry ApplyFavoriteToggle(LibraryEntry entry, bool isFavorite)
+    private static LibraryEntry ApplyFavoriteToggle(LibraryEntry entry, bool isFavorite, DateTimeOffset unfavoriteTimestamp)
     {
         if (isFavorite)
         {
@@ -541,7 +542,7 @@ internal sealed class Effects(
             LibraryEntrySavedFilter f => f with
             {
                 IsFavorite = false,
-                LastUsedUtc = DateTimeOffset.UtcNow,
+                LastUsedUtc = unfavoriteTimestamp,
             },
             LibraryEntryFilterSet p => p with
             {
@@ -731,7 +732,24 @@ internal sealed class Effects(
             return;
         }
 
-        DispatchUpdateWithLatestSnapshot(id, mutate, dispatcher);
+        var latest = state.Value.Entries.FirstOrDefault(e => e.Id == id);
+
+        if (latest is null) { return; }
+
+        var latestMutated = mutate(latest);
+
+        if (!ReferenceEquals(latest, snapshot))
+        {
+            try { await store.UpdateAsync(latestMutated).ConfigureAwait(false); }
+            catch (Exception ex)
+            {
+                logger.Warning($"FilterLibrary Update (re-issue against latest snapshot) failed for {id}. {ex.Message}");
+
+                return;
+            }
+        }
+
+        dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(latestMutated));
     }
 
     private Task PromoteSourceIfAutoTracked(LibraryEntryId? sourceEntryId, IDispatcher dispatcher)
