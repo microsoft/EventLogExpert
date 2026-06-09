@@ -7,7 +7,6 @@ public sealed class ProviderDetails
 {
     private IReadOnlyList<EventModel> _events = [];
     private Dictionary<long, List<EventModel>>? _eventsByIdLookup;
-    private Func<long, MessageModel?>? _getParameterByRawIdDelegate;
     private IReadOnlyList<MessageModel> _messages = [];
     private Dictionary<int, List<MessageModel>>? _messagesByShortIdLookup;
     private IReadOnlyList<MessageModel> _parameters = [];
@@ -56,7 +55,6 @@ public sealed class ProviderDetails
         {
             _parameters = value;
             _parametersByRawIdLookup = null;
-            _getParameterByRawIdDelegate = null;
         }
     }
 
@@ -65,9 +63,6 @@ public sealed class ProviderDetails
     public string? ResolvedFromOwningPublisher { get; set; }
 
     public IDictionary<int, string> Tasks { get; set; } = new Dictionary<int, string>();
-
-    internal Func<long, MessageModel?> GetParameterByRawIdDelegate =>
-        _getParameterByRawIdDelegate ??= GetParameterByRawId;
 
     /// <summary>Gets events matching the given Id using a pre-built lookup dictionary.</summary>
     public IReadOnlyList<EventModel> GetEventsById(long id)
@@ -92,7 +87,7 @@ public sealed class ProviderDetails
     ///     Gets the first parameter message with the given RawId, or null when none matches. Duplicate RawIds resolve
     ///     first-wins.
     /// </summary>
-    internal MessageModel? GetParameterByRawId(long rawId)
+    public MessageModel? GetParameterByRawId(long rawId)
     {
         _parametersByRawIdLookup ??= BuildParametersByRawIdLookup();
 
