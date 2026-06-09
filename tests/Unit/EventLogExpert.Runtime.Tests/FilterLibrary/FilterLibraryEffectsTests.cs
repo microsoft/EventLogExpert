@@ -1530,6 +1530,25 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
+    public async Task HandleSaveEntry_ReprojectsOriginOntoLatestSnapshot_NotPreAwaitSnapshot()
+    {
+        var staleEntry = BuildFilterEntry("OldName") with { Origin = LibraryEntryOrigin.AutoTracked };
+        var renamedEntry = (LibraryEntrySavedFilter)staleEntry with { Name = "NewName" };
+        var staleState = new FilterLibraryState { Entries = [staleEntry] };
+        var renamedState = new FilterLibraryState { Entries = [renamedEntry] };
+        var (effects, _, dispatcher, stateMock, _) = CreateEffects(state: staleState);
+
+        stateMock.Value.Returns(staleState, staleState, renamedState);
+
+        await effects.HandleSaveEntry(new SaveEntryAction(staleEntry.Id), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a =>
+            a.Entry.Id == staleEntry.Id &&
+            a.Entry.Name == "NewName" &&
+            a.Entry.Origin == LibraryEntryOrigin.UserSaved));
+    }
+
+    [Fact]
     public async Task HandleSaveEntry_UnknownId_IsNoOp()
     {
         var (effects, store, dispatcher, _, _) = CreateEffects();
@@ -1537,6 +1556,24 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleSaveEntry(new SaveEntryAction(LibraryEntryId.Create()), dispatcher);
 
         await store.DidNotReceive().UpdateAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleSaveEntry_WhenEntryDeletedDuringStoreAwait_DoesNotDispatch()
+    {
+        var entry = BuildFilterEntry("Auto") with { Origin = LibraryEntryOrigin.AutoTracked };
+        var initialState = new FilterLibraryState { Entries = [entry] };
+        var emptyState = new FilterLibraryState { Entries = [] };
+        var (effects, store, dispatcher, stateMock, _) = CreateEffects(state: initialState);
+
+        stateMock.Value.Returns(initialState, initialState, emptyState);
+
+        await effects.HandleSaveEntry(new SaveEntryAction(entry.Id), dispatcher);
+
+        await store.Received(1).UpdateAsync(
+            Arg.Is<LibraryEntry>(e => e.Id == entry.Id && e.Origin == LibraryEntryOrigin.UserSaved),
+            Arg.Any<CancellationToken>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
     }
 
     [Fact]
