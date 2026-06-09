@@ -65,8 +65,8 @@ internal sealed class TemplateAnalyzer
     ///     version.
     /// </summary>
     /// <remarks>
-    ///     Preserves the exact semantics of the original DoesTemplateApproximatelyMatchPropertyCount, including the
-    ///     sequential fallback: visible-count first, falling back to all-node count ONLY when the visible count is zero.
+    ///     Uses sequential fallback — visible-only count first, falling back to the all-node count ONLY when the visible
+    ///     count is zero.
     /// </remarks>
     public bool ApproximatelyMatchesPropertyCount(ReadOnlySpan<char> template, int eventPropertyCount)
     {
@@ -89,7 +89,10 @@ internal sealed class TemplateAnalyzer
     ///     count or the visible-only count is accepted to handle providers that include or omit length-provider fields in
     ///     their property output.
     /// </summary>
-    /// <remarks>Preserves the exact semantics of the original DoesTemplateMatchPropertyCount.</remarks>
+    /// <remarks>
+    ///     Accepts either the full data-node count or the visible-only count, since EvtRender output may include or omit
+    ///     length-provider fields depending on provider.
+    /// </remarks>
     public bool MatchesPropertyCount(ReadOnlySpan<char> template, int eventPropertyCount)
     {
         if (template.IsEmpty) { return false; }
@@ -105,7 +108,10 @@ internal sealed class TemplateAnalyzer
     ///     Strict variant of <see cref="MatchesPropertyCount" /> — accepts an empty template only when the event has zero
     ///     properties (which is the shape some providers emit for full-RawId entries with no EventData section).
     /// </summary>
-    /// <remarks>Preserves the exact semantics of the original DoesTemplateStrictlyMatchPropertyCount.</remarks>
+    /// <remarks>
+    ///     Stricter than <see cref="MatchesPropertyCount" />: an empty template is accepted ONLY when the event has zero
+    ///     properties (which is the shape some providers emit for full-RawId entries with no EventData section).
+    /// </remarks>
     public bool StrictlyMatchesPropertyCount(ReadOnlySpan<char> template, int eventPropertyCount)
     {
         if (template.IsEmpty) { return eventPropertyCount == 0; }

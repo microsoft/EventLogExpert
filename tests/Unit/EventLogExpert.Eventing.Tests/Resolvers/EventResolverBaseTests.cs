@@ -255,7 +255,7 @@ public sealed class EventResolverBaseTests
     {
         // Arrange - regression for the cross-issue case: when primary has ambiguous legacy
         // messages AND supplemental is loaded for the description fallback, supplemental's
-        // task and keyword metadata must also be visible to ResolveTaskName / GetKeywordsFromBitmask.
+        // task and keyword metadata must also be visible to the task / keyword resolution path.
         var primaryDetails = new ProviderDetails
         {
             ProviderName = Constants.TestProviderName,
@@ -1700,7 +1700,7 @@ public sealed class EventResolverBaseTests
         // The classic-emitted event has Qualifiers=0x4001 and EventID=24577 (=0x6001), but
         // the modern manifest stores it under the full 32-bit RawId (0x4001 << 16) | 0x6001
         // = 0x40016001 (1073831937). GetEventsById(24577) returns nothing, so the short-cast
-        // fallback in GetModernEvent is the only path that can match. The manifest entry has
+        // fallback in the modern-event matcher is the only path that can match. The manifest entry has
         // an empty Template and the event carries no EventData properties — the fallback's
         // template gate must accept that combination.
         var providerDetails = new ProviderDetails
