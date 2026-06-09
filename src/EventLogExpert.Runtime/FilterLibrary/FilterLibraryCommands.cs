@@ -39,6 +39,15 @@ internal sealed class FilterLibraryCommands(IDispatcher dispatcher) : IFilterLib
 
     public void SavePaneAsFilterSet(string name) => dispatcher.Dispatch(new SavePaneAsFilterSetAction(name));
 
+    public void SetEntryName(LibraryEntryId entryId, string name) =>
+        dispatcher.Dispatch(new SetEntryNameAction(entryId, name));
+
+    public void SetEntryTags(LibraryEntryId entryId, ImmutableList<string> tags) =>
+        dispatcher.Dispatch(new SetEntryTagsAction(entryId, tags));
+
+    public void SetFilterSetFilters(LibraryEntryId filterSetId, ImmutableList<SavedFilter> filters) =>
+        dispatcher.Dispatch(new SetFilterSetFiltersAction(filterSetId, filters));
+
     public void SetIsFavorite(LibraryEntryId entryId, bool isFavorite) =>
         dispatcher.Dispatch(new SetIsFavoriteAction(entryId, isFavorite));
 

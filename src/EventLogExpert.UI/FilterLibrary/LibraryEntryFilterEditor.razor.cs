@@ -36,13 +36,13 @@ public sealed partial class LibraryEntryFilterEditor : ComponentBase
         var newFilters = FilterSet.Filters
             .Select(f => f.Id.Equals(existingId) ? f with { IsExcluded = isExcluded } : f)
             .ToImmutableList();
-        FilterLibraryCommands.UpdateEntry(FilterSet with { Filters = newFilters });
+        FilterLibraryCommands.SetFilterSetFilters(FilterSet.Id, newFilters);
     }
 
     private void OnRemoveSaved(FilterId existingId)
     {
         var newFilters = FilterSet.Filters.Where(f => !f.Id.Equals(existingId)).ToImmutableList();
-        FilterLibraryCommands.UpdateEntry(FilterSet with { Filters = newFilters });
+        FilterLibraryCommands.SetFilterSetFilters(FilterSet.Id, newFilters);
     }
 
     private void OnSaveSavedFilter(FilterId existingId, SavedFilter updated)
@@ -50,7 +50,7 @@ public sealed partial class LibraryEntryFilterEditor : ComponentBase
         var newFilters = FilterSet.Filters
             .Select(f => f.Id.Equals(existingId) ? updated with { Id = existingId } : f)
             .ToImmutableList();
-        FilterLibraryCommands.UpdateEntry(FilterSet with { Filters = newFilters });
+        FilterLibraryCommands.SetFilterSetFilters(FilterSet.Id, newFilters);
     }
 
     private void OnToggleEnabledForSaved(FilterId existingId)
@@ -58,13 +58,13 @@ public sealed partial class LibraryEntryFilterEditor : ComponentBase
         var newFilters = FilterSet.Filters
             .Select(f => f.Id.Equals(existingId) ? f with { IsEnabled = !f.IsEnabled } : f)
             .ToImmutableList();
-        FilterLibraryCommands.UpdateEntry(FilterSet with { Filters = newFilters });
+        FilterLibraryCommands.SetFilterSetFilters(FilterSet.Id, newFilters);
     }
 
     private void SavePendingDraft(FilterDraft draft, SavedFilter built)
     {
         var newFilters = FilterSet.Filters.Add(built with { Id = FilterId.Create() });
-        FilterLibraryCommands.UpdateEntry(FilterSet with { Filters = newFilters });
+        FilterLibraryCommands.SetFilterSetFilters(FilterSet.Id, newFilters);
         _pendingDrafts.Remove(draft);
     }
 }

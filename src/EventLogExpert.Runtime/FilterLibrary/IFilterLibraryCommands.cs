@@ -29,6 +29,12 @@ public interface IFilterLibraryCommands
     /// <summary>Removes the library entry with <paramref name="entryId" /> and persists.</summary>
     void DeleteEntry(LibraryEntryId entryId);
 
+    /// <summary>
+    ///     Removes <paramref name="name" /> from every library entry that carries it (case-insensitive match after
+    ///     <see cref="LibraryEntryTagNormalizer" /> normalization).
+    /// </summary>
+    void DeleteTag(string name);
+
     /// <summary>Loads persisted library entries from the store into the FilterLibrary state.</summary>
     void LoadLibrary();
 
@@ -36,15 +42,9 @@ public interface IFilterLibraryCommands
     void RecordFilterApplied(SavedFilter filter);
 
     /// <summary>
-    ///     Removes <paramref name="name" /> from every library entry that carries it (case-insensitive match after
-    ///     <see cref="LibraryEntryTagNormalizer" /> normalization).
-    /// </summary>
-    void DeleteTag(string name);
-
-    /// <summary>
     ///     Renames a tag across every library entry that carries it. Both names are normalized via
-    ///     <see cref="LibraryEntryTagNormalizer" />. Entries containing both old and new tags retain only the canonical
-    ///     new tag (dedup). No-op when normalized old and new are equal.
+    ///     <see cref="LibraryEntryTagNormalizer" />. Entries containing both old and new tags retain only the canonical new
+    ///     tag (dedup). No-op when normalized old and new are equal.
     /// </summary>
     void RenameTag(string oldName, string newName);
 
@@ -59,6 +59,12 @@ public interface IFilterLibraryCommands
 
     /// <summary>Saves the current FilterPane filters as a new filter set (effect reads pane state).</summary>
     void SavePaneAsFilterSet(string name);
+
+    void SetEntryName(LibraryEntryId entryId, string name);
+
+    void SetEntryTags(LibraryEntryId entryId, ImmutableList<string> tags);
+
+    void SetFilterSetFilters(LibraryEntryId filterSetId, ImmutableList<SavedFilter> filters);
 
     /// <summary>Sets the favorite flag on the library entry (applies mutex + Origin promotion).</summary>
     void SetIsFavorite(LibraryEntryId entryId, bool isFavorite);

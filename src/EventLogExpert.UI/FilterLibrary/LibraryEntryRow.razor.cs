@@ -297,14 +297,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
         if (newTags.Count == Entry.Tags.Count) { return Task.CompletedTask; }
 
-        var updated = Entry switch
-        {
-            LibraryEntrySavedFilter f => f with { Tags = newTags },
-            LibraryEntryFilterSet fs => fs with { Tags = newTags },
-            _ => Entry,
-        };
-
-        FilterLibraryCommands.UpdateEntry(updated);
+        FilterLibraryCommands.SetEntryTags(Entry.Id, newTags);
         AnnouncementService.Announce($"Removed tag '{tag}' from {Entry.Name}");
 
         return Task.CompletedTask;
@@ -335,7 +328,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
         if (string.Equals(trimmed, Entry.Name, StringComparison.Ordinal)) { return; }
 
-        FilterLibraryCommands.UpdateEntry(Entry with { Name = trimmed });
+        FilterLibraryCommands.SetEntryName(Entry.Id, trimmed);
         AnnouncementService.Announce($"Renamed entry to '{trimmed}'");
     }
 
@@ -364,14 +357,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     private async Task OnTagsChangedAsync(ImmutableList<string> tags)
     {
-        var updated = Entry switch
-        {
-            LibraryEntrySavedFilter f => f with { Tags = tags },
-            LibraryEntryFilterSet fs => fs with { Tags = tags },
-            _ => Entry,
-        };
-
-        FilterLibraryCommands.UpdateEntry(updated);
+        FilterLibraryCommands.SetEntryTags(Entry.Id, tags);
         await Task.CompletedTask;
     }
 

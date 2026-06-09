@@ -10,6 +10,7 @@ using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.UI.FilterLibrary;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Tests.FilterLibrary;
 
@@ -58,7 +59,7 @@ public sealed class LibraryEntryFilterEditorTests : BunitContext
         var pendingRow = component.FindComponents<LibraryFilterRow>()[0];
         await component.InvokeAsync(() => pendingRow.Instance.OnPendingDiscard.InvokeAsync());
 
-        _commands.DidNotReceive().UpdateEntry(Arg.Any<LibraryEntry>());
+        _commands.DidNotReceive().SetFilterSetFilters(Arg.Any<LibraryEntryId>(), Arg.Any<ImmutableList<SavedFilter>>());
 
         component.Render();
         Assert.Empty(component.FindComponents<LibraryFilterRow>());
@@ -79,9 +80,9 @@ public sealed class LibraryEntryFilterEditorTests : BunitContext
         var pendingRow = component.FindComponents<LibraryFilterRow>()[0];
         await component.InvokeAsync(() => pendingRow.Instance.OnPendingSave.InvokeAsync(built));
 
-        var captured = CapturedUpdatedFilterSet();
-        Assert.Single(captured.Filters);
-        Assert.Equal("Level == 7", captured.Filters[0].ComparisonText);
+        var captured = CapturedUpdatedFilters();
+        Assert.Single(captured);
+        Assert.Equal("Level == 7", captured[0].ComparisonText);
 
         component.Render();
         Assert.Empty(component.FindComponents<LibraryFilterRow>());
@@ -137,9 +138,9 @@ public sealed class LibraryEntryFilterEditorTests : BunitContext
         var row = component.FindComponents<LibraryFilterRow>()[0];
         await component.InvokeAsync(() => row.Instance.OnExclusionChanged.InvokeAsync(true));
 
-        var captured = CapturedUpdatedFilterSet();
-        Assert.Single(captured.Filters);
-        Assert.True(captured.Filters[0].IsExcluded);
+        var captured = CapturedUpdatedFilters();
+        Assert.Single(captured);
+        Assert.True(captured[0].IsExcluded);
     }
 
     [Fact]
@@ -156,9 +157,9 @@ public sealed class LibraryEntryFilterEditorTests : BunitContext
         var rows = component.FindComponents<LibraryFilterRow>();
         await component.InvokeAsync(() => rows[1].Instance.OnRemove.InvokeAsync());
 
-        var captured = CapturedUpdatedFilterSet();
-        Assert.Single(captured.Filters);
-        Assert.Equal("Level == 4", captured.Filters[0].ComparisonText);
+        var captured = CapturedUpdatedFilters();
+        Assert.Single(captured);
+        Assert.Equal("Level == 4", captured[0].ComparisonText);
     }
 
     [Fact]
@@ -175,10 +176,10 @@ public sealed class LibraryEntryFilterEditorTests : BunitContext
         var row = component.FindComponents<LibraryFilterRow>()[0];
         await component.InvokeAsync(() => row.Instance.OnSave.InvokeAsync(updatedFilter));
 
-        var captured = CapturedUpdatedFilterSet();
-        Assert.Single(captured.Filters);
-        Assert.Equal("Level == 5", captured.Filters[0].ComparisonText);
-        Assert.Equal(original.Id, captured.Filters[0].Id);
+        var captured = CapturedUpdatedFilters();
+        Assert.Single(captured);
+        Assert.Equal("Level == 5", captured[0].ComparisonText);
+        Assert.Equal(original.Id, captured[0].Id);
     }
 
     [Fact]
@@ -194,9 +195,9 @@ public sealed class LibraryEntryFilterEditorTests : BunitContext
         var row = component.FindComponents<LibraryFilterRow>()[0];
         await component.InvokeAsync(() => row.Instance.OnToggleEnabled.InvokeAsync());
 
-        var captured = CapturedUpdatedFilterSet();
-        Assert.Single(captured.Filters);
-        Assert.True(captured.Filters[0].IsEnabled);
+        var captured = CapturedUpdatedFilters();
+        Assert.Single(captured);
+        Assert.True(captured[0].IsEnabled);
     }
 
     [Fact]
@@ -254,11 +255,10 @@ public sealed class LibraryEntryFilterEditorTests : BunitContext
             Filters = [.. filters],
         };
 
-    private LibraryEntryFilterSet CapturedUpdatedFilterSet()
+    private ImmutableList<SavedFilter> CapturedUpdatedFilters()
     {
         var call = _commands.ReceivedCalls()
-            .Single(c => c.GetMethodInfo().Name == nameof(IFilterLibraryCommands.UpdateEntry));
-        var entry = (LibraryEntry)call.GetArguments()[0]!;
-        return Assert.IsType<LibraryEntryFilterSet>(entry);
+            .Single(c => c.GetMethodInfo().Name == nameof(IFilterLibraryCommands.SetFilterSetFilters));
+        return (ImmutableList<SavedFilter>)call.GetArguments()[1]!;
     }
 }
