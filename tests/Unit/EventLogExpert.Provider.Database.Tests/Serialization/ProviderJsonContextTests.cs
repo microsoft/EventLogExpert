@@ -13,7 +13,6 @@ public sealed class ProviderJsonContextTests
         typeof(MessageModel),
         typeof(EventModel),
         typeof(IReadOnlyList<MessageModel>),
-        typeof(IEnumerable<MessageModel>),
         typeof(IReadOnlyList<EventModel>),
         typeof(IDictionary<long, string>),
         typeof(IDictionary<int, string>),

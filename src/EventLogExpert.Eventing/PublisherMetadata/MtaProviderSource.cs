@@ -150,7 +150,7 @@ public static class MtaProviderSource
         details.Messages.Count == 0 &&
         details.Opcodes.Count == 0 &&
         details.Tasks.Count == 0 &&
-        !details.Parameters.Any();
+        details.Parameters.Count == 0;
 
     private static IEnumerable<ProviderDetails> LoadProvidersCore(
         string evtxPath,

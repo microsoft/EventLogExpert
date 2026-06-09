@@ -10,7 +10,6 @@ namespace EventLogExpert.ProviderDatabase.Serialization;
 [JsonSerializable(typeof(MessageModel))]
 [JsonSerializable(typeof(EventModel))]
 [JsonSerializable(typeof(IReadOnlyList<MessageModel>))]
-[JsonSerializable(typeof(IEnumerable<MessageModel>))]
 [JsonSerializable(typeof(IReadOnlyList<EventModel>))]
 [JsonSerializable(typeof(IDictionary<long, string>))]
 [JsonSerializable(typeof(IDictionary<int, string>))]

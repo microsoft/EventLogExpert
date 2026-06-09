@@ -27,7 +27,7 @@ public sealed class ProviderDetails
         Keywords.Count == 0 &&
         Opcodes.Count == 0 &&
         Tasks.Count == 0 &&
-        !Parameters.Any() &&
+        Parameters.Count == 0 &&
         ResolvedFromOwningPublisher is null;
 
     public IDictionary<long, string> Keywords { get; set; } = new Dictionary<long, string>();
@@ -46,7 +46,7 @@ public sealed class ProviderDetails
     public IDictionary<int, string> Opcodes { get; set; } = new Dictionary<int, string>();
 
     /// <summary>Parameter strings from legacy provider</summary>
-    public IEnumerable<MessageModel> Parameters { get; set; } = [];
+    public IReadOnlyList<MessageModel> Parameters { get; set; } = [];
 
     public string ProviderName { get; set; } = string.Empty;
 
