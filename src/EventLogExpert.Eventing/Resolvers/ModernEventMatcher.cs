@@ -149,7 +149,7 @@ internal sealed class ModernEventMatcher(TemplateAnalyzer templates, ITraceLogge
 
         // For exact Id+Version+LogName matches, tolerate the template having slightly
         // more data nodes than the event supplies. This handles version mismatches where
-        // the manifest added optional fields. FormatDescription handles out-of-range
+        // the manifest added optional fields. The description formatter handles out-of-range
         // property indices gracefully by substituting empty string.
         if (modernEvent is not null && _templates.ApproximatelyMatchesPropertyCount(modernEvent.Template, eventPropertyCount))
         {

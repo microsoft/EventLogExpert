@@ -1,9 +1,7 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Events;
-
-namespace EventLogExpert.Eventing.Resolvers;
+namespace EventLogExpert.Eventing.Common.Events;
 
 public static class SeverityFormatter
 {
