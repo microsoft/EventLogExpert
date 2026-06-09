@@ -19,12 +19,12 @@ namespace EventLogExpert.Eventing.Resolvers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Construction injects the unified <see cref="TemplateAnalyzer" /> (for outType extraction), the
-///         <see cref="ModernEventMatcher" /> (for legacy-message disambiguation when the description comes from a
-///         multi-message provider), the optional <see cref="IEventResolverCache" /> for description / value interning, the
-///         optional <see cref="ITraceLogger" /> for diagnostics, and a <see cref="Func{T, TResult}" /> delegate that
-///         exposes the owning <see cref="EventResolverBase" />'s protected virtual <c>TryGetSupplementalDetails</c> hook
-///         for the lazy-load fallback inside <c>GetParametersForDescription</c>.
+///         Construction injects the unified <see cref="TemplateAnalyzer" /> (for outType extraction), the optional
+///         <see cref="IEventResolverCache" /> for description / value interning, the optional <see cref="ITraceLogger" />
+///         for diagnostics, and a <see cref="Func{T, TResult}" /> delegate that exposes the owning
+///         <see cref="EventResolverBase" />'s protected virtual <c>TryGetSupplementalDetails</c> hook for the lazy-load
+///         fallback inside <c>PickParameterSourceForDescription</c>. Legacy-message disambiguation invokes the static
+///         <see cref="ModernEventMatcher.DisambiguateLegacyMessage" /> directly (no instance reference held).
 ///     </para>
 ///     <para>
 ///         The delegate-injection pattern captures the virtual-method slot at base-ctor time via <c>ldvirtftn</c>. When
