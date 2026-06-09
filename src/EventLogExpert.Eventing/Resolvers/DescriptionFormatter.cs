@@ -63,6 +63,8 @@ internal sealed partial class DescriptionFormatter(
         "win:Win32Error"
     }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
+    private static readonly Func<long, MessageModel?> s_nullLookup = static _ => null;
+
     private readonly IEventResolverCache? _cache = cache;
     private readonly ITraceLogger? _logger = logger;
     private readonly ModernEventMatcher _matcher = matcher;
@@ -94,8 +96,8 @@ internal sealed partial class DescriptionFormatter(
         {
             _logger?.Debug($"{nameof(Resolve)}: Using modern event description - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}");
 
-            return FormatDescription(properties, modernEvent!.Description,
-                GetParametersForDescription(primaryDetails, supplemental, descriptionFromSupplemental, ref supplemental, eventRecord));
+            return FormatDescription(properties, modernEvent.Description,
+                GetParameterLookupForDescription(primaryDetails, supplemental, descriptionFromSupplemental, ref supplemental, eventRecord));
         }
 
         // Legacy provider message lookup
@@ -106,7 +108,7 @@ internal sealed partial class DescriptionFormatter(
             _logger?.Debug($"{nameof(Resolve)}: Using legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}");
 
             return FormatDescription(properties, legacyMessages[0].Text,
-                GetParametersForDescription(primaryDetails, supplemental, descriptionFromSupplemental, ref supplemental, eventRecord));
+                GetParameterLookupForDescription(primaryDetails, supplemental, descriptionFromSupplemental, ref supplemental, eventRecord));
         }
 
         if (legacyMessages.Count > 1)
@@ -118,7 +120,7 @@ internal sealed partial class DescriptionFormatter(
                 _logger?.Debug($"{nameof(Resolve)}: Disambiguated legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Level={eventRecord.Level}");
 
                 return FormatDescription(properties, bestMatch.Text,
-                    GetParametersForDescription(primaryDetails, supplemental, descriptionFromSupplemental, ref supplemental, eventRecord));
+                    GetParameterLookupForDescription(primaryDetails, supplemental, descriptionFromSupplemental, ref supplemental, eventRecord));
             }
 
             _logger?.Debug($"{nameof(Resolve)}: Multiple legacy messages found, could not disambiguate - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, MessageCount={legacyMessages.Count}");
@@ -137,7 +139,7 @@ internal sealed partial class DescriptionFormatter(
                     // Description came from supplemental, so resolve %%n parameter substitutions
                     // against supplemental's parameter table first.
                     return FormatDescription(supplementalProperties, supplementalModernEvent.Description,
-                        GetParametersForDescription(primaryDetails, supplemental, true, ref supplemental, eventRecord));
+                        GetParameterLookupForDescription(primaryDetails, supplemental, true, ref supplemental, eventRecord));
                 }
 
                 var supplementalLegacy = supplemental.GetMessagesByShortId(eventRecord.Id);
@@ -148,7 +150,7 @@ internal sealed partial class DescriptionFormatter(
                     _logger?.Debug($"{nameof(Resolve)}: Disambiguated via supplemental legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
 
                     return FormatDescription(properties, supplementalBest.Text,
-                        GetParametersForDescription(primaryDetails, supplemental, true, ref supplemental, eventRecord));
+                        GetParameterLookupForDescription(primaryDetails, supplemental, true, ref supplemental, eventRecord));
                 }
             }
         }
@@ -160,7 +162,7 @@ internal sealed partial class DescriptionFormatter(
         {
             _logger?.Debug($"{nameof(Resolve)}: Using single-property description fallback - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
 
-            return FormatDescription(properties, null, details.Parameters);
+            return FormatDescription(properties, null, s_nullLookup);
         }
 
         if (details.IsEmpty && (supplemental is null || supplemental.IsEmpty))
@@ -275,8 +277,8 @@ internal sealed partial class DescriptionFormatter(
 
     private string BuildNoMetadataFallbackDescription(EventRecord eventRecord, List<string> properties)
     {
-        const long classicKeywordBit = 0x0080000000000000L;
-        bool isClassic = ((eventRecord.Keywords ?? 0) & classicKeywordBit) != 0;
+        const long ClassicKeywordBit = 0x0080000000000000L;
+        bool isClassic = ((eventRecord.Keywords ?? 0) & ClassicKeywordBit) != 0;
 
         string? systemMessage = null;
 
@@ -293,8 +295,7 @@ internal sealed partial class DescriptionFormatter(
         string? propertyTail = BuildEventDataTail(properties);
 
         // The propertyTail varies per event (timestamps, paths, IDs, etc.) — caching it
-        // would grow the description cache unboundedly. Only cache the low-cardinality
-        // canned strings (DefaultNoProviderDescription, systemMessage).
+        // would grow the description cache unboundedly.
         if (propertyTail is not null)
         {
             return string.IsNullOrWhiteSpace(systemMessage)
@@ -302,17 +303,18 @@ internal sealed partial class DescriptionFormatter(
                 : $"{systemMessage}\r\n\r\n{propertyTail}";
         }
 
-        string fallback = string.IsNullOrWhiteSpace(systemMessage)
-            ? DefaultNoProviderDescription
-            : systemMessage!;
+        if (string.IsNullOrWhiteSpace(systemMessage))
+        {
+            return DefaultNoProviderDescription;
+        }
 
-        return _cache?.GetOrAddDescription(fallback) ?? fallback;
+        return _cache?.GetOrAddDescription(systemMessage!) ?? systemMessage!;
     }
 
     private string FormatDescription(
         List<string> properties,
         string? descriptionTemplate,
-        IEnumerable<MessageModel> parameters)
+        Func<long, MessageModel?> parameterLookup)
     {
         string returnDescription;
 
@@ -323,19 +325,17 @@ internal sealed partial class DescriptionFormatter(
             // Found a few providers that have their properties wrapped with \r\n for some reason.
             // Multi-property fall-through is a defensive backstop (e.g. a legacy message row with
             // empty Text); DefaultFailedDescription is reserved for actual formatting exceptions.
-            returnDescription = properties.Count == 1 ?
-                properties[0].TrimEnd('\0', '\r', '\n') :
-                DefaultNoMatchingDescription;
-
-            return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
+            return properties.Count == 1
+                ? properties[0].TrimEnd('\0', '\r', '\n')
+                : DefaultNoMatchingDescription;
         }
 
         // Guard against stack overflow from very large templates
-        const int maxStackAllocChars = 4096;
+        const int MaxStackAllocChars = 4096;
         int cleanupBufferSize = descriptionTemplate.Length * 2;
         char[]? cleanupRented = null;
 
-        Span<char> description = cleanupBufferSize <= maxStackAllocChars
+        Span<char> description = cleanupBufferSize <= MaxStackAllocChars
             ? stackalloc char[cleanupBufferSize]
             : (cleanupRented = ArrayPool<char>.Shared.Rent(cleanupBufferSize));
 
@@ -413,7 +413,7 @@ internal sealed partial class DescriptionFormatter(
                         // Some parameters exceed int size and need to be cast from long to int
                         // because they are actually negative numbers
                         ReadOnlySpan<char> parameterMessage =
-                            parameters.FirstOrDefault(m => m.RawId == (int)parameterId)?.Text ?? string.Empty;
+                            parameterLookup((int)parameterId)?.Text ?? string.Empty;
 
                         // Fallback to system FormatMessage for Win32 error codes
                         // when provider parameters aren't available (e.g., MTA/DB resolvers)
@@ -461,7 +461,7 @@ internal sealed partial class DescriptionFormatter(
 
             returnDescription = new string(updatedDescription[..currentLength]);
 
-            return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
+            return returnDescription;
         }
         catch (InvalidOperationException ex)
         {
@@ -589,11 +589,11 @@ internal sealed partial class DescriptionFormatter(
     }
 
     /// <summary>
-    ///     Picks the parameter table for %%n substitutions, biased toward whichever provider supplied the description
+    ///     Picks the parameter lookup for %%n substitutions, biased toward whichever provider supplied the description
     ///     text. When <paramref name="descriptionFromSupplemental" /> is true, prefer supplemental's parameters and fall back
     ///     to primary; otherwise prefer primary and fall back to supplemental (lazily loading it when not yet available).
     /// </summary>
-    private IEnumerable<MessageModel> GetParametersForDescription(
+    private Func<long, MessageModel?> GetParameterLookupForDescription(
         ProviderDetails? primary,
         ProviderDetails? supplementalDetails,
         bool descriptionFromSupplemental,
@@ -602,15 +602,15 @@ internal sealed partial class DescriptionFormatter(
     {
         if (descriptionFromSupplemental && supplementalDetails is not null)
         {
-            if (supplementalDetails.Parameters.Count > 0) { return supplementalDetails.Parameters; }
+            if (supplementalDetails.Parameters.Count > 0) { return supplementalDetails.GetParameterByRawIdDelegate; }
 
-            return primary?.Parameters ?? supplementalDetails.Parameters;
+            return primary?.GetParameterByRawIdDelegate ?? supplementalDetails.GetParameterByRawIdDelegate;
         }
 
-        if (primary is not null && primary.Parameters.Count > 0) { return primary.Parameters; }
+        if (primary is not null && primary.Parameters.Count > 0) { return primary.GetParameterByRawIdDelegate; }
 
         supplemental ??= _supplementalProvider(eventRecord);
 
-        return supplemental?.Parameters ?? primary?.Parameters ?? [];
+        return supplemental?.GetParameterByRawIdDelegate ?? primary?.GetParameterByRawIdDelegate ?? s_nullLookup;
     }
 }
