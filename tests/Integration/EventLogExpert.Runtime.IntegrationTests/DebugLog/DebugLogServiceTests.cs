@@ -195,6 +195,18 @@ public sealed class DebugLogServiceTests : IDisposable
     }
 
     [Fact]
+    public void Dispose_CalledTwice_DoesNotThrow()
+    {
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+        var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
+
+        debugLogService.Dispose();
+
+        Assert.Null(Record.Exception(debugLogService.Dispose));
+    }
+
+    [Fact]
     public void Dispose_ShouldCleanupWithoutError()
     {
         // Arrange
@@ -206,6 +218,31 @@ public sealed class DebugLogServiceTests : IDisposable
         // Act & Assert - Dispose should complete without throwing
         var exception = Record.Exception(debugLogService.Dispose);
         Assert.Null(exception);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_CalledTwice_DoesNotThrow()
+    {
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+        var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
+
+        await debugLogService.DisposeAsync();
+
+        var exception = await Record.ExceptionAsync(async () => await debugLogService.DisposeAsync());
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_FollowedByDispose_DoesNotThrow()
+    {
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+        var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
+
+        await debugLogService.DisposeAsync();
+
+        Assert.Null(Record.Exception(debugLogService.Dispose));
     }
 
     [Fact]

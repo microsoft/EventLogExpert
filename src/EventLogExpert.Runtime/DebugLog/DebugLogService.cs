@@ -85,7 +85,7 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, 
 
     public void Dispose()
     {
-        DetachEvents();
+        try { DetachEvents(); } catch { }
 
         using (_writeLock.EnterScope())
         {
@@ -106,7 +106,7 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, 
 
     public async ValueTask DisposeAsync()
     {
-        DetachEvents();
+        try { DetachEvents(); } catch { }
 
         StreamWriter? writer;
 
