@@ -108,7 +108,7 @@ internal sealed partial class DescriptionFormatter(
 
         if (legacyMessages.Count > 1)
         {
-            var bestMatch = _matcher.DisambiguateLegacyMessage(eventRecord, legacyMessages);
+            var bestMatch = ModernEventMatcher.DisambiguateLegacyMessage(eventRecord, legacyMessages);
 
             if (bestMatch is not null)
             {
@@ -138,7 +138,7 @@ internal sealed partial class DescriptionFormatter(
                 }
 
                 var supplementalLegacy = supplemental.GetMessagesByShortId(eventRecord.Id);
-                var supplementalBest = _matcher.DisambiguateLegacyMessage(eventRecord, supplementalLegacy);
+                var supplementalBest = ModernEventMatcher.DisambiguateLegacyMessage(eventRecord, supplementalLegacy);
 
                 if (supplementalBest is not null)
                 {

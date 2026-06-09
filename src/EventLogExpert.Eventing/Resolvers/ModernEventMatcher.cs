@@ -16,9 +16,6 @@ namespace EventLogExpert.Eventing.Resolvers;
 ///     template-property-count, then relaxed-template-count (handles version-mismatch optional fields), then Id+LogName
 ///     ignoring Version, then full-RawId+Qualifiers (for Complus / WPDClassInstaller entries), then short-Id+Version
 ///     ignoring LogName, then Id+Version ignoring LogName when exactly one candidate passes template validation.
-///     <see cref="DisambiguateLegacyMessage" /> is exposed as a public instance method so consumers that already hold a
-///     candidate set (e.g., the description formatter) can run the legacy-message disambiguation without re-running the
-///     matcher.
 /// </remarks>
 internal sealed class ModernEventMatcher(TemplateAnalyzer templates, ITraceLogger? logger)
 {
@@ -31,7 +28,7 @@ internal sealed class ModernEventMatcher(TemplateAnalyzer templates, ITraceLogge
     ///     publicly so the description formatter can run this disambiguation against a candidate set it already holds without
     ///     re-running <see cref="Match" />.
     /// </summary>
-    public MessageModel? DisambiguateLegacyMessage(EventRecord eventRecord, IReadOnlyList<MessageModel> legacyMessages)
+    public static MessageModel? DisambiguateLegacyMessage(EventRecord eventRecord, IReadOnlyList<MessageModel> legacyMessages)
     {
         if (legacyMessages.Count == 0) { return null; }
 

@@ -3,14 +3,14 @@
 
 namespace EventLogExpert.Eventing.Common.Events;
 
-public static class SeverityFormatter
+internal static class SeverityFormatter
 {
     /// <summary>Maps an ETW level byte to its display string.</summary>
     /// <remarks>
     ///     ETW level 0 is technically "LogAlways", but the Windows Event Viewer MMC and wevtutil both render it as
     ///     "Information". We match that behavior intentionally.
     /// </remarks>
-    public static string Format(byte? level) => level switch
+    internal static string Format(byte? level) => level switch
     {
         0 => nameof(SeverityLevel.Information), // LogAlways — rendered as Information by Windows
         1 => nameof(SeverityLevel.Critical),
