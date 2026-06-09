@@ -1595,7 +1595,7 @@ public sealed class FilterLibraryEffectsTests
     public async Task HandleSaveEntry_ReprojectsOriginOntoLatestSnapshot_NotPreAwaitSnapshot()
     {
         var staleEntry = BuildFilterEntry("OldName") with { Origin = LibraryEntryOrigin.AutoTracked };
-        var renamedEntry = (LibraryEntrySavedFilter)staleEntry with { Name = "NewName" };
+        var renamedEntry = staleEntry with { Name = "NewName" };
         var staleState = new FilterLibraryState { Entries = [staleEntry] };
         var renamedState = new FilterLibraryState { Entries = [renamedEntry] };
         var (effects, _, dispatcher, stateMock, _) = CreateEffects(state: staleState);
@@ -1811,6 +1811,35 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleUpdateLibraryEntry(new UpdateLibraryEntryAction(entry), dispatcher);
 
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+        logger.ReceivedWithAnyArgs(1).Warning(default);
+    }
+
+    [Fact]
+    public async Task PersistAndDispatchAsync_ReissueAgainstLatestSnapshotFails_DispatchesLoadLibraryToResync()
+    {
+        var staleEntry = BuildFilterEntry("OldName") with { Origin = LibraryEntryOrigin.AutoTracked };
+        var renamedEntry = staleEntry with { Name = "NewName" };
+        var staleState = new FilterLibraryState { Entries = [staleEntry] };
+        var renamedState = new FilterLibraryState { Entries = [renamedEntry] };
+        var (effects, store, dispatcher, stateMock, logger) = CreateEffects(state: staleState);
+
+        stateMock.Value.Returns(staleState, staleState, renamedState);
+
+        int updateCalls = 0;
+        store.UpdateAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                updateCalls++;
+                return updateCalls == 1
+                    ? Task.CompletedTask
+                    : Task.FromException(new InvalidOperationException("reissue-fail"));
+            });
+
+        await effects.HandleSaveEntry(new SaveEntryAction(staleEntry.Id), dispatcher);
+
+        Assert.Equal(2, updateCalls);
+        dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
