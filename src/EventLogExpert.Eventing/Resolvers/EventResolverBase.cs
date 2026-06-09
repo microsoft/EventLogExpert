@@ -29,11 +29,6 @@ public class EventResolverBase : IDisposable
         _logger = logger;
         _matcher = new ModernEventMatcher(_templates, logger);
         _taskKeywords = new TaskKeywordResolver(cache, logger);
-        // Method-group capture of TryGetSupplementalDetails uses ldvirtftn semantics: the delegate's
-        // method slot resolves against the runtime type of `this`. When EventResolver's ctor calls
-        // : base(cache, logger), `this` is already EventResolver, so the captured delegate dispatches
-        // to the override. The delegate is INVOKED later during _descriptions.Resolve, after the
-        // derived ctor body has run, so override-side fields are fully initialized at invocation time.
         _descriptions = new DescriptionFormatter(_templates, _matcher, cache, logger, TryGetSupplementalDetails);
     }
 
@@ -106,13 +101,13 @@ public class EventResolverBase : IDisposable
     {
         if (!disposing) { return; }
 
-        // Atomically guard against double-disposal: only the first caller observes the prior 0.
-        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) { }
+        _ = Interlocked.CompareExchange(ref _disposed, 1, 0);
     }
 
     /// <summary>
-    ///     Override in derived classes to provide a supplemental ProviderDetails when the primary source (MTA/DB) has
-    ///     partial coverage for a provider. Called only when the primary provider exists but couldn't match the event.
+    ///     Override in derived classes to provide a supplemental ProviderDetails when the primary source has partial
+    ///     coverage. Called from the non-decisive primary path AND as a lazy backstop during parameter resolution when the
+    ///     primary has no parameter table.
     /// </summary>
     protected virtual ProviderDetails? TryGetSupplementalDetails(EventRecord eventRecord) => null;
 
@@ -129,7 +124,7 @@ public class EventResolverBase : IDisposable
             ComputerName = _cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
             Description = _descriptions.Resolve(eventRecord, details, descriptionDetails, modernEvent, supplemental, supplementalModernEvent),
             Id = eventRecord.Id,
-            Keywords = _taskKeywords.GetKeywords(eventRecord, details, supplemental),
+            Keywords = _taskKeywords.ResolveKeywords(eventRecord, details, supplemental),
             Level = SeverityFormatter.Format(eventRecord.Level),
             LogName = _cache?.GetOrAddValue(eventRecord.LogName) ?? eventRecord.LogName,
             ProcessId = eventRecord.ProcessId,

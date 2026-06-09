@@ -121,7 +121,6 @@ internal sealed class ModernEventMatcher(TemplateAnalyzer templates, ITraceLogge
 
         int eventPropertyCount = eventRecord.Properties.Count;
 
-        // Use indexed lookup instead of linear scan
         var candidateEvents = details.GetEventsById(eventRecord.Id);
 
         EventModel? modernEvent = null;
