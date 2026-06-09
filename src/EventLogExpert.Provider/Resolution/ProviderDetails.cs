@@ -7,8 +7,11 @@ public sealed class ProviderDetails
 {
     private IReadOnlyList<EventModel> _events = [];
     private Dictionary<long, List<EventModel>>? _eventsByIdLookup;
+    private Func<long, MessageModel?>? _getParameterByRawIdDelegate;
     private IReadOnlyList<MessageModel> _messages = [];
     private Dictionary<int, List<MessageModel>>? _messagesByShortIdLookup;
+    private IReadOnlyList<MessageModel> _parameters = [];
+    private Dictionary<long, MessageModel>? _parametersByRawIdLookup;
 
     /// <summary>Events and related items from modern provider</summary>
     public IReadOnlyList<EventModel> Events
@@ -46,13 +49,25 @@ public sealed class ProviderDetails
     public IDictionary<int, string> Opcodes { get; set; } = new Dictionary<int, string>();
 
     /// <summary>Parameter strings from legacy provider</summary>
-    public IReadOnlyList<MessageModel> Parameters { get; set; } = [];
+    public IReadOnlyList<MessageModel> Parameters
+    {
+        get => _parameters;
+        set
+        {
+            _parameters = value;
+            _parametersByRawIdLookup = null;
+            _getParameterByRawIdDelegate = null;
+        }
+    }
 
     public string ProviderName { get; set; } = string.Empty;
 
     public string? ResolvedFromOwningPublisher { get; set; }
 
     public IDictionary<int, string> Tasks { get; set; } = new Dictionary<int, string>();
+
+    internal Func<long, MessageModel?> GetParameterByRawIdDelegate =>
+        _getParameterByRawIdDelegate ??= GetParameterByRawId;
 
     /// <summary>Gets events matching the given Id using a pre-built lookup dictionary.</summary>
     public IReadOnlyList<EventModel> GetEventsById(long id)
@@ -71,6 +86,18 @@ public sealed class ProviderDetails
         _messagesByShortIdLookup ??= BuildMessagesByShortIdLookup();
 
         return _messagesByShortIdLookup.TryGetValue(shortId, out var list) ? list : [];
+    }
+
+    /// <summary>
+    ///     Gets the first parameter message with the given RawId using a pre-built lookup dictionary. Returns null when
+    ///     no parameter matches. Duplicate RawIds resolve first-wins, matching the prior <c>FirstOrDefault</c> behavior on the
+    ///     <see cref="Parameters" /> list.
+    /// </summary>
+    public MessageModel? GetParameterByRawId(long rawId)
+    {
+        _parametersByRawIdLookup ??= BuildParametersByRawIdLookup();
+
+        return _parametersByRawIdLookup.GetValueOrDefault(rawId);
     }
 
     private Dictionary<long, List<EventModel>> BuildEventsByIdLookup()
@@ -108,6 +135,18 @@ public sealed class ProviderDetails
             }
 
             list.Add(m);
+        }
+
+        return lookup;
+    }
+
+    private Dictionary<long, MessageModel> BuildParametersByRawIdLookup()
+    {
+        var lookup = new Dictionary<long, MessageModel>(_parameters.Count);
+
+        foreach (var p in _parameters)
+        {
+            lookup.TryAdd(p.RawId, p);
         }
 
         return lookup;

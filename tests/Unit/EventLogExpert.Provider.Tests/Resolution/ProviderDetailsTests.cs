@@ -133,6 +133,32 @@ public sealed class ProviderDetailsTests
     }
 
     [Fact]
+    public void GetParameterByRawId_WhenDuplicateRawIds_ReturnsFirstWinningMatch()
+    {
+        var details = EventUtils.CreateProvider(Constants.TestProviderLongName);
+        details.Parameters =
+        [
+            new MessageModel { RawId = 42, Text = "first", Tag = "A" },
+            new MessageModel { RawId = 42, Text = "second", Tag = "B" }
+        ];
+
+        var match = details.GetParameterByRawId(42);
+
+        Assert.NotNull(match);
+        Assert.Equal("first", match.Text);
+        Assert.Equal("A", match.Tag);
+    }
+
+    [Fact]
+    public void GetParameterByRawId_WhenRawIdDoesNotExist_ReturnsNull()
+    {
+        var details = EventUtils.CreateProvider(Constants.TestProviderLongName);
+        details.Parameters = [new MessageModel { RawId = 1, Text = "only" }];
+
+        Assert.Null(details.GetParameterByRawId(999));
+    }
+
+    [Fact]
     public void IsEmpty_WhenAllCollectionsEmptyAndNoFallback_ReturnsTrue()
     {
         // Arrange
@@ -239,5 +265,24 @@ public sealed class ProviderDetailsTests
         // Assert — old ShortId no longer found, new ShortId found
         Assert.Empty(details.GetMessagesByShortId(1));
         Assert.Single(details.GetMessagesByShortId(2));
+    }
+
+    [Fact]
+    public void ParametersSetter_InvalidatesCachedLookup()
+    {
+        var details = EventUtils.CreateProvider(Constants.TestProviderLongName);
+        details.Parameters = [new MessageModel { RawId = 1, Text = "original" }];
+
+        var beforeReplace = details.GetParameterByRawId(1);
+        Assert.NotNull(beforeReplace);
+        Assert.Equal("original", beforeReplace.Text);
+
+        details.Parameters = [new MessageModel { RawId = 2, Text = "replaced" }];
+
+        Assert.Null(details.GetParameterByRawId(1));
+
+        var replaced = details.GetParameterByRawId(2);
+        Assert.NotNull(replaced);
+        Assert.Equal("replaced", replaced.Text);
     }
 }
