@@ -92,10 +92,16 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, 
             if (_disposed) { return; }
 
             _disposed = true;
-            CloseWriter();
         }
 
-        _interprocessMutex.Dispose();
+        try
+        {
+            CloseWriter();
+        }
+        finally
+        {
+            _interprocessMutex.Dispose();
+        }
     }
 
     public async ValueTask DisposeAsync()

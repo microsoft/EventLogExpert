@@ -17,18 +17,20 @@ internal sealed class IpcMessageWriter(Stream destination) : IAsyncDisposable
     private static readonly UTF8Encoding s_utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
     private readonly SemaphoreSlim _writeLock = new(initialCount: 1, maxCount: 1);
     private readonly StreamWriter _writer = new(destination, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { NewLine = "\n", AutoFlush = false };
+    private bool _disposed;
 
     public async ValueTask DisposeAsync()
     {
-        // Acquire the write lock first so any in-flight WriteAsync completes before we tear the
-        // writer down. Concurrent writers blocked on the semaphore are intentionally drained by
-        // the runner's grace-then-kill ordering; if a writer is genuinely stuck we still want
-        // disposal to make progress, so this wait is unbounded by design (the helper process
-        // is about to exit either way).
+        if (_disposed) { return; }
+
         await _writeLock.WaitAsync().ConfigureAwait(false);
 
         try
         {
+            if (_disposed) { return; }
+
+            _disposed = true;
+
             try { await _writer.FlushAsync(); } catch { /* best effort during dispose */ }
             await _writer.DisposeAsync();
         }
@@ -41,18 +43,30 @@ internal sealed class IpcMessageWriter(Stream destination) : IAsyncDisposable
 
     public async Task WriteAsync(DatabaseToolsIpcMessage message, CancellationToken cancellationToken)
     {
-        var json = JsonSerializer.Serialize(message, DatabaseToolsIpcSerializer.Options);
+        if (_disposed) { return; }
 
-        await _writeLock.WaitAsync(cancellationToken);
+        var json = JsonSerializer.Serialize(message, DatabaseToolsIpcSerializer.Options);
 
         try
         {
+            await _writeLock.WaitAsync(cancellationToken);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Lock was disposed by a concurrent DisposeAsync; writer is gone, drop the write.
+            return;
+        }
+
+        try
+        {
+            if (_disposed) { return; }
+
             await _writer.WriteLineAsync(json.AsMemory(), cancellationToken);
             await _writer.FlushAsync(cancellationToken);
         }
         finally
         {
-            _writeLock.Release();
+            try { _writeLock.Release(); } catch (ObjectDisposedException) { /* disposed between WaitAsync and Release */ }
         }
     }
 }
