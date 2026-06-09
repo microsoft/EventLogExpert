@@ -38,6 +38,7 @@ public partial class EventResolverBase : IDisposable
 
     private readonly IEventResolverCache? _cache;
     private readonly ITraceLogger? _logger;
+    private readonly ModernEventMatcher _matcher;
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
     private readonly TaskKeywordResolver _taskKeywords;
     private readonly TemplateAnalyzer _templates = new();
@@ -48,6 +49,7 @@ public partial class EventResolverBase : IDisposable
     {
         _cache = cache;
         _logger = logger;
+        _matcher = new ModernEventMatcher(_templates, logger);
         _taskKeywords = new TaskKeywordResolver(cache, logger);
     }
 
@@ -67,7 +69,7 @@ public partial class EventResolverBase : IDisposable
 
         // Resolve the modern event once and reuse for both description and task name
         ProviderDetails.TryGetValue(eventRecord.ProviderName, out var details);
-        var modernEvent = details is not null ? GetModernEvent(eventRecord, details) : null;
+        var modernEvent = details is not null ? _matcher.Match(eventRecord, details) : null;
 
         var descriptionDetails = details;
         ProviderDetails? supplemental = null;
@@ -93,7 +95,7 @@ public partial class EventResolverBase : IDisposable
         supplemental = TryGetSupplementalDetails(eventRecord);
 
         EventModel? supplementalModernEvent = supplemental is not null
-            ? GetModernEvent(eventRecord, supplemental)
+            ? _matcher.Match(eventRecord, supplemental)
             : null;
 
         if (supplemental is not null && primaryLegacyCount == 0)
@@ -204,94 +206,12 @@ public partial class EventResolverBase : IDisposable
         }
     }
 
-    /// <summary>Treats null and empty string as equivalent for LogName comparison.</summary>
-    private static bool LogNamesMatch(string? a, string? b) =>
-        string.IsNullOrEmpty(a) ? string.IsNullOrEmpty(b) : string.Equals(a, b, StringComparison.Ordinal);
-
     private static void ResizeBuffer(ref char[] buffer, ref Span<char> source, int sizeToAdd)
     {
         char[] newBuffer = ArrayPool<char>.Shared.Rent(source.Length + sizeToAdd);
         source.CopyTo(newBuffer);
         ArrayPool<char>.Shared.Return(buffer);
         source = buffer = newBuffer;
-    }
-
-    /// <summary>
-    ///     Disambiguate multiple legacy messages for the same event ID. Tries Qualifier match (high 16 bits of RawId),
-    ///     then LogLink, then severity. Returns null when the set is empty or remains ambiguous after all checks.
-    /// </summary>
-    private static MessageModel? TryDisambiguateLegacyMessage(EventRecord eventRecord, IReadOnlyList<MessageModel> legacyMessages)
-    {
-        if (legacyMessages.Count == 0) { return null; }
-
-        if (legacyMessages.Count == 1) { return legacyMessages[0]; }
-
-        // Qualifier match. For classic/legacy events, Windows encodes Qualifiers in
-        // the high 16 bits of the message ID, so RawId == (Qualifiers << 16) | EventId
-        // identifies the exact message-table entry.
-        if (eventRecord.Qualifiers.HasValue)
-        {
-            List<MessageModel>? qualifierMatches = null;
-
-            foreach (var m in legacyMessages)
-            {
-                if ((ushort)((m.RawId >> 16) & 0xFFFF) == eventRecord.Qualifiers.Value)
-                {
-                    (qualifierMatches ??= []).Add(m);
-                }
-            }
-
-            if (qualifierMatches is { Count: 1 })
-            {
-                return qualifierMatches[0];
-            }
-
-            if (qualifierMatches is { Count: > 1 })
-            {
-                legacyMessages = qualifierMatches;
-            }
-        }
-
-        // LogLink match
-        foreach (var m in legacyMessages)
-        {
-            if (m.LogLink is not null && LogNamesMatch(m.LogLink, eventRecord.LogName))
-            {
-                return m;
-            }
-        }
-
-        // Severity-based match. MC RawId bits 31-30 encode severity:
-        // 00=Success, 01=Informational, 10=Warning, 11=Error.
-        // ETW levels: 0=LogAlways, 1=Critical, 2=Error, 3=Warning, 4=Information, 5=Verbose.
-        if (eventRecord.Level is null) { return null; }
-
-        int targetSeverity = eventRecord.Level switch
-        {
-            1 or 2 => 3,
-            3 => 2,
-            4 or 5 => 1,
-            _ => 0
-        };
-
-        MessageModel? severityCandidate = null;
-
-        foreach (var m in legacyMessages)
-        {
-            int messageSeverity = (int)((m.RawId >> 30) & 0x3);
-
-            if (messageSeverity != targetSeverity) { continue; }
-
-            if (severityCandidate is not null)
-            {
-                // Multiple matches with same severity — still ambiguous
-                return null;
-            }
-
-            severityCandidate = m;
-        }
-
-        return severityCandidate;
     }
 
     [GeneratedRegex("%+[0-9]+")]
@@ -638,158 +558,6 @@ public partial class EventResolverBase : IDisposable
         return formattedValues;
     }
 
-    private EventModel? GetModernEvent(EventRecord eventRecord, ProviderDetails details)
-    {
-        if (eventRecord.Version is null && string.IsNullOrEmpty(eventRecord.LogName))
-        {
-            Logger?.Debug($"{nameof(GetModernEvent)}: Skipping modern event lookup - EventId={eventRecord.Id}, Provider={eventRecord.ProviderName} has null Version and empty LogName");
-
-            return null;
-        }
-
-        int eventPropertyCount = eventRecord.Properties.Count;
-
-        // Use indexed lookup instead of linear scan
-        var candidateEvents = details.GetEventsById(eventRecord.Id);
-
-        EventModel? modernEvent = null;
-
-        foreach (var e in candidateEvents)
-        {
-            if (e.Id != eventRecord.Id ||
-                e.Version != eventRecord.Version ||
-                !LogNamesMatch(e.LogName, eventRecord.LogName))
-            {
-                continue;
-            }
-
-            modernEvent = e;
-
-            break;
-        }
-
-        if (modernEvent is not null && _templates.StrictlyMatchesPropertyCount(modernEvent.Template, eventPropertyCount))
-        {
-            Logger?.Debug($"{nameof(GetModernEvent)}: Exact match found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}");
-
-            return modernEvent;
-        }
-
-        // For exact Id+Version+LogName matches, tolerate the template having slightly
-        // more data nodes than the event supplies. This handles version mismatches where
-        // the manifest added optional fields. FormatDescription handles out-of-range
-        // property indices gracefully by substituting empty string.
-        if (modernEvent is not null && _templates.ApproximatelyMatchesPropertyCount(modernEvent.Template, eventPropertyCount))
-        {
-            Logger?.Debug($"{nameof(GetModernEvent)}: Exact match with relaxed template count - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}");
-
-            return modernEvent;
-        }
-
-        if (modernEvent is not null)
-        {
-            Logger?.Debug($"{nameof(GetModernEvent)}: Exact match found but template property count mismatch - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}");
-        }
-
-        foreach (var @event in candidateEvents)
-        {
-            if (!LogNamesMatch(@event.LogName, eventRecord.LogName)) { continue; }
-
-            if (!_templates.MatchesPropertyCount(@event.Template, eventPropertyCount)) { continue; }
-
-            Logger?.Debug($"{nameof(GetModernEvent)}: Match by Id/LogName with template - EventId={eventRecord.Id}, LogName={eventRecord.LogName}, MatchedVersion={@event.Version}");
-
-            return @event;
-        }
-
-        // Try again forcing the long to a short and with no log name. Needed for providers
-        // such as Microsoft-Windows-Complus and Microsoft-Windows-WPDClassInstaller that store
-        // events with the full 32-bit RawId (high 16 bits = Qualifiers, low 16 bits = EventId).
-        // Strict template match accepts empty template + zero EventData properties, which is the
-        // shape WPDClassInstaller emits for its full-RawId entries. When the record carries a
-        // Qualifiers value, prefer the exact full-RawId match before the low-16 ambiguity check.
-        if (eventRecord.Qualifiers is { } qualifier)
-        {
-            var fullRawId = ((long)qualifier << 16) | eventRecord.Id;
-
-            foreach (var @event in details.Events)
-            {
-                if (@event.Id != fullRawId || @event.Version != eventRecord.Version) { continue; }
-
-                if (!_templates.StrictlyMatchesPropertyCount(@event.Template, eventPropertyCount)) { continue; }
-
-                Logger?.Debug($"{nameof(GetModernEvent)}: Match by full RawId fallback - RawId={fullRawId:X}, Version={eventRecord.Version}");
-
-                return @event;
-            }
-        }
-
-        EventModel? shortIdMatch = null;
-
-        foreach (var @event in details.Events)
-        {
-            if ((ushort)@event.Id != eventRecord.Id || @event.Version != eventRecord.Version) { continue; }
-
-            // When the record's qualifier is known, full-RawId entries with conflicting high
-            // bits would have been caught above. Skip them here so they do not mask short-only
-            // entries or trigger a false ambiguity.
-            if (eventRecord.Qualifiers is not null && @event.Id > ushort.MaxValue) { continue; }
-
-            if (!_templates.StrictlyMatchesPropertyCount(@event.Template, eventPropertyCount)) { continue; }
-
-            if (shortIdMatch is not null)
-            {
-                // Multiple matches — ambiguous
-                shortIdMatch = null;
-
-                break;
-            }
-
-            shortIdMatch = @event;
-        }
-
-        if (shortIdMatch is not null)
-        {
-            Logger?.Debug($"{nameof(GetModernEvent)}: Match by short Id/Version fallback - EventId={eventRecord.Id}, Version={eventRecord.Version}");
-
-            return shortIdMatch;
-        }
-
-        // Final fallback: match by Id+Version ignoring LogName, but only if exactly
-        // one candidate passes template validation. This handles providers that define
-        // events under diagnostic/operational channels but log to Application/System
-        // via eventlog redirects (e.g., Winlogon 6001).
-        EventModel? logNameIgnoredMatch = null;
-
-        foreach (var @event in candidateEvents)
-        {
-            if (@event.Version != eventRecord.Version) { continue; }
-
-            if (!_templates.MatchesPropertyCount(@event.Template, eventPropertyCount)) { continue; }
-
-            if (logNameIgnoredMatch is not null)
-            {
-                // Multiple candidates — ambiguous, don't guess
-                logNameIgnoredMatch = null;
-
-                break;
-            }
-
-            logNameIgnoredMatch = @event;
-        }
-
-        if (logNameIgnoredMatch is not null)
-        {
-            Logger?.Debug($"{nameof(GetModernEvent)}: Unique match by Id/Version ignoring LogName - EventId={eventRecord.Id}, Version={eventRecord.Version}, MatchedLogName={logNameIgnoredMatch.LogName}");
-
-            return logNameIgnoredMatch;
-        }
-
-        Logger?.Debug($"{nameof(GetModernEvent)}: No matching event found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}, CandidateEventsWithSameId={candidateEvents.Count}");
-
-        return null;
-    }
-
     /// <summary>
     ///     Picks the parameter table for %%n substitutions, biased toward whichever provider supplied the description
     ///     text. When <paramref name="descriptionFromSupplemental" /> is true, prefer supplemental's parameters and fall back
@@ -857,7 +625,7 @@ public partial class EventResolverBase : IDisposable
 
         if (legacyMessages.Count > 1)
         {
-            var bestMatch = TryDisambiguateLegacyMessage(eventRecord, legacyMessages);
+            var bestMatch = _matcher.DisambiguateLegacyMessage(eventRecord, legacyMessages);
 
             if (bestMatch is not null)
             {
@@ -887,7 +655,7 @@ public partial class EventResolverBase : IDisposable
                 }
 
                 var supplementalLegacy = supplemental.GetMessagesByShortId(eventRecord.Id);
-                var supplementalBest = TryDisambiguateLegacyMessage(eventRecord, supplementalLegacy);
+                var supplementalBest = _matcher.DisambiguateLegacyMessage(eventRecord, supplementalLegacy);
 
                 if (supplementalBest is not null)
                 {
