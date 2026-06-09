@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Provider.Models;
+using EventLogExpert.Provider.Resolution;
 
 namespace EventLogExpert.Eventing.Resolvers;
 
