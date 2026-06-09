@@ -890,6 +890,7 @@ internal sealed class Effects(
                 catch (Exception ex)
                 {
                     logger.Warning($"FilterLibrary Update (re-issue against latest snapshot) failed for {id}. {ex.Message}");
+                    dispatcher.Dispatch(new LoadLibraryAction());
 
                     return;
                 }
