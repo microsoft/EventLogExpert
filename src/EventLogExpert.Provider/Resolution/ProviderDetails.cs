@@ -92,7 +92,7 @@ public sealed class ProviderDetails
     ///     Gets the first parameter message with the given RawId, or null when none matches. Duplicate RawIds resolve
     ///     first-wins.
     /// </summary>
-    public MessageModel? GetParameterByRawId(long rawId)
+    internal MessageModel? GetParameterByRawId(long rawId)
     {
         _parametersByRawIdLookup ??= BuildParametersByRawIdLookup();
 
