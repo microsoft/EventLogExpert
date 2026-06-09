@@ -2,9 +2,11 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Common.Versioning;
+using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using EventLogExpert.Runtime.Update;
@@ -603,6 +605,138 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
+    public async Task CheckForUpdates_WhenMalformedReleaseVersion_ShouldSkipAndLogWarning()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        IEnumerable<GitHubRelease> releases =
+        [
+            new GitHubRelease
+            {
+                Version = "v23.1.alpha",
+                IsPreRelease = false,
+                ReleaseDate = DateTime.Now,
+                Assets =
+                [
+                    new GitHubReleaseAsset { Name = "EventLogExpert_alpha_x64.msix", Uri = "https://example/alpha.msix" }
+                ],
+                RawChanges = "malformed"
+            },
+            new GitHubRelease
+            {
+                Version = Constants.GitHubLatestVersion,
+                IsPreRelease = false,
+                ReleaseDate = DateTime.Now.AddDays(-1),
+                Assets =
+                [
+                    new GitHubReleaseAsset { Name = Constants.GitHubLatestName, Uri = Constants.GitHubLatestUri }
+                ],
+                RawChanges = Constants.GitHubReleaseNotes
+            }
+        ];
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns(Task.FromResult(releases));
+
+        var mockTraceLogger = Substitute.For<ITraceLogger>();
+        var mockDeploymentService = Substitute.For<IDeploymentService>();
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService,
+            deploymentService: mockDeploymentService,
+            traceLogger: mockTraceLogger);
+
+        // Act
+        await updateService.CheckForUpdates(usePreRelease: false);
+
+        // Assert
+        mockTraceLogger.Received().Warning(
+            Arg.Is<WarningLogHandler>(h => h.ToString().Contains("skipping release") && h.ToString().Contains("v23.1.alpha")));
+
+        mockDeploymentService.Received(1).UpdateOnNextRestart(Constants.GitHubLatestUri);
+    }
+
+    [Fact]
+    public async Task CheckForUpdates_WhenRunningPreReleaseAndChannelPreviouslyEnabledThenDisabled_ShouldPromptRollback()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.GitHubPrereleaseVersion[1..]));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
+
+        var mockAppTitleService = Substitute.For<IAppTitleService>();
+        var mockDeploymentService = Substitute.For<IDeploymentService>();
+
+        var mockSettings = Substitute.For<ISettingsService>();
+        mockSettings.IsPreReleaseEnabled.Returns(false);
+        mockSettings.HasEverEnabledPreRelease.Returns(true);
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            appTitleService: mockAppTitleService,
+            gitHubService: mockGitHubService,
+            deploymentService: mockDeploymentService,
+            settings: mockSettings);
+
+        // Act
+        await updateService.CheckForUpdates(usePreRelease: false);
+
+        // Assert
+        mockAppTitleService.Received(1).SetIsPrerelease(true);
+        mockSettings.DidNotReceive().IsPreReleaseEnabled = Arg.Any<bool>();
+
+        mockDeploymentService.Received(1).UpdateOnNextRestart(Constants.GitHubLatestUri);
+    }
+
+    [Fact]
+    public async Task CheckForUpdates_WhenRunningPreReleaseAndChannelNeverEnabled_ShouldEnableChannelAndSuppressRollbackPrompt()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.GitHubPrereleaseVersion[1..]));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
+
+        var mockAppTitleService = Substitute.For<IAppTitleService>();
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
+        var mockDeploymentService = Substitute.For<IDeploymentService>();
+
+        var mockSettings = Substitute.For<ISettingsService>();
+        mockSettings.IsPreReleaseEnabled.Returns(false);
+        mockSettings.HasEverEnabledPreRelease.Returns(false);
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            appTitleService: mockAppTitleService,
+            gitHubService: mockGitHubService,
+            deploymentService: mockDeploymentService,
+            alertDialogService: mockAlertDialogService,
+            settings: mockSettings);
+
+        // Act
+        await updateService.CheckForUpdates(usePreRelease: false);
+
+        // Assert
+        mockAppTitleService.Received(1).SetIsPrerelease(true);
+        mockSettings.Received(1).IsPreReleaseEnabled = true;
+
+        await mockAlertDialogService.DidNotReceive()
+            .ShowAlert("Update Available", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+
+        mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
+        mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
+    }
+
+    [Fact]
     public async Task GetReleaseNotes_NoCurrentChanges_ShouldShowFailureAlertAndReturnNull()
     {
         // Arrange
@@ -617,6 +751,74 @@ public sealed class UpdateServiceTests
         await mockAlertDialogService.Received(1)
             .ShowAlert(Arg.Is<string>(s => s.Contains("Release Notes")), Arg.Is<string>(s => s.Contains("Failed to get release notes")), "OK");
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetReleaseNotes_WhenRunningOlderThanLatest_ShouldReturnNotesForCurrentVersion()
+    {
+        // Arrange
+        const string currentRawChanges = "## Notes for v23.1.1.1\r\n\r\n* abcdef1234567890abcdef1234567890abcdef12 Bug fix for current version";
+        const string newerRawChanges = "## Notes for v23.1.1.2\r\n\r\n* 1234567890abcdef1234567890abcdef12345678 Feature A for newer version";
+
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        IEnumerable<GitHubRelease> releases =
+        [
+            new GitHubRelease
+            {
+                Version = Constants.GitHubLatestVersion,
+                IsPreRelease = false,
+                ReleaseDate = DateTime.Now,
+                Assets =
+                [
+                    new GitHubReleaseAsset { Name = Constants.GitHubLatestName, Uri = Constants.GitHubLatestUri }
+                ],
+                RawChanges = newerRawChanges
+            },
+            new GitHubRelease
+            {
+                Version = "v" + Constants.AppInstalledVersion,
+                IsPreRelease = false,
+                ReleaseDate = DateTime.Now.AddDays(-1),
+                Assets =
+                [
+                    new GitHubReleaseAsset
+                    {
+                        Name = "EventLogExpert_23.1.1.1_x64.msix",
+                        Uri = "https://github.com/microsoft/EventLogExpert/releases/download/v23.1.1.1/EventLogExpert_23.1.1.1_x64.msix"
+                    }
+                ],
+                RawChanges = currentRawChanges
+            }
+        ];
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns(Task.FromResult(releases));
+
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
+        mockAlertDialogService
+            .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
+            .Returns(Task.FromResult(false));
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService,
+            alertDialogService: mockAlertDialogService);
+
+        // Act
+        await updateService.CheckForUpdates(usePreRelease: false);
+        var result = await updateService.GetReleaseNotes();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Contains(Constants.AppInstalledVersion, result.Value.Title);
+        Assert.Contains("Bug fix for current version", result.Value.Markdown);
+        Assert.DoesNotContain("Feature A for newer version", result.Value.Markdown);
+
+        await mockAlertDialogService.DidNotReceive()
+            .ShowAlert("Release Notes Failure", Arg.Any<string>(), "OK");
     }
 
     [Fact]
@@ -658,14 +860,22 @@ public sealed class UpdateServiceTests
         IGitHubService? gitHubService = null,
         IDeploymentService? deploymentService = null,
         ITraceLogger? traceLogger = null,
-        IAlertDialogService? alertDialogService = null)
+        IAlertDialogService? alertDialogService = null,
+        ISettingsService? settings = null)
     {
+        if (settings is null)
+        {
+            settings = Substitute.For<ISettingsService>();
+            settings.HasEverEnabledPreRelease.Returns(true);
+        }
+
         return new UpdateService(
             currentVersionProvider ?? Substitute.For<ICurrentVersionProvider>(),
             appTitleService ?? Substitute.For<IAppTitleService>(),
             gitHubService ?? Substitute.For<IGitHubService>(),
             deploymentService ?? Substitute.For<IDeploymentService>(),
             traceLogger ?? Substitute.For<ITraceLogger>(),
-            alertDialogService ?? Substitute.For<IAlertDialogService>());
+            alertDialogService ?? Substitute.For<IAlertDialogService>(),
+            settings);
     }
 }

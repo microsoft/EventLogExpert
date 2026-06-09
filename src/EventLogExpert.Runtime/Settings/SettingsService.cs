@@ -11,6 +11,7 @@ internal sealed class SettingsService(ISettingsPreferencesProvider preferences) 
     private readonly ISettingsPreferencesProvider _preferences = preferences;
 
     private EventCopyFormat? _copyFormat;
+    private bool? _hasEverEnabledPreRelease;
     private bool? _isPreReleaseEnabled;
     private LogLevel? _logLevel;
     private Theme? _theme;
@@ -36,13 +37,37 @@ internal sealed class SettingsService(ISettingsPreferencesProvider preferences) 
 
     public Action? CopyFormatChanged { get; set; }
 
+    public bool HasEverEnabledPreRelease
+    {
+        get
+        {
+            _hasEverEnabledPreRelease ??= _preferences.HasEverEnabledPreReleasePreference;
+
+            return _hasEverEnabledPreRelease ?? false;
+        }
+        private set
+        {
+            if (_hasEverEnabledPreRelease == value) { return; }
+
+            _hasEverEnabledPreRelease = value;
+            _preferences.HasEverEnabledPreReleasePreference = value;
+        }
+    }
+
     public bool IsPreReleaseEnabled
     {
         get
         {
             _isPreReleaseEnabled ??= _preferences.PreReleasePreference;
 
-            return _isPreReleaseEnabled ?? false;
+            var enabled = _isPreReleaseEnabled ?? false;
+
+            if (enabled && !HasEverEnabledPreRelease)
+            {
+                HasEverEnabledPreRelease = true;
+            }
+
+            return enabled;
         }
         set
         {
@@ -50,6 +75,11 @@ internal sealed class SettingsService(ISettingsPreferencesProvider preferences) 
 
             _isPreReleaseEnabled = value;
             _preferences.PreReleasePreference = value;
+
+            if (value && !HasEverEnabledPreRelease)
+            {
+                HasEverEnabledPreRelease = true;
+            }
         }
     }
 

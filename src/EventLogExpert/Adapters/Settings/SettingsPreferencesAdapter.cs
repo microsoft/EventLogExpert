@@ -9,11 +9,18 @@ namespace EventLogExpert.Adapters.Settings;
 
 internal sealed class SettingsPreferencesAdapter : ISettingsPreferencesProvider
 {
+    private const string HasEverEnabledPreRelease = "has-ever-enabled-prerelease";
     private const string KeyboardCopyFormat = "keyboard-copy-format";
     private const string LoggingLevel = "logging-level";
     private const string PreReleaseEnabled = "prerelease-enabled";
     private const string ThemeName = "theme";
     private const string TimeZone = "timezone";
+
+    public bool HasEverEnabledPreReleasePreference
+    {
+        get => Preferences.Default.Get(HasEverEnabledPreRelease, false);
+        set => Preferences.Default.Set(HasEverEnabledPreRelease, value);
+    }
 
     public EventCopyFormat KeyboardCopyFormatPreference
     {

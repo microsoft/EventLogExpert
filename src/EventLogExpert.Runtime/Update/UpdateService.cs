@@ -5,6 +5,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Common.Versioning;
+using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update.Deployment;
 using EventLogExpert.Runtime.Update.ReleaseNotes;
 
@@ -16,7 +17,8 @@ internal sealed class UpdateService(
     IGitHubService githubService,
     IDeploymentService deploymentService,
     ITraceLogger traceLogger,
-    IAlertDialogService alertDialogService) : IUpdateService
+    IAlertDialogService alertDialogService,
+    ISettingsService settings) : IUpdateService
 {
     private string? _currentRawChanges;
     private int _hasAutoChecked;
@@ -51,8 +53,6 @@ internal sealed class UpdateService(
 
         try
         {
-            // Versions are based on current DateTime so this is safer than dealing with
-            // stripping the v off the Version for every release
             GitHubRelease[] releases = [.. (await githubService.GetReleases()).OrderByDescending(x => x.ReleaseDate)];
 
             if (releases.Length <= 0)
@@ -62,36 +62,75 @@ internal sealed class UpdateService(
 
             traceLogger.Debug($"{nameof(CheckForUpdates)} Found the following releases:");
 
+            GitHubRelease? currentRelease = null;
+
             foreach (var release in releases)
             {
                 traceLogger.Debug($"{nameof(CheckForUpdates)}   Version: {release.Version} " +
                     $"ReleaseDate: {release.ReleaseDate} IsPreRelease: {release.IsPreRelease}");
 
-                if (!usePreRelease && release.IsPreRelease) { continue; }
-
-                // Need to drop the v off the version number provided by GitHub
-                if (versionProvider.CurrentVersion.CompareTo(new Version(release.Version.TrimStart('v'))) != 0)
+                if (!Version.TryParse(release.Version.TrimStart('v'), out var releaseVersion))
                 {
-                    latest = release;
+                    traceLogger.Warning($"{nameof(CheckForUpdates)} skipping release with unparseable version: {release.Version}");
+
+                    continue;
+                }
+
+                if (versionProvider.CurrentVersion.CompareTo(releaseVersion) == 0)
+                {
+                    currentRelease = release;
 
                     break;
                 }
+            }
 
-                _currentRawChanges = release.RawChanges;
+            bool effectiveUsePreRelease = usePreRelease;
 
-                if (release.IsPreRelease)
+            if (currentRelease is { } current)
+            {
+                _currentRawChanges = current.RawChanges;
+
+                if (current.IsPreRelease)
                 {
                     appTitleService.SetIsPrerelease(true);
-                }
 
-                if (userInitiated)
+                    if (settings is { IsPreReleaseEnabled: false, HasEverEnabledPreRelease: false })
+                    {
+                        settings.IsPreReleaseEnabled = true;
+                        effectiveUsePreRelease = true;
+
+                        traceLogger.Debug($"{nameof(CheckForUpdates)} auto-enabled IsPreReleaseEnabled " +
+                            $"(running prerelease {current.Version}).");
+                    }
+                }
+            }
+
+            foreach (var release in releases)
+            {
+                if (!effectiveUsePreRelease && release.IsPreRelease) { continue; }
+
+                if (!Version.TryParse(release.Version.TrimStart('v'), out var releaseVersion))
                 {
-                    await alertDialogService.ShowAlert("No Updates Available",
-                        "You are currently running the latest version.",
-                        "OK");
+                    continue;
                 }
 
-                return;
+                if (versionProvider.CurrentVersion.CompareTo(releaseVersion) != 0)
+                {
+                    latest = release;
+                }
+                else
+                {
+                    if (userInitiated)
+                    {
+                        await alertDialogService.ShowAlert("No Updates Available",
+                            "You are currently running the latest version.",
+                            "OK");
+                    }
+
+                    return;
+                }
+
+                break;
             }
 
             if (!latest.HasValue)
