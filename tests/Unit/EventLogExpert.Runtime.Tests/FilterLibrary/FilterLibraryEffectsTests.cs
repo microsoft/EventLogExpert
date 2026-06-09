@@ -16,6 +16,40 @@ namespace EventLogExpert.Runtime.Tests.FilterLibrary;
 public sealed class FilterLibraryEffectsTests
 {
     [Fact]
+    public async Task ApplyBulkTagUpdate_ReissueAgainstLatestSnapshotFails_ReloadsLibrary_AnnouncesFailure_DispatchesNoProjection()
+    {
+        var staleEntry = BuildFilterEntry("A") with { Tags = ["bug"], Name = "Stale" };
+        var renamedEntry = staleEntry with { Name = "Renamed" };
+        var staleState = new FilterLibraryState { Entries = [staleEntry] };
+        var renamedState = new FilterLibraryState { Entries = [renamedEntry] };
+        var announcer = Substitute.For<IAnnouncementService>();
+        var (effects, store, dispatcher, stateMock, _) = CreateEffects(state: staleState, announcementService: announcer);
+
+        stateMock.Value.Returns(staleState, renamedState);
+
+        int bulkCalls = 0;
+        store.UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                bulkCalls++;
+                if (bulkCalls == 1)
+                {
+                    var list = (IReadOnlyList<LibraryEntry>)call[0];
+                    return Task.FromResult<IReadOnlyList<LibraryEntryId>>(list.Select(e => e.Id).ToList());
+                }
+
+                return Task.FromException<IReadOnlyList<LibraryEntryId>>(new InvalidOperationException("reissue-fail"));
+            });
+
+        await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+        dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
+        dispatcher.Received(1).Dispatch(Arg.Any<TagBulkUpdateFailedAction>());
+        announcer.Received(1).Announce("Couldn't update tags. The library was reloaded.");
+    }
+
+    [Fact]
     public async Task HandleAddFilterToExistingFilterSet_AppendsToFilterSet()
     {
         var existingFilter = SavedFilter.TryCreate("Level == 2");
@@ -63,6 +97,34 @@ public sealed class FilterLibraryEffectsTests
         await store.DidNotReceive().UpdateAsync(Arg.Is<LibraryEntry>(e => e.Id == filterSet.Id), Arg.Any<CancellationToken>());
         // But DID promote the source.
         await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e.Id == source.Id && e.Origin == LibraryEntryOrigin.UserSaved), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAddFilterToExistingFilterSet_FilterPresentInGateSnapshot_DoesNotDoubleAddOrPersist()
+    {
+        var existing = SavedFilter.TryCreate("Level == 4");
+        var duplicate = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(existing);
+        Assert.NotNull(duplicate);
+        var filterSetEmpty = new LibraryEntryFilterSet
+        {
+            Name = "Set",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = [],
+        };
+        var filterSetWithExisting = filterSetEmpty with { Filters = [existing] };
+        var stateWithoutFilter = new FilterLibraryState { Entries = [filterSetEmpty] };
+        var stateWithFilter = new FilterLibraryState { Entries = [filterSetWithExisting] };
+        var (effects, store, dispatcher, stateMock, _) = CreateEffects(state: stateWithoutFilter);
+
+        stateMock.Value.Returns(stateWithoutFilter, stateWithFilter, stateWithFilter);
+
+        await effects.HandleAddFilterToExistingFilterSet(
+            new AddFilterToExistingFilterSetAction(filterSetEmpty.Id, duplicate, SourceEntryId: null),
+            dispatcher);
+
+        await store.DidNotReceive().UpdateAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
     }
 
     [Fact]
@@ -1751,6 +1813,41 @@ public sealed class FilterLibraryEffectsTests
 
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
         logger.ReceivedWithAnyArgs(1).Warning(default);
+    }
+
+    [Fact]
+    public async Task WriteGate_SerializesConcurrentPersistAndDispatchAsyncCalls()
+    {
+        var entry1 = BuildFilterEntry("E1") with { Origin = LibraryEntryOrigin.AutoTracked };
+        var entry2 = BuildFilterEntry("E2") with { Origin = LibraryEntryOrigin.AutoTracked };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [entry1, entry2] });
+
+        var firstBlocker = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int totalCalls = 0;
+        Lock lockObj = new();
+
+        store.UpdateAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                int seq;
+
+                lock (lockObj) { seq = ++totalCalls; }
+
+                return seq == 1 ? firstBlocker.Task : Task.CompletedTask;
+            });
+
+        var task1 = effects.HandleSaveEntry(new SaveEntryAction(entry1.Id), dispatcher);
+        var task2 = effects.HandleSaveEntry(new SaveEntryAction(entry2.Id), dispatcher);
+
+        await PollUntilAsync(() => Volatile.Read(ref totalCalls) == 1, TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, Volatile.Read(ref totalCalls));
+
+        firstBlocker.SetResult(true);
+        await Task.WhenAll(task1, task2);
+
+        Assert.Equal(2, Volatile.Read(ref totalCalls));
     }
 
     private static LibraryEntrySavedFilter BuildFilterEntry(string name)
