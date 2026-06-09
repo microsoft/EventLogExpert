@@ -47,6 +47,8 @@ internal sealed class IpcMessageWriter(Stream destination) : IAsyncDisposable
         finally
         {
             try { _writeLock.Release(); } catch (ObjectDisposedException) { }
+
+            try { _writeLock.Dispose(); } catch (ObjectDisposedException) { }
         }
     }
 

@@ -97,7 +97,7 @@ public sealed record FatalMessage(string ExceptionType, string Message, string S
 /// <summary>
 ///     Control message written runner -> helper to request cooperative cancellation of the in-flight operation.
 ///     Helper-side dedicated control reader cancels the operation's linked <c>CancellationTokenSource</c>; the operation
-///     then completes via the normal <see cref="ResultMessage" /> path with <see cref="DatabaseToolsOutcome.Cancelled" />
-///     .
+///     then completes via the normal <see cref="ResultMessage" /> path with
+///     <see cref="DatabaseToolsOutcome.Cancelled" />.
 /// </summary>
 public sealed record CancelMessage : DatabaseToolsIpcMessage;
