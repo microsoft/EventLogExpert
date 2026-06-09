@@ -8,6 +8,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Resolution;
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -52,11 +53,9 @@ public partial class EventResolverBase : IDisposable
         new(StringComparer.OrdinalIgnoreCase);
 
     private readonly IEventResolverCache? _cache;
-    private readonly ConcurrentDictionary<string, string[]> _formattedPropertiesCache = [];
     private readonly ITraceLogger? _logger;
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
-    private readonly ConcurrentDictionary<string, string[]> _visibleOutTypesCache = [];
-    private readonly ConcurrentDictionary<string, int> _visiblePropertyCountCache = [];
+    private readonly TemplateAnalyzer _templates = new();
 
     private int _disposed;
 
@@ -136,7 +135,7 @@ public partial class EventResolverBase : IDisposable
         if (!disposing) { return; }
 
         // Atomically guard against double-disposal: only the first caller observes the prior 0.
-        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) { return; }
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) { }
     }
 
     /// <summary>
@@ -217,18 +216,6 @@ public partial class EventResolverBase : IDisposable
                     break;
             }
         }
-    }
-
-    private static string? ExtractAttribute(ReadOnlySpan<char> element, ReadOnlySpan<char> attributePrefix)
-    {
-        int index = element.IndexOf(attributePrefix, StringComparison.Ordinal);
-
-        if (index == -1) { return null; }
-
-        index += attributePrefix.Length;
-        int endIndex = element[index..].IndexOf('"');
-
-        return endIndex != -1 ? new string(element.Slice(index, endIndex)) : null;
     }
 
     /// <summary>Treats null and empty string as equivalent for LogName comparison.</summary>
@@ -367,99 +354,6 @@ public partial class EventResolverBase : IDisposable
         return _cache?.GetOrAddValue(taskName) ?? taskName;
     }
 
-    /// <summary>
-    ///     Counts the number of "visible" template properties by excluding length-prefixed binary data length fields.
-    ///     When a &lt;data&gt; element has a <c>length</c> attribute referencing another &lt;data&gt; element's <c>name</c>,
-    ///     Windows consumes the referenced length field internally and does not surface it as a user property via EvtRender.
-    /// </summary>
-    private int CountVisibleTemplateProperties(ReadOnlySpan<char> template)
-    {
-        var cache = _visiblePropertyCountCache.GetAlternateLookup<ReadOnlySpan<char>>();
-
-        if (cache.TryGetValue(template, out int cachedCount)) { return cachedCount; }
-
-        List<string> names = [];
-        HashSet<string> lengthProviderNames = new(StringComparer.OrdinalIgnoreCase);
-
-        ReadOnlySpan<char> dataTag = "<data";
-        ReadOnlySpan<char> nameAttr = "name=\"";
-        ReadOnlySpan<char> lengthAttr = "length=\"";
-
-        int searchStart = 0;
-
-        while (searchStart < template.Length)
-        {
-            int dataIndex = template[searchStart..].IndexOf(dataTag, StringComparison.OrdinalIgnoreCase);
-
-            if (dataIndex == -1) { break; }
-
-            dataIndex += searchStart;
-
-            int nextCharIndex = dataIndex + dataTag.Length;
-
-            if (nextCharIndex < template.Length)
-            {
-                char next = template[nextCharIndex];
-
-                if (next != ' ' && next != '\t' && next != '\r' && next != '\n' && next != '/' && next != '>')
-                {
-                    searchStart = nextCharIndex;
-
-                    continue;
-                }
-            }
-
-            int elementEnd = template[dataIndex..].IndexOf("/>");
-
-            if (elementEnd == -1)
-            {
-                elementEnd = template[dataIndex..].IndexOf('>');
-            }
-
-            if (elementEnd == -1) { break; }
-
-            elementEnd += dataIndex;
-
-            ReadOnlySpan<char> element = template[dataIndex..elementEnd];
-
-            names.Add(ExtractAttribute(element, nameAttr) ?? string.Empty);
-
-            // If this element has a length attribute, the referenced element is a length
-            // provider that Windows consumes internally.
-            string? lengthRef = ExtractAttribute(element, lengthAttr);
-
-            if (lengthRef is not null)
-            {
-                lengthProviderNames.Add(lengthRef);
-            }
-
-            searchStart = elementEnd + 1;
-        }
-
-        if (lengthProviderNames.Count == 0)
-        {
-            cache.TryAdd(template, names.Count);
-
-            return names.Count;
-        }
-
-        // Exclude only the length provider elements; the binary data elements
-        // themselves are still surfaced as properties by Windows.
-        int visibleCount = 0;
-
-        for (int i = 0; i < names.Count; i++)
-        {
-            if (string.IsNullOrEmpty(names[i]) || !lengthProviderNames.Contains(names[i]))
-            {
-                visibleCount++;
-            }
-        }
-
-        cache.TryAdd(template, visibleCount);
-
-        return visibleCount;
-    }
-
     private ResolvedEvent CreateEventModel(
         EventRecord eventRecord,
         EventModel? modernEvent,
@@ -485,48 +379,6 @@ public partial class EventResolverBase : IDisposable
             UserId = eventRecord.UserId,
             Xml = eventRecord.Xml ?? string.Empty
         };
-
-    /// <summary>
-    ///     Relaxed template match for exact Id+Version+LogName matches only. Allows the template to have exactly 1 more
-    ///     data node than the event has properties, which handles version mismatches where the manifest added an optional
-    ///     field in a newer version.
-    /// </summary>
-    private bool DoesTemplateApproximatelyMatchPropertyCount(ReadOnlySpan<char> template, int eventPropertyCount)
-    {
-        if (template.IsEmpty || eventPropertyCount <= 0) { return false; }
-
-        int templateCount = CountVisibleTemplateProperties(template);
-
-        if (templateCount == 0)
-        {
-            templateCount = GetOrParseTemplateDataNodes(template).Length;
-        }
-
-        int diff = templateCount - eventPropertyCount;
-
-        // Template may have exactly 1 more field than the event
-        return diff == 1;
-    }
-
-    private bool DoesTemplateMatchPropertyCount(ReadOnlySpan<char> template, int eventPropertyCount)
-    {
-        if (template.IsEmpty) { return false; }
-
-        string[] dataNodes = GetOrParseTemplateDataNodes(template);
-
-        if (dataNodes.Length == eventPropertyCount) { return true; }
-
-        // Account for length-prefixed binary data pairs that Windows does not
-        // surface as separate user properties via EvtRender.
-        return CountVisibleTemplateProperties(template) == eventPropertyCount;
-    }
-
-    private bool DoesTemplateStrictlyMatchPropertyCount(ReadOnlySpan<char> template, int eventPropertyCount)
-    {
-        if (template.IsEmpty) { return eventPropertyCount == 0; }
-
-        return DoesTemplateMatchPropertyCount(template, eventPropertyCount);
-    }
 
     private string FormatDescription(
         List<string> properties,
@@ -707,7 +559,7 @@ public partial class EventResolverBase : IDisposable
 
     private List<string> GetFormattedProperties(ReadOnlySpan<char> template, IReadOnlyList<object> properties)
     {
-        string[]? dataNodes = null;
+        ImmutableArray<string> dataNodes = default;
         List<string> formattedValues = [];
 
         if (!template.IsEmpty)
@@ -715,20 +567,15 @@ public partial class EventResolverBase : IDisposable
             // EvtRender may or may not include hidden length-provider fields in its output.
             // Choose the outType array whose length matches the actual property count.
             // If neither matches, skip outType formatting to avoid misalignment.
-            var visibleOutTypes = GetVisibleTemplateOutTypes(template);
+            var meta = _templates.Analyze(template);
 
-            if (visibleOutTypes.Length == properties.Count)
+            if (meta.VisibleOutTypes.Length == properties.Count)
             {
-                dataNodes = visibleOutTypes;
+                dataNodes = meta.VisibleOutTypes;
             }
-            else
+            else if (meta.AllOutTypes.Length == properties.Count)
             {
-                var allOutTypes = GetOrParseTemplateDataNodes(template);
-
-                if (allOutTypes.Length == properties.Count)
-                {
-                    dataNodes = allOutTypes;
-                }
+                dataNodes = meta.AllOutTypes;
             }
         }
 
@@ -736,7 +583,7 @@ public partial class EventResolverBase : IDisposable
 
         foreach (object property in properties)
         {
-            string? outType = index < dataNodes?.Length ? dataNodes[index] : null;
+            string? outType = !dataNodes.IsDefault && index < dataNodes.Length ? dataNodes[index] : null;
 
             switch (property)
             {
@@ -899,7 +746,7 @@ public partial class EventResolverBase : IDisposable
             break;
         }
 
-        if (modernEvent is not null && DoesTemplateStrictlyMatchPropertyCount(modernEvent.Template, eventPropertyCount))
+        if (modernEvent is not null && _templates.StrictlyMatchesPropertyCount(modernEvent.Template, eventPropertyCount))
         {
             Logger?.Debug($"{nameof(GetModernEvent)}: Exact match found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}");
 
@@ -910,7 +757,7 @@ public partial class EventResolverBase : IDisposable
         // more data nodes than the event supplies. This handles version mismatches where
         // the manifest added optional fields. FormatDescription handles out-of-range
         // property indices gracefully by substituting empty string.
-        if (modernEvent is not null && DoesTemplateApproximatelyMatchPropertyCount(modernEvent.Template, eventPropertyCount))
+        if (modernEvent is not null && _templates.ApproximatelyMatchesPropertyCount(modernEvent.Template, eventPropertyCount))
         {
             Logger?.Debug($"{nameof(GetModernEvent)}: Exact match with relaxed template count - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}");
 
@@ -926,7 +773,7 @@ public partial class EventResolverBase : IDisposable
         {
             if (!LogNamesMatch(@event.LogName, eventRecord.LogName)) { continue; }
 
-            if (!DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
+            if (!_templates.MatchesPropertyCount(@event.Template, eventPropertyCount)) { continue; }
 
             Logger?.Debug($"{nameof(GetModernEvent)}: Match by Id/LogName with template - EventId={eventRecord.Id}, LogName={eventRecord.LogName}, MatchedVersion={@event.Version}");
 
@@ -947,7 +794,7 @@ public partial class EventResolverBase : IDisposable
             {
                 if (@event.Id != fullRawId || @event.Version != eventRecord.Version) { continue; }
 
-                if (!DoesTemplateStrictlyMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
+                if (!_templates.StrictlyMatchesPropertyCount(@event.Template, eventPropertyCount)) { continue; }
 
                 Logger?.Debug($"{nameof(GetModernEvent)}: Match by full RawId fallback - RawId={fullRawId:X}, Version={eventRecord.Version}");
 
@@ -966,7 +813,7 @@ public partial class EventResolverBase : IDisposable
             // entries or trigger a false ambiguity.
             if (eventRecord.Qualifiers is not null && @event.Id > ushort.MaxValue) { continue; }
 
-            if (!DoesTemplateStrictlyMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
+            if (!_templates.StrictlyMatchesPropertyCount(@event.Template, eventPropertyCount)) { continue; }
 
             if (shortIdMatch is not null)
             {
@@ -996,7 +843,7 @@ public partial class EventResolverBase : IDisposable
         {
             if (@event.Version != eventRecord.Version) { continue; }
 
-            if (!DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
+            if (!_templates.MatchesPropertyCount(@event.Template, eventPropertyCount)) { continue; }
 
             if (logNameIgnoredMatch is not null)
             {
@@ -1019,83 +866,6 @@ public partial class EventResolverBase : IDisposable
         Logger?.Debug($"{nameof(GetModernEvent)}: No matching event found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}, CandidateEventsWithSameId={candidateEvents.Count}");
 
         return null;
-    }
-
-    private string[] GetOrParseTemplateDataNodes(ReadOnlySpan<char> template)
-    {
-        var cache = _formattedPropertiesCache.GetAlternateLookup<ReadOnlySpan<char>>();
-
-        if (cache.TryGetValue(template, out string[]? dataNodes))
-        {
-            return dataNodes;
-        }
-
-        List<string> temp = [];
-        ReadOnlySpan<char> dataTag = "<data";
-        ReadOnlySpan<char> outTypeAttribute = "outType=\"";
-
-        int searchStart = 0;
-
-        while (searchStart < template.Length)
-        {
-            int dataIndex = template[searchStart..].IndexOf(dataTag, StringComparison.OrdinalIgnoreCase);
-
-            if (dataIndex == -1) { break; }
-
-            dataIndex += searchStart;
-
-            // Verify the character after "<data" is whitespace, '/', or '>'
-            // to avoid matching tags like "<dataSource"
-            int nextCharIndex = dataIndex + dataTag.Length;
-
-            if (nextCharIndex < template.Length)
-            {
-                char next = template[nextCharIndex];
-
-                if (next != ' ' && next != '\t' && next != '\r' && next != '\n' && next != '/' && next != '>')
-                {
-                    searchStart = nextCharIndex;
-
-                    continue;
-                }
-            }
-
-            // Find the end of this element
-            int elementEnd = template[dataIndex..].IndexOf("/>");
-
-            if (elementEnd == -1)
-            {
-                elementEnd = template[dataIndex..].IndexOf('>');
-            }
-
-            if (elementEnd == -1) { break; }
-
-            elementEnd += dataIndex;
-
-            ReadOnlySpan<char> element = template[dataIndex..elementEnd];
-            int outTypeIndex = element.IndexOf(outTypeAttribute, StringComparison.Ordinal);
-
-            if (outTypeIndex != -1)
-            {
-                outTypeIndex += outTypeAttribute.Length;
-                int endIndex = element[outTypeIndex..].IndexOf('"');
-
-                temp.Add(endIndex != -1 ?
-                    new string(element.Slice(outTypeIndex, endIndex)) :
-                    string.Empty);
-            }
-            else
-            {
-                temp.Add(string.Empty);
-            }
-
-            searchStart = elementEnd + 1;
-        }
-
-        dataNodes = [.. temp];
-        cache.TryAdd(template, dataNodes);
-
-        return dataNodes;
     }
 
     /// <summary>
@@ -1122,96 +892,6 @@ public partial class EventResolverBase : IDisposable
         supplemental ??= TryGetSupplementalDetails(eventRecord);
 
         return supplemental?.Parameters ?? primary?.Parameters ?? [];
-    }
-
-    /// <summary>
-    ///     Returns the outType values for only visible template properties, excluding hidden length-provider fields that
-    ///     Windows consumes internally. This ensures the outType array aligns correctly with the properties surfaced by
-    ///     EvtRender.
-    /// </summary>
-    private string[] GetVisibleTemplateOutTypes(ReadOnlySpan<char> template)
-    {
-        var cache = _visibleOutTypesCache.GetAlternateLookup<ReadOnlySpan<char>>();
-
-        if (cache.TryGetValue(template, out string[]? cached)) { return cached; }
-
-        List<(string name, string outType)> elements = [];
-        HashSet<string> lengthProviderNames = new(StringComparer.OrdinalIgnoreCase);
-
-        ReadOnlySpan<char> dataTag = "<data";
-        ReadOnlySpan<char> nameAttr = "name=\"";
-        ReadOnlySpan<char> outTypeAttr = "outType=\"";
-        ReadOnlySpan<char> lengthAttr = "length=\"";
-
-        int searchStart = 0;
-
-        while (searchStart < template.Length)
-        {
-            int dataIndex = template[searchStart..].IndexOf(dataTag, StringComparison.OrdinalIgnoreCase);
-
-            if (dataIndex == -1) { break; }
-
-            dataIndex += searchStart;
-
-            int nextCharIndex = dataIndex + dataTag.Length;
-
-            if (nextCharIndex < template.Length)
-            {
-                char next = template[nextCharIndex];
-
-                if (next != ' ' && next != '\t' && next != '\r' && next != '\n' && next != '/' && next != '>')
-                {
-                    searchStart = nextCharIndex;
-
-                    continue;
-                }
-            }
-
-            int elementEnd = template[dataIndex..].IndexOf("/>");
-
-            if (elementEnd == -1)
-            {
-                elementEnd = template[dataIndex..].IndexOf('>');
-            }
-
-            if (elementEnd == -1) { break; }
-
-            elementEnd += dataIndex;
-
-            ReadOnlySpan<char> element = template[dataIndex..elementEnd];
-
-            string name = ExtractAttribute(element, nameAttr) ?? string.Empty;
-            string outType = ExtractAttribute(element, outTypeAttr) ?? string.Empty;
-
-            elements.Add((name, outType));
-
-            string? lengthRef = ExtractAttribute(element, lengthAttr);
-
-            if (lengthRef is not null)
-            {
-                lengthProviderNames.Add(lengthRef);
-            }
-
-            searchStart = elementEnd + 1;
-        }
-
-        string[] result;
-
-        if (lengthProviderNames.Count == 0)
-        {
-            result = elements.Select(e => e.outType).ToArray();
-        }
-        else
-        {
-            result = elements
-                .Where(e => string.IsNullOrEmpty(e.name) || !lengthProviderNames.Contains(e.name))
-                .Select(e => e.outType)
-                .ToArray();
-        }
-
-        cache.TryAdd(template, result);
-
-        return result;
     }
 
     /// <summary>Resolve event descriptions from an event record.</summary>
