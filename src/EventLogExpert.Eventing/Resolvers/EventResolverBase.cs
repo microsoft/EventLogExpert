@@ -33,28 +33,13 @@ public partial class EventResolverBase : IDisposable
         "win:Win32Error"
     ];
 
-    /// <summary>
-    ///     These are already defined in System.Diagnostics.Eventing.Reader.StandardEventKeywords. However, the names
-    ///     there do not match what is normally displayed in Event Viewer. We redefine them here so we can use our own strings.
-    /// </summary>
-    private static readonly Dictionary<long, string> s_standardKeywords = new()
-    {
-        { 0x1000000000000, "Response Time" },
-        { 0x2000000000000, "Wdi Context" },
-        { 0x4000000000000, "Wdi Diag" },
-        { 0x8000000000000, "Sqm" },
-        { 0x10000000000000, "Audit Failure" },
-        { 0x20000000000000, "Audit Success" },
-        { 0x40000000000000, "Correlation Hint" },
-        { 0x80000000000000, "Classic" }
-    };
-
     protected readonly ConcurrentDictionary<string, ProviderDetails?> ProviderDetails =
         new(StringComparer.OrdinalIgnoreCase);
 
     private readonly IEventResolverCache? _cache;
     private readonly ITraceLogger? _logger;
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
+    private readonly TaskKeywordResolver _taskKeywords;
     private readonly TemplateAnalyzer _templates = new();
 
     private int _disposed;
@@ -63,6 +48,7 @@ public partial class EventResolverBase : IDisposable
     {
         _cache = cache;
         _logger = logger;
+        _taskKeywords = new TaskKeywordResolver(cache, logger);
     }
 
     protected bool IsDisposed => Volatile.Read(ref _disposed) != 0;
@@ -347,13 +333,6 @@ public partial class EventResolverBase : IDisposable
         return _cache?.GetOrAddDescription(fallback) ?? fallback;
     }
 
-    private string CacheTaskName(string taskName)
-    {
-        taskName = taskName.TrimEnd('\0');
-
-        return _cache?.GetOrAddValue(taskName) ?? taskName;
-    }
-
     private ResolvedEvent CreateEventModel(
         EventRecord eventRecord,
         EventModel? modernEvent,
@@ -367,13 +346,13 @@ public partial class EventResolverBase : IDisposable
             ComputerName = _cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
             Description = ResolveDescription(eventRecord, details, descriptionDetails, modernEvent, supplemental, supplementalModernEvent),
             Id = eventRecord.Id,
-            Keywords = GetKeywordsFromBitmask(eventRecord, details, supplemental),
+            Keywords = _taskKeywords.GetKeywords(eventRecord, details, supplemental),
             Level = SeverityFormatter.Format(eventRecord.Level),
             LogName = _cache?.GetOrAddValue(eventRecord.LogName) ?? eventRecord.LogName,
             ProcessId = eventRecord.ProcessId,
             RecordId = eventRecord.RecordId,
             Source = _cache?.GetOrAddValue(eventRecord.ProviderName) ?? eventRecord.ProviderName,
-            TaskCategory = ResolveTaskName(eventRecord, details, modernEvent, supplemental, supplementalModernEvent),
+            TaskCategory = _taskKeywords.ResolveTaskName(eventRecord, details, modernEvent, supplemental, supplementalModernEvent),
             ThreadId = eventRecord.ThreadId,
             TimeCreated = eventRecord.TimeCreated,
             UserId = eventRecord.UserId,
@@ -659,63 +638,6 @@ public partial class EventResolverBase : IDisposable
         return formattedValues;
     }
 
-    private List<string> GetKeywordsFromBitmask(EventRecord eventRecord, ProviderDetails? details, ProviderDetails? supplemental)
-    {
-        if (eventRecord.Keywords is null or 0) { return []; }
-
-        var keywordsValue = eventRecord.Keywords.Value;
-        List<string> returnValue = [];
-
-        // Standard (Microsoft-defined) keywords live in bits 48–55. Skip the entire
-        // standard-keyword scan when the event has no bits in that range.
-        if ((keywordsValue & 0x00FF_0000_0000_0000L) != 0)
-        {
-            foreach (var (bit, name) in s_standardKeywords)
-            {
-                if ((keywordsValue & bit) != bit) { continue; }
-
-                var keyword = name.TrimEnd('\0');
-                returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
-            }
-        }
-
-        // Provider-defined keywords use bits 0–47; bits 48–63 are reserved
-        // for Microsoft-defined standard keywords handled above.
-        var providerBits = keywordsValue & 0x0000_FFFF_FFFF_FFFFL;
-
-        if (providerBits == 0) { return returnValue; }
-
-        long matchedBits = 0;
-
-        if (details is not null)
-        {
-            foreach (var (bit, name) in details.Keywords)
-            {
-                if ((providerBits & bit) != bit) { continue; }
-
-                matchedBits |= bit;
-                var keyword = name.TrimEnd('\0');
-                returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
-            }
-        }
-
-        // Fill remaining set bits from supplemental. Primary wins on conflicts.
-        if (supplemental is not null && !ReferenceEquals(supplemental, details))
-        {
-            foreach (var (bit, name) in supplemental.Keywords)
-            {
-                if ((providerBits & bit) != bit) { continue; }
-
-                if ((matchedBits & bit) == bit) { continue; }
-
-                var keyword = name.TrimEnd('\0');
-                returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
-            }
-        }
-
-        return returnValue;
-    }
-
     private EventModel? GetModernEvent(EventRecord eventRecord, ProviderDetails details)
     {
         if (eventRecord.Version is null && string.IsNullOrEmpty(eventRecord.LogName))
@@ -997,93 +919,5 @@ public partial class EventResolverBase : IDisposable
         Logger?.Debug($"{nameof(ResolveDescription)}: No matching description found - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}");
 
         return DefaultNoMatchingDescription;
-    }
-
-    private string ResolveTaskName(
-        EventRecord eventRecord,
-        ProviderDetails? details,
-        EventModel? modernEvent,
-        ProviderDetails? supplemental,
-        EventModel? supplementalModernEvent)
-    {
-        if (TryResolveTaskNameFromDetails(eventRecord, details, modernEvent, out var taskName))
-        {
-            return CacheTaskName(taskName);
-        }
-
-        if (supplemental is not null &&
-            !ReferenceEquals(supplemental, details) &&
-            TryResolveTaskNameFromDetails(eventRecord, supplemental, supplementalModernEvent, out taskName))
-        {
-            // The primary modernEvent (if any) was already tried above against primary's tables.
-            // Use the pre-computed supplementalModernEvent so its EventModel.Task can drive
-            // supplemental's Tasks lookup.
-            return CacheTaskName(taskName);
-        }
-
-        return !eventRecord.Task.HasValue ?
-            string.Empty :
-            CacheTaskName(eventRecord.Task == 0 ? "None" : $"({eventRecord.Task})");
-    }
-
-    private bool TryResolveTaskNameFromDetails(
-        EventRecord eventRecord,
-        ProviderDetails? details,
-        EventModel? modernEvent,
-        out string taskName)
-    {
-        taskName = string.Empty;
-
-        if (details is null)
-        {
-            return false;
-        }
-
-        if (modernEvent?.Task is not null && details.Tasks.TryGetValue(modernEvent.Task, out var name))
-        {
-            taskName = name;
-            return true;
-        }
-
-        if (!eventRecord.Task.HasValue)
-        {
-            return false;
-        }
-
-        if (details.Tasks.TryGetValue(eventRecord.Task.Value, out name))
-        {
-            taskName = name;
-            return true;
-        }
-
-        var messagesByShortId = details.GetMessagesByShortId(eventRecord.Task.Value);
-
-        List<MessageModel>? potentialTaskNames = null;
-
-        foreach (var m in messagesByShortId)
-        {
-            if (m.LogLink is null || m.LogLink != eventRecord.LogName) { continue; }
-
-            potentialTaskNames ??= [];
-            potentialTaskNames.Add(m);
-        }
-
-        if (potentialTaskNames is { Count: > 0 })
-        {
-            taskName = potentialTaskNames[0].Text;
-
-            if (potentialTaskNames.Count > 1)
-            {
-                Logger?.Debug($"More than one matching task ID was found.");
-                Logger?.Debug($"  eventRecord.Task: {eventRecord.Task}");
-                Logger?.Debug($"   Potential matches:");
-
-                potentialTaskNames.ForEach(t => Logger?.Debug($"    {t.LogLink} {t.Text}"));
-            }
-
-            return true;
-        }
-
-        return false;
     }
 }
