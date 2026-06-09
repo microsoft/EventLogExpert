@@ -21,7 +21,7 @@ internal sealed class Effects(
 {
     private const int MaxAutoTrackedRecents = 50;
 
-    private readonly SemaphoreSlim _migrationGate = new(initialCount: 1, maxCount: 1);
+    private readonly SemaphoreSlim _writeGate = new(initialCount: 1, maxCount: 1);
 
     [EffectMethod]
     public async Task HandleAddFilterToExistingFilterSet(AddFilterToExistingFilterSetAction action, IDispatcher dispatcher)
@@ -30,24 +30,9 @@ internal sealed class Effects(
 
         if (filterSet is null) { return; }
 
-        // Dedup tuple matches the SQL UNIQUE INDEX scope: (lower(ComparisonText), Mode, IsExcluded).
-        // Distinct Mode values are intentional per the mode-drift policy.
-        var addText = action.Filter.ComparisonText;
-        var addMode = action.Filter.Mode;
-        var addExcluded = action.Filter.IsExcluded;
-
-        if (filterSet.Filters.Any(f =>
-            string.Equals(f.ComparisonText, addText, StringComparison.OrdinalIgnoreCase) &&
-            f.Mode == addMode &&
-            f.IsExcluded == addExcluded))
-        {
-            await PromoteSourceIfAutoTracked(action.SourceEntryId, dispatcher).ConfigureAwait(false);
-            return;
-        }
-
         var newFilter = action.Filter with { Id = FilterId.Create(), IsEnabled = false };
 
-        await PersistAndDispatchAsync(filterSet.Id, e => AppendFilterToSet(e, newFilter), dispatcher).ConfigureAwait(false);
+        await PersistAndDispatchAsync(filterSet.Id, e => AppendFilterToSetIfMissing(e, newFilter), dispatcher).ConfigureAwait(false);
         await PromoteSourceIfAutoTracked(action.SourceEntryId, dispatcher).ConfigureAwait(false);
     }
 
@@ -64,29 +49,46 @@ internal sealed class Effects(
             Origin = LibraryEntryOrigin.UserSaved,
         };
 
-        try { await store.AddAsync(created).ConfigureAwait(false); }
-        catch (Exception ex)
-        {
-            logger.Warning($"FilterLibrary Add (new filter set) failed for {created.Id}. {ex.Message}");
+        await _writeGate.WaitAsync().ConfigureAwait(false);
 
-            return;
+        try
+        {
+            try { await store.AddAsync(created).ConfigureAwait(false); }
+            catch (Exception ex)
+            {
+                logger.Warning($"FilterLibrary Add (new filter set) failed for {created.Id}. {ex.Message}");
+
+                return;
+            }
+
+            dispatcher.Dispatch(new AddLibraryEntrySuccessAction(created));
+        }
+        finally
+        {
+            _writeGate.Release();
         }
 
-        dispatcher.Dispatch(new AddLibraryEntrySuccessAction(created));
         await PromoteSourceIfAutoTracked(action.SourceEntryId, dispatcher).ConfigureAwait(false);
     }
 
     [EffectMethod]
     public async Task HandleAddLibraryEntry(AddLibraryEntryAction action, IDispatcher dispatcher)
     {
+        await _writeGate.WaitAsync().ConfigureAwait(false);
+
         try
         {
             await store.AddAsync(action.Entry).ConfigureAwait(false);
+
             dispatcher.Dispatch(new AddLibraryEntrySuccessAction(action.Entry));
         }
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Add failed for entry {action.Entry.Id}. {ex.Message}");
+        }
+        finally
+        {
+            _writeGate.Release();
         }
     }
 
@@ -108,14 +110,21 @@ internal sealed class Effects(
     [EffectMethod]
     public async Task HandleDeleteLibraryEntry(DeleteLibraryEntryAction action, IDispatcher dispatcher)
     {
+        await _writeGate.WaitAsync().ConfigureAwait(false);
+
         try
         {
             await store.DeleteAsync(action.EntryId).ConfigureAwait(false);
+
             dispatcher.Dispatch(new DeleteLibraryEntrySuccessAction(action.EntryId));
         }
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Delete failed for entry {action.EntryId}. {ex.Message}");
+        }
+        finally
+        {
+            _writeGate.Release();
         }
     }
 
@@ -146,7 +155,7 @@ internal sealed class Effects(
     {
         dispatcher.Dispatch(new LoadLibraryStartedAction());
 
-        await _migrationGate.WaitAsync().ConfigureAwait(false);
+        await _writeGate.WaitAsync().ConfigureAwait(false);
 
         try
         {
@@ -254,40 +263,49 @@ internal sealed class Effects(
         }
         finally
         {
-            _migrationGate.Release();
+            _writeGate.Release();
         }
     }
 
     [EffectMethod]
     public async Task HandleRecordEntryApplied(RecordEntryAppliedAction action, IDispatcher dispatcher)
     {
-        var entries = state.Value.Entries;
-        var entry = entries.FirstOrDefault(e => e.Id == action.EntryId);
+        await _writeGate.WaitAsync().ConfigureAwait(false);
 
-        if (entry is not LibraryEntrySavedFilter || entry.IsFavorite) { return; }
-
-        var nowUtc = DateTimeOffset.UtcNow;
-        bool bumped;
-
-        try { bumped = await store.TryBumpLastUsedIfNotFavoriteAsync(entry.Id, nowUtc).ConfigureAwait(false); }
-        catch (Exception ex)
+        try
         {
-            logger.Warning($"FilterLibrary TryBumpLastUsed failed for {entry.Id}. {ex.Message}");
+            var entries = state.Value.Entries;
+            var entry = entries.FirstOrDefault(e => e.Id == action.EntryId);
 
-            return;
+            if (entry is not LibraryEntrySavedFilter || entry.IsFavorite) { return; }
+
+            var nowUtc = DateTimeOffset.UtcNow;
+            bool bumped;
+
+            try { bumped = await store.TryBumpLastUsedIfNotFavoriteAsync(entry.Id, nowUtc).ConfigureAwait(false); }
+            catch (Exception ex)
+            {
+                logger.Warning($"FilterLibrary TryBumpLastUsed failed for {entry.Id}. {ex.Message}");
+
+                return;
+            }
+
+            if (!bumped) { return; }
+
+            var latestEntries = state.Value.Entries;
+            var latest = latestEntries.FirstOrDefault(e => e.Id == action.EntryId);
+
+            if (latest is null) { return; }
+
+            LibraryEntry bumpedEntry = ApplyLastUsedBump(latest, nowUtc);
+            var projected = latestEntries.Replace(latest, bumpedEntry);
+            dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(bumpedEntry));
+            await PruneFromSnapshot(projected, dispatcher).ConfigureAwait(false);
         }
-
-        if (!bumped) { return; }
-
-        var latestEntries = state.Value.Entries;
-        var latest = latestEntries.FirstOrDefault(e => e.Id == action.EntryId);
-
-        if (latest is null) { return; }
-
-        LibraryEntry bumpedEntry = ApplyLastUsedBump(latest, nowUtc);
-        var projected = latestEntries.Replace(latest, bumpedEntry);
-        dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(bumpedEntry));
-        await PruneFromSnapshot(projected, dispatcher).ConfigureAwait(false);
+        finally
+        {
+            _writeGate.Release();
+        }
     }
 
     [EffectMethod]
@@ -297,100 +315,110 @@ internal sealed class Effects(
 
         if (string.IsNullOrWhiteSpace(filter.ComparisonText)) { return; }
 
-        var entries = state.Value.Entries;
+        await _writeGate.WaitAsync().ConfigureAwait(false);
 
-        var existing = entries
-            .OfType<LibraryEntrySavedFilter>()
-            .FirstOrDefault(e =>
-                string.Equals(e.Filter.ComparisonText, filter.ComparisonText, StringComparison.OrdinalIgnoreCase) &&
-                e.Filter.Mode == filter.Mode &&
-                e.Filter.IsExcluded == filter.IsExcluded);
-
-        if (existing is not null)
+        try
         {
-            if (existing.IsFavorite) { return; }
+            var entries = state.Value.Entries;
 
-            var nowUtc = DateTimeOffset.UtcNow;
-            bool bumped;
+            var existing = entries
+                .OfType<LibraryEntrySavedFilter>()
+                .FirstOrDefault(e =>
+                    string.Equals(e.Filter.ComparisonText, filter.ComparisonText, StringComparison.OrdinalIgnoreCase) &&
+                    e.Filter.Mode == filter.Mode &&
+                    e.Filter.IsExcluded == filter.IsExcluded);
 
-            try { bumped = await store.TryBumpLastUsedIfNotFavoriteAsync(existing.Id, nowUtc).ConfigureAwait(false); }
-            catch (Exception ex)
+            if (existing is not null)
             {
-                logger.Warning($"FilterLibrary TryBumpLastUsed failed for {existing.Id}. {ex.Message}");
+                if (existing.IsFavorite) { return; }
+
+                var nowUtc = DateTimeOffset.UtcNow;
+                bool bumped;
+
+                try { bumped = await store.TryBumpLastUsedIfNotFavoriteAsync(existing.Id, nowUtc).ConfigureAwait(false); }
+                catch (Exception ex)
+                {
+                    logger.Warning($"FilterLibrary TryBumpLastUsed failed for {existing.Id}. {ex.Message}");
+                    return;
+                }
+
+                if (!bumped) { return; }
+
+                var latestEntries = state.Value.Entries;
+                var latestExisting = latestEntries.FirstOrDefault(e => e.Id == existing.Id) as LibraryEntrySavedFilter;
+
+                if (latestExisting is null) { return; }
+
+                var bumpedEntry = latestExisting with { LastUsedUtc = nowUtc };
+                var projected = latestEntries.Replace(latestExisting, bumpedEntry);
+                dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(bumpedEntry));
+                await PruneFromSnapshot(projected, dispatcher).ConfigureAwait(false);
+
                 return;
             }
 
-            if (!bumped) { return; }
+            var candidate = new LibraryEntrySavedFilter
+            {
+                Name = TruncateForDisplay(filter.ComparisonText),
+                CreatedUtc = DateTimeOffset.UtcNow,
+                Filter = filter with { IsEnabled = false },
+                LastUsedUtc = DateTimeOffset.UtcNow,
+                Origin = LibraryEntryOrigin.AutoTracked,
+            };
 
-            var latestEntries = state.Value.Entries;
-            var latestExisting = latestEntries.FirstOrDefault(e => e.Id == existing.Id) as LibraryEntrySavedFilter;
+            (LibraryEntry Entry, bool WasInserted) result;
 
-            if (latestExisting is null) { return; }
+            try { result = await store.AddOrReturnExistingFilterAsync(candidate).ConfigureAwait(false); }
+            catch (Exception ex)
+            {
+                logger.Warning(
+                    $"FilterLibrary AddOrReturnExistingFilter failed for '{filter.ComparisonText}'. {ex.Message}");
 
-            var bumpedEntry = latestExisting with { LastUsedUtc = nowUtc };
-            var projected = latestEntries.Replace(latestExisting, bumpedEntry);
-            dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(bumpedEntry));
-            await PruneFromSnapshot(projected, dispatcher).ConfigureAwait(false);
+                return;
+            }
 
-            return;
+            if (result.WasInserted)
+            {
+                var projected = entries.Add(candidate);
+                dispatcher.Dispatch(new AddLibraryEntrySuccessAction(candidate));
+                await PruneFromSnapshot(projected, dispatcher).ConfigureAwait(false);
+
+                return;
+            }
+
+            if (result.Entry.IsFavorite) { return; }
+
+            var collisionNowUtc = DateTimeOffset.UtcNow;
+            bool collisionBumped;
+
+            try { collisionBumped = await store.TryBumpLastUsedIfNotFavoriteAsync(result.Entry.Id, collisionNowUtc).ConfigureAwait(false); }
+            catch (Exception ex)
+            {
+                logger.Warning(
+                    $"FilterLibrary TryBumpLastUsed (collision path) failed for {result.Entry.Id}. {ex.Message}");
+
+                return;
+            }
+
+            if (!collisionBumped) { return; }
+
+            var collisionLatestEntries = state.Value.Entries;
+            var collisionLatest = collisionLatestEntries.FirstOrDefault(e => e.Id == result.Entry.Id) as LibraryEntrySavedFilter
+                ?? (LibraryEntrySavedFilter)result.Entry;
+            var collisionEntry = collisionLatest with { LastUsedUtc = collisionNowUtc };
+            var existingIndex = collisionLatestEntries.FindIndex(e => e.Id == collisionEntry.Id);
+            var collisionProjected = existingIndex >= 0
+                ? collisionLatestEntries.SetItem(existingIndex, collisionEntry)
+                : collisionLatestEntries.Add(collisionEntry);
+
+            dispatcher.Dispatch(new AddLibraryEntrySuccessAction(collisionEntry));
+
+            await PruneFromSnapshot(collisionProjected, dispatcher).ConfigureAwait(false);
         }
-
-        var candidate = new LibraryEntrySavedFilter
+        finally
         {
-            Name = TruncateForDisplay(filter.ComparisonText),
-            CreatedUtc = DateTimeOffset.UtcNow,
-            Filter = filter with { IsEnabled = false },
-            LastUsedUtc = DateTimeOffset.UtcNow,
-            Origin = LibraryEntryOrigin.AutoTracked,
-        };
-
-        (LibraryEntry Entry, bool WasInserted) result;
-
-        try { result = await store.AddOrReturnExistingFilterAsync(candidate).ConfigureAwait(false); }
-        catch (Exception ex)
-        {
-            logger.Warning(
-                $"FilterLibrary AddOrReturnExistingFilter failed for '{filter.ComparisonText}'. {ex.Message}");
-
-            return;
+            _writeGate.Release();
         }
-
-        if (result.WasInserted)
-        {
-            var projected = entries.Add(candidate);
-            dispatcher.Dispatch(new AddLibraryEntrySuccessAction(candidate));
-            await PruneFromSnapshot(projected, dispatcher).ConfigureAwait(false);
-
-            return;
-        }
-
-        if (result.Entry.IsFavorite) { return; }
-
-        var collisionNowUtc = DateTimeOffset.UtcNow;
-        bool collisionBumped;
-
-        try { collisionBumped = await store.TryBumpLastUsedIfNotFavoriteAsync(result.Entry.Id, collisionNowUtc).ConfigureAwait(false); }
-        catch (Exception ex)
-        {
-            logger.Warning(
-                $"FilterLibrary TryBumpLastUsed (collision path) failed for {result.Entry.Id}. {ex.Message}");
-
-            return;
-        }
-
-        if (!collisionBumped) { return; }
-
-        var collisionLatestEntries = state.Value.Entries;
-        var collisionLatest = collisionLatestEntries.FirstOrDefault(e => e.Id == result.Entry.Id) as LibraryEntrySavedFilter
-            ?? (LibraryEntrySavedFilter)result.Entry;
-        var collisionEntry = collisionLatest with { LastUsedUtc = collisionNowUtc };
-        var existingIndex = collisionLatestEntries.FindIndex(e => e.Id == collisionEntry.Id);
-        var collisionProjected = existingIndex >= 0
-            ? collisionLatestEntries.SetItem(existingIndex, collisionEntry)
-            : collisionLatestEntries.Add(collisionEntry);
-
-        dispatcher.Dispatch(new AddLibraryEntrySuccessAction(collisionEntry));
-        await PruneFromSnapshot(collisionProjected, dispatcher).ConfigureAwait(false);
     }
 
     [EffectMethod]
@@ -520,22 +548,33 @@ internal sealed class Effects(
     [EffectMethod]
     public async Task HandleUpdateLibraryEntry(UpdateLibraryEntryAction action, IDispatcher dispatcher)
     {
+        await _writeGate.WaitAsync().ConfigureAwait(false);
+
         try
         {
             await store.UpdateAsync(action.Entry).ConfigureAwait(false);
+
             dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(action.Entry));
         }
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Update failed for entry {action.Entry.Id}. {ex.Message}");
         }
+        finally
+        {
+            _writeGate.Release();
+        }
     }
 
-    private static LibraryEntry AppendFilterToSet(LibraryEntry entry, SavedFilter newFilter) => entry switch
+    private static LibraryEntry AppendFilterToSetIfMissing(LibraryEntry entry, SavedFilter newFilter)
     {
-        LibraryEntryFilterSet p => p with { Filters = p.Filters.Add(newFilter) },
-        _ => entry,
-    };
+        if (entry is not LibraryEntryFilterSet filterSet || filterSet.Filters.Any(f =>
+            string.Equals(f.ComparisonText, newFilter.ComparisonText, StringComparison.OrdinalIgnoreCase) &&
+            f.Mode == newFilter.Mode &&
+            f.IsExcluded == newFilter.IsExcluded)) { return entry; }
+
+        return filterSet with { Filters = filterSet.Filters.Add(newFilter) };
+    }
 
     private static LibraryEntry ApplyFavoriteToggle(LibraryEntry entry, bool isFavorite, DateTimeOffset unfavoriteTimestamp)
     {
@@ -692,75 +731,98 @@ internal sealed class Effects(
     {
         if (updatedEntries.Count == 0) { return; }
 
-        IReadOnlyList<LibraryEntryId> updatedIds;
+        await _writeGate.WaitAsync().ConfigureAwait(false);
 
         try
         {
-            updatedIds = await store.UpdateRangeAsync(updatedEntries).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            logger.Warning($"FilterLibrary bulk tag update failed; reloading library. {ex.Message}");
-            announcementService.Announce("Couldn't update tags. The library was reloaded.");
-            dispatcher.Dispatch(new LoadLibraryAction());
-            dispatcher.Dispatch(new TagBulkUpdateFailedAction());
+            IReadOnlyList<LibraryEntryId> updatedIds;
 
-            return;
-        }
-
-        if (updatedIds.Count == 0)
-        {
-            announcementService.Announce("Couldn't update tags. The library was reloaded.");
-            dispatcher.Dispatch(new LoadLibraryAction());
-            dispatcher.Dispatch(new TagBulkUpdateFailedAction());
-
-            return;
-        }
-
-        var updatedIdSet = updatedIds.ToHashSet();
-        var latestEntries = state.Value.Entries;
-        List<LibraryEntry>? reissueQueue = null;
-
-        foreach (var entry in updatedEntries)
-        {
-            if (!updatedIdSet.Contains(entry.Id)) { continue; }
-
-            var latest = latestEntries.FirstOrDefault(e => e.Id == entry.Id);
-
-            if (latest is null) { continue; }
-
-            LibraryEntry projected = (latest, entry) switch
+            try
             {
-                (LibraryEntrySavedFilter latestFilter, LibraryEntrySavedFilter bulkFilter) =>
-                    latestFilter with { Tags = bulkFilter.Tags },
-                (LibraryEntryFilterSet latestSet, LibraryEntryFilterSet bulkSet) =>
-                    latestSet with { Tags = bulkSet.Tags },
-                _ => entry,
-            };
-
-            if (NonTagFieldsDiffer(latest, entry))
-            {
-                (reissueQueue ??= []).Add(projected);
+                updatedIds = await store.UpdateRangeAsync(updatedEntries).ConfigureAwait(false);
             }
-
-            dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(projected));
-        }
-
-        if (reissueQueue is { Count: > 0 })
-        {
-            try { await store.UpdateRangeAsync(reissueQueue).ConfigureAwait(false); }
             catch (Exception ex)
             {
-                logger.Warning($"FilterLibrary bulk tag re-issue against latest snapshot failed. {ex.Message}");
+                logger.Warning($"FilterLibrary bulk tag update failed; reloading library. {ex.Message}");
+                announcementService.Announce("Couldn't update tags. The library was reloaded.");
+                dispatcher.Dispatch(new LoadLibraryAction());
+                dispatcher.Dispatch(new TagBulkUpdateFailedAction());
+
+                return;
             }
-        }
 
-        if (updatedIds.Count < updatedEntries.Count)
+            if (updatedIds.Count == 0)
+            {
+                announcementService.Announce("Couldn't update tags. The library was reloaded.");
+                dispatcher.Dispatch(new LoadLibraryAction());
+                dispatcher.Dispatch(new TagBulkUpdateFailedAction());
+
+                return;
+            }
+
+            var updatedIdSet = updatedIds.ToHashSet();
+            var latestEntries = state.Value.Entries;
+            var projections = new List<LibraryEntry>(updatedIds.Count);
+            List<LibraryEntry>? reissueQueue = null;
+
+            foreach (var entry in updatedEntries)
+            {
+                if (!updatedIdSet.Contains(entry.Id)) { continue; }
+
+                var latest = latestEntries.FirstOrDefault(e => e.Id == entry.Id);
+
+                if (latest is null) { continue; }
+
+                LibraryEntry projected = (latest, entry) switch
+                {
+                    (LibraryEntrySavedFilter latestFilter, LibraryEntrySavedFilter bulkFilter) =>
+                        latestFilter with { Tags = bulkFilter.Tags },
+                    (LibraryEntryFilterSet latestSet, LibraryEntryFilterSet bulkSet) =>
+                        latestSet with { Tags = bulkSet.Tags },
+                    _ => entry,
+                };
+
+                projections.Add(projected);
+
+                if (NonTagFieldsDiffer(latest, entry))
+                {
+                    (reissueQueue ??= []).Add(projected);
+                }
+            }
+
+            if (reissueQueue is { Count: > 0 })
+            {
+                try
+                {
+                    await store.UpdateRangeAsync(reissueQueue).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    logger.Warning($"FilterLibrary bulk tag re-issue against latest snapshot failed; reloading library. {ex.Message}");
+                    announcementService.Announce("Couldn't update tags. The library was reloaded.");
+                    dispatcher.Dispatch(new LoadLibraryAction());
+                    dispatcher.Dispatch(new TagBulkUpdateFailedAction());
+
+                    return;
+                }
+            }
+
+            foreach (var projected in projections)
+            {
+                dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(projected));
+            }
+
+            if (updatedIds.Count < updatedEntries.Count)
+            {
+                dispatcher.Dispatch(new LoadLibraryAction());
+            }
+
+            announcementService.Announce(buildAnnouncement(updatedIds.Count));
+        }
+        finally
         {
-            dispatcher.Dispatch(new LoadLibraryAction());
+            _writeGate.Release();
         }
-
-        announcementService.Announce(buildAnnouncement(updatedIds.Count));
     }
 
     private void DispatchUpdateWithLatestSnapshot(
@@ -771,14 +833,24 @@ internal sealed class Effects(
 
     private async Task PersistAddAsync(LibraryEntry entry, IDispatcher dispatcher)
     {
-        try { await store.AddAsync(entry).ConfigureAwait(false); }
-        catch (Exception ex)
-        {
-            logger.Warning($"FilterLibrary Add failed for {entry.Id}. {ex.Message}");
-            return;
-        }
+        await _writeGate.WaitAsync().ConfigureAwait(false);
 
-        dispatcher.Dispatch(new AddLibraryEntrySuccessAction(entry));
+        try
+        {
+            try { await store.AddAsync(entry).ConfigureAwait(false); }
+            catch (Exception ex)
+            {
+                logger.Warning($"FilterLibrary Add failed for {entry.Id}. {ex.Message}");
+
+                return;
+            }
+
+            dispatcher.Dispatch(new AddLibraryEntrySuccessAction(entry));
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
     }
 
     private async Task PersistAndDispatchAsync(
@@ -786,38 +858,49 @@ internal sealed class Effects(
         Func<LibraryEntry, LibraryEntry> mutate,
         IDispatcher dispatcher)
     {
-        var snapshot = state.Value.Entries.FirstOrDefault(e => e.Id == id);
+        await _writeGate.WaitAsync().ConfigureAwait(false);
 
-        if (snapshot is null) { return; }
-
-        var mutated = mutate(snapshot);
-
-        try { await store.UpdateAsync(mutated).ConfigureAwait(false); }
-        catch (Exception ex)
+        try
         {
-            logger.Warning($"FilterLibrary Update failed for {id}. {ex.Message}");
+            var snapshot = state.Value.Entries.FirstOrDefault(e => e.Id == id);
 
-            return;
-        }
+            if (snapshot is null) { return; }
 
-        var latest = state.Value.Entries.FirstOrDefault(e => e.Id == id);
+            var mutated = mutate(snapshot);
 
-        if (latest is null) { return; }
+            if (ReferenceEquals(mutated, snapshot)) { return; }
 
-        var latestMutated = mutate(latest);
-
-        if (!ReferenceEquals(latest, snapshot))
-        {
-            try { await store.UpdateAsync(latestMutated).ConfigureAwait(false); }
+            try { await store.UpdateAsync(mutated).ConfigureAwait(false); }
             catch (Exception ex)
             {
-                logger.Warning($"FilterLibrary Update (re-issue against latest snapshot) failed for {id}. {ex.Message}");
+                logger.Warning($"FilterLibrary Update failed for {id}. {ex.Message}");
 
                 return;
             }
-        }
 
-        dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(latestMutated));
+            var latest = state.Value.Entries.FirstOrDefault(e => e.Id == id);
+
+            if (latest is null) { return; }
+
+            var latestMutated = mutate(latest);
+
+            if (!ReferenceEquals(latest, snapshot))
+            {
+                try { await store.UpdateAsync(latestMutated).ConfigureAwait(false); }
+                catch (Exception ex)
+                {
+                    logger.Warning($"FilterLibrary Update (re-issue against latest snapshot) failed for {id}. {ex.Message}");
+
+                    return;
+                }
+            }
+
+            dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(latestMutated));
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
     }
 
     private Task PromoteSourceIfAutoTracked(LibraryEntryId? sourceEntryId, IDispatcher dispatcher)
