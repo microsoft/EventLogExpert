@@ -481,6 +481,30 @@ internal sealed class Effects(
     }
 
     [EffectMethod]
+    public Task HandleSetEntryName(SetEntryNameAction action, IDispatcher dispatcher)
+    {
+        var newName = action.Name;
+
+        return PersistAndDispatchAsync(action.EntryId, e => ApplyName(e, newName), dispatcher);
+    }
+
+    [EffectMethod]
+    public Task HandleSetEntryTags(SetEntryTagsAction action, IDispatcher dispatcher)
+    {
+        var newTags = action.Tags;
+
+        return PersistAndDispatchAsync(action.EntryId, e => ApplyTags(e, newTags), dispatcher);
+    }
+
+    [EffectMethod]
+    public Task HandleSetFilterSetFilters(SetFilterSetFiltersAction action, IDispatcher dispatcher)
+    {
+        var newFilters = action.Filters;
+
+        return PersistAndDispatchAsync(action.FilterSetId, e => ApplyFilters(e, newFilters), dispatcher);
+    }
+
+    [EffectMethod]
     public Task HandleSetIsFavorite(SetIsFavoriteAction action, IDispatcher dispatcher)
     {
         var entry = state.Value.Entries.FirstOrDefault(e => e.Id == action.EntryId);
@@ -552,10 +576,30 @@ internal sealed class Effects(
         };
     }
 
+    private static LibraryEntry ApplyFilters(LibraryEntry entry, ImmutableList<SavedFilter> newFilters) => entry switch
+    {
+        LibraryEntryFilterSet p => p with { Filters = newFilters },
+        _ => entry,
+    };
+
     private static LibraryEntry ApplyLastUsedBump(LibraryEntry entry, DateTimeOffset nowUtc) => entry switch
     {
         LibraryEntrySavedFilter f => f with { LastUsedUtc = nowUtc },
         LibraryEntryFilterSet p => p with { LastUsedUtc = nowUtc },
+        _ => entry,
+    };
+
+    private static LibraryEntry ApplyName(LibraryEntry entry, string newName) => entry switch
+    {
+        LibraryEntrySavedFilter f => f with { Name = newName },
+        LibraryEntryFilterSet p => p with { Name = newName },
+        _ => entry,
+    };
+
+    private static LibraryEntry ApplyTags(LibraryEntry entry, ImmutableList<string> newTags) => entry switch
+    {
+        LibraryEntrySavedFilter f => f with { Tags = newTags },
+        LibraryEntryFilterSet p => p with { Tags = newTags },
         _ => entry,
     };
 
@@ -607,6 +651,15 @@ internal sealed class Effects(
             LibraryEntryFilterSet p => p.Filters,
             _ => throw new InvalidOperationException($"Unhandled LibraryEntry type '{entry.GetType().FullName}'."),
         };
+
+    private static bool NonTagFieldsDiffer(LibraryEntry latest, LibraryEntry bulkEntry) => (latest, bulkEntry) switch
+    {
+        (LibraryEntrySavedFilter latestFilter, LibraryEntrySavedFilter bulkFilter) =>
+            !Equals(latestFilter with { Tags = bulkFilter.Tags }, bulkFilter),
+        (LibraryEntryFilterSet latestSet, LibraryEntryFilterSet bulkSet) =>
+            !Equals(latestSet with { Tags = bulkSet.Tags }, bulkSet),
+        _ => true,
+    };
 
     private static LibraryEntry PromoteOriginToUserSaved(LibraryEntry entry) => entry switch
     {
@@ -666,6 +719,7 @@ internal sealed class Effects(
 
         var updatedIdSet = updatedIds.ToHashSet();
         var latestEntries = state.Value.Entries;
+        List<LibraryEntry>? reissueQueue = null;
 
         foreach (var entry in updatedEntries)
         {
@@ -684,7 +738,21 @@ internal sealed class Effects(
                 _ => entry,
             };
 
+            if (NonTagFieldsDiffer(latest, entry))
+            {
+                (reissueQueue ??= []).Add(projected);
+            }
+
             dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(projected));
+        }
+
+        if (reissueQueue is { Count: > 0 })
+        {
+            try { await store.UpdateRangeAsync(reissueQueue).ConfigureAwait(false); }
+            catch (Exception ex)
+            {
+                logger.Warning($"FilterLibrary bulk tag re-issue against latest snapshot failed. {ex.Message}");
+            }
         }
 
         if (updatedIds.Count < updatedEntries.Count)

@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using NSubstitute;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Tests.FilterLibrary;
 
@@ -390,8 +391,8 @@ public sealed class LibraryEntryRowTests : BunitContext
 
         await component.Find("button[aria-label='Remove tag bug']").ClickAsync(new MouseEventArgs());
 
-        _commands.Received(1).UpdateEntry(Arg.Is<LibraryEntry>(
-            e => e.Id == entry.Id && e.Tags.SequenceEqual(new[] { "perf" })));
+        _commands.Received(1).SetEntryTags(entry.Id, Arg.Is<ImmutableList<string>>(
+            tags => tags.SequenceEqual(new[] { "perf" })));
         _announcements.Received(1).Announce("Removed tag 'bug' from X");
     }
 
