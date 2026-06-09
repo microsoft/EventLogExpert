@@ -174,6 +174,55 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void HasEverEnabledPreRelease_WhenAccessedMultipleTimes_ShouldCacheValue()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        mockPreferences.HasEverEnabledPreReleasePreference.Returns(true);
+
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        _ = settingsService.HasEverEnabledPreRelease;
+        _ = settingsService.HasEverEnabledPreRelease;
+        _ = settingsService.HasEverEnabledPreRelease;
+
+        // Assert
+        _ = mockPreferences.Received(1).HasEverEnabledPreReleasePreference;
+    }
+
+    [Fact]
+    public void HasEverEnabledPreRelease_WhenFirstAccessed_ShouldReturnFromPreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        mockPreferences.HasEverEnabledPreReleasePreference.Returns(true);
+
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        var result = settingsService.HasEverEnabledPreRelease;
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void HasEverEnabledPreRelease_WhenPreferenceIsDefault_ShouldReturnFalse()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        var result = settingsService.HasEverEnabledPreRelease;
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
     public void IsPreReleaseEnabled_WhenAccessedMultipleTimes_ShouldCacheValue()
     {
         // Arrange
@@ -223,6 +272,24 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void IsPreReleaseEnabled_WhenReadAsTrueAndStickyNotSet_ShouldCascadeStickyBit()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        mockPreferences.PreReleasePreference.Returns(true);
+        mockPreferences.HasEverEnabledPreReleasePreference.Returns(false);
+
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        var result = settingsService.IsPreReleaseEnabled;
+
+        // Assert
+        Assert.True(result);
+        mockPreferences.Received(1).HasEverEnabledPreReleasePreference = true;
+    }
+
+    [Fact]
     public void IsPreReleaseEnabled_WhenSet_ShouldUpdatePreferences()
     {
         // Arrange
@@ -234,6 +301,25 @@ public sealed class SettingsServiceTests
 
         // Assert
         mockPreferences.Received(1).PreReleasePreference = true;
+    }
+
+    [Fact]
+    public void IsPreReleaseEnabled_WhenSetToFalse_ShouldNotChangeStickyBit()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        mockPreferences.PreReleasePreference.Returns(true);
+
+        var settingsService = CreateSettingsService(mockPreferences);
+        _ = settingsService.IsPreReleaseEnabled; // Cache the value
+        mockPreferences.ClearReceivedCalls();
+
+        // Act
+        settingsService.IsPreReleaseEnabled = false;
+
+        // Assert
+        mockPreferences.Received(1).PreReleasePreference = false;
+        mockPreferences.DidNotReceive().HasEverEnabledPreReleasePreference = Arg.Any<bool>();
     }
 
     [Fact]
@@ -252,6 +338,40 @@ public sealed class SettingsServiceTests
 
         // Assert
         mockPreferences.DidNotReceive().PreReleasePreference = Arg.Any<bool>();
+    }
+
+    [Fact]
+    public void IsPreReleaseEnabled_WhenSetToTrueAndChannelPreviouslyEnabled_ShouldNotRewriteStickyBit()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        mockPreferences.HasEverEnabledPreReleasePreference.Returns(true);
+
+        var settingsService = CreateSettingsService(mockPreferences);
+        _ = settingsService.HasEverEnabledPreRelease; // Cache the value
+        mockPreferences.ClearReceivedCalls();
+
+        // Act
+        settingsService.IsPreReleaseEnabled = true;
+
+        // Assert
+        mockPreferences.Received(1).PreReleasePreference = true;
+        mockPreferences.DidNotReceive().HasEverEnabledPreReleasePreference = Arg.Any<bool>();
+    }
+
+    [Fact]
+    public void IsPreReleaseEnabled_WhenSetToTrueAndChannelNeverEnabled_ShouldCascadeStickyBit()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.IsPreReleaseEnabled = true;
+
+        // Assert
+        mockPreferences.Received(1).PreReleasePreference = true;
+        mockPreferences.Received(1).HasEverEnabledPreReleasePreference = true;
     }
 
     [Fact]

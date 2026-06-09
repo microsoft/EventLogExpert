@@ -8,6 +8,8 @@ namespace EventLogExpert.Runtime.Settings;
 
 public interface ISettingsPreferencesProvider
 {
+    bool HasEverEnabledPreReleasePreference { get; set; }
+
     EventCopyFormat KeyboardCopyFormatPreference { get; set; }
 
     LogLevel LogLevelPreference { get; set; }

@@ -12,6 +12,8 @@ public interface ISettingsService
 
     Action? CopyFormatChanged { get; set; }
 
+    bool HasEverEnabledPreRelease { get; }
+
     bool IsPreReleaseEnabled { get; set; }
 
     LogLevel LogLevel { get; set; }
