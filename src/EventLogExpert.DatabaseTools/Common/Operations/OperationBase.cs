@@ -133,7 +133,7 @@ internal abstract class OperationBase
             _providerDetailFormat,
             details.ProviderName,
             details.Events.Count,
-            details.Parameters.Count(),
+            details.Parameters.Count,
             details.Keywords.Count,
             details.Opcodes.Count,
             details.Tasks.Count,

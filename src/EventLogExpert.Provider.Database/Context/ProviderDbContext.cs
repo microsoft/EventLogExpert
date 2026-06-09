@@ -266,7 +266,7 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Parameters)
-            .HasConversion<CompressedJsonValueConverter<IEnumerable<MessageModel>>>();
+            .HasConversion<CompressedJsonValueConverter<IReadOnlyList<MessageModel>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Events)

@@ -6,9 +6,9 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Models;
 using System.Buffers;
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Security.Principal;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.Resolvers;
@@ -39,7 +39,12 @@ namespace EventLogExpert.Eventing.Resolvers;
 ///         entry-supplemental-null means no supplemental exists.
 ///     </para>
 /// </remarks>
-internal sealed partial class DescriptionFormatter
+internal sealed partial class DescriptionFormatter(
+    TemplateAnalyzer templates,
+    ModernEventMatcher matcher,
+    IEventResolverCache? cache,
+    ITraceLogger? logger,
+    Func<EventRecord, ProviderDetails?> supplementalProvider)
 {
     private const string DefaultFailedDescription = "Failed to resolve description, see XML for more details.";
     private const string DefaultNoMatchingDescription = "No matching message found with loaded providers, see XML for more details.";
@@ -49,34 +54,21 @@ internal sealed partial class DescriptionFormatter
     ///     The mappings from the outType attribute in the EventModel XML template to determine if it should be displayed
     ///     as Hex.
     /// </summary>
-    private static readonly List<string> s_displayAsHexTypes =
-    [
+    // FrozenSet chosen over List for O(1) lookup on the per-property hot path inside GetFormattedProperties.
+    private static readonly FrozenSet<string> s_displayAsHexTypes = new[]
+    {
         "win:HexInt32",
         "win:HexInt64",
         "win:Pointer",
         "win:Win32Error"
-    ];
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
-    private readonly IEventResolverCache? _cache;
-    private readonly ITraceLogger? _logger;
-    private readonly ModernEventMatcher _matcher;
+    private readonly IEventResolverCache? _cache = cache;
+    private readonly ITraceLogger? _logger = logger;
+    private readonly ModernEventMatcher _matcher = matcher;
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
-    private readonly Func<EventRecord, ProviderDetails?> _supplementalProvider;
-    private readonly TemplateAnalyzer _templates;
-
-    public DescriptionFormatter(
-        TemplateAnalyzer templates,
-        ModernEventMatcher matcher,
-        IEventResolverCache? cache,
-        ITraceLogger? logger,
-        Func<EventRecord, ProviderDetails?> supplementalProvider)
-    {
-        _templates = templates;
-        _matcher = matcher;
-        _cache = cache;
-        _logger = logger;
-        _supplementalProvider = supplementalProvider;
-    }
+    private readonly Func<EventRecord, ProviderDetails?> _supplementalProvider = supplementalProvider;
+    private readonly TemplateAnalyzer _templates = templates;
 
     /// <summary>Resolve event descriptions from an event record.</summary>
     public string Resolve(
@@ -187,15 +179,28 @@ internal sealed partial class DescriptionFormatter
     {
         if (properties.Count == 0) { return null; }
 
-        StringBuilder builder = new();
-        builder.Append("The following information was included with the event:\r\n");
+        const string Header = "The following information was included with the event:\r\n";
 
-        foreach (var property in properties)
+        int totalLength = Header.Length;
+
+        for (int i = 0; i < properties.Count; i++)
         {
-            builder.Append("\r\n").Append(property);
+            totalLength += 2 + properties[i].Length;
         }
 
-        return builder.ToString();
+        return string.Create(totalLength, properties, static (span, props) =>
+        {
+            Header.AsSpan().CopyTo(span);
+            int idx = Header.Length;
+
+            for (int i = 0; i < props.Count; i++)
+            {
+                span[idx++] = '\r';
+                span[idx++] = '\n';
+                props[i].AsSpan().CopyTo(span[idx..]);
+                idx += props[i].Length;
+            }
+        });
     }
 
     private static void CleanupFormatting(ReadOnlySpan<char> unformattedString, ref Span<char> buffer, out int bufferIndex)
@@ -484,7 +489,7 @@ internal sealed partial class DescriptionFormatter
     private List<string> GetFormattedProperties(ReadOnlySpan<char> template, IReadOnlyList<object> properties)
     {
         ImmutableArray<string> dataNodes = default;
-        List<string> formattedValues = [];
+        List<string> formattedValues = new(properties.Count);
 
         if (!template.IsEmpty)
         {
@@ -530,9 +535,9 @@ internal sealed partial class DescriptionFormatter
                 default:
                     if (string.IsNullOrEmpty(outType))
                     {
-                        formattedValues.Add($"{property}");
+                        formattedValues.Add(property?.ToString() ?? string.Empty);
                     }
-                    else if (s_displayAsHexTypes.Contains(outType, StringComparer.OrdinalIgnoreCase))
+                    else if (s_displayAsHexTypes.Contains(outType))
                     {
                         formattedValues.Add(property switch
                         {
@@ -544,7 +549,7 @@ internal sealed partial class DescriptionFormatter
                             uint ui => $"0x{ui:X}",
                             long l => $"0x{l:X}",
                             ulong ul => $"0x{ul:X}",
-                            _ => $"{property}"
+                            _ => property?.ToString() ?? string.Empty
                         });
                     }
                     else if (string.Equals(outType, "win:HResult", StringComparison.OrdinalIgnoreCase) && property is int hResult)
@@ -567,11 +572,11 @@ internal sealed partial class DescriptionFormatter
 
                         formattedValues.Add(property is uint or int or ulong or long or ushort or short or byte
                             ? NativeErrorResolver.GetNtStatusMessage(statusCode)
-                            : $"{property}");
+                            : property?.ToString() ?? string.Empty);
                     }
                     else
                     {
-                        formattedValues.Add($"{property}");
+                        formattedValues.Add(property?.ToString() ?? string.Empty);
                     }
 
                     break;
@@ -597,12 +602,12 @@ internal sealed partial class DescriptionFormatter
     {
         if (descriptionFromSupplemental && supplementalDetails is not null)
         {
-            if (supplementalDetails.Parameters.Any()) { return supplementalDetails.Parameters; }
+            if (supplementalDetails.Parameters.Count > 0) { return supplementalDetails.Parameters; }
 
             return primary?.Parameters ?? supplementalDetails.Parameters;
         }
 
-        if (primary is not null && primary.Parameters.Any()) { return primary.Parameters; }
+        if (primary is not null && primary.Parameters.Count > 0) { return primary.Parameters; }
 
         supplemental ??= _supplementalProvider(eventRecord);
 

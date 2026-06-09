@@ -669,9 +669,9 @@ public sealed class ProviderDbContextTests : IDisposable
         using (var context = new ProviderDbContext(dbPath, true))
         {
             var retrieved = context.ProviderDetails.First(p => p.ProviderName == "ComplexProvider");
-            Assert.Equal(3, retrieved.Messages.Count());
-            Assert.Equal(2, retrieved.Parameters.Count());
-            Assert.Equal(2, retrieved.Events.Count());
+            Assert.Equal(3, retrieved.Messages.Count);
+            Assert.Equal(2, retrieved.Parameters.Count);
+            Assert.Equal(2, retrieved.Events.Count);
             Assert.Equal(3, retrieved.Keywords.Count);
             Assert.Equal(2, retrieved.Opcodes.Count);
             Assert.Equal(3, retrieved.Tasks.Count);
@@ -1153,7 +1153,7 @@ public sealed class ProviderDbContextTests : IDisposable
             CompressedJsonValueConverter<IReadOnlyList<MessageModel>>.ConvertToCompressedJson(details.Messages));
 
         cmd.Parameters.AddWithValue("$parameters",
-            CompressedJsonValueConverter<IEnumerable<MessageModel>>.ConvertToCompressedJson(details.Parameters));
+            CompressedJsonValueConverter<IReadOnlyList<MessageModel>>.ConvertToCompressedJson(details.Parameters));
 
         cmd.Parameters.AddWithValue("$events",
             CompressedJsonValueConverter<IReadOnlyList<EventModel>>.ConvertToCompressedJson(details.Events));
