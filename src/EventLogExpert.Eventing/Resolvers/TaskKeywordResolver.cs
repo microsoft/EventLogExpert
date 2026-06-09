@@ -17,10 +17,6 @@ namespace EventLogExpert.Eventing.Resolvers;
 /// </remarks>
 internal sealed class TaskKeywordResolver(IEventResolverCache? cache, ITraceLogger? logger)
 {
-    /// <summary>
-    ///     These are already defined in System.Diagnostics.Eventing.Reader.StandardEventKeywords. However, the names
-    ///     there do not match what is normally displayed in Event Viewer. We redefine them here so we can use our own strings.
-    /// </summary>
     private static readonly Dictionary<long, string> s_standardKeywords = new()
     {
         { 0x1000000000000, "Response Time" },
@@ -41,7 +37,7 @@ internal sealed class TaskKeywordResolver(IEventResolverCache? cache, ITraceLogg
     ///     standard keywords (bits 48–55) with provider-defined keywords (bits 0–47). Primary provider wins over supplemental
     ///     on bit conflicts.
     /// </summary>
-    public List<string> GetKeywords(EventRecord eventRecord, ProviderDetails? details, ProviderDetails? supplemental)
+    public List<string> ResolveKeywords(EventRecord eventRecord, ProviderDetails? details, ProviderDetails? supplemental)
     {
         if (eventRecord.Keywords is null or 0) { return []; }
 

@@ -34,7 +34,7 @@ internal sealed class TemplateAnalyzer
 
     /// <summary>
     ///     Parses <paramref name="template" /> if it is not already cached and returns its
-    ///     <see cref="TemplateMetadata" />. Empty templates return <see cref="s_empty" /> without touching the cache.
+    ///     <see cref="TemplateMetadata" />. Empty templates return empty metadata without touching the cache.
     /// </summary>
     public TemplateMetadata Analyze(ReadOnlySpan<char> template)
     {

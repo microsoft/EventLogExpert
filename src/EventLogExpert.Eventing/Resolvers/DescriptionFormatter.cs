@@ -50,11 +50,6 @@ internal sealed partial class DescriptionFormatter(
     private const string DefaultNoMatchingDescription = "No matching message found with loaded providers, see XML for more details.";
     private const string DefaultNoProviderDescription = "No matching provider available, see XML for more details.";
 
-    /// <summary>
-    ///     The mappings from the outType attribute in the EventModel XML template to determine if it should be displayed
-    ///     as Hex.
-    /// </summary>
-    // FrozenSet chosen over List for O(1) lookup on the per-property hot path inside GetFormattedProperties.
     private static readonly FrozenSet<string> s_displayAsHexTypes = new[]
     {
         "win:HexInt32",
@@ -76,12 +71,12 @@ internal sealed partial class DescriptionFormatter(
     public string Resolve(
         EventRecord eventRecord,
         ProviderDetails? primaryDetails,
-        ProviderDetails? details,
+        ProviderDetails? descriptionDetails,
         EventModel? modernEvent,
         ProviderDetails? supplemental,
         EventModel? supplementalModernEvent)
     {
-        if (details is null)
+        if (descriptionDetails is null)
         {
             _logger?.Debug($"{nameof(Resolve)}: No provider details available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, RecordId={eventRecord.RecordId}");
 
@@ -90,25 +85,25 @@ internal sealed partial class DescriptionFormatter(
 
         var properties = GetFormattedProperties(modernEvent?.Template, eventRecord.Properties);
 
-        var descriptionFromSupplemental = supplemental is not null && ReferenceEquals(details, supplemental);
+        var descriptionFromSupplemental = supplemental is not null && ReferenceEquals(descriptionDetails, supplemental);
 
         if (!string.IsNullOrEmpty(modernEvent?.Description))
         {
             _logger?.Debug($"{nameof(Resolve)}: Using modern event description - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}");
 
             return FormatDescription(properties, modernEvent.Description,
-                GetParameterLookupForDescription(primaryDetails, supplemental, descriptionFromSupplemental, ref supplemental, eventRecord));
+                GetParameterLookupForDescription(primaryDetails, descriptionFromSupplemental, ref supplemental, eventRecord));
         }
 
         // Legacy provider message lookup
-        var legacyMessages = details.GetMessagesByShortId(eventRecord.Id);
+        var legacyMessages = descriptionDetails.GetMessagesByShortId(eventRecord.Id);
 
         if (legacyMessages.Count == 1)
         {
             _logger?.Debug($"{nameof(Resolve)}: Using legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}");
 
             return FormatDescription(properties, legacyMessages[0].Text,
-                GetParameterLookupForDescription(primaryDetails, supplemental, descriptionFromSupplemental, ref supplemental, eventRecord));
+                GetParameterLookupForDescription(primaryDetails, descriptionFromSupplemental, ref supplemental, eventRecord));
         }
 
         if (legacyMessages.Count > 1)
@@ -120,7 +115,7 @@ internal sealed partial class DescriptionFormatter(
                 _logger?.Debug($"{nameof(Resolve)}: Disambiguated legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Level={eventRecord.Level}");
 
                 return FormatDescription(properties, bestMatch.Text,
-                    GetParameterLookupForDescription(primaryDetails, supplemental, descriptionFromSupplemental, ref supplemental, eventRecord));
+                    GetParameterLookupForDescription(primaryDetails, descriptionFromSupplemental, ref supplemental, eventRecord));
             }
 
             _logger?.Debug($"{nameof(Resolve)}: Multiple legacy messages found, could not disambiguate - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, MessageCount={legacyMessages.Count}");
@@ -128,7 +123,7 @@ internal sealed partial class DescriptionFormatter(
             // Last-resort: ambiguous primary may be resolvable via supplemental. ResolveEvent
             // pre-loads supplemental and its modern event for count > 1, so both are already
             // set here when supplemental is available.
-            if (supplemental is not null && !ReferenceEquals(supplemental, details))
+            if (supplemental is not null && !ReferenceEquals(supplemental, descriptionDetails))
             {
                 if (!string.IsNullOrEmpty(supplementalModernEvent?.Description))
                 {
@@ -139,7 +134,7 @@ internal sealed partial class DescriptionFormatter(
                     // Description came from supplemental, so resolve %%n parameter substitutions
                     // against supplemental's parameter table first.
                     return FormatDescription(supplementalProperties, supplementalModernEvent.Description,
-                        GetParameterLookupForDescription(primaryDetails, supplemental, true, ref supplemental, eventRecord));
+                        GetParameterLookupForDescription(primaryDetails, true, ref supplemental, eventRecord));
                 }
 
                 var supplementalLegacy = supplemental.GetMessagesByShortId(eventRecord.Id);
@@ -150,7 +145,7 @@ internal sealed partial class DescriptionFormatter(
                     _logger?.Debug($"{nameof(Resolve)}: Disambiguated via supplemental legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
 
                     return FormatDescription(properties, supplementalBest.Text,
-                        GetParameterLookupForDescription(primaryDetails, supplemental, true, ref supplemental, eventRecord));
+                        GetParameterLookupForDescription(primaryDetails, true, ref supplemental, eventRecord));
                 }
             }
         }
@@ -165,7 +160,7 @@ internal sealed partial class DescriptionFormatter(
             return FormatDescription(properties, null, s_nullLookup);
         }
 
-        if (details.IsEmpty && (supplemental is null || supplemental.IsEmpty))
+        if (descriptionDetails.IsEmpty && (supplemental is null || supplemental.IsEmpty))
         {
             _logger?.Debug($"{nameof(Resolve)}: No provider metadata available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}, Keywords=0x{eventRecord.Keywords ?? 0:X16}");
 
@@ -595,16 +590,15 @@ internal sealed partial class DescriptionFormatter(
     /// </summary>
     private Func<long, MessageModel?> GetParameterLookupForDescription(
         ProviderDetails? primary,
-        ProviderDetails? supplementalDetails,
         bool descriptionFromSupplemental,
         ref ProviderDetails? supplemental,
         EventRecord eventRecord)
     {
-        if (descriptionFromSupplemental && supplementalDetails is not null)
+        if (descriptionFromSupplemental && supplemental is not null)
         {
-            if (supplementalDetails.Parameters.Count > 0) { return supplementalDetails.GetParameterByRawIdDelegate; }
+            if (supplemental.Parameters.Count > 0) { return supplemental.GetParameterByRawIdDelegate; }
 
-            return primary?.GetParameterByRawIdDelegate ?? supplementalDetails.GetParameterByRawIdDelegate;
+            return primary?.GetParameterByRawIdDelegate ?? supplemental.GetParameterByRawIdDelegate;
         }
 
         if (primary is not null && primary.Parameters.Count > 0) { return primary.GetParameterByRawIdDelegate; }

@@ -89,9 +89,8 @@ public sealed class ProviderDetails
     }
 
     /// <summary>
-    ///     Gets the first parameter message with the given RawId using a pre-built lookup dictionary. Returns null when
-    ///     no parameter matches. Duplicate RawIds resolve first-wins, matching the prior <c>FirstOrDefault</c> behavior on the
-    ///     <see cref="Parameters" /> list.
+    ///     Gets the first parameter message with the given RawId, or null when none matches. Duplicate RawIds resolve
+    ///     first-wins.
     /// </summary>
     public MessageModel? GetParameterByRawId(long rawId)
     {
