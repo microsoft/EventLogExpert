@@ -24,9 +24,7 @@ internal sealed class ModernEventMatcher(TemplateAnalyzer templates, ITraceLogge
 
     /// <summary>
     ///     Disambiguates multiple legacy messages for the same event ID. Tries Qualifier match (high 16 bits of RawId),
-    ///     then LogLink, then severity. Returns null when the set is empty or remains ambiguous after all checks. Exposed
-    ///     publicly so the description formatter can run this disambiguation against a candidate set it already holds without
-    ///     re-running <see cref="Match" />.
+    ///     then LogLink, then severity. Returns null when the set is empty or remains ambiguous after all checks.
     /// </summary>
     public static MessageModel? DisambiguateLegacyMessage(EventRecord eventRecord, IReadOnlyList<MessageModel> legacyMessages)
     {

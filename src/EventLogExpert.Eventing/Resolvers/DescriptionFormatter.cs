@@ -41,7 +41,6 @@ namespace EventLogExpert.Eventing.Resolvers;
 /// </remarks>
 internal sealed partial class DescriptionFormatter(
     TemplateAnalyzer templates,
-    ModernEventMatcher matcher,
     IEventResolverCache? cache,
     ITraceLogger? logger,
     Func<EventRecord, ProviderDetails?> supplementalProvider)
@@ -62,7 +61,6 @@ internal sealed partial class DescriptionFormatter(
 
     private readonly IEventResolverCache? _cache = cache;
     private readonly ITraceLogger? _logger = logger;
-    private readonly ModernEventMatcher _matcher = matcher;
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
     private readonly Func<EventRecord, ProviderDetails?> _supplementalProvider = supplementalProvider;
     private readonly TemplateAnalyzer _templates = templates;
