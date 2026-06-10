@@ -61,6 +61,6 @@ The threshold for what gets written to the in-app debug log surfaced by `Help` �
 
 ### Pre-release Builds
 
-A footer toggle. When `True`, `Help` → `Check for Updates` includes pre-release GitHub releases as candidates. Stable releases are always considered regardless of this setting.
+A footer toggle. When `True`, `Help` → `Check for Updates` includes pre-release GitHub releases as candidates. Stable releases are always considered regardless of this setting. The toggle is persisted in user preferences and applies to every subsequent update check, including the background checks the app runs on its own.
 
 [Docs home](Home.md)

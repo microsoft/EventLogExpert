@@ -2,25 +2,39 @@
 
 ## Filtering
 
-The Filter pane sits above the event table. Every event in the active log set is evaluated against the applied filters; non-matches are hidden. The pane has five `Add` buttons across the top:
+The Filter pane sits above the event table. Every event in the active log set is evaluated against the applied filters; non-matches are hidden.
 
-| Button | Adds |
+<!-- screenshot: filter-pane --> ![Filter pane header showing the left-side action buttons, active-filter indicator, and right-side icon trio](.images/filter-pane.png)
+
+The pane header carries the row-adding actions on the left and the persistence / management actions on the right:
+
+| Left-side action | Adds |
 | --- | --- |
-| `Add Basic Filter` | A category × evaluator × value comparison against a single resolved-event field. |
+| `Add Filter` (split button, primary action) | A property × operator × value Basic comparison against a single resolved-event field. |
+| `Add Filter` chevron → `Basic` | Same as the primary action. |
+| `Add Filter` chevron → `Advanced` | A free-form filter expression evaluated against `ResolvedEvent` by the app's built-in filter parser. |
+| `Add Filter` chevron → `Recent` | A `Cached` filter row pre-populated from the filter library's favorites / recent strings. Disabled when no recents are available; the menu lists the actual reason in its disabled tooltip (`Filter library failed to load. Open Filter Library to retry.`, `Filter library is still loading. Please try again.`, or `No recent filters yet — apply a Basic or Advanced filter to populate.`). |
+| `Add Exclusion` | A Basic filter row in the excluded state — same property × operator × value shape as `Add Filter` → `Basic`, but matching events are hidden instead of shown. Any saved row can be flipped between included and excluded later via the chrome `Exclude` / `Include` button. |
 | `Add Date Filter` | A `Before` / `After` time-window filter. Only one date filter exists at a time; the button is hidden once one is added. |
-| `Add Advanced Filter` | A free-form Dynamic LINQ expression evaluated against `ResolvedEvent`. |
-| `Add Cached Filter` | Picks a string from the Filter Cache (Favorites + Recent) and adds it as a Cached filter row. See [Saved Filters](Saved-Filters.md). |
-| `Add Exclusion` | A Basic filter row in the excluded state — same category × evaluator × value shape as `Add Basic Filter`, but matching events are hidden instead of shown. Any saved row can be flipped between included and excluded later via the chrome `Exclude` / `Include` button. |
+| `Apply Filter Set` | Opens an inline picker (dropdown of every saved filter set in the library). Picking one and clicking `Apply` adds that set's filters to the current pane. When the library has no filter sets yet, the picker shows one of two empty-state messages pointing the user at `Save as Filter Set` on the right — the wording shifts slightly depending on whether the pane currently has filters worth saving. |
 
 Each saved row carries a chrome strip with `Edit`, `Exclude` (or `Include` when the row is already an exclusion), `Remove`, and a `Disable` / `Enable` toggle. While editing, the chrome shows `Save` and `Cancel`. Non-exclusion rows also show a highlight-color picker (`Highlight Color`) before the comparison content. When any filter is being applied, the pane shows `[Applying Filters]` with a spinner; otherwise it shows `[Active Filters: N]`. The pane can be collapsed via the caret in the top-right corner.
 
-The pane header's right-side icon strip carries the persistence and management actions: `Save Filters as Group` (bookmark-plus icon — prompts for a group name and saves the current filter rows), `Clear All Filters` (trash icon — confirms then removes every filter row, the date filter, and any pending drafts), `Manage Cached Filters` (bookmark icon — opens the [filter cache modal](Saved-Filters.md)), and `Manage Filter Groups` (collection icon — opens the [filter groups modal](Saved-Filters.md)). The save and clear icons announce themselves as disabled when the pane has nothing to act on. See [Keyboard and Copy](Keyboard-And-Copy.md). `View` → `Show All Events` (`Ctrl+H`) suspends evaluation without removing any filters.
+The pane header's right-side icon strip carries three persistence and management actions:
+
+| Icon | Action | Behavior |
+| --- | --- | --- |
+| Bookmark-plus | `Save as Filter Set` | Prompts for a name (default `New Filter Set`) and saves the current filter rows as a new filter set in the library. The date filter is not included. Active tooltip: `Save as Filter Set...`; disabled tooltip: `No filters to save` (plus a screen-reader hint `Add a filter before saving as a Filter Set.`). |
+| Trash | `Clear All Filters` | Shows a confirmation with the count of items being removed, then drops every filter row, the date filter, and any pending drafts. Active tooltip: `Clear All Filters...`; disabled tooltip: `No filters to clear`. |
+| Bookmarks | `Open Filter Library` | Opens the [Filter Library modal](Saved-Filters.md). Tooltip: `Open Filter Library`. |
+
+`View` → `Show All Events` (`Ctrl+H`) suspends inclusion-filter evaluation without removing any filters. Exclusions and the date filter remain in effect when it's on.
 
 ### Basic filters
 
-Pick a category, pick an evaluator, then enter or pick a comparison value. Optionally add one or more predicates joined to the parent with `AND` or `OR`.
+Pick a property, pick an operator, then enter or pick a comparison value. Optionally add one or more predicates joined to the parent with `AND` or `OR`.
 
-**Categories** (`FilterCategory`):
+**Properties** (`EventProperty`):
 
 | Label | Source field |
 | --- | --- |
@@ -36,7 +50,7 @@ Pick a category, pick an evaluator, then enter or pick a comparison value. Optio
 | `Description` | resolved description text |
 | `Xml` | raw XML (forces eager XML resolution; see caveat) |
 
-**Evaluators** (`FilterEvaluator`):
+**Operators** (`ComparisonOperator` × `MatchMode`):
 
 | Label | Behavior |
 | --- | --- |
@@ -44,7 +58,7 @@ Pick a category, pick an evaluator, then enter or pick a comparison value. Optio
 | `Contains` | Case-insensitive substring match. |
 | `Not Equal` | Negated `Equals` (same case-sensitivity rules). |
 | `Not Contains` | Negated `Contains` (case-insensitive). |
-| `Multi Select` | Matches any value in the supplied set. The category determines which set is offered (e.g., `Level` → checkboxes for the five level values; `Source` → the providers seen in the active logs). |
+| `Multi Select` | The same row in `MatchMode.Many` paired with the `Equals` operator — matches any value in the supplied set. The property determines which set is offered (e.g., `Level` → checkboxes for the five level values; `Source` → the providers seen in the active logs). `Not Equal` does not have a multi-select variant in the picker. |
 
 Predicates live underneath the parent and can be combined freely. `AND` requires the predicate to also match; `OR` matches if either the parent or the predicate matches.
 
@@ -52,12 +66,12 @@ Predicates live underneath the parent and can be combined freely. `AND` requires
 
 `After` / `Before` timestamps in the configured time zone (see [Settings](Settings.md) → `Time Zone`). Only one date filter is allowed; removing it lets `Add Date Filter` reappear. Right-clicking an event in the table and choosing `Exclude Events Before` / `Exclude Events After` is a shortcut that sets a date filter using the right-clicked event's timestamp as the boundary.
 
-### Advanced filters (Dynamic LINQ)
+### Advanced filters
 
-Free-form expression evaluated against the `ResolvedEvent` record using [Dynamic LINQ](https://dynamic-linq.net/). The placeholder shown in the input is:
+Free-form expression evaluated against the `ResolvedEvent` record by the app's built-in filter parser. The syntax is a subset of C# expressions — identifier access, method calls (`.Contains("...")`, `.ToString()`, etc.), `==` / `!=` / `<` / `<=` / `>` / `>=`, `&&`, `||`, `!`, with standard C# operator precedence. The placeholder shown in the input is:
 
 ```
-(Id == 1000 || Id == 1001) && Description.Contains('Fault')
+(Id == 1000 || Id == 1001) && Description.Contains("Fault")
 ```
 
 Available properties:
@@ -89,12 +103,12 @@ Available properties:
 
 Either an `Add Exclusion` row from the start, or any Basic / Advanced row toggled with the `Exclude` chrome button. Matching events are hidden. Excluded filters are evaluated independently of `View` → `Show All Events`: the show-all toggle disables only the inclusion side, so exclusions and the date filter remain in effect when it's on. The pane header's `Clear All Filters` icon (trash) removes every filter from the pane (including the date filter and exclusions) — there's no built-in way to reversibly suspend everything at once.
 
-### Cached filters
+### Recent / Cached filters
 
-Quick-access strings for repeat use. See [Saved Filters](Saved-Filters.md) for how the cache is populated and managed.
+Quick-access strings for repeat use. The `Add Filter` chevron's `Recent` item creates a Cached-mode row pre-populated from the filter library's favorites and recent entries. The library itself (favorites, previously-used auto-tracked rows, and what the `Apply Filter Set` picker offers) is managed from the [Filter Library modal](Saved-Filters.md).
 
 ### Highlighting
 
-Each non-excluded filter row exposes a `Highlight Color` picker in its chrome. When set, every event matching that filter is rendered with that background color in the event table. When multiple filters with different colors match the same event, the first matching enabled, non-excluded filter in pane order wins (a filter with `Highlight Color` set to `None` still counts as a match and suppresses any later highlight). Selection styling beats highlight while a row is selected. Highlight colors persist with the filter — saving a group preserves its colors.
+Each non-excluded filter row exposes a `Highlight Color` picker in its chrome. When set, every event matching that filter is rendered with that background color in the event table. When multiple filters with different colors match the same event, the first matching enabled, non-excluded filter in pane order wins (a filter with `Highlight Color` set to `None` still counts as a match and suppresses any later highlight). Selection styling beats highlight while a row is selected. Highlight colors persist with the filter — saving a filter set preserves its colors.
 
 [Docs home](Home.md)

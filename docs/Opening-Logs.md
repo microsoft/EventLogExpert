@@ -4,7 +4,7 @@
 
 The `File` menu is the primary entry point for opening logs. There are three sources, all available under both `File` → `Open` (replace the active log set) and `File` → `Combine` (overlay on top of what's already open). The `Combine` submenu is greyed out until at least one log is open.
 
-`.evtx` files can also be opened by drag-and-drop onto the window or by passing them as command-line arguments at launch. Both routes always combine — they add to the current log set rather than replacing it.
+`.evtx` files can be opened by drag-and-drop onto the window or by passing them as command-line arguments at launch. Folders can also be passed as command-line arguments at launch and are expanded to their top-level `.evtx` files (no recursion — same semantic as `File` → `Open` → `Folder`); the drag-and-drop target only enables when at least one `.evtx` is in the dragged set, and only file items are accepted (folders are filtered out at the drag layer). Both routes always combine — they add to the current log set rather than replacing it. Activation tokens that arrive during cold launch are buffered until the main page is ready to consume them, so dragging `.evtx` files onto the desktop icon works the same as dragging onto an already-running window.
 
 ### Explorer right-click context menu
 
@@ -15,7 +15,7 @@ If EventLogExpert is installed as the packaged (MSIX) app, two right-click conte
 
 ### File
 
-`File` → `Open` → `File` (`Ctrl+O`) opens the system file picker filtered to `.evtx`. Pick one file or many — every selected `.evtx` is loaded concurrently as a separate log. The same applies for `File` → `Combine` → `File`, which adds the picked files to the existing log set.
+`File` → `Open` → `File` (`Ctrl+O`) opens the system file picker filtered to `.evtx`. Pick one file or many — each selected `.evtx` is enqueued as a separate log in order; the actual load work then runs in parallel under a per-machine throttle (roughly your CPU count), so multiple logs can be loading at once. The same applies for `File` → `Combine` → `File`, which adds the picked files to the existing log set.
 
 ### Folder
 
@@ -27,7 +27,7 @@ Use this when you've been handed a folder of `.evtx` exports from one or more ma
 
 `File` → `Open` → `Live` opens a Windows event channel as a live log — the channel is read in real time as opposed to a static snapshot.
 
-The submenu always lists `Application`, `System`, and `Security`. Below them, an `Other Logs` submenu is built from the channels actually registered on the local machine, presented as a hierarchical tree (`Microsoft` → `Windows` → `<provider>` → `<log>`, etc.). The list is discovered once per app session and cached after the first menu open or background prewarm; channels added or removed during the session aren't reflected until the app restarts.
+The submenu always lists `Application`, `System`, and `Security`. Below them, an `Other Logs` submenu is built from the channels actually registered on the local machine, presented as a hierarchical tree (`Microsoft` → `Windows` → `{provider}` → `{log}`, etc.). The list is discovered once per app session and cached after the first menu open or background prewarm; channels added or removed during the session aren't reflected until the app restarts.
 
 **Admin-only channels.** Some channels can't be read without elevation. When the app isn't running as Administrator, `Security` (and other elevation-gated channels surfaced under `Other Logs`) appear in the menu but are disabled. Re-launching the app as Administrator enables them. The disabled state is the only signal — there's no popup. Anything that opens fine without elevation stays enabled.
 
@@ -49,7 +49,7 @@ The status bar surfaces both:
 | Status bar token | Condition |
 | --- | --- |
 | `Continuously Updating` | At least one live log is open and `Continuously Update` is on. |
-| `New Events: <n>` | At least one live log is open and `Continuously Update` is off; `<n>` is the buffer size. |
+| `New Events: {n}` | At least one live log is open and `Continuously Update` is off; `{n}` is the buffer size. |
 | `Buffer Full` | The new-event buffer reached its cap. Live watchers are stopped while this is set, so no further events arrive until either `Load New Events` drains the buffer or `Continuously Update` is turned on (both clear the buffer and restart the watchers). |
 
 ### Close All

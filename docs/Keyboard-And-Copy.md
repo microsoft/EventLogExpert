@@ -17,7 +17,7 @@ The `Edit` menu always lists all four copy formats:
 
 Multi-selection is honored — every selected row is included in the copied payload in the order they appear.
 
-The persistence and management actions (`Save Filters as Group`, `Clear All Filters`, `Manage Cached Filters`, `Manage Filter Groups`) live on the [Filter pane](Filtering.md) header's right-side icon strip rather than on the menu bar. `Save Filters as Group` prompts for a `Group Name` (default `New Filter Section\New Filter Group`) and saves the current filter rows — the date filter is not included. `Clear All Filters` shows a confirmation with the count of items being removed, then drops every filter row, the date filter, and any pending drafts. See [Saved Filters](Saved-Filters.md).
+The persistence and management actions (`Save as Filter Set`, `Clear All Filters`, `Open Filter Library`) live on the [Filter pane](Filtering.md) header's right-side icon strip rather than on the menu bar. `Save as Filter Set` prompts for a name (default `New Filter Set`) and saves the current filter rows as a new filter set in the library — the date filter is not included. `Clear All Filters` shows a confirmation with the count of items being removed, then drops every filter row, the date filter, and any pending drafts. `Open Filter Library` opens the library modal — see [Saved Filters](Saved-Filters.md).
 
 ### Menu navigation
 

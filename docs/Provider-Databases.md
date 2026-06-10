@@ -41,10 +41,12 @@ Root description (verbatim from `--help`):
 
 Five subcommands.
 
+**A note on `create` and `diff`.** Both subcommands defer creating the output `.db` file until at least one provider is about to be persisted — a scan that yields zero providers (an over-restrictive `--filter`, a `diff` with no new providers, etc.) finishes without leaving an empty `.db` file on disk. The output file appears only when there is something to write.
+
 ### `eventdbtool show`
 
 ```
-eventdbtool show [<source>] [--filter <regex>] [--verbose]
+eventdbtool show [{source}] [--filter {regex}] [--verbose]
 ```
 
 > List event providers. When no source is supplied, lists providers on the local machine. When a source is supplied, it may be a .db file created with this tool, an exported .evtx file (resolved via its sibling LocaleMetaData/*.MTA files), or a folder containing either.
@@ -58,12 +60,12 @@ eventdbtool show [<source>] [--filter <regex>] [--verbose]
 ### `eventdbtool create`
 
 ```
-eventdbtool create <file> [<source>] [--filter <regex>] [--skip-providers-in-file <source>] [--verbose]
+eventdbtool create {file} [{source}] [--filter {regex}] [--skip-providers-in-file {source}] [--verbose]
 ```
 
 > Creates a new event database.
 
-The `<file>` argument must end in `.db` and must not already exist.
+The `{file}` argument must end in `.db` and must not already exist.
 
 | Argument / option | Description |
 | --- | --- |
@@ -76,7 +78,7 @@ The `<file>` argument must end in `.db` and must not already exist.
 ### `eventdbtool merge`
 
 ```
-eventdbtool merge <source> <target db> [--overwrite] [--verbose]
+eventdbtool merge {source} {target db} [--overwrite] [--verbose]
 ```
 
 > Copies providers from a source into a target database.
@@ -93,7 +95,7 @@ The target must already exist and be at the current schema version (run `upgrade
 ### `eventdbtool diff`
 
 ```
-eventdbtool diff <first source> <second source> <new db> [--verbose]
+eventdbtool diff {first source} {second source} {new db} [--verbose]
 ```
 
 > Given two provider sources (each may be a .db, an exported .evtx, or a folder containing them), produces a database containing all providers from the second source which are not in the first source.
@@ -108,7 +110,7 @@ eventdbtool diff <first source> <second source> <new db> [--verbose]
 ### `eventdbtool upgrade`
 
 ```
-eventdbtool upgrade <file> [--verbose]
+eventdbtool upgrade {file} [--verbose]
 ```
 
 > Upgrades the database schema
