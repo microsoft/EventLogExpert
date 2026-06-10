@@ -6,11 +6,11 @@ A Windows Event Log viewer for tech support and IT professionals.
 
 ## Key features
 
-* Loads `.evtx` files concurrently — `File` → `Open`, drag-and-drop, or open every `.evtx` in a folder in one step.
+* Opens `.evtx` files via `File` → `Open`, drag-and-drop, or by loading every `.evtx` in a folder in one step. Folders can also be passed at launch as command-line arguments.
 * Combined view interleaves events from any mix of file and live logs by time across multiple machines.
 * Configurable event-table columns (visibility, ordering, sort) with per-row highlight colors driven by your filters.
-* Filter pane with Basic (category × evaluator) filters, predicates joined with `AND` / `OR`, Date filter, Advanced Dynamic LINQ expressions, and Exclusion filters.
-* Filter Cache (Favorites + Recent) and named, importable / exportable Filter Groups.
+* Filter pane with Basic (property × operator) filters, predicates joined with `AND` / `OR`, Date filter, Advanced filter expressions, and Exclusion filters.
+* Filter Library with saved single filters, named filter sets, favorites, tag-based organization, automatic tracking of recently-applied filters, plus library-wide import / export and per-filter-set export.
 * Live event channels with auto-discovery (admin-only channels disabled when not elevated), `Continuously Update`, and a `Load New Events` buffered mode.
 * Provider Databases — load `.db` files captured on another machine so its `.evtx` files resolve descriptions and task categories correctly.
 * In-line description previews in the table; on-demand event XML in the Details pane.
@@ -21,7 +21,7 @@ For more information, check our [docs](docs/Home.md).
 
 ## Quick Start
 
-Download the `EventLogExpert_<version>_x64.appinstaller` (or the matching `EventLogExpert_<version>_x64.msix`) from the latest release and run it: <https://github.com/microsoft/EventLogExpert/releases/latest>.
+Download the `EventLogExpert_{version}_x64.appinstaller` (or the matching `EventLogExpert_{version}_x64.msix`) from the latest release and run it: <https://github.com/microsoft/EventLogExpert/releases/latest>.
 
 The `.appinstaller` declares its dependency on the Windows App Runtime (currently `Microsoft.WindowsAppRuntime.1.7.msix`, also published in the same release) so App Installer fetches the runtime automatically on a clean machine. Updates are checked on launch.
 
@@ -34,7 +34,7 @@ Add-AppxPackage $home\Downloads\Microsoft.WindowsAppRuntime.1.7.msix
 Then install the app:
 
 ```
-Add-AppxPackage $home\Downloads\EventLogExpert_<version>_x64.msix
+Add-AppxPackage $home\Downloads\EventLogExpert_{version}_x64.msix
 ```
 
 ### First time setup

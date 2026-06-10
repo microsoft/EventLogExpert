@@ -8,8 +8,8 @@ Runs on supported versions of Windows: Windows 11, Windows Server 2022, Windows 
 
 - [Opening Logs](Opening-Logs.md) — Opening files, folders, and live channels.
 - [Viewing Events](Viewing-Events.md) — Tab strip, configurable table columns, details pane.
-- [Filtering](Filtering.md) — Basic, Date, Advanced (Dynamic LINQ), Cached, Exclusion filters and highlighting.
-- [Saved Filters](Saved-Filters.md) — Filter cache (Favorites + Recent) and Filter groups.
+- [Filtering](Filtering.md) — Basic, Date, Advanced, Recent, Exclusion filters and highlighting.
+- [Saved Filters](Saved-Filters.md) — The Filter Library: saved filters, favorites, filter sets, and previously-used auto-tracking.
 - [Provider Databases](Provider-Databases.md) — Why event databases exist and the `eventdbtool` CLI.
 - [Settings](Settings.md) — Time zone, databases, theme, copy mode, log level, pre-release builds.
 - [Keyboard and Copy](Keyboard-And-Copy.md) — Ctrl+C copy formats and other keyboard bindings.
