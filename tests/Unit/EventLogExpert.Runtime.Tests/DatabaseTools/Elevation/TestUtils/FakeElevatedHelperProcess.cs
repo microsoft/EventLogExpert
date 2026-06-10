@@ -17,6 +17,8 @@ internal sealed class FakeElevatedHelperProcess(Stream pipe, int processId) : IE
 
     public int ProcessId { get; } = processId;
 
+    public bool SimulateUnkillable { get; set; }
+
     public bool WasKilled => Volatile.Read(ref _killed) != 0;
 
     public async ValueTask DisposeAsync()
@@ -25,13 +27,32 @@ internal sealed class FakeElevatedHelperProcess(Stream pipe, int processId) : IE
         await _pipe.DisposeAsync();
     }
 
-    public void Kill()
+    public bool Kill()
     {
-        if (Interlocked.Exchange(ref _killed, 1) == 0)
+        if (_exitTcs.Task.IsCompleted)
         {
-            try { OnKilled?.Invoke(); } catch { /* tests are responsible for their own callback robustness */ }
-            _exitTcs.TrySetResult(-1);
+            // Process has already "exited" via SignalExited or a prior Kill — report success per the
+            // IElevatedHelperProcess.Kill contract ("true if the process was killed by this call OR was already exited").
+            return true;
         }
+
+        if (Interlocked.Exchange(ref _killed, 1) != 0)
+        {
+            return !SimulateUnkillable;
+        }
+
+        try { OnKilled?.Invoke(); } catch { /* tests are responsible for their own callback robustness */ }
+
+        if (SimulateUnkillable)
+        {
+            // Simulate a wedged high-IL helper: the kill attempt fails and the process keeps running so the exit
+            // TCS is intentionally NOT set. The runner is expected to fall back to closing the pipe to unblock.
+            return false;
+        }
+
+        _exitTcs.TrySetResult(-1);
+
+        return true;
     }
 
     public void SignalExited(int exitCode) => _exitTcs.TrySetResult(exitCode);

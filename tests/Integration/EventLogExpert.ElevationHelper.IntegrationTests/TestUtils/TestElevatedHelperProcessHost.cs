@@ -12,9 +12,17 @@ namespace EventLogExpert.ElevationHelper.IntegrationTests.TestUtils;
 
 internal sealed class TestElevatedHelperProcessHost(ITraceLogger logger) : IElevatedHelperProcessHost
 {
+    private const int MaxClientPidRejections = 32;
     private const int PipeBufferSize = 65536;
 
     private static readonly TimeSpan s_connectTimeout = TimeSpan.FromSeconds(15);
+
+    internal enum PidVerifyResult
+    {
+        Match = 0,
+        ClientPidMismatch = 1,
+        GetPidFailed = 2
+    }
 
     public async Task<IElevatedHelperProcess> StartAsync(IReadOnlyList<string> extraArgs, CancellationToken cancellationToken)
     {
@@ -71,15 +79,13 @@ internal sealed class TestElevatedHelperProcessHost(ITraceLogger logger) : IElev
 
             try
             {
-                await pipeServer.WaitForConnectionAsync(connectCts.Token);
+                await AcceptAndVerifyClientPidAsync(pipeServer, helperProcess.Id, logger, connectCts.Token);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 throw new TimeoutException(
                     $"Elevated helper PID {helperProcess.Id} did not connect within {s_connectTimeout.TotalSeconds:N0}s.");
             }
-
-            VerifyClientPid(pipeServer, expectedPid: helperProcess.Id);
 
             var handle = new TestElevatedHelperProcess(helperProcess, pipeServer, logger);
             helperProcess = null;
@@ -90,14 +96,77 @@ internal sealed class TestElevatedHelperProcessHost(ITraceLogger logger) : IElev
         {
             try { pipeServer.Dispose(); } catch { /* swallowed during error cleanup */ }
 
-            if (helperProcess is not null)
+            if (helperProcess is null) { throw; }
+
+            try
             {
-                try { if (!helperProcess.HasExited) { helperProcess.Kill(entireProcessTree: false); } } catch { /* swallowed */ }
-                helperProcess.Dispose();
+                if (!helperProcess.HasExited) { helperProcess.Kill(entireProcessTree: false); }
             }
+            catch (InvalidOperationException) { /* already exited */ }
+            catch (Exception ex)
+            {
+                logger.Error(
+                    $"{nameof(TestElevatedHelperProcessHost)}: failed to kill spawned helper PID {helperProcess.Id} during error cleanup: {ex.GetType().Name}: {ex.Message}");
+            }
+
+            helperProcess.Dispose();
 
             throw;
         }
+    }
+
+    internal static async Task AcceptAndVerifyClientPidAsync(
+        NamedPipeServerStream pipeServer,
+        int expectedPid,
+        ITraceLogger logger,
+        CancellationToken cancellationToken)
+    {
+        int rejections = 0;
+
+        while (true)
+        {
+            await pipeServer.WaitForConnectionAsync(cancellationToken);
+
+            var result = TryVerifyClientPid(pipeServer, expectedPid);
+
+            if (result == PidVerifyResult.Match) { return; }
+
+            if (result == PidVerifyResult.GetPidFailed)
+            {
+                var error = Marshal.GetLastWin32Error();
+
+                throw new InvalidOperationException($"GetNamedPipeClientProcessId failed (Win32 error {error}).");
+            }
+
+            pipeServer.Disconnect();
+            rejections++;
+
+            if (rejections >= MaxClientPidRejections)
+            {
+                throw new InvalidOperationException(
+                    $"Rejected {MaxClientPidRejections} same-user pipe connections from non-helper PIDs before the legitimate helper connected.");
+            }
+
+            if (rejections == 1)
+            {
+                logger.Information(
+                    $"{nameof(TestElevatedHelperProcessHost)}: rejected pipe connection from non-helper PID (expected {expectedPid}); continuing to wait for legitimate helper.");
+            }
+            else
+            {
+                logger.Trace($"{nameof(TestElevatedHelperProcessHost)}: rejected pipe connection #{rejections} from non-helper PID.");
+            }
+        }
+    }
+
+    internal static PidVerifyResult TryVerifyClientPid(NamedPipeServerStream pipeServer, int expectedPid)
+    {
+        if (!NativeMethods.GetNamedPipeClientProcessId(pipeServer.SafePipeHandle, out var clientPid))
+        {
+            return PidVerifyResult.GetPidFailed;
+        }
+
+        return clientPid == (uint)expectedPid ? PidVerifyResult.Match : PidVerifyResult.ClientPidMismatch;
     }
 
     private static string BuildArgumentString(string runtimeConfigPath, string helperDllPath, string pipeName, IReadOnlyList<string> extraArgs)
@@ -119,7 +188,9 @@ internal sealed class TestElevatedHelperProcessHost(ITraceLogger logger) : IElev
     private static string QuoteIfNeeded(string arg)
     {
         if (string.IsNullOrEmpty(arg)) { return "\"\""; }
+
         if (arg.IndexOfAny([' ', '\t', '"']) < 0) { return arg; }
+
         return "\"" + arg.Replace("\"", "\\\"") + "\"";
     }
 
@@ -137,21 +208,6 @@ internal sealed class TestElevatedHelperProcessHost(ITraceLogger logger) : IElev
         }
 
         return testRuntimeConfig;
-    }
-
-    private static void VerifyClientPid(NamedPipeServerStream pipeServer, int expectedPid)
-    {
-        if (!NativeMethods.GetNamedPipeClientProcessId(pipeServer.SafePipeHandle, out var clientPid))
-        {
-            var error = Marshal.GetLastWin32Error();
-            throw new InvalidOperationException($"GetNamedPipeClientProcessId failed (Win32 error {error}).");
-        }
-
-        if (clientPid != (uint)expectedPid)
-        {
-            throw new InvalidOperationException(
-                $"Pipe client PID {clientPid} does not match spawned helper PID {expectedPid}. Rejecting connection.");
-        }
     }
 
     private static class NativeMethods
@@ -175,19 +231,27 @@ internal sealed class TestElevatedHelperProcess(Process process, NamedPipeServer
         if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
 
         try { await pipe.DisposeAsync(); } catch { /* swallowed during dispose */ }
+
         try { process.Dispose(); } catch { /* swallowed during dispose */ }
     }
 
-    public void Kill()
+    public bool Kill()
     {
         try
         {
             if (!process.HasExited) { process.Kill(entireProcessTree: false); }
+
+            return true;
         }
-        catch (InvalidOperationException) { /* already exited */ }
+        catch (InvalidOperationException)
+        {
+            return true;
+        }
         catch (Exception ex)
         {
-            logger.Warning($"{nameof(TestElevatedHelperProcess)}.{nameof(Kill)} threw: {ex}");
+            logger.Error($"{nameof(TestElevatedHelperProcess)}.{nameof(Kill)} failed: {ex.GetType().Name}: {ex.Message}");
+
+            return false;
         }
     }
 
@@ -198,6 +262,7 @@ internal sealed class TestElevatedHelperProcess(Process process, NamedPipeServer
         async Task<int> WaitAsync()
         {
             await process.WaitForExitAsync(cancellationToken);
+
             return process.ExitCode;
         }
     }

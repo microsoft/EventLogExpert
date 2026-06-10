@@ -21,7 +21,7 @@ namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 ///     Production <see cref="IElevatedDatabaseToolsRunner" /> implementation. For each request: spawn helper -> wait
 ///     for Hello message (10s) -> send request -> drain messages through a bounded <see cref="Channel{T}" /> -> forward
 ///     Log/Progress to caller sinks + mirror to <see cref="ITraceLogger" /> with <c>[ElevatedHelper]</c> prefix -> capture
-///     terminal Result/Fatal -> await helper exit (5s grace, then force-kill) -> translate to
+///     terminal Result/Fatal -> await helper exit (5s grace, then force-kill if killable) -> translate to
 ///     <see cref="DatabaseToolsResult" />.
 /// </summary>
 /// <remarks>
@@ -29,7 +29,19 @@ namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 ///         <b>Cancellation flow:</b> caller cancels -> runner writes <see cref="CancelMessage" /> to the pipe
 ///         (best-effort) and starts a 30s grace timer. Helper observes the message, cancels its operation CTS, and emits a
 ///         <see cref="ResultMessage" /> with <see cref="DatabaseToolsOutcome.Cancelled" />. If the helper does NOT emit a
-///         result within the grace window, the runner force-kills the process and returns a synthesized Cancelled outcome.
+///         result within the grace window, the runner force-kills the process. On a successful kill the runner returns a
+///         synthesized Cancelled outcome with a "force-killed" note; if the kill itself fails (for example, a medium-IL
+///         runner cannot terminate a high-IL helper and <see cref="IElevatedHelperProcess.Kill" /> returns <c>false</c>),
+///         the runner disposes the pipe to unblock the drain loop and returns Cancelled with an explicit orphan warning
+///         so the caller can surface that the helper may continue running.
+///     </para>
+///     <para>
+///         <b>Early-return cleanup:</b> if <see cref="RunAsync" /> returns before the normal terminal-message path
+///         completes (Hello timeout, protocol mismatch, wrong-first-envelope, pipe-closed-before-Hello, cancel-while-
+///         sending-request), a centralized <c>finally</c> block disposes the pipe (graceful: helper sees EOF and exits
+///         cooperatively), bounded-waits for exit, and falls back to <see cref="IElevatedHelperProcess.Kill" /> only if
+///         the helper does not exit within the grace window. If the fallback kill also fails the helper becomes an
+///         orphan; the pipe is already closed so the runner returns without waiting further.
 ///     </para>
 ///     <para>
 ///         <b>Concurrency invariants:</b>
@@ -58,6 +70,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
     internal const string ElevatedHelperTag = "[ElevatedHelper]";
 
     private const int ChannelCapacity = 1024;
+
     private static readonly UTF8Encoding s_utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
     private readonly TimeSpan _cancellationGrace;
@@ -90,6 +103,13 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         _helloTimeout = helloTimeout;
         _cancellationGrace = cancellationGrace;
         _exitGrace = exitGrace;
+    }
+
+    private enum KillDisposition
+    {
+        NotAttempted = 0,
+        Succeeded = 1,
+        Failed = 2
     }
 
     public Task<DatabaseToolsResult> CreateAsync(CreateDatabaseRequest request, IProgress<LogRecord> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
@@ -235,8 +255,20 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 await Task.Delay(_cancellationGrace, graceCts.Token);
 
                 _traceLogger.Warning($"{ElevatedHelperTag} Helper did not respond with a Result message within {_cancellationGrace.TotalSeconds:N0}s of CancelMessage - force-killing.");
-                process.Kill();
-                killState.MarkKilled();
+
+                if (process.Kill())
+                {
+                    killState.MarkKillSucceeded();
+                }
+                else
+                {
+                    killState.MarkKillFailed();
+
+                    _traceLogger.Error($"{ElevatedHelperTag} Kill returned false; helper may continue running as orphan. Disposing pipe to unblock drain loop.");
+
+                    try { await ((IAsyncDisposable)process.Pipe).DisposeAsync(); }
+                    catch { /* best effort */ }
+                }
             }
             catch (OperationCanceledException) { /* helper finished in time */ }
             catch (Exception ex)
@@ -300,6 +332,9 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         IElevatedHelperProcess? process = null;
         SemaphoreSlim? writeLock = null;
         CancellationTokenRegistration cancelRegistration = default;
+        Task? pipeReaderTask = null;
+        CancellationTokenSource? readerStopCts = null;
+        bool exitHandled = false;
 
         _traceLogger.Trace($"{ElevatedHelperTag} Starting {request.GetType().Name} (verbose={request.Verbose})...");
 
@@ -342,10 +377,10 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                     FullMode = BoundedChannelFullMode.Wait
                 });
 
-            using var readerStopCts = new CancellationTokenSource();
+            readerStopCts = new CancellationTokenSource();
 
             var pipeStream = process.Pipe;
-            var pipeReaderTask = Task.Run(
+            pipeReaderTask = Task.Run(
                 () => DrainPipeAsync(pipeStream, channel.Writer, readerStopCts.Token),
                 readerStopCts.Token);
 
@@ -458,26 +493,49 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             // Helper sent a terminal message (or pipe closed). Cancel the kill-timer so it doesn't fire on a clean finish.
             killState.CancelGraceTimer();
 
-            // 7) Wait for helper to exit (grace, then force-kill).
+            // 7) Wait for helper to exit (bounded by _exitGrace, then force-kill if it lingers and is killable).
             int exitCode;
             try
             {
-                using var exitCts = new CancellationTokenSource();
-                exitCts.CancelAfter(_exitGrace);
+                using var exitCts = new CancellationTokenSource(_exitGrace);
 
                 exitCode = await process.WaitForExitAsync(exitCts.Token);
             }
             catch (OperationCanceledException)
             {
-                if (!killState.HelperKilled)
+                if (killState.Disposition != KillDisposition.Failed)
                 {
                     _traceLogger.Warning($"{ElevatedHelperTag} Helper did not exit within {_exitGrace.TotalSeconds:N0}s after IPC drained - force-killing.");
-                    process.Kill();
-                    killState.MarkKilled();
+
+                    if (process.Kill())
+                    {
+                        killState.MarkKillSucceeded();
+                    }
+                    else
+                    {
+                        killState.MarkKillFailed();
+
+                        _traceLogger.Error($"{ElevatedHelperTag} Kill returned false; helper may continue running as orphan. Disposing pipe.");
+
+                        try { await ((IAsyncDisposable)process.Pipe).DisposeAsync(); }
+                        catch { /* best effort */ }
+                    }
                 }
 
-                try { exitCode = await process.WaitForExitAsync(CancellationToken.None); }
-                catch { exitCode = -1; }
+                if (killState.Disposition == KillDisposition.Failed)
+                {
+                    exitCode = -1;
+                }
+                else
+                {
+                    try
+                    {
+                        using var killWaitCts = new CancellationTokenSource(_exitGrace);
+
+                        exitCode = await process.WaitForExitAsync(killWaitCts.Token);
+                    }
+                    catch { exitCode = -1; }
+                }
             }
 
             // 8) Stop the pipe reader so it releases the StreamReader / Stream.
@@ -493,27 +551,72 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             _traceLogger.Trace($"{ElevatedHelperTag} Helper process exited; exit code = {exitCode}{(killState.HelperKilled ? " (force-killed)" : string.Empty)}.");
 
             // 9) Translate to DatabaseToolsResult.
-            return TranslateOutcome(result, fatal, exitCode, killState.HelperKilled, cancellationToken, stopwatch.Elapsed);
+            exitHandled = true;
+
+            return TranslateOutcome(result, fatal, exitCode, killState.Disposition, cancellationToken, stopwatch.Elapsed);
         }
         catch (Exception ex)
         {
             _traceLogger.Error($"{ElevatedHelperTag} Unhandled exception in runner: {ex}");
 
-            if (process is not null && !killState.HelperKilled)
-            {
-                try { process.Kill(); } catch { /* best effort */ }
-            }
-
             return new DatabaseToolsResult(DatabaseToolsOutcome.Failed, $"{ex.GetType().Name}: {ex.Message}", stopwatch.Elapsed);
         }
         finally
         {
+            killState.CancelGraceTimer();
+
+            if (!exitHandled && process is not null)
+            {
+                try { readerStopCts?.Cancel(); }
+                catch (ObjectDisposedException) { /* already disposed */ }
+
+                if (pipeReaderTask is not null)
+                {
+                    try { await pipeReaderTask.WaitAsync(_exitGrace); }
+                    catch { /* best effort */ }
+                }
+
+                // Graceful first: dispose pipe so helper sees EOF and exits cooperatively.
+                try { await ((IAsyncDisposable)process.Pipe).DisposeAsync(); }
+                catch { /* best effort */ }
+
+                try
+                {
+                    using var cleanupCts = new CancellationTokenSource(_exitGrace);
+
+                    await process.WaitForExitAsync(cleanupCts.Token);
+                }
+                catch
+                {
+                    // Helper didn't exit cooperatively — force-kill as last resort.
+                    if (process.Kill())
+                    {
+                        killState.MarkKillSucceeded();
+
+                        try
+                        {
+                            using var forceCts = new CancellationTokenSource(_exitGrace);
+
+                            await process.WaitForExitAsync(forceCts.Token);
+                        }
+                        catch { /* best effort */ }
+                    }
+                    else
+                    {
+                        killState.MarkKillFailed();
+                        // Kill failed → pipe already disposed, helper orphaned, nothing more to do.
+                    }
+                }
+            }
+
             killState.DisposeGraceTimer();
             writeLock?.Dispose();
+            readerStopCts?.Dispose();
 
             if (process is not null)
             {
-                await process.DisposeAsync();
+                try { await process.DisposeAsync(); }
+                catch { /* best effort */ }
             }
         }
     }
@@ -534,7 +637,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         ResultMessage? result,
         FatalMessage? fatal,
         int exitCode,
-        bool helperKilled,
+        KillDisposition killDisposition,
         CancellationToken cancellationToken,
         TimeSpan elapsed)
     {
@@ -554,29 +657,37 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 elapsed);
         }
 
-        if (cancellationToken.IsCancellationRequested)
+        if (!cancellationToken.IsCancellationRequested)
         {
             return new DatabaseToolsResult(
-                DatabaseToolsOutcome.Cancelled,
-                helperKilled
-                    ? "Cancelled (helper did not respond to CancelMessage within grace window; force-killed). If you ran an Upgrade, a .bak of the original target may remain next to it - rename it to recover."
-                    : "Cancelled.",
+                DatabaseToolsOutcome.Failed,
+                $"Helper exited (code {exitCode}) without sending a Result message.",
                 elapsed);
         }
 
-        return new DatabaseToolsResult(
-            DatabaseToolsOutcome.Failed,
-            $"Helper exited (code {exitCode}) without sending a Result message.",
-            elapsed);
+        string summary = killDisposition switch
+        {
+            KillDisposition.Failed =>
+                "Cancelled (helper did not respond to cancel and could not be terminated; it may continue running as an orphan process). " +
+                "If you ran an Upgrade, a .bak of the original target may remain next to it - rename it to recover.",
+            KillDisposition.Succeeded =>
+                "Cancelled (helper did not respond to CancelMessage within grace window; force-killed). " +
+                "If you ran an Upgrade, a .bak of the original target may remain next to it - rename it to recover.",
+            _ => "Cancelled."
+        };
+
+        return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, summary, elapsed);
     }
 
     private sealed class KillState
     {
         private int _cancelRequested;
+        private int _disposition;
         private CancellationTokenSource? _graceTimerCts;
-        private int _helperKilled;
 
-        public bool HelperKilled => Volatile.Read(ref _helperKilled) != 0;
+        public KillDisposition Disposition => (KillDisposition)Volatile.Read(ref _disposition);
+
+        public bool HelperKilled => Disposition == KillDisposition.Succeeded;
 
         public void CancelGraceTimer()
         {
@@ -592,7 +703,12 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
         public bool MarkCancelRequested() => Interlocked.Exchange(ref _cancelRequested, 1) == 0;
 
-        public void MarkKilled() => Interlocked.Exchange(ref _helperKilled, 1);
+        public void MarkKillFailed() => Interlocked.CompareExchange(
+            ref _disposition,
+            (int)KillDisposition.Failed,
+            (int)KillDisposition.NotAttempted);
+
+        public void MarkKillSucceeded() => Interlocked.Exchange(ref _disposition, (int)KillDisposition.Succeeded);
 
         public void SetGraceTimer(CancellationTokenSource cts) => Volatile.Write(ref _graceTimerCts, cts);
     }
