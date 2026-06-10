@@ -27,12 +27,14 @@ internal sealed class Reducers
 
         if (state.EventTables.IsEmpty)
         {
-            return state with
-            {
-                EventTables = state.EventTables.Add(newTable),
-                EventCountByLog = counts,
-                ActiveEventLogId = newTable.Id
-            };
+            return ResetGroupCollapseIfActiveChanged(
+                state with
+                {
+                    EventTables = state.EventTables.Add(newTable),
+                    EventCountByLog = counts,
+                    ActiveEventLogId = newTable.Id
+                },
+                state.ActiveEventLogId);
         }
 
         var combinedTable = state.EventTables.FirstOrDefault(table => table.IsCombined);
@@ -48,14 +50,16 @@ internal sealed class Reducers
 
         combinedTable = new LogView(EventLogId.Create()) { IsCombined = true };
 
-        return state with
-        {
-            EventTables = state.EventTables
-                .Add(combinedTable)
-                .Add(newTable),
-            EventCountByLog = counts,
-            ActiveEventLogId = combinedTable.Id
-        };
+        return ResetGroupCollapseIfActiveChanged(
+            state with
+            {
+                EventTables = state.EventTables
+                    .Add(combinedTable)
+                    .Add(newTable),
+                EventCountByLog = counts,
+                ActiveEventLogId = combinedTable.Id
+            },
+            state.ActiveEventLogId);
     }
 
     [ReducerMethod]
@@ -69,7 +73,9 @@ internal sealed class Reducers
             state.DisplayedEvents,
             action.Events,
             GetEffectiveOrderBy(state.OrderBy),
-            state.IsDescending);
+            state.IsDescending,
+            state.GroupBy,
+            state.IsGroupDescending);
 
         var updatedTable = SetComputerNameIfFirstEvent(table, action.Events);
         var counts = IncrementCount(state.EventCountByLog, table.Id, action.Events.Count);
@@ -123,7 +129,9 @@ internal sealed class Reducers
             state.DisplayedEvents,
             combinedBatch,
             GetEffectiveOrderBy(state.OrderBy),
-            state.IsDescending);
+            state.IsDescending,
+            state.GroupBy,
+            state.IsGroupDescending);
 
         return state with
         {
@@ -135,13 +143,13 @@ internal sealed class Reducers
 
     [ReducerMethod(typeof(CloseAllLogsAction))]
     public static LogTableState ReduceCloseAll(LogTableState state) =>
-        state with
+        ResetGroupCollapse(state with
         {
             EventTables = [],
             DisplayedEvents = [],
             EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty,
             ActiveEventLogId = null
-        };
+        });
 
     [ReducerMethod]
     public static LogTableState ReduceCloseLog(LogTableState state, CloseLogAction action)
@@ -159,39 +167,45 @@ internal sealed class Reducers
         switch (remainingPerLogTables.Count)
         {
             case <= 0:
-                return state with
-                {
-                    EventTables = [],
-                    DisplayedEvents = [],
-                    EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty,
-                    ActiveEventLogId = null
-                };
+                return ResetGroupCollapseIfActiveChanged(
+                    state with
+                    {
+                        EventTables = [],
+                        DisplayedEvents = [],
+                        EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty,
+                        ActiveEventLogId = null
+                    },
+                    state.ActiveEventLogId);
             case 1:
                 {
                     var soleRemaining = remainingPerLogTables[0];
                     var filtered = FilterByOwningLog(state.DisplayedEvents, soleRemaining.LogName);
 
-                    return state with
-                    {
-                        EventTables = remainingPerLogTables,
-                        DisplayedEvents = filtered,
-                        EventCountByLog = counts,
-                        ActiveEventLogId = soleRemaining.Id
-                    };
+                    return ResetGroupCollapseIfActiveChanged(
+                        state with
+                        {
+                            EventTables = remainingPerLogTables,
+                            DisplayedEvents = filtered,
+                            EventCountByLog = counts,
+                            ActiveEventLogId = soleRemaining.Id
+                        },
+                        state.ActiveEventLogId);
                 }
             default:
                 {
                     var combinedTable = new LogView(EventLogId.Create()) { IsCombined = true };
                     var filtered = FilterOutOwningLog(state.DisplayedEvents, closingTable.LogName);
 
-                    return state with
-                    {
-                        EventTables = remainingPerLogTables.Insert(0, combinedTable),
-                        DisplayedEvents = filtered,
-                        EventCountByLog = counts,
-                        ActiveEventLogId = remainingPerLogTables.Any(t => t.Id == state.ActiveEventLogId) ?
-                            state.ActiveEventLogId : combinedTable.Id
-                    };
+                    return ResetGroupCollapseIfActiveChanged(
+                        state with
+                        {
+                            EventTables = remainingPerLogTables.Insert(0, combinedTable),
+                            DisplayedEvents = filtered,
+                            EventCountByLog = counts,
+                            ActiveEventLogId = remainingPerLogTables.Any(t => t.Id == state.ActiveEventLogId) ?
+                                state.ActiveEventLogId : combinedTable.Id
+                        },
+                        state.ActiveEventLogId);
                 }
         }
     }
@@ -199,13 +213,31 @@ internal sealed class Reducers
     [ReducerMethod]
     public static LogTableState ReduceLoadColumnsCompleted(
         LogTableState state,
-        LoadColumnsCompletedAction action) =>
-        state with
+        LoadColumnsCompletedAction action)
+    {
+        var updated = state with
         {
             Columns = action.LoadedColumns,
             ColumnWidths = action.ColumnWidths,
             ColumnOrder = action.ColumnOrder
         };
+
+        bool groupColumnHidden = updated.GroupBy is { } groupColumn &&
+            (!action.LoadedColumns.TryGetValue(groupColumn, out bool isVisible) || !isVisible);
+
+        if (!groupColumnHidden) { return updated; }
+
+        return updated with
+        {
+            GroupBy = null,
+            IsGroupDescending = false,
+            GroupsCollapsedByDefault = false,
+            GroupCollapseOverrides = ImmutableHashSet.Create<string>(StringComparer.Ordinal),
+            DisplayedEvents = updated.DisplayedEvents.SortEvents(
+                GetEffectiveOrderBy(updated.OrderBy),
+                updated.IsDescending)
+        };
+    }
 
     [ReducerMethod]
     public static LogTableState ReduceReorderColumn(LogTableState state, ReorderColumnAction action)
@@ -233,18 +265,75 @@ internal sealed class Reducers
 
         if (activeTable is null) { return state; }
 
-        return state with { ActiveEventLogId = activeTable.Id };
+        return ResetGroupCollapseIfActiveChanged(
+            state with { ActiveEventLogId = activeTable.Id },
+            state.ActiveEventLogId);
     }
+
+    [ReducerMethod]
+    public static LogTableState ReduceSetAllGroupsCollapsed(
+        LogTableState state,
+        SetAllGroupsCollapsedAction action) =>
+        state.GroupsCollapsedByDefault == action.Collapsed && state.GroupCollapseOverrides.IsEmpty ?
+            state :
+            state with
+            {
+                GroupsCollapsedByDefault = action.Collapsed,
+                GroupCollapseOverrides = ImmutableHashSet.Create<string>(StringComparer.Ordinal)
+            };
 
     [ReducerMethod]
     public static LogTableState ReduceSetColumnWidth(LogTableState state, SetColumnWidthAction action) =>
         state with { ColumnWidths = state.ColumnWidths.SetItem(action.ColumnName, action.Width) };
 
     [ReducerMethod]
+    public static LogTableState ReduceSetGroupBy(LogTableState state, SetGroupByAction action) =>
+        state with
+        {
+            GroupBy = action.GroupBy,
+            IsGroupDescending = false,
+            GroupsCollapsedByDefault = false,
+            GroupCollapseOverrides = ImmutableHashSet.Create<string>(StringComparer.Ordinal),
+            DisplayedEvents = state.DisplayedEvents.SortEvents(
+                GetEffectiveOrderBy(state.OrderBy),
+                state.IsDescending,
+                action.GroupBy)
+        };
+
+    [ReducerMethod]
     public static LogTableState ReduceSetOrderBy(LogTableState state, SetOrderByAction action) =>
         state.OrderBy.Equals(action.OrderBy) ?
             SortDisplayEvents(state, null, true) :
             SortDisplayEvents(state, action.OrderBy, state.IsDescending);
+
+    [ReducerMethod]
+    public static LogTableState ReduceToggleGroupCollapsed(
+        LogTableState state,
+        ToggleGroupCollapsedAction action) =>
+        state with
+        {
+            GroupCollapseOverrides = state.GroupCollapseOverrides.Contains(action.GroupKey) ?
+                state.GroupCollapseOverrides.Remove(action.GroupKey) :
+                state.GroupCollapseOverrides.Add(action.GroupKey)
+        };
+
+    [ReducerMethod(typeof(ToggleGroupSortingAction))]
+    public static LogTableState ReduceToggleGroupSorting(LogTableState state)
+    {
+        if (state.GroupBy is null) { return state; }
+
+        bool isGroupDescending = !state.IsGroupDescending;
+
+        return state with
+        {
+            IsGroupDescending = isGroupDescending,
+            DisplayedEvents = state.DisplayedEvents.SortEvents(
+                GetEffectiveOrderBy(state.OrderBy),
+                state.IsDescending,
+                state.GroupBy,
+                isGroupDescending)
+        };
+    }
 
     [ReducerMethod]
     public static LogTableState ReduceToggleLoading(LogTableState state, ToggleLoadingAction action)
@@ -346,7 +435,11 @@ internal sealed class Reducers
             }
         }
 
-        var sorted = concatenated.SortEvents(GetEffectiveOrderBy(state.OrderBy), state.IsDescending);
+        var sorted = concatenated.SortEvents(
+            GetEffectiveOrderBy(state.OrderBy),
+            state.IsDescending,
+            state.GroupBy,
+            state.IsGroupDescending);
 
         return state with
         {
@@ -374,7 +467,9 @@ internal sealed class Reducers
             existing,
             action.Events,
             GetEffectiveOrderBy(state.OrderBy),
-            state.IsDescending);
+            state.IsDescending,
+            state.GroupBy,
+            state.IsGroupDescending);
 
         var updatedTable = SetComputerNameIfFirstEvent(table, action.Events) with { IsLoading = false };
         var counts = state.EventCountByLog.SetItem(table.Id, action.Events.Count);
@@ -437,6 +532,20 @@ internal sealed class Reducers
         return counts.SetItem(logId, current + delta);
     }
 
+    private static LogTableState ResetGroupCollapse(LogTableState state) =>
+        state is { GroupsCollapsedByDefault: false, GroupCollapseOverrides.IsEmpty: true }
+            ? state
+            : state with
+            {
+                GroupsCollapsedByDefault = false,
+                GroupCollapseOverrides = ImmutableHashSet.Create<string>(StringComparer.Ordinal)
+            };
+
+    private static LogTableState ResetGroupCollapseIfActiveChanged(
+        LogTableState updated,
+        EventLogId? previousActiveId) =>
+        updated.ActiveEventLogId == previousActiveId ? updated : ResetGroupCollapse(updated);
+
     private static LogView SetComputerNameIfFirstEvent(LogView table, IReadOnlyList<ResolvedEvent> newEvents)
     {
         if (!string.IsNullOrEmpty(table.ComputerName) || newEvents.Count == 0) { return table; }
@@ -461,7 +570,11 @@ internal sealed class Reducers
 
         return state with
         {
-            DisplayedEvents = state.DisplayedEvents.SortEvents(effectiveOrderBy, isDescending),
+            DisplayedEvents = state.DisplayedEvents.SortEvents(
+                effectiveOrderBy,
+                isDescending,
+                state.GroupBy,
+                state.IsGroupDescending),
             OrderBy = orderBy,
             IsDescending = isDescending
         };

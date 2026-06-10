@@ -187,6 +187,154 @@ public sealed class ResolvedEventOrderingTests
     }
 
     [Fact]
+    public void SortEvents_WhenGroupByEqualsOrderBy_UsesDateAndTimeChronologyBeforeRecordId()
+    {
+        var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(level: "Information", recordId: 1, timeCreated: baseTime.AddSeconds(2)),
+            FilterEventBuilder.CreateTestEvent(level: "Information", recordId: 2, timeCreated: baseTime.AddSeconds(1))
+        };
+
+        var result = events.SortEvents(ColumnName.Level, false, ColumnName.Level);
+
+        Assert.Equal(new long?[] { 2L, 1L }, result.Select(e => e.RecordId));
+    }
+
+    [Fact]
+    public void SortEvents_WhenGroupByNull_MatchesUngroupedSort()
+    {
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 3),
+            FilterEventBuilder.CreateTestEvent(id: 1),
+            FilterEventBuilder.CreateTestEvent(id: 2)
+        };
+
+        var grouped = events.SortEvents(ColumnName.EventId);
+
+        Assert.Equal(new[] { 1, 2, 3 }, grouped.Select(e => e.Id));
+    }
+
+    [Fact]
+    public void SortEvents_WhenGroupDescending_OrdersEmptyBucketAfterValuedGroup()
+    {
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 2, computerName: null!),
+            FilterEventBuilder.CreateTestEvent(id: 1, computerName: "X")
+        };
+
+        var result = events.SortEvents(
+            orderBy: ColumnName.EventId,
+            isDescending: false,
+            groupBy: ColumnName.ComputerName,
+            isGroupDescending: true);
+
+        Assert.Equal(new[] { 1, 2 }, result.Select(e => e.Id));
+        Assert.Equal("X", result[0].ComputerName);
+        Assert.True(string.IsNullOrEmpty(result[1].ComputerName));
+    }
+
+    [Fact]
+    public void SortEvents_WhenGroupDescending_OrdersGroupsDescendingButWithinGroupAscending()
+    {
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
+            FilterEventBuilder.CreateTestEvent(id: 5, source: "A"),
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "B"),
+            FilterEventBuilder.CreateTestEvent(id: 3, source: "A")
+        };
+
+        var result = events.SortEvents(ColumnName.EventId, false, ColumnName.Source, true);
+
+        Assert.Equal(new[] { "B", "B", "A", "A" }, result.Select(e => e.Source));
+        Assert.Equal(new[] { 1, 2, 3, 5 }, result.Select(e => e.Id));
+    }
+
+    [Fact]
+    public void SortEvents_WhenGrouped_KeepsGroupsContiguousAndSortsWithinGroupByOrderBy()
+    {
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "B", recordId: 1),
+            FilterEventBuilder.CreateTestEvent(id: 5, source: "A", recordId: 2),
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "B", recordId: 3),
+            FilterEventBuilder.CreateTestEvent(id: 3, source: "A", recordId: 4)
+        };
+
+        var result = events.SortEvents(ColumnName.EventId, false, ColumnName.Source);
+
+        Assert.Equal(new[] { "A", "A", "B", "B" }, result.Select(e => e.Source));
+        Assert.Equal(new[] { 3, 5, 1, 2 }, result.Select(e => e.Id));
+    }
+
+    [Fact]
+    public void SortEvents_WhenGrouped_NullAndEmptyComputerNameShareOneBucket()
+    {
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 1, computerName: "X"),
+            FilterEventBuilder.CreateTestEvent(id: 2, computerName: null!),
+            FilterEventBuilder.CreateTestEvent(id: 3, computerName: "")
+        };
+
+        var result = events.SortEvents(ColumnName.EventId, false, ColumnName.ComputerName);
+
+        Assert.True(string.IsNullOrEmpty(result[0].ComputerName));
+        Assert.True(string.IsNullOrEmpty(result[1].ComputerName));
+        Assert.Equal("X", result[2].ComputerName);
+        Assert.Equal(new[] { 2, 3, 1 }, result.Select(e => e.Id));
+    }
+
+    [Fact]
+    public void SortEvents_WhenGroupedAcrossLogs_OrdersWithinGroupByTimeNotRecordId()
+    {
+        var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "A", timeCreated: baseTime.AddSeconds(2), recordId: 1, owningLog: "LogA"),
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "A", timeCreated: baseTime.AddSeconds(1), recordId: 999, owningLog: "LogB")
+        };
+
+        var result = events.SortEvents(orderBy: null, isDescending: false, groupBy: ColumnName.Source);
+
+        Assert.Equal(new[] { 2, 1 }, result.Select(e => e.Id));
+        Assert.Equal(new[] { "LogB", "LogA" }, result.Select(e => e.OwningLog));
+    }
+
+    [Fact]
+    public void SortEvents_WhenGroupedAndSameTick_FallsBackToRecordIdDeterministically()
+    {
+        var time = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "A", timeCreated: time, recordId: 2),
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "A", timeCreated: time, recordId: 1)
+        };
+
+        var result = events.SortEvents(orderBy: null, isDescending: false, groupBy: ColumnName.Source);
+
+        Assert.Equal(new long?[] { 1L, 2L }, result.Select(e => e.RecordId));
+    }
+
+    [Fact]
+    public void SortEvents_WhenGroupedByHighCardinalityColumn_EachEventIsItsOwnGroupInOrder()
+    {
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 3),
+            FilterEventBuilder.CreateTestEvent(id: 1),
+            FilterEventBuilder.CreateTestEvent(id: 2)
+        };
+
+        var result = events.SortEvents(orderBy: null, isDescending: false, groupBy: ColumnName.EventId);
+
+        Assert.Equal(new[] { 1, 2, 3 }, result.Select(e => e.Id));
+    }
+
+    [Fact]
     public void SortEvents_WhenInputMutatedAfterCall_ShouldReturnIndependentList()
     {
         var events = new List<ResolvedEvent>
@@ -795,5 +943,36 @@ public sealed class ResolvedEventOrderingTests
         Assert.Equal(3L, result[0].RecordId);
         Assert.Equal(2L, result[1].RecordId);
         Assert.Equal(1L, result[2].RecordId);
+    }
+
+    [Fact]
+    public void SortEvents_WhenWithinGroupDescending_IsIndependentOfGroupDirection()
+    {
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
+            FilterEventBuilder.CreateTestEvent(id: 5, source: "A"),
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "B"),
+            FilterEventBuilder.CreateTestEvent(id: 3, source: "A")
+        };
+
+        var result = events.SortEvents(ColumnName.EventId, true, ColumnName.Source);
+
+        Assert.Equal(new[] { "A", "A", "B", "B" }, result.Select(e => e.Source));
+        Assert.Equal(new[] { 5, 3, 2, 1 }, result.Select(e => e.Id));
+    }
+
+    [Fact]
+    public void SortEvents_WhenWithinGroupDescending_ReversesRecordIdTiebreak()
+    {
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 9, source: "A", recordId: 10),
+            FilterEventBuilder.CreateTestEvent(id: 9, source: "A", recordId: 11)
+        };
+
+        var result = events.SortEvents(ColumnName.EventId, true, ColumnName.Source);
+
+        Assert.Equal(new long?[] { 11L, 10L }, result.Select(e => e.RecordId));
     }
 }
