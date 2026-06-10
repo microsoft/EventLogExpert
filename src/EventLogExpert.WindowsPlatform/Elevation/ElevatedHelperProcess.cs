@@ -31,7 +31,7 @@ internal sealed class ElevatedHelperProcess(Process process, NamedPipeServerStre
         try { process.Dispose(); } catch { /* swallowed during dispose */ }
     }
 
-    public void Kill()
+    public bool Kill()
     {
         try
         {
@@ -39,14 +39,19 @@ internal sealed class ElevatedHelperProcess(Process process, NamedPipeServerStre
             {
                 process.Kill(entireProcessTree: false);
             }
+
+            return true;
         }
         catch (InvalidOperationException)
         {
-            // Process already exited — no-op.
+            // Process already exited — treat as success per IElevatedHelperProcess.Kill contract.
+            return true;
         }
         catch (Exception ex)
         {
-            logger.Warning($"{nameof(ElevatedHelperProcess)}.{nameof(Kill)} threw: {ex}");
+            logger.Error($"{nameof(ElevatedHelperProcess)}.{nameof(Kill)} failed (process likely unkillable from this integrity level): {ex.GetType().Name}: {ex.Message}");
+
+            return false;
         }
     }
 

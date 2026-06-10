@@ -21,9 +21,11 @@ namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 ///     <para>
 ///         <b>Cleanup contract:</b> implementations of <see cref="DisposeAsync" /> close the pipe but do NOT kill the
 ///         helper process. Closing the pipe will cause the helper to observe EOF on its next read/write and typically
-///         exit; if it doesn't, the caller must invoke <see cref="Kill" /> explicitly. This split avoids surprising the
-///         caller when a deliberate keep-alive-after-close pattern is desired (e.g., in tests that want to inspect the
-///         helper's exit code separately from pipe teardown).
+///         exit; if it doesn't, the caller must invoke <see cref="Kill" /> explicitly. Because <see cref="Kill" /> may
+///         fail (a medium-IL caller cannot terminate a high-IL helper, for example), callers MUST check the boolean return
+///         and fall back to closing the pipe (forcing EOF on the helper's next pipe read/write) when <see cref="Kill" />
+///         returns <c>false</c>. This split avoids surprising the caller when a deliberate keep-alive-after-close pattern
+///         is desired (e.g., in tests that want to inspect the helper's exit code separately from pipe teardown).
 ///     </para>
 /// </remarks>
 public interface IElevatedHelperProcess : IAsyncDisposable
@@ -40,10 +42,15 @@ public interface IElevatedHelperProcess : IAsyncDisposable
 
     /// <summary>
     ///     Hard-terminates the helper process. Used as the last-resort cancellation fallback when the cooperative
-    ///     <c>CancelMessage</c> + grace window does not produce a clean exit. Does NOT throw if the process has already
-    ///     exited.
+    ///     <c>CancelMessage</c> + grace window does not produce a clean exit.
     /// </summary>
-    void Kill();
+    /// <returns>
+    ///     <c>true</c> if the process was successfully killed by this call OR had already exited before the call;
+    ///     <c>false</c> if the kill attempt failed (for example, a medium-IL caller cannot terminate a high-IL helper and the
+    ///     underlying <see cref="System.ComponentModel.Win32Exception" /> is logged then surfaced as a failed attempt).
+    ///     Callers SHOULD fall back to closing <see cref="Pipe" /> when this returns <c>false</c>.
+    /// </returns>
+    bool Kill();
 
     /// <summary>Waits for the helper process to exit. Returns the OS exit code.</summary>
     Task<int> WaitForExitAsync(CancellationToken cancellationToken);

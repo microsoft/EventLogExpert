@@ -19,9 +19,17 @@ namespace EventLogExpert.WindowsPlatform.Elevation;
 /// </summary>
 internal sealed class ElevatedHelperProcessHost(ITraceLogger logger) : IElevatedHelperProcessHost
 {
+    private const int MaxClientPidRejections = 32;
     private const int PipeBufferSize = 65536;
 
     private static readonly TimeSpan s_pipeConnectTimeout = TimeSpan.FromSeconds(30);
+
+    internal enum PidVerifyResult
+    {
+        Match = 0,
+        ClientPidMismatch = 1,
+        GetPidFailed = 2
+    }
 
     public async Task<IElevatedHelperProcess> StartAsync(IReadOnlyList<string> extraArgs, CancellationToken cancellationToken)
     {
@@ -42,7 +50,8 @@ internal sealed class ElevatedHelperProcessHost(ITraceLogger logger) : IElevated
         // Create the server pipe BEFORE spawning the helper, so we're ready to accept its connect-back without race.
         // CurrentUserOnly restricts the DACL to the current user SID; combined with PID verification below this is a
         // narrow surface — only same-user processes can even attempt to connect, and only the spawned helper's PID
-        // is accepted.
+        // is accepted. Wrong-PID connections are disconnected and the listener keeps waiting (within the connect
+        // window) so a same-user race attacker cannot DoS the legitimate helper.
         var pipeServer = new NamedPipeServerStream(
             pipeName,
             PipeDirection.InOut,
@@ -77,17 +86,13 @@ internal sealed class ElevatedHelperProcessHost(ITraceLogger logger) : IElevated
 
             try
             {
-                await pipeServer.WaitForConnectionAsync(connectCts.Token);
+                await AcceptAndVerifyClientPidAsync(pipeServer, helperProcess.Id, logger, connectCts.Token);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 throw new TimeoutException(
                     $"Elevated helper PID {helperProcess.Id} did not connect to IPC pipe within {s_pipeConnectTimeout.TotalSeconds:N0}s.");
             }
-
-            // PID verification: defense-in-depth on top of the CurrentUserOnly ACL. A same-user attacker would need
-            // to race a connect to this GUID-named pipe AND already be running with our exact PID — not feasible.
-            VerifyClientPid(pipeServer, expectedPid: helperProcess.Id);
 
             var handle = new ElevatedHelperProcess(helperProcess, pipeServer, logger);
             helperProcess = null;  // Ownership transferred.
@@ -97,22 +102,80 @@ internal sealed class ElevatedHelperProcessHost(ITraceLogger logger) : IElevated
         catch
         {
             // Cleanup on any failure path BEFORE the handle is returned. The pipe + spawned process would otherwise
-            // leak. Process.Kill() on an already-exited process is a no-op (per docs).
+            // leak. Surface non-already-exited kill failures as Error logs so we don't silently leak high-IL helpers.
             try { pipeServer.Dispose(); } catch { /* swallowed during error cleanup */ }
 
-            if (helperProcess is not null)
-            {
-                try
-                {
-                    if (!helperProcess.HasExited) { helperProcess.Kill(entireProcessTree: false); }
-                }
-                catch { /* swallowed during error cleanup */ }
+            if (helperProcess is null) { throw; }
 
-                helperProcess.Dispose();
+            try
+            {
+                if (!helperProcess.HasExited) { helperProcess.Kill(entireProcessTree: false); }
             }
+            catch (InvalidOperationException) { /* already exited */ }
+            catch (Exception ex)
+            {
+                logger.Error(
+                    $"{nameof(ElevatedHelperProcessHost)}: failed to kill spawned helper PID {helperProcess.Id} during error cleanup: {ex.GetType().Name}: {ex.Message}");
+            }
+
+            helperProcess.Dispose();
 
             throw;
         }
+    }
+
+    internal static async Task AcceptAndVerifyClientPidAsync(
+        NamedPipeServerStream pipeServer,
+        int expectedPid,
+        ITraceLogger logger,
+        CancellationToken cancellationToken)
+    {
+        int rejections = 0;
+
+        while (true)
+        {
+            await pipeServer.WaitForConnectionAsync(cancellationToken);
+
+            var result = TryVerifyClientPid(pipeServer, expectedPid);
+
+            if (result == PidVerifyResult.Match) { return; }
+
+            if (result == PidVerifyResult.GetPidFailed)
+            {
+                var error = Marshal.GetLastWin32Error();
+
+                throw new InvalidOperationException($"GetNamedPipeClientProcessId failed (Win32 error {error}).");
+            }
+
+            pipeServer.Disconnect();
+            rejections++;
+
+            if (rejections >= MaxClientPidRejections)
+            {
+                throw new InvalidOperationException(
+                    $"Rejected {MaxClientPidRejections} same-user pipe connections from non-helper PIDs before the legitimate helper connected.");
+            }
+
+            if (rejections == 1)
+            {
+                logger.Information(
+                    $"{nameof(ElevatedHelperProcessHost)}: rejected pipe connection from non-helper PID (expected {expectedPid}); continuing to wait for legitimate helper.");
+            }
+            else
+            {
+                logger.Trace($"{nameof(ElevatedHelperProcessHost)}: rejected pipe connection #{rejections} from non-helper PID.");
+            }
+        }
+    }
+
+    internal static PidVerifyResult TryVerifyClientPid(NamedPipeServerStream pipeServer, int expectedPid)
+    {
+        if (!NativeMethods.GetNamedPipeClientProcessId(pipeServer.SafePipeHandle, out var clientPid))
+        {
+            return PidVerifyResult.GetPidFailed;
+        }
+
+        return clientPid == (uint)expectedPid ? PidVerifyResult.Match : PidVerifyResult.ClientPidMismatch;
     }
 
     private static string BuildArgumentString(string pipeName, IReadOnlyList<string> extraArgs)
@@ -146,21 +209,6 @@ internal sealed class ElevatedHelperProcessHost(ITraceLogger logger) : IElevated
             ?? throw new InvalidOperationException($"Cannot derive install directory from process path: {processPath}");
 
         return Path.Combine(installDir, "ElevationHelper", "eventlogexpert-elevated.exe");
-    }
-
-    private static void VerifyClientPid(NamedPipeServerStream pipeServer, int expectedPid)
-    {
-        if (!NativeMethods.GetNamedPipeClientProcessId(pipeServer.SafePipeHandle, out var clientPid))
-        {
-            var error = Marshal.GetLastWin32Error();
-            throw new InvalidOperationException($"GetNamedPipeClientProcessId failed (Win32 error {error}).");
-        }
-
-        if (clientPid != (uint)expectedPid)
-        {
-            throw new InvalidOperationException(
-                $"Pipe client PID {clientPid} does not match spawned helper PID {expectedPid}. Rejecting connection.");
-        }
     }
 
     private static class NativeMethods
