@@ -273,14 +273,18 @@ internal sealed class Reducers
     [ReducerMethod]
     public static LogTableState ReduceSetAllGroupsCollapsed(
         LogTableState state,
-        SetAllGroupsCollapsedAction action) =>
-        state.GroupsCollapsedByDefault == action.Collapsed && state.GroupCollapseOverrides.IsEmpty ?
+        SetAllGroupsCollapsedAction action)
+    {
+        if (state.GroupBy is null) { return state; }
+
+        return state.GroupsCollapsedByDefault == action.Collapsed && state.GroupCollapseOverrides.IsEmpty ?
             state :
             state with
             {
                 GroupsCollapsedByDefault = action.Collapsed,
                 GroupCollapseOverrides = ImmutableHashSet.Create<string>(StringComparer.Ordinal)
             };
+    }
 
     [ReducerMethod]
     public static LogTableState ReduceSetColumnWidth(LogTableState state, SetColumnWidthAction action) =>
@@ -309,13 +313,17 @@ internal sealed class Reducers
     [ReducerMethod]
     public static LogTableState ReduceToggleGroupCollapsed(
         LogTableState state,
-        ToggleGroupCollapsedAction action) =>
-        state with
+        ToggleGroupCollapsedAction action)
+    {
+        if (state.GroupBy is null) { return state; }
+
+        return state with
         {
             GroupCollapseOverrides = state.GroupCollapseOverrides.Contains(action.GroupKey) ?
                 state.GroupCollapseOverrides.Remove(action.GroupKey) :
                 state.GroupCollapseOverrides.Add(action.GroupKey)
         };
+    }
 
     [ReducerMethod(typeof(ToggleGroupSortingAction))]
     public static LogTableState ReduceToggleGroupSorting(LogTableState state)

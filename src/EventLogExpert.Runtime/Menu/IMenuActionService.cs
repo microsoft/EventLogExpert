@@ -39,11 +39,15 @@ public interface IMenuActionService
 
     Task SaveFiltersAsFilterSetAsync();
 
+    void SetAllGroupsCollapsed(bool collapsed);
+
     void SetContinuouslyUpdate(bool value);
 
     Task ShowDebugLogsAsync();
 
     Task ShowReleaseNotesAsync();
+
+    void ToggleGroupSortDirection();
 
     void ToggleShowAllEvents();
 }

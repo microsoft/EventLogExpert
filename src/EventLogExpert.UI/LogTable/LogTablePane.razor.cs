@@ -17,6 +17,7 @@ using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common.Interop;
+using EventLogExpert.UI.LogTable.Grouping;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -49,7 +50,7 @@ public sealed partial class LogTablePane
     private IReadOnlyList<ResolvedEvent>? _lastIndexedDisplayedEvents;
     // View-local cursor: the row that is the moving end of a range selection within the
     // current table. May briefly diverge from _selectedEvent during local keyboard nav
-    // (advanced before the dispatch round-trip) and after RebuildRowIndexMap rebinds it
+    // (advanced before the dispatch round-trip) and after RebuildRowMaps rebinds it
     // to the equivalent row in a freshly built DisplayedEvents list. Defaults to the
     // same row as _selectionAnchor for single-row selections.
     private ResolvedEvent? _localCursor;
@@ -58,6 +59,8 @@ public sealed partial class LogTablePane
     private ColumnName[] _previousEnabledColumns = [];
     private bool _resortSelectionOnNextRender;
     private Dictionary<ResolvedEvent, int> _rowIndexMap = new(ReferenceEqualityComparer.Instance);
+    private GroupedRowView? _rowView;
+    private (IReadOnlyList<ResolvedEvent> Events, EventLogId? TableId, ColumnName? GroupBy, bool GroupDescending, bool CollapsedDefault, ImmutableHashSet<string>? Overrides) _rowViewSnapshot;
     private ResolvedEvent? _selectedEvent;
     private ImmutableList<ResolvedEvent> _selectedEvents = [];
     private HashSet<ResolvedEvent> _selectedSet = new(ReferenceEqualityComparer.Instance);
@@ -207,7 +210,8 @@ public sealed partial class LogTablePane
         _timeZoneSettings = Settings.TimeZoneInfo;
 
         WarnOnUnknownFilterColors(_filters);
-        RebuildRowIndexMap();
+
+        RebuildRowMaps();
 
         await base.OnInitializedAsync();
     }
@@ -272,7 +276,7 @@ public sealed partial class LogTablePane
 
         _timeZoneSettings = Settings.TimeZoneInfo;
 
-        RebuildRowIndexMap();
+        RebuildRowMaps();
 
         return true;
     }
@@ -460,6 +464,8 @@ public sealed partial class LogTablePane
         return displayedEvents.Count > 0 ? 0 : -1;
     }
 
+    private int GetAriaRowCount() => (_rowView?.Count ?? _activeDisplayedEvents.Count) + 1;
+
     private int GetColumnWidth(ColumnName column) =>
         _logTableState.ColumnWidths.TryGetValue(column, out int width) ? width : ColumnDefaults.GetColumnWidth(column);
 
@@ -470,6 +476,34 @@ public sealed partial class LogTablePane
         Settings.TimeZoneInfo.Equals(TimeZoneInfo.Local) ?
             "Date and Time" :
             $"Date and Time {Settings.TimeZoneInfo.DisplayName.Split(" ").First()}";
+
+    private string GetGroupName() => _logTableState.GroupBy?.ToFullString() ?? string.Empty;
+
+    private string GetGroupValueText(EventGroup group)
+    {
+        if (group.EventCount == 0) { return "(none)"; }
+
+        var representative = _activeDisplayedEvents[group.StartIndex];
+
+        string? value = _logTableState.GroupBy switch
+        {
+            ColumnName.Level => representative.Level,
+            ColumnName.DateAndTime => representative.TimeCreated.ConvertTimeZone(_timeZoneSettings).ToString(),
+            ColumnName.ActivityId => representative.ActivityId?.ToString(),
+            ColumnName.Log => GetLogShortName(representative.OwningLog),
+            ColumnName.ComputerName => representative.ComputerName,
+            ColumnName.Source => representative.Source,
+            ColumnName.EventId => representative.Id.ToString(),
+            ColumnName.TaskCategory => representative.TaskCategory,
+            ColumnName.Keywords => representative.KeywordsDisplayName,
+            ColumnName.ProcessId => representative.ProcessId?.ToString(),
+            ColumnName.ThreadId => representative.ThreadId?.ToString(),
+            ColumnName.User => representative.UserId?.ToString(),
+            _ => null
+        };
+
+        return string.IsNullOrEmpty(value) ? "(none)" : value;
+    }
 
     private string? GetHighlight(ResolvedEvent @event)
     {
@@ -514,8 +548,26 @@ public sealed partial class LogTablePane
             .ToArray();
     }
 
-    private int GetRowIndex(ResolvedEvent evt) =>
-        _rowIndexMap.TryGetValue(evt, out int index) ? index + 2 : 2;
+    private int GetRowIndex(ResolvedEvent evt)
+    {
+        if (!_rowIndexMap.TryGetValue(evt, out int index)) { return 2; }
+
+        return (_rowView?.VisibleRowForEvent(index) ?? index) + 2;
+    }
+
+    private int GetRowStripe(ResolvedEvent evt)
+    {
+        if (!_rowIndexMap.TryGetValue(evt, out int index)) { return 0; }
+
+        if (_rowView is null) { return index % 2; }
+
+        return (index - _rowView.GroupForEvent(index).StartIndex) % 2;
+    }
+
+    private void HandleGroupHeaderKeyDown(KeyboardEventArgs args, string groupKey)
+    {
+        if (args.Key == "Enter") { ToggleGroupCollapsed(groupKey); }
+    }
 
     private async Task HandleKeyDown(KeyboardEventArgs args)
     {
@@ -633,6 +685,9 @@ public sealed partial class LogTablePane
         MenuService.OpenAt(args.ClientX, args.ClientY, ShowContextMenuItems(clicked));
     }
 
+    private void InvokeGroupContextMenu(MouseEventArgs args, EventGroup group) =>
+        MenuService.OpenAt(args.ClientX, args.ClientY, ShowGroupContextMenuItems(group));
+
     private void InvokeTableColumnMenu(MouseEventArgs args) =>
         MenuService.OpenAt(args.ClientX, args.ClientY, ShowColumnMenuItems());
 
@@ -664,47 +719,74 @@ public sealed partial class LogTablePane
         }
     }
 
-    private void RebuildRowIndexMap()
+    private void RebuildGroupedRowView(IReadOnlyList<ResolvedEvent> displayedEvents)
     {
-        var displayedEvents = ResolveActiveDisplayedEvents();
-        _activeDisplayedEvents = displayedEvents;
+        var state = _logTableState;
 
-        if (ReferenceEquals(displayedEvents, _lastIndexedDisplayedEvents)) { return; }
-
-        _lastIndexedDisplayedEvents = displayedEvents;
-        _rowIndexMap = new Dictionary<ResolvedEvent, int>(displayedEvents.Count, ReferenceEqualityComparer.Instance);
-        // New event-list reference means stored ResolvedEvent instances
-        // are stale; clearing prevents memory growth across log reloads.
-        _highlightCache.Clear();
-
-        if (displayedEvents.Count == 0)
+        if (state.GroupBy is not { } groupBy)
         {
-            _selectionAnchor = null;
-            _localCursor = null;
+            _rowView = null;
+            _rowViewSnapshot = default;
 
             return;
         }
 
-        for (int i = 0; i < displayedEvents.Count; i++)
+        var snapshot = (displayedEvents, _currentTable?.Id, state.GroupBy, state.IsGroupDescending,
+            state.GroupsCollapsedByDefault, (ImmutableHashSet<string>?)state.GroupCollapseOverrides);
+
+        if (_rowView is not null && _rowViewSnapshot.Equals(snapshot)) { return; }
+
+        _rowViewSnapshot = snapshot;
+        _rowView = GroupedRowView.Build(displayedEvents, groupBy, state.IsGroupCollapsed);
+    }
+
+    private void RebuildRowMaps()
+    {
+        var displayedEvents = ResolveActiveDisplayedEvents();
+        _activeDisplayedEvents = displayedEvents;
+
+        if (!ReferenceEquals(displayedEvents, _lastIndexedDisplayedEvents))
         {
-            _rowIndexMap[displayedEvents[i]] = i;
+            _lastIndexedDisplayedEvents = displayedEvents;
+            _rowIndexMap = new Dictionary<ResolvedEvent, int>(displayedEvents.Count, ReferenceEqualityComparer.Instance);
+            // New event-list reference means stored ResolvedEvent instances
+            // are stale; clearing prevents memory growth across log reloads.
+            _highlightCache.Clear();
+
+            if (displayedEvents.Count == 0)
+            {
+                _selectionAnchor = null;
+                _localCursor = null;
+            }
+            else
+            {
+                for (int i = 0; i < displayedEvents.Count; i++)
+                {
+                    _rowIndexMap[displayedEvents[i]] = i;
+                }
+
+                // Re-resolve anchor/active by stable key when DisplayedEvents has
+                // been replaced (sort/filter/reload). Reference equality alone would
+                // drop them on every list rebuild even when the same logical event
+                // is still visible.
+                _selectionAnchor = ResolveByKey(displayedEvents, _selectionAnchor);
+                _localCursor = ResolveByKey(displayedEvents, _localCursor);
+
+                // Detect when the existing selection no longer matches sort order so
+                // OnAfterRenderAsync can dispatch a re-sorted SetSelectedEvents.
+                // Events outside the current displayed table preserve their relative
+                // position and never trigger a re-sort by themselves.
+                if (IsSelectionOutOfSortOrder(_selectedEvents))
+                {
+                    _resortSelectionOnNextRender = true;
+                }
+            }
         }
 
-        // Re-resolve anchor/active by stable key when DisplayedEvents has
-        // been replaced (sort/filter/reload). Reference equality alone would
-        // drop them on every list rebuild even when the same logical event
-        // is still visible.
-        _selectionAnchor = ResolveByKey(displayedEvents, _selectionAnchor);
-        _localCursor = ResolveByKey(displayedEvents, _localCursor);
-
-        // Detect when the existing selection no longer matches sort order so
-        // OnAfterRenderAsync can dispatch a re-sorted SetSelectedEvents.
-        // Events outside the current displayed table preserve their relative
-        // position and never trigger a re-sort by themselves.
-        if (IsSelectionOutOfSortOrder(_selectedEvents))
-        {
-            _resortSelectionOnNextRender = true;
-        }
+        // The grouped row-view rebuilds on any grouping-state change, including
+        // collapse toggles that keep the same DisplayedEvents reference (so the
+        // events-ref guard above would skip them).
+        RebuildGroupedRowView(displayedEvents);
     }
 
     private async void RescrollToSelected()
@@ -893,6 +975,44 @@ public sealed partial class LogTablePane
         }
     }
 
+    private void SelectGroup(EventGroup group)
+    {
+        if (group.EventCount == 0 ||
+            group.StartIndex + group.EventCount > _activeDisplayedEvents.Count)
+        {
+            return;
+        }
+
+        var members = new List<ResolvedEvent>(group.EventCount);
+
+        for (int i = group.StartIndex; i < group.StartIndex + group.EventCount; i++)
+        {
+            members.Add(_activeDisplayedEvents[i]);
+        }
+
+        var active = members[0];
+        _selectionAnchor = active;
+        _localCursor = active;
+        DispatchSetSelection(members, active);
+    }
+
+    private void SelectGroupByKey(string key)
+    {
+        if (_rowView is null || !_rowView.TryGetGroupByKey(key, out var group)) { return; }
+
+        SelectGroup(group);
+    }
+
+    private void SetGroupCollapsed(string key, bool collapse)
+    {
+        if (_rowView is null || !_rowView.TryGetGroupByKey(key, out _)) { return; }
+
+        if (LogTableState.Value.IsGroupCollapsed(key) != collapse)
+        {
+            LogTableCommands.ToggleGroupCollapsed(key);
+        }
+    }
+
     private IReadOnlyList<MenuItem> ShowColumnMenuItems()
     {
         var state = LogTableState.Value;
@@ -920,6 +1040,23 @@ public sealed partial class LogTablePane
         }
 
         items.Add(MenuItem.SubMenu("Order By", orderItems));
+
+        var groupItems = new List<MenuItem>
+        {
+            MenuItem.Item("(none)", () => LogTableCommands.SetGroupBy(null), isChecked: state.GroupBy is null)
+        };
+
+        foreach (var (column, _) in state.Columns)
+        {
+            var capturedColumn = column;
+            groupItems.Add(MenuItem.Item(
+                column.ToFullString(),
+                () => LogTableCommands.SetGroupBy(capturedColumn),
+                isChecked: state.GroupBy.Equals(capturedColumn)));
+        }
+
+        items.Add(MenuItem.SubMenu("Group By", groupItems));
+
         items.Add(MenuItem.Separator());
         items.Add(MenuItem.Item(
             "Reset Column Defaults",
@@ -965,6 +1102,29 @@ public sealed partial class LogTablePane
 
         return items;
     }
+
+    private IReadOnlyList<MenuItem> ShowGroupContextMenuItems(EventGroup group)
+    {
+        bool collapsedNow = LogTableState.Value.IsGroupCollapsed(group.Key);
+
+        return
+        [
+            MenuItem.Item(
+                collapsedNow ? "Expand Group" : "Collapse Group",
+                () => SetGroupCollapsed(group.Key, !collapsedNow)),
+            MenuItem.Item("Expand All Groups", () => LogTableCommands.SetAllGroupsCollapsed(false)),
+            MenuItem.Item("Collapse All Groups", () => LogTableCommands.SetAllGroupsCollapsed(true)),
+            MenuItem.Separator(),
+            MenuItem.Item(
+                "Group Descending",
+                () => LogTableCommands.ToggleGroupSortDirection(),
+                isChecked: LogTableState.Value.IsGroupDescending),
+            MenuItem.Separator(),
+            MenuItem.Item("Select Group", () => SelectGroupByKey(group.Key)),
+        ];
+    }
+
+    private void ToggleGroupCollapsed(string groupKey) => LogTableCommands.ToggleGroupCollapsed(groupKey);
 
     private void ToggleSorting() => LogTableCommands.ToggleSortDirection();
 
