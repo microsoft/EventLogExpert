@@ -1,12 +1,73 @@
 @using EventLogExpert.Eventing.Common.Events
+@using EventLogExpert.UI.LogTable.Grouping
 @inherits FluxorComponent
 
 <LogTabBar />
 
+@{
+    RenderFragment<ResolvedEvent> renderEventRow = evt =>
+        @<tr aria-rowindex="@GetRowIndex(evt)"
+             aria-selected="@(_selectedSet.Contains(evt).ToString().ToLower())"
+             class="@GetCss(evt)"
+             data-highlight="@GetHighlight(evt)"
+             data-stripe="@(GetRowStripe(evt))"
+             @key="@($"{evt.OwningLog}_{evt.RecordId}_{evt.TimeCreated:O}")"
+             @onmousedown="args => SelectEvent(args, evt)"
+             role="row"
+             tabindex="0">
+            @for (int i = 0; i < _enabledColumns.Length; i++)
+            {
+                <td aria-colindex="@(i + 1)" role="gridcell">
+                    @switch (_enabledColumns[i])
+                    {
+                        case ColumnName.Level:
+                            <text><span aria-hidden="true" class="@GetLevelClass(evt.Level)"></span> @evt.Level</text>
+                            break;
+                        case ColumnName.DateAndTime:
+                            @evt.TimeCreated.ConvertTimeZone(_timeZoneSettings)
+                            break;
+                        case ColumnName.ActivityId:
+                            @evt.ActivityId
+                            break;
+                        case ColumnName.Log:
+                            @GetLogShortName(evt.OwningLog)
+                            break;
+                        case ColumnName.ComputerName:
+                            @evt.ComputerName
+                            break;
+                        case ColumnName.Source:
+                            @evt.Source
+                            break;
+                        case ColumnName.EventId:
+                            @evt.Id
+                            break;
+                        case ColumnName.TaskCategory:
+                            @evt.TaskCategory
+                            break;
+                        case ColumnName.Keywords:
+                            @evt.KeywordsDisplayName
+                            break;
+                        case ColumnName.ProcessId:
+                            @evt.ProcessId
+                            break;
+                        case ColumnName.ThreadId:
+                            @evt.ThreadId
+                            break;
+                        case ColumnName.User:
+                            @evt.UserId
+                            break;
+                    }
+                </td>
+            }
+
+            <td aria-colindex="@(_enabledColumns.Length + 1)" role="gridcell">@evt.Description</td>
+        </tr>;
+}
+
 <div aria-labelledby="eventTable" class="table-container" @onkeydown="HandleKeyDown" role="region" tabindex="0">
     <table aria-label="Event Log Table"
         aria-multiselectable="true"
-        aria-rowcount="@(_activeDisplayedEvents.Count + 1)"
+        aria-rowcount="@GetAriaRowCount()"
         id="eventTable"
         role="grid">
         <thead @oncontextmenu="InvokeTableColumnMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
@@ -47,63 +108,50 @@
         <tbody @oncontextmenu="InvokeContextMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
         @if (_currentTable is not null)
         {
-            <Virtualize Context="evt" Items="@(_activeDisplayedEvents as ICollection<ResolvedEvent> ?? [])">
-                <tr aria-rowindex="@GetRowIndex(evt)"
-                    aria-selected="@(_selectedSet.Contains(evt).ToString().ToLower())"
-                    class="@GetCss(evt)"
-                    data-highlight="@GetHighlight(evt)"
-                    @key="@($"{evt.OwningLog}_{evt.RecordId}_{evt.TimeCreated:O}")"
-                    @onmousedown="args => SelectEvent(args, evt)"
-                    role="row"
-                    tabindex="0">
-                    @for (int i = 0; i < _enabledColumns.Length; i++)
-                    {
-                        <td aria-colindex="@(i + 1)" role="gridcell">
-                            @switch (_enabledColumns[i])
-                            {
-                                case ColumnName.Level:
-                                    <text><span aria-hidden="true" class="@GetLevelClass(evt.Level)"></span> @evt.Level</text>
-                                    break;
-                                case ColumnName.DateAndTime:
-                                    @evt.TimeCreated.ConvertTimeZone(_timeZoneSettings)
-                                    break;
-                                case ColumnName.ActivityId:
-                                    @evt.ActivityId
-                                    break;
-                                case ColumnName.Log:
-                                    @GetLogShortName(evt.OwningLog)
-                                    break;
-                                case ColumnName.ComputerName:
-                                    @evt.ComputerName
-                                    break;
-                                case ColumnName.Source:
-                                    @evt.Source
-                                    break;
-                                case ColumnName.EventId:
-                                    @evt.Id
-                                    break;
-                                case ColumnName.TaskCategory:
-                                    @evt.TaskCategory
-                                    break;
-                                case ColumnName.Keywords:
-                                    @evt.KeywordsDisplayName
-                                    break;
-                                case ColumnName.ProcessId:
-                                    @evt.ProcessId
-                                    break;
-                                case ColumnName.ThreadId:
-                                    @evt.ThreadId
-                                    break;
-                                case ColumnName.User:
-                                    @evt.UserId
-                                    break;
-                            }
-                        </td>
-                    }
+            @if (_rowView is null)
+            {
+                <Virtualize Context="evt" Items="@(_activeDisplayedEvents as ICollection<ResolvedEvent> ?? [])">
+                    @renderEventRow(evt)
+                </Virtualize>
+            }
+            else
+            {
+                var view = _rowView;
 
-                    <td aria-colindex="@(_enabledColumns.Length + 1)" role="gridcell">@evt.Description</td>
-                </tr>
-            </Virtualize>
+                <Virtualize Context="row" Items="view">
+                    @if (row.Kind == TableRowKind.Header)
+                    {
+                        var group = view.GroupAt(row);
+
+                        <tr aria-expanded="@((!group.IsCollapsed).ToString().ToLower())"
+                            aria-rowindex="@(group.VisibleStart + 2)"
+                            class="group-header-row"
+                            data-collapsed="@group.IsCollapsed.ToString().ToLower()"
+                            @key="@($"hdr:{group.Key}")"
+                            @onclick="() => ToggleGroupCollapsed(group.Key)"
+                            @oncontextmenu="args => InvokeGroupContextMenu(args, group)"
+                            @oncontextmenu:preventDefault="true"
+                            @oncontextmenu:stopPropagation="true"
+                            @onkeydown="args => HandleGroupHeaderKeyDown(args, group.Key)"
+                            role="row"
+                            tabindex="0">
+                            <td colspan="@(_enabledColumns.Length + 1)" role="gridcell">
+                                <span class="group-chevron"
+                                    data-collapsed="@group.IsCollapsed.ToString().ToLower()">
+                                    <i class="bi bi-caret-right"></i>
+                                </span>
+                                <span class="group-name">@GetGroupName():</span>
+                                <span class="group-value">@GetGroupValueText(group)</span>
+                                <span class="group-count">(@group.EventCount)</span>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @renderEventRow(view.EventAt(row))
+                    }
+                </Virtualize>
+            }
         }
         </tbody>
     </table>

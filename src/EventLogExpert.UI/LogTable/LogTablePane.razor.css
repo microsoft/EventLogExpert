@@ -15,7 +15,7 @@ table {
     table-layout: fixed;
 }
 
-tr:nth-child(odd) { background-color: var(--background-darkgray); }
+tr[data-stripe="1"] { background-color: var(--background-darkgray); }
 
 th {
     position: sticky;
@@ -68,7 +68,7 @@ tr {
 /* Single rule applies any highlight color via the [data-highlight] palette
    defined in app.css. Bg/fg pair guarantees WCAG-compliant contrast.
    Specificity (.table-row[data-highlight] = 0,2,0) beats
-   tr:nth-child(odd) (0,1,1) without needing !important. The inset
+   the tr[data-stripe] zebra (0,1,1) without needing !important. The inset
    box-shadow mirrors .selected's non-color cue so highlighted rows remain
    distinguishable in forced-colors / high-contrast modes that strip bg/fg. */
 .table-row[data-highlight] {
@@ -119,6 +119,34 @@ tr {
 }
 
 .description { width: 100%; }
+
+.group-header-row { cursor: pointer; }
+
+.group-header-row > td {
+    border-top: 1px solid var(--clr-lightblue);
+    border-right: none;
+    font-weight: 600;
+    background-color: var(--background-darkgray);
+}
+
+.group-chevron {
+    display: inline-block;
+    width: 1rem;
+    text-align: center;
+    color: var(--text-secondary);
+    transition: transform 0.1s ease-in-out;
+
+    &[data-collapsed="false"] { transform: rotate(90deg); }
+}
+
+.group-count {
+    margin-left: .25rem;
+    color: var(--text-secondary);
+}
+
+.group-name { color: var(--text-secondary); }
+
+.group-value { color: var(--toggle-accent); }
 
 th.dragging {
     opacity: 0.5;

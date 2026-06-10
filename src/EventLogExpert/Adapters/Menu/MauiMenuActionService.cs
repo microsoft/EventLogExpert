@@ -11,6 +11,7 @@ using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
@@ -38,6 +39,7 @@ public sealed class MauiMenuActionService(
     IEventLogCommands eventLogCommands,
     IFilterLibraryCommands filterLibraryCommands,
     IFilterPaneCommands filterPaneCommands,
+    ILogTableCommands logTableCommands,
     IClipboardService clipboardService,
     IAlertDialogService dialogService,
     IModalCoordinator modalCoordinator,
@@ -58,6 +60,7 @@ public sealed class MauiMenuActionService(
     private readonly IFilterPaneCommands _filterPaneCommands = filterPaneCommands;
     private readonly IFolderPickerService _folderPickerService = folderPickerService;
     private readonly SemaphoreSlim _logNamesLock = new(1, 1);
+    private readonly ILogTableCommands _logTableCommands = logTableCommands;
     private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
     private readonly ISettingsService _settings = settings;
     private readonly ITraceLogger _traceLogger = traceLogger;
@@ -316,6 +319,8 @@ public sealed class MauiMenuActionService(
         _filterLibraryCommands.SavePaneAsFilterSet(filterSetName);
     }
 
+    public void SetAllGroupsCollapsed(bool collapsed) => _logTableCommands.SetAllGroupsCollapsed(collapsed);
+
     public void SetContinuouslyUpdate(bool value) =>
         _eventLogCommands.SetContinuouslyUpdate(value);
 
@@ -337,6 +342,8 @@ public sealed class MauiMenuActionService(
             _traceLogger.Error($"Failed to display release notes: {ex}");
         }
     }
+
+    public void ToggleGroupSortDirection() => _logTableCommands.ToggleGroupSortDirection();
 
     public void ToggleShowAllEvents() => _filterPaneCommands.ToggleFilteringEnabled();
 

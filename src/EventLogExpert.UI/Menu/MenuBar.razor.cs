@@ -6,6 +6,7 @@ using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common.Interop;
@@ -19,6 +20,8 @@ namespace EventLogExpert.UI.Menu;
 
 public sealed partial class MenuBar
 {
+    private const string GroupDisabledReason = "Group events first (column header > Group By)";
+
     private readonly List<TopLevel> _bars = [];
 
     private ElementReference[] _barElements = [];
@@ -40,6 +43,12 @@ public sealed partial class MenuBar
 
     [Inject]
     private IStateSelection<EventLogState, bool> HasActiveLogs { get; init; } = null!;
+
+    [Inject]
+    private IStateSelection<LogTableState, bool> IsGroupDescending { get; init; } = null!;
+
+    [Inject]
+    private IStateSelection<LogTableState, bool> IsGrouping { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
@@ -70,6 +79,8 @@ public sealed partial class MenuBar
         ContinuouslyUpdate.Select(state => state.ContinuouslyUpdate);
         FilterPaneIsEnabled.Select(state => state.IsEnabled);
         HasActiveLogs.Select(state => !state.ActiveLogs.IsEmpty);
+        IsGroupDescending.Select(state => state.IsGroupDescending);
+        IsGrouping.Select(state => state.GroupBy is not null);
 
         Settings.CopyFormatChanged += OnSettingsChanged;
         MenuService.StateChanged += OnMenuServiceStateChanged;
@@ -224,6 +235,8 @@ public sealed partial class MenuBar
         // Snapshot state at open time. Live updates aren't pushed into an open menu - the next open will reflect any change.
         bool isFilterEnabled = FilterPaneIsEnabled.Value;
         bool isContinuouslyUpdating = ContinuouslyUpdate.Value;
+        bool isGrouping = IsGrouping.Value;
+        bool isGroupDescending = IsGroupDescending.Value;
 
         return
         [
@@ -237,6 +250,23 @@ public sealed partial class MenuBar
                 "Continuously Update",
                 () => Actions.SetContinuouslyUpdate(!isContinuouslyUpdating),
                 isChecked: isContinuouslyUpdating),
+            MenuItem.Separator(),
+            MenuItem.Item(
+                "Group Descending",
+                Actions.ToggleGroupSortDirection,
+                isChecked: isGroupDescending,
+                isEnabled: isGrouping,
+                disabledReason: isGrouping ? null : GroupDisabledReason),
+            MenuItem.Item(
+                "Expand All Groups",
+                () => Actions.SetAllGroupsCollapsed(false),
+                isEnabled: isGrouping,
+                disabledReason: isGrouping ? null : GroupDisabledReason),
+            MenuItem.Item(
+                "Collapse All Groups",
+                () => Actions.SetAllGroupsCollapsed(true),
+                isEnabled: isGrouping,
+                disabledReason: isGrouping ? null : GroupDisabledReason),
         ];
     }
 

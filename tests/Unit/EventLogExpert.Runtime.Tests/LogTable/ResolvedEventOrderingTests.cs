@@ -11,6 +11,18 @@ namespace EventLogExpert.Runtime.Tests.LogTable;
 public sealed class ResolvedEventOrderingTests
 {
     [Fact]
+    public void CompareColumn_NullStringColumn_TreatedAsEmptyToMatchGroupKey()
+    {
+        var nullValue = FilterEventBuilder.CreateTestEvent(computerName: null!);
+        var emptyValue = FilterEventBuilder.CreateTestEvent(computerName: string.Empty);
+
+        Assert.Equal(
+            ResolvedEventGroupKey.For(ColumnName.ComputerName, nullValue),
+            ResolvedEventGroupKey.For(ColumnName.ComputerName, emptyValue));
+        Assert.Equal(0, ResolvedEventOrdering.CompareColumn(nullValue, emptyValue, ColumnName.ComputerName));
+    }
+
+    [Fact]
     public void MergeSorted_WhenBatchIsEmpty_ShouldReturnExistingUnchanged()
     {
         var existing = new List<ResolvedEvent>

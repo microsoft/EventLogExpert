@@ -66,15 +66,15 @@ internal static class ResolvedEventOrdering
     internal static int CompareColumn(ResolvedEvent a, ResolvedEvent b, ColumnName column) =>
         column switch
         {
-            ColumnName.Level => string.Compare(a.Level, b.Level, StringComparison.Ordinal),
+            ColumnName.Level => string.Compare(a.Level ?? string.Empty, b.Level ?? string.Empty, StringComparison.Ordinal),
             ColumnName.DateAndTime => a.TimeCreated.CompareTo(b.TimeCreated),
             ColumnName.ActivityId => Nullable.Compare(a.ActivityId, b.ActivityId),
-            ColumnName.Log => string.Compare(a.LogName, b.LogName, StringComparison.Ordinal),
-            ColumnName.ComputerName => string.Compare(a.ComputerName, b.ComputerName, StringComparison.Ordinal),
-            ColumnName.Source => string.Compare(a.Source, b.Source, StringComparison.Ordinal),
+            ColumnName.Log => string.Compare(a.LogName ?? string.Empty, b.LogName ?? string.Empty, StringComparison.Ordinal),
+            ColumnName.ComputerName => string.Compare(a.ComputerName ?? string.Empty, b.ComputerName ?? string.Empty, StringComparison.Ordinal),
+            ColumnName.Source => string.Compare(a.Source ?? string.Empty, b.Source ?? string.Empty, StringComparison.Ordinal),
             ColumnName.EventId => a.Id.CompareTo(b.Id),
-            ColumnName.TaskCategory => string.Compare(a.TaskCategory, b.TaskCategory, StringComparison.Ordinal),
-            ColumnName.Keywords => string.Compare(a.KeywordsDisplayName, b.KeywordsDisplayName, StringComparison.Ordinal),
+            ColumnName.TaskCategory => string.Compare(a.TaskCategory ?? string.Empty, b.TaskCategory ?? string.Empty, StringComparison.Ordinal),
+            ColumnName.Keywords => string.Compare(a.KeywordsDisplayName ?? string.Empty, b.KeywordsDisplayName ?? string.Empty, StringComparison.Ordinal),
             ColumnName.ProcessId => Nullable.Compare(a.ProcessId, b.ProcessId),
             ColumnName.ThreadId => Nullable.Compare(a.ThreadId, b.ThreadId),
             ColumnName.User => string.Compare(a.UserId?.Value ?? string.Empty, b.UserId?.Value ?? string.Empty, StringComparison.Ordinal),

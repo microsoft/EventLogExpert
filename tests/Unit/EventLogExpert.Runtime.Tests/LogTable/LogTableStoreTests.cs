@@ -881,12 +881,23 @@ public sealed class LogTableStoreTests
     [Fact]
     public void ReduceSetAllGroupsCollapsed_SetsDefaultAndClearsOverrides()
     {
-        var state = new LogTableState { GroupCollapseOverrides = ImmutableHashSet.Create("x") };
+        var state = new LogTableState { GroupBy = ColumnName.Source, GroupCollapseOverrides = ImmutableHashSet.Create("x") };
 
         var result = Reducers.ReduceSetAllGroupsCollapsed(state, new SetAllGroupsCollapsedAction(true));
 
         Assert.True(result.GroupsCollapsedByDefault);
         Assert.Empty(result.GroupCollapseOverrides);
+    }
+
+    [Fact]
+    public void ReduceSetAllGroupsCollapsed_WhenNotGrouping_NoOps()
+    {
+        var state = new LogTableState { GroupCollapseOverrides = ImmutableHashSet.Create("x") };
+
+        var result = Reducers.ReduceSetAllGroupsCollapsed(state, new SetAllGroupsCollapsedAction(true));
+
+        Assert.Same(state, result);
+        Assert.False(result.GroupsCollapsedByDefault);
     }
 
     [Fact]
@@ -936,7 +947,7 @@ public sealed class LogTableStoreTests
     public void ReduceToggleGroupCollapsed_TogglesKey()
     {
         var collapsed = Reducers.ReduceToggleGroupCollapsed(
-            new LogTableState(),
+            new LogTableState { GroupBy = ColumnName.Source },
             new ToggleGroupCollapsedAction("grp"));
 
         Assert.Contains("grp", collapsed.GroupCollapseOverrides);
@@ -944,6 +955,16 @@ public sealed class LogTableStoreTests
         var expanded = Reducers.ReduceToggleGroupCollapsed(collapsed, new ToggleGroupCollapsedAction("grp"));
 
         Assert.DoesNotContain("grp", expanded.GroupCollapseOverrides);
+    }
+
+    [Fact]
+    public void ReduceToggleGroupCollapsed_WhenNotGrouping_NoOps()
+    {
+        var state = new LogTableState();
+
+        var result = Reducers.ReduceToggleGroupCollapsed(state, new ToggleGroupCollapsedAction("grp"));
+
+        Assert.Same(state, result);
     }
 
     [Fact]
