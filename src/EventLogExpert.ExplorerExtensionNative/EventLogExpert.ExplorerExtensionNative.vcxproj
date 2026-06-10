@@ -6,6 +6,21 @@
     so the manifest's <com:Class Path="EventLogExpert.ExplorerExtension.dll" ...> stays accurate.
     Build prereqs are documented in docs/Explorer-Context-Menu.md.
   -->
+  <!--
+    Windows SDK via NuGet (Microsoft.Windows.SDK.CPP[.x64]) — imported FIRST so WindowsSdkDir and
+    WindowsTargetPlatformVersion are established before Microsoft.Cpp.*.props run their SDK
+    resolution. This makes the C++/WinRT build self-contained: it resolves SDK headers, import
+    libs, and winmd from the restored packages rather than a machine-installed SDK. Without it,
+    CI containers that ship the VC++ toolset but no Windows SDK (the OneBranch vse2022 image used
+    by the release pipeline) fail with `error MSB8036: The Windows SDK version ... was not found`
+    because the bare WindowsTargetPlatformVersion '10.0' below resolves to "latest installed" and
+    nothing is installed. The Exists() guards keep the build working when the packages are not
+    restored — it then falls back to the latest machine-installed SDK via the bare '10.0'. The
+    x64 package supplies only the x64 import libs (it carries no .targets). Versions are pinned in
+    packages.config; bump in lockstep there. See docs/Explorer-Context-Menu.md.
+  -->
+  <Import Project="..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.8249\build\native\Microsoft.Windows.SDK.cpp.props" Condition="Exists('..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.8249\build\native\Microsoft.Windows.SDK.cpp.props')" />
+  <Import Project="..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.8249\build\native\Microsoft.Windows.SDK.cpp.x64.props" Condition="Exists('..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.8249\build\native\Microsoft.Windows.SDK.cpp.x64.props')" />
   <Import Project="..\packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.props" Condition="Exists('..\packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.props')" />
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -24,7 +39,11 @@
     <ProjectGuid>{B9D2A1F3-8C47-4E2D-9F5B-6A1E2C3D4E5F}</ProjectGuid>
     <RootNamespace>EventLogExpertExplorerExtension</RootNamespace>
     <TargetName>EventLogExpert.ExplorerExtension</TargetName>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <!-- Conditional so the NuGet Windows SDK package (imported near the top of this file) wins
+         when restored — its props set WindowsTargetPlatformVersion to the package's SDK version.
+         The bare '10.0' (latest machine-installed SDK) remains the fallback for environments that
+         don't restore the SDK package. See the SDK.CPP import comment above. -->
+    <WindowsTargetPlatformVersion Condition="'$(WindowsTargetPlatformVersion)' == ''">10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -131,6 +150,7 @@
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.8249\build\native\Microsoft.Windows.SDK.cpp.targets" Condition="Exists('..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.8249\build\native\Microsoft.Windows.SDK.cpp.targets')" />
     <Import Project="..\packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.targets" Condition="Exists('..\packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.targets')" />
     <Import Project="..\packages\Microsoft.Windows.ImplementationLibrary.1.0.260126.7\build\native\Microsoft.Windows.ImplementationLibrary.targets" Condition="Exists('..\packages\Microsoft.Windows.ImplementationLibrary.1.0.260126.7\build\native\Microsoft.Windows.ImplementationLibrary.targets')" />
   </ImportGroup>
