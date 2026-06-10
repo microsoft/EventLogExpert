@@ -53,13 +53,33 @@ internal static class ResolvedEventOrdering
     public static IReadOnlyList<ResolvedEvent> SortEvents(
         this IEnumerable<ResolvedEvent> events,
         ColumnName? orderBy = null,
-        bool isDescending = false)
+        bool isDescending = false,
+        ColumnName? groupBy = null,
+        bool isGroupDescending = false)
     {
         var sorted = new List<ResolvedEvent>(events);
-        sorted.Sort(GetComparer(orderBy, isDescending));
+        sorted.Sort(SelectComparer(orderBy, isDescending, groupBy, isGroupDescending));
 
         return sorted.AsReadOnly();
     }
+
+    internal static int CompareColumn(ResolvedEvent a, ResolvedEvent b, ColumnName column) =>
+        column switch
+        {
+            ColumnName.Level => string.Compare(a.Level, b.Level, StringComparison.Ordinal),
+            ColumnName.DateAndTime => a.TimeCreated.CompareTo(b.TimeCreated),
+            ColumnName.ActivityId => Nullable.Compare(a.ActivityId, b.ActivityId),
+            ColumnName.Log => string.Compare(a.LogName, b.LogName, StringComparison.Ordinal),
+            ColumnName.ComputerName => string.Compare(a.ComputerName, b.ComputerName, StringComparison.Ordinal),
+            ColumnName.Source => string.Compare(a.Source, b.Source, StringComparison.Ordinal),
+            ColumnName.EventId => a.Id.CompareTo(b.Id),
+            ColumnName.TaskCategory => string.Compare(a.TaskCategory, b.TaskCategory, StringComparison.Ordinal),
+            ColumnName.Keywords => string.Compare(a.KeywordsDisplayName, b.KeywordsDisplayName, StringComparison.Ordinal),
+            ColumnName.ProcessId => Nullable.Compare(a.ProcessId, b.ProcessId),
+            ColumnName.ThreadId => Nullable.Compare(a.ThreadId, b.ThreadId),
+            ColumnName.User => string.Compare(a.UserId?.Value ?? string.Empty, b.UserId?.Value ?? string.Empty, StringComparison.Ordinal),
+            _ => 0
+        };
 
     internal static Comparison<ResolvedEvent> GetComparer(ColumnName? orderBy, bool isDescending) =>
         isDescending
@@ -96,17 +116,49 @@ internal static class ResolvedEventOrdering
                 _ => s_ascByDefault
             };
 
+    internal static Comparison<ResolvedEvent> GetGroupedComparer(
+        ColumnName groupBy,
+        bool isGroupDescending,
+        ColumnName? orderBy,
+        bool isDescending)
+    {
+        var withinGroup = orderBy ?? ColumnName.DateAndTime;
+
+        return (a, b) =>
+        {
+            int group = CompareColumn(a, b, groupBy);
+
+            if (group != 0) { return isGroupDescending ? -Math.Sign(group) : group; }
+
+            int within = CompareColumn(a, b, withinGroup);
+
+            if (within == 0 && withinGroup != ColumnName.DateAndTime)
+            {
+                within = CompareColumn(a, b, ColumnName.DateAndTime);
+            }
+
+            if (within == 0)
+            {
+                within = FallbackTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
+            }
+
+            return isDescending ? -Math.Sign(within) : within;
+        };
+    }
+
     internal static IReadOnlyList<ResolvedEvent> MergeSorted(
         IReadOnlyList<ResolvedEvent> existing,
         IReadOnlyList<ResolvedEvent> batch,
         ColumnName? orderBy,
-        bool isDescending)
+        bool isDescending,
+        ColumnName? groupBy = null,
+        bool isGroupDescending = false)
     {
         if (batch.Count == 0) { return existing; }
 
-        if (existing.Count == 0) { return batch.SortEvents(orderBy, isDescending); }
+        if (existing.Count == 0) { return batch.SortEvents(orderBy, isDescending, groupBy, isGroupDescending); }
 
-        var comparer = GetComparer(orderBy, isDescending);
+        var comparer = SelectComparer(orderBy, isDescending, groupBy, isGroupDescending);
 
         var sortedBatch = new List<ResolvedEvent>(batch);
         sortedBatch.Sort(comparer);
@@ -125,6 +177,15 @@ internal static class ResolvedEventOrdering
 
         return result.AsReadOnly();
     }
+
+    internal static Comparison<ResolvedEvent> SelectComparer(
+        ColumnName? orderBy,
+        bool isDescending,
+        ColumnName? groupBy,
+        bool isGroupDescending) =>
+        groupBy is null
+            ? GetComparer(orderBy, isDescending)
+            : GetGroupedComparer(groupBy.Value, isGroupDescending, orderBy, isDescending);
 
     /// <summary>Falls back to RecordId, then OwningLog (for combined logs) to guarantee a total order for List.Sort stability.</summary>
     private static int FallbackTieBreaker(int recordIdResult, ResolvedEvent a, ResolvedEvent b) =>

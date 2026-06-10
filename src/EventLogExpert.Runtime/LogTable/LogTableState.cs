@@ -29,4 +29,16 @@ public sealed record LogTableState
     public ColumnName? OrderBy { get; init; }
 
     public bool IsDescending { get; init; } = true;
+
+    public ColumnName? GroupBy { get; init; }
+
+    public bool IsGroupDescending { get; init; }
+
+    public bool GroupsCollapsedByDefault { get; init; }
+
+    public ImmutableHashSet<string> GroupCollapseOverrides { get; init; } =
+        ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+
+    public bool IsGroupCollapsed(string groupKey) =>
+        GroupsCollapsedByDefault ^ GroupCollapseOverrides.Contains(groupKey);
 }

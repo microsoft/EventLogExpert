@@ -243,6 +243,23 @@ public sealed class LogTableStoreTests
         Assert.DoesNotContain(state.EventTables, t => t.Id == logData2.Id);
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    public void IsGroupCollapsed_XorsDefaultAndOverride(bool collapsedByDefault, bool hasOverride, bool expected)
+    {
+        var overrides = hasOverride ? ImmutableHashSet.Create("g") : ImmutableHashSet<string>.Empty;
+        var state = new LogTableState
+        {
+            GroupsCollapsedByDefault = collapsedByDefault,
+            GroupCollapseOverrides = overrides
+        };
+
+        Assert.Equal(expected, state.IsGroupCollapsed("g"));
+    }
+
     [Fact]
     public void LogTableState_DefaultState_ShouldHaveCorrectDefaults()
     {
@@ -361,6 +378,24 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
+    public void ReduceAddTable_WhenFirstLogSetsActive_ResetsCollapse()
+    {
+        var state = new LogTableState
+        {
+            GroupsCollapsedByDefault = true,
+            GroupCollapseOverrides = ImmutableHashSet.Create("g")
+        };
+
+        var result = Reducers.ReduceAddTable(
+            state,
+            new AddTableAction(new EventLogData("Application", LogPathType.Channel, [])));
+
+        Assert.NotNull(result.ActiveEventLogId);
+        Assert.False(result.GroupsCollapsedByDefault);
+        Assert.Empty(result.GroupCollapseOverrides);
+    }
+
+    [Fact]
     public void ReduceAddTable_WhenFirstTable_ShouldBeLoading()
     {
         // Arrange
@@ -424,6 +459,28 @@ public sealed class LogTableStoreTests
         Assert.Null(newState.EventTables.First().FileName);
         Assert.Equal(Constants.LogNameApplication, newState.EventTables.First().LogName);
         Assert.Equal(LogPathType.Channel, newState.EventTables.First().LogPathType);
+    }
+
+    [Fact]
+    public void ReduceAddTable_WhenSecondLogSwitchesToCombined_ResetsCollapse()
+    {
+        var state = Reducers.ReduceAddTable(
+            new LogTableState(),
+            new AddTableAction(new EventLogData("First", LogPathType.Channel, [])));
+        state = state with
+        {
+            GroupsCollapsedByDefault = true,
+            GroupCollapseOverrides = ImmutableHashSet.Create("g")
+        };
+
+        var result = Reducers.ReduceAddTable(
+            state,
+            new AddTableAction(new EventLogData("Second", LogPathType.Channel, [])));
+
+        Assert.Contains(result.EventTables, t => t.IsCombined);
+        Assert.Equal(result.EventTables.First(t => t.IsCombined).Id, result.ActiveEventLogId);
+        Assert.False(result.GroupsCollapsedByDefault);
+        Assert.Empty(result.GroupCollapseOverrides);
     }
 
     [Fact]
@@ -563,6 +620,38 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
+    public void ReduceAppendTableEvents_WhenGrouped_MergesIntoExistingAndNewGroups()
+    {
+        var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var table = new LogView(EventLogId.Create()) { LogName = "Application" };
+        var state = new LogTableState
+        {
+            EventTables = ImmutableList.Create(table),
+            ActiveEventLogId = table.Id,
+            GroupBy = ColumnName.Source,
+            IsDescending = false,
+            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(table.Id, 0)
+        };
+
+        IReadOnlyList<ResolvedEvent> batch1 =
+        [
+            FilterEventBuilder.CreateTestEvent(id: 100, source: "A", timeCreated: baseTime.AddSeconds(1)),
+            FilterEventBuilder.CreateTestEvent(id: 200, source: "B", timeCreated: baseTime.AddSeconds(2))
+        ];
+        state = Reducers.ReduceAppendTableEvents(state, new AppendTableEventsAction(table.Id, batch1));
+
+        IReadOnlyList<ResolvedEvent> batch2 =
+        [
+            FilterEventBuilder.CreateTestEvent(id: 300, source: "A", timeCreated: baseTime.AddSeconds(3)),
+            FilterEventBuilder.CreateTestEvent(id: 500, source: "C", timeCreated: baseTime.AddSeconds(5))
+        ];
+        var result = Reducers.ReduceAppendTableEvents(state, new AppendTableEventsAction(table.Id, batch2));
+
+        Assert.Equal(new[] { "A", "A", "B", "C" }, result.DisplayedEvents.Select(e => e.Source));
+        Assert.Equal(new[] { 100, 300, 200, 500 }, result.DisplayedEvents.Select(e => e.Id));
+    }
+
+    [Fact]
     public void ReduceAppendTableEvents_WhenTableNotFound_ShouldReturnUnchangedState()
     {
         // Arrange
@@ -608,6 +697,283 @@ public sealed class LogTableStoreTests
         Assert.Equal(1L, newState.DisplayedEvents[0].RecordId);
         Assert.False(newState.EventCountByLog.ContainsKey(staleLogId));
         Assert.Equal(1, newState.EventCountByLog[openLog.Id]);
+    }
+
+    [Fact]
+    public void ReduceAppendTableEventsBatch_WhenGrouped_MergesIntoExistingGroups()
+    {
+        var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var table = new LogView(EventLogId.Create()) { LogName = "Application" };
+        var state = new LogTableState
+        {
+            EventTables = ImmutableList.Create(table),
+            ActiveEventLogId = table.Id,
+            GroupBy = ColumnName.Source,
+            IsDescending = false,
+            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(table.Id, 0)
+        };
+
+        state = Reducers.ReduceAppendTableEvents(
+            state,
+            new AppendTableEventsAction(table.Id,
+            [
+                FilterEventBuilder.CreateTestEvent(id: 100, source: "A", timeCreated: baseTime.AddSeconds(1)),
+                FilterEventBuilder.CreateTestEvent(id: 200, source: "B", timeCreated: baseTime.AddSeconds(2))
+            ]));
+
+        var byLog = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
+        {
+            [table.Id] =
+            [
+                FilterEventBuilder.CreateTestEvent(id: 300, source: "A", timeCreated: baseTime.AddSeconds(3)),
+                FilterEventBuilder.CreateTestEvent(id: 500, source: "C", timeCreated: baseTime.AddSeconds(5))
+            ]
+        };
+
+        var result = Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction(byLog));
+
+        Assert.Equal(new[] { "A", "A", "B", "C" }, result.DisplayedEvents.Select(e => e.Source));
+        Assert.Equal(new[] { 100, 300, 200, 500 }, result.DisplayedEvents.Select(e => e.Id));
+    }
+
+    [Fact]
+    public void ReduceCloseAll_ResetsCollapse()
+    {
+        var table = new LogView(EventLogId.Create()) { LogName = "A" };
+        var state = new LogTableState
+        {
+            EventTables = ImmutableList.Create(table),
+            ActiveEventLogId = table.Id,
+            GroupsCollapsedByDefault = true,
+            GroupCollapseOverrides = ImmutableHashSet.Create("g")
+        };
+
+        var result = Reducers.ReduceCloseAll(state);
+
+        Assert.Null(result.ActiveEventLogId);
+        Assert.False(result.GroupsCollapsedByDefault);
+        Assert.Empty(result.GroupCollapseOverrides);
+    }
+
+    [Fact]
+    public void ReduceCloseLog_WhenActiveChanges_ResetsCollapse()
+    {
+        var tableA = new LogView(EventLogId.Create()) { LogName = "A" };
+        var tableB = new LogView(EventLogId.Create()) { LogName = "B" };
+        var combined = new LogView(EventLogId.Create()) { IsCombined = true };
+        var state = new LogTableState
+        {
+            EventTables = ImmutableList.Create(combined, tableA, tableB),
+            ActiveEventLogId = combined.Id,
+            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty
+                .Add(tableA.Id, 0)
+                .Add(tableB.Id, 0),
+            GroupsCollapsedByDefault = true,
+            GroupCollapseOverrides = ImmutableHashSet.Create("g")
+        };
+
+        var result = Reducers.ReduceCloseLog(state, new CloseLogAction(tableB.Id));
+
+        Assert.Equal(tableA.Id, result.ActiveEventLogId);
+        Assert.False(result.GroupsCollapsedByDefault);
+        Assert.Empty(result.GroupCollapseOverrides);
+    }
+
+    [Fact]
+    public void ReduceLoadColumnsCompleted_WhenGroupColumnHidden_ClearsGroupAndResortsUngrouped()
+    {
+        var state = new LogTableState
+        {
+            GroupBy = ColumnName.Source,
+            IsGroupDescending = true,
+            GroupCollapseOverrides = ImmutableHashSet.Create("g"),
+            OrderBy = ColumnName.EventId,
+            IsDescending = false,
+            DisplayedEvents = new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
+                FilterEventBuilder.CreateTestEvent(id: 1, source: "A")
+            }.AsReadOnly()
+        };
+
+        var hiddenColumns = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.Source, false)
+            .Add(ColumnName.EventId, true);
+
+        var result = Reducers.ReduceLoadColumnsCompleted(
+            state,
+            new LoadColumnsCompletedAction(hiddenColumns, ImmutableDictionary<ColumnName, int>.Empty, []));
+
+        Assert.Null(result.GroupBy);
+        Assert.False(result.IsGroupDescending);
+        Assert.Empty(result.GroupCollapseOverrides);
+        Assert.Equal(new[] { 1, 2 }, result.DisplayedEvents.Select(e => e.Id));
+    }
+
+    [Fact]
+    public void ReduceLoadColumnsCompleted_WhenGroupColumnStaysVisible_KeepsGroup()
+    {
+        var state = new LogTableState { GroupBy = ColumnName.Source };
+
+        var visibleColumns = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.Source, true)
+            .Add(ColumnName.Level, false);
+
+        var result = Reducers.ReduceLoadColumnsCompleted(
+            state,
+            new LoadColumnsCompletedAction(visibleColumns, ImmutableDictionary<ColumnName, int>.Empty, []));
+
+        Assert.Equal(ColumnName.Source, result.GroupBy);
+    }
+
+    [Fact]
+    public void ReduceLoadColumnsCompleted_WhenResetDefaultsHidesGroupColumn_ClearsGroup()
+    {
+        var state = new LogTableState { GroupBy = ColumnName.ActivityId };
+
+        var defaults = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.Level, true)
+            .Add(ColumnName.DateAndTime, true);
+
+        var result = Reducers.ReduceLoadColumnsCompleted(
+            state,
+            new LoadColumnsCompletedAction(defaults, ImmutableDictionary<ColumnName, int>.Empty, []));
+
+        Assert.Null(result.GroupBy);
+    }
+
+    [Fact]
+    public void ReduceSetActiveTable_WhenActiveChanges_ResetsCollapse()
+    {
+        var tableA = new LogView(EventLogId.Create()) { LogName = "A" };
+        var tableB = new LogView(EventLogId.Create()) { LogName = "B" };
+        var state = new LogTableState
+        {
+            EventTables = ImmutableList.Create(tableA, tableB),
+            ActiveEventLogId = tableA.Id,
+            GroupsCollapsedByDefault = true,
+            GroupCollapseOverrides = ImmutableHashSet.Create("g")
+        };
+
+        var result = Reducers.ReduceSetActiveTable(state, new SetActiveTableAction(tableB.Id));
+
+        Assert.Equal(tableB.Id, result.ActiveEventLogId);
+        Assert.False(result.GroupsCollapsedByDefault);
+        Assert.Empty(result.GroupCollapseOverrides);
+    }
+
+    [Fact]
+    public void ReduceSetActiveTable_WhenActiveUnchanged_PreservesCollapse()
+    {
+        var tableA = new LogView(EventLogId.Create()) { LogName = "A" };
+        var state = new LogTableState
+        {
+            EventTables = ImmutableList.Create(tableA),
+            ActiveEventLogId = tableA.Id,
+            GroupCollapseOverrides = ImmutableHashSet.Create("g")
+        };
+
+        var result = Reducers.ReduceSetActiveTable(state, new SetActiveTableAction(tableA.Id));
+
+        Assert.Contains("g", result.GroupCollapseOverrides);
+    }
+
+    [Fact]
+    public void ReduceSetAllGroupsCollapsed_SetsDefaultAndClearsOverrides()
+    {
+        var state = new LogTableState { GroupCollapseOverrides = ImmutableHashSet.Create("x") };
+
+        var result = Reducers.ReduceSetAllGroupsCollapsed(state, new SetAllGroupsCollapsedAction(true));
+
+        Assert.True(result.GroupsCollapsedByDefault);
+        Assert.Empty(result.GroupCollapseOverrides);
+    }
+
+    [Fact]
+    public void ReduceSetGroupBy_SetsGroupResortsAndResetsDirectionAndCollapse()
+    {
+        var state = new LogTableState
+        {
+            DisplayedEvents = new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
+                FilterEventBuilder.CreateTestEvent(id: 1, source: "A")
+            }.AsReadOnly(),
+            IsGroupDescending = true,
+            GroupCollapseOverrides = ImmutableHashSet.Create("stale")
+        };
+
+        var result = Reducers.ReduceSetGroupBy(state, new SetGroupByAction(ColumnName.Source));
+
+        Assert.Equal(ColumnName.Source, result.GroupBy);
+        Assert.False(result.IsGroupDescending);
+        Assert.Empty(result.GroupCollapseOverrides);
+        Assert.Equal(new[] { "A", "B" }, result.DisplayedEvents.Select(e => e.Source));
+    }
+
+    [Fact]
+    public void ReduceSetGroupBy_WhenNull_ClearsGroupingAndResortsUngrouped()
+    {
+        var state = new LogTableState
+        {
+            GroupBy = ColumnName.Source,
+            OrderBy = ColumnName.EventId,
+            IsDescending = false,
+            DisplayedEvents = new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
+                FilterEventBuilder.CreateTestEvent(id: 1, source: "A")
+            }.AsReadOnly()
+        };
+
+        var result = Reducers.ReduceSetGroupBy(state, new SetGroupByAction(null));
+
+        Assert.Null(result.GroupBy);
+        Assert.Equal(new[] { 1, 2 }, result.DisplayedEvents.Select(e => e.Id));
+    }
+
+    [Fact]
+    public void ReduceToggleGroupCollapsed_TogglesKey()
+    {
+        var collapsed = Reducers.ReduceToggleGroupCollapsed(
+            new LogTableState(),
+            new ToggleGroupCollapsedAction("grp"));
+
+        Assert.Contains("grp", collapsed.GroupCollapseOverrides);
+
+        var expanded = Reducers.ReduceToggleGroupCollapsed(collapsed, new ToggleGroupCollapsedAction("grp"));
+
+        Assert.DoesNotContain("grp", expanded.GroupCollapseOverrides);
+    }
+
+    [Fact]
+    public void ReduceToggleGroupSorting_WhenGrouped_FlipsDirectionAndResorts()
+    {
+        var state = new LogTableState
+        {
+            GroupBy = ColumnName.Source,
+            IsGroupDescending = false,
+            DisplayedEvents = new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+                FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+            }.AsReadOnly()
+        };
+
+        var result = Reducers.ReduceToggleGroupSorting(state);
+
+        Assert.True(result.IsGroupDescending);
+        Assert.Equal(new[] { "B", "A" }, result.DisplayedEvents.Select(e => e.Source));
+    }
+
+    [Fact]
+    public void ReduceToggleGroupSorting_WhenNotGrouped_IsNoOp()
+    {
+        var state = new LogTableState { GroupBy = null, IsGroupDescending = false };
+
+        var result = Reducers.ReduceToggleGroupSorting(state);
+
+        Assert.Same(state, result);
     }
 
     [Fact]
@@ -860,6 +1226,44 @@ public sealed class LogTableStoreTests
         Assert.Equal(3L, state.DisplayedEvents[1].RecordId);
         Assert.Equal(2L, state.DisplayedEvents[2].RecordId);
         Assert.Equal(1L, state.DisplayedEvents[3].RecordId);
+    }
+
+    [Fact]
+    public void ReduceUpdateTable_WhenGrouped_ReplacesLogSliceAndRetainsOtherLogGrouped()
+    {
+        var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var log1 = new LogView(EventLogId.Create()) { LogName = "Log1" };
+        var log2 = new LogView(EventLogId.Create()) { LogName = "Log2" };
+        var combined = new LogView(EventLogId.Create()) { IsCombined = true };
+
+        var existing = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "A", timeCreated: baseTime.AddSeconds(1), owningLog: "Log1"),
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "A", timeCreated: baseTime.AddSeconds(2), owningLog: "Log2")
+        }.SortEvents(orderBy: null, isDescending: false, groupBy: ColumnName.Source);
+
+        var state = new LogTableState
+        {
+            EventTables = ImmutableList.Create(combined, log1, log2),
+            ActiveEventLogId = combined.Id,
+            GroupBy = ColumnName.Source,
+            IsDescending = false,
+            DisplayedEvents = existing,
+            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty
+                .Add(log1.Id, 1)
+                .Add(log2.Id, 1)
+        };
+
+        IReadOnlyList<ResolvedEvent> log1Replacement =
+        [
+            FilterEventBuilder.CreateTestEvent(id: 3, source: "A", timeCreated: baseTime.AddSeconds(3), owningLog: "Log1")
+        ];
+
+        var result = Reducers.ReduceUpdateTable(state, new UpdateTableAction(log1.Id, log1Replacement));
+
+        Assert.Equal(new[] { 2, 3 }, result.DisplayedEvents.Select(e => e.Id).OrderBy(id => id));
+        Assert.DoesNotContain(result.DisplayedEvents, e => e.Id == 1);
+        Assert.Equal(new[] { "A", "A" }, result.DisplayedEvents.Select(e => e.Source));
     }
 
     [Fact]

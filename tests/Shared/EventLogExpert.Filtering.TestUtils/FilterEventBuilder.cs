@@ -23,8 +23,9 @@ public static class FilterEventBuilder
         int? processId = null,
         int? threadId = null,
         SecurityIdentifier? userId = null,
-        IReadOnlyList<string>? keywords = null) =>
-        new("TestLog", LogPathType.Channel)
+        IReadOnlyList<string>? keywords = null,
+        string owningLog = "TestLog") =>
+        new(owningLog, LogPathType.Channel)
         {
             Id = id,
             Source = source,
