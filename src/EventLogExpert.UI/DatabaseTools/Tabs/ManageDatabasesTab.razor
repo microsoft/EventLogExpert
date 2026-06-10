@@ -12,16 +12,19 @@
     <span aria-atomic="true" aria-live="polite" class="visually-hidden" role="status">@_selectionAnnouncement</span>
 
     <div class="manage-databases-import-row">
-        <button aria-pressed="@(_isSelectionModeActive ? "true" : "false")"
-            class="button manage-databases-select-btn"
-            id="manage-select-button"
-            @onclick="ToggleSelectionMode"
-            @ref="_selectButtonRef"
-            type="button">
-            <i aria-hidden="true" class="bi bi-check2-square"></i>
-            @(_isSelectionModeActive ? "Done" : "Select")
-        </button>
-        <button class="button"
+        @if (DatabaseService.Entries.Count > 0)
+        {
+            <button aria-pressed="@(_isSelectionModeActive ? "true" : "false")"
+                class="button manage-databases-select-btn"
+                id="manage-select-button"
+                @onclick="ToggleSelectionMode"
+                @ref="_selectButtonRef"
+                type="button">
+                <i aria-hidden="true" class="bi bi-check2-square"></i>
+                @(_isSelectionModeActive ? "Done" : "Select")
+            </button>
+        }
+        <button class="button manage-databases-import-btn"
             id="manage-import-button"
             @onclick="ImportDatabase"
             @ref="_importButtonRef"
