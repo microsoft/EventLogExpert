@@ -855,11 +855,18 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         foreach (var key in deadRefs) { _rowRefs.Remove(key); }
 
-        // Auto-exit selection mode if the entries list collapses while selecting;
-        // the bulk strip would render above an empty-state placeholder otherwise.
-        if (_isSelectionModeActive && currentNames.Count == 0)
+        // When the entries list collapses to zero, the Select button and entry rows
+        // disappear from the DOM; restore focus to Import so keyboard users don't lose
+        // their anchor. Exit selection mode in the same step so the bulk strip doesn't
+        // render above an empty-state placeholder.
+        if (currentNames.Count == 0)
         {
-            ExitSelectionMode();
+            if (_isSelectionModeActive)
+            {
+                ExitSelectionMode();
+            }
+
+            _focusRestorationTarget = (string.Empty, FocusTarget.ImportButton);
         }
 
         _ = InvokeAsyncSafe();

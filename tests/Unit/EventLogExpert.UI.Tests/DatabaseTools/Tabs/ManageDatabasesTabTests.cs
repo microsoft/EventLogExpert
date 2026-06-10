@@ -728,7 +728,8 @@ public sealed class ManageDatabasesTabTests : BunitContext
         _databaseService.RaiseEntriesChanged();
         await component.InvokeAsync(() => { });
 
-        Assert.Equal("false", component.Find("#manage-select-button").GetAttribute("aria-pressed"));
+        Assert.False(component.Instance.IsInSelectionMode);
+        Assert.Empty(component.FindAll("#manage-select-button"));
     }
 
     [Fact]
@@ -1072,6 +1073,16 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var statusRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
         Assert.NotNull(statusRegion);
         Assert.Equal("true", statusRegion.GetAttribute("aria-atomic"));
+    }
+
+    [Fact]
+    public void Render_SelectButton_HiddenWhenNoEntries()
+    {
+        _databaseService.Entries = [];
+
+        var component = Render<ManageDatabasesTab>();
+
+        Assert.Empty(component.FindAll("#manage-select-button"));
     }
 
     [Fact]

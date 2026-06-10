@@ -11,8 +11,11 @@
     flex: none;
     display: flex;
     gap: .5rem;
-    justify-content: space-between;
     padding: .5rem 1rem;
+}
+
+.manage-databases-import-btn {
+    margin-left: auto;
 }
 
 .manage-databases-selection-header {
