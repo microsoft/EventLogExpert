@@ -388,6 +388,14 @@ function registerKeyHandlers(table, signal) {
                 return;
             }
 
+            // ArrowLeft/Right drive the treegrid only when grouped; suppress horizontal
+            // scroll there. Flat mode (role="grid") keeps native behavior.
+            if ((e.key === "ArrowLeft" || e.key === "ArrowRight") &&
+                table.getAttribute("role") === "treegrid") {
+                e.preventDefault();
+                return;
+            }
+
             // Ctrl+A: prevent the WebView's native Select-All so the
             // table's own Ctrl+A handler in HandleKeyDown owns the gesture.
             if (e.ctrlKey && (e.key === "a" || e.key === "A")) {

@@ -41,6 +41,7 @@ public sealed partial class LogTablePane
     private EventLogId? _cachedFilteredTableId;
     private IReadOnlyList<ResolvedEvent>? _cachedFilteredView;
     private LogView? _currentTable;
+    private TableCursor? _cursor;
     private DotNetObjectReference<LogTablePane>? _dotNetRef;
     private ColumnName[] _enabledColumns = null!;
     private ImmutableList<SavedFilter> _filters = [];
@@ -48,12 +49,6 @@ public sealed partial class LogTablePane
     private bool _focusActiveOnNextRender;
     private string _headerName = string.Empty;
     private IReadOnlyList<ResolvedEvent>? _lastIndexedDisplayedEvents;
-    // View-local cursor: the row that is the moving end of a range selection within the
-    // current table. May briefly diverge from _selectedEvent during local keyboard nav
-    // (advanced before the dispatch round-trip) and after RebuildRowMaps rebinds it
-    // to the equivalent row in a freshly built DisplayedEvents list. Defaults to the
-    // same row as _selectionAnchor for single-row selections.
-    private ResolvedEvent? _localCursor;
     private LogTableState _logTableState = null!;
     private int _pageSize = DefaultPageSize;
     private ColumnName[] _previousEnabledColumns = [];
@@ -64,12 +59,12 @@ public sealed partial class LogTablePane
     private ResolvedEvent? _selectedEvent;
     private ImmutableList<ResolvedEvent> _selectedEvents = [];
     private HashSet<ResolvedEvent> _selectedSet = new(ReferenceEqualityComparer.Instance);
-    // The fixed end of a range selection - set on plain click, Ctrl+Click,
-    // and any keyboard nav that establishes a single selection. Reused for
-    // Shift+Click and Shift+Arrow to compute the range.
     private ResolvedEvent? _selectionAnchor;
     private IJSObjectReference? _tableModule;
     private TimeZoneInfo _timeZoneSettings = null!;
+
+    private ResolvedEvent? ActiveEvent =>
+        _cursor is { Kind: TableRowKind.Event, Event: { } @event } ? @event : null;
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
@@ -138,8 +133,6 @@ public sealed partial class LogTablePane
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Reinitialize JS when columns change (add/remove/reorder). This
-        // ensures resize dividers and event listeners target the current DOM.
         if (firstRender || !_enabledColumns.SequenceEqual(_previousEnabledColumns))
         {
             _previousEnabledColumns = _enabledColumns.ToArray();
@@ -200,7 +193,7 @@ public sealed partial class LogTablePane
         _currentTable = _logTableState.EventTables.FirstOrDefault(x => x.Id == _logTableState.ActiveEventLogId);
         _enabledColumns = GetOrderedEnabledColumns();
         _selectedEvent = SelectedEvent.Value;
-        _localCursor = _selectedEvent;
+        SetCursorEvent(_selectedEvent);
         _selectedEvents = SelectedEvents.Value;
         _selectedSet = new HashSet<ResolvedEvent>(_selectedEvents, ReferenceEqualityComparer.Instance);
         var initialPaneState = FilterPaneState.Value;
@@ -218,15 +211,14 @@ public sealed partial class LogTablePane
 
     protected override bool ShouldRender()
     {
-        // Snapshot once so the short-circuit check and the Property assignment
-        // below see the same reference even if Fluxor publishes a new state
-        // mid-method.
         var currentPaneState = FilterPaneState.Value;
         var currentFilters = currentPaneState.Filters;
         bool filtersChanged = !ReferenceEquals(currentFilters, _filters);
         bool selectedEventChanged = !ReferenceEquals(SelectedEvent.Value, _selectedEvent);
 
-        if (ReferenceEquals(LogTableState.Value, _logTableState) &&
+        // Also render on a pending focus move, which changes no Fluxor state.
+        if (!_focusActiveOnNextRender &&
+            ReferenceEquals(LogTableState.Value, _logTableState) &&
             ReferenceEquals(SelectedEvents.Value, _selectedEvents) &&
             !selectedEventChanged &&
             !filtersChanged &&
@@ -242,22 +234,14 @@ public sealed partial class LogTablePane
         if (selectionChanged)
         {
             _selectedEvents = SelectedEvents.Value;
-            // Reference equality is intentional. Even though ResolvedEvent is
-            // now a fully immutable record (no mutating ResolveXml() workaround),
-            // value-equality requires hashing every string Property on every selection
-            // mutation. Reference equality keeps selection bookkeeping O(1) and
-            // also avoids any chance that two distinct event instances that happen
-            // to be value-equal would collapse into a single selected row.
+            // Reference equality, not value: value-equality would hash strings per change.
             _selectedSet = new HashSet<ResolvedEvent>(_selectedEvents, ReferenceEqualityComparer.Instance);
         }
 
         if (selectedEventChanged)
         {
             _selectedEvent = SelectedEvent.Value;
-            // Reconcile the local cursor with the store. Without this, store-side
-            // updates (reload restore, close-log clearing) would not propagate to
-            // the keyboard-nav cursor.
-            _localCursor = _selectedEvent;
+            SetCursorEvent(_selectedEvent);
         }
 
         if (filtersChanged)
@@ -303,9 +287,7 @@ public sealed partial class LogTablePane
         {
             if (ReferenceEquals(evt, candidate)) { return evt; }
 
-            // Skip key-based matching when either side has no RecordId -
-            // null == null is true for nullable longs, which would falsely
-            // collapse distinct error-read events that share TimeCreated.
+            // Skip null RecordId: null == null would merge distinct error-read events.
             if (evt.RecordId is null || candidate.RecordId is null) { continue; }
 
             if (evt.RecordId == candidate.RecordId &&
@@ -317,6 +299,22 @@ public sealed partial class LogTablePane
         }
 
         return null;
+    }
+
+    private void ApplyNavSelection(IReadOnlyList<ResolvedEvent> displayedEvents, ResolvedEvent targetEvent, bool shift)
+    {
+        if (shift)
+        {
+            _selectionAnchor ??= ActiveEvent ?? targetEvent;
+            SetCursorEvent(targetEvent);
+            DispatchSetSelection(BuildRange(displayedEvents, _selectionAnchor, targetEvent), targetEvent);
+        }
+        else
+        {
+            _selectionAnchor = targetEvent;
+            SetCursorEvent(targetEvent);
+            DispatchSetSelection([targetEvent], targetEvent);
+        }
     }
 
     private void ApplySelectedFilter(ResolvedEvent selectedEvent, EventProperty property, bool exclude)
@@ -361,8 +359,6 @@ public sealed partial class LogTablePane
         ResolvedEvent anchor,
         ResolvedEvent selected)
     {
-        // O(1) lookups via _rowIndexMap; fall back to a linear scan only if
-        // the map is stale (e.g., during a render between table rebuilds).
         if (!_rowIndexMap.TryGetValue(anchor, out int anchorIndex)) { anchorIndex = -1; }
 
         if (!_rowIndexMap.TryGetValue(selected, out int activeIndex)) { activeIndex = -1; }
@@ -395,10 +391,6 @@ public sealed partial class LogTablePane
 
     private void DispatchSetSelection(IReadOnlyList<ResolvedEvent> events, ResolvedEvent? selected)
     {
-        // Sort the selection by current row-index for events in this table; events
-        // belonging to other open logs (not in _rowIndexMap) preserve their existing
-        // relative order at the tail. De-dupe by reference identity throughout so
-        // SetSelectedEvents never has to re-process duplicates.
         var seen = new HashSet<ResolvedEvent>(ReferenceEqualityComparer.Instance);
         List<(ResolvedEvent Event, int Index)> inTable = new(events.Count);
         List<ResolvedEvent> outOfTable = [];
@@ -430,38 +422,20 @@ public sealed partial class LogTablePane
 
     private async Task FocusActiveRow()
     {
-        if (_localCursor is null) { return; }
+        int visibleRow = ResolveCursorVisibleRow();
 
-        if (!_rowIndexMap.TryGetValue(_localCursor, out int index)) { return; }
+        // A negative index would target aria-rowindex=1 (the header row).
+        if (visibleRow < 0) { return; }
 
         try
         {
-            if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("focusEventTableRow", index); }
+            if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("focusEventTableRow", visibleRow); }
         }
         catch (JSDisconnectedException) { /* Circuit gone - focus best-effort during teardown. */ }
         catch (Exception e)
         {
             TraceLogger.Warning($"Failed to focus active table row: {e}");
         }
-    }
-
-    private int GetActiveIndex(IReadOnlyList<ResolvedEvent> displayedEvents)
-    {
-        if (_localCursor is not null && _rowIndexMap.TryGetValue(_localCursor, out int idx))
-        {
-            return idx;
-        }
-
-        // Fall back to last selected; without that, anchor on the first row
-        // so the first ArrowDown selects the second row, not nothing.
-        var fallback = _selectedEvents.LastOrDefault();
-
-        if (fallback is not null && _rowIndexMap.TryGetValue(fallback, out int fallbackIndex))
-        {
-            return fallbackIndex;
-        }
-
-        return displayedEvents.Count > 0 ? 0 : -1;
     }
 
     private int GetAriaRowCount() => (_rowView?.Count ?? _activeDisplayedEvents.Count) + 1;
@@ -471,6 +445,24 @@ public sealed partial class LogTablePane
 
     private string GetCss(ResolvedEvent @event) =>
         _selectedSet.Contains(@event) ? "table-row selected" : "table-row";
+
+    private int GetCurrentVisibleRow(IReadOnlyList<ResolvedEvent> displayedEvents)
+    {
+        int cursorRow = ResolveCursorVisibleRow();
+
+        if (cursorRow >= 0) { return cursorRow; }
+
+        var fallback = _selectedEvents.LastOrDefault();
+
+        if (fallback is not null && _rowIndexMap.TryGetValue(fallback, out int fallbackIndex))
+        {
+            return _rowView?.VisibleRowForEvent(fallbackIndex) ?? fallbackIndex;
+        }
+
+        int count = _rowView?.Count ?? displayedEvents.Count;
+
+        return count > 0 ? 0 : -1;
+    }
 
     private string GetDateColumnHeader() =>
         Settings.TimeZoneInfo.Equals(TimeZoneInfo.Local) ?
@@ -507,8 +499,6 @@ public sealed partial class LogTablePane
 
     private string? GetHighlight(ResolvedEvent @event)
     {
-        // Selected rows show selection styling (.selected wins via !important);
-        // skip cache writes so deselecting doesn't require a refill.
         if (_selectedSet.Contains(@event)) { return null; }
 
         if (_highlightCache.TryGetValue(@event, out var cached)) { return cached; }
@@ -538,8 +528,6 @@ public sealed partial class LogTablePane
 
         if (_logTableState.ColumnOrder.IsEmpty)
         {
-            // Use ColumnDefaults.ColumnOrder for a deterministic fallback rather than
-            // HashSet iteration order, which is not guaranteed.
             return ColumnDefaults.ColumnOrder.Where(enabledSet.Contains).ToArray();
         }
 
@@ -564,18 +552,12 @@ public sealed partial class LogTablePane
         return (index - _rowView.GroupForEvent(index).StartIndex) % 2;
     }
 
-    private void HandleGroupHeaderKeyDown(KeyboardEventArgs args, string groupKey)
-    {
-        if (args.Key == "Enter") { ToggleGroupCollapsed(groupKey); }
-    }
-
     private async Task HandleKeyDown(KeyboardEventArgs args)
     {
         var displayedEvents = _activeDisplayedEvents;
 
         if (displayedEvents.Count == 0) { return; }
 
-        // Ctrl+C copies the active selection regardless of focused row.
         if (args is { CtrlKey: true, Code: "KeyC" })
         {
             await ClipboardService.CopySelectedEvent();
@@ -583,81 +565,160 @@ public sealed partial class LogTablePane
             return;
         }
 
-        // Ctrl+A: select all displayed events. Anchor=first, active=last.
         if (args is { CtrlKey: true, Code: "KeyA" })
         {
+            var last = displayedEvents[^1];
             _selectionAnchor = displayedEvents[0];
-            _localCursor = displayedEvents[^1];
-            DispatchSetSelection(displayedEvents, _localCursor);
+            SetCursorEvent(last);
+            DispatchSetSelection(displayedEvents, last);
 
             return;
         }
 
-        // Escape: clear selection entirely.
         if (args.Code == "Escape")
         {
             _selectionAnchor = null;
-            _localCursor = null;
+            SetCursor(null);
             DispatchSetSelection([], null);
 
             return;
         }
 
-        // Navigation keys: ArrowUp/Down, Home/End, PageUp/Down.
-        int currentIndex = GetActiveIndex(displayedEvents);
-        int targetIndex;
+        if (_rowView is not null)
+        {
+            if (args.Code is "ArrowLeft")
+            {
+                HandleTreegridLeft();
+
+                return;
+            }
+
+            if (args.Code is "ArrowRight")
+            {
+                HandleTreegridRight();
+
+                return;
+            }
+
+            if (args.Key is "Enter")
+            {
+                if (_cursor is { Kind: TableRowKind.Header, GroupKey: { } enterKey })
+                {
+                    ToggleGroupCollapsed(enterKey);
+                    _focusActiveOnNextRender = true;
+                }
+
+                return;
+            }
+        }
+
+        int count = _rowView?.Count ?? displayedEvents.Count;
+        int currentRow = GetCurrentVisibleRow(displayedEvents);
+        int targetRow;
+        int scanDirection;
 
         switch (args.Code)
         {
             case "ArrowUp":
-                targetIndex = Math.Max(0, currentIndex - 1);
+                targetRow = Math.Max(0, currentRow - 1);
+                scanDirection = -1;
                 break;
             case "ArrowDown":
-                targetIndex = Math.Min(displayedEvents.Count - 1, currentIndex + 1);
+                targetRow = Math.Min(count - 1, currentRow + 1);
+                scanDirection = 1;
                 break;
             case "PageUp":
             case "PageDown":
-                // Refresh page size on each press so window/splitter resizes
-                // don't leave the cached value stale for the rest of the
-                // session.
                 int liveStep = await TryRefreshPageSize();
                 int step = liveStep > 0 ? liveStep : _pageSize;
 
-                targetIndex = args.Code == "PageUp"
-                    ? Math.Max(0, currentIndex - step)
-                    : Math.Min(displayedEvents.Count - 1, currentIndex + step);
+                if (args.Code == "PageUp")
+                {
+                    targetRow = Math.Max(0, currentRow - step);
+                    scanDirection = -1;
+                }
+                else
+                {
+                    targetRow = Math.Min(count - 1, currentRow + step);
+                    scanDirection = 1;
+                }
+
                 break;
             case "Home":
-                targetIndex = 0;
+                targetRow = 0;
+                scanDirection = 1;
                 break;
             case "End":
-                targetIndex = displayedEvents.Count - 1;
+                targetRow = count - 1;
+                scanDirection = -1;
                 break;
             default:
                 return;
         }
 
-        if (targetIndex == currentIndex && _localCursor is not null) { return; }
+        if (targetRow == currentRow && _cursor is not null) { return; }
 
-        var targetEvent = displayedEvents[targetIndex];
+        if (_rowView is null)
+        {
+            ApplyNavSelection(displayedEvents, displayedEvents[targetRow], args.ShiftKey);
+            _focusActiveOnNextRender = true;
 
-        if (args.ShiftKey)
-        {
-            // Extend the range from the anchor to the new active row. If we
-            // have no anchor (e.g., first navigation into an empty selection),
-            // anchor on the previous active or the new target row.
-            _selectionAnchor ??= _localCursor ?? targetEvent;
-            _localCursor = targetEvent;
-            DispatchSetSelection(BuildRange(displayedEvents, _selectionAnchor, targetEvent), targetEvent);
-        }
-        else
-        {
-            _selectionAnchor = targetEvent;
-            _localCursor = targetEvent;
-            DispatchSetSelection([targetEvent], targetEvent);
+            return;
         }
 
-        _focusActiveOnNextRender = true;
+        NavigateGroupedTo(displayedEvents, targetRow, scanDirection, args.ShiftKey);
+    }
+
+    private void HandleTreegridLeft()
+    {
+        var view = _rowView;
+
+        if (view is null) { return; }
+
+        if (_cursor is { Kind: TableRowKind.Event, Event: { } @event } &&
+            _rowIndexMap.TryGetValue(@event, out int index))
+        {
+            SetCursorHeader(view.GroupForEvent(index).Key);
+            _focusActiveOnNextRender = true;
+
+            return;
+        }
+
+        if (_cursor is { Kind: TableRowKind.Header, GroupKey: { } key } &&
+            view.TryGetGroupByKey(key, out var group) && !group.IsCollapsed)
+        {
+            ToggleGroupCollapsed(key);
+            _focusActiveOnNextRender = true;
+        }
+    }
+
+    private void HandleTreegridRight()
+    {
+        var view = _rowView;
+
+        if (view is null ||
+            _cursor is not { Kind: TableRowKind.Header, GroupKey: { } key } ||
+            !view.TryGetGroupByKey(key, out var group))
+        {
+            return;
+        }
+
+        if (group.IsCollapsed)
+        {
+            ToggleGroupCollapsed(key);
+            _focusActiveOnNextRender = true;
+
+            return;
+        }
+
+        if (group.EventCount > 0)
+        {
+            var first = _activeDisplayedEvents[group.StartIndex];
+            _selectionAnchor = first;
+            SetCursorEvent(first);
+            DispatchSetSelection([first], first);
+            _focusActiveOnNextRender = true;
+        }
     }
 
     private async Task InitializeTableEventHandlers()
@@ -674,10 +735,6 @@ public sealed partial class LogTablePane
 
     private void InvokeContextMenu(MouseEventArgs args)
     {
-        // Snapshot the currently selected event into the closures so a subsequent selection change
-        // (e.g. user clicks elsewhere while the menu is open) doesn't retarget the action. Note:
-        // selection follows the right-click in LogTablePane, so SelectedEvent.Value matches the row
-        // under the pointer at invocation time.
         var clicked = SelectedEvent.Value;
 
         if (clicked is null) { return; }
@@ -685,8 +742,11 @@ public sealed partial class LogTablePane
         MenuService.OpenAt(args.ClientX, args.ClientY, ShowContextMenuItems(clicked));
     }
 
-    private void InvokeGroupContextMenu(MouseEventArgs args, EventGroup group) =>
+    private void InvokeGroupContextMenu(MouseEventArgs args, EventGroup group)
+    {
+        SetCursorHeader(group.Key);
         MenuService.OpenAt(args.ClientX, args.ClientY, ShowGroupContextMenuItems(group));
+    }
 
     private void InvokeTableColumnMenu(MouseEventArgs args) =>
         MenuService.OpenAt(args.ClientX, args.ClientY, ShowColumnMenuItems());
@@ -707,6 +767,73 @@ public sealed partial class LogTablePane
         return false;
     }
 
+    private void NavigateGroupedTo(
+        IReadOnlyList<ResolvedEvent> displayedEvents,
+        int targetRow,
+        int scanDirection,
+        bool shift)
+    {
+        var view = _rowView!;
+        var row = view[targetRow];
+
+        if (row.Kind == TableRowKind.Event)
+        {
+            ApplyNavSelection(displayedEvents, view.EventAt(row), shift);
+            _focusActiveOnNextRender = true;
+
+            return;
+        }
+
+        if (!shift)
+        {
+            SetCursorHeader(view.GroupAt(row).Key);
+            _focusActiveOnNextRender = true;
+
+            return;
+        }
+
+        int probe = targetRow;
+
+        while (probe >= 0 && probe < view.Count && view[probe].Kind == TableRowKind.Header)
+        {
+            probe += scanDirection;
+        }
+
+        if (probe < 0 || probe >= view.Count) { return; }
+
+        ApplyNavSelection(displayedEvents, view.EventAt(view[probe]), shift: true);
+        _focusActiveOnNextRender = true;
+    }
+
+    private TableCursor? NearestHeaderCursor(int priorVisibleRow)
+    {
+        var groups = _rowView!.Groups;
+
+        if (groups.Count == 0) { return null; }
+
+        foreach (var group in groups)
+        {
+            if (group.VisibleStart >= priorVisibleRow) { return TableCursor.ForHeader(group.Key); }
+        }
+
+        return TableCursor.ForHeader(groups[^1].Key);
+    }
+
+    // Retype an event in a collapsed group to its header.
+    private TableCursor? NormalizeCursor(TableCursor? cursor)
+    {
+        if (_rowView is { } view &&
+            cursor is { Kind: TableRowKind.Event, Event: { } @event } &&
+            _rowIndexMap.TryGetValue(@event, out int index))
+        {
+            var group = view.GroupForEvent(index);
+
+            if (group.IsCollapsed) { return TableCursor.ForHeader(group.Key); }
+        }
+
+        return cursor;
+    }
+
     private async void OnSetActiveTable(SetActiveTableAction action)
     {
         try
@@ -725,8 +852,22 @@ public sealed partial class LogTablePane
 
         if (state.GroupBy is not { } groupBy)
         {
+            int firstEventIndex = -1;
+
+            if (_rowView is { } priorView &&
+                _cursor is { Kind: TableRowKind.Header, GroupKey: { } headerKey } &&
+                priorView.TryGetGroupByKey(headerKey, out var priorGroup) && priorGroup.EventCount > 0)
+            {
+                firstEventIndex = priorGroup.StartIndex;
+            }
+
             _rowView = null;
             _rowViewSnapshot = default;
+
+            if (firstEventIndex >= 0 && firstEventIndex < displayedEvents.Count)
+            {
+                SetCursorEvent(displayedEvents[firstEventIndex]);
+            }
 
             return;
         }
@@ -736,8 +877,12 @@ public sealed partial class LogTablePane
 
         if (_rowView is not null && _rowViewSnapshot.Equals(snapshot)) { return; }
 
+        int priorHeaderRow = _cursor is { Kind: TableRowKind.Header } ? ResolveCursorVisibleRow() : -1;
+
         _rowViewSnapshot = snapshot;
         _rowView = GroupedRowView.Build(displayedEvents, groupBy, state.IsGroupCollapsed);
+
+        ReconcileGroupedCursor(priorHeaderRow);
     }
 
     private void RebuildRowMaps()
@@ -749,14 +894,12 @@ public sealed partial class LogTablePane
         {
             _lastIndexedDisplayedEvents = displayedEvents;
             _rowIndexMap = new Dictionary<ResolvedEvent, int>(displayedEvents.Count, ReferenceEqualityComparer.Instance);
-            // New event-list reference means stored ResolvedEvent instances
-            // are stale; clearing prevents memory growth across log reloads.
             _highlightCache.Clear();
 
             if (displayedEvents.Count == 0)
             {
                 _selectionAnchor = null;
-                _localCursor = null;
+                _cursor = null;
             }
             else
             {
@@ -765,17 +908,14 @@ public sealed partial class LogTablePane
                     _rowIndexMap[displayedEvents[i]] = i;
                 }
 
-                // Re-resolve anchor/active by stable key when DisplayedEvents has
-                // been replaced (sort/filter/reload). Reference equality alone would
-                // drop them on every list rebuild even when the same logical event
-                // is still visible.
                 _selectionAnchor = ResolveByKey(displayedEvents, _selectionAnchor);
-                _localCursor = ResolveByKey(displayedEvents, _localCursor);
 
-                // Detect when the existing selection no longer matches sort order so
-                // OnAfterRenderAsync can dispatch a re-sorted SetSelectedEvents.
-                // Events outside the current displayed table preserve their relative
-                // position and never trigger a re-sort by themselves.
+                if (_cursor is { Kind: TableRowKind.Event, Event: { } cursorEvent })
+                {
+                    var resolved = ResolveByKey(displayedEvents, cursorEvent);
+                    _cursor = resolved is null ? null : TableCursor.ForEvent(resolved);
+                }
+
                 if (IsSelectionOutOfSortOrder(_selectedEvents))
                 {
                     _resortSelectionOnNextRender = true;
@@ -783,10 +923,34 @@ public sealed partial class LogTablePane
             }
         }
 
-        // The grouped row-view rebuilds on any grouping-state change, including
-        // collapse toggles that keep the same DisplayedEvents reference (so the
-        // events-ref guard above would skip them).
+        // Outside the events-ref guard: collapse toggles keep the same reference.
         RebuildGroupedRowView(displayedEvents);
+    }
+
+    private void ReconcileGroupedCursor(int priorHeaderRow)
+    {
+        if (_rowView is not { } view || _cursor is not { } cursor) { return; }
+
+        if (cursor is { Kind: TableRowKind.Event, Event: { } @event })
+        {
+            if (_rowIndexMap.TryGetValue(@event, out int index))
+            {
+                var group = view.GroupForEvent(index);
+
+                if (group.IsCollapsed) { _cursor = TableCursor.ForHeader(group.Key); }
+            }
+            else
+            {
+                _cursor = null;
+            }
+
+            return;
+        }
+
+        if (cursor is { Kind: TableRowKind.Header, GroupKey: { } key } && !view.TryGetGroupByKey(key, out _))
+        {
+            _cursor = NearestHeaderCursor(priorHeaderRow);
+        }
     }
 
     private async void RescrollToSelected()
@@ -840,21 +1004,30 @@ public sealed partial class LogTablePane
         return result;
     }
 
+    private int ResolveCursorVisibleRow()
+    {
+        if (_cursor is { Kind: TableRowKind.Header, GroupKey: { } key })
+        {
+            return _rowView?.VisibleRowForHeader(key) ?? -1;
+        }
+
+        if (_cursor is { Kind: TableRowKind.Event, Event: { } @event } &&
+            _rowIndexMap.TryGetValue(@event, out int index))
+        {
+            return _rowView?.VisibleRowForEvent(index) ?? index;
+        }
+
+        return -1;
+    }
+
     private void ResortSelectionForCurrentTable()
     {
-        // Re-publish the current selection in the new sort order. The dispatch
-        // is idempotent - ReduceSetSelectedEvents short-circuits when both the
-        // selection and active event are unchanged by reference, so this is
-        // safe to call after every DisplayedEvents reference change.
-        DispatchSetSelection(_selectedEvents, _localCursor ?? _selectedEvent);
+        DispatchSetSelection(_selectedEvents, ActiveEvent ?? _selectedEvent);
     }
 
     private async Task ScrollToSelectedEvent()
     {
-        // Target the active event (focused row) rather than the last selected
-        // event - selection is now in sort order, so "last in selection" no
-        // longer corresponds to "the row the user is interacting with".
-        var target = _localCursor ?? _selectedEvent ?? _selectedEvents.LastOrDefault();
+        var target = ActiveEvent ?? _selectedEvent ?? _selectedEvents.LastOrDefault();
 
         if (target is null) { return; }
 
@@ -862,12 +1035,7 @@ public sealed partial class LogTablePane
 
         if (displayedEvents.Count == 0) { return; }
 
-        // Match on OwningLog (the per-source identifier - file path for
-        // exported logs, channel name for live logs) in addition to LogName
-        // and RecordId so we don't scroll to a value-equal row from a
-        // different open log when multiple sources share the same channel
-        // name and overlapping record-id ranges. Single pass over the list
-        // returns both the row and its index without re-scanning via IndexOf.
+        // Match OwningLog too so overlapping logs don't cross-match on RecordId.
         for (var index = 0; index < displayedEvents.Count; index++)
         {
             var candidate = displayedEvents[index];
@@ -879,7 +1047,9 @@ public sealed partial class LogTablePane
                 continue;
             }
 
-            if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("scrollToRow", index); }
+            int targetRow = _rowView?.VisibleRowForEvent(index) ?? index;
+
+            if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("scrollToRow", targetRow); }
 
             return;
         }
@@ -892,26 +1062,20 @@ public sealed partial class LogTablePane
         switch (args)
         {
             case { ShiftKey: true } when displayedEvents.Count > 0:
-                // Shift+Click: range from anchor to clicked. Anchor stays put.
-                // Without an anchor (first interaction), treat as a plain
-                // click so we have something to extend from on the next click.
                 if (_selectionAnchor is null)
                 {
                     _selectionAnchor = @event;
-                    _localCursor = @event;
+                    SetCursorEvent(@event);
                     DispatchSetSelection([@event], @event);
 
                     return;
                 }
 
-                _localCursor = @event;
+                SetCursorEvent(@event);
                 var range = BuildRange(displayedEvents, _selectionAnchor, @event);
 
                 if (args.CtrlKey)
                 {
-                    // Ctrl+Shift+Click: additive range. Merge existing
-                    // selection with the new range. Dedupe by reference is
-                    // handled centrally inside DispatchSetSelection.
                     var merged = new List<ResolvedEvent>(_selectedEvents.Count + range.Count);
                     merged.AddRange(_selectedEvents);
                     merged.AddRange(range);
@@ -925,11 +1089,8 @@ public sealed partial class LogTablePane
                 return;
 
             case { CtrlKey: true }:
-                // Ctrl+Click toggles a single row and moves the anchor to it.
-                // Active stays on the clicked row even if it was deselected
-                // (Explorer-style focus semantics).
                 _selectionAnchor = @event;
-                _localCursor = @event;
+                SetCursorEvent(@event);
 
                 if (_selectedSet.Contains(@event))
                 {
@@ -953,22 +1114,16 @@ public sealed partial class LogTablePane
                 return;
 
             default:
-                // Right-click on a row that's already part of a multi-selection
-                // should preserve the selection and only move focus to the
-                // clicked row, matching Windows Explorer behavior so the
-                // context menu can act on the existing selection. Left/middle
-                // clicks (and right-clicks on a non-selected row) replace the
-                // selection with just the clicked row.
                 if (args.Button == 2 && _selectedSet.Contains(@event))
                 {
-                    _localCursor = @event;
+                    SetCursorEvent(@event);
                     DispatchSetSelection(_selectedEvents, @event);
 
                     return;
                 }
 
                 _selectionAnchor = @event;
-                _localCursor = @event;
+                SetCursorEvent(@event);
                 DispatchSetSelection([@event], @event);
 
                 return;
@@ -992,7 +1147,7 @@ public sealed partial class LogTablePane
 
         var active = members[0];
         _selectionAnchor = active;
-        _localCursor = active;
+        SetCursorEvent(active);
         DispatchSetSelection(members, active);
     }
 
@@ -1002,6 +1157,13 @@ public sealed partial class LogTablePane
 
         SelectGroup(group);
     }
+
+    private void SetCursor(TableCursor? cursor) => _cursor = NormalizeCursor(cursor);
+
+    private void SetCursorEvent(ResolvedEvent? @event) =>
+        SetCursor(@event is null ? null : TableCursor.ForEvent(@event));
+
+    private void SetCursorHeader(string groupKey) => SetCursor(TableCursor.ForHeader(groupKey));
 
     private void SetGroupCollapsed(string key, bool collapse)
     {

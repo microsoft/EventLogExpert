@@ -34,6 +34,22 @@ The menu bar follows WAI-ARIA menubar conventions. Once a menu-bar button has fo
 
 Hovering a different top-level menu while a menu is open switches to that menu — same as Win32 menubars.
 
+### Grouped event table
+
+When the event table is [grouped](Viewing-Events.md#grouping) it behaves as a tree grid. Alongside the normal selection keys:
+
+| Key | Action |
+| --- | --- |
+| `ArrowUp` / `ArrowDown` | Move through visible rows, stopping on group headers as well as events. Landing on an event selects it; landing on a header only moves focus, leaving the current selection unchanged. |
+| `ArrowLeft` | On an event, move focus to its group header. On an expanded header, collapse the group. |
+| `ArrowRight` | On a collapsed header, expand the group. On an expanded header, move to and select its first event. |
+| `Enter` | Toggle the focused group header between expanded and collapsed. |
+| `Home` / `End` | Move to the first / last visible row, which may be a header (focus only). |
+| `Shift` + `ArrowUp` / `ArrowDown` | Extend the selection to the next / previous event, skipping over headers. A range that spans a collapsed group includes that group's hidden events. |
+| `Ctrl+A` | Select every event in the table, including events inside collapsed groups. |
+
+Flat (ungrouped) tables keep the standard arrow behavior; `ArrowLeft` / `ArrowRight` are not intercepted there.
+
 ### Other shortcuts
 
 | Shortcut | Action |
