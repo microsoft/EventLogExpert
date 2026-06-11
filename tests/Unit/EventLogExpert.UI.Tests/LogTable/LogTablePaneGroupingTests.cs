@@ -551,6 +551,33 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     }
 
     [Fact]
+    public void GroupedByLog_HeaderShowsLogNameNotRepresentativeOwningLog()
+    {
+        var logId = EventLogId.Create();
+        var e1 = LogEvent(1, @"C:\logs\App1.evtx", "Application");
+        var e2 = LogEvent(2, @"C:\logs\App2.evtx", "Application");
+
+        _logTableState.Value.Returns(new LogTableState
+        {
+            ActiveEventLogId = logId,
+            EventTables = ImmutableList.Create(new LogView(logId) { LogName = "Combined", IsCombined = true }),
+            DisplayedEvents = [e1, e2],
+            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(logId, 2),
+            Columns = ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.Log, true),
+            ColumnOrder = ImmutableList.Create(ColumnName.Log),
+            GroupBy = ColumnName.Log,
+            GroupCollapseOverrides = Collapsed()
+        });
+
+        var cut = Render<LogTablePane>();
+        var header = cut.Find("tr.group-header-row");
+
+        Assert.Contains("Application", header.TextContent);
+        Assert.DoesNotContain("App1.evtx", header.TextContent);
+        Assert.DoesNotContain("App2.evtx", header.TextContent);
+    }
+
+    [Fact]
     public void Ungrouped_ArrowDown_SelectsNextEvent()
     {
         _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), Event(1, "Alpha"), Event(2, "Beta")));
@@ -618,6 +645,16 @@ public sealed class LogTablePaneGroupingTests : BunitContext
             Id = id,
             RecordId = id,
             Source = source,
+            TimeCreated = new DateTime(2024, 1, 1, 0, 0, id, DateTimeKind.Utc),
+            Description = $"event {id}"
+        };
+
+    private static ResolvedEvent LogEvent(int id, string owningLog, string logName) =>
+        new(owningLog, LogPathType.Channel)
+        {
+            Id = id,
+            RecordId = id,
+            LogName = logName,
             TimeCreated = new DateTime(2024, 1, 1, 0, 0, id, DateTimeKind.Utc),
             Description = $"event {id}"
         };
