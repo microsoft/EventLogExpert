@@ -7,6 +7,7 @@ using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterEditor;
 
@@ -30,30 +31,48 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>, IDisposable
     {
         get
         {
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var result = new List<CachedFilterOption>();
+            var eligible = FilterLibraryState.Value.Entries
+                .OfType<LibraryEntrySavedFilter>()
+                .Where(e => e.IsFavorite || e.LastUsedUtc is not null);
 
-            var savedFilters = FilterLibraryState.Value.Entries.OfType<LibraryEntrySavedFilter>().ToList();
+            var favorites = new List<(string Value, string SortName, ImmutableList<string> Tags)>();
+            var recents = new List<(string Value, DateTimeOffset LastUsed, ImmutableList<string> Tags)>();
 
-            foreach (var entry in savedFilters
-                .Where(e => e.IsFavorite)
-                .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
+            foreach (var group in eligible.GroupBy(e => e.Filter.ComparisonText, StringComparer.OrdinalIgnoreCase))
             {
-                if (seen.Add(entry.Filter.ComparisonText))
+                var members = group.ToList();
+
+                var tags = members
+                    .SelectMany(e => e.Tags)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)
+                    .ToImmutableList();
+
+                var favoriteNames = members
+                    .Where(e => e.IsFavorite)
+                    .Select(e => e.Name)
+                    .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (favoriteNames.Count > 0)
                 {
-                    result.Add(new CachedFilterOption(entry.Filter.ComparisonText, true));
+                    favorites.Add((group.Key, favoriteNames[0], tags));
+                }
+                else
+                {
+                    recents.Add((group.Key, members.Max(e => e.LastUsedUtc!.Value), tags));
                 }
             }
 
-            foreach (var entry in savedFilters
-                .Where(e => e is { IsFavorite: false, LastUsedUtc: not null })
-                .OrderByDescending(e => e.LastUsedUtc!.Value))
-            {
-                if (seen.Add(entry.Filter.ComparisonText))
-                {
-                    result.Add(new CachedFilterOption(entry.Filter.ComparisonText, false));
-                }
-            }
+            var result = new List<CachedFilterOption>(favorites.Count + recents.Count);
+
+            result.AddRange(favorites
+                .OrderBy(f => f.SortName, StringComparer.OrdinalIgnoreCase)
+                .Select(f => new CachedFilterOption(f.Value, true, f.Tags)));
+
+            result.AddRange(recents
+                .OrderByDescending(r => r.LastUsed)
+                .Select(r => new CachedFilterOption(r.Value, false, r.Tags)));
 
             return result;
         }

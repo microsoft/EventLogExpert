@@ -32,6 +32,7 @@ public sealed partial class FilterPane
     internal bool IsFilterSetPickerVisible;
     internal LibraryEntryId SelectedFilterSetId;
 
+    private readonly List<string> _filterSetTags = [];
     private readonly DateFilter _model = new();
     private readonly List<FilterDraft> _pendingDrafts = [];
     private readonly Dictionary<FilterId, FilterRow?> _rowRefs = new();
@@ -45,6 +46,15 @@ public sealed partial class FilterPane
     private FilterId? _focusTargetAfterRemove;
     private bool _isFilterListVisible;
     private IJSObjectReference? _menuAnchorModule;
+
+    internal IReadOnlyList<string> AvailableFilterSetTags =>
+        AvailableTagsForSets([.. FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>()]);
+
+    internal IReadOnlyList<LibraryEntryFilterSet> VisibleFilterSets =>
+        FilterSetsByTags(
+            [.. FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>()],
+            _filterSetTags,
+            SelectedFilterSetId);
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
@@ -96,6 +106,27 @@ public sealed partial class FilterPane
     [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
+
+    internal static IReadOnlyList<string> AvailableTagsForSets(IReadOnlyList<LibraryEntryFilterSet> sets) =>
+        [.. sets.SelectMany(s => s.Tags).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase)];
+
+    internal static IReadOnlyList<LibraryEntryFilterSet> FilterSetsByTags(
+        IReadOnlyList<LibraryEntryFilterSet> sets,
+        IReadOnlyList<string> selectedTags,
+        LibraryEntryId currentSelection)
+    {
+        var available = AvailableTagsForSets(sets);
+        var effective = selectedTags.Where(t => available.Contains(t, StringComparer.OrdinalIgnoreCase)).ToList();
+
+        return
+        [
+            .. sets
+                .Where(s => effective.Count == 0
+                    || effective.All(t => s.Tags.Contains(t, StringComparer.OrdinalIgnoreCase))
+                    || s.Id.Equals(currentSelection))
+                .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+        ];
+    }
 
     internal void ApplyFilterSetSelection()
     {
@@ -171,6 +202,7 @@ public sealed partial class FilterPane
             return;
         }
 
+        _filterSetTags.Clear();
         IsFilterSetPickerVisible = true;
         SelectedFilterSetId = HasFilterSets
             ? FilterLibraryState.Value.Entries
@@ -199,6 +231,7 @@ public sealed partial class FilterPane
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         PruneStaleRowRefs();
+        PruneStaleFilterSetTags();
 
         if (_focusTargetAfterRemove is { } targetId
             && _rowRefs.TryGetValue(targetId, out var target)
@@ -224,6 +257,7 @@ public sealed partial class FilterPane
             _pendingDrafts.Clear();
             IsFilterSetPickerVisible = false;
             SelectedFilterSetId = default;
+            _filterSetTags.Clear();
         });
 
         SubscribeToAction<SetFilterDateRangeSuccessAction>(action =>
@@ -323,6 +357,7 @@ public sealed partial class FilterPane
     {
         IsFilterSetPickerVisible = false;
         SelectedFilterSetId = default;
+        _filterSetTags.Clear();
     }
 
     private async Task ClearAllFiltersAsync()
@@ -416,6 +451,14 @@ public sealed partial class FilterPane
     private bool IsFocusable(FilterId id) =>
         _rowRefs.TryGetValue(id, out var row) && row is not null && !row.IsEditing;
 
+    private void OnFilterSetTagsChanged(List<string> tags)
+    {
+        if (ReferenceEquals(tags, _filterSetTags)) { return; }
+
+        _filterSetTags.Clear();
+        _filterSetTags.AddRange(tags);
+    }
+
     // Marshaled through the renderer dispatcher because StateChanged may fire from arbitrary threads;
     // re-renders so the chevron's aria-expanded reflects open/close state.
     private void OnMenuServiceStateChanged() => _ = InvokeAsync(StateHasChanged);
@@ -436,6 +479,18 @@ public sealed partial class FilterPane
     }
 
     private Task OpenFilterLibraryAsync() => ModalCoordinator.OpenFilterLibraryAsync();
+
+    private void PruneStaleFilterSetTags()
+    {
+        if (_filterSetTags.Count == 0) { return; }
+
+        var available = AvailableFilterSetTags;
+
+        if (_filterSetTags.RemoveAll(t => !available.Contains(t, StringComparer.OrdinalIgnoreCase)) > 0)
+        {
+            StateHasChanged();
+        }
+    }
 
     private void PruneStaleRowRefs()
     {
