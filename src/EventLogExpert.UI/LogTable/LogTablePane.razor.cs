@@ -482,7 +482,7 @@ public sealed partial class LogTablePane
             ColumnName.Level => representative.Level,
             ColumnName.DateAndTime => representative.TimeCreated.ConvertTimeZone(_timeZoneSettings).ToString(),
             ColumnName.ActivityId => representative.ActivityId?.ToString(),
-            ColumnName.Log => GetLogShortName(representative.OwningLog),
+            ColumnName.Log => representative.LogName,
             ColumnName.ComputerName => representative.ComputerName,
             ColumnName.Source => representative.Source,
             ColumnName.EventId => representative.Id.ToString(),
