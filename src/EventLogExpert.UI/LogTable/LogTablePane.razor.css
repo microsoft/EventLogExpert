@@ -129,6 +129,13 @@ tr {
     background-color: var(--background-darkgray);
 }
 
+/* Header focus ring. outline-offset insets it so border-collapse doesn't clip the <tr>
+   outline in WebView2. */
+.group-header-row:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: -2px;
+}
+
 .group-chevron {
     display: inline-block;
     width: 1rem;
