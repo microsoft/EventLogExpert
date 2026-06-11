@@ -30,7 +30,6 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     private readonly IEventLogCommands _eventLogCommands = Substitute.For<IEventLogCommands>();
     private readonly IState<FilterPaneState> _filterPaneState = Substitute.For<IState<FilterPaneState>>();
     private readonly IHighlightSelector _highlightSelector = Substitute.For<IHighlightSelector>();
-
     private readonly BunitJSModuleInterop _jsModule;
     private readonly ILogTableCommands _logTableCommands = Substitute.For<ILogTableCommands>();
     private readonly IState<LogTableState> _logTableState = Substitute.For<IState<LogTableState>>();
@@ -149,6 +148,22 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     }
 
     [Fact]
+    public void Grouped_ExternalSelectionIntoCollapsedGroup_RetypesCursorWithoutRebuild()
+    {
+        var alpha1 = Event(1, "Alpha");
+        _logTableState.Value.Returns(BuildState(ColumnName.Source, Collapsed("Alpha"), alpha1, Event(2, "Beta")));
+
+        var cut = Render<LogTablePane>();
+
+        _selectedEvent.Value.Returns(alpha1);
+        RaiseStateChanged(cut);
+
+        Press(cut, "ArrowRight");
+
+        _logTableCommands.Received(1).ToggleGroupCollapsed("Alpha");
+    }
+
+    [Fact]
     public async Task Grouped_GroupContextMenu_CollapseAll_DispatchesCommand()
     {
         IReadOnlyList<MenuItem>? items = null;
@@ -195,6 +210,29 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "Enter");
 
         _logTableCommands.Received(1).ToggleGroupCollapsed("Alpha");
+    }
+
+    [Fact]
+    public void Grouped_HeaderGroupVanishes_FallsBackToNearestSurvivingHeader()
+    {
+        var alpha1 = Event(1, "Alpha");
+        var beta2 = Event(2, "Beta");
+        var gamma3 = Event(3, "Gamma");
+        _logTableState.Value.Returns(BuildState(ColumnName.Source, Collapsed(), alpha1, beta2, gamma3));
+
+        var cut = Render<LogTablePane>();
+        Press(cut, "Home");      // header Alpha
+        Press(cut, "ArrowDown"); // event 1
+        Press(cut, "ArrowDown"); // header Beta (cursor on the middle header)
+
+        _logTableState.Value.Returns(BuildState(ColumnName.Source, Collapsed(), alpha1, gamma3));
+        RaiseStateChanged(cut);
+        cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll("tr.group-header-row").Count));
+
+        Press(cut, "Enter");
+
+        _logTableCommands.Received(1).ToggleGroupCollapsed("Gamma");
+        _logTableCommands.DidNotReceive().ToggleGroupCollapsed("Beta");
     }
 
     [Fact]
@@ -462,6 +500,30 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     }
 
     [Fact]
+    public void Grouped_UngroupWithHeaderCursor_ResumesFromFormerGroupsFirstEvent()
+    {
+        var alpha1 = Event(1, "Alpha");
+        var beta2 = Event(2, "Beta");
+        _logTableState.Value.Returns(BuildState(ColumnName.Source, Collapsed(), alpha1, beta2));
+
+        var cut = Render<LogTablePane>();
+        Press(cut, "Home");      // header Alpha
+        Press(cut, "ArrowDown"); // event 1
+        Press(cut, "ArrowDown"); // header Beta (cursor on a non-first header)
+
+        _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), alpha1, beta2));
+        RaiseStateChanged(cut);
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("tr.group-header-row")));
+
+        _eventLogCommands.ClearReceivedCalls();
+        Press(cut, "ArrowUp");
+
+        _eventLogCommands.Received(1).SetSelectedEvents(
+            Arg.Is<IReadOnlyCollection<ResolvedEvent>>(c => c.Count == 1 && c.Contains(alpha1)),
+            Arg.Any<ResolvedEvent?>());
+    }
+
+    [Fact]
     public void Grouped_WhenAllExpanded_RendersEveryEventRow()
     {
         var cut = RenderGrouped(
@@ -572,6 +634,11 @@ public sealed class LogTablePaneGroupingTests : BunitContext
 
         return (int)invocations.Last().Arguments[0]!;
     }
+
+    // Re-render the component against the latest substituted state (after updating a
+    // _logTableState/_selectedEvent return value mid-test).
+    private void RaiseStateChanged(IRenderedComponent<LogTablePane> cut) =>
+        cut.InvokeAsync(() => _logTableState.StateChanged += Raise.Event<EventHandler>(_logTableState, EventArgs.Empty));
 
     private IRenderedComponent<LogTablePane> RenderGrouped(ImmutableHashSet<string> collapsed, params ResolvedEvent[] events)
     {
