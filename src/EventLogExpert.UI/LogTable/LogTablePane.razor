@@ -117,9 +117,8 @@
                             role="row"
                             tabindex="0">
                             <td colspan="@(_enabledColumns.Length + 1)" role="gridcell">
-                                <span class="group-chevron"
-                                    data-collapsed="@group.IsCollapsed.ToString().ToLower()">
-                                    <i class="bi bi-caret-right"></i>
+                                <span class="group-chevron" data-collapsed="@group.IsCollapsed.ToString().ToLower()">
+                                    <i aria-hidden="true" class="bi bi-caret-right"></i>
                                 </span>
                                 <span class="group-name">@GetGroupName():</span>
                                 <span class="group-value">@GetGroupValueText(group)</span>
