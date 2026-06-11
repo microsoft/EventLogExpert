@@ -202,6 +202,14 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     }
 
     [Fact]
+    public void Grouped_HeaderChevronIcon_IsAriaHidden()
+    {
+        var cut = RenderGrouped(Collapsed(), Event(1, "Alpha"));
+
+        Assert.Equal("true", cut.Find("tr.group-header-row .group-chevron i").GetAttribute("aria-hidden"));
+    }
+
+    [Fact]
     public void Grouped_HeaderEnterKey_TogglesCollapse()
     {
         var cut = RenderGrouped(Collapsed(), Event(1, "Alpha"));

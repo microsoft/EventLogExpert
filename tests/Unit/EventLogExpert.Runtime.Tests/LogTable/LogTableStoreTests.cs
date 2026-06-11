@@ -944,6 +944,22 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
+    public void ReduceSetGroupBy_WhenSameColumn_PreservesDirectionAndCollapse()
+    {
+        var state = new LogTableState
+        {
+            GroupBy = ColumnName.Source,
+            IsGroupDescending = true,
+            GroupCollapseOverrides = ImmutableHashSet.Create("kept")
+        };
+
+        var result = Reducers.ReduceSetGroupBy(state, new SetGroupByAction(ColumnName.Source));
+
+        Assert.True(result.IsGroupDescending);
+        Assert.Contains("kept", result.GroupCollapseOverrides);
+    }
+
+    [Fact]
     public void ReduceToggleGroupCollapsed_TogglesKey()
     {
         var collapsed = Reducers.ReduceToggleGroupCollapsed(

@@ -291,8 +291,11 @@ internal sealed class Reducers
         state with { ColumnWidths = state.ColumnWidths.SetItem(action.ColumnName, action.Width) };
 
     [ReducerMethod]
-    public static LogTableState ReduceSetGroupBy(LogTableState state, SetGroupByAction action) =>
-        state with
+    public static LogTableState ReduceSetGroupBy(LogTableState state, SetGroupByAction action)
+    {
+        if (state.GroupBy == action.GroupBy) { return state; }
+
+        return state with
         {
             GroupBy = action.GroupBy,
             IsGroupDescending = false,
@@ -303,6 +306,7 @@ internal sealed class Reducers
                 state.IsDescending,
                 action.GroupBy)
         };
+    }
 
     [ReducerMethod]
     public static LogTableState ReduceSetOrderBy(LogTableState state, SetOrderByAction action) =>
