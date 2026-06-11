@@ -23,17 +23,19 @@ public sealed class MenuBarGroupingTests : BunitContext
     private readonly IMenuActionService _actions = Substitute.For<IMenuActionService>();
     private readonly IStateSelection<EventLogState, bool> _eventLogSelection = Substitute.For<IStateSelection<EventLogState, bool>>();
     private readonly IStateSelection<FilterPaneState, bool> _filterPaneIsEnabled = Substitute.For<IStateSelection<FilterPaneState, bool>>();
-    private readonly IStateSelection<LogTableState, bool> _groupingSelection = Substitute.For<IStateSelection<LogTableState, bool>>();
+    private readonly List<IStateSelection<LogTableState, bool>> _logTableSelections = [];
     private readonly IMenuService _menuService = Substitute.For<IMenuService>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
     private readonly ICurrentVersionProvider _versionProvider = Substitute.For<ICurrentVersionProvider>();
+
+    private LogTableState _logTableState = new();
 
     public MenuBarGroupingTests()
     {
         Services.AddSingleton(_actions);
         Services.AddSingleton(_eventLogSelection);
         Services.AddSingleton(_filterPaneIsEnabled);
-        Services.AddSingleton(_groupingSelection);
+        Services.AddTransient<IStateSelection<LogTableState, bool>>(_ => CreateLogTableSelection());
         Services.AddSingleton(_menuService);
         Services.AddSingleton(_settings);
         Services.AddSingleton(_versionProvider);
@@ -51,13 +53,25 @@ public sealed class MenuBarGroupingTests : BunitContext
     {
         Render<MenuBar>();
 
-        _groupingSelection.Received(2).Select(Arg.Any<Func<LogTableState, bool>>());
+        Assert.Equal(2, _logTableSelections.Count);
+        Assert.All(_logTableSelections, s => s.Received(1).Select(Arg.Any<Func<LogTableState, bool>>()));
     }
 
     [Fact]
-    public async Task View_WhenGrouping_GroupActionsEnabledAndDescendingChecked()
+    public async Task View_WhenGroupingAscending_DescendingEnabledButUnchecked()
     {
-        _groupingSelection.Value.Returns(true);
+        _logTableState = new LogTableState { GroupBy = ColumnName.Source, IsGroupDescending = false };
+
+        var descending = Item(await OpenViewMenu(), "Group Descending");
+
+        Assert.True(descending.IsEnabled);
+        Assert.False(descending.IsChecked);
+    }
+
+    [Fact]
+    public async Task View_WhenGroupingDescending_GroupActionsEnabledAndDescendingChecked()
+    {
+        _logTableState = new LogTableState { GroupBy = ColumnName.Source, IsGroupDescending = true };
 
         var items = await OpenViewMenu();
 
@@ -72,7 +86,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     [Fact]
     public async Task View_WhenNotGrouping_GroupActionsDisabledWithReason()
     {
-        _groupingSelection.Value.Returns(false);
+        _logTableState = new LogTableState { GroupBy = null };
 
         var items = await OpenViewMenu();
 
@@ -86,6 +100,19 @@ public sealed class MenuBarGroupingTests : BunitContext
 
     private static MenuItem Item(IReadOnlyList<MenuItem> items, string label) =>
         items.Single(item => item.Label == label);
+
+    // Distinct substitute per selection; Value applies its own projection to _logTableState.
+    private IStateSelection<LogTableState, bool> CreateLogTableSelection()
+    {
+        var selection = Substitute.For<IStateSelection<LogTableState, bool>>();
+        Func<LogTableState, bool>? selector = null;
+        selection.When(s => s.Select(Arg.Any<Func<LogTableState, bool>>()))
+            .Do(call => selector = call.Arg<Func<LogTableState, bool>>());
+        selection.Value.Returns(_ => selector is not null && selector(_logTableState));
+        _logTableSelections.Add(selection);
+
+        return selection;
+    }
 
     private async Task<IReadOnlyList<MenuItem>> OpenViewMenu()
     {
