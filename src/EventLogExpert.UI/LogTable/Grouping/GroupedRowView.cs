@@ -97,6 +97,8 @@ internal sealed class GroupedRowView : IReadOnlyList<TableRow>, IList<TableRow>
 
     public ResolvedEvent EventAt(TableRow row) => _events[row.EventIndex];
 
+    public ResolvedEvent FirstEventOf(EventGroup group) => _events[group.StartIndex];
+
     public IEnumerator<TableRow> GetEnumerator()
     {
         for (int i = 0; i < Count; i++) { yield return this[i]; }
