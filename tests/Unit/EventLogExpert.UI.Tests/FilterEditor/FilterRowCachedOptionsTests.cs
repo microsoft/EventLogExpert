@@ -67,6 +67,27 @@ public sealed class FilterRowCachedOptionsTests
     }
 
     [Fact]
+    public void CachedOptions_SameTextDifferentTags_UnionsTagsIntoOneOption()
+    {
+        var favNetwork = BuildSavedFilter("Fav", filterText: "Level == 4", isFavorite: true, tags: ["network"]);
+        var recentSecurity = BuildSavedFilter(
+            "Recent",
+            filterText: "Level == 4",
+            isFavorite: false,
+            lastUsed: DateTimeOffset.UtcNow,
+            tags: ["security"]);
+        var row = NewRowWithLibraryEntries(favNetwork, recentSecurity);
+
+        var options = row.CachedOptions;
+
+        Assert.Single(options);
+        Assert.True(options[0].IsFavorite);
+        Assert.Equal(
+            new[] { "network", "security" },
+            options[0].Tags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToArray());
+    }
+
+    [Fact]
     public void CachedOptions_TwoFavorites_OrderedByNameOrdinalIgnoreCase()
     {
         var zebra = BuildSavedFilter("zebra", filterText: "Level == 1", isFavorite: true);
@@ -108,7 +129,8 @@ public sealed class FilterRowCachedOptionsTests
         string name,
         string filterText,
         bool isFavorite,
-        DateTimeOffset? lastUsed = null)
+        DateTimeOffset? lastUsed = null,
+        ImmutableList<string>? tags = null)
     {
         var filter = SavedFilter.TryCreate(filterText);
         Assert.NotNull(filter);
@@ -120,6 +142,7 @@ public sealed class FilterRowCachedOptionsTests
             Filter = filter,
             IsFavorite = isFavorite,
             LastUsedUtc = isFavorite ? null : lastUsed,
+            Tags = tags ?? [],
         };
     }
 

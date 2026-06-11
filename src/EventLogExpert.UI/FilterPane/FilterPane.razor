@@ -156,6 +156,26 @@
             <div class="filter-form flex-row">
                 @if (HasFilterSets)
                 {
+                    @if (AvailableFilterSetTags is { Count: > 0 } setTags)
+                    {
+                        <span>
+                            Tags:
+                            <ValueSelect AriaLabel="Narrow filter sets by tag"
+                                CssClass="input filter-multiselect-dropdown"
+                                EmptyText="All tags"
+                                IsMultiSelect="true"
+                                T="string"
+                                Values="_filterSetTags"
+                                ValuesChanged="OnFilterSetTagsChanged">
+                                <ValueSelectItem ClearItem T="string">All tags</ValueSelectItem>
+                                @foreach (var tag in setTags)
+                                {
+                                    <ValueSelectItem T="string" Value="@tag">@tag</ValueSelectItem>
+                                }
+                            </ValueSelect>
+                        </span>
+                    }
+
                     <span>
                         Filter Set:
                         <ValueSelect AriaLabel="Filter Set"
@@ -164,7 +184,7 @@
                             ToStringFunc="@(GetFilterSetName)"
                             Value="SelectedFilterSetId"
                             ValueChanged="id => SelectedFilterSetId = id">
-                            @foreach (var filterSet in FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
+                            @foreach (var filterSet in VisibleFilterSets)
                             {
                                 <ValueSelectItem T="LibraryEntryId" Value="filterSet.Id">
                                     <span class="filter-set-option-row" title="@FormatFilterSetLabel(filterSet)">

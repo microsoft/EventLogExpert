@@ -13,6 +13,8 @@ namespace EventLogExpert.UI.FilterEditor;
 
 public sealed partial class FilterEditorCore : ComponentBase
 {
+    private readonly List<string> _selectedTags = [];
+
     private FilterRowShell? _shellRef;
 
     [Parameter] public IReadOnlyList<CachedFilterOption>? CachedOptions { get; set; }
@@ -45,11 +47,39 @@ public sealed partial class FilterEditorCore : ComponentBase
 
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
+    private IReadOnlyList<string> AvailableCachedTags =>
+        CachedOptions is null ? [] : AvailableTags(CachedOptions);
+
+    private string CachedEmptyHint =>
+        _selectedTags.Count > 0 ? "No recent filters match the selected tags — clear tags to see all" : "No recent options available here";
+
     private string ErrorMessage { get; set; } = string.Empty;
 
     private FilterDraft? Filter { get; set; }
 
     private bool IsPending => Value is null && PendingDraft is not null;
+
+    private IReadOnlyList<CachedFilterOption> VisibleCachedOptions =>
+        FilterCachedByTags(CachedOptions ?? [], _selectedTags, Filter?.ComparisonText);
+
+    internal static IReadOnlyList<string> AvailableTags(IReadOnlyList<CachedFilterOption> options) =>
+        [.. options.SelectMany(o => o.Tags).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase)];
+
+    internal static IReadOnlyList<CachedFilterOption> FilterCachedByTags(
+        IReadOnlyList<CachedFilterOption> options,
+        IReadOnlyList<string> selectedTags,
+        string? currentSelection)
+    {
+        if (selectedTags.Count == 0) { return options; }
+
+        return
+        [
+            .. options.Where(o =>
+                selectedTags.All(t => o.Tags.Contains(t, StringComparer.OrdinalIgnoreCase))
+                || (!string.IsNullOrEmpty(currentSelection)
+                    && string.Equals(o.Value, currentSelection, StringComparison.OrdinalIgnoreCase)))
+        ];
+    }
 
     internal ValueTask FocusEditAsync() =>
         _shellRef?.FocusEditAsync() ?? ValueTask.CompletedTask;
@@ -71,6 +101,12 @@ public sealed partial class FilterEditorCore : ComponentBase
         if (IsPending)
         {
             Filter ??= PendingDraft;
+        }
+
+        if (_selectedTags.Count > 0 && CachedOptions is not null)
+        {
+            var available = AvailableTags(CachedOptions);
+            _selectedTags.RemoveAll(t => !available.Contains(t, StringComparer.OrdinalIgnoreCase));
         }
 
         base.OnParametersSet();
@@ -136,7 +172,7 @@ public sealed partial class FilterEditorCore : ComponentBase
     {
         foreach (var mode in Enum.GetValues<FilterMode>())
         {
-            if (mode == FilterMode.Cached && CachedOptions is null && filter.Mode != FilterMode.Cached)
+            if (mode == FilterMode.Cached && (CachedOptions is null or { Count: 0 }) && filter.Mode != FilterMode.Cached)
             {
                 continue;
             }
@@ -159,6 +195,14 @@ public sealed partial class FilterEditorCore : ComponentBase
 
         Filter.ComparisonText = value ?? string.Empty;
         ErrorMessage = string.Empty;
+    }
+
+    private void OnSelectedTagsChanged(List<string> tags)
+    {
+        if (ReferenceEquals(tags, _selectedTags)) { return; }
+
+        _selectedTags.Clear();
+        _selectedTags.AddRange(tags);
     }
 
     private async Task RemoveHandler()

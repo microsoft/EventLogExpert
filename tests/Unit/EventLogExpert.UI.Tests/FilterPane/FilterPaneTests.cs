@@ -141,6 +141,52 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public void AvailableTagsForSets_ReturnsDistinctSortedUnion()
+    {
+        var a = BuildFilterSet("A", ["zebra", "alpha"]);
+        var b = BuildFilterSet("B", ["alpha", "mid"]);
+
+        var tags = UI.FilterPane.FilterPane.AvailableTagsForSets([a, b]);
+
+        Assert.Equal(new[] { "alpha", "mid", "zebra" }, tags.ToArray());
+    }
+
+    [Fact]
+    public void FilterSetsByTags_AllSemantics_NarrowsToSetsWithEveryTag()
+    {
+        var both = BuildFilterSet("Both", ["x", "y"]);
+        var onlyX = BuildFilterSet("OnlyX", ["x"]);
+
+        var result = UI.FilterPane.FilterPane.FilterSetsByTags([both, onlyX], ["x", "y"], default);
+
+        Assert.Single(result);
+        Assert.Equal("Both", result[0].Name);
+    }
+
+    [Fact]
+    public void FilterSetsByTags_NoSelectedTags_ReturnsAllSetsOrderedByName()
+    {
+        var zebra = BuildFilterSet("Zebra", ["x"]);
+        var alpha = BuildFilterSet("Alpha", ["y"]);
+
+        var result = UI.FilterPane.FilterPane.FilterSetsByTags([zebra, alpha], [], default);
+
+        Assert.Equal(new[] { "Alpha", "Zebra" }, result.Select(s => s.Name).ToArray());
+    }
+
+    [Fact]
+    public void FilterSetsByTags_PreservesCurrentSelectionEvenWhenExcluded()
+    {
+        var tagged = BuildFilterSet("Tagged", ["x"]);
+        var current = BuildFilterSet("Current", ["other"]);
+
+        var result = UI.FilterPane.FilterPane.FilterSetsByTags([tagged, current], ["x"], current.Id);
+
+        Assert.Contains(result, s => s.Name == "Current");
+        Assert.Contains(result, s => s.Name == "Tagged");
+    }
+
+    [Fact]
     public void GetRecentDisabledReason_WhenEmpty_ReturnsRecentNoneAvailable()
     {
         SetLibraryState(new FilterLibraryState
@@ -284,6 +330,29 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public void PruneStaleFilterSetTags_RemovesTagsNoLongerAvailable()
+    {
+        var tagged = BuildFilterSet("Set", ["keep"]);
+        SetLibraryState(new FilterLibraryState
+        {
+            IsLoaded = true,
+            Entries = ImmutableList.Create<LibraryEntry>(tagged),
+        });
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        var tagsField = (List<string>)typeof(UI.FilterPane.FilterPane)
+            .GetField("_filterSetTags", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(component.Instance)!;
+        tagsField.Add("keep");
+        tagsField.Add("gone");
+
+        component.Render();
+
+        Assert.Contains("keep", tagsField);
+        Assert.DoesNotContain("gone", tagsField);
+    }
+
+    [Fact]
     public void PruneStaleRowRefs_RemovesNullRefForLiveFilter()
     {
         var filter = SavedFilter.TryCreate("Level == 4")!;
@@ -309,12 +378,13 @@ public sealed class FilterPaneTests : BunitContext
         Assert.DoesNotContain(filter.Id, rowRefs.Keys);
     }
 
-    private static LibraryEntryFilterSet BuildFilterSet(string name) =>
+    private static LibraryEntryFilterSet BuildFilterSet(string name, ImmutableList<string>? tags = null) =>
         new()
         {
             Name = name,
             CreatedUtc = DateTimeOffset.UtcNow,
             Filters = ImmutableList<SavedFilter>.Empty,
+            Tags = tags ?? [],
         };
 
     private static LibraryEntrySavedFilter BuildSavedFilter(string name, bool isFavorite = false, DateTimeOffset? lastUsed = null)
