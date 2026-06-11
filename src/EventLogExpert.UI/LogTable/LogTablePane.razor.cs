@@ -852,21 +852,21 @@ public sealed partial class LogTablePane
 
         if (state.GroupBy is not { } groupBy)
         {
-            int firstEventIndex = -1;
+            ResolvedEvent? formerGroupFirstEvent = null;
 
             if (_rowView is { } priorView &&
                 _cursor is { Kind: TableRowKind.Header, GroupKey: { } headerKey } &&
                 priorView.TryGetGroupByKey(headerKey, out var priorGroup) && priorGroup.EventCount > 0)
             {
-                firstEventIndex = priorGroup.StartIndex;
+                formerGroupFirstEvent = priorView.FirstEventOf(priorGroup);
             }
 
             _rowView = null;
             _rowViewSnapshot = default;
 
-            if (firstEventIndex >= 0 && firstEventIndex < displayedEvents.Count)
+            if (formerGroupFirstEvent is not null)
             {
-                SetCursorEvent(displayedEvents[firstEventIndex]);
+                SetCursorEvent(formerGroupFirstEvent);
             }
 
             return;

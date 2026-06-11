@@ -511,12 +511,13 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowDown"); // event 1
         Press(cut, "ArrowDown"); // header Beta (cursor on a non-first header)
 
-        _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), alpha1, beta2));
+        // Ungroup resorts the list (reversed here); a stale index would mispoint.
+        _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), beta2, alpha1));
         RaiseStateChanged(cut);
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("tr.group-header-row")));
 
         _eventLogCommands.ClearReceivedCalls();
-        Press(cut, "ArrowUp");
+        Press(cut, "ArrowDown");
 
         _eventLogCommands.Received(1).SetSelectedEvents(
             Arg.Is<IReadOnlyCollection<ResolvedEvent>>(c => c.Count == 1 && c.Contains(alpha1)),
