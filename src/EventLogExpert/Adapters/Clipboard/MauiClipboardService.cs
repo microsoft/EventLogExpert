@@ -201,7 +201,7 @@ public sealed class MauiClipboardService : IClipboardService
         var enabled = _eventTableColumns.Value;
         var order = _columnOrder.Value;
         var columns = (order.IsEmpty
-                ? enabled.Where(column => column.Value).Select(column => column.Key)
+                ? enabled.Where(column => column.Value).Select(column => column.Key).OrderBy(column => column)
                 : order.Where(column => enabled.TryGetValue(column, out bool isEnabled) && isEnabled))
             .ToList();
 
