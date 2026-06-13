@@ -18,8 +18,13 @@
              tabindex="0">
             @for (int i = 0; i < _enabledColumns.Length; i++)
             {
-                <td aria-colindex="@(i + 1)" role="gridcell">
-                    @switch (_enabledColumns[i])
+                var capturedColumn = _enabledColumns[i];
+                <td aria-colindex="@(i + 1)"
+                    @oncontextmenu="@(args => InvokeCellContextMenu(args, evt, capturedColumn))"
+                    @oncontextmenu:preventDefault="true"
+                    @oncontextmenu:stopPropagation="true"
+                    role="gridcell">
+                    @switch (capturedColumn)
                     {
                         case ColumnName.RecordId: @evt.RecordId break;
                         case ColumnName.Level:
@@ -41,7 +46,13 @@
                 </td>
             }
 
-            <td aria-colindex="@(_enabledColumns.Length + 1)" role="gridcell">@evt.Description</td>
+            <td aria-colindex="@(_enabledColumns.Length + 1)"
+                @oncontextmenu="@(args => InvokeCellContextMenu(args, evt, null))"
+                @oncontextmenu:preventDefault="true"
+                @oncontextmenu:stopPropagation="true"
+                role="gridcell">
+                @evt.Description
+            </td>
         </tr>;
 }
 
