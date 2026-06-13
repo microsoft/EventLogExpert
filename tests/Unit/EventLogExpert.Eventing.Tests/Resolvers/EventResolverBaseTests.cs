@@ -10,6 +10,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Resolution;
 using NSubstitute;
 using System.Collections.Concurrent;
+using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Tests.Resolvers;
 
@@ -3074,6 +3075,36 @@ public sealed class EventResolverBaseTests
             // Assert
             Assert.Equal(testCase.Expected, displayEvent.Level);
         }
+    }
+
+    [Fact]
+    public void ResolveEvent_WithSharedKeywordsAndSid_ShouldInternAcrossEvents()
+    {
+        // Arrange
+        var cache = new EventResolverCache();
+        var resolver = new TestEventResolver(cache, Substitute.For<ITraceLogger>());
+
+        const long auditSuccessKeyword = 0x20000000000000L;
+
+        EventRecord CreateRecord() => new()
+        {
+            ProviderName = "Provider",
+            Id = 1000,
+            LogName = Constants.ApplicationLogName,
+            ComputerName = "Computer",
+            Keywords = auditSuccessKeyword,
+            UserId = new SecurityIdentifier("S-1-5-18")
+        };
+
+        // Act
+        var first = resolver.ResolveEvent(CreateRecord());
+        var second = resolver.ResolveEvent(CreateRecord());
+
+        // Assert
+        Assert.Equal(new[] { "Audit Success" }, first.Keywords);
+        Assert.Same(first.Keywords, second.Keywords);
+        Assert.NotNull(first.UserId);
+        Assert.Same(first.UserId, second.UserId);
     }
 
     [Fact]
