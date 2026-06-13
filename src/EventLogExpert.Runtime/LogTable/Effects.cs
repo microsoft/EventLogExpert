@@ -9,15 +9,19 @@ namespace EventLogExpert.Runtime.LogTable;
 internal sealed class Effects(
     ILogTablePreferencesProvider preferencesProvider,
     IState<LogTableState> logTableState,
-    ILogTableColumnDefaultsProvider columnDefaults)
+    ILogTableColumnDefaultsProvider columnDefaults,
+    IColumnResetMigrator columnResetMigrator)
 {
     private readonly ILogTableColumnDefaultsProvider _columnDefaults = columnDefaults;
+    private readonly IColumnResetMigrator _columnResetMigrator = columnResetMigrator;
     private readonly IState<LogTableState> _logTableState = logTableState;
     private readonly ILogTablePreferencesProvider _preferencesProvider = preferencesProvider;
 
     [EffectMethod(typeof(LoadColumnsAction))]
     public Task HandleLoadColumns(IDispatcher dispatcher)
     {
+        if (_columnResetMigrator.ShouldRunMigration()) { _columnResetMigrator.RunMigration(); }
+
         var columns = new Dictionary<ColumnName, bool>();
         var enabledColumns = _preferencesProvider.EnabledEventTableColumnsPreference;
 

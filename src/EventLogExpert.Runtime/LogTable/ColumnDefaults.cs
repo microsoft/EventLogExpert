@@ -19,6 +19,7 @@ internal sealed class ColumnDefaults : ILogTableColumnDefaultsProvider
 
     private static readonly ImmutableList<ColumnName> s_order =
     [
+        ColumnName.RecordId,
         ColumnName.Level,
         ColumnName.DateAndTime,
         ColumnName.ActivityId,
@@ -35,6 +36,7 @@ internal sealed class ColumnDefaults : ILogTableColumnDefaultsProvider
 
     private static readonly FrozenDictionary<ColumnName, int> s_widths = new Dictionary<ColumnName, int>
     {
+        [ColumnName.RecordId] = 90,
         [ColumnName.Level] = 100,
         [ColumnName.DateAndTime] = 160,
         [ColumnName.ActivityId] = 270,

@@ -12,6 +12,7 @@ public static class ResolvedEventGroupKey
     public static string For(ColumnName column, ResolvedEvent @event) =>
         column switch
         {
+            ColumnName.RecordId => @event.RecordId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             ColumnName.Level => @event.Level ?? string.Empty,
             ColumnName.DateAndTime => @event.TimeCreated.Ticks.ToString(CultureInfo.InvariantCulture),
             ColumnName.ActivityId => @event.ActivityId?.ToString("D", CultureInfo.InvariantCulture) ?? string.Empty,

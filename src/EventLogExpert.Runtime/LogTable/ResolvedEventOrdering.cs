@@ -32,6 +32,8 @@ internal static class ResolvedEventOrdering
         (a, b) => WithTieBreaker(Nullable.Compare(a.ThreadId, b.ThreadId), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByUser =
         (a, b) => WithTieBreaker(string.Compare(a.UserId?.Value, b.UserId?.Value, StringComparison.Ordinal), a, b);
+    private static readonly Comparison<ResolvedEvent> s_ascByRecordId =
+        (a, b) => WithTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByDefault =
         (a, b) => FallbackTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
 
@@ -44,6 +46,7 @@ internal static class ResolvedEventOrdering
     private static readonly Comparison<ResolvedEvent> s_descByLevel = (a, b) => s_ascByLevel(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByLog = (a, b) => s_ascByLog(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByProcessId = (a, b) => s_ascByProcessId(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByRecordId = (a, b) => s_ascByRecordId(b, a);
     private static readonly Comparison<ResolvedEvent> s_descBySource = (a, b) => s_ascBySource(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByTaskCategory = (a, b) => s_ascByTaskCategory(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByThreadId = (a, b) => s_ascByThreadId(b, a);
@@ -66,6 +69,7 @@ internal static class ResolvedEventOrdering
     internal static int CompareColumn(ResolvedEvent a, ResolvedEvent b, ColumnName column) =>
         column switch
         {
+            ColumnName.RecordId => Nullable.Compare(a.RecordId, b.RecordId),
             ColumnName.Level => string.Compare(a.Level ?? string.Empty, b.Level ?? string.Empty, StringComparison.Ordinal),
             ColumnName.DateAndTime => a.TimeCreated.CompareTo(b.TimeCreated),
             ColumnName.ActivityId => Nullable.Compare(a.ActivityId, b.ActivityId),
@@ -85,6 +89,7 @@ internal static class ResolvedEventOrdering
         isDescending
             ? orderBy switch
             {
+                ColumnName.RecordId => s_descByRecordId,
                 ColumnName.Level => s_descByLevel,
                 ColumnName.DateAndTime => s_descByDateAndTime,
                 ColumnName.ActivityId => s_descByActivityId,
@@ -101,6 +106,7 @@ internal static class ResolvedEventOrdering
             }
             : orderBy switch
             {
+                ColumnName.RecordId => s_ascByRecordId,
                 ColumnName.Level => s_ascByLevel,
                 ColumnName.DateAndTime => s_ascByDateAndTime,
                 ColumnName.ActivityId => s_ascByActivityId,
