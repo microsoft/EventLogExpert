@@ -122,6 +122,8 @@ internal static class ResolvedEventOrdering
                 _ => s_ascByDefault
             };
 
+    internal static ColumnName GetEffectiveOrderBy(ColumnName? orderBy) => orderBy ?? ColumnName.DateAndTime;
+
     internal static Comparison<ResolvedEvent> GetGroupedComparer(
         ColumnName groupBy,
         bool isGroupDescending,

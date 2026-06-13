@@ -532,8 +532,7 @@ internal sealed class Reducers
         return filtered.AsReadOnly();
     }
 
-    private static ColumnName GetEffectiveOrderBy(ColumnName? orderBy) =>
-        orderBy ?? ColumnName.DateAndTime;
+    private static ColumnName GetEffectiveOrderBy(ColumnName? orderBy) => ResolvedEventOrdering.GetEffectiveOrderBy(orderBy);
 
     private static ImmutableDictionary<EventLogId, int> IncrementCount(
         ImmutableDictionary<EventLogId, int> counts,
