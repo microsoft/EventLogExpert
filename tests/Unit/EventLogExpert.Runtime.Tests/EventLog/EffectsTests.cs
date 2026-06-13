@@ -1690,6 +1690,7 @@ public sealed class EffectsTests
     {
         var closeCoordinator = new LogCloseCoordinator();
         var concurrencyState = new EventLogConcurrencyState();
+        var coordinator = new PartialLoadCoordinator(dispatcher, Timeout.InfiniteTimeSpan);
 
         var filtering = new FilteringEffects(
             eventLogState,
@@ -1708,12 +1709,14 @@ public sealed class EffectsTests
             databaseService,
             criticalErrorService,
             closeCoordinator,
-            concurrencyState);
+            concurrencyState,
+            coordinator);
 
         var logReload = new LogReloadEffects(
             eventLogState,
             filterService,
-            closeCoordinator);
+            closeCoordinator,
+            coordinator);
 
         var databaseCoordination = new DatabaseCoordinationEffects(
             eventLogState,

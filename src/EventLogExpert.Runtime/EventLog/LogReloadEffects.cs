@@ -13,9 +13,11 @@ namespace EventLogExpert.Runtime.EventLog;
 internal sealed class LogReloadEffects(
     IState<EventLogState> eventLogState,
     IFilterService filterService,
-    LogCloseCoordinator closeCoordinator)
+    LogCloseCoordinator closeCoordinator,
+    PartialLoadCoordinator coordinator)
 {
     private readonly LogCloseCoordinator _closeCoordinator = closeCoordinator;
+    private readonly PartialLoadCoordinator _coordinator = coordinator;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IFilterService _filterService = filterService;
 
@@ -23,6 +25,8 @@ internal sealed class LogReloadEffects(
     public Task HandleLoadEvents(LoadEventsAction action, IDispatcher dispatcher)
     {
         var filteredEvents = _filterService.GetFilteredEvents(action.Events, _eventLogState.Value.AppliedFilter);
+
+        _coordinator.MarkFinalized(action.LogData.Id);
 
         dispatcher.Dispatch(new UpdateTableAction(action.LogData.Id, filteredEvents));
 
@@ -54,7 +58,7 @@ internal sealed class LogReloadEffects(
     {
         var filteredEvents = _filterService.GetFilteredEvents(action.Events, _eventLogState.Value.AppliedFilter);
 
-        dispatcher.Dispatch(new AppendTableEventsAction(action.LogData.Id, filteredEvents));
+        _coordinator.Enqueue(action.LogData.Id, filteredEvents);
 
         return Task.CompletedTask;
     }
