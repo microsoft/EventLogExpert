@@ -395,7 +395,7 @@ public sealed class EffectsTests
         var mockState = Substitute.For<IState<LogTableState>>();
         mockState.Value.Returns(state ?? new LogTableState());
 
-        var effects = new Effects(mockPreferencesProvider, mockState, s_columnDefaults);
+        var effects = new Effects(mockPreferencesProvider, mockState, s_columnDefaults, new NoOpColumnResetMigrator());
         var mockDispatcher = Substitute.For<IDispatcher>();
 
         return (effects, mockDispatcher, mockPreferencesProvider);
