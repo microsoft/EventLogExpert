@@ -20,6 +20,7 @@ namespace EventLogExpert.Adapters.Clipboard;
 
 public sealed class MauiClipboardService : IClipboardService
 {
+    private readonly IStateSelection<LogTableState, ImmutableList<ColumnName>> _columnOrder;
     private readonly IStateSelection<LogTableState, ImmutableDictionary<ColumnName, bool>> _eventTableColumns;
     private readonly IStateSelection<EventLogState, ResolvedEvent?> _selectedEvent;
     private readonly IStateSelection<EventLogState, ImmutableList<ResolvedEvent>> _selectedEvents;
@@ -29,6 +30,7 @@ public sealed class MauiClipboardService : IClipboardService
 
     public MauiClipboardService(
         IStateSelection<LogTableState, ImmutableDictionary<ColumnName, bool>> eventTableColumns,
+        IStateSelection<LogTableState, ImmutableList<ColumnName>> columnOrder,
         IStateSelection<EventLogState, ImmutableList<ResolvedEvent>> selectedEvents,
         IStateSelection<EventLogState, ResolvedEvent?> selectedEvent,
         ISettingsService settings,
@@ -36,6 +38,7 @@ public sealed class MauiClipboardService : IClipboardService
         ITraceLogger traceLogger)
     {
         _eventTableColumns = eventTableColumns;
+        _columnOrder = columnOrder;
         _selectedEvents = selectedEvents;
         _selectedEvent = selectedEvent;
         _settings = settings;
@@ -43,6 +46,7 @@ public sealed class MauiClipboardService : IClipboardService
         _traceLogger = traceLogger;
 
         _eventTableColumns.Select(s => s.Columns);
+        _columnOrder.Select(s => s.ColumnOrder);
         _selectedEvents.Select(s => s.SelectedEvents);
         _selectedEvent.Select(s => s.SelectedEvent);
     }
@@ -77,6 +81,13 @@ public sealed class MauiClipboardService : IClipboardService
             _traceLogger.Error($"{nameof(MauiClipboardService)}.{nameof(CopyTextAsync)}: failed: {ex}");
         }
     }
+
+    private static string EscapeMarkdownCell(string? value) =>
+        (value ?? string.Empty)
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal)
+            .Replace("|", "\\|", StringComparison.Ordinal);
 
     private static string FormatXmlForCopy(string xml)
     {
@@ -185,6 +196,38 @@ public sealed class MauiClipboardService : IClipboardService
         }
     }
 
+    private string BuildMarkdownTable(IReadOnlyList<ResolvedEvent> events)
+    {
+        var enabled = _eventTableColumns.Value;
+        var order = _columnOrder.Value;
+        var columns = (order.IsEmpty
+                ? enabled.Where(column => column.Value).Select(column => column.Key)
+                : order.Where(column => enabled.TryGetValue(column, out bool isEnabled) && isEnabled))
+            .ToList();
+
+        StringBuilder builder = new();
+
+        builder.Append("| ");
+        foreach (var column in columns) { builder.Append(EscapeMarkdownCell(column.ToFullString())).Append(" | "); }
+
+        builder.AppendLine("Description |");
+
+        builder.Append('|');
+        for (int separator = 0; separator <= columns.Count; separator++) { builder.Append(" --- |"); }
+
+        builder.AppendLine();
+
+        foreach (var @event in events)
+        {
+            builder.Append("| ");
+            foreach (var column in columns) { builder.Append(EscapeMarkdownCell(GetColumnText(column, @event))).Append(" | "); }
+
+            builder.Append(EscapeMarkdownCell(@event.Description)).AppendLine(" |");
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
     private string FormatEventForCopy(EventCopyFormat format, ResolvedEvent @event, string xml)
     {
         if (format == EventCopyFormat.Xml)
@@ -199,6 +242,25 @@ public sealed class MauiClipboardService : IClipboardService
         return builder.ToString();
     }
 
+    private string GetColumnText(ColumnName column, ResolvedEvent @event) =>
+        column switch
+        {
+            ColumnName.Level => @event.Level,
+            ColumnName.DateAndTime => @event.TimeCreated.ConvertTimeZone(_settings.TimeZoneInfo).ToString(),
+            ColumnName.ActivityId => @event.ActivityId?.ToString() ?? string.Empty,
+            ColumnName.Log => GetLogShortName(@event.OwningLog),
+            ColumnName.ComputerName => @event.ComputerName,
+            ColumnName.Source => @event.Source,
+            ColumnName.EventId => @event.Id.ToString(),
+            ColumnName.TaskCategory => @event.TaskCategory,
+            ColumnName.Keywords => @event.KeywordsDisplayName,
+            ColumnName.ProcessId => @event.ProcessId?.ToString() ?? string.Empty,
+            ColumnName.ThreadId => @event.ThreadId?.ToString() ?? string.Empty,
+            ColumnName.User => @event.UserId?.ToString() ?? string.Empty,
+            ColumnName.RecordId => @event.RecordId?.ToString() ?? string.Empty,
+            _ => string.Empty
+        };
+
     private async Task<string> GetFormattedEvent(EventCopyFormat? format)
     {
         // Snapshot the selection once. Re-reading _selectedEvents.Value across awaits could see
@@ -208,6 +270,15 @@ public sealed class MauiClipboardService : IClipboardService
         var selected = _selectedEvent.Value;
 
         var resolvedFormat = format ?? _settings.CopyFormat;
+
+        if (resolvedFormat == EventCopyFormat.Markdown)
+        {
+            IReadOnlyList<ResolvedEvent> markdownEvents =
+                events.IsEmpty ? (selected is null ? [] : [selected]) : events;
+
+            return markdownEvents.Count == 0 ? string.Empty : BuildMarkdownTable(markdownEvents);
+        }
+
         bool needsXml = resolvedFormat is EventCopyFormat.Xml or EventCopyFormat.Full;
 
         // Single-event copy: prefer the selected (focused) row so right-click → copy

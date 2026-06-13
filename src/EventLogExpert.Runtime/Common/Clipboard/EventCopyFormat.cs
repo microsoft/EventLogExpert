@@ -8,5 +8,6 @@ public enum EventCopyFormat
     Default,
     Simple,
     Xml,
-    Full
+    Full,
+    Markdown
 }
