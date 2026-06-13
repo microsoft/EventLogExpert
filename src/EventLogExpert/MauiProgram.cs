@@ -7,6 +7,7 @@ using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterLibrary;
+using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using Fluxor;
@@ -71,13 +72,15 @@ public static class MauiProgram
 
         builder.Services.AddFilterLibraryExport();
 
-        if (LegacyMigrationFeature.Enabled || BackslashMigrationFeature.Enabled)
+        if (LegacyMigrationFeature.Enabled || BackslashMigrationFeature.Enabled || ColumnResetMigrationFeature.Enabled)
         {
             builder.Services.AddSingleton<ILegacyPreferences, MauiLegacyPreferencesAdapter>();
         }
 
+        // TODO: Disable this in the next release build
         builder.Services.AddLegacyFilterMigration();
         builder.Services.AddBackslashNameMigration();
+        builder.Services.AddColumnResetMigration();
 
         // Top-level layer registration
         builder.Services.AddEventLogFiltering();

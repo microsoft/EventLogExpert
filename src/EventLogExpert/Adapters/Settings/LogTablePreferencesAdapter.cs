@@ -8,9 +8,9 @@ namespace EventLogExpert.Adapters.Settings;
 
 internal sealed class LogTablePreferencesAdapter : ILogTablePreferencesProvider
 {
-    private const string ColumnOrder = "column-order";
-    private const string ColumnWidths = "column-widths";
-    private const string EnabledEventTableColumns = "enabled-event-table-columns";
+    private const string ColumnOrder = LogTablePreferenceKeys.ColumnOrder;
+    private const string ColumnWidths = LogTablePreferenceKeys.ColumnWidths;
+    private const string EnabledEventTableColumns = LogTablePreferenceKeys.EnabledEventTableColumns;
 
     public IEnumerable<ColumnName> ColumnOrderPreference
     {
