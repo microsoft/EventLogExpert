@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Filtering.Evaluation;
@@ -23,13 +22,14 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
-using FilterMode = EventLogExpert.Filtering.Evaluation.FilterMode;
 
 namespace EventLogExpert.UI.LogTable;
 
 public sealed partial class LogTablePane
 {
     private const int DefaultPageSize = 20;
+    private const int MenuValueMaxLength = 40;
+    private const string NoCellValueReason = "No value in this cell to filter on";
 
     private static readonly HashSet<int> s_warnedUnknownColors = [];
 
@@ -301,6 +301,56 @@ public sealed partial class LogTablePane
         return null;
     }
 
+    private static string TruncateForMenu(string value)
+    {
+        string collapsed = value.ReplaceLineEndings(" ");
+
+        if (collapsed.Length <= MenuValueMaxLength) { return collapsed; }
+
+        int limit = char.IsHighSurrogate(collapsed[MenuValueMaxLength - 1])
+            ? MenuValueMaxLength - 1
+            : MenuValueMaxLength;
+
+        return collapsed[..limit] + "...";
+    }
+
+    private void AppendCellFilterItems(List<MenuItem> items, ResolvedEvent @event, ColumnName? column)
+    {
+        if (column is not { } cellColumn) { return; }
+
+        if (CellFilterBuilder.MapColumn(cellColumn) is not { } property) { return; }
+
+        string columnLabel = cellColumn.ToFullString();
+
+        if (CellFilterBuilder.TryGetDisplayValue(@event, property, out var value))
+        {
+            string shown = TruncateForMenu(value);
+            string verb = property is EventProperty.Keywords ? "has" : "=";
+
+            items.Add(MenuItem.Item(
+                $"Include only where {columnLabel} {verb} '{shown}'",
+                () => ApplySelectedFilter(@event, property, exclude: false)));
+            items.Add(MenuItem.Item(
+                $"Exclude where {columnLabel} {verb} '{shown}'",
+                () => ApplySelectedFilter(@event, property, exclude: true)));
+        }
+        else
+        {
+            items.Add(MenuItem.Item(
+                $"Include only where {columnLabel}",
+                () => { },
+                isEnabled: false,
+                disabledReason: NoCellValueReason));
+            items.Add(MenuItem.Item(
+                $"Exclude where {columnLabel}",
+                () => { },
+                isEnabled: false,
+                disabledReason: NoCellValueReason));
+        }
+
+        items.Add(MenuItem.Separator());
+    }
+
     private void ApplyNavSelection(IReadOnlyList<ResolvedEvent> displayedEvents, ResolvedEvent targetEvent, bool shift)
     {
         if (shift)
@@ -319,39 +369,10 @@ public sealed partial class LogTablePane
 
     private void ApplySelectedFilter(ResolvedEvent selectedEvent, EventProperty property, bool exclude)
     {
-        string filterValue = property switch
+        if (CellFilterBuilder.TryBuild(selectedEvent, property, exclude, out var filter))
         {
-            EventProperty.Id => selectedEvent.Id.ToString(),
-            EventProperty.ActivityId => selectedEvent.ActivityId?.ToString() ?? string.Empty,
-            EventProperty.Level => selectedEvent.Level,
-            EventProperty.Keywords => selectedEvent.KeywordsDisplayName,
-            EventProperty.Source => selectedEvent.Source,
-            EventProperty.TaskCategory => selectedEvent.TaskCategory,
-            _ => string.Empty,
-        };
-
-        var basicFilter = new BasicFilter(
-            new FilterComparison
-            {
-                Property = property,
-                Value = filterValue,
-                Operator = ComparisonOperator.Equals,
-                MatchMode = MatchMode.Single,
-            },
-            []);
-
-        if (!BasicFilterFormatter.TryFormat(basicFilter, out var comparisonString)) { return; }
-
-        var filter = SavedFilter.TryCreate(
-            comparisonString,
-            basicFilter,
-            isExcluded: exclude,
-            isEnabled: true,
-            mode: FilterMode.Basic);
-
-        if (filter is null) { return; }
-
-        FilterPaneCommands.SetFilter(filter);
+            FilterPaneCommands.SetFilter(filter);
+        }
     }
 
     private IReadOnlyList<ResolvedEvent> BuildRange(
@@ -732,6 +753,16 @@ public sealed partial class LogTablePane
             "./_content/EventLogExpert.UI/LogTable/LogTablePane.razor.js");
 
         await _tableModule.InvokeVoidAsync("initializeTableEvents", _dotNetRef);
+    }
+
+    private void InvokeCellContextMenu(MouseEventArgs args, ResolvedEvent @event, ColumnName? column)
+    {
+        var items = new List<MenuItem>();
+
+        AppendCellFilterItems(items, @event, column);
+        items.AddRange(ShowContextMenuItems(@event));
+
+        MenuService.OpenAt(args.ClientX, args.ClientY, items);
     }
 
     private void InvokeContextMenu(MouseEventArgs args)
@@ -1244,8 +1275,12 @@ public sealed partial class LogTablePane
                 FilterPaneCommands.SetFilterDateRange(
                     new DateFilter { After = selectedEvent.TimeCreated })),
             MenuItem.Separator(),
-            MenuItem.SubMenu("Include", ShowEventFieldItems(selectedEvent, false)),
-            MenuItem.SubMenu("Exclude", ShowEventFieldItems(selectedEvent, true)),
+            MenuItem.SubMenu(
+                "More Fields",
+                [
+                    MenuItem.SubMenu("Include", ShowEventFieldItems(selectedEvent, false)),
+                    MenuItem.SubMenu("Exclude", ShowEventFieldItems(selectedEvent, true)),
+                ]),
         ];
     }
 
@@ -1258,9 +1293,13 @@ public sealed partial class LogTablePane
             if (property is EventProperty.Description or EventProperty.Xml) { continue; }
 
             var capturedProperty = property;
+            bool hasValue = CellFilterBuilder.TryGetDisplayValue(selectedEvent, property, out _);
+
             items.Add(MenuItem.Item(
                 property.ToFullString(),
-                () => ApplySelectedFilter(selectedEvent, capturedProperty, exclude)));
+                () => ApplySelectedFilter(selectedEvent, capturedProperty, exclude),
+                isEnabled: hasValue,
+                disabledReason: hasValue ? null : NoCellValueReason));
         }
 
         return items;
