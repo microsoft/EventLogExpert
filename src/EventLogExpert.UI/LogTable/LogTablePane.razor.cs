@@ -479,6 +479,7 @@ public sealed partial class LogTablePane
 
         string? value = _logTableState.GroupBy switch
         {
+            ColumnName.RecordId => representative.RecordId?.ToString(),
             ColumnName.Level => representative.Level,
             ColumnName.DateAndTime => representative.TimeCreated.ConvertTimeZone(_timeZoneSettings).ToString(),
             ColumnName.ActivityId => representative.ActivityId?.ToString(),

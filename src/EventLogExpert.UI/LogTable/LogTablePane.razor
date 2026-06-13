@@ -21,6 +21,7 @@
                 <td aria-colindex="@(i + 1)" role="gridcell">
                     @switch (_enabledColumns[i])
                     {
+                        case ColumnName.RecordId: @evt.RecordId break;
                         case ColumnName.Level:
                             <span aria-hidden="true" class="@GetLevelClass(evt.Level)"></span>
                             @evt.Level
