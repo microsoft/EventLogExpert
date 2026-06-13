@@ -106,6 +106,9 @@ public sealed class MauiClipboardService : IClipboardService
                 {
                     switch (column)
                     {
+                        case ColumnName.RecordId:
+                            builder.Append($"\"{@event.RecordId}\" ");
+                            break;
                         case ColumnName.Level:
                             builder.Append($"\"{@event.Level}\" ");
                             break;

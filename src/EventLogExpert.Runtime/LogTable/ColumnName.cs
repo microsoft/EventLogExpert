@@ -7,6 +7,7 @@ namespace EventLogExpert.Runtime.LogTable;
 
 public enum ColumnName
 {
+    [EnumMember(Value = "Record ID")] RecordId,
     Level,
     [EnumMember(Value = "Date and Time")] DateAndTime,
     [EnumMember(Value = "Activity ID")] ActivityId,

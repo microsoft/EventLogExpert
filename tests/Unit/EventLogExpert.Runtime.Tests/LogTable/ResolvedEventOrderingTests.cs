@@ -715,6 +715,40 @@ public sealed class ResolvedEventOrderingTests
     }
 
     [Fact]
+    public void SortEvents_WhenOrderByRecordId_ShouldSortByRecordId()
+    {
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(recordId: 30),
+            FilterEventBuilder.CreateTestEvent(recordId: 10),
+            FilterEventBuilder.CreateTestEvent(recordId: 20)
+        };
+
+        var result = events.SortEvents(ColumnName.RecordId);
+
+        Assert.Equal(10, result[0].RecordId);
+        Assert.Equal(20, result[1].RecordId);
+        Assert.Equal(30, result[2].RecordId);
+    }
+
+    [Fact]
+    public void SortEvents_WhenOrderByRecordIdDescending_ShouldSortByRecordIdDescending()
+    {
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(recordId: 10),
+            FilterEventBuilder.CreateTestEvent(recordId: 30),
+            FilterEventBuilder.CreateTestEvent(recordId: 20)
+        };
+
+        var result = events.SortEvents(ColumnName.RecordId, true);
+
+        Assert.Equal(30, result[0].RecordId);
+        Assert.Equal(20, result[1].RecordId);
+        Assert.Equal(10, result[2].RecordId);
+    }
+
+    [Fact]
     public void SortEvents_WhenOrderBySource_ShouldSortBySource()
     {
         // Arrange

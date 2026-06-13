@@ -97,6 +97,14 @@ public sealed class ResolvedEventGroupKeyTests
     }
 
     [Fact]
+    public void For_NullRecordId_IsEmptyBucket()
+    {
+        var evt = FilterEventBuilder.CreateTestEvent(recordId: null);
+
+        Assert.Equal(string.Empty, ResolvedEventGroupKey.For(ColumnName.RecordId, evt));
+    }
+
+    [Fact]
     public void For_NullThreadId_IsEmptyBucket()
     {
         var evt = FilterEventBuilder.CreateTestEvent(threadId: null);
@@ -118,6 +126,14 @@ public sealed class ResolvedEventGroupKeyTests
         var evt = FilterEventBuilder.CreateTestEvent(processId: 4096);
 
         Assert.Equal("4096", ResolvedEventGroupKey.For(ColumnName.ProcessId, evt));
+    }
+
+    [Fact]
+    public void For_RecordId_UsesInvariantNumber()
+    {
+        var evt = FilterEventBuilder.CreateTestEvent(recordId: 4096);
+
+        Assert.Equal("4096", ResolvedEventGroupKey.For(ColumnName.RecordId, evt));
     }
 
     [Fact]
