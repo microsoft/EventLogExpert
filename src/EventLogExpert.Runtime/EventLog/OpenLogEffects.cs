@@ -31,7 +31,8 @@ internal sealed class OpenLogEffects(
     IDatabaseService databaseService,
     ICriticalErrorService criticalErrorService,
     LogCloseCoordinator closeCoordinator,
-    EventLogConcurrencyState concurrencyState)
+    EventLogConcurrencyState concurrencyState,
+    PartialLoadCoordinator coordinator)
 {
     private static readonly int s_maxGlobalConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
     private static readonly SemaphoreSlim s_resolutionThrottle = new(s_maxGlobalConcurrency, s_maxGlobalConcurrency);
@@ -39,6 +40,7 @@ internal sealed class OpenLogEffects(
     private readonly ICriticalErrorService _criticalErrorService = criticalErrorService;
     private readonly LogCloseCoordinator _closeCoordinator = closeCoordinator;
     private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
+    private readonly PartialLoadCoordinator _coordinator = coordinator;
     private readonly IDatabaseService _databaseService = databaseService;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly Lock _globalCtsLock = new();
@@ -58,6 +60,8 @@ internal sealed class OpenLogEffects(
     {
         _logger.Trace($"{nameof(HandleCloseAll)} requested ({_eventLogState.Value.ActiveLogs.Count} active logs).");
 
+        _coordinator.DiscardAll();
+
         _concurrencyState.InvalidateInFlightFilters();
         _concurrencyState.InvalidateInFlightReloads();
 
@@ -75,6 +79,8 @@ internal sealed class OpenLogEffects(
     public async Task HandleCloseLog(CloseLogAction action, IDispatcher dispatcher)
     {
         _logger.Trace($"{nameof(HandleCloseLog)} requested for '{action.LogName}' (id: {action.LogId}).");
+
+        _coordinator.Discard(action.LogId);
 
         try
         {
