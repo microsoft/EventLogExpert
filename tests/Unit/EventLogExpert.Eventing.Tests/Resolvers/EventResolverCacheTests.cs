@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Resolvers;
+using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Tests.Resolvers;
 
@@ -181,6 +182,187 @@ public sealed class EventResolverCacheTests
 
         // Assert
         Assert.Equal(input, result);
+    }
+
+    [Fact]
+    public void GetOrAddKeywords_AfterClearAll_ShouldReturnNewReference()
+    {
+        var cache = new EventResolverCache();
+        var before = cache.GetOrAddKeywords(new List<string> { "Audit Success" });
+
+        cache.ClearAll();
+
+        var after = cache.GetOrAddKeywords(new List<string> { "Audit Success" });
+
+        Assert.NotSame(before, after);
+        Assert.Same(after, cache.GetOrAddKeywords(new List<string> { "Audit Success" }));
+    }
+
+    [Fact]
+    public void GetOrAddKeywords_AfterMutatingOriginalInput_ShouldNotCorruptCache()
+    {
+        var cache = new EventResolverCache();
+        var input = new List<string> { "Alpha", "Beta" };
+
+        var firstResult = cache.GetOrAddKeywords(input);
+        input.Add("Gamma");
+
+        var secondResult = cache.GetOrAddKeywords(new List<string> { "Alpha", "Beta" });
+
+        Assert.Same(firstResult, secondResult);
+        Assert.Equal(new[] { "Alpha", "Beta" }, firstResult);
+    }
+
+    [Fact]
+    public void GetOrAddKeywords_ConcurrentCalls_ShouldHandleThreadSafely()
+    {
+        var cache = new EventResolverCache();
+        var results = new IReadOnlyList<string>[100];
+
+        Parallel.For(0, 100, i =>
+        {
+            results[i] = cache.GetOrAddKeywords(new List<string> { $"Keyword{i % 10}" });
+        });
+
+        for (int key = 0; key < 10; key++)
+        {
+            var expected = results[key];
+            Assert.NotNull(expected);
+
+            for (int occurrence = 1; occurrence < 10; occurrence++)
+            {
+                Assert.Same(expected, results[key + (occurrence * 10)]);
+            }
+        }
+    }
+
+    [Fact]
+    public void GetOrAddKeywords_WithDifferentContent_ShouldReturnDifferentReferences()
+    {
+        var cache = new EventResolverCache();
+
+        var first = cache.GetOrAddKeywords(new List<string> { "Audit Success" });
+        var second = cache.GetOrAddKeywords(new List<string> { "Audit Failure" });
+
+        Assert.NotSame(first, second);
+    }
+
+    [Fact]
+    public void GetOrAddKeywords_WithDifferentOrder_ShouldReturnDifferentReferences()
+    {
+        var cache = new EventResolverCache();
+
+        var first = cache.GetOrAddKeywords(new List<string> { "Audit Success", "Classic" });
+        var second = cache.GetOrAddKeywords(new List<string> { "Classic", "Audit Success" });
+
+        Assert.NotSame(first, second);
+    }
+
+    [Fact]
+    public void GetOrAddKeywords_WithEmptyList_ShouldReturnSharedEmptyInstance()
+    {
+        var cache = new EventResolverCache();
+
+        var first = cache.GetOrAddKeywords(new List<string>());
+        var second = cache.GetOrAddKeywords(Array.Empty<string>());
+
+        Assert.Same(first, second);
+        Assert.Empty(first);
+    }
+
+    [Fact]
+    public void GetOrAddKeywords_WithSameContent_ShouldReturnSameReference()
+    {
+        var cache = new EventResolverCache();
+
+        var first = cache.GetOrAddKeywords(new List<string> { "Audit Success" });
+        var second = cache.GetOrAddKeywords(new List<string> { "Audit Success" });
+
+        Assert.Same(first, second);
+        Assert.Equal(new[] { "Audit Success" }, first);
+    }
+
+    [Fact]
+    public void GetOrAddSid_AfterClearAll_ShouldReturnNewReference()
+    {
+        var cache = new EventResolverCache();
+        var before = cache.GetOrAddSid(new SecurityIdentifier("S-1-5-18"));
+
+        cache.ClearAll();
+
+        var after = cache.GetOrAddSid(new SecurityIdentifier("S-1-5-18"));
+
+        Assert.NotSame(before, after);
+        Assert.Same(after, cache.GetOrAddSid(new SecurityIdentifier("S-1-5-18")));
+    }
+
+    [Fact]
+    public void GetOrAddSid_ConcurrentCalls_ShouldHandleThreadSafely()
+    {
+        var cache = new EventResolverCache();
+        var sids = new[] { "S-1-5-18", "S-1-5-19", "S-1-5-20", "S-1-1-0", "S-1-5-32-544" };
+        var results = new SecurityIdentifier?[100];
+
+        Parallel.For(0, 100, i =>
+        {
+            results[i] = cache.GetOrAddSid(new SecurityIdentifier(sids[i % sids.Length]));
+        });
+
+        for (int key = 0; key < sids.Length; key++)
+        {
+            var expected = results[key];
+            Assert.NotNull(expected);
+
+            for (int occurrence = key + sids.Length; occurrence < 100; occurrence += sids.Length)
+            {
+                Assert.Same(expected, results[occurrence]);
+            }
+        }
+    }
+
+    [Fact]
+    public void GetOrAddSid_WithDifferentSid_ShouldReturnDifferentReferences()
+    {
+        var cache = new EventResolverCache();
+
+        var first = cache.GetOrAddSid(new SecurityIdentifier("S-1-5-18"));
+        var second = cache.GetOrAddSid(new SecurityIdentifier("S-1-5-19"));
+
+        Assert.NotSame(first, second);
+    }
+
+    [Fact]
+    public void GetOrAddSid_WithNull_ShouldReturnNull()
+    {
+        var cache = new EventResolverCache();
+
+        Assert.Null(cache.GetOrAddSid(null));
+    }
+
+    [Fact]
+    public void GetOrAddSid_WithSameSid_ShouldReturnSameReference()
+    {
+        var cache = new EventResolverCache();
+
+        var first = cache.GetOrAddSid(new SecurityIdentifier("S-1-5-18"));
+        var second = cache.GetOrAddSid(new SecurityIdentifier("S-1-5-18"));
+
+        Assert.Same(first, second);
+    }
+
+    [Fact]
+    public void MixedOperations_AllCachesConcurrentWithClearAll_ShouldHandleThreadSafely()
+    {
+        var cache = new EventResolverCache();
+
+        var exception = Record.Exception(() =>
+            Parallel.Invoke(
+                () => { for (int i = 0; i < 100; i++) { cache.GetOrAddValue($"Value{i}"); } },
+                () => { for (int i = 0; i < 100; i++) { cache.GetOrAddKeywords(new List<string> { $"Keyword{i % 10}" }); } },
+                () => { for (int i = 0; i < 100; i++) { cache.GetOrAddSid(new SecurityIdentifier($"S-1-5-{18 + (i % 3)}")); } },
+                () => { for (int i = 0; i < 10; i++) { Thread.Sleep(5); cache.ClearAll(); } }));
+
+        Assert.Null(exception);
     }
 
     [Fact]
