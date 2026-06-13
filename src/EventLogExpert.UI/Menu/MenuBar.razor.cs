@@ -112,6 +112,9 @@ public sealed partial class MenuBar
             MenuItem.Item("Copy Selected (Full)",
                 () => Actions.CopySelectedAsync(EventCopyFormat.Full),
                 defaultCopyFormat == EventCopyFormat.Full ? "Ctrl+C" : null),
+            MenuItem.Item("Copy Selected (Markdown)",
+                () => Actions.CopySelectedAsync(EventCopyFormat.Markdown),
+                defaultCopyFormat == EventCopyFormat.Markdown ? "Ctrl+C" : null),
         ];
     }
 
