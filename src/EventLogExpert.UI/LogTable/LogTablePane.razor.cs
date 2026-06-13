@@ -53,7 +53,6 @@ public sealed partial class LogTablePane
     private int _pageSize = DefaultPageSize;
     private ColumnName[] _previousEnabledColumns = [];
     private bool _resortSelectionOnNextRender;
-    private Dictionary<ResolvedEvent, int> _rowIndexMap = new(ReferenceEqualityComparer.Instance);
     private GroupedRowView? _rowView;
     private (IReadOnlyList<ResolvedEvent> Events, EventLogId? TableId, ColumnName? GroupBy, bool GroupDescending, bool CollapsedDefault, ImmutableHashSet<string>? Overrides) _rowViewSnapshot;
     private ResolvedEvent? _selectedEvent;
@@ -380,9 +379,8 @@ public sealed partial class LogTablePane
         ResolvedEvent anchor,
         ResolvedEvent selected)
     {
-        if (!_rowIndexMap.TryGetValue(anchor, out int anchorIndex)) { anchorIndex = -1; }
-
-        if (!_rowIndexMap.TryGetValue(selected, out int activeIndex)) { activeIndex = -1; }
+        int anchorIndex = RowIndexOf(anchor);
+        int activeIndex = RowIndexOf(selected);
 
         if (anchorIndex < 0 || activeIndex < 0)
         {
@@ -420,7 +418,9 @@ public sealed partial class LogTablePane
         {
             if (!seen.Add(selectedEvent)) { continue; }
 
-            if (_rowIndexMap.TryGetValue(selectedEvent, out int index))
+            int index = RowIndexOf(selectedEvent);
+
+            if (index >= 0)
             {
                 inTable.Add((selectedEvent, index));
             }
@@ -475,9 +475,14 @@ public sealed partial class LogTablePane
 
         var fallback = _selectedEvents.LastOrDefault();
 
-        if (fallback is not null && _rowIndexMap.TryGetValue(fallback, out int fallbackIndex))
+        if (fallback is not null)
         {
-            return _rowView?.VisibleRowForEvent(fallbackIndex) ?? fallbackIndex;
+            int fallbackIndex = RowIndexOf(fallback);
+
+            if (fallbackIndex >= 0)
+            {
+                return _rowView?.VisibleRowForEvent(fallbackIndex) ?? fallbackIndex;
+            }
         }
 
         int count = _rowView?.Count ?? displayedEvents.Count;
@@ -560,14 +565,18 @@ public sealed partial class LogTablePane
 
     private int GetRowIndex(ResolvedEvent evt)
     {
-        if (!_rowIndexMap.TryGetValue(evt, out int index)) { return 2; }
+        int index = RowIndexOf(evt);
+
+        if (index < 0) { return 2; }
 
         return (_rowView?.VisibleRowForEvent(index) ?? index) + 2;
     }
 
     private int GetRowStripe(ResolvedEvent evt)
     {
-        if (!_rowIndexMap.TryGetValue(evt, out int index)) { return 0; }
+        int index = RowIndexOf(evt);
+
+        if (index < 0) { return 0; }
 
         if (_rowView is null) { return index % 2; }
 
@@ -697,13 +706,17 @@ public sealed partial class LogTablePane
 
         if (view is null) { return; }
 
-        if (_cursor is { Kind: TableRowKind.Event, Event: { } @event } &&
-            _rowIndexMap.TryGetValue(@event, out int index))
+        if (_cursor is { Kind: TableRowKind.Event, Event: { } @event })
         {
-            SetCursorHeader(view.GroupForEvent(index).Key);
-            _focusActiveOnNextRender = true;
+            int index = RowIndexOf(@event);
 
-            return;
+            if (index >= 0)
+            {
+                SetCursorHeader(view.GroupForEvent(index).Key);
+                _focusActiveOnNextRender = true;
+
+                return;
+            }
         }
 
         if (_cursor is { Kind: TableRowKind.Header, GroupKey: { } key } &&
@@ -789,7 +802,9 @@ public sealed partial class LogTablePane
 
         foreach (var selectedEvent in selection)
         {
-            if (!_rowIndexMap.TryGetValue(selectedEvent, out int index)) { continue; }
+            int index = RowIndexOf(selectedEvent);
+
+            if (index < 0) { continue; }
 
             if (index < lastIndex) { return true; }
 
@@ -854,14 +869,19 @@ public sealed partial class LogTablePane
     // Retype an event in a collapsed group to its header.
     private TableCursor? NormalizeCursor(TableCursor? cursor)
     {
-        if (_rowView is { } view &&
-            cursor is { Kind: TableRowKind.Event, Event: { } @event } &&
-            _rowIndexMap.TryGetValue(@event, out int index))
+        if (_rowView is not { } view ||
+            cursor is not { Kind: TableRowKind.Event, Event: { } @event })
         {
-            var group = view.GroupForEvent(index);
-
-            if (group.IsCollapsed) { return TableCursor.ForHeader(group.Key); }
+            return cursor;
         }
+
+        int index = RowIndexOf(@event);
+
+        if (index < 0) { return cursor; }
+
+        var group = view.GroupForEvent(index);
+
+        if (group.IsCollapsed) { return TableCursor.ForHeader(group.Key); }
 
         return cursor;
     }
@@ -925,7 +945,6 @@ public sealed partial class LogTablePane
         if (!ReferenceEquals(displayedEvents, _lastIndexedDisplayedEvents))
         {
             _lastIndexedDisplayedEvents = displayedEvents;
-            _rowIndexMap = new Dictionary<ResolvedEvent, int>(displayedEvents.Count, ReferenceEqualityComparer.Instance);
             _highlightCache.Clear();
 
             if (displayedEvents.Count == 0)
@@ -935,11 +954,6 @@ public sealed partial class LogTablePane
             }
             else
             {
-                for (int i = 0; i < displayedEvents.Count; i++)
-                {
-                    _rowIndexMap[displayedEvents[i]] = i;
-                }
-
                 _selectionAnchor = ResolveByKey(displayedEvents, _selectionAnchor);
 
                 if (_cursor is { Kind: TableRowKind.Event, Event: { } cursorEvent })
@@ -965,7 +979,9 @@ public sealed partial class LogTablePane
 
         if (cursor is { Kind: TableRowKind.Event, Event: { } @event })
         {
-            if (_rowIndexMap.TryGetValue(@event, out int index))
+            int index = RowIndexOf(@event);
+
+            if (index >= 0)
             {
                 var group = view.GroupForEvent(index);
 
@@ -1005,6 +1021,13 @@ public sealed partial class LogTablePane
 
         var canonical = _logTableState.DisplayedEvents;
 
+        if (_logTableState.EventTables.Count(table => !table.IsCombined) == 1 &&
+            _logTableState.EventCountByLog.TryGetValue(_currentTable.Id, out int onlyLogCount) &&
+            onlyLogCount == canonical.Count)
+        {
+            return canonical;
+        }
+
         if (_cachedFilteredView is not null &&
             ReferenceEquals(canonical, _cachedFilteredCanonical) &&
             _cachedFilteredTableId == _currentTable.Id)
@@ -1043,10 +1066,14 @@ public sealed partial class LogTablePane
             return _rowView?.VisibleRowForHeader(key) ?? -1;
         }
 
-        if (_cursor is { Kind: TableRowKind.Event, Event: { } @event } &&
-            _rowIndexMap.TryGetValue(@event, out int index))
+        if (_cursor is { Kind: TableRowKind.Event, Event: { } @event })
         {
-            return _rowView?.VisibleRowForEvent(index) ?? index;
+            int index = RowIndexOf(@event);
+
+            if (index >= 0)
+            {
+                return _rowView?.VisibleRowForEvent(index) ?? index;
+            }
         }
 
         return -1;
@@ -1056,6 +1083,15 @@ public sealed partial class LogTablePane
     {
         DispatchSetSelection(_selectedEvents, ActiveEvent ?? _selectedEvent);
     }
+
+    private int RowIndexOf(ResolvedEvent @event) =>
+        ResolvedEventIndex.IndexOf(
+            _activeDisplayedEvents,
+            @event,
+            _logTableState.OrderBy,
+            _logTableState.IsDescending,
+            _logTableState.GroupBy,
+            _logTableState.IsGroupDescending);
 
     private async Task ScrollToSelectedEvent()
     {
