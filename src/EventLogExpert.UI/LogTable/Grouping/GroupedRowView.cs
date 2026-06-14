@@ -62,33 +62,31 @@ internal sealed class GroupedRowView : IReadOnlyList<TableRow>, IList<TableRow>
         var groupIndexByKey = new Dictionary<string, int>(StringComparer.Ordinal);
         int visible = 0;
         int index = 0;
-        // Carry each run's boundary key forward so every event's key is computed once.
-        string? key = events.Count > 0 ? ResolvedEventGroupKey.For(groupBy, events[0]) : null;
+        int start = 0;
+        string? currentKey = null;
 
-        while (index < events.Count)
+        // The view may compute elements on demand; avoid random indexing.
+        foreach (var resolved in events)
         {
-            string currentKey = key!;
-            int start = index;
-            index++;
+            string key = ResolvedEventGroupKey.For(groupBy, resolved);
 
-            while (index < events.Count)
+            if (currentKey is null)
             {
-                string nextKey = ResolvedEventGroupKey.For(groupBy, events[index]);
-
-                if (!string.Equals(nextKey, currentKey, StringComparison.Ordinal))
-                {
-                    key = nextKey;
-
-                    break;
-                }
-
-                index++;
+                currentKey = key;
+            }
+            else if (!string.Equals(key, currentKey, StringComparison.Ordinal))
+            {
+                CloseGroup(groups, groupIndexByKey, currentKey, start, index, isCollapsed, ref visible);
+                currentKey = key;
+                start = index;
             }
 
-            var group = new EventGroup(currentKey, start, index - start, isCollapsed(currentKey), visible);
-            groupIndexByKey[currentKey] = groups.Count;
-            groups.Add(group);
-            visible += group.VisibleSize;
+            index++;
+        }
+
+        if (currentKey is not null)
+        {
+            CloseGroup(groups, groupIndexByKey, currentKey, start, index, isCollapsed, ref visible);
         }
 
         return new GroupedRowView(events, [.. groups], visible, groupIndexByKey);
@@ -161,6 +159,21 @@ internal sealed class GroupedRowView : IReadOnlyList<TableRow>, IList<TableRow>
         _groupIndexByKey.TryGetValue(groupKey, out int i) ? _groups[i].VisibleStart : -1;
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    private static void CloseGroup(
+        List<EventGroup> groups,
+        Dictionary<string, int> groupIndexByKey,
+        string key,
+        int start,
+        int end,
+        Func<string, bool> isCollapsed,
+        ref int visible)
+    {
+        var group = new EventGroup(key, start, end - start, isCollapsed(key), visible);
+        groupIndexByKey[key] = groups.Count;
+        groups.Add(group);
+        visible += group.VisibleSize;
+    }
 
     private int FindGroup(int target, bool byVisibleStart)
     {

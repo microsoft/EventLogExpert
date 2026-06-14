@@ -215,6 +215,20 @@ public sealed class SegmentedSortedListTests
     }
 
     [Fact]
+    public void ResolveByKey_MatchesByReferenceAndEquivalentKey_ElseNull()
+    {
+        var events = new List<ResolvedEvent>();
+        for (int i = 1; i <= 300; i++) { events.Add(Ev("LogA", i, i)); }
+        var list = SegmentedSortedList.CreateSorted(events, s_byTime);
+
+        var original = events[150];
+
+        Assert.Same(original, list.ResolveByKey(original));
+        Assert.Same(original, list.ResolveByKey(Ev("LogA", 151, 151)));
+        Assert.Null(list.ResolveByKey(Ev("LogB", 999, 9999)));
+    }
+
+    [Fact]
     public void ResolvedEventIndex_IndexOf_FindsInstancesAcrossSegments_IncludingNullRecordIdTieWindow()
     {
         var e1 = Ev("LogA", 100, null);

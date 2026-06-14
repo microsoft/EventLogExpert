@@ -270,13 +270,12 @@ public sealed class LogTablePaneSelectionTests : BunitContext
         {
             ActiveEventLogId = logId,
             EventTables = ImmutableList.Create(new LogView(logId) { LogName = LogName }),
-            DisplayedEvents = [displayedEvent],
             EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(logId, 1),
             Columns = allColumns.ToImmutableDictionary(column => column, _ => true),
             ColumnOrder = [.. allColumns],
             OrderBy = orderBy,
             IsDescending = isDescending
-        });
+        }.WithLogEvents(logId, displayedEvent));
 
         return Render<LogTablePane>();
     }
@@ -289,12 +288,11 @@ public sealed class LogTablePaneSelectionTests : BunitContext
         {
             ActiveEventLogId = logId,
             EventTables = ImmutableList.Create(new LogView(logId) { LogName = LogName }),
-            DisplayedEvents = [_event1, _event2, _event3],
             EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(logId, 3),
             Columns = ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.Level, true),
             ColumnOrder = ImmutableList.Create(ColumnName.Level),
             IsDescending = false
-        });
+        }.WithLogEvents(logId, _event1, _event2, _event3));
 
         var cut = Render<LogTablePane>();
 
