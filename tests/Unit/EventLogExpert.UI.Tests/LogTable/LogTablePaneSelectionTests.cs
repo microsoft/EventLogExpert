@@ -292,7 +292,8 @@ public sealed class LogTablePaneSelectionTests : BunitContext
             DisplayedEvents = [_event1, _event2, _event3],
             EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(logId, 3),
             Columns = ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.Level, true),
-            ColumnOrder = ImmutableList.Create(ColumnName.Level)
+            ColumnOrder = ImmutableList.Create(ColumnName.Level),
+            IsDescending = false
         });
 
         var cut = Render<LogTablePane>();

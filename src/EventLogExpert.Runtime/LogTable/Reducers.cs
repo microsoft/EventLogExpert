@@ -397,10 +397,8 @@ internal sealed class Reducers
 
         int preservedCount = 0;
 
-        for (int eventIndex = 0; eventIndex < state.DisplayedEvents.Count; eventIndex++)
+        foreach (var existing in state.DisplayedEvents)
         {
-            var existing = state.DisplayedEvents[eventIndex];
-
             if (currentLogNames.Contains(existing.OwningLog) &&
                 !logNamesBeingReplaced.Contains(existing.OwningLog))
             {
@@ -417,10 +415,8 @@ internal sealed class Reducers
 
         var concatenated = new List<ResolvedEvent>(totalCount);
 
-        for (int eventIndex = 0; eventIndex < state.DisplayedEvents.Count; eventIndex++)
+        foreach (var existing in state.DisplayedEvents)
         {
-            var existing = state.DisplayedEvents[eventIndex];
-
             if (currentLogNames.Contains(existing.OwningLog) &&
                 !logNamesBeingReplaced.Contains(existing.OwningLog))
             {
@@ -498,6 +494,11 @@ internal sealed class Reducers
         IReadOnlyList<ResolvedEvent> events,
         string owningLog)
     {
+        if (events is SegmentedSortedList segmented)
+        {
+            return segmented.WhereSegmented(current => string.Equals(current.OwningLog, owningLog, StringComparison.Ordinal));
+        }
+
         var filtered = new List<ResolvedEvent>(events.Count);
 
         for (int eventIndex = 0; eventIndex < events.Count; eventIndex++)
@@ -517,6 +518,11 @@ internal sealed class Reducers
         IReadOnlyList<ResolvedEvent> events,
         string owningLog)
     {
+        if (events is SegmentedSortedList segmented)
+        {
+            return segmented.WhereSegmented(current => !string.Equals(current.OwningLog, owningLog, StringComparison.Ordinal));
+        }
+
         var filtered = new List<ResolvedEvent>(events.Count);
 
         for (int eventIndex = 0; eventIndex < events.Count; eventIndex++)
@@ -532,8 +538,7 @@ internal sealed class Reducers
         return filtered.AsReadOnly();
     }
 
-    private static ColumnName GetEffectiveOrderBy(ColumnName? orderBy) =>
-        orderBy ?? ColumnName.DateAndTime;
+    private static ColumnName GetEffectiveOrderBy(ColumnName? orderBy) => ResolvedEventOrdering.GetEffectiveOrderBy(orderBy);
 
     private static ImmutableDictionary<EventLogId, int> IncrementCount(
         ImmutableDictionary<EventLogId, int> counts,

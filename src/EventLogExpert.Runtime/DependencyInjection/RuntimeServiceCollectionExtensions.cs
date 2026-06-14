@@ -134,6 +134,7 @@ public static class RuntimeServiceCollectionExtensions
             // Shared coordination state for EventLog effects classes.
             services.AddSingleton<LogCloseCoordinator>();
             services.AddSingleton<EventLogConcurrencyState>();
+            services.AddSingleton<PartialLoadCoordinator>();
 
             // UI capabilities.
             services.AddSingleton<IHighlightSelector, HighlightSelector>();

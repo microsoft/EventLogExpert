@@ -117,14 +117,17 @@ public class EventResolverBase : IDisposable
         ProviderDetails? details,
         ProviderDetails? descriptionDetails,
         ProviderDetails? supplemental,
-        EventModel? supplementalModernEvent) =>
-        new(eventRecord.PathName, eventRecord.LogPathType)
+        EventModel? supplementalModernEvent)
+    {
+        var keywords = _taskKeywords.ResolveKeywords(eventRecord, details, supplemental);
+
+        return new(eventRecord.PathName, eventRecord.LogPathType)
         {
             ActivityId = eventRecord.ActivityId,
             ComputerName = _cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
             Description = _descriptions.Resolve(eventRecord, details, descriptionDetails, modernEvent, supplemental, supplementalModernEvent),
             Id = eventRecord.Id,
-            Keywords = _taskKeywords.ResolveKeywords(eventRecord, details, supplemental),
+            Keywords = _cache?.GetOrAddKeywords(keywords) ?? keywords,
             Level = SeverityFormatter.Format(eventRecord.Level),
             LogName = _cache?.GetOrAddValue(eventRecord.LogName) ?? eventRecord.LogName,
             ProcessId = eventRecord.ProcessId,
@@ -133,7 +136,8 @@ public class EventResolverBase : IDisposable
             TaskCategory = _taskKeywords.ResolveTaskName(eventRecord, details, modernEvent, supplemental, supplementalModernEvent),
             ThreadId = eventRecord.ThreadId,
             TimeCreated = eventRecord.TimeCreated,
-            UserId = eventRecord.UserId,
+            UserId = _cache?.GetOrAddSid(eventRecord.UserId) ?? eventRecord.UserId,
             Xml = eventRecord.Xml ?? string.Empty
         };
+    }
 }
