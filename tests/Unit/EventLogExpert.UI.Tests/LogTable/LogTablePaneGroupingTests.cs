@@ -510,17 +510,18 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     [Fact]
     public void Grouped_UngroupWithHeaderCursor_ResumesFromFormerGroupsFirstEvent()
     {
-        var alpha1 = Event(1, "Alpha");
-        var beta2 = Event(2, "Beta");
-        _logTableState.Value.Returns(BuildState(ColumnName.Source, Collapsed(), alpha1, beta2));
+        // Ungrouped order (by time) differs from grouped order (by Source).
+        var alpha = Event(2, "Alpha");
+        var beta = Event(1, "Beta");
+        _logTableState.Value.Returns(BuildState(ColumnName.Source, Collapsed(), alpha, beta));
 
         var cut = Render<LogTablePane>();
         Press(cut, "Home");      // header Alpha
-        Press(cut, "ArrowDown"); // event 1
+        Press(cut, "ArrowDown"); // event Alpha
         Press(cut, "ArrowDown"); // header Beta (cursor on a non-first header)
 
-        // Ungroup resorts the list (reversed here); a stale index would mispoint.
-        _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), beta2, alpha1));
+        // Ungroup resorts the list; a stale index would mispoint.
+        _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), beta, alpha));
         RaiseStateChanged(cut);
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("tr.group-header-row")));
 
@@ -528,7 +529,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowDown");
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<ResolvedEvent>>(c => c.Count == 1 && c.Contains(alpha1)),
+            Arg.Is<IReadOnlyCollection<ResolvedEvent>>(c => c.Count == 1 && c.Contains(alpha)),
             Arg.Any<ResolvedEvent?>());
     }
 
@@ -562,21 +563,25 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     [Fact]
     public void GroupedByLog_HeaderShowsLogNameNotRepresentativeOwningLog()
     {
-        var logId = EventLogId.Create();
+        var combinedId = EventLogId.Create();
+        var appId1 = EventLogId.Create();
+        var appId2 = EventLogId.Create();
         var e1 = LogEvent(1, @"C:\logs\App1.evtx", "Application");
         var e2 = LogEvent(2, @"C:\logs\App2.evtx", "Application");
 
         _logTableState.Value.Returns(new LogTableState
         {
-            ActiveEventLogId = logId,
-            EventTables = ImmutableList.Create(new LogView(logId) { LogName = "Combined", IsCombined = true }),
-            DisplayedEvents = [e1, e2],
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(logId, 2),
+            ActiveEventLogId = combinedId,
+            EventTables = ImmutableList.Create(
+                new LogView(combinedId) { LogName = "Combined", IsCombined = true },
+                new LogView(appId1) { LogName = "Application" },
+                new LogView(appId2) { LogName = "Application" }),
+            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(appId1, 1).Add(appId2, 1),
             Columns = ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.Log, true),
             ColumnOrder = ImmutableList.Create(ColumnName.Log),
             GroupBy = ColumnName.Log,
             GroupCollapseOverrides = Collapsed()
-        });
+        }.WithLogEvents(appId1, e1).WithLogEvents(appId2, e2));
 
         var cut = Render<LogTablePane>();
         var header = cut.Find("tr.group-header-row");
@@ -635,14 +640,13 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         {
             ActiveEventLogId = logId,
             EventTables = ImmutableList.Create(new LogView(logId) { LogName = LogName }),
-            DisplayedEvents = events,
             EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(logId, events.Length),
             Columns = ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.Source, true),
             ColumnOrder = ImmutableList.Create(ColumnName.Source),
             IsDescending = false,
             GroupBy = groupBy,
             GroupCollapseOverrides = collapsed
-        };
+        }.WithLogEvents(logId, events);
     }
 
     private static ImmutableHashSet<string> Collapsed(params string[] keys) =>

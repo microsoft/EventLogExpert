@@ -789,11 +789,14 @@ public sealed class LogTableStoreTests
             GroupCollapseOverrides = ImmutableHashSet.Create("g"),
             OrderBy = ColumnName.EventId,
             IsDescending = false,
-            DisplayedEvents = new List<ResolvedEvent>
-            {
-                FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
-                FilterEventBuilder.CreateTestEvent(id: 1, source: "A")
-            }.AsReadOnly()
+            PerLogEvents = BuildPerLog(
+                new List<ResolvedEvent>
+                {
+                    FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
+                    FilterEventBuilder.CreateTestEvent(id: 1, source: "A")
+                },
+                [],
+                orderBy: ColumnName.EventId, isDescending: false, groupBy: ColumnName.Source, isGroupDescending: true)
         };
 
         var hiddenColumns = ImmutableDictionary<ColumnName, bool>.Empty
@@ -905,11 +908,14 @@ public sealed class LogTableStoreTests
     {
         var state = new LogTableState
         {
-            DisplayedEvents = new List<ResolvedEvent>
-            {
-                FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
-                FilterEventBuilder.CreateTestEvent(id: 1, source: "A")
-            }.AsReadOnly(),
+            PerLogEvents = BuildPerLog(
+                new List<ResolvedEvent>
+                {
+                    FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
+                    FilterEventBuilder.CreateTestEvent(id: 1, source: "A")
+                },
+                [],
+                isGroupDescending: true),
             IsGroupDescending = true,
             GroupCollapseOverrides = ImmutableHashSet.Create("stale")
         };
@@ -930,11 +936,14 @@ public sealed class LogTableStoreTests
             GroupBy = ColumnName.Source,
             OrderBy = ColumnName.EventId,
             IsDescending = false,
-            DisplayedEvents = new List<ResolvedEvent>
-            {
-                FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
-                FilterEventBuilder.CreateTestEvent(id: 1, source: "A")
-            }.AsReadOnly()
+            PerLogEvents = BuildPerLog(
+                new List<ResolvedEvent>
+                {
+                    FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
+                    FilterEventBuilder.CreateTestEvent(id: 1, source: "A")
+                },
+                [],
+                orderBy: ColumnName.EventId, isDescending: false, groupBy: ColumnName.Source)
         };
 
         var result = Reducers.ReduceSetGroupBy(state, new SetGroupByAction(null));
@@ -990,11 +999,14 @@ public sealed class LogTableStoreTests
         {
             GroupBy = ColumnName.Source,
             IsGroupDescending = false,
-            DisplayedEvents = new List<ResolvedEvent>
-            {
-                FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
-                FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
-            }.AsReadOnly()
+            PerLogEvents = BuildPerLog(
+                new List<ResolvedEvent>
+                {
+                    FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+                    FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+                },
+                [],
+                groupBy: ColumnName.Source)
         };
 
         var result = Reducers.ReduceToggleGroupSorting(state);
@@ -1285,7 +1297,8 @@ public sealed class LogTableStoreTests
             ActiveEventLogId = combined.Id,
             GroupBy = ColumnName.Source,
             IsDescending = false,
-            DisplayedEvents = existing,
+            PerLogEvents = BuildPerLog(
+                existing, [log1, log2], orderBy: null, isDescending: false, groupBy: ColumnName.Source),
             EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty
                 .Add(log1.Id, 1)
                 .Add(log2.Id, 1)
@@ -1419,5 +1432,31 @@ public sealed class LogTableStoreTests
             baseTime.AddSeconds(40)
         };
         Assert.Equal(expectedTimes, actualTimes);
+    }
+
+    // Seeds PerLogEvents keyed by each event's OwningLog.
+    private static ImmutableDictionary<EventLogId, SegmentedSortedList> BuildPerLog(
+        IEnumerable<ResolvedEvent> events,
+        IEnumerable<LogView> tables,
+        ColumnName? orderBy = null,
+        bool isDescending = true,
+        ColumnName? groupBy = null,
+        bool isGroupDescending = false)
+    {
+        var byLog = events.GroupBy(resolved => resolved.OwningLog).ToList();
+
+        // Match the reducers' default: RecordId for one log, else DateAndTime.
+        var context = new SortContext(
+            ResolvedEventOrdering.ResolveDefaultOrderBy(orderBy, groupBy, byLog.Count),
+            isDescending,
+            groupBy,
+            isGroupDescending);
+
+        var idByName = tables.Where(table => !table.IsCombined).ToDictionary(table => table.LogName, table => table.Id);
+
+        return byLog
+            .ToImmutableDictionary(
+                group => idByName.TryGetValue(group.Key, out var id) ? id : EventLogId.Create(),
+                group => SegmentedSortedList.CreateSorted(group, context));
     }
 }
