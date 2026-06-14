@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
+using System.Diagnostics;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
 
@@ -90,6 +91,18 @@ public sealed class SegmentedSortedListTests
     }
 
     [Fact]
+    public void Append_InterleavingMultiLogBatches_StayCorrectlySorted()
+    {
+        var list = SegmentedSortedList.CreateSorted([Ev("LogA", 100, 1), Ev("LogB", 150, 2)], s_byTime);
+
+        list = list.Append([Ev("LogA", 120, 3), Ev("LogB", 90, 4)]);
+        list = list.Append([Ev("LogA", 80, 5), Ev("LogB", 200, 6)]);
+
+        Assert.Equal(6, list.Count);
+        AssertSorted(list);
+    }
+
+    [Fact]
     public void Append_SingleLogDescendingStream_UsesPrependFastPathWithoutCopying()
     {
         var descending = new SortContext(ColumnName.DateAndTime, isDescending: true, groupBy: null, isGroupDescending: false);
@@ -127,11 +140,12 @@ public sealed class SegmentedSortedListTests
     }
 
     [Fact]
-    public void Implements_ICollectionContract_ForVirtualizeBinding()
+    public void Implements_ListContract_ForVirtualizeBinding()
     {
         var list = SegmentedSortedList.CreateSorted([Ev("LogA", 1, 1), Ev("LogA", 2, 2)], s_byTime);
 
         Assert.IsAssignableFrom<IReadOnlyList<ResolvedEvent>>(list);
+        Assert.IsAssignableFrom<IList<ResolvedEvent>>(list);
 
         var collection = list as ICollection<ResolvedEvent>;
 
@@ -141,6 +155,12 @@ public sealed class SegmentedSortedListTests
         Assert.Throws<NotSupportedException>(() => collection.Add(Ev("LogA", 3, 3)));
         Assert.Throws<NotSupportedException>(() => collection.Clear());
         Assert.Throws<NotSupportedException>(() => collection.Remove(Ev("LogA", 1, 1)));
+
+        var asList = (IList<ResolvedEvent>)list;
+
+        Assert.Throws<NotSupportedException>(() => asList[0] = Ev("LogA", 9, 9));
+        Assert.Throws<NotSupportedException>(() => asList.Insert(0, Ev("LogA", 9, 9)));
+        Assert.Throws<NotSupportedException>(() => asList.RemoveAt(0));
     }
 
     [Fact]
@@ -170,20 +190,14 @@ public sealed class SegmentedSortedListTests
     }
 
     [Fact]
-    public void MergeFrom_SegmentedListWithDifferentContext_ReSortsSafely()
+    public void MergeSorted_ContextDrift_ThrowsUnreachable()
     {
         var byLevel = new SortContext(ColumnName.Level, isDescending: false, groupBy: null, isGroupDescending: false);
-        var late = Ev("LogA", 300, 1, "Critical");
-        var early = Ev("LogA", 100, 2, "Warning");
-        var existing = SegmentedSortedList.CreateSorted([late, early], byLevel);
+        IReadOnlyList<ResolvedEvent> existing = SegmentedSortedList.CreateSorted(
+            [Ev("LogA", 300, 1, "Critical"), Ev("LogA", 100, 2, "Warning")], byLevel);
 
-        var middle = Ev("LogA", 200, 3, "Information");
-        var result = SegmentedSortedList.MergeFrom(existing, [middle], s_byTime);
-
-        Assert.Equal(3, result.Count);
-        Assert.Same(early, result[0]);
-        Assert.Same(middle, result[1]);
-        Assert.Same(late, result[2]);
+        Assert.Throws<UnreachableException>(() =>
+            ResolvedEventOrdering.MergeSorted(existing, [Ev("LogA", 200, 3, "Information")], ColumnName.DateAndTime, isDescending: false));
     }
 
     [Fact]
@@ -198,6 +212,28 @@ public sealed class SegmentedSortedListTests
 
         AssertSameSequence(StableMerge(existing, tied), result);
         Assert.Same(head, result[0]);
+    }
+
+    [Fact]
+    public void ResolvedEventIndex_IndexOf_FindsInstancesAcrossSegments_IncludingNullRecordIdTieWindow()
+    {
+        var e1 = Ev("LogA", 100, null);
+        var e2 = Ev("LogA", 100, null);
+        var list = SegmentedSortedList.CreateSorted([e1, e2], s_byTime);
+
+        var e3 = Ev("LogA", 100, null);
+        list = list.Append([e3]);
+
+        Assert.Equal(2, list.SegmentCount);
+
+        int i1 = ResolvedEventIndex.IndexOf(list, e1, ColumnName.DateAndTime);
+        int i2 = ResolvedEventIndex.IndexOf(list, e2, ColumnName.DateAndTime);
+        int i3 = ResolvedEventIndex.IndexOf(list, e3, ColumnName.DateAndTime);
+
+        Assert.Same(e1, list[i1]);
+        Assert.Same(e2, list[i2]);
+        Assert.Same(e3, list[i3]);
+        Assert.Equal([0, 1, 2], new[] { i1, i2, i3 }.OrderBy(x => x).ToArray());
     }
 
     [Fact]

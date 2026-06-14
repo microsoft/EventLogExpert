@@ -167,11 +167,9 @@ internal static class ResolvedEventOrdering
             return segmented.Append(batch);
         }
 
-        Debug.Assert(
-            existing is not SegmentedSortedList,
-            "DisplayedEvents sort context drifted from the requested merge context.");
-
-        return SegmentedSortedList.MergeFrom(existing, batch, context);
+        return existing is SegmentedSortedList ?
+            throw new UnreachableException("DisplayedEvents sort context drifted from the requested merge context.") :
+            SegmentedSortedList.MergeFrom(existing, batch, context);
     }
 
     internal static Comparison<ResolvedEvent> SelectComparer(

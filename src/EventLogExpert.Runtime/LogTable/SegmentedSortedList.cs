@@ -31,7 +31,7 @@ internal readonly record struct SortContext
 // Immutable sorted segments kept globally non-interleaving (segment i entirely <= segment i+1), so the logical
 // sequence is their concatenation and indexing is a prefix-sum binary search. Appends that sit before/after
 // existing add a segment (no copy); interleaving appends fall back to a full merge.
-internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, ICollection<ResolvedEvent>
+internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IList<ResolvedEvent>
 {
     private readonly Comparison<ResolvedEvent> _comparer;
     private readonly SortContext _context;
@@ -67,6 +67,8 @@ internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IColle
 
             return _segments[segment][index - _prefix[segment]];
         }
+
+        set => throw new NotSupportedException();
     }
 
     public void Add(ResolvedEvent item) => throw new NotSupportedException();
@@ -102,7 +104,25 @@ internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IColle
         }
     }
 
+    public int IndexOf(ResolvedEvent item)
+    {
+        int index = 0;
+
+        foreach (var resolved in this)
+        {
+            if (EqualityComparer<ResolvedEvent>.Default.Equals(resolved, item)) { return index; }
+
+            index++;
+        }
+
+        return -1;
+    }
+
+    public void Insert(int index, ResolvedEvent item) => throw new NotSupportedException();
+
     public bool Remove(ResolvedEvent item) => throw new NotSupportedException();
+
+    public void RemoveAt(int index) => throw new NotSupportedException();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
@@ -126,11 +146,6 @@ internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IColle
         SortContext context)
     {
         if (existing.Count == 0) { return CreateSorted(batch, context); }
-
-        // A segmented existing reaching this path drifted from the merge context, so it is sorted by a
-        // different comparer; re-sort everything rather than trusting a 2-way merge that assumes both inputs
-        // already share the merge comparer.
-        if (existing is SegmentedSortedList) { return CreateSorted(existing.Concat(batch), context); }
 
         var comparer = ResolvedEventOrdering.SelectComparer(
             context.OrderBy, context.IsDescending, context.GroupBy, context.IsGroupDescending);
@@ -164,7 +179,7 @@ internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IColle
             return new SegmentedSortedList(_segments.Add(sortedBatch), _context, _comparer);
         }
 
-        var merged = Merge(ToArray(), sortedBatch, _comparer);
+        var merged = MergeWith(sortedBatch);
 
         return new SegmentedSortedList([merged], _context, _comparer);
     }
@@ -246,11 +261,35 @@ internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IColle
         return low;
     }
 
-    private ResolvedEvent[] ToArray()
+    private ImmutableArray<ResolvedEvent> MergeWith(ImmutableArray<ResolvedEvent> sortedBatch)
     {
-        var array = new ResolvedEvent[Count];
-        CopyTo(array, 0);
+        var result = ImmutableArray.CreateBuilder<ResolvedEvent>(Count + sortedBatch.Length);
 
-        return array;
+        using var existing = GetEnumerator();
+        bool hasExisting = existing.MoveNext();
+        int j = 0;
+
+        while (hasExisting && j < sortedBatch.Length)
+        {
+            if (_comparer(existing.Current, sortedBatch[j]) <= 0)
+            {
+                result.Add(existing.Current);
+                hasExisting = existing.MoveNext();
+            }
+            else
+            {
+                result.Add(sortedBatch[j++]);
+            }
+        }
+
+        while (hasExisting)
+        {
+            result.Add(existing.Current);
+            hasExisting = existing.MoveNext();
+        }
+
+        while (j < sortedBatch.Length) { result.Add(sortedBatch[j++]); }
+
+        return result.MoveToImmutable();
     }
 }
