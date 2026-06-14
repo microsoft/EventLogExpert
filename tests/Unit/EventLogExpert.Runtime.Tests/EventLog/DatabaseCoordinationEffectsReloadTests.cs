@@ -182,10 +182,18 @@ public sealed class DatabaseCoordinationEffectsReloadTests
         });
 
         var signalCompletionOnDispatch = false;
+        CancellationTokenSource? firstCallCts = null;
 
         _dispatcher.When(d => d.Dispatch(Arg.Any<CloseLogAction>())).Do(call =>
         {
-            if (!signalCompletionOnDispatch) { return; }
+            if (!signalCompletionOnDispatch)
+            {
+                // Cancel deterministically at the close-await point (not via a wall-clock timer) so the first
+                // reload always fails at the same place and the Received(2) assertion can't race CI scheduling.
+                firstCallCts!.Cancel();
+
+                return;
+            }
 
             var action = (CloseLogAction)call.Args()[0];
             _closeCoordinator.CompleteCloseFor(action.LogId);
@@ -193,10 +201,9 @@ public sealed class DatabaseCoordinationEffectsReloadTests
 
         var sut = CreateSut();
 
-        using (var cts = new CancellationTokenSource())
+        using (firstCallCts = new CancellationTokenSource())
         {
-            cts.CancelAfter(TimeSpan.FromMilliseconds(50));
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => sut.ReloadAllActiveLogsAsync(cts.Token));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => sut.ReloadAllActiveLogsAsync(firstCallCts.Token));
         }
 
         signalCompletionOnDispatch = true;
