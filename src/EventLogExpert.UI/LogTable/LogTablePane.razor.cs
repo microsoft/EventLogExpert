@@ -37,9 +37,6 @@ public sealed partial class LogTablePane
 
     private IReadOnlyList<ResolvedEvent> _activeDisplayedEvents = [];
     private SavedFilter[] _activeHighlightFilters = [];
-    private IReadOnlyList<ResolvedEvent>? _cachedFilteredCanonical;
-    private EventLogId? _cachedFilteredTableId;
-    private IReadOnlyList<ResolvedEvent>? _cachedFilteredView;
     private LogView? _currentTable;
     private TableCursor? _cursor;
     private DotNetObjectReference<LogTablePane>? _dotNetRef;
@@ -278,27 +275,8 @@ public sealed partial class LogTablePane
 
     private static ResolvedEvent? ResolveByKey(
         IReadOnlyList<ResolvedEvent> displayedEvents,
-        ResolvedEvent? candidate)
-    {
-        if (candidate is null) { return null; }
-
-        foreach (var evt in displayedEvents)
-        {
-            if (ReferenceEquals(evt, candidate)) { return evt; }
-
-            // Skip null RecordId: null == null would merge distinct error-read events.
-            if (evt.RecordId is null || candidate.RecordId is null) { continue; }
-
-            if (evt.RecordId == candidate.RecordId &&
-                evt.TimeCreated == candidate.TimeCreated &&
-                string.Equals(evt.OwningLog, candidate.OwningLog, StringComparison.Ordinal))
-            {
-                return evt;
-            }
-        }
-
-        return null;
-    }
+        ResolvedEvent? candidate) =>
+        ResolvedEventIndex.ResolveByKey(displayedEvents, candidate);
 
     private static string TruncateForMenu(string value)
     {
@@ -356,7 +334,7 @@ public sealed partial class LogTablePane
         {
             _selectionAnchor ??= ActiveEvent ?? targetEvent;
             SetCursorEvent(targetEvent);
-            DispatchSetSelection(BuildRange(displayedEvents, _selectionAnchor, targetEvent), targetEvent);
+            DispatchSetSelection(BuildRange(displayedEvents, _selectionAnchor, targetEvent), targetEvent, alreadyOrdered: true);
         }
         else
         {
@@ -382,34 +360,24 @@ public sealed partial class LogTablePane
         int anchorIndex = RowIndexOf(anchor);
         int activeIndex = RowIndexOf(selected);
 
-        if (anchorIndex < 0 || activeIndex < 0)
-        {
-            for (int i = 0; i < displayedEvents.Count; i++)
-            {
-                if (anchorIndex < 0 && ReferenceEquals(displayedEvents[i], anchor)) { anchorIndex = i; }
-
-                if (activeIndex < 0 && ReferenceEquals(displayedEvents[i], selected)) { activeIndex = i; }
-
-                if (anchorIndex >= 0 && activeIndex >= 0) { break; }
-            }
-        }
-
         if (anchorIndex < 0 || activeIndex < 0) { return [selected]; }
 
         int start = Math.Min(anchorIndex, activeIndex);
         int end = Math.Max(anchorIndex, activeIndex);
-        var range = new ResolvedEvent[end - start + 1];
 
-        for (int i = 0; i < range.Length; i++)
-        {
-            range[i] = displayedEvents[start + i];
-        }
-
-        return range;
+        return ResolvedEventIndex.Slice(displayedEvents, start, end - start + 1);
     }
 
-    private void DispatchSetSelection(IReadOnlyList<ResolvedEvent> events, ResolvedEvent? selected)
+    private void DispatchSetSelection(IReadOnlyList<ResolvedEvent> events, ResolvedEvent? selected, bool alreadyOrdered = false)
     {
+        // These callers pass ordered, unique events; skip rank + sort.
+        if (alreadyOrdered)
+        {
+            EventLogCommands.SetSelectedEvents(events, selected);
+
+            return;
+        }
+
         var seen = new HashSet<ResolvedEvent>(ReferenceEqualityComparer.Instance);
         List<(ResolvedEvent Event, int Index)> inTable = new(events.Count);
         List<ResolvedEvent> outOfTable = [];
@@ -601,7 +569,7 @@ public sealed partial class LogTablePane
             var last = displayedEvents[^1];
             _selectionAnchor = displayedEvents[0];
             SetCursorEvent(last);
-            DispatchSetSelection(displayedEvents, last);
+            DispatchSetSelection(displayedEvents, last, alreadyOrdered: true);
 
             return;
         }
@@ -1017,46 +985,9 @@ public sealed partial class LogTablePane
     {
         if (_currentTable is null) { return []; }
 
-        if (_currentTable.IsCombined) { return _logTableState.DisplayedEvents; }
-
-        var canonical = _logTableState.DisplayedEvents;
-
-        if (_logTableState.EventTables.Count(table => !table.IsCombined) == 1 &&
-            _logTableState.EventCountByLog.TryGetValue(_currentTable.Id, out int onlyLogCount) &&
-            onlyLogCount == canonical.Count)
-        {
-            return canonical;
-        }
-
-        if (_cachedFilteredView is not null &&
-            ReferenceEquals(canonical, _cachedFilteredCanonical) &&
-            _cachedFilteredTableId == _currentTable.Id)
-        {
-            return _cachedFilteredView;
-        }
-
-        int expectedCapacity = _logTableState.EventCountByLog.TryGetValue(_currentTable.Id, out int trackedCount)
-            ? trackedCount
-            : 0;
-
-        var filtered = new List<ResolvedEvent>(expectedCapacity);
-
-        for (int eventIndex = 0; eventIndex < canonical.Count; eventIndex++)
-        {
-            var current = canonical[eventIndex];
-
-            if (string.Equals(current.OwningLog, _currentTable.LogName, StringComparison.Ordinal))
-            {
-                filtered.Add(current);
-            }
-        }
-
-        var result = filtered.AsReadOnly();
-        _cachedFilteredCanonical = canonical;
-        _cachedFilteredTableId = _currentTable.Id;
-        _cachedFilteredView = result;
-
-        return result;
+        return _currentTable.IsCombined
+            ? _logTableState.DisplayedEvents
+            : _logTableState.EventsForLog(_currentTable.Id);
     }
 
     private int ResolveCursorVisibleRow()
@@ -1099,28 +1030,19 @@ public sealed partial class LogTablePane
 
         if (target is null) { return; }
 
-        var displayedEvents = _activeDisplayedEvents;
+        if (_activeDisplayedEvents.Count == 0) { return; }
 
-        if (displayedEvents.Count == 0) { return; }
+        var resolved = ResolvedEventIndex.ResolveByKey(_activeDisplayedEvents, target);
 
-        // Match OwningLog too so overlapping logs don't cross-match on RecordId.
-        for (var index = 0; index < displayedEvents.Count; index++)
-        {
-            var candidate = displayedEvents[index];
+        if (resolved is null) { return; }
 
-            if (candidate.RecordId != target.RecordId ||
-                !string.Equals(candidate.OwningLog, target.OwningLog, StringComparison.Ordinal) ||
-                !string.Equals(candidate.LogName, target.LogName, StringComparison.Ordinal))
-            {
-                continue;
-            }
+        int index = RowIndexOf(resolved);
 
-            int targetRow = _rowView?.VisibleRowForEvent(index) ?? index;
+        if (index < 0) { return; }
 
-            if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("scrollToRow", targetRow); }
+        int targetRow = _rowView?.VisibleRowForEvent(index) ?? index;
 
-            return;
-        }
+        if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("scrollToRow", targetRow); }
     }
 
     private void SelectEvent(MouseEventArgs args, ResolvedEvent @event)
@@ -1151,7 +1073,7 @@ public sealed partial class LogTablePane
                 }
                 else
                 {
-                    DispatchSetSelection(range, @event);
+                    DispatchSetSelection(range, @event, alreadyOrdered: true);
                 }
 
                 return;
@@ -1206,17 +1128,12 @@ public sealed partial class LogTablePane
             return;
         }
 
-        var members = new List<ResolvedEvent>(group.EventCount);
-
-        for (int i = group.StartIndex; i < group.StartIndex + group.EventCount; i++)
-        {
-            members.Add(_activeDisplayedEvents[i]);
-        }
+        var members = ResolvedEventIndex.Slice(_activeDisplayedEvents, group.StartIndex, group.EventCount);
 
         var active = members[0];
         _selectionAnchor = active;
         SetCursorEvent(active);
-        DispatchSetSelection(members, active);
+        DispatchSetSelection(members, active, alreadyOrdered: true);
     }
 
     private void SelectGroupByKey(string key)

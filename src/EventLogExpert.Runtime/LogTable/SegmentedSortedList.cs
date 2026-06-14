@@ -186,6 +186,66 @@ internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IList<
 
     internal bool HasContext(SortContext context) => _context == context;
 
+    internal int Rank(ResolvedEvent target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        int low = 0;
+        int high = Count;
+
+        while (low < high)
+        {
+            int mid = low + ((high - low) >> 1);
+
+            if (_comparer(this[mid], target) < 0) { low = mid + 1; }
+            else { high = mid; }
+        }
+
+        // Scan the comparer-equal window (null-RecordId error reads) for the exact instance.
+        for (int i = low; i < Count && _comparer(this[i], target) == 0; i++)
+        {
+            if (ReferenceEquals(this[i], target)) { return i; }
+        }
+
+        return -1;
+    }
+
+    internal ResolvedEvent? ResolveByKey(ResolvedEvent candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+
+        int low = 0;
+        int high = Count;
+
+        while (low < high)
+        {
+            int mid = low + ((high - low) >> 1);
+
+            if (_comparer(this[mid], candidate) < 0) { low = mid + 1; }
+            else { high = mid; }
+        }
+
+        for (int i = low; i < Count && _comparer(this[i], candidate) == 0; i++)
+        {
+            var current = this[i];
+
+            if (ReferenceEquals(current, candidate)) { return current; }
+
+            // Skip null RecordId: null == null would merge distinct error-read events.
+            if (current.RecordId is null || candidate.RecordId is null) { continue; }
+
+            if (current.RecordId == candidate.RecordId &&
+                current.TimeCreated == candidate.TimeCreated &&
+                string.Equals(current.OwningLog, candidate.OwningLog, StringComparison.Ordinal) &&
+                string.Equals(current.LogName, candidate.LogName, StringComparison.Ordinal))
+            {
+                return current;
+            }
+        }
+
+        return null;
+    }
+
     internal SegmentedSortedList WhereSegmented(Func<ResolvedEvent, bool> predicate)
     {
         var builder = ImmutableArray.CreateBuilder<ImmutableArray<ResolvedEvent>>(_segments.Length);

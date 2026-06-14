@@ -36,7 +36,17 @@ internal static class ResolvedEventOrdering
     private static readonly Comparison<ResolvedEvent> s_ascByRecordId =
         (a, b) => WithTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByDefault =
-        (a, b) => FallbackTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
+        (a, b) =>
+        {
+            int byRecordId = Nullable.Compare(a.RecordId, b.RecordId);
+
+            if (byRecordId != 0) { return byRecordId; }
+
+            // Fall back to timestamp then OwningLog for a total order.
+            int byTime = a.TimeCreated.CompareTo(b.TimeCreated);
+
+            return byTime != 0 ? byTime : string.Compare(a.OwningLog, b.OwningLog, StringComparison.Ordinal);
+        };
 
     private static readonly Comparison<ResolvedEvent> s_descByActivityId = (a, b) => s_ascByActivityId(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByComputerName = (a, b) => s_ascByComputerName(b, a);
@@ -170,6 +180,14 @@ internal static class ResolvedEventOrdering
         return existing is SegmentedSortedList ?
             throw new UnreachableException("DisplayedEvents sort context drifted from the requested merge context.") :
             SegmentedSortedList.MergeFrom(existing, batch, context);
+    }
+
+    // RecordId for one log; timestamp for a combined view of several.
+    internal static ColumnName? ResolveDefaultOrderBy(ColumnName? orderBy, ColumnName? groupBy, int logCount)
+    {
+        if (orderBy is not null || groupBy is not null) { return orderBy; }
+
+        return logCount > 1 ? ColumnName.DateAndTime : null;
     }
 
     internal static Comparison<ResolvedEvent> SelectComparer(
