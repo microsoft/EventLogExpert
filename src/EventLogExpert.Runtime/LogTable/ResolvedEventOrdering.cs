@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using System.Diagnostics;
 
 namespace EventLogExpert.Runtime.LogTable;
 
@@ -58,13 +59,8 @@ internal static class ResolvedEventOrdering
         ColumnName? orderBy = null,
         bool isDescending = false,
         ColumnName? groupBy = null,
-        bool isGroupDescending = false)
-    {
-        var sorted = new List<ResolvedEvent>(events);
-        sorted.Sort(SelectComparer(orderBy, isDescending, groupBy, isGroupDescending));
-
-        return sorted.AsReadOnly();
-    }
+        bool isGroupDescending = false) =>
+        SegmentedSortedList.CreateSorted(events, new SortContext(orderBy, isDescending, groupBy, isGroupDescending));
 
     internal static int CompareColumn(ResolvedEvent a, ResolvedEvent b, ColumnName column) =>
         column switch
@@ -164,26 +160,18 @@ internal static class ResolvedEventOrdering
     {
         if (batch.Count == 0) { return existing; }
 
-        if (existing.Count == 0) { return batch.SortEvents(orderBy, isDescending, groupBy, isGroupDescending); }
+        var context = new SortContext(orderBy, isDescending, groupBy, isGroupDescending);
 
-        var comparer = SelectComparer(orderBy, isDescending, groupBy, isGroupDescending);
-
-        var sortedBatch = new List<ResolvedEvent>(batch);
-        sortedBatch.Sort(comparer);
-
-        var result = new List<ResolvedEvent>(existing.Count + sortedBatch.Count);
-        int i = 0, j = 0;
-
-        while (i < existing.Count && j < sortedBatch.Count)
+        if (existing is SegmentedSortedList segmented && segmented.HasContext(context))
         {
-            result.Add(comparer(existing[i], sortedBatch[j]) <= 0 ? existing[i++] : sortedBatch[j++]);
+            return segmented.Append(batch);
         }
 
-        while (i < existing.Count) { result.Add(existing[i++]); }
+        Debug.Assert(
+            existing is not SegmentedSortedList,
+            "DisplayedEvents sort context drifted from the requested merge context.");
 
-        while (j < sortedBatch.Count) { result.Add(sortedBatch[j++]); }
-
-        return result.AsReadOnly();
+        return SegmentedSortedList.MergeFrom(existing, batch, context);
     }
 
     internal static Comparison<ResolvedEvent> SelectComparer(
