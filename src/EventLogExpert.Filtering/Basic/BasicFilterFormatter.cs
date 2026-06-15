@@ -112,6 +112,10 @@ public static class BasicFilterFormatter
                     stringBuilder.Append(
                         $"\"{EscapeStringLiteral(comparison.Value)}\", StringComparison.OrdinalIgnoreCase))");
                 }
+                else if (IsBareIntegerField(comparison.Property) && IsBareIntegerLiteral(comparison.Value))
+                {
+                    stringBuilder.Append(comparison.Value);
+                }
                 else
                 {
                     stringBuilder.Append($"\"{EscapeStringLiteral(comparison.Value)}\"");
@@ -162,11 +166,10 @@ public static class BasicFilterFormatter
     {
         if (matchMode == MatchMode.Many)
         {
-            // The Many shape ignores the operator (semantically Equals-Any-Of). Keywords gets the prefix template,
-            // everything else gets the closing-paren suffix template.
+            // The Many shape ignores the operator (semantically Equals-Any-Of). Keywords gets the prefix template;
+            // every other field (incl. numeric — the emitter coerces the string array) gets the bare closing paren.
             return property switch
             {
-                EventProperty.Id or EventProperty.Level => $"{property}.ToString())",
                 EventProperty.Keywords => $"{property}.Any",
                 _ => $"{property})"
             };
@@ -182,7 +185,6 @@ public static class BasicFilterFormatter
             },
             ComparisonOperator.Contains => property switch
             {
-                EventProperty.Id or EventProperty.ActivityId => $"{property}.ToString().Contains",
                 EventProperty.Keywords => $"{property}.Any(e => e.Contains",
                 EventProperty.UserId => $"{property} != null && {property}.Value.Contains",
                 _ => $"{property}.Contains"
@@ -195,12 +197,26 @@ public static class BasicFilterFormatter
             },
             ComparisonOperator.NotContains => property switch
             {
-                EventProperty.Id or EventProperty.ActivityId => $"!{property}.ToString().Contains",
                 EventProperty.Keywords => $"!{property}.Any(e => e.Contains",
                 EventProperty.UserId => $"{property} != null && !{property}.Value.Contains",
                 _ => $"!{property}.Contains"
             },
             _ => string.Empty
         };
+    }
+
+    private static bool IsBareIntegerField(EventProperty property) =>
+        property is EventProperty.Id or EventProperty.ProcessId or EventProperty.ThreadId;
+
+    private static bool IsBareIntegerLiteral(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) { return false; }
+
+        foreach (var character in value)
+        {
+            if (!char.IsAsciiDigit(character)) { return false; }
+        }
+
+        return int.TryParse(value, out _);
     }
 }

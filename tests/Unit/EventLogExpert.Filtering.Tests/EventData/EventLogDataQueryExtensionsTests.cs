@@ -48,6 +48,30 @@ public sealed class EventLogDataQueryExtensionsTests
     }
 
     [Fact]
+    public void EventLogData_GetEventValues_ForLogName_ShouldReturnPerEventChannelsNotTheDataName()
+    {
+        // Values come from each event's LogName (the channel on the record), not EventLogData.Name (the file
+        // path / descriptor) — so an .evtx import whose Name differs from the channel still yields the channels.
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(100, logName: "Security"),
+            FilterEventBuilder.CreateTestEvent(200, logName: "Security"),
+            FilterEventBuilder.CreateTestEvent(300, logName: "Application")
+        };
+
+        var logData = new EventLogData("saved-export.evtx", LogPathType.File, events);
+
+        // Act
+        var values = logData.GetEventValues(EventProperty.LogName).ToList();
+
+        // Assert
+        Assert.Equal(2, values.Count);
+        Assert.Contains("Security", values);
+        Assert.Contains("Application", values);
+        Assert.DoesNotContain("saved-export.evtx", values);
+    }
+
+    [Fact]
     public void EventLogData_GetEventValues_ForSource_ShouldReturnDistinctSources()
     {
         // Arrange

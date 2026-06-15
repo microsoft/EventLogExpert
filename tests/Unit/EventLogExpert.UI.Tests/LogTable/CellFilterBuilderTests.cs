@@ -77,6 +77,17 @@ public sealed class CellFilterBuilderTests
     }
 
     [Fact]
+    public void TryBuild_LogName_MatchesSameLogButNotDifferent()
+    {
+        var sourceEvent = FullEvent() with { LogName = "Application" };
+        var otherEvent = FullEvent() with { LogName = "System" };
+
+        Assert.True(CellFilterBuilder.TryBuild(sourceEvent, EventProperty.LogName, exclude: false, out var filter));
+        Assert.True(filter.Compiled!.Predicate(sourceEvent));
+        Assert.False(filter.Compiled!.Predicate(otherEvent));
+    }
+
+    [Fact]
     public void TryBuild_MultipleKeywords_MatchesAnyOfThem()
     {
         var sourceEvent = FullEvent() with { Keywords = ["Classic", "Audit Success"] };
@@ -141,6 +152,13 @@ public sealed class CellFilterBuilderTests
         var emptyEvent = EmptyFor(property);
 
         Assert.False(CellFilterBuilder.TryBuild(emptyEvent, property, exclude: false, out _));
+    }
+
+    [Fact]
+    public void TryGetDisplayValue_LogName_ReturnsLogName()
+    {
+        Assert.True(CellFilterBuilder.TryGetDisplayValue(FullEvent() with { LogName = "Application" }, EventProperty.LogName, out var value));
+        Assert.Equal("Application", value);
     }
 
     [Theory]

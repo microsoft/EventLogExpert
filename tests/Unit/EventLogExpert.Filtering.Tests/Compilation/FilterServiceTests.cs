@@ -381,7 +381,7 @@ public sealed class FilterServiceTests
     }
 
     [Theory]
-    [InlineData(EventProperty.Id, ComparisonOperator.Equals, MatchMode.Single, "100", "Id == \"100\"")]
+    [InlineData(EventProperty.Id, ComparisonOperator.Equals, MatchMode.Single, "100", "Id == 100")]
     [InlineData(EventProperty.Level, ComparisonOperator.Equals, MatchMode.Single, "Error", "Level == \"Error\"")]
     [InlineData(EventProperty.Source,
         ComparisonOperator.Equals,
@@ -425,7 +425,7 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryFormat_WhenIdToStringContains_ShouldGenerateCorrectComparison()
+    public void TryFormat_WhenIdContains_ShouldEmitBareContains()
     {
         // Arrange
         var source = CreateBasicFilter(
@@ -439,7 +439,7 @@ public sealed class FilterServiceTests
 
         // Assert
         Assert.True(result);
-        Assert.Equal("Id.ToString().Contains(\"10\", StringComparison.OrdinalIgnoreCase)", comparison);
+        Assert.Equal("Id.Contains(\"10\", StringComparison.OrdinalIgnoreCase)", comparison);
     }
 
     [Fact]
@@ -512,7 +512,7 @@ public sealed class FilterServiceTests
     }
 
     [Theory]
-    [InlineData(EventProperty.Id, ComparisonOperator.NotEqual, MatchMode.Single, "100", "Id != \"100\"")]
+    [InlineData(EventProperty.Id, ComparisonOperator.NotEqual, MatchMode.Single, "100", "Id != 100")]
     [InlineData(EventProperty.Level, ComparisonOperator.NotEqual, MatchMode.Single, "Error", "Level != \"Error\"")]
     public void TryFormat_WhenNotEqualOperator_ShouldGenerateCorrectComparison(
         EventProperty property,
@@ -579,7 +579,7 @@ public sealed class FilterServiceTests
 
         // Assert
         Assert.True(result);
-        Assert.Contains("Id == \"100\"", comparison);
+        Assert.Contains("Id == 100", comparison);
         Assert.Contains("Level == \"Error\"", comparison);
     }
 
@@ -748,7 +748,7 @@ public sealed class FilterServiceTests
 
         // Assert
         Assert.True(sourceResult);
-        Assert.Equal("Id == \"100\"", sourceComparison);
+        Assert.Equal("Id == 100", sourceComparison);
     }
 
     [Fact]
@@ -777,7 +777,7 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryFormat_WithBasicFilter_WhenMultiSelectNonKeywords_ShouldEmitContainsToStringExpression()
+    public void TryFormat_WithBasicFilter_WhenMultiSelectNonKeywords_ShouldEmitBareMultiSelectContains()
     {
         // Arrange
         var source = new BasicFilter(
@@ -797,7 +797,7 @@ public sealed class FilterServiceTests
         Assert.True(sourceResult);
 
         Assert.Equal(
-            "(new[] {\"Error\", \"Warning\"}).Contains(Level.ToString())",
+            "(new[] {\"Error\", \"Warning\"}).Contains(Level)",
             sourceComparison);
     }
 
@@ -843,7 +843,7 @@ public sealed class FilterServiceTests
                     false)
             ]);
 
-        var expected = "Id == \"100\" && Source == \"Kernel\"";
+        var expected = "Id == 100 && Source == \"Kernel\"";
 
         // Act
         var result = BasicFilterFormatter.TryFormat(source, out var comparison);
@@ -888,7 +888,7 @@ public sealed class FilterServiceTests
             ]);
 
         var expected =
-            "Id == \"100\" || Level == \"Error\"" +
+            "Id == 100 || Level == \"Error\"" +
             " && Source.Contains(\"Kernel\", StringComparison.OrdinalIgnoreCase)";
 
         // Act

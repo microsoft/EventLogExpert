@@ -19,7 +19,6 @@ public sealed class BasicFilterDecomposerTests
     public static IEnumerable<object[]> SingleValueRoundTrips() =>
         from property in EachBasicFilterProperty()
         from op in EachSingleValueOperator()
-        where SupportsSingleValueRoundTrip(property, op)
         let value = SingleValueFor(property, op)
         where value is not null
         select new object[] { property, op, value };
@@ -262,7 +261,6 @@ public sealed class BasicFilterDecomposerTests
     }
 
     [Theory]
-    [InlineData("LogName == \"Application\"")]
     [InlineData("ComputerName == \"SERVER01\"")]
     [InlineData("RecordId == 1234567890123")]
     public void TryDecompose_WhenPropertyOutsideBasicFilterVocabulary_RefusesAsAdvancedOnly(string filter)
@@ -439,6 +437,7 @@ public sealed class BasicFilterDecomposerTests
             EventProperty.ProcessId => ["4", "8"],
             EventProperty.ThreadId => ["8", "16"],
             EventProperty.UserId => ["S-1-5-18", "S-1-5-19"],
+            EventProperty.LogName => ["Application", "System"],
             _ => null
         };
 
@@ -458,19 +457,7 @@ public sealed class BasicFilterDecomposerTests
             EventProperty.UserId => "S-1-5-18",
             EventProperty.Description => "An error occurred",
             EventProperty.Xml => "<x/>",
+            EventProperty.LogName => "Application",
             _ => null
         };
-
-    private static bool SupportsSingleValueRoundTrip(EventProperty property, ComparisonOperator op)
-    {
-        // Formatter / lowerer asymmetry on ProcessId / ThreadId Contains: formatter emits a Contains-on-string
-        // shape the lowerer's Contains-on-string branch never matches, so the round-trip is not representable.
-        if (op is ComparisonOperator.Contains or ComparisonOperator.NotContains
-            && property is EventProperty.ProcessId or EventProperty.ThreadId)
-        {
-            return false;
-        }
-
-        return true;
-    }
 }

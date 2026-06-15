@@ -111,9 +111,49 @@ internal static class Emitter
 
         return node.Field switch
         {
-            ResolvedEventField.Id => e => e.Id.ToString(CultureInfo.InvariantCulture).Contains(needle, comparison),
+            ResolvedEventField.Id => e =>
+            {
+                Span<char> buffer = stackalloc char[11];
+
+                return e.Id.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture)
+                    && buffer[..written].Contains(needle, comparison);
+            },
+            ResolvedEventField.ProcessId => e =>
+            {
+                if (!e.ProcessId.HasValue) { return false; }
+
+                Span<char> buffer = stackalloc char[11];
+
+                return e.ProcessId.Value.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture)
+                    && buffer[..written].Contains(needle, comparison);
+            },
+            ResolvedEventField.ThreadId => e =>
+            {
+                if (!e.ThreadId.HasValue) { return false; }
+
+                Span<char> buffer = stackalloc char[11];
+
+                return e.ThreadId.Value.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture)
+                    && buffer[..written].Contains(needle, comparison);
+            },
+            ResolvedEventField.RecordId => e =>
+            {
+                if (!e.RecordId.HasValue) { return false; }
+
+                Span<char> buffer = stackalloc char[20];
+
+                return e.RecordId.Value.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture)
+                    && buffer[..written].Contains(needle, comparison);
+            },
             ResolvedEventField.ActivityId => e =>
-                e.ActivityId.HasValue && e.ActivityId.Value.ToString().Contains(needle, comparison),
+            {
+                if (!e.ActivityId.HasValue) { return false; }
+
+                Span<char> buffer = stackalloc char[36];
+
+                return e.ActivityId.Value.TryFormat(buffer, out var written, "D")
+                    && buffer[..written].Contains(needle, comparison);
+            },
             ResolvedEventField.UserId => e => e.UserId is not null && e.UserId.Value.Contains(needle, comparison),
             ResolvedEventField.ComputerName => e => e.ComputerName.Contains(needle, comparison),
             ResolvedEventField.Description => e => e.Description.Contains(needle, comparison),

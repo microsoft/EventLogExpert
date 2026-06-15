@@ -65,6 +65,7 @@ internal static class CellFilterBuilder
             EventProperty.ProcessId => @event.ProcessId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             EventProperty.ThreadId => @event.ThreadId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             EventProperty.UserId => @event.UserId?.Value ?? string.Empty,
+            EventProperty.LogName => @event.LogName,
             _ => string.Empty
         };
 

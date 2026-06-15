@@ -33,7 +33,7 @@ public sealed class BasicFilterFormatterTests
         var result = BasicFilterFormatter.TryFormat(source, out var formatted);
 
         Assert.True(result);
-        Assert.Equal("Id == \"100\"", formatted);
+        Assert.Equal("Id == 100", formatted);
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public sealed class BasicFilterFormatterTests
         var result = BasicFilterFormatter.TryFormat(source, true, out var formatted);
 
         Assert.True(result);
-        Assert.Equal("Id == \"100\" && Level == \"Error\"", formatted);
+        Assert.Equal("Id == 100 && Level == \"Error\"", formatted);
     }
 
     [Fact]

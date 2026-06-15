@@ -89,7 +89,7 @@ public sealed class FilterDraftModeTests
         draft.ApplyModeSwitch(FilterMode.Advanced);
 
         Assert.Equal(FilterMode.Advanced, draft.Mode);
-        Assert.Equal("Id == \"100\"", draft.ComparisonText);
+        Assert.Equal("Id == 100", draft.ComparisonText);
         Assert.Null(draft.Comparison.Value);
         Assert.Empty(draft.Predicates);
     }
@@ -357,7 +357,7 @@ public sealed class FilterDraftModeTests
         Assert.NotNull(saved);
         Assert.Equal(FilterMode.Basic, saved.Mode);
         Assert.NotNull(saved.BasicFilter);
-        Assert.Equal("Id == \"100\"", saved.ComparisonText);
+        Assert.Equal("Id == 100", saved.ComparisonText);
     }
 
     [Fact]

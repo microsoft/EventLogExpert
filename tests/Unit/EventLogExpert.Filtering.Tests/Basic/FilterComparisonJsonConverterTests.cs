@@ -13,7 +13,7 @@ public sealed class FilterComparisonJsonConverterTests
     {
         // Pairs with the per-ordinal Read_LegacyCategoryKey theory: adding or removing an EventProperty
         // value would leave that theory passing while still corrupting legacy reads for the missing ordinal.
-        Assert.Equal(11, Enum.GetValues<EventProperty>().Length);
+        Assert.Equal(12, Enum.GetValues<EventProperty>().Length);
     }
 
     [Fact]
