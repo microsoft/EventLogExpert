@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "wins-registration-errors",
+      "name": "WINS name registration errors",
+      "purpose": "WINS service errors and warnings, including name registration and replication problems.",
+      "group": "Wins",
+      "channels": [ "WINS" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] } }
+      ]
+    }
+  ]
+}

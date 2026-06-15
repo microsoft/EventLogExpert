@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "failed-signins-brute-force",
+      "name": "Failed sign-ins / brute force",
+      "purpose": "Failed logon attempts that reveal brute-force, password-spray, or bad-credential activity (4625).",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "value": "4625" }
+        }
+      ]
+    },
+    {
+      "id": "account-lockouts",
+      "name": "Account lockouts",
+      "purpose": "Accounts locked out after repeated failed logons (4740).",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "value": "4740" }
+        }
+      ]
+    },
+    {
+      "id": "successful-signins",
+      "name": "Successful sign-ins",
+      "purpose": "Successful account logons for session and access auditing (4624).",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "value": "4624" }
+        }
+      ]
+    },
+    {
+      "id": "explicit-credentials-runas",
+      "name": "Explicit credentials / RunAs",
+      "purpose": "Logons using explicit credentials such as RunAs (4648); useful for lateral-movement hunting.",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "value": "4648" }
+        }
+      ]
+    },
+    {
+      "id": "special-privilege-logon",
+      "name": "Special-privilege logon",
+      "purpose": "Logons granted sensitive privileges, including administrative equivalents (4672).",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "value": "4672" }
+        }
+      ]
+    },
+    {
+      "id": "account-management",
+      "name": "Account management",
+      "purpose": "User account create, enable, disable, delete, password-reset, and change events (4720-4781).",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4720", "4722", "4723", "4724", "4725", "4726", "4738", "4781" ] }
+        }
+      ]
+    },
+    {
+      "id": "group-membership-changes",
+      "name": "Group membership changes",
+      "purpose": "Security-group member add and remove events (4728, 4729, 4732, 4733, 4756).",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 6,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4728", "4729", "4732", "4733", "4756" ] }
+        }
+      ]
+    },
+    {
+      "id": "kerberos-ticket-activity",
+      "name": "Kerberos & ticket activity",
+      "purpose": "Kerberos TGT and service-ticket requests and failures (4768, 4769, 4771, 4772).",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 7,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4768", "4769", "4771", "4772" ] }
+        }
+      ]
+    },
+    {
+      "id": "credential-validation-ntlm",
+      "name": "Credential validation (NTLM)",
+      "purpose": "NTLM credential validation events on the authenticating server (4776).",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 8,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "value": "4776" }
+        }
+      ]
+    },
+    {
+      "id": "logoff-activity",
+      "name": "Logoff activity",
+      "purpose": "Account logoff and session-end events (4634, 4647).",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 9,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4634", "4647" ] }
+        }
+      ]
+    },
+    {
+      "id": "audit-security-policy-changes",
+      "name": "Audit / security policy changes",
+      "purpose": "Audit-log clear (1102) and audit-policy change (4719) events; classic defense-evasion signals.",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 10,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1102", "4719" ] }
+        }
+      ]
+    }
+  ]
+}

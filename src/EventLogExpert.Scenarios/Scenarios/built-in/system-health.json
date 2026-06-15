@@ -6,7 +6,6 @@
       "name": "Recent Critical & Error Events",
       "purpose": "Surface the most severe System-log events first.",
       "group": "SystemHealth",
-      "tags": [ "system", "sysadmin", "failures" ],
       "channels": [ "System" ],
       "requiresAdmin": false,
       "priority": 0,
@@ -23,7 +22,6 @@
       "name": "Failed services at boot",
       "purpose": "Service Control Manager failures that block services from starting.",
       "group": "SystemHealth",
-      "tags": [ "system", "sysadmin", "failures" ],
       "channels": [ "System" ],
       "requiresAdmin": false,
       "priority": 0,
@@ -39,15 +37,33 @@
       ]
     },
     {
+      "id": "crashing-services",
+      "name": "Crashing services",
+      "purpose": "Services that terminated unexpectedly and their recovery actions (SCM 7031, 7034).",
+      "group": "SystemHealth",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Service Control Manager" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "7031", "7034" ] } }
+          ]
+        }
+      ]
+    },
+    {
       "id": "newly-installed-services",
       "name": "Newly installed services",
       "purpose": "A new service was installed (Service Control Manager event 7045); also a threat signal.",
       "group": "SystemHealth",
-      "tags": [ "system", "sysadmin", "audit" ],
       "channels": [ "System" ],
       "requiresAdmin": false,
-      "priority": 0,
-      "order": 2,
+      "priority": 1,
+      "order": 3,
       "version": 1,
       "filters": [
         {
@@ -59,15 +75,75 @@
       ]
     },
     {
+      "id": "boot-driver-failures",
+      "name": "Boot driver failures",
+      "purpose": "A boot-start driver failed to load (SCM 7026) or a device driver reported a problem (Kernel-PnP 219).",
+      "group": "SystemHealth",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Service Control Manager" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "7026" } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-PnP" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "219" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "device-pnp-install-problems",
+      "name": "Device / PnP install problems",
+      "purpose": "Plug and Play device and driver install failures (Kernel-PnP 219, 411).",
+      "group": "SystemHealth",
+      "channels": [ "System" ],
+      "optionalChannels": [ "Microsoft-Windows-Kernel-PnP/Configuration" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-PnP" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "219", "411" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "umdf-driver-failures",
+      "name": "UMDF driver failures",
+      "purpose": "User-mode driver framework reported a driver fault (10110, 10111).",
+      "group": "SystemHealth",
+      "channels": [ "System" ],
+      "optionalChannels": [ "Microsoft-Windows-DriverFrameworks-UserMode/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 6,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-DriverFrameworks-UserMode" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "10110", "10111" ] } }
+          ]
+        }
+      ]
+    },
+    {
       "id": "unexpected-restart-power-loss-bsod",
       "name": "Unexpected restart / power loss / BSOD",
       "purpose": "Dirty shutdowns: Kernel-Power 41, BugCheck 1001, and EventLog 6008.",
       "group": "SystemHealth",
-      "tags": [ "system", "sysadmin", "failures" ],
       "channels": [ "System" ],
       "requiresAdmin": false,
       "priority": 0,
-      "order": 3,
+      "order": 7,
       "version": 1,
       "filters": [
         {
@@ -83,27 +159,156 @@
       ]
     },
     {
-      "id": "service-install-and-control-audit",
-      "name": "Service install & control audit",
-      "purpose": "Correlate service installs across the System log (7045) and the Security audit log (4697).",
+      "id": "boot-shutdown-restart-timeline",
+      "name": "Boot / shutdown / restart timeline",
+      "purpose": "Clean service start/stop (EventLog 6005/6006/6008), shutdown initiator (User32 1074), and kernel boot/shutdown (12/13).",
       "group": "SystemHealth",
-      "tags": [ "system", "security", "audit" ],
-      "channels": [ "System", "Security" ],
-      "requiresAdmin": true,
+      "channels": [ "System" ],
+      "requiresAdmin": false,
       "priority": 1,
-      "order": 4,
+      "order": 8,
       "version": 1,
       "filters": [
         {
-          "comparison": { "property": "LogName", "value": "System" },
+          "comparison": { "property": "Source", "value": "EventLog" },
           "predicates": [
-            { "joinWithAny": false, "comparison": { "property": "Id", "value": "7045" } }
+            { "joinWithAny": false, "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6005", "6006", "6008" ] } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "User32" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "1074" } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-General" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "matchMode": "Many", "values": [ "12", "13" ] } }
           ]
-        },
+        }
+      ]
+    },
+    {
+      "id": "failed-fast-startup-boot-timeout",
+      "name": "Failed fast-startup / boot timeout",
+      "purpose": "Kernel-Boot reported a fast-startup or boot-sequence problem (16, 27, 29).",
+      "group": "SystemHealth",
+      "channels": [ "System" ],
+      "optionalChannels": [ "Microsoft-Windows-Kernel-Boot/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 9,
+      "version": 1,
+      "filters": [
         {
-          "comparison": { "property": "LogName", "value": "Security" },
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-Boot" },
           "predicates": [
-            { "joinWithAny": false, "comparison": { "property": "Id", "value": "4697" } }
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "16", "27", "29" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "slow-boot-shutdown-causes",
+      "name": "Slow boot / shutdown causes",
+      "purpose": "Diagnostics-Performance boot (100-103) and shutdown (200-203) degradation events.",
+      "group": "SystemHealth",
+      "channels": [ "Microsoft-Windows-Diagnostics-Performance/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 10,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "100", "101", "102", "103", "200", "201", "202", "203" ] }
+        }
+      ]
+    },
+    {
+      "id": "fatal-hardware-errors-whea",
+      "name": "Fatal hardware errors (WHEA)",
+      "purpose": "Windows Hardware Error Architecture reported a fatal hardware error (1, 18).",
+      "group": "SystemHealth",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 11,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-WHEA-Logger" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1", "18" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "corrected-hardware-errors-whea",
+      "name": "Corrected hardware errors (WHEA)",
+      "purpose": "Windows Hardware Error Architecture corrected-error warnings (17, 19, 47).",
+      "group": "SystemHealth",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 12,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-WHEA-Logger" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "17", "19", "47" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "out-of-memory-resource-exhaustion",
+      "name": "Out-of-memory / resource exhaustion",
+      "purpose": "Windows diagnosed a low virtual-memory condition (Resource-Exhaustion-Detector 2004).",
+      "group": "SystemHealth",
+      "channels": [ "System" ],
+      "optionalChannels": [ "Microsoft-Windows-Resource-Exhaustion-Detector/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 13,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Resource-Exhaustion-Detector" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "2004" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cpu-thermal-firmware-throttling",
+      "name": "CPU thermal / firmware throttling",
+      "purpose": "Processor performance limited by system firmware or thermal conditions (Kernel-Processor-Power 37).",
+      "group": "SystemHealth",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 14,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-Processor-Power" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "37" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sleep-hibernate-resume-transitions",
+      "name": "Sleep / hibernate / resume transitions",
+      "purpose": "Power-state transitions for tracking sleep, hibernate, and resume (Kernel-Power 42, 107, 109).",
+      "group": "SystemHealth",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 15,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-Power" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "42", "107", "109" ] } }
           ]
         }
       ]

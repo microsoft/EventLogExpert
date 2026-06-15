@@ -268,7 +268,6 @@ internal static partial class ScenarioCatalogLoader
                 Name = dto.Name!,
                 Purpose = dto.Purpose!,
                 Group = group,
-                Tags = [.. dto.Tags ?? []],
                 Channels = [.. dto.Channels!],
                 OptionalChannels = [.. dto.OptionalChannels ?? []],
                 Gating = gating,

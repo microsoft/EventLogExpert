@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "iis-app-pool-crashes",
+      "name": "App pool / WAS worker crashes & rapid-fail",
+      "purpose": "Windows Process Activation Service worker-process crashes and rapid-fail protection (WAS 5009, 5011, 5021, 5057, 5117, 5139, 5186).",
+      "group": "WebAndIis",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-WAS" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5009", "5011", "5021", "5057", "5186" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "w3wp-dotnet-crashes",
+      "name": "w3wp .NET runtime crashes",
+      "purpose": "IIS worker-process crashes from the .NET runtime and Application Error whose fault module is w3wp (1000, 1023, 1026).",
+      "group": "WebAndIis",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "matchMode": "Many", "values": [ ".NET Runtime", "Application Error" ] },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1000", "1023", "1026" ] } },
+            { "joinWithAny": false, "comparison": { "property": "Description", "operator": "Contains", "value": "w3wp" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "httpsys-listener-ssl-errors",
+      "name": "HTTP.sys SSL configuration errors",
+      "purpose": "HTTP.sys SSL configuration errors for an endpoint (HTTP.sys event 15021).",
+      "group": "WebAndIis",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "matchMode": "Many", "values": [ "Microsoft-Windows-HttpEvent", "Http" ] },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "15021" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aspnet-unhandled-exceptions",
+      "name": "ASP.NET unhandled exceptions & restarts",
+      "purpose": "ASP.NET unhandled exceptions and worker restarts (1309, 1310, 1325).",
+      "group": "WebAndIis",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "ASP.NET" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1309", "1310", "1325" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ancm-startup-failure",
+      "name": "ASP.NET Core (ANCM) startup failure",
+      "purpose": "ASP.NET Core Module failed to start an application (IIS AspNetCore Module V2 1010).",
+      "group": "WebAndIis",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "matchMode": "Many", "values": [ "IIS AspNetCore Module V2", "IIS AspNetCore Module" ] },
+          "predicates": [
+            { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Critical", "Error" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "iis-native-module-install",
+      "name": "IIS native module install",
+      "purpose": "A native IIS module was registered (Configuration 29); a primary web-shell backdoor persistence signal.",
+      "group": "WebAndIis",
+      "channels": [ "Microsoft-Windows-IIS-Configuration/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "value": "29" },
+          "predicates": [
+            { "comparison": { "property": "Description", "operator": "Contains", "value": "/system.webServer/modules/add" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "iis-etw-logging-disabled",
+      "name": "IIS ETW logging disabled",
+      "purpose": "The ETW logging target was removed from IIS (Configuration 29); a defense-evasion tactic.",
+      "group": "WebAndIis",
+      "channels": [ "Microsoft-Windows-IIS-Configuration/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 6,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "value": "29" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Description", "operator": "Contains", "value": "@logTargetW3C" } },
+            { "joinWithAny": false, "comparison": { "property": "Description", "operator": "Contains", "value": "ETW" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "iis-http-logging-disabled",
+      "name": "IIS HTTP logging disabled",
+      "purpose": "HTTP request logging was disabled for a site (Configuration 29); covers up attacker requests.",
+      "group": "WebAndIis",
+      "channels": [ "Microsoft-Windows-IIS-Configuration/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 7,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "value": "29" },
+          "predicates": [
+            { "comparison": { "property": "Description", "operator": "Contains", "value": "/system.webServer/httpLogging/@dontLog" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "iis-configuration-changes",
+      "name": "IIS configuration changes & errors",
+      "purpose": "IIS configuration errors and warnings from the configuration operational log.",
+      "group": "WebAndIis",
+      "channels": [ "Microsoft-Windows-IIS-Configuration/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 8,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] } }
+      ]
+    }
+  ]
+}

@@ -18,8 +18,6 @@ public sealed record ScenarioDefinition
 
     public required ScenarioGroup Group { get; init; }
 
-    public ImmutableArray<string> Tags { get; init; } = [];
-
     /// <summary>Required channels; more than one denotes a combined scenario.</summary>
     public required ImmutableArray<string> Channels { get; init; }
 

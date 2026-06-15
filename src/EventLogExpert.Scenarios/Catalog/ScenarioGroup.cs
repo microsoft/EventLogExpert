@@ -13,6 +13,17 @@ public enum ScenarioGroup
     Network,
     Storage,
     UpdatesAndPolicy,
-    ServerRoles,
-    MicrosoftProducts
+    ActiveDirectory,
+    DnsServer,
+    DhcpServer,
+    NpsAndRras,
+    Wins,
+    WebAndIis,
+    VirtualizationAndClustering,
+    FilePrintAndStorage,
+    SqlServer,
+    Exchange,
+    SharePoint,
+    DefenderForEndpoint,
+    Office
 }

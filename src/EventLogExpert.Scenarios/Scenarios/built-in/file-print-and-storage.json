@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "print-spooler-failures",
+      "name": "Print spooler & job failures",
+      "purpose": "Print spooler and print-job failures (PrintService 372, 808).",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Microsoft-Windows-PrintService/Admin" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "372", "808" ] } }
+      ]
+    },
+    {
+      "id": "print-document-audit",
+      "name": "Print job audit (document printed)",
+      "purpose": "Document-printed audit events with user, printer, and document detail (PrintService 307).",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Microsoft-Windows-PrintService/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "307" } }
+      ]
+    },
+    {
+      "id": "printer-share-changes",
+      "name": "Printer share created / removed",
+      "purpose": "Printer share creation and removal for print-server change auditing (PrintService 848, 849).",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Microsoft-Windows-PrintService/Admin" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "848", "849" ] } }
+      ]
+    },
+    {
+      "id": "printer-driver-installation",
+      "name": "Printer driver installation",
+      "purpose": "A printer driver was added (PrintService 316); relevant to PrintNightmare-style abuse.",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Microsoft-Windows-PrintService/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "316" } }
+      ]
+    },
+    {
+      "id": "fsrm-quota-file-screen",
+      "name": "FSRM quota & file-screen events",
+      "purpose": "File Server Resource Manager quota and file-screen activity (SrmSvc).",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Source", "value": "SrmSvc" } }
+      ]
+    },
+    {
+      "id": "windows-server-backup-failures",
+      "name": "Windows Server Backup failures",
+      "purpose": "Windows Server Backup job failures (Backup 8, 9, 19, 49, 517, 521, 561).",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Microsoft-Windows-Backup" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "8", "9", "19", "49", "517", "521", "561" ] } }
+      ]
+    },
+    {
+      "id": "iscsi-connection-drops",
+      "name": "iSCSI connection drops & latency",
+      "purpose": "iSCSI initiator connection drops and latency events (iScsiPrt 7, 9, 20, 39, 129).",
+      "group": "FilePrintAndStorage",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 6,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "iScsiPrt" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "7", "9", "20", "39", "129" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dfs-namespace-health",
+      "name": "DFS namespace health & referrals",
+      "purpose": "DFS Namespace service health and referral problems (DfsSvc).",
+      "group": "FilePrintAndStorage",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 7,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Source", "value": "DfsSvc" } }
+      ]
+    },
+    {
+      "id": "data-deduplication-failures",
+      "name": "Data deduplication failures",
+      "purpose": "Data Deduplication errors and warnings, including job and integrity failures.",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Microsoft-Windows-Deduplication/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 8,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] } }
+      ]
+    },
+    {
+      "id": "smb1-protocol-negotiated",
+      "name": "SMB1 protocol negotiated",
+      "purpose": "A client negotiated the deprecated SMB1 protocol with this server (SMBServer 3000).",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Microsoft-Windows-SMBServer/Operational" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 9,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "3000" } }
+      ]
+    },
+    {
+      "id": "smb-server-security-events",
+      "name": "SMB server security posture",
+      "purpose": "SMB server unencrypted-access rejection, preauth integrity failure, anonymous access denied, and SMB2/3-disabled events (1003, 1005, 1009, 1024).",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Microsoft-Windows-SMBServer/Operational" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 10,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1003", "1005", "1009", "1024" ] } }
+      ]
+    },
+    {
+      "id": "smb-anonymous-access-denied",
+      "name": "SMB anonymous share access denied",
+      "purpose": "The server refused anonymous (null-session) access to a share (SMBServer 1007).",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Microsoft-Windows-SMBServer/Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 11,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "1007" } }
+      ]
+    },
+    {
+      "id": "storage-replica-errors",
+      "name": "Storage Replica errors",
+      "purpose": "Storage Replica replication errors and warnings (StorageReplica Admin, including 4004 and 5014).",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Microsoft-Windows-StorageReplica/Admin" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 12,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] } }
+      ]
+    },
+    {
+      "id": "file-share-changes-audit",
+      "name": "File share created / modified / deleted (audit)",
+      "purpose": "Network share lifecycle audit events (5142, 5143, 5144); requires File Share auditing.",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 13,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5142", "5143", "5144" ] } }
+      ]
+    },
+    {
+      "id": "file-share-access-audit",
+      "name": "File share session access (audit)",
+      "purpose": "Network share first-access-per-session audit events (5140); requires File Share auditing.",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 14,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "5140" } }
+      ]
+    },
+    {
+      "id": "work-folders-server-errors",
+      "name": "Work Folders server sync errors",
+      "purpose": "Work Folders (SyncShare) server-side sync errors and warnings.",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Microsoft-Windows-SyncShare/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 15,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] } }
+      ]
+    },
+    {
+      "id": "storage-migration-failures",
+      "name": "Storage Migration Service failures",
+      "purpose": "Storage Migration Service orchestrator errors during inventory, transfer, and cutover.",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Microsoft-Windows-StorageMigrationService/Admin" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 16,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Critical", "Error" ] } }
+      ]
+    }
+  ]
+}

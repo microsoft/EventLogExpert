@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "nps-radius-authentication",
+      "name": "NPS / RADIUS authentication",
+      "purpose": "Network Policy Server granted or denied network access (6272, 6273, 6278).",
+      "group": "NpsAndRras",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6272", "6273", "6278" ] } }
+      ]
+    },
+    {
+      "id": "nps-radius-lockout",
+      "name": "NPS / RADIUS account lockout",
+      "purpose": "NPS locked an account after repeated failed authentications (6279); a brute-force signal.",
+      "group": "NpsAndRras",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "6279" } }
+      ]
+    },
+    {
+      "id": "nps-nap-quarantine",
+      "name": "NPS NAP quarantine / probation",
+      "purpose": "NPS placed a client in quarantine or probation after a health check (6276, 6277).",
+      "group": "NpsAndRras",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6276", "6277" ] } }
+      ]
+    },
+    {
+      "id": "nps-requests-discarded",
+      "name": "NPS requests discarded",
+      "purpose": "NPS discarded an authentication or accounting request due to policy or configuration faults (6274, 6275).",
+      "group": "NpsAndRras",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6274", "6275" ] } }
+      ]
+    },
+    {
+      "id": "vpn-rras-failures",
+      "name": "VPN & RRAS connectivity failures",
+      "purpose": "Routing and Remote Access and RAS errors and warnings (Rasman, RemoteAccess, RasServer).",
+      "group": "NpsAndRras",
+      "channels": [ "System" ],
+      "optionalChannels": [ "Microsoft-Windows-RemoteAccess-MgmtClient/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "matchMode": "Many", "values": [ "Rasman", "RemoteAccess", "Microsoft-Windows-RasServer" ] },
+          "predicates": [
+            { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] } }
+          ]
+        }
+      ]
+    }
+  ]
+}

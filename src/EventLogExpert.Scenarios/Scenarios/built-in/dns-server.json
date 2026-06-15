@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "dns-server-errors-zone-health",
+      "name": "DNS Server errors & zone health",
+      "purpose": "DNS Server errors and warnings plus key zone-health events (4004, 4015, 4016, 6522, 6702).",
+      "group": "DnsServer",
+      "channels": [ "DNS Server" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] },
+          "predicates": [
+            { "joinWithAny": true, "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4004", "4015", "4016", "6522", "6702" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dns-server-plugin-dll-load",
+      "name": "DNS Server plugin DLL load",
+      "purpose": "DNS server-level plugin DLL load events (150, 770, 771); the mechanism of the DnsAdmins-to-DC escalation.",
+      "group": "DnsServer",
+      "channels": [ "DNS Server" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "150", "770", "771" ] } }
+      ]
+    },
+    {
+      "id": "dns-unauthorized-zone-transfer",
+      "name": "DNS unauthorized zone transfer",
+      "purpose": "Zone-transfer requests for non-authoritative zones (6004); a reconnaissance signal.",
+      "group": "DnsServer",
+      "channels": [ "DNS Server" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "6004" } }
+      ]
+    },
+    {
+      "id": "dns-zone-record-changes-audit",
+      "name": "DNS zone & record changes (audit)",
+      "purpose": "DNS zone and resource-record change auditing (513-523).",
+      "group": "DnsServer",
+      "channels": [ "Microsoft-Windows-DNS-Server/Audit" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "513", "514", "515", "516", "517", "518", "519", "520", "521", "522", "523" ] } }
+      ]
+    },
+    {
+      "id": "dns-server-config-changes-audit",
+      "name": "DNS server config changes (audit)",
+      "purpose": "DNS server-level configuration changes such as forwarders, root hints, and scopes (537, 540-543, 548, 557).",
+      "group": "DnsServer",
+      "channels": [ "Microsoft-Windows-DNS-Server/Audit" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "537", "540", "541", "542", "543", "548", "557" ] } }
+      ]
+    },
+    {
+      "id": "dnssec-signing-key-rollover",
+      "name": "DNSSEC signing & key rollover",
+      "purpose": "DNSSEC zone sign, unsign, re-sign, and key rollover events (525-531, 533).",
+      "group": "DnsServer",
+      "channels": [ "Microsoft-Windows-DNS-Server/Audit" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "525", "526", "527", "528", "529", "530", "531", "533" ] } }
+      ]
+    },
+    {
+      "id": "dns-response-policy-changes",
+      "name": "DNS response-policy & client-subnet changes",
+      "purpose": "DNS policy and client-subnet record changes that can redirect resolution (574-582).",
+      "group": "DnsServer",
+      "channels": [ "Microsoft-Windows-DNS-Server/Audit" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 6,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "574", "575", "576", "577", "578", "579", "580", "581", "582" ] } }
+      ]
+    },
+    {
+      "id": "dns-analytic-query-failures",
+      "name": "DNS analytic query failures",
+      "purpose": "Query-level DNS resolution failures from the Analytical log when it is enabled (258, 259, 262).",
+      "group": "DnsServer",
+      "channels": [ "Microsoft-Windows-DNS-Server/Analytical" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 7,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Level", "value": "Error" } }
+      ]
+    }
+  ]
+}

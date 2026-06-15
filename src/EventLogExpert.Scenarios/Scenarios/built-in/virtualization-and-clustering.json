@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "hyperv-vm-health",
+      "name": "Hyper-V VM health",
+      "purpose": "Critical and error events across the Hyper-V VMMS, Worker, and Hypervisor admin logs.",
+      "group": "VirtualizationAndClustering",
+      "channels": [ "Microsoft-Windows-Hyper-V-VMMS/Admin", "Microsoft-Windows-Hyper-V-Worker/Admin", "Microsoft-Windows-Hyper-V-Hypervisor/Admin" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "LogName", "value": "Microsoft-Windows-Hyper-V-VMMS/Admin" }, "predicates": [ { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Critical", "Error" ] } } ] },
+        { "comparison": { "property": "LogName", "value": "Microsoft-Windows-Hyper-V-Worker/Admin" }, "predicates": [ { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Critical", "Error" ] } } ] },
+        { "comparison": { "property": "LogName", "value": "Microsoft-Windows-Hyper-V-Hypervisor/Admin" }, "predicates": [ { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Critical", "Error" ] } } ] }
+      ]
+    },
+    {
+      "id": "hyperv-live-migration-failures",
+      "name": "Hyper-V live migration failures",
+      "purpose": "Hyper-V live migration failures (VMMS 21502, 21026).",
+      "group": "VirtualizationAndClustering",
+      "channels": [ "Microsoft-Windows-Hyper-V-VMMS/Admin" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "21502", "21026" ] } }
+      ]
+    },
+    {
+      "id": "hyperv-replica-failures",
+      "name": "Hyper-V Replica failures",
+      "purpose": "Hyper-V Replica replication failures (VMMS 24004, 24026, 29202, 29206, 29210, 29220).",
+      "group": "VirtualizationAndClustering",
+      "channels": [ "Microsoft-Windows-Hyper-V-VMMS/Admin" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "24004", "24026", "29202", "29206", "29210" ] } }
+      ]
+    },
+    {
+      "id": "hyperv-vswitch-health",
+      "name": "Hyper-V virtual switch health",
+      "purpose": "Hyper-V virtual switch errors and warnings (VmSwitch 10, 15, 113).",
+      "group": "VirtualizationAndClustering",
+      "channels": [ "Microsoft-Windows-Hyper-V-VmSwitch/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "10", "15", "113" ] } }
+      ]
+    },
+    {
+      "id": "cluster-node-quarantine",
+      "name": "Cluster node quarantine",
+      "purpose": "A failover cluster node was quarantined after consecutive failures (FailoverClustering 1672, 1676).",
+      "group": "VirtualizationAndClustering",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1672", "1676" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cluster-service-fatal",
+      "name": "Cluster service fatal errors",
+      "purpose": "Failover cluster service self-termination events (FailoverClustering 1000, 1001, 1006, 1073, 1080, 1092).",
+      "group": "VirtualizationAndClustering",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1000", "1001", "1006", "1073", "1080", "1092" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cluster-network-partition",
+      "name": "Cluster network partition",
+      "purpose": "Failover cluster network interface and partition failures (FailoverClustering 1127, 1129, 1130, 1553, 1554).",
+      "group": "VirtualizationAndClustering",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 6,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1127", "1129", "1130", "1553", "1554" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cluster-role-failover-exhausted",
+      "name": "Cluster role failover exhausted",
+      "purpose": "Clustered roles that exceeded their failover threshold and were left failed (FailoverClustering 1146, 1250, 1254, 1255).",
+      "group": "VirtualizationAndClustering",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 7,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1146", "1250", "1254", "1255" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cluster-quorum-db-integrity",
+      "name": "Cluster quorum & database integrity",
+      "purpose": "Failover cluster quorum loss and database corruption events (FailoverClustering 1057, 1070, 1080, 1547, 1564, 1575).",
+      "group": "VirtualizationAndClustering",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 8,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1057", "1070", "1080", "1547", "1564", "1575" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cluster-disk-resource-failures",
+      "name": "Cluster disk resource failures",
+      "purpose": "Clustered disk and storage resource failures (FailoverClustering 1034, 1035, 1037, 1038, 1069).",
+      "group": "VirtualizationAndClustering",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 9,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1034", "1035", "1037", "1038", "1069" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s2d-disk-volume-health",
+      "name": "Storage Spaces Direct disk & volume health",
+      "purpose": "Storage Spaces Direct physical disk and volume health transitions (StorageSpaces-Driver 311, 315, 316, 157, 163, 164).",
+      "group": "VirtualizationAndClustering",
+      "channels": [ "Microsoft-Windows-StorageSpaces-Driver/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 10,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "311", "315", "316" ] } }
+      ]
+    },
+    {
+      "id": "cluster-aware-updating-failures",
+      "name": "Cluster-Aware Updating failures",
+      "purpose": "Cluster-Aware Updating run failures, including node-drain and script errors.",
+      "group": "VirtualizationAndClustering",
+      "channels": [ "Microsoft-Windows-ClusterAwareUpdating/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 11,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Critical", "Error", "Warning" ] } }
+      ]
+    }
+  ]
+}

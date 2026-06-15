@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "office-application-alerts",
+      "name": "Office application alerts (OAlerts)",
+      "purpose": "Microsoft Office application alert events such as save and recovery prompts (OAlerts 300).",
+      "group": "Office",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "matchMode": "Many", "values": [ "Microsoft Office 16 Alerts", "Microsoft Office 15 Alerts" ] },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "300" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "office-crashes-hangs",
+      "name": "Office crashes / hangs",
+      "purpose": "Crashes and hangs of the core Office applications (Word, Excel, Outlook, PowerPoint).",
+      "group": "Office",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Description", "operator": "Contains", "value": "WINWORD.EXE" },
+          "predicates": [
+            { "joinWithAny": true, "comparison": { "property": "Description", "operator": "Contains", "value": "EXCEL.EXE" } },
+            { "joinWithAny": true, "comparison": { "property": "Description", "operator": "Contains", "value": "OUTLOOK.EXE" } },
+            { "joinWithAny": true, "comparison": { "property": "Description", "operator": "Contains", "value": "POWERPNT.EXE" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "teams-crashes-hangs",
+      "name": "Microsoft Teams crashes / hangs",
+      "purpose": "Crashes and hangs of new and classic Microsoft Teams (ms-teams.exe, Teams.exe).",
+      "group": "Office",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Description", "operator": "Contains", "value": "Teams.exe" }
+        }
+      ]
+    },
+    {
+      "id": "onedrive-crashes",
+      "name": "OneDrive process crashes",
+      "purpose": "OneDrive client process crashes (OneDrive.exe).",
+      "group": "Office",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Application Error" },
+          "predicates": [
+            { "comparison": { "property": "Description", "operator": "Contains", "value": "OneDrive.exe" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "edge-webview2-crashes",
+      "name": "Edge / WebView2 runtime crashes",
+      "purpose": "Microsoft Edge and WebView2 runtime crashes (msedge.exe, msedgewebview2.exe).",
+      "group": "Office",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Description", "operator": "Contains", "value": "msedge.exe" },
+          "predicates": [
+            { "joinWithAny": true, "comparison": { "property": "Description", "operator": "Contains", "value": "msedgewebview2.exe" } }
+          ]
+        }
+      ]
+    }
+  ]
+}
