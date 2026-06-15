@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Resolvers;
@@ -24,15 +25,15 @@ public sealed class EventResolverCache : IEventResolverCache
     /// <summary>Returns the description if it exists in the cache, otherwise adds it to the cache and returns it.</summary>
     public string GetOrAddDescription(string description) => _descriptionCache.GetOrAdd(description, static key => key);
 
-    /// <summary>Returns a shared list with the same contents, adding a frozen copy to the cache on first sight.</summary>
+    /// <summary>Returns a shared read-only list with the same contents, adding a frozen copy to the cache on first sight.</summary>
     public IReadOnlyList<string> GetOrAddKeywords(IReadOnlyList<string> keywords)
     {
         if (keywords.Count == 0) { return []; }
 
         if (_keywordsCache.TryGetValue(keywords, out var existing)) { return existing; }
 
-        // Freeze to an array on miss so a caller that later mutates its list can't corrupt the cached key.
-        string[] frozen = [.. keywords];
+        // Copy and wrap on miss so the cached key stays immutable.
+        var frozen = new ReadOnlyCollection<string>([.. keywords]);
 
         return _keywordsCache.GetOrAdd(frozen, frozen);
     }

@@ -283,6 +283,18 @@ public sealed class EventResolverCacheTests
     }
 
     [Fact]
+    public void GetOrAddKeywords_ReturnedList_IsReadOnlyAndNotAMutableArray()
+    {
+        var cache = new EventResolverCache();
+
+        var result = cache.GetOrAddKeywords(new List<string> { "Audit Success", "Classic" });
+
+        Assert.Null(result as string[]);
+        Assert.True(((ICollection<string>)result).IsReadOnly);
+        Assert.Throws<NotSupportedException>(() => ((IList<string>)result)[0] = "Mutated");
+    }
+
+    [Fact]
     public void GetOrAddSid_AfterClearAll_ShouldReturnNewReference()
     {
         var cache = new EventResolverCache();

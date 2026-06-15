@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Events;
 using System.Collections;
 using System.Collections.Immutable;
+using System.Diagnostics;
 
 namespace EventLogExpert.Runtime.LogTable;
 
@@ -34,7 +35,10 @@ internal sealed class CombinedEventView : IReadOnlyList<ResolvedEvent>, IList<Re
             builder.Add(list);
             total += list.Count;
 
-            if (list.Count > 0) { _byOwningLog[list[0].OwningLog] = list; }
+            if (list.Count > 0 && !_byOwningLog.TryAdd(list[0].OwningLog, list))
+            {
+                throw new UnreachableException($"Per-log lists share owning log '{list[0].OwningLog}'.");
+            }
         }
 
         _lists = builder.ToImmutable();

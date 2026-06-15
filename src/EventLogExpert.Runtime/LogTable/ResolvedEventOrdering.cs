@@ -63,7 +63,7 @@ internal static class ResolvedEventOrdering
     private static readonly Comparison<ResolvedEvent> s_descByThreadId = (a, b) => s_ascByThreadId(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByUser = (a, b) => s_ascByUser(b, a);
 
-    /// <summary>Sorts events by RecordId if no order is specified. Always returns a new list.</summary>
+    /// <summary>Returns a new sorted list. With no order specified, ungrouped events fall back to RecordId then timestamp; grouped events sort by timestamp within each group.</summary>
     public static IReadOnlyList<ResolvedEvent> SortEvents(
         this IEnumerable<ResolvedEvent> events,
         ColumnName? orderBy = null,
