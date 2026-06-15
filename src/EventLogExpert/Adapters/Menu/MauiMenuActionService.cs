@@ -22,6 +22,7 @@ using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.WindowsPlatform.Activation;
 using Fluxor;
+using System.Collections.Immutable;
 using Application = Microsoft.Maui.Controls.Application;
 using IDispatcher = Fluxor.IDispatcher;
 using MauiFilePicker = Microsoft.Maui.Storage.FilePicker;
@@ -215,7 +216,14 @@ public sealed class MauiMenuActionService(
     public Task OpenIssueAsync() => OpenBrowserAsync("https://github.com/microsoft/EventLogExpert/issues/new");
 
     public Task OpenLiveLogAsync(string logName, bool combineLog) =>
-        OpenLogsBatchAsync([(logName, LogPathType.Channel)], combineLog);
+        OpenLogsBatchCoreAsync([(logName, LogPathType.Channel)], combineLog);
+
+    public Task<OpenLogsBatchResult> OpenLiveLogsAsync(IEnumerable<string> logNames, bool combineLog)
+    {
+        ArgumentNullException.ThrowIfNull(logNames);
+
+        return OpenLogsBatchCoreAsync(logNames.Select(name => (name, LogPathType.Channel)), combineLog);
+    }
 
     public async Task<OpenLogStatus> OpenLogAsync(string logPath, LogPathType pathType, bool combineLog = false)
     {
@@ -265,44 +273,8 @@ public sealed class MauiMenuActionService(
         return OpenLogStatus.Opened;
     }
 
-    /// <summary>
-    ///     Opens each log in <paramref name="logs" /> sequentially and surfaces a single banner alert at the end naming
-    ///     every log that contained zero events. <paramref name="combineLog" /> controls whether the first successful open
-    ///     closes existing logs first; subsequent opens within the batch always coalesce with the new state. Use this from any
-    ///     call site that may open multiple logs in one user gesture (multi-file picker, folder open, drag-drop, command line)
-    ///     so the user sees one batched alert instead of one popup per empty file.
-    /// </summary>
-    public async Task OpenLogsBatchAsync(IEnumerable<(string Path, LogPathType Type)> logs, bool combineLog)
-    {
-        ArgumentNullException.ThrowIfNull(logs);
-
-        List<string>? emptyDisplayNames = null;
-        var combineForCall = combineLog;
-
-        foreach (var (path, type) in logs)
-        {
-            // Only Opened consumed the close-existing semantics; Skipped/Failed/Empty did not,
-            // so combineForCall must NOT flip until a real open happens.
-            switch (await OpenLogAsync(path, type, combineForCall))
-            {
-                case OpenLogStatus.Opened:
-                    combineForCall = true;
-                    break;
-                case OpenLogStatus.Empty:
-                    (emptyDisplayNames ??= []).Add(GetEmptyLogDisplayName(path, type));
-                    break;
-            }
-        }
-
-        if (emptyDisplayNames is { Count: > 0 })
-        {
-            await _dialogService.ShowAlert(
-                "Empty log",
-                EmptyLogAlertFormatter.BuildMessage(emptyDisplayNames),
-                "Ok",
-                AlertPresentation.Banner);
-        }
-    }
+    public Task OpenLogsBatchAsync(IEnumerable<(string Path, LogPathType Type)> logs, bool combineLog) =>
+        OpenLogsBatchCoreAsync(logs, combineLog);
 
     public Task<bool> OpenSettingsAsync() =>
         TryOpenModalAsync(_modalCoordinator.OpenSettingsAsync, nameof(SettingsModal));
@@ -366,6 +338,57 @@ public sealed class MauiMenuActionService(
         {
             await _dialogService.ShowAlert("Failed to launch browser", ex.Message, "Ok");
         }
+    }
+
+    private async Task<OpenLogsBatchResult> OpenLogsBatchCoreAsync(
+        IEnumerable<(string Path, LogPathType Type)> logs,
+        bool combineLog)
+    {
+        ArgumentNullException.ThrowIfNull(logs);
+
+        List<string>? emptyDisplayNames = null;
+        var combineForCall = combineLog;
+        var opened = 0;
+        var failed = 0;
+        var skipped = 0;
+
+        foreach (var (path, type) in logs)
+        {
+            // Only Opened consumed the close-existing semantics; Skipped/Failed/Empty did not,
+            // so combineForCall must NOT flip until a real open happens.
+            switch (await OpenLogAsync(path, type, combineForCall))
+            {
+                case OpenLogStatus.Opened:
+                    opened++;
+                    combineForCall = true;
+                    break;
+                case OpenLogStatus.Empty:
+                    (emptyDisplayNames ??= []).Add(GetEmptyLogDisplayName(path, type));
+                    break;
+                case OpenLogStatus.Failed:
+                    failed++;
+                    break;
+                case OpenLogStatus.Skipped:
+                    skipped++;
+                    break;
+            }
+        }
+
+        if (emptyDisplayNames is { Count: > 0 })
+        {
+            await _dialogService.ShowAlert(
+                "Empty log",
+                EmptyLogAlertFormatter.BuildMessage(emptyDisplayNames),
+                "Ok",
+                AlertPresentation.Banner);
+        }
+
+        return new OpenLogsBatchResult(
+            opened,
+            emptyDisplayNames?.Count ?? 0,
+            failed,
+            skipped,
+            emptyDisplayNames?.ToImmutableArray() ?? []);
     }
 
     private async Task<bool> TryOpenModalAsync(Func<Task<ModalOpenResult<bool>>> open, string modalName)
