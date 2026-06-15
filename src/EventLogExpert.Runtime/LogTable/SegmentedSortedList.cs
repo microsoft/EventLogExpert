@@ -85,16 +85,22 @@ internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IList<
         return false;
     }
 
-    public void CopyTo(ResolvedEvent[] array, int arrayIndex)
-    {
-        ArgumentNullException.ThrowIfNull(array);
+public void CopyTo(ResolvedEvent[] array, int arrayIndex)
+{
+    ArgumentNullException.ThrowIfNull(array);
+    ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
 
-        foreach (var segment in _segments)
-        {
-            segment.CopyTo(array, arrayIndex);
-            arrayIndex += segment.Length;
-        }
+    if (array.Length - arrayIndex < Count)
+    {
+        throw new ArgumentException("Destination array is not long enough.", nameof(array));
     }
+
+    foreach (var segment in _segments)
+    {
+        segment.CopyTo(array, arrayIndex);
+        arrayIndex += segment.Length;
+    }
+}
 
     public IEnumerator<ResolvedEvent> GetEnumerator()
     {
