@@ -17,5 +17,6 @@ public enum EventProperty
     [EnumMember(Value = "Thread ID")] ThreadId,
     [EnumMember(Value = "User ID")] UserId,
     Description,
-    Xml
+    Xml,
+    [EnumMember(Value = "Log Name")] LogName
 }

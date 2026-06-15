@@ -304,25 +304,29 @@ internal static class Lowerer
             return new MultiEqualsNode(argField, elements);
         }
 
-        // P.Contains(needle, StringComparison.OrdinalIgnoreCase) for string properties
+        // P.Contains(needle, StringComparison.OrdinalIgnoreCase) for any Contains-supported field. Denylist
+        // Keywords (own Any-shape) and TimeCreated (no Emitter.EmitContains arm) so Lowerer acceptance stays in
+        // lock-step with the emitter; non-string fields are formatted to text inside the emitter.
         if (IsCaseInsensitiveMatch(call.Name, "Contains")
-            && call.Target is IdentifierSyntax stringPropTarget
-            && PropertyResolver.TryResolve(stringPropTarget.Name, out var stringField, out var kind)
-            && kind == TypedLiteralKind.String
-            && stringField != ResolvedEventField.Keywords)
+            && call.Target is IdentifierSyntax containsTarget
+            && PropertyResolver.TryResolve(containsTarget.Name, out var containsField, out _)
+            && containsField is not (ResolvedEventField.Keywords or ResolvedEventField.TimeCreated))
         {
             var (needle, ignoreCase) = ParseContainsArgs(call.Arguments, call.Position);
 
-            return new ContainsNode(stringField, needle, ignoreCase);
+            return new ContainsNode(containsField, needle, ignoreCase);
         }
 
-        // P.ToString().Contains(needle, OIC) for Id, ActivityId, etc. (formatter shape)
+        // P.ToString().Contains(needle, OIC) — legacy formatter shape, kept for back-compat with stored filters.
+        // Same Contains-supported-field denylist as the bare branch so Lowerer acceptance stays in lock-step with
+        // Emitter.EmitContains (Keywords has its own Any-shape; TimeCreated has no emit arm).
         if (IsCaseInsensitiveMatch(call.Name, "Contains")
             && call.Target is MethodCallSyntax toStringCall
             && IsCaseInsensitiveMatch(toStringCall.Name, "ToString")
             && toStringCall.Arguments.Count == 0
             && toStringCall.Target is IdentifierSyntax toStringPropTarget
-            && PropertyResolver.TryResolve(toStringPropTarget.Name, out var toStringField, out _))
+            && PropertyResolver.TryResolve(toStringPropTarget.Name, out var toStringField, out _)
+            && toStringField is not (ResolvedEventField.Keywords or ResolvedEventField.TimeCreated))
         {
             var (needle, ignoreCase) = ParseContainsArgs(call.Arguments, call.Position);
 

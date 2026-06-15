@@ -213,8 +213,8 @@ internal static class BasicFilterDecomposer
             case ResolvedEventField.UserId: property = EventProperty.UserId; return true;
             case ResolvedEventField.Description: property = EventProperty.Description; return true;
             case ResolvedEventField.Xml: property = EventProperty.Xml; return true;
+            case ResolvedEventField.LogName: property = EventProperty.LogName; return true;
             case ResolvedEventField.ComputerName:
-            case ResolvedEventField.LogName:
             case ResolvedEventField.RecordId:
             case ResolvedEventField.TimeCreated:
             default:

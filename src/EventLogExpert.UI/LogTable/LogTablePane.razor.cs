@@ -23,6 +23,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
+using System.Globalization;
 using FilterMode = EventLogExpert.Filtering.Evaluation.FilterMode;
 
 namespace EventLogExpert.UI.LogTable;
@@ -321,12 +322,13 @@ public sealed partial class LogTablePane
     {
         string filterValue = property switch
         {
-            EventProperty.Id => selectedEvent.Id.ToString(),
+            EventProperty.Id => selectedEvent.Id.ToString(CultureInfo.InvariantCulture),
             EventProperty.ActivityId => selectedEvent.ActivityId?.ToString() ?? string.Empty,
             EventProperty.Level => selectedEvent.Level,
             EventProperty.Keywords => selectedEvent.KeywordsDisplayName,
             EventProperty.Source => selectedEvent.Source,
             EventProperty.TaskCategory => selectedEvent.TaskCategory,
+            EventProperty.LogName => selectedEvent.LogName,
             _ => string.Empty,
         };
 
