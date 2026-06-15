@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
+using System.Diagnostics;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
 
@@ -27,6 +28,16 @@ public sealed class CombinedEventViewTests
         Assert.Null(destination[0]);
 
         for (int i = 0; i < facade.Count; i++) { Assert.Same(oracle[i], destination[i + 1]); }
+    }
+
+    [Fact]
+    public void Constructor_DuplicateOwningLog_Throws()
+    {
+        var context = new SortContext(ColumnName.DateAndTime, true, null, false);
+        var first = SegmentedSortedList.CreateSorted(MakeLog("Shared", 1, 5), context);
+        var second = SegmentedSortedList.CreateSorted(MakeLog("Shared", 100, 5), context);
+
+        Assert.Throws<UnreachableException>(() => new CombinedEventView([first, second], context));
     }
 
     [Fact]
