@@ -74,6 +74,31 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
     }
 
     [Fact]
+    public void GetValues_LogNameField_ReturnsDistinctLoadedChannelsAcrossLogs()
+    {
+        // The LogName value dropdown aggregates each event's channel, distinct + sorted, across all active logs.
+        var appLog = new EventLogData(
+            Constants.LogNameTestLog,
+            LogPathType.Channel,
+            [CreateTestEvent(100, logName: "Application"), CreateTestEvent(200, logName: "Application")]);
+
+        var secLog = new EventLogData(
+            Constants.LogNameLog2,
+            LogPathType.Channel,
+            [CreateTestEvent(4624, logName: "Security", owningLog: Constants.LogNameLog2)]);
+
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty
+            .Add(Constants.LogNameTestLog, appLog)
+            .Add(Constants.LogNameLog2, secLog);
+
+        // Act
+        var logNames = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.LogName);
+
+        // Assert
+        Assert.Equal(["Application", "Security"], logNames);
+    }
+
+    [Fact]
     public void GetValues_SameSnapshotAndField_ReturnsCachedInstance()
     {
         // Arrange
@@ -133,8 +158,12 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
         Assert.Empty(items);
     }
 
-    private static ResolvedEvent CreateTestEvent(int id = 1, string source = "TestSource") =>
-        new(Constants.LogNameTestLog, LogPathType.Channel)
+    private static ResolvedEvent CreateTestEvent(
+        int id = 1,
+        string source = "TestSource",
+        string logName = "Application",
+        string owningLog = Constants.LogNameTestLog) =>
+        new(owningLog, LogPathType.Channel)
         {
             Id = id,
             Source = source,
@@ -142,7 +171,7 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
             Description = "Test description",
             ComputerName = "TestComputer",
             TaskCategory = "TestCategory",
-            LogName = "Application",
+            LogName = logName,
             TimeCreated = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc),
             Keywords = []
         };

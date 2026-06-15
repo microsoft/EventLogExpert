@@ -58,5 +58,6 @@ public static class EventPropertyValuesCache
         EventProperty.ActivityId or
         EventProperty.Keywords or
         EventProperty.Source or
-        EventProperty.TaskCategory;
+        EventProperty.TaskCategory or
+        EventProperty.LogName;
 }
