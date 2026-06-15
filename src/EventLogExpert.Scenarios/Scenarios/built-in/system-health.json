@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "recent-critical-and-error-events",
+      "name": "Recent Critical & Error Events",
+      "purpose": "Surface the most severe System-log events first.",
+      "group": "SystemHealth",
+      "tags": [ "system", "sysadmin", "failures" ],
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Critical", "Error" ] }
+        }
+      ]
+    },
+    {
+      "id": "failed-services-at-boot",
+      "name": "Failed services at boot",
+      "purpose": "Service Control Manager failures that block services from starting.",
+      "group": "SystemHealth",
+      "tags": [ "system", "sysadmin", "failures" ],
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Service Control Manager" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "7000", "7001", "7022", "7023", "7024", "7026" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "newly-installed-services",
+      "name": "Newly installed services",
+      "purpose": "A new service was installed (Service Control Manager event 7045); also a threat signal.",
+      "group": "SystemHealth",
+      "tags": [ "system", "sysadmin", "audit" ],
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Service Control Manager" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "7045" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unexpected-restart-power-loss-bsod",
+      "name": "Unexpected restart / power loss / BSOD",
+      "purpose": "Dirty shutdowns: Kernel-Power 41, BugCheck 1001, and EventLog 6008.",
+      "group": "SystemHealth",
+      "tags": [ "system", "sysadmin", "failures" ],
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-Power" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "41" } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "BugCheck" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "1001" } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "EventLog" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "6008" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "service-install-and-control-audit",
+      "name": "Service install & control audit",
+      "purpose": "Correlate service installs across the System log (7045) and the Security audit log (4697).",
+      "group": "SystemHealth",
+      "tags": [ "system", "security", "audit" ],
+      "channels": [ "System", "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "LogName", "value": "System" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "7045" } }
+          ]
+        },
+        {
+          "comparison": { "property": "LogName", "value": "Security" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "4697" } }
+          ]
+        }
+      ]
+    }
+  ]
+}

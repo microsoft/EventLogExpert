@@ -23,9 +23,11 @@ using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
+using EventLogExpert.Scenarios.Catalog;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -170,6 +172,10 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IPackageDeploymentService))]
     [InlineData(typeof(IPackageVersionProvider))]
     [InlineData(typeof(IUpdateService))]
+    // Built-in scenarios.
+    [InlineData(typeof(BuiltInScenarioRegistry))]
+    [InlineData(typeof(IScenarioQueryService))]
+    [InlineData(typeof(IScenarioLaunchService))]
     public async Task AddEventLogRuntime_ShouldResolveHostFacingAbstraction(Type serviceType)
     {
         // Arrange
@@ -194,6 +200,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IStateSelection<EventLogState, bool>>());
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
         services.AddSingleton<HttpClient>();
+        services.AddSingleton(Substitute.For<IMenuActionService>());
 
         services.AddEventLogRuntime();
 
@@ -225,5 +232,6 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IStateSelection<EventLogState, bool>>());
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
         services.AddSingleton<HttpClient>();
+        services.AddSingleton(Substitute.For<IMenuActionService>());
     }
 }

@@ -14,6 +14,7 @@
     <ProjectReference Include="..\EventLogExpert.DatabaseTools\EventLogExpert.DatabaseTools.csproj" />
     <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
     <ProjectReference Include="..\EventLogExpert.Filtering\EventLogExpert.Filtering.csproj" />
+    <ProjectReference Include="..\EventLogExpert.Scenarios\EventLogExpert.Scenarios.csproj" />
   </ItemGroup>
 
   <ItemGroup>
