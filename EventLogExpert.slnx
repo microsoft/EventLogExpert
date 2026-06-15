@@ -20,6 +20,7 @@
     <Project Path="src/EventLogExpert.Provider/EventLogExpert.Provider.csproj" />
     <Project Path="src/EventLogExpert.EventDbTool/EventLogExpert.EventDbTool.csproj" />
     <Project Path="src/EventLogExpert.Filtering/EventLogExpert.Filtering.csproj" />
+    <Project Path="src/EventLogExpert.Scenarios/EventLogExpert.Scenarios.csproj" />
     <Project Path="src/EventLogExpert.Provider.Database/EventLogExpert.Provider.Database.csproj" />
     <Project Path="src/EventLogExpert.DatabaseTools/EventLogExpert.DatabaseTools.csproj" />
     <Project Path="src/EventLogExpert.ElevationHelper/EventLogExpert.ElevationHelper.csproj" />
@@ -42,6 +43,7 @@
     <Project Path="tests/Unit/EventLogExpert.Logging.Tests/EventLogExpert.Logging.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Runtime.Tests/EventLogExpert.Runtime.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Filtering.Tests/EventLogExpert.Filtering.Tests.csproj" />
+    <Project Path="tests/Unit/EventLogExpert.Scenarios.Tests/EventLogExpert.Scenarios.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Provider.Database.Tests/EventLogExpert.Provider.Database.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Provider.Tests/EventLogExpert.Provider.Tests.csproj" />
   </Folder>

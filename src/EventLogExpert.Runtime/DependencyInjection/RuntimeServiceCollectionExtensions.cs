@@ -20,9 +20,11 @@ using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
+using EventLogExpert.Scenarios.Catalog;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -116,6 +118,10 @@ public static class RuntimeServiceCollectionExtensions
         ///             SQLite-backed store via <c>services.AddFilterLibrarySqliteStore(<i>dbPath</i>)</c>, or supply a custom
         ///             implementation.
         ///         </item>
+        ///         <item>
+        ///             <c>IMenuActionService</c> - the scenario launch service depends on it to open a scenario's channels. The
+        ///             host registers the concrete implementation (e.g., <c>MauiMenuActionService</c>).
+        ///         </item>
         ///     </list>
         ///     Omitting any of these produces a DI resolution failure when the dependent services are first activated.
         /// </summary>
@@ -178,6 +184,14 @@ public static class RuntimeServiceCollectionExtensions
             // DatabaseTools service (CLI-equivalent operations exposed to the UI).
             services.AddDatabaseToolsServices();
             services.TryAddSingleton<IDatabaseToolsService, DatabaseToolsService>();
+
+            // Built-in scenarios: the immutable embedded catalog + presence/query/launch services. The registry
+            // aggregates every registered IScenarioSource (PR1 ships only the built-in source).
+            services.AddSingleton<IScenarioSource, BuiltInScenarioSource>();
+            services.AddSingleton<BuiltInScenarioRegistry>();
+            services.AddSingleton<IChannelPresenceProbe, ChannelPresenceProbe>();
+            services.AddSingleton<IScenarioQueryService, ScenarioQueryService>();
+            services.AddSingleton<IScenarioLaunchService, ScenarioLaunchService>();
 
             return services;
         }
