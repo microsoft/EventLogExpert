@@ -31,7 +31,5 @@ internal sealed class ScenarioDto
 
     public List<string>? SourceGates { get; set; }
 
-    public List<string>? Tags { get; set; }
-
     public int Version { get; set; }
 }

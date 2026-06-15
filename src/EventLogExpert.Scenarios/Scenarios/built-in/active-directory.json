@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "ad-replication-failures",
+      "name": "AD replication failures",
+      "purpose": "Active Directory replication errors between domain controllers (NTDS Replication 1311, 1865, 1925, 1988, 2042, 2087, 2088).",
+      "group": "ActiveDirectory",
+      "channels": [ "Directory Service" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1311", "1865", "1925", "1988", "2042", "2087", "2088" ] }
+        }
+      ]
+    },
+    {
+      "id": "directory-service-errors",
+      "name": "Directory Service critical / errors",
+      "purpose": "All critical and error events from the Active Directory Directory Service.",
+      "group": "ActiveDirectory",
+      "channels": [ "Directory Service" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Critical", "Error" ] } }
+      ]
+    },
+    {
+      "id": "dfsr-sysvol-failures",
+      "name": "DFSR SYSVOL failures",
+      "purpose": "DFS Replication failures affecting SYSVOL (DFS Replication 2213, 4012, 5002, 5008, 5014).",
+      "group": "ActiveDirectory",
+      "channels": [ "DFS Replication" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "2213", "4012", "5002", "5008", "5014" ] }
+        }
+      ]
+    },
+    {
+      "id": "netlogon-secure-channel-failures",
+      "name": "Netlogon secure-channel failures",
+      "purpose": "Domain secure-channel and trust failures reported by Netlogon (5719, 5722, 5723).",
+      "group": "ActiveDirectory",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Netlogon" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5719", "5722", "5723" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "zerologon-vulnerable-netlogon",
+      "name": "Vulnerable Netlogon connections (ZeroLogon)",
+      "purpose": "Netlogon vulnerable secure-channel connections denied or allowed (5827, 5828, 5829); 5829 indicates CVE-2020-1472 exploitation risk.",
+      "group": "ActiveDirectory",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Netlogon" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5827", "5828", "5829" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kdc-kerberos-errors",
+      "name": "KDC / Kerberos encryption-type errors",
+      "purpose": "Key Distribution Center encryption-type errors (Kerberos-Key-Distribution-Center 16, 27).",
+      "group": "ActiveDirectory",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Kerberos-Key-Distribution-Center" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "16", "27" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kdc-certificate-no-strong-mapping",
+      "name": "KDC certificate no strong mapping (PKINIT)",
+      "purpose": "The KDC issued a ticket from a certificate with no strong account mapping (39, 41); relates to CVE-2022-26923.",
+      "group": "ActiveDirectory",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 6,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Kerberos-Key-Distribution-Center" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "39", "41" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ldap-expensive-insecure-binds",
+      "name": "LDAP expensive / insecure binds",
+      "purpose": "Expensive and insecure (unsigned or cleartext) LDAP binds against the directory (1644, 2886, 2887, 2889).",
+      "group": "ActiveDirectory",
+      "channels": [ "Directory Service" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 7,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1644", "2886", "2887", "2889" ] } }
+      ]
+    },
+    {
+      "id": "adws-failures",
+      "name": "AD Web Services failures",
+      "purpose": "Active Directory Web Services errors that block PowerShell and tooling access (1202, 1206, 1401, or any error).",
+      "group": "ActiveDirectory",
+      "channels": [ "Active Directory Web Services" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 8,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1206", "1401" ] },
+          "predicates": [
+            { "joinWithAny": true, "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Critical", "Error" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "adcs-enrollment-denied",
+      "name": "AD CS enrollment request denied",
+      "purpose": "The certification authority denied a certificate enrollment request (CertificationAuthority 53).",
+      "group": "ActiveDirectory",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 9,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-CertificationAuthority" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "53" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "adcs-template-security-changes",
+      "name": "AD CS certificate-template security changes",
+      "purpose": "Certificate template load and update events that can introduce ESC-family vulnerabilities (4898, 4899).",
+      "group": "ActiveDirectory",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 10,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4898", "4899" ] } }
+      ]
+    },
+    {
+      "id": "adfs-authentication-failures",
+      "name": "AD FS authentication failures",
+      "purpose": "AD FS token, credential, password-change, and sign-out failures (1201, 1203, 1205, 1207).",
+      "group": "ActiveDirectory",
+      "channels": [ "AD FS/Admin" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 11,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1201", "1203", "1205", "1207" ] } }
+      ]
+    },
+    {
+      "id": "ad-object-changes",
+      "name": "Active Directory object changes",
+      "purpose": "Directory object create, modify, and delete audit events (5136, 5137, 5141); requires Directory Service Changes auditing.",
+      "group": "ActiveDirectory",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 12,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5136", "5137", "5141" ] } }
+      ]
+    },
+    {
+      "id": "domain-trust-changes",
+      "name": "Domain trust changes",
+      "purpose": "Domain and forest trust create, remove, and modify audit events (4706, 4707, 4716, 4865, 4866, 4867).",
+      "group": "ActiveDirectory",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 13,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4706", "4707", "4716", "4865", "4866", "4867" ] } }
+      ]
+    },
+    {
+      "id": "kerberos-policy-change",
+      "name": "Kerberos policy change",
+      "purpose": "Kerberos policy modifications such as ticket lifetime and encryption types (4713).",
+      "group": "ActiveDirectory",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 14,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "4713" } }
+      ]
+    },
+    {
+      "id": "kerberos-preauth-failures",
+      "name": "Kerberos pre-authentication failures",
+      "purpose": "Kerberos pre-authentication failures that reveal password spraying and bad-password attacks (4771).",
+      "group": "ActiveDirectory",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 15,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "4771" } }
+      ]
+    },
+    {
+      "id": "ntlm-operational",
+      "name": "NTLM operational activity",
+      "purpose": "Legacy and blocked NTLM authentication events from the NTLM operational log (8001, 8002, 8003, 8004).",
+      "group": "ActiveDirectory",
+      "channels": [ "Microsoft-Windows-NTLM/Operational" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 16,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "8001", "8002", "8003", "8004" ] } }
+      ]
+    },
+    {
+      "id": "ntlmv1-downgrade",
+      "name": "NTLMv1 downgrade",
+      "purpose": "NTLMv1 negotiation reported by LsaSrv (6038, 6039); NTLMv1 hashes are weak and relayable.",
+      "group": "ActiveDirectory",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 17,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "LsaSrv" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6038", "6039" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ntds-partition-backup-age",
+      "name": "NTDS partition backup age",
+      "purpose": "An AD partition has not been backed up within the tombstone lifetime (NTDS General 2089).",
+      "group": "ActiveDirectory",
+      "channels": [ "Directory Service" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 18,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "value": "2089" }
+        }
+      ]
+    }
+  ]
+}

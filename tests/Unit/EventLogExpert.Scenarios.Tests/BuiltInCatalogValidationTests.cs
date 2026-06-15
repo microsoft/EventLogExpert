@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Evaluation;
@@ -57,6 +58,49 @@ public sealed class BuiltInCatalogValidationTests
                 row.Filter.Comparison.Property is EventProperty.LogName ||
                 row.Filter.Predicates.Any(predicate => predicate.Comparison.Property is EventProperty.LogName),
                 $"Combined scenario '{scenario.Id}' has a row that is not LogName-scoped.")));
+    }
+
+    [Fact]
+    public void DescriptionContains_MatchesRealisticEvent()
+    {
+        var officeSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == "office-crashes-hangs"));
+        var wordCrash = new ResolvedEvent("Application", LogPathType.Channel)
+        {
+            LogName = "Application",
+            Source = "Application Error",
+            Id = 1000,
+            Description = "Faulting application name: WINWORD.EXE, version: 16.0.1, time stamp: 0x0"
+        };
+        Assert.Contains(officeSet, saved => saved.Compiled!.Predicate(wordCrash));
+
+        var lolbinSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == "suspicious-lolbin-execution"));
+        var processCreate = new ResolvedEvent("Security", LogPathType.Channel)
+        {
+            LogName = "Security",
+            Source = "Microsoft-Windows-Security-Auditing",
+            Id = 4688,
+            Description = "A new process has been created. New Process Name: C:\\Windows\\System32\\rundll32.exe"
+        };
+        Assert.Contains(lolbinSet, saved => saved.Compiled!.Predicate(processCreate));
+    }
+
+    [Fact]
+    public void MultiSourceOrRow_MatchesEachOrTerm()
+    {
+        var scenario = s_registry.Scenarios.Single(scenario => scenario.Id == "storage-controller-driver-resets");
+        var saved = s_registry.BuildFilterSet(scenario).Single();
+        Assert.NotNull(saved.Compiled);
+
+        static ResolvedEvent Event(string source, int id) =>
+            new("System", LogPathType.Channel) { LogName = "System", Source = source, Id = id };
+
+        Assert.True(saved.Compiled!.Predicate(Event("storahci", 11)), "storahci term should match");
+        Assert.True(saved.Compiled!.Predicate(Event("stornvme", 14)), "stornvme term should match");
+        Assert.True(saved.Compiled!.Predicate(Event("iaStorA", 129)), "iaStorA term should match");
+        Assert.True(saved.Compiled!.Predicate(Event("disk", 153)), "disk term should match");
+        Assert.False(saved.Compiled!.Predicate(Event("disk", 11)), "disk with a non-matching id should not match");
+        Assert.False(saved.Compiled!.Predicate(Event("storahci", 999)), "storahci with a non-matching id should not match");
+        Assert.False(saved.Compiled!.Predicate(Event("Disk", 153)), "Source matching is case-sensitive (Ordinal): the real provider is 'disk', so 'Disk' must not match");
     }
 
     [Theory]

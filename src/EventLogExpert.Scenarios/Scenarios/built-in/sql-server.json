@@ -1,0 +1,277 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "sql-login-failures",
+      "name": "SQL login failures",
+      "purpose": "SQL Server failed-login events (18456); credential and access problems.",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "18456" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-fatal-engine-errors",
+      "name": "SQL high-severity / fatal engine errors",
+      "purpose": "Severe SQL Server engine errors including I/O and consistency failures (701, 823, 824, 825, 9001, 17883, 17884, 17887, 17888).",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "701", "823", "824", "825", "9001", "17883", "17884", "17887", "17888" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-page-checksum-failure",
+      "name": "SQL page checksum failure (storage corruption)",
+      "purpose": "A SQL data page changed between write and read, indicating storage-layer corruption (832).",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "832" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-deadlocks",
+      "name": "SQL deadlocks",
+      "purpose": "Transactions chosen as deadlock victims (1205); requires deadlock logging via trace flag 1222 or sp_altermessage 1205 WITH_LOG.",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "1205" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-filegroup-datafile-full",
+      "name": "SQL filegroup / data file full",
+      "purpose": "A filegroup or data file is full, blocking writes to user databases (1101, 1105).",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1101", "1105" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-transaction-log-full",
+      "name": "SQL transaction log full",
+      "purpose": "The transaction log is full, blocking all data modifications (9002).",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "9002" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-database-file-open-failure",
+      "name": "SQL database file open failure",
+      "purpose": "SQL Server could not open a database or log file at startup (17204, 17207); precedes RECOVERY_PENDING or SUSPECT.",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 6,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "17204", "17207" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-internal-assertion",
+      "name": "SQL internal assertion failure",
+      "purpose": "SQL Server internal assertion violations indicating possible corruption or engine bugs (3624, 17065, 17066, 17067).",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 7,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "3624", "17065", "17066", "17067" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-abnormal-termination",
+      "name": "SQL abnormal termination (crash)",
+      "purpose": "SQL Server process access violations and fatal-exception terminations (17308, 17311).",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 8,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "17308", "17311" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-backup-restore-failures",
+      "name": "SQL backup / restore failures",
+      "purpose": "SQL Server backup and restore failures, including VDI I/O errors (3041, 18204, 18210).",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 9,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "3041", "18204", "18210" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-alwayson-secondary-disrupted",
+      "name": "SQL Always On secondary disrupted",
+      "purpose": "An availability-group secondary entered RESTORING or SUSPECT state (35268, 35269).",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 10,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "35268", "35269" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-memory-paged-out",
+      "name": "SQL process memory paged out",
+      "purpose": "A significant part of the SQL Server process was paged out under memory pressure (17890).",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 11,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "17890" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-service-lifecycle",
+      "name": "SQL service start & shutdown",
+      "purpose": "SQL Server ready-for-connections and shutdown events for correlating outages (17126, 17147, 17148).",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 12,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "17126", "17147", "17148" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-agent-job-failures",
+      "name": "SQL Agent job failures",
+      "purpose": "SQL Server Agent job-step failures (SQLSERVERAGENT 208).",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 13,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "SQLSERVERAGENT" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "208" } }
+          ]
+        },
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "SQLAgent" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "208" } }
+          ]
+        }
+      ]
+    }
+  ]
+}

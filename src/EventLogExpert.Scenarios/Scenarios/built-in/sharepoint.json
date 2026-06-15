@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "sharepoint-uls-timer-failures",
+      "name": "SharePoint critical ULS & timer-job failures",
+      "purpose": "SharePoint critical ULS and timer-job failures (5586, 6398).",
+      "group": "SharePoint",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "SharePoint" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5586", "6398" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sharepoint-search-crawl-failures",
+      "name": "SharePoint search / crawl failures",
+      "purpose": "SharePoint search and crawl administration failures (6482).",
+      "group": "SharePoint",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "SharePoint" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "6482" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sharepoint-user-profile-sync-failure",
+      "name": "SharePoint User Profile sync failure",
+      "purpose": "SharePoint User Profile synchronization timer-job failure (5553).",
+      "group": "SharePoint",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "SharePoint" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "5553" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sharepoint-claims-auth-failure",
+      "name": "SharePoint Security Token Service failure",
+      "purpose": "SharePoint Security Token Service could not activate, blocking claims authentication (8306).",
+      "group": "SharePoint",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "SharePoint" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "8306" } }
+          ]
+        }
+      ]
+    }
+  ]
+}

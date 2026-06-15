@@ -130,43 +130,6 @@ public sealed class ScenarioCatalogLoaderTests
     }
 
     [Fact]
-    public void Load_NullScenarioElement_IsAggregatedError_NotThrow()
-    {
-        var result = Load("""
-            { "schemaVersion": 1, "scenarios": [ null ] }
-            """);
-
-        Assert.Empty(result.Scenarios);
-        Assert.Contains(result.Errors, error => error.Contains("scenario is null"));
-    }
-
-    [Fact]
-    public void Load_NullFilterRowElement_IsAggregatedError_NotThrow()
-    {
-        var result = Load(Wrap("""
-            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
-              "channels": [ "System" ],
-              "filters": [ null ] }
-            """));
-
-        Assert.Empty(result.Scenarios);
-        Assert.Contains(result.Errors, error => error.Contains("filter row is null"));
-    }
-
-    [Fact]
-    public void Load_NullPredicateElement_IsAggregatedError_NotThrow()
-    {
-        var result = Load(Wrap("""
-            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
-              "channels": [ "System" ],
-              "filters": [ { "comparison": { "property": "Id", "value": "1" }, "predicates": [ null ] } ] }
-            """));
-
-        Assert.Empty(result.Scenarios);
-        Assert.Contains(result.Errors, error => error.Contains("predicate is null"));
-    }
-
-    [Fact]
     public void Load_MinimalValidScenario_Succeeds()
     {
         var result = Load(Wrap("""
@@ -204,6 +167,43 @@ public sealed class ScenarioCatalogLoaderTests
     }
 
     [Fact]
+    public void Load_NullFilterRowElement_IsAggregatedError_NotThrow()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ],
+              "filters": [ null ] }
+            """));
+
+        Assert.Empty(result.Scenarios);
+        Assert.Contains(result.Errors, error => error.Contains("filter row is null"));
+    }
+
+    [Fact]
+    public void Load_NullPredicateElement_IsAggregatedError_NotThrow()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ],
+              "filters": [ { "comparison": { "property": "Id", "value": "1" }, "predicates": [ null ] } ] }
+            """));
+
+        Assert.Empty(result.Scenarios);
+        Assert.Contains(result.Errors, error => error.Contains("predicate is null"));
+    }
+
+    [Fact]
+    public void Load_NullScenarioElement_IsAggregatedError_NotThrow()
+    {
+        var result = Load("""
+            { "schemaVersion": 1, "scenarios": [ null ] }
+            """);
+
+        Assert.Empty(result.Scenarios);
+        Assert.Contains(result.Errors, error => error.Contains("scenario is null"));
+    }
+
+    [Fact]
     public void Load_SourceRegistrationGating_IsRejected()
     {
         var result = Load(Wrap("""
@@ -235,6 +235,19 @@ public sealed class ScenarioCatalogLoaderTests
 
         Assert.Empty(result.Scenarios);
         Assert.Contains(result.Errors, error => error.Contains("schemaVersion"));
+    }
+
+    [Fact]
+    public void TryLoad_BuiltInCatalog_HasNoValidationErrors()
+    {
+        var result = ScenarioCatalogLoader.TryLoad(typeof(ScenarioCatalogLoader).Assembly);
+
+        Assert.True(
+            result.Errors.IsEmpty,
+            $"Built-in catalog has validation errors:{Environment.NewLine}{string.Join(Environment.NewLine, result.Errors)}");
+        Assert.True(result.Scenarios.Count >= 16, $"Expected at least 16 built-in scenarios, found {result.Scenarios.Count}.");
+        Assert.Contains(result.Scenarios, scenario => scenario.Id == "recent-critical-and-error-events");
+        Assert.Contains(result.Scenarios, scenario => scenario.Id == "unexpected-restart-power-loss-bsod");
     }
 
     private static ScenarioCatalogLoadResult Load(string json) =>

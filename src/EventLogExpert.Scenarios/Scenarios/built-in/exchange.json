@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "exchange-transport-backpressure",
+      "name": "Exchange transport back-pressure & mail-flow",
+      "purpose": "Exchange transport resource pressure and mail-flow events (MSExchangeTransport 1009, 15004, 15006, 15007).",
+      "group": "Exchange",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "MSExchangeTransport" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1009", "15004", "15006", "15007" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exchange-frontend-tls-certificate",
+      "name": "Exchange front-end TLS certificate missing",
+      "purpose": "Exchange Front End Transport could not find its configured TLS certificate, breaking STARTTLS mail flow (MSExchangeFrontEndTransport 12014).",
+      "group": "Exchange",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "MSExchangeFrontEndTransport" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "12014" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exchange-store-mount-failures",
+      "name": "Exchange store / database mount failures",
+      "purpose": "Exchange information store and database mount failures (MSExchangeIS 9518, 9519, 9646).",
+      "group": "Exchange",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "MSExchangeIS" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "9518", "9519" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exchange-dag-replication",
+      "name": "Exchange DAG replication health",
+      "purpose": "Exchange Database Availability Group replication health events (MSExchangeRepl 2153, 4074, 4099, 4113).",
+      "group": "Exchange",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "MSExchangeRepl" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "2153", "4074", "4099", "4113" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exchange-adaccess-failures",
+      "name": "Exchange ADAccess (topology) failures",
+      "purpose": "Exchange Active Directory topology and access failures (MSExchange ADAccess 2080, 2102, 2114).",
+      "group": "Exchange",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "MSExchange ADAccess" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "2102", "2114" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exchange-all-component-errors",
+      "name": "Exchange all-component errors",
+      "purpose": "Every error and critical event from any Exchange component (noisy catch-all).",
+      "group": "Exchange",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "MSExchange" },
+          "predicates": [
+            { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Critical" ] } }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "disk-io-errors-bad-blocks",
+      "name": "Disk I/O errors / bad blocks",
+      "purpose": "Disk read/write errors and bad-block reports (disk 7, 11, 15, 51, 153).",
+      "group": "Storage",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "disk" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "7", "11", "15", "51", "153" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ntfs-corruption-repair",
+      "name": "NTFS corruption / repair needed",
+      "purpose": "NTFS file-system corruption and self-heal events (Ntfs 55, 98, 130, 131, 137, 140).",
+      "group": "Storage",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Ntfs" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "55", "98", "130", "131", "137", "140" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "volume-manager-partition-signature",
+      "name": "Volume manager / partition signature",
+      "purpose": "Volume manager dump-write failures (volmgr 161) and partition-signature collisions (partmgr 58).",
+      "group": "Storage",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "volmgr" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "161" } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "partmgr" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "58" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "storage-controller-driver-resets",
+      "name": "Storage controller / driver resets",
+      "purpose": "Storage adapter timeouts and resets (storahci, stornvme, iaStorA 11, 14, 129) and disk controller errors (153).",
+      "group": "Storage",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "storahci" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Id", "matchMode": "Many", "values": [ "11", "14", "129" ] } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "stornvme" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "matchMode": "Many", "values": [ "11", "14", "129" ] } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "iaStorA" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "matchMode": "Many", "values": [ "11", "14", "129" ] } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "disk" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "153" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bitlocker-recovery-tpm-issues",
+      "name": "BitLocker recovery / TPM issues",
+      "purpose": "BitLocker recovery-mode and TPM problems (BitLocker-API 514, 521, 525, 526, 532, 846, 851, 852).",
+      "group": "Storage",
+      "channels": [ "Microsoft-Windows-BitLocker/BitLocker Management" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "514", "521", "525", "526", "532", "846", "851", "852" ] }
+        }
+      ]
+    },
+    {
+      "id": "vss-shadow-copy-backup-failures",
+      "name": "VSS / shadow-copy / backup failures",
+      "purpose": "Volume Shadow Copy faults across the System log (Volsnap 25, 36) and the Application log (VSS 13, 8193, 12289).",
+      "group": "Storage",
+      "channels": [ "System", "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "LogName", "value": "System" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Source", "value": "Volsnap" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "matchMode": "Many", "values": [ "25", "36" ] } }
+          ]
+        },
+        {
+          "comparison": { "property": "LogName", "value": "Application" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Source", "value": "VSS" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "matchMode": "Many", "values": [ "13", "8193", "12289" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chkdsk-boot-time-results",
+      "name": "Chkdsk boot-time results",
+      "purpose": "Boot-time disk-check results written by Wininit (1001).",
+      "group": "Storage",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 6,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Wininit" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "1001" } }
+          ]
+        }
+      ]
+    }
+  ]
+}

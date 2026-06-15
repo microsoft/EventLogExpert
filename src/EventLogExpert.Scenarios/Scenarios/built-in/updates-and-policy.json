@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "group-policy-processing-errors",
+      "name": "Group Policy processing errors",
+      "purpose": "Group Policy processing failures from the Operational log plus classic System-log errors (1058, 1085).",
+      "group": "UpdatesAndPolicy",
+      "channels": [ "Microsoft-Windows-GroupPolicy/Operational", "System" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "LogName", "value": "Microsoft-Windows-GroupPolicy/Operational" },
+          "predicates": [
+            { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] } }
+          ]
+        },
+        {
+          "comparison": { "property": "LogName", "value": "System" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Source", "value": "Microsoft-Windows-GroupPolicy" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1058", "1085" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "windows-update-diagnostics",
+      "name": "Windows Update failures",
+      "purpose": "Windows Update client installation and download errors and warnings.",
+      "group": "UpdatesAndPolicy",
+      "channels": [ "System" ],
+      "optionalChannels": [ "Microsoft-Windows-WindowsUpdateClient/Operational" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-WindowsUpdateClient" },
+          "predicates": [
+            { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "windows-setup-servicing-errors",
+      "name": "Windows setup & servicing errors",
+      "purpose": "Component servicing and standalone-update-installer errors (Servicing, WUSA).",
+      "group": "UpdatesAndPolicy",
+      "channels": [ "Setup" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "matchMode": "Many", "values": [ "Microsoft-Windows-Servicing", "Microsoft-Windows-WUSA" ] },
+          "predicates": [
+            { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "time-synchronization-failures",
+      "name": "Time synchronization failures",
+      "purpose": "Windows Time service synchronization problems (Time-Service / W32Time 29, 36, 50, 129, 131).",
+      "group": "UpdatesAndPolicy",
+      "channels": [ "System" ],
+      "optionalChannels": [ "Microsoft-Windows-Time-Service/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "matchMode": "Many", "values": [ "Microsoft-Windows-Time-Service", "W32Time" ] },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "29", "36", "50", "129", "131" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "app-compatibility-issues",
+      "name": "App compatibility issues",
+      "purpose": "Program Compatibility Assistant errors and warnings for apps that misbehave on this Windows build.",
+      "group": "UpdatesAndPolicy",
+      "channels": [ "Microsoft-Windows-Application-Experience/Program-Compatibility-Assistant" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] }
+        }
+      ]
+    },
+    {
+      "id": "certificate-lifecycle-events",
+      "name": "Certificate lifecycle events",
+      "purpose": "Certificate enrollment and renewal errors and warnings on this machine.",
+      "group": "UpdatesAndPolicy",
+      "channels": [ "Microsoft-Windows-CertificateServicesClient-Lifecycle-System/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "dns-resolution-timeouts",
+      "name": "DNS resolution timeouts",
+      "purpose": "DNS client resolution timeouts and failures (DNS-Client 1013, 1014, 1015).",
+      "group": "Network",
+      "channels": [ "Microsoft-Windows-DNS-Client/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1013", "1014", "1015" ] },
+          "predicates": [
+            { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Warning", "Error", "Critical" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dns-dynamic-registration-failures",
+      "name": "DNS dynamic registration failures",
+      "purpose": "Failures registering this host's records in DNS (DNS-Client 8003, 8004, 8015, 8018, 8021, 8022, 8023).",
+      "group": "Network",
+      "channels": [ "Microsoft-Windows-DNS-Client/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "8003", "8004", "8015", "8018", "8021", "8022", "8023" ] }
+        }
+      ]
+    },
+    {
+      "id": "dhcp-lease-failures-apipa",
+      "name": "DHCP lease failures / APIPA",
+      "purpose": "DHCP client lease acquisition failures and APIPA fallback (Dhcp-Client 1000-1008).",
+      "group": "Network",
+      "channels": [ "Microsoft-Windows-Dhcp-Client/Admin" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1000", "1001", "1002", "1003", "1006", "1007", "1008" ] }
+        }
+      ]
+    },
+    {
+      "id": "duplicate-ip-address-conflict",
+      "name": "Duplicate IP / address conflict",
+      "purpose": "IP address conflicts reported by TCP/IP (Tcpip / NetBT 4198, 4199) or the DHCP client (1005).",
+      "group": "Network",
+      "channels": [ "System" ],
+      "optionalChannels": [ "Microsoft-Windows-Dhcp-Client/Admin" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "matchMode": "Many", "values": [ "Tcpip", "NetBT" ] },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4198", "4199" ] } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "Microsoft-Windows-Dhcp-Client" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "1005" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "firewall-rule-policy-changes",
+      "name": "Firewall rule / policy changes",
+      "purpose": "Windows Firewall rule and policy add/modify/delete events for change auditing.",
+      "group": "Network",
+      "channels": [ "Microsoft-Windows-Windows Firewall With Advanced Security/Firewall" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "2002", "2003", "2004", "2005", "2006", "2052", "2071", "2073", "2082", "2083", "2097" ] }
+        }
+      ]
+    },
+    {
+      "id": "firewall-blocked-app-hints",
+      "name": "Firewall blocked-app hints",
+      "purpose": "Applications whose listening sockets were blocked by Windows Firewall (2011).",
+      "group": "Network",
+      "channels": [ "Microsoft-Windows-Windows Firewall With Advanced Security/Firewall" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "value": "2011" }
+        }
+      ]
+    },
+    {
+      "id": "smb-client-connectivity-failures",
+      "name": "SMB client connectivity failures",
+      "purpose": "SMB client share-access and connectivity failures (SMBClient 30702, 30800, 30803-30816).",
+      "group": "Network",
+      "channels": [ "Microsoft-Windows-SMBClient/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 6,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "30702", "30800", "30803", "30804", "30805", "30807", "30816" ] }
+        }
+      ]
+    },
+    {
+      "id": "wifi-connect-disconnect-auth",
+      "name": "Wi-Fi connect / disconnect / auth",
+      "purpose": "Wireless association, disconnect, and authentication events (WLAN-AutoConfig).",
+      "group": "Network",
+      "channels": [ "Microsoft-Windows-WLAN-AutoConfig/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 7,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "8000", "8001", "8002", "8003", "11000", "11001", "11002", "12011", "12012", "12013" ] }
+        }
+      ]
+    },
+    {
+      "id": "network-location-profile-changes",
+      "name": "Network location / profile changes",
+      "purpose": "Network profile category changes between public, private, and domain (NetworkProfile 10000-10002).",
+      "group": "Network",
+      "channels": [ "Microsoft-Windows-NetworkProfile/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 8,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "10000", "10001", "10002" ] }
+        }
+      ]
+    }
+  ]
+}

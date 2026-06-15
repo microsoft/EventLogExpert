@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "mde-sensor-health",
+      "name": "MDE sensor onboarding / health failures",
+      "purpose": "Microsoft Defender for Endpoint sensor onboarding and health failures (SENSE).",
+      "group": "DefenderForEndpoint",
+      "channels": [ "Microsoft-Windows-SENSE/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "3", "5", "6", "7", "9", "10", "12", "15", "17", "25", "26", "27", "28", "30", "34" ] },
+          "predicates": [
+            { "joinWithAny": true, "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mde-sensor-onboard-offboard",
+      "name": "MDE sensor onboard / offboard",
+      "purpose": "Defender for Endpoint sensor onboarding and offboarding completion events (SENSE 11, 44).",
+      "group": "DefenderForEndpoint",
+      "channels": [ "Microsoft-Windows-SENSE/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "11", "44" ] } }
+      ]
+    },
+    {
+      "id": "mde-auto-investigation-errors",
+      "name": "MDE automated investigation errors",
+      "purpose": "Defender for Endpoint automated investigation (SenseIR) errors and warnings.",
+      "group": "DefenderForEndpoint",
+      "channels": [ "Microsoft-Windows-SenseIR/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] } }
+      ]
+    },
+    {
+      "id": "defender-realtime-protection",
+      "name": "Defender real-time protection failure & recovery",
+      "purpose": "Microsoft Defender real-time protection failed or recovered (3002, 3007).",
+      "group": "DefenderForEndpoint",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "3002", "3007" ] } }
+      ]
+    },
+    {
+      "id": "defender-signature-update-health",
+      "name": "Defender signature update health",
+      "purpose": "Defender security-intelligence update success and failure (2000, 2001).",
+      "group": "DefenderForEndpoint",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "2000", "2001" ] } }
+      ]
+    },
+    {
+      "id": "defender-engine-platform-update",
+      "name": "Defender engine & platform update health",
+      "purpose": "Defender engine and platform update success and failure (2002, 2003, 2006).",
+      "group": "DefenderForEndpoint",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "2002", "2003", "2006" ] } }
+      ]
+    },
+    {
+      "id": "defender-definition-reversion",
+      "name": "Defender definition load failure",
+      "purpose": "Defender failed to load definitions and reverted to the last-known-good set (2004).",
+      "group": "DefenderForEndpoint",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 6,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "2004" } }
+      ]
+    },
+    {
+      "id": "defender-engine-crash",
+      "name": "Defender engine crash or hang",
+      "purpose": "The Defender antimalware engine terminated unexpectedly (5008).",
+      "group": "DefenderForEndpoint",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 7,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "5008" } }
+      ]
+    },
+    {
+      "id": "defender-tamper-protection-block",
+      "name": "Defender tamper protection block",
+      "purpose": "Tamper protection blocked a change to Microsoft Defender Antivirus (5013); an evasion attempt.",
+      "group": "DefenderForEndpoint",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 8,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "5013" } }
+      ]
+    },
+    {
+      "id": "defender-platform-expiry",
+      "name": "Defender platform expiry",
+      "purpose": "The Defender platform entered its grace period or expired, disabling protection (5100, 5101).",
+      "group": "DefenderForEndpoint",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 9,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5100", "5101" ] } }
+      ]
+    },
+    {
+      "id": "defender-scan-lifecycle",
+      "name": "Defender scan lifecycle",
+      "purpose": "Defender antimalware scan started, completed, and cancelled events (1000, 1001, 1002).",
+      "group": "DefenderForEndpoint",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 10,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1000", "1001", "1002" ] } }
+      ]
+    },
+    {
+      "id": "defender-controlled-folder-access",
+      "name": "Defender Controlled Folder Access block",
+      "purpose": "Controlled Folder Access blocked an untrusted process from modifying protected disk sectors (1127).",
+      "group": "DefenderForEndpoint",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 11,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "1127" } }
+      ]
+    }
+  ]
+}

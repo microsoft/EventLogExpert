@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "application-crashes",
+      "name": "Application crashes",
+      "purpose": "User-mode application faults reported by Windows Error Reporting (Application Error 1000).",
+      "group": "Applications",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Application Error" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "1000" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "application-hangs",
+      "name": "Application hangs",
+      "purpose": "Applications that stopped responding (Application Hang 1002).",
+      "group": "Applications",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Application Hang" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "1002" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "windows-error-reports",
+      "name": "Windows Error Reports (WER)",
+      "purpose": "Windows Error Reporting fault buckets (1001).",
+      "group": "Applications",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Windows Error Reporting" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "1001" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "faults-triage",
+      "name": "Faults triage (crash, hang, WER)",
+      "purpose": "Combined application crashes (1000), hangs (1002), and Windows Error Reports (1001).",
+      "group": "Applications",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Application Error" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "1000" } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "Application Hang" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "1002" } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "Windows Error Reporting" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "1001" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dotnet-unhandled-exceptions",
+      "name": ".NET unhandled exceptions",
+      "purpose": "Unhandled managed exceptions from the .NET runtime (1026).",
+      "group": "Applications",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": ".NET Runtime" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "1026" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "all-dotnet-runtime-errors",
+      "name": "All .NET Runtime errors",
+      "purpose": "Every error and critical event from the .NET runtime.",
+      "group": "Applications",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": ".NET Runtime" },
+          "predicates": [
+            { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Critical" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "all-application-errors-and-criticals",
+      "name": "All Application errors & criticals",
+      "purpose": "Catch-all for every error and critical event in the Application log.",
+      "group": "Applications",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 6,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Critical" ] }
+        }
+      ]
+    },
+    {
+      "id": "msi-installation-failures",
+      "name": "MSI installation failures",
+      "purpose": "Windows Installer operation and service-start failures (MsiInstaller 11708, 11920).",
+      "group": "Applications",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 7,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "MsiInstaller" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "11708", "11920" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "msi-all-activity",
+      "name": "MSI all activity",
+      "purpose": "Every Windows Installer event for install and patch auditing.",
+      "group": "Applications",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 8,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "MsiInstaller" }
+        }
+      ]
+    },
+    {
+      "id": "msix-appx-deployment-failures",
+      "name": "MSIX / AppX deployment failures",
+      "purpose": "Modern app package deployment failures (AppXDeploymentServer 404, 409, 465, 602).",
+      "group": "Applications",
+      "channels": [ "Microsoft-Windows-AppXDeploymentServer/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 9,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Id", "matchMode": "Many", "values": [ "404", "409", "465", "602" ] },
+          "predicates": [
+            { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Critical" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "appmodel-runtime-errors",
+      "name": "AppModel runtime errors",
+      "purpose": "Packaged-app runtime errors and criticals from the AppModel runtime.",
+      "group": "Applications",
+      "channels": [ "Microsoft-Windows-AppModel-Runtime/Admin" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 10,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Critical" ] }
+        }
+      ]
+    },
+    {
+      "id": "dcom-permission-errors",
+      "name": "DCOM permission errors",
+      "purpose": "DistributedCOM launch and activation permission errors (10016).",
+      "group": "Applications",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 11,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-DistributedCOM" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "10016" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "user-profile-load-issues",
+      "name": "User profile load issues",
+      "purpose": "Roaming and local user profile load failures (User Profiles Service 1500, 1511, 1515, 1530, 1542).",
+      "group": "Applications",
+      "channels": [ "Application" ],
+      "optionalChannels": [ "Microsoft-Windows-User Profile Service/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 12,
+      "version": 1,
+      "filters": [
+        {
+          "comparison": { "property": "Source", "operator": "Contains", "value": "User Profile" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1500", "1511", "1515", "1530", "1542" ] } }
+          ]
+        }
+      ]
+    }
+  ]
+}

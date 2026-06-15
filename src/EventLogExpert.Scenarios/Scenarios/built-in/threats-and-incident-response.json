@@ -1,0 +1,546 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "new-service-installed-system",
+      "name": "New service installed (SCM)",
+      "purpose": "A new service was installed (Service Control Manager 7045); a common persistence signal.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Source", "value": "Service Control Manager" }, "predicates": [ { "comparison": { "property": "Id", "value": "7045" } } ] }
+      ]
+    },
+    {
+      "id": "new-service-installed-audited",
+      "name": "New service installed (audited)",
+      "purpose": "Security-audited service installation (4697); requires the audit policy to be enabled.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "4697" } }
+      ]
+    },
+    {
+      "id": "service-installation-combined",
+      "name": "Service installation (combined)",
+      "purpose": "Correlate service installs across the System log (7045) and the Security audit log (4697).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "System", "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "LogName", "value": "System" }, "predicates": [ { "comparison": { "property": "Id", "value": "7045" } } ] },
+        { "comparison": { "property": "LogName", "value": "Security" }, "predicates": [ { "comparison": { "property": "Id", "value": "4697" } } ] }
+      ]
+    },
+    {
+      "id": "scheduled-task-created-audited",
+      "name": "Scheduled task created / changed (audited)",
+      "purpose": "Security-audited scheduled-task create, update, delete, enable, and disable (4698-4702).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4698", "4699", "4700", "4701", "4702" ] } }
+      ]
+    },
+    {
+      "id": "scheduled-task-lifecycle-operational",
+      "name": "Scheduled task lifecycle (operational)",
+      "purpose": "Task Scheduler registration, update, and delete events from the Operational log (106, 140, 141).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-TaskScheduler/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "106", "140", "141" ] } }
+      ]
+    },
+    {
+      "id": "scheduled-task-activity-combined",
+      "name": "Scheduled task activity (combined)",
+      "purpose": "Combine audited scheduled-task changes (Security 4698-4702) with operational task lifecycle (106, 140, 141).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Security", "Microsoft-Windows-TaskScheduler/Operational" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "LogName", "value": "Security" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4698", "4699", "4700", "4701", "4702" ] } } ] },
+        { "comparison": { "property": "LogName", "value": "Microsoft-Windows-TaskScheduler/Operational" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "106", "140", "141" ] } } ] }
+      ]
+    },
+    {
+      "id": "wmi-event-subscription-persistence",
+      "name": "WMI event-subscription persistence",
+      "purpose": "WMI permanent event subscriptions, a stealthy persistence mechanism (WMI-Activity 5859, 5860, 5861).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-WMI-Activity/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 6,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5859", "5860", "5861" ] } }
+      ]
+    },
+    {
+      "id": "powershell-script-block-logging",
+      "name": "PowerShell script-block logging",
+      "purpose": "PowerShell script-block logging (4104); captures the actual script content executed.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-PowerShell/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 7,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "4104" } }
+      ]
+    },
+    {
+      "id": "suspicious-powershell-script-blocks",
+      "name": "Suspicious PowerShell script blocks",
+      "purpose": "Script-block events flagged at warning level, which PowerShell uses for suspicious content (4104).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-PowerShell/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 8,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "Level", "value": "Warning" } } ] }
+      ]
+    },
+    {
+      "id": "powershell-module-pipeline-logging",
+      "name": "PowerShell module / pipeline logging",
+      "purpose": "PowerShell module load and pipeline execution logging (4103, 4105, 4106).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-PowerShell/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 9,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4103", "4105", "4106" ] } }
+      ]
+    },
+    {
+      "id": "classic-powershell-engine",
+      "name": "Classic PowerShell engine / pipeline",
+      "purpose": "Classic Windows PowerShell engine and pipeline events (400, 403, 600, 800).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Windows PowerShell" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 10,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "400", "403", "600", "800" ] } }
+      ]
+    },
+    {
+      "id": "powershell-all-activity-combined",
+      "name": "PowerShell all activity (combined)",
+      "purpose": "Combine modern script-block and module logging with the classic Windows PowerShell engine log.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-PowerShell/Operational", "Windows PowerShell" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 11,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "LogName", "value": "Microsoft-Windows-PowerShell/Operational" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4103", "4104", "4105", "4106" ] } } ] },
+        { "comparison": { "property": "LogName", "value": "Windows PowerShell" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "400", "403", "600", "800" ] } } ] }
+      ]
+    },
+    {
+      "id": "process-creation-with-command-line",
+      "name": "Process creation with command line",
+      "purpose": "Audited process creation (4688); command-line capture requires the corresponding audit policy.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 12,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "4688" } }
+      ]
+    },
+    {
+      "id": "suspicious-lolbin-execution",
+      "name": "Suspicious LOLBin execution",
+      "purpose": "Process-creation events whose command line names a commonly abused living-off-the-land binary.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 13,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "rundll32" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "regsvr32" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "mshta" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "wmic" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "certutil" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "bitsadmin" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "msiexec" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "installutil" } } ] }
+      ]
+    },
+    {
+      "id": "encoded-hidden-powershell-cmdline",
+      "name": "Encoded / hidden PowerShell command line",
+      "purpose": "Process-creation events whose command line shows encoded or hidden PowerShell execution.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 14,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "-enc" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "-EncodedCommand" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "FromBase64String" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "-w hidden" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "-nop" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "DownloadString" } } ] }
+      ]
+    },
+    {
+      "id": "sysmon-process-creation",
+      "name": "Sysmon process creation",
+      "purpose": "Sysmon process-create events with full parent and hash detail (1).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-Sysmon/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 15,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "1" } }
+      ]
+    },
+    {
+      "id": "sysmon-network-connection",
+      "name": "Sysmon network connection",
+      "purpose": "Sysmon network-connection events (3).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-Sysmon/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 16,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "3" } }
+      ]
+    },
+    {
+      "id": "sysmon-process-network-filecreate",
+      "name": "Sysmon process, network, file-create",
+      "purpose": "Sysmon process-create (1), network-connect (3), and file-create (11) for activity triage.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-Sysmon/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 17,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1", "3", "11" ] } }
+      ]
+    },
+    {
+      "id": "sysmon-process-injection",
+      "name": "Sysmon process injection",
+      "purpose": "Sysmon CreateRemoteThread (8) and ProcessAccess (10) events that signal injection.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-Sysmon/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 18,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "8", "10" ] } }
+      ]
+    },
+    {
+      "id": "sysmon-image-driver-load",
+      "name": "Sysmon image / driver load",
+      "purpose": "Sysmon image-load (7) and driver-load (6) events.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-Sysmon/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 19,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6", "7" ] } }
+      ]
+    },
+    {
+      "id": "sysmon-registry-autostart",
+      "name": "Sysmon registry autostart",
+      "purpose": "Sysmon registry events covering autostart locations (12, 13, 14).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-Sysmon/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 20,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "12", "13", "14" ] } }
+      ]
+    },
+    {
+      "id": "sysmon-dns-query",
+      "name": "Sysmon DNS query",
+      "purpose": "Sysmon DNS-query events (22).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-Sysmon/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 21,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "22" } }
+      ]
+    },
+    {
+      "id": "sysmon-tamper-service-state",
+      "name": "Sysmon tamper / service state",
+      "purpose": "Sysmon service state-change (4), config-change (16), and tamper (25) events.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-Sysmon/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 22,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4", "16", "25" ] } }
+      ]
+    },
+    {
+      "id": "defender-malware-detected",
+      "name": "Defender - malware detected",
+      "purpose": "Microsoft Defender Antivirus malware detections (1116, 1006, 1015).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 23,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1116", "1006", "1015" ] } }
+      ]
+    },
+    {
+      "id": "defender-remediation-action-taken",
+      "name": "Defender - remediation / action taken",
+      "purpose": "Defender remediation actions such as quarantine, removal, and block (1117, 1007-1009, 1118, 1119).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 24,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1117", "1007", "1008", "1009", "1118", "1119" ] } }
+      ]
+    },
+    {
+      "id": "defender-tampering-protection-disabled",
+      "name": "Defender - tampering / protection disabled",
+      "purpose": "Defender protection-state changes that may indicate tampering (5001, 5004, 5007, 5010, 5012).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 25,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5001", "5004", "5007", "5010", "5012" ] } }
+      ]
+    },
+    {
+      "id": "defender-asr-network-exploit",
+      "name": "Defender - ASR / network / exploit protection",
+      "purpose": "Attack-surface-reduction, network-protection, and exploit-protection events (1121, 1122, 1125, 1126).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 26,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1121", "1122", "1125", "1126" ] } }
+      ]
+    },
+    {
+      "id": "security-audit-log-cleared",
+      "name": "Security audit log cleared or stopped",
+      "purpose": "The Security audit log was cleared (1102) or the event log service was shut down (1100); both can indicate anti-forensic tampering.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 27,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1100", "1102" ] } }
+      ]
+    },
+    {
+      "id": "event-log-cleared-any",
+      "name": "Event log cleared (any log)",
+      "purpose": "Any event log was cleared (Eventlog 104).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 28,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Source", "value": "Microsoft-Windows-Eventlog" }, "predicates": [ { "comparison": { "property": "Id", "value": "104" } } ] }
+      ]
+    },
+    {
+      "id": "log-cleared-anti-forensics-combined",
+      "name": "Log cleared / anti-forensics (combined)",
+      "purpose": "Correlate Security audit-log clear or service stop (1102, 1100) with any-log clears in the System log (104).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Security", "System" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 29,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "LogName", "value": "Security" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1100", "1102" ] } } ] },
+        { "comparison": { "property": "LogName", "value": "System" }, "predicates": [ { "joinWithAny": false, "comparison": { "property": "Source", "value": "Microsoft-Windows-Eventlog" } }, { "joinWithAny": false, "comparison": { "property": "Id", "value": "104" } } ] }
+      ]
+    },
+    {
+      "id": "rdp-local-session",
+      "name": "RDP local session (logon / disconnect / reconnect)",
+      "purpose": "Terminal Services local session manager logon, disconnect, and reconnect events (21, 24, 25).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 30,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "21", "24", "25" ] } }
+      ]
+    },
+    {
+      "id": "rdp-inbound-authentication",
+      "name": "RDP inbound authentication",
+      "purpose": "Remote Connection Manager inbound RDP authentication events (1149).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 31,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "1149" } }
+      ]
+    },
+    {
+      "id": "rdp-activity-combined",
+      "name": "RDP activity (combined)",
+      "purpose": "Combine inbound RDP authentication (1149) with local session logon, disconnect, and reconnect (21, 24, 25).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational", "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 32,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "LogName", "value": "Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational" }, "predicates": [ { "comparison": { "property": "Id", "value": "1149" } } ] },
+        { "comparison": { "property": "LogName", "value": "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "21", "24", "25" ] } } ] }
+      ]
+    },
+    {
+      "id": "winrm-remoting-activity",
+      "name": "WinRM remoting activity",
+      "purpose": "WinRM remote-management session and operation events (6, 91, 161, 168, 169).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-WinRM/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 33,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6", "91", "161", "168", "169" ] } }
+      ]
+    },
+    {
+      "id": "wmi-remote-activity",
+      "name": "WMI remote / activity",
+      "purpose": "WMI activity and remote operation events (5857-5861).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-WMI-Activity/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 34,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5857", "5858", "5859", "5860", "5861" ] } }
+      ]
+    },
+    {
+      "id": "remote-execution-lateral-movement-combined",
+      "name": "Remote execution / lateral movement (combined)",
+      "purpose": "Combine WinRM, PowerShell, WMI, and Task Scheduler operational logs for lateral-movement hunting.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-WinRM/Operational", "Microsoft-Windows-PowerShell/Operational", "Microsoft-Windows-WMI-Activity/Operational", "Microsoft-Windows-TaskScheduler/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 35,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "LogName", "value": "Microsoft-Windows-WinRM/Operational" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6", "91", "161", "168", "169" ] } } ] },
+        { "comparison": { "property": "LogName", "value": "Microsoft-Windows-PowerShell/Operational" }, "predicates": [ { "comparison": { "property": "Id", "value": "4104" } } ] },
+        { "comparison": { "property": "LogName", "value": "Microsoft-Windows-WMI-Activity/Operational" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5857", "5858", "5860", "5861" ] } } ] },
+        { "comparison": { "property": "LogName", "value": "Microsoft-Windows-TaskScheduler/Operational" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "106", "140", "141" ] } } ] }
+      ]
+    },
+    {
+      "id": "endpoint-ir-triage-persistence-evasion",
+      "name": "Endpoint IR triage - persistence & evasion",
+      "purpose": "Flagship cross-log triage: audited persistence and evasion (Security), service installs and log clears (System), task lifecycle (Task Scheduler), and script-block logging (PowerShell).",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Security", "System", "Microsoft-Windows-TaskScheduler/Operational", "Microsoft-Windows-PowerShell/Operational" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 36,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "LogName", "value": "Security" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4697", "4698", "4699", "4702", "1102", "1100" ] } } ] },
+        { "comparison": { "property": "LogName", "value": "System" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "7045", "104" ] } } ] },
+        { "comparison": { "property": "LogName", "value": "Microsoft-Windows-TaskScheduler/Operational" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "106", "140", "141" ] } } ] },
+        { "comparison": { "property": "LogName", "value": "Microsoft-Windows-PowerShell/Operational" }, "predicates": [ { "comparison": { "property": "Id", "value": "4104" } } ] }
+      ]
+    }
+  ]
+}

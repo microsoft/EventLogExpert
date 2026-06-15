@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "dhcp-authorization-failures",
+      "name": "DHCP authorization failures (rogue server)",
+      "purpose": "DHCP service determined not authorized in Active Directory (1045, 1046, 1051); blocks lease issuance.",
+      "group": "DhcpServer",
+      "channels": [ "DhcpAdminEvents" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 0,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1045", "1046", "1051" ] } }
+      ]
+    },
+    {
+      "id": "dhcp-service-startup-failures",
+      "name": "DHCP service startup failures",
+      "purpose": "Fatal DHCP service initialization failures (1001, 1002, 1004, 1006, 1008).",
+      "group": "DhcpServer",
+      "channels": [ "DhcpAdminEvents" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 1,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1001", "1002", "1004", "1006", "1008" ] } }
+      ]
+    },
+    {
+      "id": "dhcp-callout-dll-injection",
+      "name": "DHCP callout DLL injection",
+      "purpose": "DHCP callout DLL load and fault events that can signal a persistence vector (1031, 1032, 1033, 1034).",
+      "group": "DhcpServer",
+      "channels": [ "DhcpAdminEvents" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1031", "1032", "1033", "1034" ] } }
+      ]
+    },
+    {
+      "id": "dhcp-scope-lifecycle",
+      "name": "DHCP scope lifecycle changes",
+      "purpose": "DHCP scope configured, modified, deleted, activated, and deactivated (70-74).",
+      "group": "DhcpServer",
+      "channels": [ "Microsoft-Windows-Dhcp-Server/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "70", "71", "72", "73", "74" ] } }
+      ]
+    },
+    {
+      "id": "dhcp-reservation-changes",
+      "name": "DHCP reservation add / remove",
+      "purpose": "Static DHCP reservation creation and deletion (106, 107).",
+      "group": "DhcpServer",
+      "channels": [ "Microsoft-Windows-Dhcp-Server/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 4,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "106", "107" ] } }
+      ]
+    },
+    {
+      "id": "dhcp-failover-partner-lost",
+      "name": "DHCP failover partner lost",
+      "purpose": "DHCP failover partner time-sync and connectivity loss (20253, 20254, 20255).",
+      "group": "DhcpServer",
+      "channels": [ "Microsoft-Windows-Dhcp-Server/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 5,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "20253", "20254", "20255" ] } }
+      ]
+    }
+  ]
+}
