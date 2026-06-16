@@ -53,9 +53,9 @@
 
         <div class="filter-header-secondary">
             <button aria-describedby="@(HasSavableFilters ? null : "save-filters-empty-hint")"
-                aria-disabled="@(!HasSavableFilters)"
                 aria-label="Save as Filter Set"
                 class="button icon-button"
+                disabled="@(!HasSavableFilters)"
                 @onclick="SaveFiltersAsFilterSetAsync"
                 title="@(HasSavableFilters ? "Save as Filter Set..." : "No filters to save")"
                 type="button">
@@ -63,9 +63,9 @@
             </button>
 
             <button aria-describedby="@(HasClearableFilters ? null : "clear-filters-empty-hint")"
-                aria-disabled="@(!HasClearableFilters)"
                 aria-label="Clear All Filters"
                 class="button icon-button"
+                disabled="@(!HasClearableFilters)"
                 @onclick="ClearAllFiltersAsync"
                 title="@(HasClearableFilters ? "Clear All Filters..." : "No filters to clear")"
                 type="button">
