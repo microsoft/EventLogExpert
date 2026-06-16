@@ -93,7 +93,9 @@ public sealed class ComponentIdTests
     [InlineData("")]
     public void NewUnique_WithInvalidPrefix_Throws(string prefix)
     {
-        Assert.Throws<ArgumentException>(() => ComponentId.NewUnique(prefix));
+        var ex = Assert.Throws<ArgumentException>(() => ComponentId.NewUnique(prefix));
+
+        Assert.Equal("prefix", ex.ParamName);
     }
 
     [Theory]
@@ -160,6 +162,16 @@ public sealed class ComponentIdTests
         var id = ComponentId.NewUnique();
 
         Assert.Throws<ArgumentException>(() => id.Suffix(""));
+    }
+
+    [Fact]
+    public void Suffix_WithInvalidCharacter_Throws()
+    {
+        var id = ComponentId.NewUnique();
+
+        var ex = Assert.Throws<ArgumentException>(() => id.Suffix("bad@part"));
+
+        Assert.Equal("part", ex.ParamName);
     }
 
     [Fact]

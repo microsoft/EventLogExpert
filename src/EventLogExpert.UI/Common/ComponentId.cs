@@ -28,7 +28,10 @@ internal readonly record struct ComponentId
 
     public static ComponentId NewUnique() => NewUnique("cid");
 
-    public static ComponentId NewUnique(string prefix) => new($"{prefix}-{Guid.NewGuid():N}");
+    public static ComponentId NewUnique(string prefix) =>
+        !IsValidId(prefix) ?
+            throw new ArgumentException($"'{prefix}' is not a valid id prefix (expected {ValidIdPattern}).", nameof(prefix)) :
+            new ComponentId($"{prefix}-{Guid.NewGuid():N}");
 
     public static ComponentId For(FilterId id, ComponentIdScope scope) =>
         id.Value == Guid.Empty ? throw new ArgumentException("Filter id must not be empty.", nameof(id)) :
@@ -39,8 +42,8 @@ internal readonly record struct ComponentId
             new ComponentId($"le-{id.Value:N}");
 
     public ComponentId Suffix(string part) =>
-        string.IsNullOrWhiteSpace(part) ?
-            throw new ArgumentException("Suffix part must not be empty or whitespace.", nameof(part)) :
+        string.IsNullOrWhiteSpace(part) || !IsValidIdFragment(part) ?
+            throw new ArgumentException($"'{part}' is not a valid id suffix (expected characters in [A-Za-z0-9_-]).", nameof(part)) :
             new ComponentId($"{Value}_{part}");
 
     public override string ToString() => _value ?? string.Empty;
@@ -55,13 +58,11 @@ internal readonly record struct ComponentId
         _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Unknown component id scope."),
     };
 
-    private static bool IsValidId(string value)
-    {
-        if (string.IsNullOrEmpty(value) || !char.IsAsciiLetter(value[0]))
-        {
-            return false;
-        }
+    private static bool IsValidId(string value) =>
+        !string.IsNullOrEmpty(value) && char.IsAsciiLetter(value[0]) && IsValidIdFragment(value);
 
+    private static bool IsValidIdFragment(string value)
+    {
         foreach (char character in value)
         {
             if (!char.IsAsciiLetterOrDigit(character) && character is not ('_' or '-'))
