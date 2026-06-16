@@ -65,8 +65,13 @@ public sealed class BuiltInScenarioRegistry
                     $"Scenario '{scenario.Id}' has a filter row that could not be formatted; the catalog should reject it at load.");
             }
 
-            var saved = SavedFilter.TryCreate(comparisonText, row.Filter, isExcluded: row.IsExcluded, isEnabled: true, mode: FilterMode.Basic)
-                ?? throw new InvalidOperationException(
+            var saved = SavedFilter.TryCreate(comparisonText,
+                    row.Filter,
+                    color: row.Color,
+                    isExcluded: row.IsExcluded,
+                    isEnabled: true,
+                    mode: FilterMode.Basic) ??
+                throw new InvalidOperationException(
                     $"Scenario '{scenario.Id}' has a filter row '{comparisonText}' that could not be compiled; the catalog should reject it at load.");
 
             builder.Add(saved);
