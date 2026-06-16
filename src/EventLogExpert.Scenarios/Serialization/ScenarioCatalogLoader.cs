@@ -169,10 +169,11 @@ internal static partial class ScenarioCatalogLoader
                 }
             }
 
-            if (predicatesOk)
-            {
-                rows.Add(new ScenarioFilterRow(new BasicFilter(root, predicates.ToImmutable()), dto.IsExcluded));
-            }
+            if (!predicatesOk) { continue; }
+
+            var color = ParseEnum(dto.Color, rowContext, "color", required: false, errors, HighlightColor.None);
+
+            rows.Add(new ScenarioFilterRow(new BasicFilter(root, predicates.ToImmutable()), dto.IsExcluded ?? false, color));
         }
 
         return rows;
@@ -366,6 +367,11 @@ internal static partial class ScenarioCatalogLoader
 
         var isCombined = definition.Channels.Length > 1;
 
+        if (definition.Filters.Length == 1 && definition.Filters[0].Color != HighlightColor.None)
+        {
+            errors.Add($"{context}: single-row scenarios must not use highlight colors.");
+        }
+
         for (var i = 0; i < definition.Filters.Length; i++)
         {
             var row = definition.Filters[i];
@@ -382,6 +388,11 @@ internal static partial class ScenarioCatalogLoader
 
     private static void ValidateRow(ScenarioFilterRow row, string context, List<string> errors)
     {
+        if (row.IsExcluded && row.Color != HighlightColor.None)
+        {
+            errors.Add($"{context}: excluded rows cannot have a highlight color.");
+        }
+
         if (!BasicFilterFormatter.TryFormat(row.Filter, strictPredicates: true, out var text))
         {
             errors.Add($"{context}: filter did not format (a comparison or predicate is incomplete).");

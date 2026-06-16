@@ -4,12 +4,37 @@
 using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Scenarios.Catalog;
 
 namespace EventLogExpert.Scenarios.Tests;
 
 public sealed class BuiltInScenarioRegistryTests
 {
+    [Fact]
+    public void BuildFilterSet_AppliesRowColor()
+    {
+        var scenario = new ScenarioDefinition
+        {
+            Id = "c",
+            Name = "c",
+            Purpose = "p",
+            Group = ScenarioGroup.SystemHealth,
+            Channels = ["System"],
+            Filters =
+            [
+                new ScenarioFilterRow(Row("12"), Color: HighlightColor.Green),
+                new ScenarioFilterRow(Row("41"), Color: HighlightColor.Red)
+            ]
+        };
+
+        var registry = new BuiltInScenarioRegistry([new FakeSource(scenario)]);
+
+        var filterSet = registry.BuildFilterSet(registry.Scenarios[0]);
+
+        Assert.Equal([HighlightColor.Green, HighlightColor.Red], filterSet.Select(saved => saved.Color));
+    }
+
     [Fact]
     public void BuildFilterSet_ProducesOneCompiledBasicFilterPerRow()
     {
@@ -69,6 +94,17 @@ public sealed class BuiltInScenarioRegistryTests
             ]
         };
     }
+
+    private static BasicFilter Row(string id) =>
+        new(
+            new FilterComparison
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = id
+            },
+            []);
 
     private sealed class FakeSource(params ScenarioDefinition[] scenarios) : IScenarioSource
     {

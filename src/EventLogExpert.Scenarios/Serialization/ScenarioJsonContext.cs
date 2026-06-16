@@ -12,6 +12,8 @@ namespace EventLogExpert.Scenarios.Serialization;
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     PropertyNameCaseInsensitive = true,
     ReadCommentHandling = JsonCommentHandling.Skip,
-    AllowTrailingCommas = true)]
+    AllowTrailingCommas = true,
+    WriteIndented = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(ScenarioFileDto))]
 internal sealed partial class ScenarioJsonContext : JsonSerializerContext;

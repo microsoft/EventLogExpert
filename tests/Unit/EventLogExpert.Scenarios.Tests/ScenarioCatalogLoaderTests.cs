@@ -31,6 +31,21 @@ public sealed class ScenarioCatalogLoaderTests
         Assert.True(result.Errors.Count >= 3, $"Expected >= 3 errors, got: {string.Join("; ", result.Errors)}");
     }
 
+    [Fact]
+    public void Load_BadColorToken_IsError()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ],
+              "filters": [
+                { "color": "NotAColor", "comparison": { "property": "Id", "value": "12" } },
+                { "comparison": { "property": "Id", "value": "41" } }
+              ] }
+            """));
+
+        Assert.Contains(result.Errors, error => error.Contains("color"));
+    }
+
     [Theory]
     [InlineData("\"property\": \"LogNam\"")]
     [InlineData("\"property\": \"Log Name\"")]
@@ -72,6 +87,22 @@ public sealed class ScenarioCatalogLoaderTests
             """));
 
         Assert.Contains(result.Errors, error => error.Contains(expected));
+    }
+
+    [Fact]
+    public void Load_ColoredMultiRowScenario_Succeeds()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ],
+              "filters": [
+                { "color": "Green", "comparison": { "property": "Id", "value": "12" } },
+                { "color": "Red", "comparison": { "property": "Id", "value": "41" } }
+              ] }
+            """));
+
+        Assert.Empty(result.Errors);
+        Assert.Single(result.Scenarios);
     }
 
     [Fact]
@@ -118,6 +149,21 @@ public sealed class ScenarioCatalogLoaderTests
             """);
 
         Assert.Contains(result.Errors, error => error.Contains("duplicate id"));
+    }
+
+    [Fact]
+    public void Load_ExcludedRowWithColor_IsError()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ],
+              "filters": [
+                { "color": "Red", "isExcluded": true, "comparison": { "property": "Id", "value": "12" } },
+                { "comparison": { "property": "Id", "value": "41" } }
+              ] }
+            """));
+
+        Assert.Contains(result.Errors, error => error.Contains("excluded rows cannot have a highlight color"));
     }
 
     [Fact]
@@ -201,6 +247,20 @@ public sealed class ScenarioCatalogLoaderTests
 
         Assert.Empty(result.Scenarios);
         Assert.Contains(result.Errors, error => error.Contains("scenario is null"));
+    }
+
+    [Fact]
+    public void Load_SingleRowWithColor_IsError()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ],
+              "filters": [
+                { "color": "Green", "comparison": { "property": "Id", "value": "12" } }
+              ] }
+            """));
+
+        Assert.Contains(result.Errors, error => error.Contains("single-row scenarios must not use highlight colors"));
     }
 
     [Fact]
