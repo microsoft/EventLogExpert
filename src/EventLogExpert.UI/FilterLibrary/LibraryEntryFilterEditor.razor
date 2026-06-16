@@ -9,7 +9,7 @@
 
             @foreach (var saved in FilterSet.Filters)
             {
-                <LibraryFilterRow Id="@($"lef-{saved.Id.Value:N}")"
+                <LibraryFilterRow Id="@ComponentId.For(saved.Id, ComponentIdScope.LibraryFilter).Value"
                     @key="saved.Id"
                     OnExclusionChanged="@(e => OnExclusionChangedForSaved(saved.Id, e))"
                     OnRemove="@(() => OnRemoveSaved(saved.Id))"
@@ -20,7 +20,7 @@
 
             @foreach (var draft in _pendingDrafts)
             {
-                <LibraryFilterRow Id="@($"lef-pending-{draft.Id.Value:N}")"
+                <LibraryFilterRow Id="@ComponentId.For(draft.Id, ComponentIdScope.LibraryPendingFilter).Value"
                     @key="draft.Id"
                     OnPendingDiscard="@(() => DiscardPendingDraft(draft))"
                     OnPendingSave="@(built => SavePendingDraft(draft, built))"
