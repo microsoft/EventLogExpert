@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.FilterEditor;
 using Microsoft.AspNetCore.Components;
 
@@ -12,7 +13,7 @@ public sealed partial class LibraryFilterRow : ComponentBase
 {
     private FilterEditorCore? _coreRef;
 
-    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Parameter] public string Id { get; set; } = ComponentId.NewUnique().Value;
 
     [Parameter] public EventCallback<bool> OnExclusionChanged { get; set; }
 

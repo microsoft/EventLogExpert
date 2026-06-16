@@ -3,6 +3,7 @@
 
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.UI.Banner;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -11,10 +12,10 @@ namespace EventLogExpert.UI.Modal;
 
 public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 {
-    private readonly string _inlineAlertMessageId = $"modal-inline-alert-message-{Guid.NewGuid():N}";
-    private readonly string _inlineAlertTitleId = $"modal-inline-alert-title-{Guid.NewGuid():N}";
-    private readonly string _inlineAlertValidationErrorId = $"modal-inline-alert-validation-{Guid.NewGuid():N}";
-    private readonly string _titleId = $"modal-title-{Guid.NewGuid():N}";
+    private readonly string _inlineAlertMessageId = ComponentId.NewUnique("modal-inline-alert-message").Value;
+    private readonly string _inlineAlertTitleId = ComponentId.NewUnique("modal-inline-alert-title").Value;
+    private readonly string _inlineAlertValidationErrorId = ComponentId.NewUnique("modal-inline-alert-validation").Value;
+    private readonly string _titleId = ComponentId.NewUnique("modal-title").Value;
 
     private ElementReference _dialogRef;
     private ElementReference _inlineAlertAcceptButtonRef;

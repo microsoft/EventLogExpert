@@ -6,6 +6,7 @@ using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
+using EventLogExpert.UI.Common;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
@@ -14,8 +15,8 @@ namespace EventLogExpert.UI.FilterLibrary;
 
 public sealed partial class LibrarySavedTabHeader : ComponentBase
 {
-    private readonly string _filterRowId = $"saved-new-row-{Guid.NewGuid():N}";
-    private readonly string _nameInputId = $"saved-new-name-{Guid.NewGuid():N}";
+    private readonly string _filterRowId = ComponentId.NewUnique("saved-new-row").Value;
+    private readonly string _nameInputId = ComponentId.NewUnique("saved-new-name").Value;
 
     private string _draftName = string.Empty;
     private ImmutableList<string> _draftTags = [];

@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.FilterLibrary;
+using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using System.Collections.Immutable;
@@ -10,7 +11,7 @@ namespace EventLogExpert.UI.Inputs;
 
 public sealed partial class TagPicker : ComponentBase
 {
-    private readonly string _listboxId = $"tag-picker-listbox-{Guid.NewGuid().ToString()[..8]}";
+    private readonly string _listboxId = ComponentId.NewUnique("tag-picker-listbox").Value;
 
     private int _activeOptionIndex = -1;
     private IReadOnlyList<string> _filteredSuggestions = [];
@@ -19,11 +20,7 @@ public sealed partial class TagPicker : ComponentBase
     private bool _isDropdownOpen;
     private bool _isInputFocused;
 
-    private bool IsListboxOpen => _isDropdownOpen && _isInputFocused && _filteredSuggestions.Count > 0;
-
     [Parameter] public string? AriaLabel { get; set; }
-
-    private string EffectiveAriaLabel => string.IsNullOrWhiteSpace(AriaLabel) ? "Tags" : AriaLabel;
 
     [Parameter] public string? Placeholder { get; set; } = "Add tag…";
 
@@ -32,6 +29,10 @@ public sealed partial class TagPicker : ComponentBase
     [Parameter][EditorRequired] public required ImmutableList<string> Value { get; set; }
 
     [Parameter] public EventCallback<ImmutableList<string>> ValueChanged { get; set; }
+
+    private string EffectiveAriaLabel => string.IsNullOrWhiteSpace(AriaLabel) ? "Tags" : AriaLabel;
+
+    private bool IsListboxOpen => _isDropdownOpen && _isInputFocused && _filteredSuggestions.Count > 0;
 
     protected override void OnParametersSet()
     {

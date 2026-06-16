@@ -6,6 +6,7 @@ using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.Modal;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Modal;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -35,8 +36,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         [LibraryTab.PreviouslyUsed] = [],
     };
 
-    private readonly string _tagManagementPanelId = $"tag-mgmt-{Guid.NewGuid():N}";
-    private readonly string _tagOverflowRegionId = $"tag-overflow-{Guid.NewGuid():N}";
+    private readonly string _tagManagementPanelId = ComponentId.NewUnique("tag-mgmt").Value;
+    private readonly string _tagOverflowRegionId = ComponentId.NewUnique("tag-overflow").Value;
 
     private LibraryTab _activeTab = LibraryTab.Saved;
     private bool _isTagManagementExpanded;

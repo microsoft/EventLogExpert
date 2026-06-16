@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.FilterEditor.Rows;
@@ -14,7 +15,7 @@ namespace EventLogExpert.UI.FilterEditor.Rows;
 /// </summary>
 public sealed partial class FilterRowShell : ComponentBase
 {
-    private readonly string _filterLabelId = $"filter-row-label-{Guid.NewGuid():N}";
+    private readonly string _filterLabelId = ComponentId.NewUnique("filter-row-label").Value;
 
     private FilterRowActions? _actionsRef;
 

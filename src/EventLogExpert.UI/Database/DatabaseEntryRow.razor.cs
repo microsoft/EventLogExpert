@@ -6,6 +6,7 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.Menu;
+using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
@@ -17,8 +18,8 @@ public sealed partial class DatabaseEntryRow : ComponentBase
     private static readonly IReadOnlyDictionary<string, object> s_ariaHiddenTrueAttributes =
         new Dictionary<string, object>(StringComparer.Ordinal) { ["aria-hidden"] = "true" };
 
-    private readonly string _nameButtonId = $"db-row-{Guid.NewGuid():N}-name";
-    private readonly string _pendingStatusId = $"db-row-{Guid.NewGuid():N}-pending";
+    private readonly string _nameButtonId = ComponentId.NewUnique("db-row-name").Value;
+    private readonly string _pendingStatusId = ComponentId.NewUnique("db-row-pending").Value;
 
     private ElementReference _nameButtonRef;
     private bool _shouldFocusNameAfterRender;

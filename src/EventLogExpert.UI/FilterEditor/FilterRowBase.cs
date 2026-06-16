@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.FilterEditor;
@@ -8,7 +9,7 @@ namespace EventLogExpert.UI.FilterEditor;
 /// <summary>Generic base for filter rows: stable DOM <see cref="Id" /> and a typed <see cref="Value" />.</summary>
 public abstract class FilterRowBase<TValue> : ComponentBase
 {
-    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Parameter] public string Id { get; set; } = ComponentId.NewUnique().Value;
 
     [Parameter] public TValue Value { get; set; } = default!;
 }

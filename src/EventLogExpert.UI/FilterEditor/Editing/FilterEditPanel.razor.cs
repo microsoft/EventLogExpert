@@ -2,13 +2,14 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Drafts;
+using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.FilterEditor.Editing;
 
 public sealed partial class FilterEditPanel : ComponentBase
 {
-    private readonly string _colorDescriptionId = $"filter-edit-panel-color-desc-{Guid.NewGuid():N}";
+    private readonly string _colorDescriptionId = ComponentId.NewUnique("filter-edit-panel-color-desc").Value;
 
     [Parameter] public string CssClass { get; set; } = string.Empty;
 

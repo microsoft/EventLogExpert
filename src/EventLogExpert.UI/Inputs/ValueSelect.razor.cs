@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -10,7 +11,7 @@ namespace EventLogExpert.UI.Inputs;
 
 public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 {
-    private readonly string _itemId = $"select_{Guid.NewGuid().ToString()[..8]}";
+    private readonly string _itemId = ComponentId.NewUnique("select").Value;
     private readonly List<ValueSelectItem<T>> _items = [];
     private readonly HashSet<T> _selectedValues = [];
 

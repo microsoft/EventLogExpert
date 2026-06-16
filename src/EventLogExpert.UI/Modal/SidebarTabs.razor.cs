@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -12,7 +13,7 @@ public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
     where TTab : struct, Enum
 {
     private readonly Dictionary<TTab, ElementReference> _tabButtonRefs = new();
-    private readonly string _tablistId = Guid.NewGuid().ToString("N");
+    private readonly string _tablistId = ComponentId.NewUnique().Value;
 
     private TTab? _pendingFocusTab;
     private IJSObjectReference? _tabKeyModule;

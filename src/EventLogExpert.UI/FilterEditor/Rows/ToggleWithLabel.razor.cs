@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
 
@@ -14,11 +15,11 @@ namespace EventLogExpert.UI.FilterEditor.Rows;
 /// </summary>
 public sealed partial class ToggleWithLabel : InputComponent<bool>
 {
-    private readonly string _textLabelId = $"toggle-with-label-text-{Guid.NewGuid():N}";
+    private readonly string _textLabelId = ComponentId.NewUnique("toggle-with-label-text").Value;
 
     [Parameter] public bool Disabled { get; set; }
 
-    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Parameter] public string Id { get; set; } = ComponentId.NewUnique().Value;
 
     /// <summary>
     ///     Visible text rendered next to the toggle (e.g. "Exclude"). When null/empty, behaves like a bare

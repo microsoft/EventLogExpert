@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.Inputs;
@@ -13,7 +14,7 @@ public sealed partial class OptionSelect : InputComponent<bool>
 
     [Parameter] public string EnabledString { get; set; } = "Enabled";
 
-    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Parameter] public string Id { get; set; } = ComponentId.NewUnique().Value;
 
     [Parameter] public bool UseStatusColors { get; set; }
 
