@@ -91,26 +91,6 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>, IDisposable
 
     internal ValueTask FocusEditAsync() => _coreRef?.FocusEditAsync() ?? ValueTask.CompletedTask;
 
-    private Task OnCancelFromCore()
-    {
-        if (Value is { } savedFilter)
-        {
-            return OnEditingChanged.InvokeAsync((savedFilter.Id, false));
-        }
-
-        return Task.CompletedTask;
-    }
-
-    private Task OnEditFromCore()
-    {
-        if (Value is { } savedFilter)
-        {
-            return OnEditingChanged.InvokeAsync((savedFilter.Id, true));
-        }
-
-        return Task.CompletedTask;
-    }
-
     private Task OnExclusionChangedFromCore(bool isExcluded)
     {
         if (Value is not { } savedFilter) { return Task.CompletedTask; }
