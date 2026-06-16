@@ -60,12 +60,12 @@
     text-align: center;
 }
 
-.icon-button[aria-disabled="true"] {
+.icon-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.icon-button[aria-disabled="true"]:hover { filter: none; }
+.icon-button:disabled:hover { filter: none; }
 
 .filter-empty-state {
     color: var(--text-secondary);
