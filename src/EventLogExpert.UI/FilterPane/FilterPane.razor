@@ -224,12 +224,18 @@
 
         @foreach (var item in FilterPaneState.Value.Filters)
         {
-            <FilterRow @key="item.Id" OnDisposed="@OnRowDisposed" OnRemoved="HandleRemovedFilter" @ref="_rowRefs[item.Id]" Value="item" />
+            <FilterRow Id="@ComponentId.For(item.Id, ComponentIdScope.PaneFilter).Value"
+                @key="item.Id"
+                OnDisposed="@OnRowDisposed"
+                OnRemoved="HandleRemovedFilter"
+                @ref="_rowRefs[item.Id]"
+                Value="item" />
         }
 
         @foreach (var draft in _pendingDrafts)
         {
-            <FilterRow @key="draft.Id"
+            <FilterRow Id="@ComponentId.For(draft.Id, ComponentIdScope.PanePendingFilter).Value"
+                @key="draft.Id"
                 OnPendingDiscard="() => HandlePendingDiscard(draft)"
                 OnPendingSave="filter => HandlePendingSave(draft, filter)"
                 PendingDraft="draft" />

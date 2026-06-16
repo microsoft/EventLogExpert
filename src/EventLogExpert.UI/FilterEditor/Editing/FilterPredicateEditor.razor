@@ -11,7 +11,9 @@
             @(Value.JoinWithAny ? "OR" : "AND")
         </button>
 
-        <FilterComparisonEditor Comparison="Value.Comparison" Id="@($"sf-{Value.Id}")" OnChanged="OnComparisonChanged" />
+        <FilterComparisonEditor Comparison="Value.Comparison"
+            Id="@ComponentId.For(Value.Id, ComponentIdScope.Predicate).Value"
+            OnChanged="OnComparisonChanged" />
 
         <button aria-label="Done editing predicate"
             class="button icon-button"
