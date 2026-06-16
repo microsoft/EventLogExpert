@@ -13,11 +13,11 @@ namespace EventLogExpert.UI.FilterEditor;
 
 public sealed partial class FilterRow : FilterRowBase<SavedFilter?>, IDisposable
 {
+    private IReadOnlyList<CachedFilterOption>? _cachedOptions;
+    private ImmutableList<LibraryEntry>? _cachedOptionsSource;
     private FilterEditorCore? _coreRef;
 
     [Parameter] public Action<FilterId>? OnDisposed { get; set; }
-
-    [Parameter] public EventCallback<(FilterId Id, bool IsEditing)> OnEditingChanged { get; set; }
 
     [Parameter] public EventCallback OnPendingDiscard { get; set; }
 
@@ -31,50 +31,18 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>, IDisposable
     {
         get
         {
-            var eligible = FilterLibraryState.Value.Entries
-                .OfType<LibraryEntrySavedFilter>()
-                .Where(e => e.IsFavorite || e.LastUsedUtc is not null);
+            // Stable reference required: per-read allocation reparameterizes the editor (WebView2 render bug).
+            var source = FilterLibraryState.Value.Entries;
 
-            var favorites = new List<(string Value, string SortName, ImmutableList<string> Tags)>();
-            var recents = new List<(string Value, DateTimeOffset LastUsed, ImmutableList<string> Tags)>();
-
-            foreach (var group in eligible.GroupBy(e => e.Filter.ComparisonText, StringComparer.OrdinalIgnoreCase))
+            if (_cachedOptions is not null && ReferenceEquals(source, _cachedOptionsSource))
             {
-                var members = group.ToList();
-
-                var tags = members
-                    .SelectMany(e => e.Tags)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)
-                    .ToImmutableList();
-
-                var favoriteNames = members
-                    .Where(e => e.IsFavorite)
-                    .Select(e => e.Name)
-                    .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                if (favoriteNames.Count > 0)
-                {
-                    favorites.Add((group.Key, favoriteNames[0], tags));
-                }
-                else
-                {
-                    recents.Add((group.Key, members.Max(e => e.LastUsedUtc!.Value), tags));
-                }
+                return _cachedOptions;
             }
 
-            var result = new List<CachedFilterOption>(favorites.Count + recents.Count);
+            _cachedOptionsSource = source;
+            _cachedOptions = BuildCachedOptions(source);
 
-            result.AddRange(favorites
-                .OrderBy(f => f.SortName, StringComparer.OrdinalIgnoreCase)
-                .Select(f => new CachedFilterOption(f.Value, true, f.Tags)));
-
-            result.AddRange(recents
-                .OrderByDescending(r => r.LastUsed)
-                .Select(r => new CachedFilterOption(r.Value, false, r.Tags)));
-
-            return result;
+            return _cachedOptions;
         }
     }
 
@@ -90,6 +58,54 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>, IDisposable
     }
 
     internal ValueTask FocusEditAsync() => _coreRef?.FocusEditAsync() ?? ValueTask.CompletedTask;
+
+    private static IReadOnlyList<CachedFilterOption> BuildCachedOptions(ImmutableList<LibraryEntry> entries)
+    {
+        var eligible = entries
+            .OfType<LibraryEntrySavedFilter>()
+            .Where(e => e.IsFavorite || e.LastUsedUtc is not null);
+
+        var favorites = new List<(string Value, string SortName, ImmutableList<string> Tags)>();
+        var recents = new List<(string Value, DateTimeOffset LastUsed, ImmutableList<string> Tags)>();
+
+        foreach (var group in eligible.GroupBy(e => e.Filter.ComparisonText, StringComparer.OrdinalIgnoreCase))
+        {
+            var members = group.ToList();
+
+            var tags = members
+                .SelectMany(e => e.Tags)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)
+                .ToImmutableList();
+
+            var favoriteNames = members
+                .Where(e => e.IsFavorite)
+                .Select(e => e.Name)
+                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (favoriteNames.Count > 0)
+            {
+                favorites.Add((group.Key, favoriteNames[0], tags));
+            }
+            else
+            {
+                recents.Add((group.Key, members.Max(e => e.LastUsedUtc!.Value), tags));
+            }
+        }
+
+        var result = new List<CachedFilterOption>(favorites.Count + recents.Count);
+
+        result.AddRange(favorites
+            .OrderBy(f => f.SortName, StringComparer.OrdinalIgnoreCase)
+            .Select(f => new CachedFilterOption(f.Value, true, f.Tags)));
+
+        result.AddRange(recents
+            .OrderByDescending(r => r.LastUsed)
+            .Select(r => new CachedFilterOption(r.Value, false, r.Tags)));
+
+        return result.AsReadOnly();
+    }
 
     private Task OnExclusionChangedFromCore(bool isExcluded)
     {
@@ -111,21 +127,9 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>, IDisposable
         await OnRemoved.InvokeAsync(savedFilter.Id);
 
         FilterPaneCommands.RemoveFilter(savedFilter.Id);
-
-        await OnEditingChanged.InvokeAsync((savedFilter.Id, false));
     }
 
-    private Task OnSaveFromCore(SavedFilter saved)
-    {
-        FilterPaneCommands.SetFilter(saved);
-
-        if (Value is { } savedFilter)
-        {
-            return OnEditingChanged.InvokeAsync((savedFilter.Id, false));
-        }
-
-        return Task.CompletedTask;
-    }
+    private void OnSaveFromCore(SavedFilter saved) => FilterPaneCommands.SetFilter(saved);
 
     private Task OnToggleEnabledFromCore()
     {
