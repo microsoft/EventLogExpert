@@ -3,8 +3,8 @@
   "scenarios": [
     {
       "id": "exchange-transport-backpressure",
-      "name": "Exchange transport back-pressure & mail-flow",
-      "purpose": "Exchange transport resource pressure and mail-flow events (MSExchangeTransport 1009, 15004, 15006, 15007).",
+      "name": "Exchange transport back-pressure",
+      "purpose": "Color-coded Exchange transport resource pressure (Application; Source MSExchangeTransport): pressure increased (15004), rejecting message submissions (15006, 15007), and a receive connector rejecting connections at its limit (1009).",
       "group": "Exchange",
       "channels": [ "Application" ],
       "requiresAdmin": false,
@@ -12,12 +12,9 @@
       "order": 0,
       "version": 1,
       "filters": [
-        {
-          "comparison": { "property": "Source", "value": "MSExchangeTransport" },
-          "predicates": [
-            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1009", "15004", "15006", "15007" ] } }
-          ]
-        }
+        { "color": "Yellow", "comparison": { "property": "Source", "value": "MSExchangeTransport" }, "predicates": [ { "comparison": { "property": "Id", "value": "15004" } } ] },
+        { "color": "Red", "comparison": { "property": "Source", "value": "MSExchangeTransport" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "15006", "15007" ] } } ] },
+        { "color": "Orange", "comparison": { "property": "Source", "value": "MSExchangeTransport" }, "predicates": [ { "comparison": { "property": "Id", "value": "1009" } } ] }
       ]
     },
     {

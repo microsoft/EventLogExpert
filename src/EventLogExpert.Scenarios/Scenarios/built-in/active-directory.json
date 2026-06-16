@@ -49,8 +49,8 @@
     },
     {
       "id": "netlogon-secure-channel-failures",
-      "name": "Netlogon secure-channel failures",
-      "purpose": "Domain secure-channel and trust failures reported by Netlogon (5719, 5722, 5723).",
+      "name": "Netlogon secure-channel timeline",
+      "purpose": "Color-coded Netlogon secure-channel health (System; Source Netlogon): healthy machine-account password change (5823), no domain controller available (5719), and session-setup / trust failures (5722, 5723).",
       "group": "ActiveDirectory",
       "channels": [ "System" ],
       "requiresAdmin": false,
@@ -58,12 +58,9 @@
       "order": 3,
       "version": 1,
       "filters": [
-        {
-          "comparison": { "property": "Source", "value": "Netlogon" },
-          "predicates": [
-            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5719", "5722", "5723" ] } }
-          ]
-        }
+        { "color": "Blue", "comparison": { "property": "Source", "value": "Netlogon" }, "predicates": [ { "comparison": { "property": "Id", "value": "5823" } } ] },
+        { "color": "Orange", "comparison": { "property": "Source", "value": "Netlogon" }, "predicates": [ { "comparison": { "property": "Id", "value": "5719" } } ] },
+        { "color": "Red", "comparison": { "property": "Source", "value": "Netlogon" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5722", "5723" ] } } ] }
       ]
     },
     {

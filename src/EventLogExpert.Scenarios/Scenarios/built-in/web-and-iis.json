@@ -3,8 +3,8 @@
   "scenarios": [
     {
       "id": "iis-app-pool-crashes",
-      "name": "App pool / WAS worker crashes & rapid-fail",
-      "purpose": "Windows Process Activation Service worker-process crashes and rapid-fail protection (WAS 5009, 5011, 5021, 5057, 5117, 5139, 5186).",
+      "name": "App pool / WAS worker lifecycle",
+      "purpose": "Windows Process Activation Service worker-process health, color-coded: worker crash / timeout (WAS 5009, 5011, 5012), app pool disabled by rapid-fail protection (5002, 5057), and identity / worker-process problems (5021, 5186).",
       "group": "WebAndIis",
       "channels": [ "System" ],
       "requiresAdmin": false,
@@ -13,9 +13,24 @@
       "version": 1,
       "filters": [
         {
+          "color": "Red",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-WAS" },
           "predicates": [
-            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5009", "5011", "5021", "5057", "5186" ] } }
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5009", "5011", "5012" ] } }
+          ]
+        },
+        {
+          "color": "DarkRed",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-WAS" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5002", "5057" ] } }
+          ]
+        },
+        {
+          "color": "Orange",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-WAS" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5021", "5186" ] } }
           ]
         }
       ]

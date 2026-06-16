@@ -20,7 +20,7 @@
     {
       "id": "failed-services-at-boot",
       "name": "Failed services at boot",
-      "purpose": "Service Control Manager failures that block services from starting.",
+      "purpose": "Service start failures color-coded by type: failed to start (SCM 7000/7001/7023/7024), hung while starting (7022), and boot/system driver load failure (7026).",
       "group": "SystemHealth",
       "channels": [ "System" ],
       "requiresAdmin": false,
@@ -29,9 +29,24 @@
       "version": 1,
       "filters": [
         {
+          "color": "Red",
           "comparison": { "property": "Source", "value": "Service Control Manager" },
           "predicates": [
-            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "7000", "7001", "7022", "7023", "7024", "7026" ] } }
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "7000", "7001", "7023", "7024" ] } }
+          ]
+        },
+        {
+          "color": "Orange",
+          "comparison": { "property": "Source", "value": "Service Control Manager" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "7022" } }
+          ]
+        },
+        {
+          "color": "DarkRed",
+          "comparison": { "property": "Source", "value": "Service Control Manager" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "7026" } }
           ]
         }
       ]
@@ -39,7 +54,7 @@
     {
       "id": "crashing-services",
       "name": "Crashing services",
-      "purpose": "Services that terminated unexpectedly and their recovery actions (SCM 7031, 7034).",
+      "purpose": "Services that terminated unexpectedly: recoverable crash with a configured recovery action (SCM 7031) versus terminal failure after exhausting recovery (7034).",
       "group": "SystemHealth",
       "channels": [ "System" ],
       "requiresAdmin": false,
@@ -48,9 +63,17 @@
       "version": 1,
       "filters": [
         {
+          "color": "Red",
           "comparison": { "property": "Source", "value": "Service Control Manager" },
           "predicates": [
-            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "7031", "7034" ] } }
+            { "comparison": { "property": "Id", "value": "7031" } }
+          ]
+        },
+        {
+          "color": "DarkRed",
+          "comparison": { "property": "Source", "value": "Service Control Manager" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "7034" } }
           ]
         }
       ]
@@ -137,8 +160,8 @@
     },
     {
       "id": "unexpected-restart-power-loss-bsod",
-      "name": "Unexpected restart / power loss / BSOD",
-      "purpose": "Dirty shutdowns: Kernel-Power 41, BugCheck 1001, and EventLog 6008.",
+      "name": "Unexpected restart / BSOD reconstruction",
+      "purpose": "Reconstructs an unexpected restart, color-coded: BSOD bugcheck report (WER-SystemErrorReporting / BugCheck 1001), kernel dirty transition (Kernel-Power 41), dirty previous shutdown (EventLog 6008), the shutdown reason (User32 1074), and the recovery boot (Kernel-General 12).",
       "group": "SystemHealth",
       "channels": [ "System" ],
       "requiresAdmin": false,
@@ -147,13 +170,38 @@
       "version": 1,
       "filters": [
         {
+          "color": "DarkRed",
+          "comparison": { "property": "Source", "matchMode": "Many", "values": [ "Microsoft-Windows-WER-SystemErrorReporting", "BugCheck" ] },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "1001" } }
+          ]
+        },
+        {
+          "color": "Yellow",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-Power" },
           "predicates": [
-            { "joinWithAny": false, "comparison": { "property": "Id", "value": "41" } },
-            { "joinWithAny": true, "comparison": { "property": "Source", "value": "BugCheck" } },
-            { "joinWithAny": false, "comparison": { "property": "Id", "value": "1001" } },
-            { "joinWithAny": true, "comparison": { "property": "Source", "value": "EventLog" } },
-            { "joinWithAny": false, "comparison": { "property": "Id", "value": "6008" } }
+            { "comparison": { "property": "Id", "value": "41" } }
+          ]
+        },
+        {
+          "color": "LightRed",
+          "comparison": { "property": "Source", "value": "EventLog" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "6008" } }
+          ]
+        },
+        {
+          "color": "LightOrange",
+          "comparison": { "property": "Source", "value": "User32" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "1074" } }
+          ]
+        },
+        {
+          "color": "Green",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-General" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "12" } }
           ]
         }
       ]
@@ -161,7 +209,7 @@
     {
       "id": "boot-shutdown-restart-timeline",
       "name": "Boot / shutdown / restart timeline",
-      "purpose": "Clean service start/stop (EventLog 6005/6006/6008), shutdown initiator (User32 1074), and kernel boot/shutdown (12/13).",
+      "purpose": "Color-coded boot/shutdown lifecycle: boot (Kernel-General 12 / EventLog 6005), clean shutdown (Kernel-General 13 / EventLog 6006), the shutdown reason (User32 1074), and a dirty previous shutdown (EventLog 6008).",
       "group": "SystemHealth",
       "channels": [ "System" ],
       "requiresAdmin": false,
@@ -170,13 +218,35 @@
       "version": 1,
       "filters": [
         {
+          "color": "Green",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-General" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "12" } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "EventLog" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "6005" } }
+          ]
+        },
+        {
+          "color": "Blue",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-General" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "13" } },
+            { "joinWithAny": true, "comparison": { "property": "Source", "value": "EventLog" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "6006" } }
+          ]
+        },
+        {
+          "color": "Teal",
+          "comparison": { "property": "Source", "value": "User32" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "1074" } }
+          ]
+        },
+        {
+          "color": "Orange",
           "comparison": { "property": "Source", "value": "EventLog" },
           "predicates": [
-            { "joinWithAny": false, "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6005", "6006", "6008" ] } },
-            { "joinWithAny": true, "comparison": { "property": "Source", "value": "User32" } },
-            { "joinWithAny": false, "comparison": { "property": "Id", "value": "1074" } },
-            { "joinWithAny": true, "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-General" } },
-            { "joinWithAny": false, "comparison": { "property": "Id", "matchMode": "Many", "values": [ "12", "13" ] } }
+            { "comparison": { "property": "Id", "value": "6008" } }
           ]
         }
       ]
@@ -257,20 +327,45 @@
     },
     {
       "id": "out-of-memory-resource-exhaustion",
-      "name": "Out-of-memory / resource exhaustion",
-      "purpose": "Windows diagnosed a low virtual-memory condition (Resource-Exhaustion-Detector 2004).",
+      "name": "Resource exhaustion with crash fallout",
+      "purpose": "Correlates a low-memory diagnosis with the application failures around it, color-coded: OS low virtual-memory (System: Resource-Exhaustion-Detector 2004), app crash (Application: Application Error 1000), app hang (Application Hang 1002), and the WER report (Windows Error Reporting 1001).",
       "group": "SystemHealth",
-      "channels": [ "System" ],
-      "optionalChannels": [ "Microsoft-Windows-Resource-Exhaustion-Detector/Operational" ],
+      "channels": [ "System", "Application" ],
       "requiresAdmin": false,
       "priority": 1,
       "order": 13,
       "version": 1,
       "filters": [
         {
-          "comparison": { "property": "Source", "value": "Microsoft-Windows-Resource-Exhaustion-Detector" },
+          "color": "Yellow",
+          "comparison": { "property": "LogName", "value": "System" },
           "predicates": [
-            { "comparison": { "property": "Id", "value": "2004" } }
+            { "joinWithAny": false, "comparison": { "property": "Source", "value": "Microsoft-Windows-Resource-Exhaustion-Detector" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "2004" } }
+          ]
+        },
+        {
+          "color": "DarkRed",
+          "comparison": { "property": "LogName", "value": "Application" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Source", "value": "Application Error" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "1000" } }
+          ]
+        },
+        {
+          "color": "Orange",
+          "comparison": { "property": "LogName", "value": "Application" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Source", "value": "Application Hang" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "1002" } }
+          ]
+        },
+        {
+          "color": "Purple",
+          "comparison": { "property": "LogName", "value": "Application" },
+          "predicates": [
+            { "joinWithAny": false, "comparison": { "property": "Source", "value": "Windows Error Reporting" } },
+            { "joinWithAny": false, "comparison": { "property": "Id", "value": "1001" } }
           ]
         }
       ]

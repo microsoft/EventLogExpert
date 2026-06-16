@@ -176,6 +176,58 @@
           "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1102", "4719" ] }
         }
       ]
+    },
+    {
+      "id": "logon-activity-triage",
+      "name": "Logon activity triage",
+      "purpose": "Color-coded logon outcomes in one view: successful logon (4624), failed logon (4625), account lockout (4740), and explicit-credential / RunAs logon (4648). Requires the Logon and Account-Management audit subcategories.",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 0,
+      "order": 11,
+      "version": 1,
+      "filters": [
+        { "color": "Green", "comparison": { "property": "Id", "value": "4624" } },
+        { "color": "Red", "comparison": { "property": "Id", "value": "4625" } },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "4740" } },
+        { "color": "Purple", "comparison": { "property": "Id", "value": "4648" } }
+      ]
+    },
+    {
+      "id": "account-compromise-timeline",
+      "name": "Account compromise timeline",
+      "purpose": "Reconstructs a takeover end-to-end, color-coded: failed logons / spray (4625), the successful breakthrough (4624), privilege escalation (4672), persistence via account and group changes (4720, 4722, 4724, 4728, 4732, 4756), and audit-log clear to cover tracks (1102).",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 12,
+      "version": 1,
+      "filters": [
+        { "color": "Red", "comparison": { "property": "Id", "value": "4625" } },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "4624" } },
+        { "color": "Purple", "comparison": { "property": "Id", "value": "4672" } },
+        { "color": "Magenta", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4720", "4722", "4724", "4728", "4732", "4756" ] } },
+        { "color": "DarkRed", "comparison": { "property": "Id", "value": "1102" } }
+      ]
+    },
+    {
+      "id": "account-lockout-investigation",
+      "name": "Account lockout investigation",
+      "purpose": "The full lockout story in one view, color-coded: the failed logons that caused it (4625), the lockout (4740), the unlock (4767), and an admin password reset (4724).",
+      "group": "Security",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 13,
+      "version": 1,
+      "filters": [
+        { "color": "Red", "comparison": { "property": "Id", "value": "4625" } },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "4740" } },
+        { "color": "Green", "comparison": { "property": "Id", "value": "4767" } },
+        { "color": "Purple", "comparison": { "property": "Id", "value": "4724" } }
+      ]
     }
   ]
 }

@@ -117,6 +117,22 @@
       "filters": [
         { "comparison": { "property": "Level", "value": "Error" } }
       ]
+    },
+    {
+      "id": "dns-zone-transfer-and-errors",
+      "name": "DNS zone transfer & server errors",
+      "purpose": "Color-coded DNS Server activity: zone transfer completed (6001, 6002), an inbound zone-transfer request to watch (6004), and server errors (plug-in 150, socket 408, AD integration 4015).",
+      "group": "DnsServer",
+      "channels": [ "DNS Server" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 8,
+      "version": 1,
+      "filters": [
+        { "color": "Green", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6001", "6002" ] } },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "6004" } },
+        { "color": "Red", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "150", "408", "4015" ] } }
+      ]
     }
   ]
 }

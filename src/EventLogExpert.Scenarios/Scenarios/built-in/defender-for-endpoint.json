@@ -173,6 +173,24 @@
       "filters": [
         { "comparison": { "property": "Id", "value": "1127" } }
       ]
+    },
+    {
+      "id": "defender-protection-timeline",
+      "name": "Defender protection status",
+      "purpose": "Color-coded Microsoft Defender Antivirus operational status: healthy activity (real-time protection on 5000, scan complete 1001, threat remediated 1117, signatures updated 2000); scan/config activity (scan started 1000, configuration changed 5007); warnings (scan cancelled 1002, signature update failed 2001); threats and protection-off (malware detected 1116, real-time protection disabled 5001); and remediation failures (1118, 1119).",
+      "group": "DefenderForEndpoint",
+      "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 12,
+      "version": 1,
+      "filters": [
+        { "color": "Green", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5000", "1001", "1117", "2000" ] } },
+        { "color": "Blue", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1000", "5007" ] } },
+        { "color": "Orange", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1002", "2001" ] } },
+        { "color": "Red", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1116", "5001" ] } },
+        { "color": "DarkRed", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1118", "1119" ] } }
+      ]
     }
   ]
 }

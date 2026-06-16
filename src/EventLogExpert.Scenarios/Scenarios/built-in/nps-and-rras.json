@@ -76,6 +76,22 @@
           ]
         }
       ]
+    },
+    {
+      "id": "nps-radius-triage",
+      "name": "NPS / RADIUS access triage",
+      "purpose": "Color-coded Network Policy Server (RADIUS) access decisions: granted (6272, 6278), denied by policy (6273), and discarded requests (6274).",
+      "group": "NpsAndRras",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 0,
+      "order": 2,
+      "version": 1,
+      "filters": [
+        { "color": "Green", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6272", "6278" ] } },
+        { "color": "Red", "comparison": { "property": "Id", "value": "6273" } },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "6274" } }
+      ]
     }
   ]
 }

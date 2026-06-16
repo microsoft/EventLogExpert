@@ -61,8 +61,8 @@
     },
     {
       "id": "cluster-node-quarantine",
-      "name": "Cluster node quarantine",
-      "purpose": "A failover cluster node was quarantined after consecutive failures (FailoverClustering 1672, 1676).",
+      "name": "Cluster node distress",
+      "purpose": "Failover cluster node and resource distress, color-coded: node quarantined (1672, 1676), clustered resource/role failed (1069, 1205), CSV paused (5120), and node removed from membership (1135).",
       "group": "VirtualizationAndClustering",
       "channels": [ "System" ],
       "requiresAdmin": false,
@@ -71,9 +71,31 @@
       "version": 1,
       "filters": [
         {
+          "color": "Orange",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
           "predicates": [
             { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1672", "1676" ] } }
+          ]
+        },
+        {
+          "color": "Yellow",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "5120" } }
+          ]
+        },
+        {
+          "color": "Red",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1069", "1205" ] } }
+          ]
+        },
+        {
+          "color": "DarkRed",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "1135" } }
           ]
         }
       ]
