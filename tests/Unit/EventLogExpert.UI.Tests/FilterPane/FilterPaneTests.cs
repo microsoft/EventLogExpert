@@ -378,6 +378,15 @@ public sealed class FilterPaneTests : BunitContext
         Assert.DoesNotContain(filter.Id, rowRefs.Keys);
     }
 
+    [Fact]
+    public void SaveAndClearButtons_WhenNoFilters_AreDisabled()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        Assert.True(component.Find("button[aria-label='Save as Filter Set']").HasAttribute("disabled"));
+        Assert.True(component.Find("button[aria-label='Clear All Filters']").HasAttribute("disabled"));
+    }
+
     private static LibraryEntryFilterSet BuildFilterSet(string name, ImmutableList<string>? tags = null) =>
         new()
         {
