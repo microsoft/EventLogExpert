@@ -17,11 +17,15 @@ public sealed record LogTableState
 
     public ImmutableList<LogView> EventTables { get; init; } = [];
 
-    // Memoized by PerLogEvents identity; each instance maps to one SortContext.
+    // One open log needs no cross-log merge: serve its SegmentedSortedList directly (allocation-free
+    // O(log segments) indexer) instead of a CombinedEventView (per-access cursor alloc + K-way stride walk).
+    // The multi-log path stays memoized by PerLogEvents identity; each CombinedEventView maps to one SortContext.
     public IReadOnlyList<ResolvedEvent> DisplayedEvents =>
         PerLogEvents.IsEmpty
             ? CombinedEventView.Empty
-            : s_combinedViews.GetValue(PerLogEvents, CreateCombinedView);
+            : PerLogEvents.Count == 1
+                ? SingleLogDisplayList()
+                : s_combinedViews.GetValue(PerLogEvents, CreateCombinedView);
 
     public ImmutableDictionary<EventLogId, int> EventCountByLog { get; init; } =
         ImmutableDictionary<EventLogId, int>.Empty;
@@ -60,6 +64,16 @@ public sealed record LogTableState
     private static CombinedEventView CreateCombinedView(
         ImmutableDictionary<EventLogId, SegmentedSortedList> perLog) =>
         new(perLog.Values, perLog.Values.First().Context);
+
+    // Caller guarantees PerLogEvents.Count == 1. Return that sole list via the struct enumerator instead of
+    // LINQ .Values.First(), which boxes an enumerator on this render-path property read.
+    private SegmentedSortedList SingleLogDisplayList()
+    {
+        using var enumerator = PerLogEvents.GetEnumerator();
+        enumerator.MoveNext();
+
+        return enumerator.Current.Value;
+    }
 
     public IReadOnlyList<ResolvedEvent> EventsForLog(EventLogId logId) =>
         PerLogEvents.TryGetValue(logId, out var list) ? list : [];

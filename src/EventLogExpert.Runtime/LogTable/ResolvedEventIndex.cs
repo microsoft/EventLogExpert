@@ -54,10 +54,24 @@ public static class ResolvedEventIndex
 
         if (lowerBound < 0) { return -1; }
 
-        // Scan the comparer-equal window for the exact null-RecordId instance.
+        // Scan the comparer-equal window: by reference, then by key (RecordId + time + log) so a reloaded/cloned
+        // instance still ranks - consistent with this method's ResolveByKey and the typed Rank dispatch above.
         for (int i = lowerBound; i < sortedEvents.Count && comparer(sortedEvents[i], target) == 0; i++)
         {
-            if (ReferenceEquals(sortedEvents[i], target)) { return i; }
+            var current = sortedEvents[i];
+
+            if (ReferenceEquals(current, target)) { return i; }
+
+            // Skip null RecordId: null == null would merge distinct error-read events.
+            if (current.RecordId is null || target.RecordId is null) { continue; }
+
+            if (current.RecordId == target.RecordId &&
+                current.TimeCreated == target.TimeCreated &&
+                string.Equals(current.OwningLog, target.OwningLog, StringComparison.Ordinal) &&
+                string.Equals(current.LogName, target.LogName, StringComparison.Ordinal))
+            {
+                return i;
+            }
         }
 
         return -1;

@@ -185,6 +185,43 @@ public sealed class EventResolverCacheTests
     }
 
     [Fact]
+    public void GetOrAddDescription_AtCap_ShouldStopCachingButKeepServingExistingHits()
+    {
+        // Arrange - a tiny cap so the bound is reachable without inserting 131072 entries.
+        var cache = new EventResolverCache(maxDescriptionCacheSize: 2);
+
+        var first = cache.GetOrAddDescription(new string("desc-A".ToCharArray()));
+        var second = cache.GetOrAddDescription(new string("desc-B".ToCharArray()));
+
+        // Act - the third distinct description is at the cap, so it is returned as-is (not cached).
+        var overflowInput = new string("desc-C".ToCharArray());
+        var overflow = cache.GetOrAddDescription(overflowInput);
+        var overflowAgain = cache.GetOrAddDescription(new string("desc-C".ToCharArray()));
+
+        // Assert - overflow entry is never interned (different instance each time)...
+        Assert.Same(overflowInput, overflow);
+        Assert.NotSame(overflow, overflowAgain);
+
+        // ...but entries cached before the cap still dedupe (sharing is preserved, no thrash/clear).
+        Assert.Same(first, cache.GetOrAddDescription(new string("desc-A".ToCharArray())));
+        Assert.Same(second, cache.GetOrAddDescription(new string("desc-B".ToCharArray())));
+    }
+
+    [Fact]
+    public void GetOrAddDescription_BelowCap_ShouldInternIdenticalDescriptions()
+    {
+        // Arrange
+        var cache = new EventResolverCache();
+
+        // Act - two distinct instances with identical content (mirrors many events sharing a description).
+        var a = cache.GetOrAddDescription(new string("recurring description".ToCharArray()));
+        var b = cache.GetOrAddDescription(new string("recurring description".ToCharArray()));
+
+        // Assert - interned to one shared instance.
+        Assert.Same(a, b);
+    }
+
+    [Fact]
     public void GetOrAddKeywords_AfterClearAll_ShouldReturnNewReference()
     {
         var cache = new EventResolverCache();
@@ -237,6 +274,18 @@ public sealed class EventResolverCacheTests
     }
 
     [Fact]
+    public void GetOrAddKeywords_ReturnedList_IsReadOnlyAndNotAMutableArray()
+    {
+        var cache = new EventResolverCache();
+
+        var result = cache.GetOrAddKeywords(new List<string> { "Audit Success", "Classic" });
+
+        Assert.Null(result as string[]);
+        Assert.True(((ICollection<string>)result).IsReadOnly);
+        Assert.Throws<NotSupportedException>(() => ((IList<string>)result)[0] = "Mutated");
+    }
+
+    [Fact]
     public void GetOrAddKeywords_WithDifferentContent_ShouldReturnDifferentReferences()
     {
         var cache = new EventResolverCache();
@@ -280,18 +329,6 @@ public sealed class EventResolverCacheTests
 
         Assert.Same(first, second);
         Assert.Equal(new[] { "Audit Success" }, first);
-    }
-
-    [Fact]
-    public void GetOrAddKeywords_ReturnedList_IsReadOnlyAndNotAMutableArray()
-    {
-        var cache = new EventResolverCache();
-
-        var result = cache.GetOrAddKeywords(new List<string> { "Audit Success", "Classic" });
-
-        Assert.Null(result as string[]);
-        Assert.True(((ICollection<string>)result).IsReadOnly);
-        Assert.Throws<NotSupportedException>(() => ((IList<string>)result)[0] = "Mutated");
     }
 
     [Fact]

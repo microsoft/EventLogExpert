@@ -278,14 +278,14 @@ internal sealed partial class DescriptionFormatter(
             // EventId 0 with the Classic keyword bit is what mmc renders as the Win32
             // ERROR_SUCCESS text ("The operation completed successfully."). The Win32
             // ERROR_SUCCESS code happens to be 0 too, but we are deliberately requesting
-            // the ERROR_SUCCESS message — not treating the EventId as a Win32 error code.
+            // the ERROR_SUCCESS message - not treating the EventId as a Win32 error code.
             const uint Win32ErrorSuccess = 0;
             systemMessage = NativeMethods.FormatSystemMessage(Win32ErrorSuccess);
         }
 
         string? propertyTail = BuildEventDataTail(properties);
 
-        // The propertyTail varies per event (timestamps, paths, IDs, etc.) — caching it
+        // The propertyTail varies per event (timestamps, paths, IDs, etc.) - caching it
         // would grow the description cache unboundedly.
         if (propertyTail is not null)
         {
@@ -406,11 +406,13 @@ internal sealed partial class DescriptionFormatter(
                         ReadOnlySpan<char> parameterMessage =
                             parameterSource?.GetParameterByRawId((int)parameterId)?.Text ?? string.Empty;
 
-                        // Fallback to system FormatMessage for Win32 error codes
-                        // when provider parameters aren't available (e.g., MTA/DB resolvers)
+                        // Fallback to the cached system message table when the provider's parameter table has no
+                        // entry. Caching hits AND misses keeps foreign/uninstalled providers (whose codes never
+                        // resolve) from re-invoking Win32 FormatMessage on every event; an empty result still
+                        // leaves the %%N token unsubstituted, matching the prior behavior.
                         if (parameterMessage.IsEmpty && parameterId is > 0 and <= uint.MaxValue)
                         {
-                            parameterMessage = NativeMethods.FormatSystemMessage((uint)parameterId);
+                            parameterMessage = NativeErrorResolver.GetSystemMessageCached((uint)parameterId);
                         }
 
                         if (!parameterMessage.IsEmpty)
@@ -452,7 +454,10 @@ internal sealed partial class DescriptionFormatter(
 
             returnDescription = new string(updatedDescription[..currentLength]);
 
-            return returnDescription;
+            // Intern the formatted description so the many events sharing an identical description (recurring event
+            // types) reference one string instance. Mirrors the no-properties (~line 343) and exception (~line 466)
+            // paths which already cache; the cache is bounded so high-cardinality logs cannot grow it without limit.
+            return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
         catch (InvalidOperationException ex)
         {

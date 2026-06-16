@@ -12,6 +12,16 @@ public sealed class ResolvedEventIndexTests
     private static readonly DateTime s_baseTime = new(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     [Fact]
+    public void IndexOf_ClonedEventWithMatchingKey_ResolvesToItsIndex()
+    {
+        var events = BuildByDateAscending(6);
+        var original = events[3];
+        var clone = NewEvent(original.RecordId, original.TimeCreated, original.OwningLog, original.Source);
+
+        Assert.Equal(3, ResolvedEventIndex.IndexOf(events, clone, ColumnName.DateAndTime, isDescending: false));
+    }
+
+    [Fact]
     public void IndexOf_DescendingOrder_ReturnsCorrectIndex()
     {
         var newest = NewEvent(recordId: 3, time: s_baseTime.AddSeconds(30), owningLog: "Application", source: "A");

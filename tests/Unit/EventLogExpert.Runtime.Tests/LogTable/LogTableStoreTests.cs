@@ -19,6 +19,97 @@ public sealed class LogTableStoreTests
     private static readonly ColumnDefaults s_columnDefaults = new();
 
     [Fact]
+    public void DisplayedEvents_WithSingleLog_ShouldResolveAClonedEventToTheLiveIndex()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var state = new LogTableState();
+        state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
+        state = Reducers.ReduceUpdateTable(
+            state,
+            new UpdateTableAction(logData.Id, new List<ResolvedEvent>
+            {
+                new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 1, RecordId = 10 },
+                new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 2, RecordId = 20 }
+            }));
+
+        var displayed = state.DisplayedEvents;
+        var live = displayed.First(resolved => resolved.RecordId == 20);
+        var clone = new ResolvedEvent(Constants.LogNameTestLog, LogPathType.Channel) { Id = 2, RecordId = 20 };
+
+        // A value-equal clone (e.g. a reloaded selection) resolves to the live instance's index via the single-log
+        // fast path, matching CombinedEventView's key-based Rank rather than returning -1.
+        Assert.Equal(ResolvedEventIndex.IndexOf(displayed, live), ResolvedEventIndex.IndexOf(displayed, clone));
+        Assert.True(ResolvedEventIndex.IndexOf(displayed, clone) >= 0);
+    }
+
+    [Fact]
+    public void DisplayedEvents_WithSingleLog_ShouldReturnAStableReferenceAcrossReads()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var state = new LogTableState();
+        state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
+        state = Reducers.ReduceAppendTableEvents(
+            state,
+            new AppendTableEventsAction(logData.Id, new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(100, recordId: 10)
+            }));
+
+        // LogTablePane skips re-indexing while DisplayedEvents is reference-stable, so the fast path must
+        // return the same instance across reads when PerLogEvents is unchanged.
+        Assert.Same(state.DisplayedEvents, state.DisplayedEvents);
+    }
+
+    [Fact]
+    public void DisplayedEvents_WithSingleLog_ShouldServeThePerLogListDirectly()
+    {
+        // Arrange - one open log with events.
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var state = new LogTableState();
+        state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
+        state = Reducers.ReduceAppendTableEvents(
+            state,
+            new AppendTableEventsAction(logData.Id, new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(100, recordId: 10),
+                FilterEventBuilder.CreateTestEvent(200, recordId: 20)
+            }));
+
+        // Assert - the single-log fast path returns the per-log list itself (same reference as EventsForLog),
+        // bypassing the CombinedEventView merge wrapper used for multiple logs.
+        Assert.Same(state.EventsForLog(logData.Id), state.DisplayedEvents);
+    }
+
+    [Fact]
+    public void DisplayedEvents_WithTwoLogs_ShouldServeCombinedViewNotAPerLogList()
+    {
+        // Arrange - two open logs. Both tables are added before either is populated so that every
+        // per-log list is built under the same (multi-log) sort context, matching the real load flow.
+        var first = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
+        var second = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
+        var state = new LogTableState();
+        state = Reducers.ReduceAddTable(state, new AddTableAction(first));
+        state = Reducers.ReduceAddTable(state, new AddTableAction(second));
+        state = Reducers.ReduceUpdateTable(
+            state,
+            new UpdateTableAction(first.Id, new List<ResolvedEvent>
+            {
+                new(Constants.LogNameLog1, LogPathType.Channel) { Id = 100, RecordId = 10 }
+            }));
+        state = Reducers.ReduceUpdateTable(
+            state,
+            new UpdateTableAction(second.Id, new List<ResolvedEvent>
+            {
+                new(Constants.LogNameLog2, LogPathType.Channel) { Id = 200, RecordId = 20 }
+            }));
+
+        // Assert - with multiple logs the merged view is served, distinct from either per-log list.
+        Assert.NotSame(state.EventsForLog(first.Id), state.DisplayedEvents);
+        Assert.NotSame(state.EventsForLog(second.Id), state.DisplayedEvents);
+        Assert.Equal(2, state.DisplayedEvents.Count);
+    }
+
+    [Fact]
     public void EventTableAction_AddTable_ShouldStoreLogData()
     {
         // Arrange
@@ -298,12 +389,12 @@ public sealed class LogTableStoreTests
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2, ComputerName = FilterTestConstants.EventComputerServer02 }
         };
 
-        // Act — second batch with a different ComputerName must not overwrite the latched value
+        // Act - second batch with a different ComputerName must not overwrite the latched value
         state = Reducers.ReduceAppendTableEvents(
             state,
             new AppendTableEventsAction(logData.Id, secondBatch));
 
-        // Assert — ComputerName latches to the first non-empty observed value
+        // Assert - ComputerName latches to the first non-empty observed value
         var table = state.EventTables.First(t => t.Id == logData.Id);
         Assert.Equal(FilterTestConstants.EventComputerServer01, table.ComputerName);
     }
@@ -311,7 +402,7 @@ public sealed class LogTableStoreTests
     [Fact]
     public void LogView_ComputerName_WhenFirstEventHasEmptyComputerName_ShouldUseLaterEventInBatch()
     {
-        // Arrange — first event has an empty ComputerName (resolver miss); second carries the name
+        // Arrange - first event has an empty ComputerName (resolver miss); second carries the name
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
@@ -327,7 +418,7 @@ public sealed class LogTableStoreTests
             state,
             new AppendTableEventsAction(logData.Id, batch));
 
-        // Assert — reducer scans past the empty leading event and latches the first non-empty value
+        // Assert - reducer scans past the empty leading event and latches the first non-empty value
         var table = state.EventTables.First(t => t.Id == logData.Id);
         Assert.Equal(FilterTestConstants.EventComputerServer01, table.ComputerName);
     }
@@ -675,7 +766,7 @@ public sealed class LogTableStoreTests
     [Fact]
     public void ReduceAppendTableEventsBatch_WhenBatchTargetsClosedLog_ShouldSkipThatBatch()
     {
-        // Arrange — open log plus a stale log id whose tab no longer exists (race: closed mid-flight)
+        // Arrange - open log plus a stale log id whose tab no longer exists (race: closed mid-flight)
         var openLog = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(openLog));
@@ -692,7 +783,7 @@ public sealed class LogTableStoreTests
             state,
             new AppendTableEventsBatchAction(batches));
 
-        // Assert — stale batch is skipped; canonical and EventCountByLog only reflect the open log
+        // Assert - stale batch is skipped; canonical and EventCountByLog only reflect the open log
         Assert.Single(newState.DisplayedEvents);
         Assert.Equal(1L, newState.DisplayedEvents[0].RecordId);
         Assert.False(newState.EventCountByLog.ContainsKey(staleLogId));
@@ -1028,9 +1119,9 @@ public sealed class LogTableStoreTests
     [Fact]
     public void ReduceUpdateDisplayedEvents_WhenLogIsNotInActiveLogs_ShouldPreserveExistingCanonicalRows()
     {
-        // Arrange — log A has rows in canonical (live-load via UpdateTable); a filter dispatch
+        // Arrange - log A has rows in canonical (live-load via UpdateTable); a filter dispatch
         // then arrives with empty ActiveLogs (e.g. log opened mid-filter so the snapshot did
-        // not include it). The omitted log's rows must stay in canonical — otherwise a fresh
+        // not include it). The omitted log's rows must stay in canonical - otherwise a fresh
         // load could be silently scrubbed by a stale filter result.
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var state = new LogTableState();
@@ -1050,7 +1141,7 @@ public sealed class LogTableStoreTests
         // Act
         var newState = Reducers.ReduceUpdateDisplayedEvents(state, action);
 
-        // Assert — table still exists, canonical rows preserved, count map preserved.
+        // Assert - table still exists, canonical rows preserved, count map preserved.
         Assert.Single(newState.EventTables);
         Assert.Equal(2, newState.DisplayedEvents.Count);
         Assert.Equal(2, newState.EventCountByLog[logData.Id]);
@@ -1059,7 +1150,7 @@ public sealed class LogTableStoreTests
     [Fact]
     public void ReduceUpdateDisplayedEvents_WhenSomeLogsOmitted_ShouldReplaceIncludedAndPreserveOmitted()
     {
-        // Arrange — two logs, both populated via UpdateTable. Filter dispatch arrives for log A
+        // Arrange - two logs, both populated via UpdateTable. Filter dispatch arrives for log A
         // only (e.g. log B opened or finished loading after the snapshot). Log A's rows must be
         // replaced by the filter result; log B's rows must be preserved untouched.
         var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
@@ -1099,7 +1190,7 @@ public sealed class LogTableStoreTests
             state,
             new UpdateDisplayedEventsAction(activeLogs));
 
-        // Assert — log A reduced from 2 to 1, log B's 3 rows untouched; counts reflect both.
+        // Assert - log A reduced from 2 to 1, log B's 3 rows untouched; counts reflect both.
         Assert.Equal(4, newState.DisplayedEvents.Count);
         Assert.Equal(1, newState.DisplayedEvents.Count(e => e.OwningLog == Constants.LogNameLog1));
         Assert.Equal(3, newState.DisplayedEvents.Count(e => e.OwningLog == Constants.LogNameLog2));
@@ -1110,7 +1201,7 @@ public sealed class LogTableStoreTests
     [Fact]
     public void ReduceUpdateDisplayedEvents_WhenTableComputerNameEmpty_ShouldLatchFromFirstNonEmptyEvent()
     {
-        // Arrange — log first becomes visible via UpdateDisplayedEvents (filter clear), not via append
+        // Arrange - log first becomes visible via UpdateDisplayedEvents (filter clear), not via append
         var logData = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
@@ -1131,7 +1222,7 @@ public sealed class LogTableStoreTests
             state,
             new UpdateDisplayedEventsAction(activeLogs));
 
-        // Assert — UpdateDisplayedEvents also latches ComputerName, not just the append paths
+        // Assert - UpdateDisplayedEvents also latches ComputerName, not just the append paths
         var updatedTable = newState.EventTables.First(t => t.Id == logData.Id);
         Assert.Equal(FilterTestConstants.EventComputerServer01, updatedTable.ComputerName);
     }
@@ -1139,7 +1230,7 @@ public sealed class LogTableStoreTests
     [Fact]
     public void ReduceUpdateTable_AfterPartialAppends_ShouldReplaceNotMergeWithPartials()
     {
-        // Arrange — partial AppendTableEvents land first (live-load deltas), then UpdateTable arrives with the full filtered list
+        // Arrange - partial AppendTableEvents land first (live-load deltas), then UpdateTable arrives with the full filtered list
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var state = new LogTableState { IsDescending = false };
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
@@ -1178,7 +1269,7 @@ public sealed class LogTableStoreTests
             state,
             new UpdateTableAction(logData.Id, fullLoad));
 
-        // Assert — partials are dropped before merging the full slice; canonical is exactly the full load
+        // Assert - partials are dropped before merging the full slice; canonical is exactly the full load
         Assert.Equal(4, state.DisplayedEvents.Count);
         Assert.Equal(state.DisplayedEvents.Select(e => e.RecordId), [1L, 2L, 3L, 4L]);
         Assert.Equal(4, state.EventCountByLog[logData.Id]);
@@ -1213,7 +1304,7 @@ public sealed class LogTableStoreTests
     [Fact]
     public void ReduceUpdateTable_WhenCalledTwiceForSameLog_ShouldReplaceNotDuplicate()
     {
-        // Arrange — first UpdateTable populates canonical with two events
+        // Arrange - first UpdateTable populates canonical with two events
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var state = new LogTableState { IsDescending = false };
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
@@ -1234,10 +1325,10 @@ public sealed class LogTableStoreTests
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 14, RecordId = 5 }
         };
 
-        // Act — second UpdateTable for the same log (e.g., filter-driven reload)
+        // Act - second UpdateTable for the same log (e.g., filter-driven reload)
         state = Reducers.ReduceUpdateTable(state, new UpdateTableAction(logData.Id, secondLoad));
 
-        // Assert — canonical reflects only the second load; first load is replaced, not appended
+        // Assert - canonical reflects only the second load; first load is replaced, not appended
         Assert.Equal(3, state.DisplayedEvents.Count);
         Assert.Equal(state.DisplayedEvents.Select(e => e.RecordId), [3L, 4L, 5L]);
         Assert.Equal(3, state.EventCountByLog[logData.Id]);
@@ -1246,7 +1337,7 @@ public sealed class LogTableStoreTests
     [Fact]
     public void ReduceUpdateTable_WhenDescendingOrderRequested_ShouldMergeInDescendingOrder()
     {
-        // Arrange — two logs, descending sort
+        // Arrange - two logs, descending sort
         var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
         var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
         var state = new LogTableState { IsDescending = true };
@@ -1269,7 +1360,7 @@ public sealed class LogTableStoreTests
         state = Reducers.ReduceUpdateTable(state, new UpdateTableAction(logData1.Id, eventsLog1));
         state = Reducers.ReduceUpdateTable(state, new UpdateTableAction(logData2.Id, eventsLog2));
 
-        // Assert — canonical view in descending RecordId order
+        // Assert - canonical view in descending RecordId order
         Assert.Equal(4, state.DisplayedEvents.Count);
         Assert.Equal(4L, state.DisplayedEvents[0].RecordId);
         Assert.Equal(3L, state.DisplayedEvents[1].RecordId);
@@ -1319,7 +1410,7 @@ public sealed class LogTableStoreTests
     [Fact]
     public void ReduceUpdateTable_WhenSecondLogIsEmpty_ShouldKeepFirstLogEvents()
     {
-        // Arrange — one log populated, one log empty (but not loading), ascending RecordId order
+        // Arrange - one log populated, one log empty (but not loading), ascending RecordId order
         var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
         var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
         var state = new LogTableState { IsDescending = false };
@@ -1336,7 +1427,7 @@ public sealed class LogTableStoreTests
         state = Reducers.ReduceUpdateTable(state, new UpdateTableAction(logData1.Id, eventsLog1));
         state = Reducers.ReduceUpdateTable(state, new UpdateTableAction(logData2.Id, []));
 
-        // Assert — canonical view contains only the populated log's events
+        // Assert - canonical view contains only the populated log's events
         Assert.Equal(2, state.DisplayedEvents.Count);
         Assert.Equal(5L, state.DisplayedEvents[0].RecordId);
         Assert.Equal(7L, state.DisplayedEvents[1].RecordId);
@@ -1345,7 +1436,7 @@ public sealed class LogTableStoreTests
     [Fact]
     public void ReduceUpdateTable_WhenSecondLogPopulated_ShouldMergeIntoCanonicalInSortedOrder()
     {
-        // Arrange — two logs with interleaved RecordIds, ascending RecordId order
+        // Arrange - two logs with interleaved RecordIds, ascending RecordId order
         var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
         var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
         var state = new LogTableState { IsDescending = false };
@@ -1364,11 +1455,11 @@ public sealed class LogTableStoreTests
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 21, RecordId = 4 }
         };
 
-        // Act — UpdateTable maintains the canonical view atomically; no follow-up call needed.
+        // Act - UpdateTable maintains the canonical view atomically; no follow-up call needed.
         state = Reducers.ReduceUpdateTable(state, new UpdateTableAction(logData1.Id, eventsLog1));
         state = Reducers.ReduceUpdateTable(state, new UpdateTableAction(logData2.Id, eventsLog2));
 
-        // Assert — canonical view interleaves both logs in RecordId order
+        // Assert - canonical view interleaves both logs in RecordId order
         Assert.Equal(4, state.DisplayedEvents.Count);
         Assert.Equal(1L, state.DisplayedEvents[0].RecordId);
         Assert.Equal(2L, state.DisplayedEvents[1].RecordId);
@@ -1381,23 +1472,23 @@ public sealed class LogTableStoreTests
     [Fact]
     public void ReduceUpdateTable_WhenTableNotFound_ShouldReturnStateUnchanged()
     {
-        // Arrange — empty state, no tables
+        // Arrange - empty state, no tables
         var state = new LogTableState();
         var staleLogId = EventLogId.Create();
         var events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
         var action = new UpdateTableAction(staleLogId, events);
 
-        // Act — stale UpdateTable for a non-existent table
+        // Act - stale UpdateTable for a non-existent table
         var newState = Reducers.ReduceUpdateTable(state, action);
 
-        // Assert — state unchanged, no exception thrown
+        // Assert - state unchanged, no exception thrown
         Assert.Same(state, newState);
     }
 
     [Fact]
     public void ReduceUpdateTable_WhenTimeCreatedDivergesFromRecordId_ShouldMergeByTimeCreated()
     {
-        // Arrange — RecordIds ascending but TimeCreated descending: verifies sort is by timestamp
+        // Arrange - RecordIds ascending but TimeCreated descending: verifies sort is by timestamp
         var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
 
         var log1Events = new List<ResolvedEvent>
@@ -1422,7 +1513,7 @@ public sealed class LogTableStoreTests
         state = Reducers.ReduceUpdateTable(state, new UpdateTableAction(logData1.Id, log1Events));
         state = Reducers.ReduceUpdateTable(state, new UpdateTableAction(logData2.Id, log2Events));
 
-        // Assert — canonical comes out time-ordered, not RecordId-ordered
+        // Assert - canonical comes out time-ordered, not RecordId-ordered
         var actualTimes = state.DisplayedEvents.Select(e => e.TimeCreated).ToList();
         var expectedTimes = new List<DateTime>
         {
