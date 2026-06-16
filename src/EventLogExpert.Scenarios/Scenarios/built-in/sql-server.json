@@ -272,6 +272,40 @@
           ]
         }
       ]
+    },
+    {
+      "id": "sql-health-triage",
+      "name": "SQL Server health triage",
+      "purpose": "Color-coded SQL Server engine health (Application log; matches any instance via Source contains MSSQL): ready for connections (17126), shutdown (17147, 17148), login failure (18456), transaction-log-full and read-retry warnings (9002, 825), and severe I/O / consistency errors (823, 824).",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 10,
+      "version": 1,
+      "filters": [
+        { "color": "Green", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "value": "17126" } } ] },
+        { "color": "Blue", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "17147", "17148" ] } } ] },
+        { "color": "Orange", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "value": "18456" } } ] },
+        { "color": "Yellow", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "9002", "825" ] } } ] },
+        { "color": "DarkRed", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "823", "824" ] } } ] }
+      ]
+    },
+    {
+      "id": "sql-backup-restore-timeline",
+      "name": "SQL backup / restore timeline",
+      "purpose": "Color-coded SQL Server backup and restore activity (Application log; Source contains MSSQL): database and log backup success (18264, 18265), database restored (18267), and backup failure (3041).",
+      "group": "SqlServer",
+      "channels": [ "Application" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 11,
+      "version": 1,
+      "filters": [
+        { "color": "Green", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "18264", "18265" ] } } ] },
+        { "color": "Blue", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "value": "18267" } } ] },
+        { "color": "Red", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "value": "3041" } } ] }
+      ]
     }
   ]
 }

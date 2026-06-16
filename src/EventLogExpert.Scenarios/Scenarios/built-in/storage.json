@@ -104,7 +104,7 @@
     {
       "id": "vss-shadow-copy-backup-failures",
       "name": "VSS / shadow-copy / backup failures",
-      "purpose": "Volume Shadow Copy faults across the System log (Volsnap 25, 36) and the Application log (VSS 13, 8193, 12289).",
+      "purpose": "Volume Shadow Copy faults, color-coded: System-log Volsnap storage pressure (25, 36) versus Application-log VSS provider/backup failures (13, 8193, 12289).",
       "group": "Storage",
       "channels": [ "System", "Application" ],
       "requiresAdmin": false,
@@ -113,6 +113,7 @@
       "version": 1,
       "filters": [
         {
+          "color": "Orange",
           "comparison": { "property": "LogName", "value": "System" },
           "predicates": [
             { "joinWithAny": false, "comparison": { "property": "Source", "value": "Volsnap" } },
@@ -120,6 +121,7 @@
           ]
         },
         {
+          "color": "Red",
           "comparison": { "property": "LogName", "value": "Application" },
           "predicates": [
             { "joinWithAny": false, "comparison": { "property": "Source", "value": "VSS" } },

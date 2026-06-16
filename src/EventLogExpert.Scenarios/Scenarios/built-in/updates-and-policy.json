@@ -29,8 +29,8 @@
     },
     {
       "id": "windows-update-diagnostics",
-      "name": "Windows Update failures",
-      "purpose": "Windows Update client installation and download errors and warnings.",
+      "name": "Windows Update outcome",
+      "purpose": "Windows Update client outcomes, color-coded: successful install (WindowsUpdateClient 19), warnings, and errors.",
       "group": "UpdatesAndPolicy",
       "channels": [ "System" ],
       "optionalChannels": [ "Microsoft-Windows-WindowsUpdateClient/Operational" ],
@@ -40,9 +40,24 @@
       "version": 1,
       "filters": [
         {
+          "color": "Green",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-WindowsUpdateClient" },
           "predicates": [
-            { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] } }
+            { "comparison": { "property": "Id", "value": "19" } }
+          ]
+        },
+        {
+          "color": "Yellow",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-WindowsUpdateClient" },
+          "predicates": [
+            { "comparison": { "property": "Level", "value": "Warning" } }
+          ]
+        },
+        {
+          "color": "Red",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-WindowsUpdateClient" },
+          "predicates": [
+            { "comparison": { "property": "Level", "value": "Error" } }
           ]
         }
       ]

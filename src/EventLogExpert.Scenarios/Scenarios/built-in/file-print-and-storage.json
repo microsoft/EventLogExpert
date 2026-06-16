@@ -243,6 +243,22 @@
       "filters": [
         { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Critical", "Error" ] } }
       ]
+    },
+    {
+      "id": "file-share-lifecycle",
+      "name": "File share lifecycle",
+      "purpose": "Color-coded network file-share changes (Security audit): share added (5142), share modified (5143), and share deleted (5144). Requires the File Share audit subcategory.",
+      "group": "FilePrintAndStorage",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 20,
+      "version": 1,
+      "filters": [
+        { "color": "Green", "comparison": { "property": "Id", "value": "5142" } },
+        { "color": "Blue", "comparison": { "property": "Id", "value": "5143" } },
+        { "color": "Red", "comparison": { "property": "Id", "value": "5144" } }
+      ]
     }
   ]
 }
