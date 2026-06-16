@@ -6,6 +6,7 @@ using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Menu;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.Focus;
 using Fluxor;
@@ -20,10 +21,9 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     private const int InlineTagChipCap = 2;
     private const int MaxVisibleTagChips = 5;
 
-    private readonly string _filterEditorRegionId = $"lefr-{Guid.NewGuid():N}";
-    private readonly string _tagsRegionId = $"library-entry-tags-{Guid.NewGuid().ToString()[..8]}";
-    private ElementReference _articleRef;
+    private readonly string _filterEditorRegionId = ComponentId.NewUnique("lefr").Value;
 
+    private ElementReference _articleRef;
     private bool _isEditingTags;
     private bool _isExpanded;
     private IJSObjectReference? _menuAnchorModule;

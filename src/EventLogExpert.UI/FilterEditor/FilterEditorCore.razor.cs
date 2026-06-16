@@ -6,6 +6,7 @@ using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.FilterEditor.Rows;
 using Microsoft.AspNetCore.Components;
 
@@ -19,7 +20,7 @@ public sealed partial class FilterEditorCore : ComponentBase
 
     [Parameter] public IReadOnlyList<CachedFilterOption>? CachedOptions { get; set; }
 
-    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Parameter] public string Id { get; set; } = ComponentId.NewUnique().Value;
 
     [Parameter] public EventCallback<bool> OnExclusionChanged { get; set; }
 

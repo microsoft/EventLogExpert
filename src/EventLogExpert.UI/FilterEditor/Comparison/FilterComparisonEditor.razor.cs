@@ -5,6 +5,7 @@ using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.EventData;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.UI.Common;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
@@ -18,7 +19,7 @@ public sealed partial class FilterComparisonEditor : ComponentBase
 
     [Parameter][EditorRequired] public FilterComparisonDraft Comparison { get; set; } = null!;
 
-    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Parameter] public string Id { get; set; } = ComponentId.NewUnique().Value;
 
     /// <summary>
     ///     Fired whenever any sub-control mutates <see cref="Comparison" /> (property, operator/match-mode, or value).

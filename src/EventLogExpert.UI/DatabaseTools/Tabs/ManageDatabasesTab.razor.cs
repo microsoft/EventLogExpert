@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Database;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -22,9 +23,9 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private readonly Dictionary<string, bool> _pendingToggles = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DatabaseEntryRow?> _rowRefs = new(StringComparer.OrdinalIgnoreCase);
-    private readonly string _saveBlockedHelpId = $"manage-save-blocked-{Guid.NewGuid():N}";
+    private readonly string _saveBlockedHelpId = ComponentId.NewUnique("manage-save-blocked").Value;
     private readonly HashSet<string> _selectedForBulk = new(StringComparer.OrdinalIgnoreCase);
-    private readonly string _upgradeBlockedHelpId = $"manage-upgrade-blocked-{Guid.NewGuid():N}";
+    private readonly string _upgradeBlockedHelpId = ComponentId.NewUnique("manage-upgrade-blocked").Value;
 
     private ElementReference _bulkRemoveButtonRef;
     private ElementReference _bulkUpgradeButtonRef;

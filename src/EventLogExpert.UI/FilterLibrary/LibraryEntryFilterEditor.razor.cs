@@ -5,6 +5,7 @@ using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.FilterLibrary;
+using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
 
@@ -24,7 +25,7 @@ public sealed partial class LibraryEntryFilterEditor : ComponentBase
 
     protected override void OnInitialized()
     {
-        _filterListId = $"library-entry-filter-editor-{FilterSet.Id.Value:N}";
+        _filterListId = ComponentId.For(FilterSet.Id).Value;
     }
 
     private void AddPendingDraft() => _pendingDrafts.Add(new FilterDraft { Mode = FilterMode.Advanced });

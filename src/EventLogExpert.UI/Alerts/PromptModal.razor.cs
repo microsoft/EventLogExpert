@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
 
@@ -13,7 +14,7 @@ namespace EventLogExpert.UI.Alerts;
 /// </summary>
 public sealed partial class PromptModal : ModalBase<string>
 {
-    private readonly string _messageId = $"prompt-modal-message-{Guid.NewGuid():N}";
+    private readonly string _messageId = ComponentId.NewUnique("prompt-modal-message").Value;
 
     private bool _focusOnNextRender = true;
     private ElementReference _inputRef;

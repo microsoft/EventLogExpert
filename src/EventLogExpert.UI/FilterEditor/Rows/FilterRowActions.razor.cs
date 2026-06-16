@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Focus;
 using Microsoft.AspNetCore.Components;
 
@@ -9,7 +10,7 @@ namespace EventLogExpert.UI.FilterEditor.Rows;
 
 public sealed partial class FilterRowActions : ComponentBase
 {
-    private readonly string _enableToggleLabelId = $"filter-row-toggle-{Guid.NewGuid():N}";
+    private readonly string _enableToggleLabelId = ComponentId.NewUnique("filter-row-toggle").Value;
 
     private ElementReference _editButtonRef;
 

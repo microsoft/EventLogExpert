@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.Common.Display;
+using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.Inputs;
@@ -25,7 +26,7 @@ public sealed partial class ValueSelectItem<T> : IDisposable
     [Parameter]
     public bool IsDisabled { get; set; }
 
-    public string ItemId { get; } = $"_{Guid.NewGuid().ToString()[..8]}";
+    public string ItemId { get; } = ComponentId.NewUnique().Value;
 
     [Parameter]
     public T Value { get; set; } = default!;

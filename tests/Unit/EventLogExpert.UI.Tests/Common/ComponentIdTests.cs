@@ -87,6 +87,54 @@ public sealed class ComponentIdTests
         Assert.Matches(ComponentId.ValidIdPattern, id);
     }
 
+    [Theory]
+    [InlineData("1bad")]
+    [InlineData("bad space")]
+    [InlineData("")]
+    public void NewUnique_WithInvalidPrefix_Throws(string prefix)
+    {
+        Assert.Throws<ArgumentException>(() => ComponentId.NewUnique(prefix));
+    }
+
+    [Theory]
+    [InlineData("filter-row-toggle")]
+    [InlineData("filter-row-label")]
+    [InlineData("filter-edit-panel-color-desc")]
+    [InlineData("toggle-with-label-text")]
+    [InlineData("lefr")]
+    [InlineData("saved-new-row")]
+    [InlineData("saved-new-name")]
+    [InlineData("tag-mgmt")]
+    [InlineData("tag-overflow")]
+    [InlineData("tag-picker-listbox")]
+    [InlineData("select")]
+    [InlineData("prompt-modal-message")]
+    [InlineData("db-row-name")]
+    [InlineData("db-row-pending")]
+    [InlineData("manage-save-blocked")]
+    [InlineData("manage-upgrade-blocked")]
+    [InlineData("modal-inline-alert-message")]
+    [InlineData("modal-inline-alert-title")]
+    [InlineData("modal-inline-alert-validation")]
+    [InlineData("modal-title")]
+    public void NewUnique_WithMigrationPrefix_ProducesLetterFirstIdWithoutWhitespace(string prefix)
+    {
+        var id = ComponentId.NewUnique(prefix).Value;
+
+        Assert.True(char.IsAsciiLetter(id[0]));
+        Assert.DoesNotContain(id, character => char.IsWhiteSpace(character));
+        Assert.Matches(ComponentId.ValidIdPattern, id);
+    }
+
+    [Fact]
+    public void NewUnique_WithPrefix_PreservesPrefix()
+    {
+        var id = ComponentId.NewUnique("tag-mgmt").Value;
+
+        Assert.StartsWith("tag-mgmt-", id);
+        Assert.Matches(ComponentId.ValidIdPattern, id);
+    }
+
     [Fact]
     public void Suffix_AppendsParts()
     {

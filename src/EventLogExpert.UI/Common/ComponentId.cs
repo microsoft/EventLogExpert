@@ -26,7 +26,9 @@ internal readonly record struct ComponentId
 
     public string Value => _value ?? throw new InvalidOperationException("ComponentId is uninitialized.");
 
-    public static ComponentId NewUnique() => new($"cid-{Guid.NewGuid():N}");
+    public static ComponentId NewUnique() => NewUnique("cid");
+
+    public static ComponentId NewUnique(string prefix) => new($"{prefix}-{Guid.NewGuid():N}");
 
     public static ComponentId For(FilterId id, ComponentIdScope scope) =>
         id.Value == Guid.Empty ? throw new ArgumentException("Filter id must not be empty.", nameof(id)) :
