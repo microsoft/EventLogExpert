@@ -14,10 +14,6 @@ public sealed partial class LibraryFilterRow : ComponentBase
 
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    [Parameter] public EventCallback OnCancel { get; set; }
-
-    [Parameter] public EventCallback OnEdit { get; set; }
-
     [Parameter] public EventCallback<bool> OnExclusionChanged { get; set; }
 
     [Parameter] public EventCallback OnPendingDiscard { get; set; }

@@ -18,7 +18,6 @@ public sealed class WrapperConformanceTests
         "OnPendingDiscard",
         "OnPendingSave",
         "OnRemoved",
-        "OnEditingChanged",
         "OnDisposed",
     };
 
@@ -31,11 +30,18 @@ public sealed class WrapperConformanceTests
         "OnRemove",
         "OnExclusionChanged",
         "OnToggleEnabled",
-        "OnEdit",
-        "OnCancel",
         "OnPendingSave",
         "OnPendingDiscard",
     };
+
+    [Fact]
+    public void FilterEditorCore_HasNoEditOrCancelHostCallback()
+    {
+        var parameterNames = GetParameterNames(typeof(FilterEditorCore));
+
+        Assert.DoesNotContain("OnEdit", parameterNames);
+        Assert.DoesNotContain("OnCancel", parameterNames);
+    }
 
     [Fact]
     public void FilterRow_ExternalParameterSurface_MatchesExpectedSnapshot()

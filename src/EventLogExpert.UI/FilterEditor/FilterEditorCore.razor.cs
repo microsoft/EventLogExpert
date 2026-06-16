@@ -21,10 +21,6 @@ public sealed partial class FilterEditorCore : ComponentBase
 
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    [Parameter] public EventCallback OnCancel { get; set; }
-
-    [Parameter] public EventCallback OnEdit { get; set; }
-
     [Parameter] public EventCallback<bool> OnExclusionChanged { get; set; }
 
     [Parameter] public EventCallback OnPendingDiscard { get; set; }
@@ -132,20 +128,19 @@ public sealed partial class FilterEditorCore : ComponentBase
         }
 
         AnnouncementService.Announce("Edit cancelled");
-        await OnCancel.InvokeAsync();
     }
 
-    private async Task EditHandler()
+    // Local edit transition: never add OnEdit/OnCancel host callbacks (WebView2 render bug).
+    private Task EditHandler()
     {
-        if (IsPending) { return; }
-
-        if (Value is not { } savedFilter) { return; }
+        if (IsPending || Value is not { } savedFilter) { return Task.CompletedTask; }
 
         ErrorMessage = string.Empty;
         Filter = FilterDraft.FromSavedFilter(savedFilter);
 
         AnnouncementService.Announce("Editing filter");
-        await OnEdit.InvokeAsync();
+
+        return Task.CompletedTask;
     }
 
     private async Task ExclusionHandler(bool isExcluded)

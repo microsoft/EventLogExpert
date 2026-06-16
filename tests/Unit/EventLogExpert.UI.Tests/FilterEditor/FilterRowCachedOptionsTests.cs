@@ -67,6 +67,48 @@ public sealed class FilterRowCachedOptionsTests
     }
 
     [Fact]
+    public void CachedOptions_Recomputes_WhenLibraryEntriesReferenceChanges()
+    {
+        var stateMock = Substitute.For<IState<FilterLibraryState>>();
+        stateMock.Value.Returns(new FilterLibraryState
+        {
+            IsLoaded = true,
+            Entries = ImmutableList.CreateRange(
+                new LibraryEntry[] { BuildSavedFilter("Fav", filterText: "Level == 4", isFavorite: true) }),
+        });
+        var row = NewRowWithState(stateMock);
+
+        var first = row.CachedOptions;
+        Assert.Single(first);
+
+        stateMock.Value.Returns(new FilterLibraryState
+        {
+            IsLoaded = true,
+            Entries = ImmutableList.CreateRange(new LibraryEntry[]
+            {
+                BuildSavedFilter("Fav", filterText: "Level == 4", isFavorite: true),
+                BuildSavedFilter("Fav2", filterText: "Level == 2", isFavorite: true),
+            }),
+        });
+
+        var second = row.CachedOptions;
+
+        Assert.NotSame(first, second);
+        Assert.Equal(2, second.Count);
+    }
+
+    [Fact]
+    public void CachedOptions_ReturnsStableReference_WhenLibraryStateUnchanged()
+    {
+        var row = NewRowWithLibraryEntries(BuildSavedFilter("Fav", filterText: "Level == 4", isFavorite: true));
+
+        var first = row.CachedOptions;
+        var second = row.CachedOptions;
+
+        Assert.Same(first, second);
+    }
+
+    [Fact]
     public void CachedOptions_SameTextDifferentTags_UnionsTagsIntoOneOption()
     {
         var favNetwork = BuildSavedFilter("Fav", filterText: "Level == 4", isFavorite: true, tags: ["network"]);
@@ -154,6 +196,11 @@ public sealed class FilterRowCachedOptionsTests
             IsLoaded = true,
             Entries = ImmutableList.CreateRange(entries),
         });
+        return NewRowWithState(stateMock);
+    }
+
+    private static FilterRow NewRowWithState(IState<FilterLibraryState> stateMock)
+    {
         var row = new FilterRow();
         var prop = typeof(FilterRow).GetProperty(
             "FilterLibraryState",
