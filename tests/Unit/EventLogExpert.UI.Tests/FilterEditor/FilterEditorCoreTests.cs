@@ -97,6 +97,28 @@ public sealed class FilterEditorCoreTests : BunitContext
     }
 
     [Fact]
+    public void EditThenCancel_TogglesEditingStateAndAnnounces()
+    {
+        var saved = MakeSavedFilter("Id == 1000");
+
+        var component = Render<FilterEditorCore>(parameters => parameters
+            .Add(p => p.Value, saved)
+            .Add(p => p.CachedOptions, new List<CachedFilterOption>()));
+
+        Assert.False(component.Instance.IsEditing);
+
+        component.Find("button[title='Edit filter']").Click();
+
+        Assert.True(component.Instance.IsEditing);
+        _announcements.Received(1).Announce("Editing filter");
+
+        component.Find("button[aria-label='Cancel edit']").Click();
+
+        Assert.False(component.Instance.IsEditing);
+        _announcements.Received(1).Announce("Edit cancelled");
+    }
+
+    [Fact]
     public void FilterCachedByTags_AllSemantics_RequiresEverySelectedTag()
     {
         var options = new List<CachedFilterOption>
