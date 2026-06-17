@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.UI.Common.Interop;
@@ -9,11 +10,15 @@ using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.LogTable;
 
 public sealed partial class LogTabBar
 {
+    private EventLogId? _activeEventLogId;
+    private HashSet<EventLogId> _emptyTabIds = [];
+    private ImmutableList<LogView>? _eventTables;
     private IJSObjectReference? _logTabBarModule;
     private ElementReference _logTabBarRootRef;
     private LogTableState _logTableState = null!;
@@ -73,21 +78,54 @@ public sealed partial class LogTabBar
         await base.OnAfterRenderAsync(firstRender);
     }
 
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        var state = LogTableState.Value;
+        _logTableState = state;
+        _eventTables = state.EventTables;
+        _activeEventLogId = state.ActiveEventLogId;
+        _emptyTabIds = ComputeEmptyTabIds(state);
+        _sortedTabs = SortTabs(state.EventTables);
+    }
+
     protected override bool ShouldRender()
     {
-        if (ReferenceEquals(LogTableState.Value, _logTableState)) { return false; }
+        var state = LogTableState.Value;
 
-        _logTableState = LogTableState.Value;
+        if (ReferenceEquals(state, _logTableState)) { return false; }
 
-        _sortedTabs =
-        [
-            .. LogTableState.Value.EventTables
-                .OrderByDescending(table => table.IsCombined)
-                .ThenBy(table => table.ComputerName)
-                .ThenBy(table => table.LogName)
-        ];
+        bool tablesChanged = !ReferenceEquals(state.EventTables, _eventTables);
+        bool activeChanged = state.ActiveEventLogId != _activeEventLogId;
+        var emptyTabIds = ComputeEmptyTabIds(state);
+        bool emptinessChanged = !emptyTabIds.SetEquals(_emptyTabIds);
+
+        _logTableState = state;
+
+        if (!tablesChanged && !activeChanged && !emptinessChanged) { return false; }
+
+        _eventTables = state.EventTables;
+        _activeEventLogId = state.ActiveEventLogId;
+        _emptyTabIds = emptyTabIds;
+
+        if (tablesChanged) { _sortedTabs = SortTabs(state.EventTables); }
 
         return true;
+    }
+
+    private static HashSet<EventLogId> ComputeEmptyTabIds(LogTableState state)
+    {
+        var empty = new HashSet<EventLogId>();
+
+        foreach (var table in state.EventTables)
+        {
+            if (table.IsCombined || table.IsLoading) { continue; }
+
+            if (state.EventCountByLog.GetValueOrDefault(table.Id, 0) <= 0) { empty.Add(table.Id); }
+        }
+
+        return empty;
     }
 
     private static string GetTabTooltip(LogView table)
@@ -101,6 +139,14 @@ public sealed partial class LogTabBar
             : $"Live Log: {table.LogName}\n" +
                 $"Computer Name: {table.ComputerName}";
     }
+
+    private static List<LogView> SortTabs(ImmutableList<LogView> tables) =>
+    [
+        .. tables
+            .OrderByDescending(table => table.IsCombined)
+            .ThenBy(table => table.ComputerName)
+            .ThenBy(table => table.LogName)
+    ];
 
     private void CloseLog(LogView table) => EventLogCommands.CloseLog(table.Id, table.LogName);
 
