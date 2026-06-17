@@ -80,6 +80,35 @@
                 <i class="bi bi-bookmarks"></i>
             </button>
 
+            @if (ScenarioAuthoringEnabled)
+            {
+                var hasEnabledFilters = HasEnabledFilters;
+
+                <button aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
+                    aria-label="Copy scenario JSON"
+                    class="button icon-button"
+                    disabled="@(!hasEnabledFilters)"
+                    @onclick="CopyScenarioJsonAsync"
+                    title="Copy current filter rows as scenario-catalog JSON"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-clipboard-data"></i>
+                </button>
+
+                <button aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
+                    aria-label="Save scenario JSON"
+                    class="button icon-button"
+                    disabled="@(!hasEnabledFilters)"
+                    @onclick="SaveScenarioJsonAsync"
+                    title="Save current filter rows as scenario-catalog JSON..."
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-filetype-json"></i>
+                </button>
+
+                <span class="visually-hidden" id="scenario-export-empty-hint">
+                    Enable a filter before exporting as a scenario.
+                </span>
+            }
+
             <span class="visually-hidden" id="save-filters-empty-hint">
                 Add a filter before saving as a Filter Set.
             </span>
@@ -222,23 +251,25 @@
             </div>
         }
 
-        @foreach (var item in FilterPaneState.Value.Filters)
-        {
-            <FilterRow Id="@ComponentId.For(item.Id, ComponentIdScope.PaneFilter).Value"
-                @key="item.Id"
-                OnDisposed="@OnRowDisposed"
-                OnRemoved="HandleRemovedFilter"
-                @ref="_rowRefs[item.Id]"
-                Value="item" />
-        }
+        <CascadingValue IsFixed="true" Value="_authoringContext">
+            @foreach (var item in FilterPaneState.Value.Filters)
+            {
+                <FilterRow Id="@ComponentId.For(item.Id, ComponentIdScope.PaneFilter).Value"
+                    @key="item.Id"
+                    OnDisposed="@OnRowDisposed"
+                    OnRemoved="HandleRemovedFilter"
+                    @ref="_rowRefs[item.Id]"
+                    Value="item" />
+            }
 
-        @foreach (var draft in _pendingDrafts)
-        {
-            <FilterRow Id="@ComponentId.For(draft.Id, ComponentIdScope.PanePendingFilter).Value"
-                @key="draft.Id"
-                OnPendingDiscard="() => HandlePendingDiscard(draft)"
-                OnPendingSave="filter => HandlePendingSave(draft, filter)"
-                PendingDraft="draft" />
-        }
+            @foreach (var draft in _pendingDrafts)
+            {
+                <FilterRow Id="@ComponentId.For(draft.Id, ComponentIdScope.PanePendingFilter).Value"
+                    @key="draft.Id"
+                    OnPendingDiscard="() => HandlePendingDiscard(draft)"
+                    OnPendingSave="filter => HandlePendingSave(draft, filter)"
+                    PendingDraft="draft" />
+            }
+        </CascadingValue>
     </div>
 </div>

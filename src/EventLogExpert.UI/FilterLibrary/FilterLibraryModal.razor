@@ -27,128 +27,130 @@
         }
         else
         {
-            <SidebarTabs @bind-ActiveTab="_activeTab"
-                IsTabpanelFocusable="@IsTabpanelEmpty"
-                @ref="_sidebarTabsRef"
-                TablistAriaLabel="Filter library views"
-                Tabs="@CurrentTabLabels"
-                TTab="LibraryTab">
-                <TabContent Context="tab">
-                    @{
-                        var tagManagementPanelId = GetTagManagementPanelId(tab);
-                        var tagOverflowRegionId = GetTagOverflowRegionId(tab);
-                    }
-                    @if (AllLibraryTags.Count > 0)
-                    {
-                        <div aria-label="Filter by tag"
-                            class="library-tag-filter-bar"
-                            @onkeydown="HandleTagFilterBarKeyDown"
-                            role="group">
-                            <span class="library-tag-filter-bar-label">Tags:</span>
-                            <button aria-controls="@(_isTagManagementExpanded ? tagManagementPanelId : null)"
-                                aria-expanded="@(_isTagManagementExpanded ? "true" : "false")"
-                                aria-label="@(_isTagManagementExpanded ? "Hide tag management" : "Manage tags")"
-                                class="button icon-button library-tag-management-trigger"
-                                @onclick="ToggleTagManagement"
-                                title="Manage tags"
-                                type="button">
-                                <i aria-hidden="true" class="bi bi-gear"></i>
-                            </button>
-                            @{
-                                var visibleTags = AllLibraryTags.Take(TagFilterBarMaxVisible).ToList();
-                                var hiddenTagsCount = AllLibraryTags.Count - visibleTags.Count;
-                            }
-                            @foreach (var tag in visibleTags)
-                            {
-                                var isSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.OrdinalIgnoreCase);
-                                <button aria-pressed="@(isSelected ? "true" : "false")"
-                                    class="library-tag-filter-chip"
-                                    @onclick="@(() => ToggleTagFilter(tag))"
-                                    type="button">
-                                    @tag
-                                </button>
-                            }
-                            @if (hiddenTagsCount > 0)
-                            {
-                                <button aria-controls="@(_isTagOverflowExpanded ? tagOverflowRegionId : null)"
-                                    aria-expanded="@(_isTagOverflowExpanded ? "true" : "false")"
-                                    aria-label="@(_isTagOverflowExpanded ? "Hide additional tags" : $"Show {hiddenTagsCount} additional tags")"
-                                    class="library-tag-filter-chip-overflow"
-                                    @onclick="ToggleTagOverflowExpanded"
-                                    type="button">
-                                    @(_isTagOverflowExpanded ? "− less" : $"+{hiddenTagsCount} more")
-                                </button>
-                            }
-                            @if (_isTagOverflowExpanded && hiddenTagsCount > 0)
-                            {
-                                <div class="library-tag-filter-bar-overflow" id="@tagOverflowRegionId">
-                                    @foreach (var tag in AllLibraryTags.Skip(TagFilterBarMaxVisible))
-                                    {
-                                        var isOverflowSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.OrdinalIgnoreCase);
-                                        <button aria-pressed="@(isOverflowSelected ? "true" : "false")"
-                                            class="library-tag-filter-chip"
-                                            @onclick="@(() => ToggleTagFilter(tag))"
-                                            type="button">
-                                            @tag
-                                        </button>
-                                    }
-                                </div>
-                            }
-                        </div>
-
-                        @if (_isTagManagementExpanded)
-                        {
-                            <TagManagementPanel AllEntries="@FilterLibraryState.Value.Entries"
-                                AllLibraryTags="@AllLibraryTags"
-                                Id="@tagManagementPanelId"
-                                OnTagDeleted="HandleTagDeleted"
-                                OnTagRenamed="HandleTagRenamed" />
+            <CascadingValue IsFixed="true" Value="_authoringContext">
+                <SidebarTabs @bind-ActiveTab="_activeTab"
+                    IsTabpanelFocusable="@IsTabpanelEmpty"
+                    @ref="_sidebarTabsRef"
+                    TablistAriaLabel="Filter library views"
+                    Tabs="@CurrentTabLabels"
+                    TTab="LibraryTab">
+                    <TabContent Context="tab">
+                        @{
+                            var tagManagementPanelId = GetTagManagementPanelId(tab);
+                            var tagOverflowRegionId = GetTagOverflowRegionId(tab);
                         }
-                    }
-                    @switch (tab)
-                    {
-                        case LibraryTab.Saved:
-                            <LibrarySavedTabHeader AllLibraryTags="@AllLibraryTags"
-                                ExistingSavedFilters="@SavedFilterEntries" />
-
-                            @if (SavedEntries.Count == 0)
-                            {
-                                <p class="library-empty-state">@GetEmptyStateMessage(tab)</p>
-                            }
-                            else
-                            {
-                                @foreach (var entry in SavedEntries)
-                                {
-                                    @RenderEntryRow(tab, entry)
+                        @if (AllLibraryTags.Count > 0)
+                        {
+                            <div aria-label="Filter by tag"
+                                class="library-tag-filter-bar"
+                                @onkeydown="HandleTagFilterBarKeyDown"
+                                role="group">
+                                <span class="library-tag-filter-bar-label">Tags:</span>
+                                <button aria-controls="@(_isTagManagementExpanded ? tagManagementPanelId : null)"
+                                    aria-expanded="@(_isTagManagementExpanded ? "true" : "false")"
+                                    aria-label="@(_isTagManagementExpanded ? "Hide tag management" : "Manage tags")"
+                                    class="button icon-button library-tag-management-trigger"
+                                    @onclick="ToggleTagManagement"
+                                    title="Manage tags"
+                                    type="button">
+                                    <i aria-hidden="true" class="bi bi-gear"></i>
+                                </button>
+                                @{
+                                    var visibleTags = AllLibraryTags.Take(TagFilterBarMaxVisible).ToList();
+                                    var hiddenTagsCount = AllLibraryTags.Count - visibleTags.Count;
                                 }
-                            }
+                                @foreach (var tag in visibleTags)
+                                {
+                                    var isSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.OrdinalIgnoreCase);
+                                    <button aria-pressed="@(isSelected ? "true" : "false")"
+                                        class="library-tag-filter-chip"
+                                        @onclick="@(() => ToggleTagFilter(tag))"
+                                        type="button">
+                                        @tag
+                                    </button>
+                                }
+                                @if (hiddenTagsCount > 0)
+                                {
+                                    <button aria-controls="@(_isTagOverflowExpanded ? tagOverflowRegionId : null)"
+                                        aria-expanded="@(_isTagOverflowExpanded ? "true" : "false")"
+                                        aria-label="@(_isTagOverflowExpanded ? "Hide additional tags" : $"Show {hiddenTagsCount} additional tags")"
+                                        class="library-tag-filter-chip-overflow"
+                                        @onclick="ToggleTagOverflowExpanded"
+                                        type="button">
+                                        @(_isTagOverflowExpanded ? "− less" : $"+{hiddenTagsCount} more")
+                                    </button>
+                                }
+                                @if (_isTagOverflowExpanded && hiddenTagsCount > 0)
+                                {
+                                    <div class="library-tag-filter-bar-overflow" id="@tagOverflowRegionId">
+                                        @foreach (var tag in AllLibraryTags.Skip(TagFilterBarMaxVisible))
+                                        {
+                                            var isOverflowSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.OrdinalIgnoreCase);
+                                            <button aria-pressed="@(isOverflowSelected ? "true" : "false")"
+                                                class="library-tag-filter-chip"
+                                                @onclick="@(() => ToggleTagFilter(tag))"
+                                                type="button">
+                                                @tag
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            </div>
 
-                            break;
-                        case LibraryTab.Favorites:
-                            @if (FavoriteEntries.Count == 0)
+                            @if (_isTagManagementExpanded)
                             {
-                                <p class="library-empty-state">@GetEmptyStateMessage(tab)</p>
+                                <TagManagementPanel AllEntries="@FilterLibraryState.Value.Entries"
+                                    AllLibraryTags="@AllLibraryTags"
+                                    Id="@tagManagementPanelId"
+                                    OnTagDeleted="HandleTagDeleted"
+                                    OnTagRenamed="HandleTagRenamed" />
                             }
-                            else
-                            {
-                                @foreach (var entry in FavoriteEntries) { @RenderEntryRow(tab, entry) }
-                            }
+                        }
+                        @switch (tab)
+                        {
+                            case LibraryTab.Saved:
+                                <LibrarySavedTabHeader AllLibraryTags="@AllLibraryTags"
+                                    ExistingSavedFilters="@SavedFilterEntries" />
 
-                            break;
-                        case LibraryTab.PreviouslyUsed:
-                            @if (PreviouslyUsedEntries.Count == 0)
-                            {
-                                <p class="library-empty-state">@GetEmptyStateMessage(tab)</p>
-                            }
-                            else
-                            {
-                                @foreach (var entry in PreviouslyUsedEntries) { @RenderEntryRow(tab, entry) }
-                            }
+                                @if (SavedEntries.Count == 0)
+                                {
+                                    <p class="library-empty-state">@GetEmptyStateMessage(tab)</p>
+                                }
+                                else
+                                {
+                                    @foreach (var entry in SavedEntries)
+                                    {
+                                        @RenderEntryRow(tab, entry)
+                                    }
+                                }
 
-                            break;
-                    }
-                </TabContent>
-            </SidebarTabs>
+                                break;
+                            case LibraryTab.Favorites:
+                                @if (FavoriteEntries.Count == 0)
+                                {
+                                    <p class="library-empty-state">@GetEmptyStateMessage(tab)</p>
+                                }
+                                else
+                                {
+                                    @foreach (var entry in FavoriteEntries) { @RenderEntryRow(tab, entry) }
+                                }
+
+                                break;
+                            case LibraryTab.PreviouslyUsed:
+                                @if (PreviouslyUsedEntries.Count == 0)
+                                {
+                                    <p class="library-empty-state">@GetEmptyStateMessage(tab)</p>
+                                }
+                                else
+                                {
+                                    @foreach (var entry in PreviouslyUsedEntries) { @RenderEntryRow(tab, entry) }
+                                }
+
+                                break;
+                        }
+                    </TabContent>
+                </SidebarTabs>
+            </CascadingValue>
         }
     </ChildContent>
 </ModalChrome>
@@ -164,11 +166,13 @@
                 @key="entry.Id"
                 OnAddToFilterSet="@HandleAddToFilterSetAsync"
                 OnApply="@HandleApplyAsync"
+                OnCopyScenario="@OnCopyScenarioCallback"
                 OnDelete="@HandleDelete"
                 OnDisposed="@OnRowDisposed"
                 OnExportEntry="@HandleExportEntryAsync"
                 OnReplace="@HandleReplaceAsync"
                 OnRequestPendingFocus="@(id => HandleRequestPendingFocusAsync(tab, id))"
+                OnSaveScenario="@OnSaveScenarioCallback"
                 OnSaveToLibrary="@HandleSaveToLibrary"
                 OnToggleFavorite="@HandleToggleFavorite"
                 @ref="_rowRefs[(tab, entry.Id)]" />

@@ -14,10 +14,8 @@ public sealed partial class FilterRowActions : ComponentBase
 
     private ElementReference _editButtonRef;
 
-    /// <summary>
-    ///     DOM id of the comparison-text element in <see cref="FilterRowHeader" />; chained into the Toggle's
-    ///     <c>aria-labelledby</c> so SR users hear the filter context plus the Enable purpose hint.
-    /// </summary>
+    [CascadingParameter] public ScenarioAuthoringRowContext? AuthoringContext { get; set; }
+
     [Parameter] public string? FilterLabelId { get; set; }
 
     [Parameter] public EventCallback OnEdit { get; set; }
@@ -33,8 +31,13 @@ public sealed partial class FilterRowActions : ComponentBase
             ? _enableToggleLabelId
             : $"{FilterLabelId} {_enableToggleLabelId}";
 
+    private bool ShowScenarioCopy => AuthoringContext is { Enabled: true };
+
     internal ValueTask FocusEditAsync() => ElementFocus.SafelyAsync(_editButtonRef);
 
     private static string DescribeFilter(SavedFilter filter) =>
         string.IsNullOrWhiteSpace(filter.ComparisonText) ? "filter" : $"filter '{filter.ComparisonText}'";
+
+    private Task CopyScenarioJsonAsync(SavedFilter savedFilter) =>
+        AuthoringContext?.CopyAsync(savedFilter) ?? Task.CompletedTask;
 }

@@ -193,6 +193,7 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IChannelPresenceProbe, ChannelPresenceProbe>();
             services.AddSingleton<IScenarioQueryService, ScenarioQueryService>();
             services.AddSingleton<IScenarioLaunchService, ScenarioLaunchService>();
+            services.AddSingleton<IScenarioAuthoringService, ScenarioAuthoringService>();
 
             return services;
         }

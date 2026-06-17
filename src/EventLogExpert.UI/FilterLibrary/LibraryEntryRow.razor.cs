@@ -45,6 +45,8 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     [Parameter][EditorRequired] public EventCallback<LibraryEntryId> OnApply { get; set; }
 
+    [Parameter] public EventCallback<LibraryEntryId> OnCopyScenario { get; set; }
+
     [Parameter][EditorRequired] public EventCallback<LibraryEntryId> OnDelete { get; set; }
 
     [Parameter] public Action<(LibraryTab Tab, LibraryEntryId Id)>? OnDisposed { get; set; }
@@ -54,6 +56,8 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     [Parameter][EditorRequired] public EventCallback<LibraryEntryId> OnReplace { get; set; }
 
     [Parameter][EditorRequired] public EventCallback<LibraryEntryId> OnRequestPendingFocus { get; set; }
+
+    [Parameter] public EventCallback<LibraryEntryId> OnSaveScenario { get; set; }
 
     [Parameter][EditorRequired] public EventCallback<LibraryEntryId> OnSaveToLibrary { get; set; }
 
@@ -210,6 +214,16 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
             items.Add(MenuItem.Item("Export...", OnExportEntryAsync));
         }
 
+        if (Entry is LibraryEntryFilterSet && OnCopyScenario.HasDelegate)
+        {
+            items.Add(MenuItem.Item("Copy as scenario JSON", OnCopyScenarioAsync));
+        }
+
+        if (Entry is LibraryEntryFilterSet && OnSaveScenario.HasDelegate)
+        {
+            items.Add(MenuItem.Item("Save as scenario JSON", OnSaveScenarioAsync));
+        }
+
         items.Add(MenuItem.Separator());
         items.Add(MenuItem.Item("Delete", OnDeleteAsync, isDanger: true));
 
@@ -232,6 +246,8 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     }
 
     private Task OnApplyAsync() => OnApply.InvokeAsync(Entry.Id);
+
+    private Task OnCopyScenarioAsync() => OnCopyScenario.InvokeAsync(Entry.Id);
 
     private async Task OnDeleteAsync()
     {
@@ -348,6 +364,8 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
         await OnReplace.InvokeAsync(Entry.Id);
     }
+
+    private Task OnSaveScenarioAsync() => OnSaveScenario.InvokeAsync(Entry.Id);
 
     private async Task OnSaveToLibraryAsync()
     {
