@@ -45,7 +45,7 @@ public sealed partial class MenuBar
     private IStateSelection<FilterPaneState, bool> FilterPaneIsEnabled { get; init; } = null!;
 
     [Inject]
-    private IStateSelection<EventLogState, bool> HasActiveLogs { get; init; } = null!;
+    private IStateSelection<LogTableState, bool> HasActiveLogs { get; init; } = null!;
 
     [Inject]
     private IStateSelection<LogTableState, bool> IsGroupDescending { get; init; } = null!;
@@ -108,7 +108,7 @@ public sealed partial class MenuBar
     {
         ContinuouslyUpdate.Select(state => state.ContinuouslyUpdate);
         FilterPaneIsEnabled.Select(state => state.IsEnabled);
-        HasActiveLogs.Select(state => !state.ActiveLogs.IsEmpty);
+        HasActiveLogs.Select(state => state.EventTables.Any(table => !table.IsCombined));
         IsGroupDescending.Select(state => state.IsGroupDescending);
         IsGrouping.Select(state => state.GroupBy is not null);
 
