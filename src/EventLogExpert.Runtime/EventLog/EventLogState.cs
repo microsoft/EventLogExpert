@@ -18,6 +18,11 @@ public sealed record EventLogState
     public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } =
         [];
 
+    internal ImmutableDictionary<string, OpenLogInfo> OpenLogs { get; init; } =
+        ImmutableDictionary<string, OpenLogInfo>.Empty;
+
+    public bool IsLogOpen(string logPath) => OpenLogs.ContainsKey(logPath);
+
     public Filter AppliedFilter { get; init; } = new(null, []);
 
     public bool ContinuouslyUpdate { get; init; } = false;

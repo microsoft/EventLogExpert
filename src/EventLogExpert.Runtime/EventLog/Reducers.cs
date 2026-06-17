@@ -32,6 +32,7 @@ internal sealed class Reducers
         state with
         {
             ActiveLogs = [],
+            OpenLogs = [],
             SelectedEvent = null,
             SelectedEvents = [],
             NewEventBuffer = [],
@@ -63,6 +64,7 @@ internal sealed class Reducers
         return state with
         {
             ActiveLogs = state.ActiveLogs.Remove(action.LogName),
+            OpenLogs = state.OpenLogs.Remove(action.LogName),
             NewEventBuffer = newEventBuffer,
             NewEventBufferIsFull = newEventBuffer.Count >= EventLogState.MaxNewEvents,
             SelectedEvent = newSelectedEvent,
@@ -108,15 +110,20 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceOpenLog(EventLogState state, OpenLogAction action) =>
+    public static EventLogState ReduceOpenLog(EventLogState state, OpenLogAction action)
+    {
         // Idempotent: re-opening an already-active log is a no-op so callers (menu, drag/drop, command line,
         // SettingsModal.ReloadOpenLogs, effects) don't need to coordinate to avoid ImmutableDictionary.Add throwing.
-        state.ActiveLogs.ContainsKey(action.LogName)
-            ? state
-            : state with
-            {
-                ActiveLogs = state.ActiveLogs.Add(action.LogName, GetEmptyLogData(action.LogName, action.LogPathType))
-            };
+        if (state.ActiveLogs.ContainsKey(action.LogName)) { return state; }
+
+        var logData = GetEmptyLogData(action.LogName, action.LogPathType);
+
+        return state with
+        {
+            ActiveLogs = state.ActiveLogs.Add(action.LogName, logData),
+            OpenLogs = state.OpenLogs.SetItem(action.LogName, new OpenLogInfo(logData.Id, action.LogPathType))
+        };
+    }
 
     [ReducerMethod]
     public static EventLogState ReduceSelectEvent(EventLogState state, SelectEventAction action)

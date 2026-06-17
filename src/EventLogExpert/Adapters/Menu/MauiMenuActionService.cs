@@ -365,7 +365,7 @@ public sealed class MauiMenuActionService(
     public async Task<OpenLogStatus> OpenLogAsync(string logPath, LogPathType pathType, bool combineLog = false)
     {
         if (string.IsNullOrWhiteSpace(logPath) ||
-            (combineLog && _eventLogState.Value.ActiveLogs.ContainsKey(logPath))) { return OpenLogStatus.Skipped; }
+            (combineLog && _eventLogState.Value.IsLogOpen(logPath))) { return OpenLogStatus.Skipped; }
 
         EventLogInformation? eventLogInformation;
 
