@@ -101,6 +101,30 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleAddEvent_WhenContinuouslyUpdateTrue_AndEventFilteredOut_ShouldStillIngestRaw()
+    {
+        // Arrange - a live-tail event the active filter hides still belongs in the raw store.
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, mockFilterService) =
+            CreateEffectsWithServices(true, activeLogs);
+
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
+            .Returns(new List<ResolvedEvent>());
+
+        var newEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
+
+        // Act
+        await effects.HandleAddEvent(new AddEventAction(newEvent), mockDispatcher);
+
+        // Assert - raw is ingested unconditionally (Prepend) even though the filtered display append is skipped.
+        mockDispatcher.Received(1).Dispatch(Arg.Is<IngestRawEventsAction>(a =>
+            a.Mode == RawIngestMode.Prepend && a.EventsByLog.ContainsKey(logData.Id)));
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AppendTableEventsAction>());
+    }
+
+    [Fact]
     public async Task HandleAddEvent_WhenContinuouslyUpdateTrue_ShouldDispatchSuccessAndUpdate()
     {
         // Arrange
@@ -1301,6 +1325,87 @@ public sealed class EffectsTests
         // Assert
         mockFilterService.Received(1).GetFilteredEvents(events, Arg.Any<Filter>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<UpdateTableAction>());
+    }
+
+    [Fact]
+    public async Task HandleLoadEvents_WhenIdMismatchAfterReducer_DoesNotDispatchIngest()
+    {
+        // Arrange - ActiveLogs holds a DIFFERENT EventLogId for this name (a reopen assigned a new id), so the
+        // EventLog reducer rejected this stale load; the effect must not ingest raw either.
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var staleInState = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, staleInState);
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        // Act
+        await effects.HandleLoadEvents(new LoadEventsAction(logData, events), mockDispatcher);
+
+        // Assert - display still updates (matches existing behavior) but no raw ingest for the rejected load.
+        mockDispatcher.Received(1).Dispatch(Arg.Any<UpdateTableAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<IngestRawEventsAction>());
+    }
+
+    [Fact]
+    public async Task HandleLoadEvents_WhenLoadAccepted_ShouldIngestRawReplace()
+    {
+        // Arrange - ActiveLogs holds the same log instance the load is for (the reducer accepted it).
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        // Act
+        await effects.HandleLoadEvents(new LoadEventsAction(logData, events), mockDispatcher);
+
+        // Assert - the full raw set is ingested as a Replace.
+        mockDispatcher.Received(1).Dispatch(Arg.Is<IngestRawEventsAction>(a =>
+            a.Mode == RawIngestMode.Replace && a.EventsByLog.ContainsKey(logData.Id)));
+    }
+
+    [Fact]
+    public async Task HandleLoadEventsPartial_WhenAccepted_ShouldIngestRawAppend()
+    {
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        await effects.LogReload.HandleLoadEventsPartial(new LoadEventsPartialAction(logData, events), mockDispatcher);
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<IngestRawEventsAction>(a =>
+            a.Mode == RawIngestMode.Append && a.EventsByLog.ContainsKey(logData.Id)));
+    }
+
+    [Fact]
+    public async Task HandleLoadEventsPartial_WhenIdMismatch_DoesNotDispatchIngest()
+    {
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var staleInState = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, staleInState);
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        await effects.LogReload.HandleLoadEventsPartial(new LoadEventsPartialAction(logData, events), mockDispatcher);
+
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<IngestRawEventsAction>());
+    }
+
+    [Fact]
+    public async Task HandleLoadNewEvents_ShouldIngestRawPrependFromBuffer()
+    {
+        var bufferedEvents = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog)
+        };
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+        var (effects, mockDispatcher) = CreateEffects(activeLogs: activeLogs, newEventBuffer: bufferedEvents);
+
+        await effects.HandleLoadNewEvents(mockDispatcher);
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<IngestRawEventsAction>(a =>
+            a.Mode == RawIngestMode.Prepend && a.EventsByLog.ContainsKey(logData.Id)));
     }
 
     [Fact]

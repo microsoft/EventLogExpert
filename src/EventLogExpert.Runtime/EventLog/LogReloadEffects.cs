@@ -30,6 +30,14 @@ internal sealed class LogReloadEffects(
 
         dispatcher.Dispatch(new UpdateTableAction(action.LogData.Id, filteredEvents));
 
+        if (_eventLogState.Value.ActiveLogs.TryGetValue(action.LogData.Name, out var ingestTarget) &&
+            ingestTarget.Id == action.LogData.Id)
+        {
+            dispatcher.Dispatch(new IngestRawEventsAction(
+                new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [action.LogData.Id] = action.Events },
+                RawIngestMode.Replace));
+        }
+
         if (!_closeCoordinator.TryConsumePendingRestore(action.LogData.Name, out var pending) ||
             pending is null ||
             (pending.SelectedIds.Count <= 0 && !pending.SelectedId.HasValue))
@@ -59,6 +67,14 @@ internal sealed class LogReloadEffects(
         var filteredEvents = _filterService.GetFilteredEvents(action.Events, _eventLogState.Value.AppliedFilter);
 
         _coordinator.Enqueue(action.LogData.Id, filteredEvents);
+
+        if (_eventLogState.Value.ActiveLogs.TryGetValue(action.LogData.Name, out var ingestTarget) &&
+            ingestTarget.Id == action.LogData.Id)
+        {
+            dispatcher.Dispatch(new IngestRawEventsAction(
+                new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [action.LogData.Id] = action.Events },
+                RawIngestMode.Append));
+        }
 
         return Task.CompletedTask;
     }
@@ -94,6 +110,15 @@ internal sealed class LogReloadEffects(
             }
 
             list.Add(bufferedEvent);
+        }
+
+        var rawByLog = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>(grouped.Count);
+
+        foreach (var (logId, events) in grouped) { rawByLog[logId] = events.AsReadOnly(); }
+
+        if (rawByLog.Count > 0)
+        {
+            dispatcher.Dispatch(new IngestRawEventsAction(rawByLog, RawIngestMode.Prepend));
         }
 
         foreach (var (logId, events) in grouped)

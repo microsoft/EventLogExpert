@@ -40,29 +40,39 @@ internal sealed class FilteringEffects(
 
             dispatcher.Dispatch(new AddEventSuccessAction(activeLogs));
 
+            if (!activeLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog))
+            {
+                return Task.CompletedTask;
+            }
+
+            // Ingest the raw event unconditionally (even when the filter hides it); the display append below
+            // stays filter-gated.
+            dispatcher.Dispatch(new IngestRawEventsAction(
+                new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [owningLog.Id] = [action.NewEvent] },
+                RawIngestMode.Prepend));
+
             var filteredNew = _filterService.GetFilteredEvents(
                 [action.NewEvent],
                 _eventLogState.Value.AppliedFilter);
 
-            if (filteredNew.Count > 0 &&
-                activeLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog))
+            if (filteredNew.Count > 0)
             {
                 dispatcher.Dispatch(new AppendTableEventsAction(owningLog.Id, filteredNew));
             }
+
+            return Task.CompletedTask;
         }
-        else
+
+        var updatedBuffer = new List<ResolvedEvent>(_eventLogState.Value.NewEventBuffer.Count + 1)
         {
-            var updatedBuffer = new List<ResolvedEvent>(_eventLogState.Value.NewEventBuffer.Count + 1)
-            {
-                action.NewEvent
-            };
+            action.NewEvent
+        };
 
-            updatedBuffer.AddRange(_eventLogState.Value.NewEventBuffer);
+        updatedBuffer.AddRange(_eventLogState.Value.NewEventBuffer);
 
-            var full = updatedBuffer.Count >= EventLogState.MaxNewEvents;
+        var full = updatedBuffer.Count >= EventLogState.MaxNewEvents;
 
-            dispatcher.Dispatch(new EventBufferedAction(updatedBuffer.AsReadOnly(), full));
-        }
+        dispatcher.Dispatch(new EventBufferedAction(updatedBuffer.AsReadOnly(), full));
 
         return Task.CompletedTask;
     }
