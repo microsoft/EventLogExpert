@@ -24,7 +24,7 @@ public sealed record ResolvedEvent(
 
     public string Level { get; init; } = string.Empty;
 
-    // This is the log name from the event reader
+    // The event's Channel system property (e.g. "Security"), populated for .evtx files as the original channel, not the file path.
     public string LogName { get; init; } = string.Empty;
 
     public int? ProcessId { get; init; }

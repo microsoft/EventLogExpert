@@ -28,6 +28,7 @@ using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
+using System.Collections.Immutable;
 using System.Security;
 using FilterMode = EventLogExpert.Filtering.Evaluation.FilterMode;
 
@@ -36,6 +37,7 @@ namespace EventLogExpert.UI.FilterPane;
 public sealed partial class FilterPane
 {
     internal bool IsFilterSetPickerVisible;
+    internal bool IsScenarioPickerVisible;
     internal LibraryEntryId SelectedFilterSetId;
 
     private readonly List<string> _filterSetTags = [];
@@ -54,6 +56,8 @@ public sealed partial class FilterPane
     private FilterId? _focusTargetAfterRemove;
     private bool _isFilterListVisible;
     private IJSObjectReference? _menuAnchorModule;
+    private IReadOnlyList<IGrouping<ScenarioGroup, ScenarioDefinition>> _scenarioMatchGroups = [];
+    private ImmutableDictionary<string, EventLogData>? _scenarioMatchSource;
 
     internal IReadOnlyList<string> AvailableFilterSetTags =>
         AvailableTagsForSets([.. FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>()]);
@@ -92,7 +96,7 @@ public sealed partial class FilterPane
     private bool HasEnabledFilters => FilterPaneState.Value.Filters.Any(filter => filter.IsEnabled);
 
     private bool HasFilters =>
-        IsDateFilterVisible || IsFilterSetPickerVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
+        IsDateFilterVisible || IsFilterSetPickerVisible || IsScenarioPickerVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
 
     private bool HasFilterSets =>
         FilterLibraryState.Value.IsLoaded
@@ -121,9 +125,37 @@ public sealed partial class FilterPane
 
     [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
 
+    [Inject] private IScenarioApplyService ScenarioApplyService { get; init; } = null!;
+
     [Inject] private ScenarioAuthoringOptions ScenarioAuthoringOptions { get; init; } = null!;
 
     [Inject] private IScenarioAuthoringService ScenarioAuthoringService { get; init; } = null!;
+
+    private IReadOnlyList<IGrouping<ScenarioGroup, ScenarioDefinition>> ScenarioMatchGroups
+    {
+        get
+        {
+            var activeLogs = EventLogState.Value.ActiveLogs;
+
+            if (ReferenceEquals(activeLogs, _scenarioMatchSource))
+            {
+                return _scenarioMatchGroups;
+            }
+
+            _scenarioMatchSource = activeLogs;
+            _scenarioMatchGroups =
+            [
+                .. ScenarioQueryService
+                        .GetInAppScenarios(LoadedLogNames(activeLogs))
+                        .GroupBy(scenario => scenario.Group)
+                        .OrderBy(group => group.Key)
+            ];
+
+            return _scenarioMatchGroups;
+        }
+    }
+
+    [Inject] private IScenarioQueryService ScenarioQueryService { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -148,35 +180,17 @@ public sealed partial class FilterPane
         ];
     }
 
+    internal static IReadOnlyList<string> LoadedLogNames(ImmutableDictionary<string, EventLogData> activeLogs) =>
+    [
+        .. activeLogs.Values
+            .SelectMany(LogNamesFor)
+            .Where(name => !string.IsNullOrEmpty(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+    ];
+
     internal void ApplyFilterSetSelection()
     {
-        if (FilterLibraryState.Value.LoadError)
-        {
-            AnnouncementService.Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal);
-            CancelFilterSetPicker();
-
-            return;
-        }
-
-        if (!FilterLibraryState.Value.IsLoaded)
-        {
-            AnnouncementService.Announce(FilterPaneAnnouncements.LoadingTryAgain);
-            CancelFilterSetPicker();
-
-            return;
-        }
-
-        var filterSets = FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().ToList();
-
-        if (!filterSets.Any(p => p.Id.Equals(SelectedFilterSetId)))
-        {
-            AnnouncementService.Announce(FilterPaneAnnouncements.SelectedFilterSetMissing);
-            SelectedFilterSetId = filterSets
-                .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
-                .FirstOrDefault()?.Id ?? default;
-
-            return;
-        }
+        if (!TryResolveSelectedFilterSet()) { return; }
 
         FilterLibraryCommands.ApplyEntry(SelectedFilterSetId);
         CancelFilterSetPicker();
@@ -192,6 +206,8 @@ public sealed partial class FilterPane
             isEnabled: HasRecentFilters,
             disabledReason: GetRecentDisabledReason()),
     ];
+
+    internal void EditDateFilter() => _canEditDate = true;
 
     internal string? GetRecentDisabledReason()
     {
@@ -231,6 +247,57 @@ public sealed partial class FilterPane
                 .First().Id
             : default;
         _isFilterListVisible = true;
+    }
+
+    internal void OpenScenarioPicker()
+    {
+        if (IsScenarioPickerVisible) { return; }
+
+        IsScenarioPickerVisible = true;
+        _isFilterListVisible = true;
+    }
+
+    internal void ReplaceFilterSetSelection()
+    {
+        if (!TryResolveSelectedFilterSet()) { return; }
+
+        FilterLibraryCommands.ReplaceWithEntry(SelectedFilterSetId);
+        CancelFilterSetPicker();
+    }
+
+    internal void SetQuickDateRange(DateFilter dateFilter) => UpdateFilterDate(dateFilter);
+
+    internal bool TryResolveSelectedFilterSet()
+    {
+        if (FilterLibraryState.Value.LoadError)
+        {
+            AnnouncementService.Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal);
+            CancelFilterSetPicker();
+
+            return false;
+        }
+
+        if (!FilterLibraryState.Value.IsLoaded)
+        {
+            AnnouncementService.Announce(FilterPaneAnnouncements.LoadingTryAgain);
+            CancelFilterSetPicker();
+
+            return false;
+        }
+
+        var filterSets = FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().ToList();
+
+        if (filterSets.Any(p => p.Id.Equals(SelectedFilterSetId)))
+        {
+            return true;
+        }
+
+        AnnouncementService.Announce(FilterPaneAnnouncements.SelectedFilterSetMissing);
+        SelectedFilterSetId = filterSets
+            .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault()?.Id ?? default;
+
+        return false;
     }
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
@@ -276,6 +343,7 @@ public sealed partial class FilterPane
             _canEditDate = false;
             _pendingDrafts.Clear();
             IsFilterSetPickerVisible = false;
+            CancelScenarioPicker();
             SelectedFilterSetId = default;
             _filterSetTags.Clear();
         });
@@ -311,6 +379,11 @@ public sealed partial class FilterPane
 
     private static string FormatFilterSetLabel(LibraryEntryFilterSet set) =>
         $"{set.Name} ({FormatFilterSetDetail(set)})";
+
+    private static IEnumerable<string> LogNamesFor(EventLogData log) =>
+        log.Type == LogPathType.Channel
+            ? [log.Name]
+            : log.Events.Select(resolvedEvent => resolvedEvent.LogName).Distinct();
 
     private void AddAdvancedFilter()
     {
@@ -379,11 +452,24 @@ public sealed partial class FilterPane
         _canEditDate = false;
     }
 
+    private void ApplyScenario(ScenarioDefinition scenario, bool replace)
+    {
+        ScenarioApplyService.ApplyInApp(scenario, replace);
+        CancelScenarioPicker();
+    }
+
     private void CancelFilterSetPicker()
     {
         IsFilterSetPickerVisible = false;
         SelectedFilterSetId = default;
         _filterSetTags.Clear();
+    }
+
+    private void CancelScenarioPicker()
+    {
+        IsScenarioPickerVisible = false;
+        _scenarioMatchSource = null;
+        _scenarioMatchGroups = [];
     }
 
     private async Task ClearAllFiltersAsync()
@@ -422,8 +508,6 @@ public sealed partial class FilterPane
             .Select(log => log.Name)
             .Distinct(StringComparer.OrdinalIgnoreCase)
     ];
-
-    private void EditDateFilter() => _canEditDate = true;
 
     private ScenarioExportResult ExportCurrentRows() =>
         ScenarioAuthoringService.ExportRows(
