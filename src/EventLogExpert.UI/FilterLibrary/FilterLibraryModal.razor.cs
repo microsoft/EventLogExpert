@@ -1,12 +1,16 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.Modal;
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.UI.Common;
+using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.UI.Modal;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -40,6 +44,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private readonly string _tagOverflowRegionId = ComponentId.NewUnique("tag-overflow").Value;
 
     private LibraryTab _activeTab = LibraryTab.Saved;
+    private ScenarioAuthoringRowContext? _authoringContext;
+    private ScenarioClipboardExporter _clipboardExporter = null!;
     private bool _isTagManagementExpanded;
     private bool _isTagOverflowExpanded;
     private bool _justClearedTags;
@@ -51,6 +57,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private SidebarTabs<LibraryTab>? _sidebarTabsRef;
 
     [Parameter] public LibraryTab? InitialTab { get; set; }
+
+    [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
     private IReadOnlyList<LibraryEntryFilterSet> AllFilterSets =>
         [.. FilterLibraryState.Value.Entries
@@ -64,6 +72,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)];
 
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
+
+    [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
     private IReadOnlyList<(LibraryTab Tab, string Label)> CurrentTabLabels =>
     [
@@ -92,6 +102,14 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
 
     [Inject] private IState<FilterLibraryState> FilterLibraryState { get; init; } = null!;
+
+    private EventCallback<LibraryEntryId> OnCopyScenarioCallback => ScenarioAuthoringOptions.Enabled
+        ? EventCallback.Factory.Create<LibraryEntryId>(this, HandleCopyScenarioAsync)
+        : default;
+
+    private EventCallback<LibraryEntryId> OnSaveScenarioCallback => ScenarioAuthoringOptions.Enabled
+        ? EventCallback.Factory.Create<LibraryEntryId>(this, HandleSaveScenarioAsync)
+        : default;
 
     private IReadOnlyList<LibraryEntry> PreviouslyUsedEntries
     {
@@ -123,6 +141,10 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private IReadOnlyList<LibraryEntrySavedFilter> SavedFilterEntries =>
         [.. FilterLibraryState.Value.Entries.OfType<LibraryEntrySavedFilter>()];
+
+    [Inject] private ScenarioAuthoringOptions ScenarioAuthoringOptions { get; init; } = null!;
+
+    [Inject] private IScenarioAuthoringService ScenarioAuthoringService { get; init; } = null!;
 
     internal static void ApplyImportPreflight(
         ImportPreflight preflight,
@@ -380,6 +402,12 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         {
             FilterLibraryCommands.LoadLibrary();
         }
+
+        _clipboardExporter = new ScenarioClipboardExporter(AnnouncementService, AlertDialogService, ClipboardService);
+
+        _authoringContext = ScenarioAuthoringOptions.Enabled
+            ? new ScenarioAuthoringRowContext(Enabled: true, CopyLibraryRowAsync)
+            : null;
     }
 
     protected override Task<bool> OnRequestCloseAsync(ModalCloseRequest request)
@@ -403,6 +431,15 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         var sanitized = new string(name.Select(c => invalid.Contains(c) ? '-' : c).ToArray());
         return sanitized.Length > 100 ? sanitized[..100] : sanitized;
     }
+
+    private Task CopyLibraryRowAsync(SavedFilter filter) =>
+        _clipboardExporter.CopyAsync(
+            ScenarioAuthoringService.ExportRows([filter], []),
+            "Filter copied to the clipboard as scenario JSON.",
+            "this filter");
+
+    private LibraryEntryFilterSet? FindFilterSet(LibraryEntryId entryId) =>
+        FilterLibraryState.Value.Entries.FirstOrDefault(e => e.Id.Equals(entryId)) as LibraryEntryFilterSet;
 
     private string GetEmptyStateMessage(LibraryTab tab)
     {
@@ -449,6 +486,16 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         await CompleteAsync(true);
     }
 
+    private async Task HandleCopyScenarioAsync(LibraryEntryId entryId)
+    {
+        if (FindFilterSet(entryId) is not { } filterSet) { return; }
+
+        await _clipboardExporter.CopyAsync(
+            ScenarioAuthoringService.ExportRows([.. filterSet.Filters], []),
+            $"'{filterSet.Name}' copied to the clipboard as scenario JSON.",
+            "this filter set");
+    }
+
     private void HandleDelete(LibraryEntryId id) => FilterLibraryCommands.DeleteEntry(id);
 
     private async Task HandleExportEntryAsync(LibraryEntryId entryId)
@@ -491,6 +538,35 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         RecordPendingFocusAfterRemoval(sourceTab, entryId);
 
         return Task.CompletedTask;
+    }
+
+    private async Task HandleSaveScenarioAsync(LibraryEntryId entryId)
+    {
+        if (FindFilterSet(entryId) is not { } filterSet) { return; }
+
+        var export = ScenarioAuthoringService.ExportRows([.. filterSet.Filters], []);
+
+        if (_clipboardExporter.NotExportable(export, "this filter set")) { return; }
+
+        var suggested = $"{SanitizeForFileName(filterSet.Name)}-scenario-{DateTimeOffset.Now:yyyyMMdd}.json";
+        var path = await FilePickerService.PickSaveAsync("Export scenario JSON", [".json"], suggestedFileName: suggested);
+
+        if (string.IsNullOrEmpty(path)) { return; }
+
+        try
+        {
+            await File.WriteAllTextAsync(path, export.Json);
+        }
+        catch (Exception ex) when (
+            ex is UnauthorizedAccessException or SecurityException or
+                PathTooLongException or DirectoryNotFoundException or IOException)
+        {
+            await ShowImportExportErrorAsync("Export failed", ex.Message);
+
+            return;
+        }
+
+        await _clipboardExporter.AnnounceAsync($"Scenario JSON saved to {path}.", export.Warnings);
     }
 
     private void HandleSaveToLibrary(LibraryEntryId id) => FilterLibraryCommands.SaveEntry(id);

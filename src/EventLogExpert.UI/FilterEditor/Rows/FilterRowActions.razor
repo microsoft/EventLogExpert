@@ -1,6 +1,16 @@
 @if (Value is { } savedFilter)
 {
     <div class="filter-row-actions">
+        @if (ShowScenarioCopy)
+        {
+            <button aria-label="@($"Copy {DescribeFilter(savedFilter)} as scenario JSON")"
+                class="button icon-button"
+                @onclick="@(() => CopyScenarioJsonAsync(savedFilter))"
+                title="Copy as scenario JSON"
+                type="button">
+                <i aria-hidden="true" class="bi bi-filetype-json"></i>
+            </button>
+        }
         <button aria-label="@($"Edit {DescribeFilter(savedFilter)}")"
             class="button icon-button"
             @onclick="OnEdit"

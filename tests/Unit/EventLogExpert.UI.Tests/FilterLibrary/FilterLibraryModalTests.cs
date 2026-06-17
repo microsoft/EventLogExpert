@@ -5,10 +5,12 @@ using Bunit;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Modal;
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.UI.FilterLibrary;
 using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
@@ -50,6 +52,9 @@ public sealed class FilterLibraryModalTests : BunitContext
         Services.AddSingleton(paneState);
 
         Services.AddSingleton(Substitute.For<IAlertDialogService>());
+        Services.AddSingleton(Substitute.For<IScenarioAuthoringService>());
+        Services.AddSingleton(Substitute.For<IClipboardService>());
+        Services.AddSingleton(new ScenarioAuthoringOptions(false));
 
         Services.AddFluxor(options => options.ScanAssemblies(typeof(FilterLibraryModal).Assembly));
 

@@ -5,17 +5,22 @@ using Bunit;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.UI.FilterPane;
 using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -45,6 +50,10 @@ public sealed class FilterPaneTests : BunitContext
         Services.AddSingleton(Substitute.For<IAlertDialogService>());
         Services.AddSingleton(Substitute.For<IModalCoordinator>());
         Services.AddSingleton(Substitute.For<IMenuActionService>());
+        Services.AddSingleton(Substitute.For<IScenarioAuthoringService>());
+        Services.AddSingleton(Substitute.For<IClipboardService>());
+        Services.AddSingleton(Substitute.For<IFilePickerService>());
+        Services.AddSingleton(new ScenarioAuthoringOptions(false));
 
         var paneState = _paneStateMock;
         paneState.Value.Returns(new FilterPaneState());
@@ -149,6 +158,56 @@ public sealed class FilterPaneTests : BunitContext
         var tags = UI.FilterPane.FilterPane.AvailableTagsForSets([a, b]);
 
         Assert.Equal(new[] { "alpha", "mid", "zebra" }, tags.ToArray());
+    }
+
+    [Fact]
+    public async Task CopyScenario_ExportsOnlyEnabledRows()
+    {
+        Services.AddSingleton(new ScenarioAuthoringOptions(true));
+        var authoring = Services.GetRequiredService<IScenarioAuthoringService>();
+        authoring.ExportRows(Arg.Any<IReadOnlyList<SavedFilter>>(), Arg.Any<IReadOnlyList<string>>())
+            .Returns(new ScenarioExportResult("{}", ImmutableList<string>.Empty, EmittedRowCount: 1));
+
+        var enabled = SavedFilter.TryCreate("Level == 4")! with { IsEnabled = true };
+        var disabled = SavedFilter.TryCreate("Level == 2")! with { IsEnabled = false };
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetPaneState(new FilterPaneState { Filters = [enabled, disabled] });
+
+        var component = Render<UI.FilterPane.FilterPane>();
+        var copyButton = component.FindAll("button")
+            .First(button => button.GetAttribute("aria-label") == "Copy scenario JSON");
+
+        await copyButton.ClickAsync(new MouseEventArgs());
+
+        authoring.Received(1).ExportRows(
+            Arg.Is<IReadOnlyList<SavedFilter>>(rows => rows.Count == 1 && rows[0].IsEnabled),
+            Arg.Any<IReadOnlyList<string>>());
+    }
+
+    [Fact]
+    public void EditButton_OnActiveFilterRow_EntersEditMode()
+    {
+        Services.AddSingleton(new ScenarioAuthoringOptions(true));
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetPaneState(new FilterPaneState { Filters = [SavedFilter.TryCreate("Level == 4")!] });
+
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        // The per-row scenario-copy button must be present for this regression (it sits alongside Edit in the row).
+        Assert.Contains(
+            component.FindAll("button"),
+            b => b.GetAttribute("aria-label")?.Contains("scenario JSON") == true);
+
+        var editButton = component.FindAll("button")
+            .FirstOrDefault(b => b.GetAttribute("aria-label")?.StartsWith("Edit ", StringComparison.Ordinal) == true);
+        Assert.NotNull(editButton);
+
+        editButton!.Click();
+
+        // Entering edit mode replaces the saved-row actions (including the Edit button) with the edit panel.
+        Assert.DoesNotContain(
+            component.FindAll("button"),
+            b => b.GetAttribute("aria-label")?.StartsWith("Edit ", StringComparison.Ordinal) == true);
     }
 
     [Fact]
@@ -330,6 +389,33 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public void PerRowScenarioCopy_WhenAuthoringDisabled_RendersNoButton()
+    {
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetPaneState(new FilterPaneState { Filters = [SavedFilter.TryCreate("Level == 4")!] });
+
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        Assert.DoesNotContain(
+            component.FindAll("button"),
+            button => button.GetAttribute("aria-label")?.Contains("scenario JSON") == true);
+    }
+
+    [Fact]
+    public void PerRowScenarioCopy_WhenAuthoringEnabled_RendersButtonOnFilterRow()
+    {
+        Services.AddSingleton(new ScenarioAuthoringOptions(true));
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetPaneState(new FilterPaneState { Filters = [SavedFilter.TryCreate("Level == 4")!] });
+
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        Assert.Contains(
+            component.FindAll("button"),
+            button => button.GetAttribute("aria-label")?.Contains("scenario JSON") == true);
+    }
+
+    [Fact]
     public void PruneStaleFilterSetTags_RemovesTagsNoLongerAvailable()
     {
         var tagged = BuildFilterSet("Set", ["keep"]);
@@ -385,6 +471,45 @@ public sealed class FilterPaneTests : BunitContext
 
         Assert.True(component.Find("button[aria-label='Save as Filter Set']").HasAttribute("disabled"));
         Assert.True(component.Find("button[aria-label='Clear All Filters']").HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public async Task SaveScenario_WhenFileWriteFails_ShowsExportFailedAlert()
+    {
+        Services.AddSingleton(new ScenarioAuthoringOptions(true));
+        Services.GetRequiredService<IScenarioAuthoringService>()
+            .ExportRows(Arg.Any<IReadOnlyList<SavedFilter>>(), Arg.Any<IReadOnlyList<string>>())
+            .Returns(new ScenarioExportResult("{}", ImmutableList<string>.Empty, EmittedRowCount: 1));
+
+        var missingDirectoryPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "scenario.json");
+        Services.GetRequiredService<IFilePickerService>()
+            .PickSaveAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<string?>())
+            .Returns(missingDirectoryPath);
+
+        var alertDialog = Services.GetRequiredService<IAlertDialogService>();
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetPaneState(new FilterPaneState { Filters = [SavedFilter.TryCreate("Level == 4")! with { IsEnabled = true }] });
+
+        var component = Render<UI.FilterPane.FilterPane>();
+        var saveButton = component.FindAll("button")
+            .First(button => button.GetAttribute("aria-label") == "Save scenario JSON");
+
+        await saveButton.ClickAsync(new MouseEventArgs());
+
+        await alertDialog.Received(1).ShowAlert("Export failed", Arg.Any<string>(), "OK");
+    }
+
+    [Fact]
+    public void ScenarioButtons_WhenAllRowsDisabled_AreDisabled()
+    {
+        Services.AddSingleton(new ScenarioAuthoringOptions(true));
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetPaneState(new FilterPaneState { Filters = [SavedFilter.TryCreate("Level == 4")! with { IsEnabled = false }] });
+
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        Assert.True(component.Find("button[aria-label='Copy scenario JSON']").HasAttribute("disabled"));
+        Assert.True(component.Find("button[aria-label='Save scenario JSON']").HasAttribute("disabled"));
     }
 
     private static LibraryEntryFilterSet BuildFilterSet(string name, ImmutableList<string>? tags = null) =>

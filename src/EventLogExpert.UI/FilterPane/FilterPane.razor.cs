@@ -1,20 +1,25 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;
+using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.UI.Focus;
@@ -23,6 +28,7 @@ using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
+using System.Security;
 using FilterMode = EventLogExpert.Filtering.Evaluation.FilterMode;
 
 namespace EventLogExpert.UI.FilterPane;
@@ -40,7 +46,9 @@ public sealed partial class FilterPane
     private ElementReference _addFilterButtonRef;
     private ElementReference _addFilterChevronRef;
     private long _addFilterMenuId;
+    private ScenarioAuthoringRowContext? _authoringContext;
     private bool _canEditDate;
+    private ScenarioClipboardExporter _clipboardExporter = null!;
     private TimeZoneInfo _currentTimeZone = TimeZoneInfo.Utc;
     private bool _focusAddButtonAfterRemove;
     private FilterId? _focusTargetAfterRemove;
@@ -49,6 +57,8 @@ public sealed partial class FilterPane
 
     internal IReadOnlyList<string> AvailableFilterSetTags =>
         AvailableTagsForSets([.. FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>()]);
+
+    internal bool ScenarioAuthoringEnabled => ScenarioAuthoringOptions.Enabled;
 
     internal IReadOnlyList<LibraryEntryFilterSet> VisibleFilterSets =>
         FilterSetsByTags(
@@ -60,7 +70,11 @@ public sealed partial class FilterPane
 
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
+    [Inject] private IClipboardService ClipboardService { get; init; } = null!;
+
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
+
+    [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
 
     [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
 
@@ -74,6 +88,8 @@ public sealed partial class FilterPane
 
     private bool HasClearableFilters =>
         IsDateFilterVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
+
+    private bool HasEnabledFilters => FilterPaneState.Value.Filters.Any(filter => filter.IsEnabled);
 
     private bool HasFilters =>
         IsDateFilterVisible || IsFilterSetPickerVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
@@ -104,6 +120,10 @@ public sealed partial class FilterPane
     private string MenuState => HasFilters ? _isFilterListVisible.ToString().ToLower() : "false";
 
     [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
+
+    [Inject] private ScenarioAuthoringOptions ScenarioAuthoringOptions { get; init; } = null!;
+
+    [Inject] private IScenarioAuthoringService ScenarioAuthoringService { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -268,6 +288,12 @@ public sealed partial class FilterPane
         Settings.TimeZoneChanged += UpdateFilterDateTimeZone;
         MenuService.StateChanged += OnMenuServiceStateChanged;
 
+        _clipboardExporter = new ScenarioClipboardExporter(AnnouncementService, AlertDialogService, ClipboardService);
+
+        _authoringContext = ScenarioAuthoringOptions.Enabled
+            ? new ScenarioAuthoringRowContext(Enabled: true, CopyActiveRowAsync)
+            : null;
+
         base.OnInitialized();
     }
 
@@ -380,7 +406,29 @@ public sealed partial class FilterPane
         if (confirmed) { FilterPaneCommands.ClearAllFilters(); }
     }
 
+    private Task CopyActiveRowAsync(SavedFilter filter) =>
+        _clipboardExporter.CopyAsync(
+            ScenarioAuthoringService.ExportRows([filter], CurrentChannelNames()),
+            "Filter copied to the clipboard as scenario JSON.",
+            "this filter");
+
+    private Task CopyScenarioJsonAsync() =>
+        _clipboardExporter.CopyAsync(ExportCurrentRows(), "Scenario JSON copied to the clipboard.", "these filters");
+
+    private IReadOnlyList<string> CurrentChannelNames() =>
+    [
+        .. EventLogState.Value.ActiveLogs.Values
+            .Where(log => log.Type == LogPathType.Channel)
+            .Select(log => log.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+    ];
+
     private void EditDateFilter() => _canEditDate = true;
+
+    private ScenarioExportResult ExportCurrentRows() =>
+        ScenarioAuthoringService.ExportRows(
+            [.. FilterPaneState.Value.Filters.Where(filter => filter.IsEnabled)],
+            CurrentChannelNames());
 
     private int GetActiveFilters()
     {
@@ -521,6 +569,31 @@ public sealed partial class FilterPane
     }
 
     private Task SaveFiltersAsFilterSetAsync() => !HasSavableFilters ? Task.CompletedTask : MenuActions.SaveFiltersAsFilterSetAsync();
+
+    private async Task SaveScenarioJsonAsync()
+    {
+        var export = ExportCurrentRows();
+
+        if (_clipboardExporter.NotExportable(export, "these filters")) { return; }
+
+        var path = await FilePickerService.PickSaveAsync("Export scenario JSON", [".json"], "scenario.json");
+
+        if (path is null) { return; }
+
+        try
+        {
+            await File.WriteAllTextAsync(path, export.Json);
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException or SecurityException)
+        {
+            await AlertDialogService.ShowAlert("Export failed", exception.Message, "OK");
+
+            return;
+        }
+
+        await _clipboardExporter.AnnounceAsync($"Scenario JSON saved to {path}.", export.Warnings);
+    }
 
     private void ToggleDateFilter() => FilterPaneCommands.ToggleFilterDate();
 

@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using Fluxor;
@@ -36,6 +37,14 @@ public static class MauiProgram
         {
             builder.Services.AddBlazorWebViewDeveloperTools();
         }
+
+#if DEBUG
+        const bool ScenarioAuthoringEnabled = true;
+#else
+        bool ScenarioAuthoringEnabled = Environment.GetCommandLineArgs()
+            .Contains("/EnableScenarioAuthoring", StringComparer.OrdinalIgnoreCase);
+#endif
+        builder.Services.AddSingleton(new ScenarioAuthoringOptions(ScenarioAuthoringEnabled));
 
         builder.Services.AddFluxor(options =>
         {
