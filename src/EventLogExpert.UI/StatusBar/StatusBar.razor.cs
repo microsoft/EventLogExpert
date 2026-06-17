@@ -17,7 +17,6 @@ public sealed partial class StatusBar
 {
     [Inject]
     private IStateSelection<EventLogState, (
-        ImmutableDictionary<string, EventLogData> ActiveLogs,
         Filter AppliedFilter,
         bool ContinuouslyUpdate,
         IReadOnlyList<ResolvedEvent> NewEventBuffer,
@@ -33,6 +32,12 @@ public sealed partial class StatusBar
     { get; init; } = null!;
 
     [Inject]
+    private IStateSelection<RawEventCountState, (
+        int Total,
+        ImmutableDictionary<EventLogId, int> ByLog)> RawCountSelection
+    { get; init; } = null!;
+
+    [Inject]
     private IStateSelection<StatusBarState, (
         ImmutableDictionary<StatusActivityId, (int, int)> EventsLoading,
         string ResolverStatus)> StatusBarSelection
@@ -41,7 +46,8 @@ public sealed partial class StatusBar
     protected override void OnInitialized()
     {
         EventLogSelection.Select(static s =>
-            (s.ActiveLogs, s.AppliedFilter, s.ContinuouslyUpdate, s.NewEventBuffer, s.NewEventBufferIsFull));
+            (s.AppliedFilter, s.ContinuouslyUpdate, s.NewEventBuffer, s.NewEventBufferIsFull));
+        RawCountSelection.Select(static s => (s.Total, s.ByLog));
         LogTableSelection.Select(static s =>
             (s.ActiveEventLogId, s.EventTables, s.DisplayedEvents, s.EventCountByLog));
         StatusBarSelection.Select(static s => (s.EventsLoading, s.ResolverStatus));

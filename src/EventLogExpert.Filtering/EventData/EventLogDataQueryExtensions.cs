@@ -12,15 +12,22 @@ internal static class EventLogDataQueryExtensions
 {
     /// <summary>Gets a distinct list of values for the specified <paramref name="property" />.</summary>
     public static IEnumerable<string> GetEventValues(this EventLogData log, EventProperty property) =>
+        log.Events.GetEventValues(property);
+
+    /// <summary>
+    ///     Gets a distinct list of values for the specified <paramref name="property" /> across
+    ///     <paramref name="events" />.
+    /// </summary>
+    public static IEnumerable<string> GetEventValues(this IEnumerable<ResolvedEvent> events, EventProperty property) =>
         property switch
         {
-            EventProperty.Id => log.Events.Select(e => e.Id.ToString(CultureInfo.InvariantCulture)).Distinct(),
-            EventProperty.ActivityId => log.Events.Select(e => e.ActivityId?.ToString() ?? string.Empty).Distinct(),
+            EventProperty.Id => events.Select(e => e.Id.ToString(CultureInfo.InvariantCulture)).Distinct(),
+            EventProperty.ActivityId => events.Select(e => e.ActivityId?.ToString() ?? string.Empty).Distinct(),
             EventProperty.Level => Enum.GetNames<SeverityLevel>(),
-            EventProperty.Keywords => log.Events.SelectMany(e => e.Keywords).Distinct(),
-            EventProperty.Source => log.Events.Select(e => e.Source).Distinct(),
-            EventProperty.TaskCategory => log.Events.Select(e => e.TaskCategory).Distinct(),
-            EventProperty.LogName => log.Events.Select(e => e.LogName).Distinct(),
+            EventProperty.Keywords => events.SelectMany(e => e.Keywords).Distinct(),
+            EventProperty.Source => events.Select(e => e.Source).Distinct(),
+            EventProperty.TaskCategory => events.Select(e => e.TaskCategory).Distinct(),
+            EventProperty.LogName => events.Select(e => e.LogName).Distinct(),
             _ => [],
         };
 }

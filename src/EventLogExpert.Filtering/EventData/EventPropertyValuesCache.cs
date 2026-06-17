@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Common.Filtering;
 using System.Collections.Concurrent;
@@ -11,19 +10,20 @@ using System.Runtime.CompilerServices;
 namespace EventLogExpert.Filtering.EventData;
 
 /// <summary>
-///     Caches the distinct, sorted list of property values across all active logs, keyed by the
-///     <see cref="ImmutableDictionary{TKey,TValue}" /> snapshot reference. Each snapshot change produces a new key, so
-///     cache entries auto-evict via <see cref="ConditionalWeakTable{TKey,TValue}" />.
+///     Caches the distinct, sorted list of property values across a set of events, keyed by an opaque snapshot
+///     reference the caller supplies (stable per event snapshot). Each snapshot change produces a new key, so cache
+///     entries auto-evict via <see cref="ConditionalWeakTable{TKey,TValue}" />.
 /// </summary>
 public static class EventPropertyValuesCache
 {
     private static readonly ConditionalWeakTable<
-        ImmutableDictionary<string, EventLogData>,
+        object,
         ConcurrentDictionary<EventProperty, Lazy<ImmutableArray<string>>>> s_cache = new();
     private static readonly ImmutableArray<string> s_levelValues = [.. Enum.GetNames<SeverityLevel>()];
 
     public static ImmutableArray<string> GetValues(
-        ImmutableDictionary<string, EventLogData> activeLogs,
+        object cacheKey,
+        IEnumerable<ResolvedEvent> events,
         EventProperty property)
     {
         if (property is EventProperty.Level)
@@ -37,11 +37,11 @@ public static class EventPropertyValuesCache
         }
 
         var perSnapshot = s_cache.GetValue(
-            activeLogs,
+            cacheKey,
             static _ => new ConcurrentDictionary<EventProperty, Lazy<ImmutableArray<string>>>());
 
         return perSnapshot
-            .GetOrAdd(property, f => new Lazy<ImmutableArray<string>>(() => Compute(activeLogs, f)))
+            .GetOrAdd(property, f => new Lazy<ImmutableArray<string>>(() => Compute(events, f)))
             .Value;
     }
 
@@ -49,9 +49,9 @@ public static class EventPropertyValuesCache
     internal static void Clear() => s_cache.Clear();
 
     private static ImmutableArray<string> Compute(
-        ImmutableDictionary<string, EventLogData> activeLogs,
+        IEnumerable<ResolvedEvent> events,
         EventProperty property) =>
-        [.. activeLogs.Values.SelectMany(log => log.GetEventValues(property)).Distinct().Order()];
+        [.. events.GetEventValues(property).Distinct().Order()];
 
     private static bool IsLogDerivedProperty(EventProperty property) => property is
         EventProperty.Id or

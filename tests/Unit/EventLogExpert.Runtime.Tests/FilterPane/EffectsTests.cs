@@ -11,6 +11,7 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.FilterProgress;
+using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using Fluxor;
 using NSubstitute;
@@ -551,13 +552,23 @@ public sealed class EffectsTests
         var mockAppliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
         mockAppliedFilter.Value.Returns(appliedFilter ?? new Filter(null, []));
 
-        var mockEventDateRange =
-            Substitute.For<IStateSelection<EventLogState, (DateTime After, DateTime Before)?>>();
-
         var logs = activeLogs ?? ImmutableDictionary<string, EventLogData>.Empty;
-        mockEventDateRange.Value.Returns(logs.Values.TryGetEventDateRange(out var range) ? range : null);
+        var rawStore = new RawEventStoreState();
 
-        var effects = new Effects(mockAppliedFilter, mockEventDateRange, mockFilterPaneState);
+        foreach (var logData in logs.Values)
+        {
+            rawStore = RawEventStoreReducers.ReduceAddTable(rawStore, new AddTableAction(logData));
+            rawStore = RawEventStoreReducers.ReduceIngestRawEvents(
+                rawStore,
+                new IngestRawEventsAction(
+                    new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [logData.Id] = logData.Events },
+                    RawIngestMode.Append));
+        }
+
+        var mockRawEventStore = Substitute.For<IState<RawEventStoreState>>();
+        mockRawEventStore.Value.Returns(rawStore);
+
+        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState);
         var mockDispatcher = Substitute.For<IDispatcher>();
 
         return (effects, mockDispatcher);

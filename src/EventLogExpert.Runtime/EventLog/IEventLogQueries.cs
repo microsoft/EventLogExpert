@@ -1,6 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Common.Filtering;
+using System.Collections.Immutable;
+
 namespace EventLogExpert.Runtime.EventLog;
 
 public interface IEventLogQueries
@@ -10,4 +13,11 @@ public interface IEventLogQueries
     ///     hour, falling back to <paramref name="fallbackUtcNow" /> when no log has events.
     /// </summary>
     (DateTime After, DateTime Before) GetEventDateRange(DateTime fallbackUtcNow);
+
+    /// <summary>
+    ///     Returns the distinct, sorted set of values present across all open raw events for the given
+    ///     <paramref name="property" /> (used to populate filter value pickers). Empty for properties that are not derived
+    ///     from event data.
+    /// </summary>
+    ImmutableArray<string> GetPropertyValues(EventProperty property);
 }

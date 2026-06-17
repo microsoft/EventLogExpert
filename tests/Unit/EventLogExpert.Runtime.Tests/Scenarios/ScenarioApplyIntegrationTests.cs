@@ -3,6 +3,7 @@
 
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 using NSubstitute;
 using EventLogReducers = EventLogExpert.Runtime.EventLog.Reducers;
@@ -43,10 +44,10 @@ public sealed class ScenarioApplyIntegrationTests
         var appliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
         appliedFilter.Value.Returns(new Filter(null, []));
 
-        var eventDateRange = Substitute.For<IStateSelection<EventLogState, (DateTime After, DateTime Before)?>>();
-        eventDateRange.Value.Returns(((DateTime, DateTime)?)null);
+        var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
+        rawEventStore.Value.Returns(new RawEventStoreState());
 
-        var effects = new FilterPaneEffects(appliedFilter, eventDateRange, paneStateAccessor);
+        var effects = new FilterPaneEffects(appliedFilter, rawEventStore, paneStateAccessor);
         var dispatcher = Substitute.For<IDispatcher>();
 
         ApplyFilterAction? captured = null;

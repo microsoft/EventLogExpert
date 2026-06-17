@@ -3,6 +3,7 @@
 
 @{
     var eventLog = EventLogSelection.Value;
+    var rawCount = RawCountSelection.Value;
     var logTable = LogTableSelection.Value;
     var statusBar = StatusBarSelection.Value;
 }
@@ -18,7 +19,7 @@
         }
     }
 
-    <span>Events Loaded: @eventLog.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
+    <span>Events Loaded: @rawCount.Total</span>
 
     @if (logTable.ActiveEventLogId is not null && eventLog.AppliedFilter.IsFilteringEnabled)
     {
@@ -27,8 +28,8 @@
         if (activeTable is null) { return; }
 
         var totalEvents = activeTable.IsCombined ?
-            eventLog.ActiveLogs.Sum(l => l.Value.Events.Count) :
-            eventLog.ActiveLogs.TryGetValue(activeTable.LogName, out var activeLogData) ? activeLogData.Events.Count : 0;
+            rawCount.Total :
+            rawCount.ByLog.GetValueOrDefault(activeTable.Id, 0);
 
         var filteredEvents = activeTable.IsCombined ?
             logTable.DisplayedEvents.Count :
@@ -37,7 +38,7 @@
         <span>Visible: @(filteredEvents) Hidden by filter: @(totalEvents - filteredEvents)</span>
     }
 
-    @if (eventLog.ActiveLogs.Values.Any(l => l.Type == LogPathType.Channel))
+    @if (logTable.EventTables.Any(table => table.LogPathType == LogPathType.Channel))
     {
         @if (eventLog.ContinuouslyUpdate)
         {

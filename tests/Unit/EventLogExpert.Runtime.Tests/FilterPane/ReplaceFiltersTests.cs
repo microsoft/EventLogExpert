@@ -5,6 +5,7 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -99,11 +100,10 @@ public sealed class ReplaceFiltersTests
         var mockAppliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
         mockAppliedFilter.Value.Returns(new Filter(null, []));
 
-        var mockEventDateRange =
-            Substitute.For<IStateSelection<EventLogState, (DateTime After, DateTime Before)?>>();
-        mockEventDateRange.Value.Returns(((DateTime, DateTime)?)null);
+        var mockRawEventStore = Substitute.For<IState<RawEventStoreState>>();
+        mockRawEventStore.Value.Returns(new RawEventStoreState());
 
-        var effects = new Effects(mockAppliedFilter, mockEventDateRange, mockFilterPaneState);
+        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState);
         var dispatcher = Substitute.For<IDispatcher>();
 
         return (effects, dispatcher);

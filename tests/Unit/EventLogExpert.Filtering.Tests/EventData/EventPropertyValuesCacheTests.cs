@@ -2,10 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Tests.TestUtils.Constants;
-using System.Collections.Immutable;
 
 namespace EventLogExpert.Filtering.Tests.EventData;
 
@@ -16,43 +14,51 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
     public void Dispose() => EventPropertyValuesCache.Clear();
 
     [Fact]
-    public void GetValues_DifferentSnapshot_RecomputesValues()
+    public void GetValues_DifferentSnapshotKey_RecomputesValues()
     {
-        // Arrange
-        var snapshotA = ImmutableDictionary<string, EventLogData>.Empty.Add(
-            Constants.LogNameTestLog,
-            new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, [CreateTestEvent(100)]));
+        var snapshotA = new object();
+        var snapshotB = new object();
 
-        var snapshotB = snapshotA.Add(
-            Constants.LogNameLog2,
-            new EventLogData(Constants.LogNameLog2, LogPathType.Channel, [CreateTestEvent(200)]));
+        var idsA = EventPropertyValuesCache.GetValues(snapshotA, [CreateTestEvent(100)], EventProperty.Id);
+        var idsB = EventPropertyValuesCache.GetValues(
+            snapshotB,
+            [CreateTestEvent(100), CreateTestEvent(200)],
+            EventProperty.Id);
 
-        // Act
-        var idsA = EventPropertyValuesCache.GetValues(snapshotA, EventProperty.Id);
-        var idsB = EventPropertyValuesCache.GetValues(snapshotB, EventProperty.Id);
-
-        // Assert
         Assert.Equal(["100"], idsA);
         Assert.Equal(["100", "200"], idsB);
     }
 
     [Fact]
+    public void GetValues_DistinctSnapshotKeys_ProduceDistinctCacheEntries()
+    {
+        var snapshotA = new object();
+        var snapshotB = new object();
+        var eventsA = new List<ResolvedEvent> { CreateTestEvent(100), CreateTestEvent(200) };
+        var eventsB = new List<ResolvedEvent> { CreateTestEvent(300) };
+
+        var idsA = EventPropertyValuesCache.GetValues(snapshotA, eventsA, EventProperty.Id);
+        var idsB = EventPropertyValuesCache.GetValues(snapshotB, eventsB, EventProperty.Id);
+        var idsASecond = EventPropertyValuesCache.GetValues(snapshotA, eventsA, EventProperty.Id);
+
+        Assert.Equal(["100", "200"], idsA);
+        Assert.Equal(["300"], idsB);
+        Assert.True(idsA == idsASecond, "Same snapshot key must return the cached ImmutableArray instance.");
+        Assert.False(idsA == idsB, "Distinct snapshot keys must yield distinct cache entries.");
+    }
+
+    [Fact]
     public void GetValues_LevelField_ReturnsAllSeverityLevelNames()
     {
-        // Arrange
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty;
+        var items = EventPropertyValuesCache.GetValues(new object(), [], EventProperty.Level);
 
-        // Act
-        var items = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.Level);
-
-        // Assert
         Assert.Equal(Enum.GetNames<SeverityLevel>(), items);
     }
 
     [Fact]
     public void GetValues_LogDerivedField_ReturnsDistinctSortedValues()
     {
-        // Arrange
+        var snapshot = new object();
         var events = new List<ResolvedEvent>
         {
             CreateTestEvent(200, "Bravo"),
@@ -61,14 +67,9 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
             CreateTestEvent(300, "Charlie")
         };
 
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+        var ids = EventPropertyValuesCache.GetValues(snapshot, events, EventProperty.Id);
+        var sources = EventPropertyValuesCache.GetValues(snapshot, events, EventProperty.Source);
 
-        // Act
-        var ids = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.Id);
-        var sources = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.Source);
-
-        // Assert
         Assert.Equal(["100", "200", "300"], ids);
         Assert.Equal(["Alpha", "Bravo", "Charlie"], sources);
     }
@@ -76,85 +77,36 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
     [Fact]
     public void GetValues_LogNameField_ReturnsDistinctLoadedChannelsAcrossLogs()
     {
-        // The LogName value dropdown aggregates each event's channel, distinct + sorted, across all active logs.
-        var appLog = new EventLogData(
-            Constants.LogNameTestLog,
-            LogPathType.Channel,
-            [CreateTestEvent(100, logName: "Application"), CreateTestEvent(200, logName: "Application")]);
+        // The LogName value dropdown aggregates each event's channel, distinct + sorted, across all open events.
+        var events = new List<ResolvedEvent>
+        {
+            CreateTestEvent(100, logName: "Application"),
+            CreateTestEvent(200, logName: "Application"),
+            CreateTestEvent(4624, logName: "Security", owningLog: Constants.LogNameLog2)
+        };
 
-        var secLog = new EventLogData(
-            Constants.LogNameLog2,
-            LogPathType.Channel,
-            [CreateTestEvent(4624, logName: "Security", owningLog: Constants.LogNameLog2)]);
+        var logNames = EventPropertyValuesCache.GetValues(new object(), events, EventProperty.LogName);
 
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty
-            .Add(Constants.LogNameTestLog, appLog)
-            .Add(Constants.LogNameLog2, secLog);
-
-        // Act
-        var logNames = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.LogName);
-
-        // Assert
         Assert.Equal(["Application", "Security"], logNames);
     }
 
     [Fact]
-    public void GetValues_SameSnapshotAndField_ReturnsCachedInstance()
+    public void GetValues_SameSnapshotKeyAndField_ReturnsCachedInstance()
     {
-        // Arrange
-        var logData = new EventLogData(
-            Constants.LogNameTestLog,
-            LogPathType.Channel,
-            [CreateTestEvent(100)]);
+        var snapshot = new object();
+        var events = new List<ResolvedEvent> { CreateTestEvent(100) };
 
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+        var first = EventPropertyValuesCache.GetValues(snapshot, events, EventProperty.Id);
+        var second = EventPropertyValuesCache.GetValues(snapshot, events, EventProperty.Id);
 
-        // Act
-        var first = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.Id);
-        var second = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.Id);
-
-        // Assert
-        Assert.True(first == second, "ImmutableArray instance should be reused for the same snapshot/Property.");
-    }
-
-    [Fact]
-    public void GetValues_SnapshotMutatedViaWith_ProducesDistinctCacheEntry()
-    {
-        // Arrange
-        var original = new EventLogData(
-            Constants.LogNameTestLog,
-            LogPathType.Channel,
-            [CreateTestEvent(100), CreateTestEvent(200)]);
-
-        var snapshotA = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, original);
-        var snapshotB = snapshotA.SetItem(
-            Constants.LogNameTestLog,
-            original with { Events = [CreateTestEvent(300)] });
-
-        // Act
-        var idsA = EventPropertyValuesCache.GetValues(snapshotA, EventProperty.Id);
-        var idsB = EventPropertyValuesCache.GetValues(snapshotB, EventProperty.Id);
-        var idsASecond = EventPropertyValuesCache.GetValues(snapshotA, EventProperty.Id);
-
-        // Assert
-        Assert.Equal(["100", "200"], idsA);
-        Assert.Equal(["300"], idsB);
-        Assert.True(idsA == idsASecond, "Same snapshot reference must return cached ImmutableArray instance.");
-        Assert.False(idsA == idsB, "Distinct snapshot references must yield distinct cache entries.");
+        Assert.True(first == second, "ImmutableArray instance should be reused for the same snapshot key/Property.");
     }
 
     [Fact]
     public void GetValues_UnsupportedField_ReturnsEmpty()
     {
-        // Arrange
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(
-            Constants.LogNameTestLog,
-            new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, [CreateTestEvent()]));
+        var items = EventPropertyValuesCache.GetValues(new object(), [CreateTestEvent()], EventProperty.Description);
 
-        // Act
-        var items = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.Description);
-
-        // Assert
         Assert.Empty(items);
     }
 

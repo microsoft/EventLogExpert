@@ -10,6 +10,7 @@ using EventLogExpert.UI.FilterEditor.Editing;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Tests.FilterEditor;
 
@@ -20,6 +21,10 @@ public sealed class FilterPredicateEditorAccessibilityTests : BunitContext
         var eventLogState = Substitute.For<IState<EventLogState>>();
         eventLogState.Value.Returns(new EventLogState());
         Services.AddSingleton(eventLogState);
+
+        var eventLogQueries = Substitute.For<IEventLogQueries>();
+        eventLogQueries.GetPropertyValues(default).ReturnsForAnyArgs(ImmutableArray<string>.Empty);
+        Services.AddSingleton(eventLogQueries);
 
         Services.AddFluxor(options => options.ScanAssemblies(typeof(FilterComparisonEditor).Assembly));
 

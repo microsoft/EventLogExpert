@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLibrary;
+using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 
 namespace EventLogExpert.Runtime.FilterPane;
@@ -12,20 +13,19 @@ namespace EventLogExpert.Runtime.FilterPane;
 internal sealed class Effects
 {
     private readonly IStateSelection<EventLogState, Filter> _appliedFilter;
-    private readonly IStateSelection<EventLogState, (DateTime After, DateTime Before)?> _eventDateRange;
     private readonly IState<FilterPaneState> _filterPaneState;
+    private readonly IState<RawEventStoreState> _rawEventStore;
 
     public Effects(
         IStateSelection<EventLogState, Filter> appliedFilter,
-        IStateSelection<EventLogState, (DateTime After, DateTime Before)?> eventDateRange,
+        IState<RawEventStoreState> rawEventStore,
         IState<FilterPaneState> filterPaneState)
     {
         _appliedFilter = appliedFilter;
-        _eventDateRange = eventDateRange;
+        _rawEventStore = rawEventStore;
         _filterPaneState = filterPaneState;
 
         _appliedFilter.Select(static s => s.AppliedFilter);
-        _eventDateRange.Select(static s => s.ActiveLogs.Values.TryGetEventDateRange(out var range) ? range : null);
     }
 
     [EffectMethod]
@@ -106,7 +106,7 @@ internal sealed class Effects
 
         if (updatedAfter is null || updatedBefore is null)
         {
-            var (after, before) = _eventDateRange.Value.RoundOrFallback(DateTime.UtcNow);
+            var (after, before) = _rawEventStore.Value.TryGetRawEventDateRange().RoundOrFallback(DateTime.UtcNow);
 
             updatedAfter ??= after;
             updatedBefore ??= before;
