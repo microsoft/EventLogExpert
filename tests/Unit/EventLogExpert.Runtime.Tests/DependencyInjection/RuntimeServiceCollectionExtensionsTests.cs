@@ -175,6 +175,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     // Built-in scenarios.
     [InlineData(typeof(BuiltInScenarioRegistry))]
     [InlineData(typeof(IScenarioQueryService))]
+    [InlineData(typeof(IScenarioApplyService))]
     [InlineData(typeof(IScenarioLaunchService))]
     [InlineData(typeof(IScenarioAuthoringService))]
     public async Task AddEventLogRuntime_ShouldResolveHostFacingAbstraction(Type serviceType)

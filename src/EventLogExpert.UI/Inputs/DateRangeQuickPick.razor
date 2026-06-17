@@ -1,0 +1,13 @@
+@inherits ComponentBase
+
+<ValueSelect AriaLabel="@AriaLabel"
+    CssClass="@CssClass"
+    T="string"
+    ToStringFunc="@PresetLabel"
+    Value="_selectedKey"
+    ValueChanged="OnPresetSelectedAsync">
+    @foreach (var preset in s_presets)
+    {
+        <ValueSelectItem T="string" Value="@preset.Key">@preset.Label</ValueSelectItem>
+    }
+</ValueSelect>

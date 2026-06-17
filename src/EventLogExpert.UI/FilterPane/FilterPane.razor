@@ -1,275 +1,345 @@
+@using EventLogExpert.Scenarios.Catalog
 @inherits FluxorComponent
 
 <div class="filter-pane">
-    <div class="filter-header">
-        <div class="filter-header-actions">
-            <div class="split-button">
-                <button class="button split-button-primary"
-                    @onclick="AddBasicFilter"
-                    @ref="_addFilterButtonRef"
-                    title="Add Basic filter (use chevron for Advanced or Recent)"
-                    type="button">
-                    <i aria-hidden="true" class="bi bi-plus-circle"></i> Add Filter
-                </button>
-                <button aria-controls="menu-host-popup"
-                    aria-expanded="@(IsAddFilterMenuOpen ? "true" : "false")"
-                    aria-haspopup="menu"
-                    aria-label="Choose filter mode"
-                    class="button split-button-chevron"
-                    @onclick="OpenAddFilterMenuAsync"
-                    @onkeydown="HandleAddFilterChevronKeyDownAsync"
-                    @ref="_addFilterChevronRef"
-                    type="button">
-                    <i class="bi bi-caret-down-fill"></i>
-                </button>
-            </div>
-
-            <button class="button" @onclick="AddExclusion">
-                <i class="bi bi-plus-circle"></i> Add Exclusion
+<div class="filter-header">
+    <div class="filter-header-actions">
+        <div class="split-button">
+            <button class="button split-button-primary"
+                @onclick="AddBasicFilter"
+                @ref="_addFilterButtonRef"
+                title="Add Basic filter (use chevron for Advanced or Recent)"
+                type="button">
+                <i aria-hidden="true" class="bi bi-plus-circle"></i> Add Filter
             </button>
-
-            @if (!IsDateFilterVisible)
-            {
-                <button class="button" @onclick="AddDateFilter">
-                    <i class="bi bi-plus-circle"></i> Add Date Filter
-                </button>
-            }
-
-            <button class="button" @onclick="OpenFilterSetPicker">
-                <i class="bi bi-plus-circle"></i> Apply Filter Set
+            <button aria-controls="menu-host-popup"
+                aria-expanded="@(IsAddFilterMenuOpen ? "true" : "false")"
+                aria-haspopup="menu"
+                aria-label="Choose filter mode"
+                class="button split-button-chevron"
+                @onclick="OpenAddFilterMenuAsync"
+                @onkeydown="HandleAddFilterChevronKeyDownAsync"
+                @ref="_addFilterChevronRef"
+                type="button">
+                <i class="bi bi-caret-down-fill"></i>
             </button>
         </div>
 
-        @if (FilterProgressState.Value.IsLoading)
+        <button class="button" @onclick="AddExclusion">
+            <i class="bi bi-plus-circle"></i> Add Exclusion
+        </button>
+
+        @if (!IsDateFilterVisible)
         {
-            <span class="filter-header-status">
-                [<i aria-label="Loading" class="spinner-border" role="status"></i> Applying Filters]
-            </span>
+            <button class="button" @onclick="AddDateFilter">
+                <i class="bi bi-plus-circle"></i> Add Date Filter
+            </button>
         }
-        else if (HasFilters && GetActiveFilters() > 0)
+
+        <button class="button" @onclick="OpenFilterSetPicker">
+            <i class="bi bi-plus-circle"></i> Apply Filter Set
+        </button>
+
+        @if (EventLogState.Value.ActiveLogs.Count > 0)
         {
-            <span class="filter-header-status">[Active Filters: @GetActiveFilters()]</span>
+            <button aria-controls="scenario-picker"
+                aria-expanded="@(IsScenarioPickerVisible ? "true" : "false")"
+                aria-haspopup="true"
+                class="button"
+                @onclick="OpenScenarioPicker"
+                type="button">
+                <i class="bi bi-plus-circle"></i> Apply Scenario
+            </button>
         }
-
-        <div class="filter-header-secondary">
-            <button aria-describedby="@(HasSavableFilters ? null : "save-filters-empty-hint")"
-                aria-label="Save as Filter Set"
-                class="button icon-button"
-                disabled="@(!HasSavableFilters)"
-                @onclick="SaveFiltersAsFilterSetAsync"
-                title="@(HasSavableFilters ? "Save as Filter Set..." : "No filters to save")"
-                type="button">
-                <i class="bi bi-bookmark-plus"></i>
-            </button>
-
-            <button aria-describedby="@(HasClearableFilters ? null : "clear-filters-empty-hint")"
-                aria-label="Clear All Filters"
-                class="button icon-button"
-                disabled="@(!HasClearableFilters)"
-                @onclick="ClearAllFiltersAsync"
-                title="@(HasClearableFilters ? "Clear All Filters..." : "No filters to clear")"
-                type="button">
-                <i class="bi bi-trash"></i>
-            </button>
-
-            <button aria-label="Open Filter Library"
-                class="button icon-button"
-                @onclick="OpenFilterLibraryAsync"
-                title="Open Filter Library"
-                type="button">
-                <i class="bi bi-bookmarks"></i>
-            </button>
-
-            @if (ScenarioAuthoringEnabled)
-            {
-                var hasEnabledFilters = HasEnabledFilters;
-
-                <button aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
-                    aria-label="Copy scenario JSON"
-                    class="button icon-button"
-                    disabled="@(!hasEnabledFilters)"
-                    @onclick="CopyScenarioJsonAsync"
-                    title="Copy current filter rows as scenario-catalog JSON"
-                    type="button">
-                    <i aria-hidden="true" class="bi bi-clipboard-data"></i>
-                </button>
-
-                <button aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
-                    aria-label="Save scenario JSON"
-                    class="button icon-button"
-                    disabled="@(!hasEnabledFilters)"
-                    @onclick="SaveScenarioJsonAsync"
-                    title="Save current filter rows as scenario-catalog JSON..."
-                    type="button">
-                    <i aria-hidden="true" class="bi bi-filetype-json"></i>
-                </button>
-
-                <span class="visually-hidden" id="scenario-export-empty-hint">
-                    Enable a filter before exporting as a scenario.
-                </span>
-            }
-
-            <span class="visually-hidden" id="save-filters-empty-hint">
-                Add a filter before saving as a Filter Set.
-            </span>
-            <span class="visually-hidden" id="clear-filters-empty-hint">
-                There are no filters to clear.
-            </span>
-
-            @if (HasFilters || FilterProgressState.Value.IsLoading)
-            {
-                <span aria-label="@(_isFilterListVisible ? "Filters Expanded" : "Filters Collapsed")"
-                    class="menu-toggle"
-                    data-rotate="@MenuState"
-                    @onclick="ToggleMenu"
-                    @onkeydown="HandleKeyDown"
-                    role="button"
-                    tabindex="0">
-                    <i class="bi bi-caret-up"></i>
-                </span>
-            }
-        </div>
     </div>
 
-    <div class="filter-set" data-toggle="@MenuState">
-        @if (IsDateFilterVisible)
+    @if (FilterProgressState.Value.IsLoading)
+    {
+        <span class="filter-header-status">
+            [<i aria-label="Loading" class="spinner-border" role="status"></i> Applying Filters]
+        </span>
+    }
+    else if (HasFilters && GetActiveFilters() > 0)
+    {
+        <span class="filter-header-status">[Active Filters: @GetActiveFilters()]</span>
+    }
+
+    <div class="filter-header-secondary">
+        <button aria-describedby="@(HasSavableFilters ? null : "save-filters-empty-hint")"
+            aria-label="Save as Filter Set"
+            class="button icon-button"
+            disabled="@(!HasSavableFilters)"
+            @onclick="SaveFiltersAsFilterSetAsync"
+            title="@(HasSavableFilters ? "Save as Filter Set..." : "No filters to save")"
+            type="button">
+            <i class="bi bi-bookmark-plus"></i>
+        </button>
+
+        <button aria-describedby="@(HasClearableFilters ? null : "clear-filters-empty-hint")"
+            aria-label="Clear All Filters"
+            class="button icon-button"
+            disabled="@(!HasClearableFilters)"
+            @onclick="ClearAllFiltersAsync"
+            title="@(HasClearableFilters ? "Clear All Filters..." : "No filters to clear")"
+            type="button">
+            <i class="bi bi-trash"></i>
+        </button>
+
+        <button aria-label="Open Filter Library"
+            class="button icon-button"
+            @onclick="OpenFilterLibraryAsync"
+            title="Open Filter Library"
+            type="button">
+            <i class="bi bi-bookmarks"></i>
+        </button>
+
+        @if (ScenarioAuthoringEnabled)
         {
-            <EditForm class="filter-form flex-row" Model="_model">
+            var hasEnabledFilters = HasEnabledFilters;
+
+            <button aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
+                aria-label="Copy scenario JSON"
+                class="button icon-button"
+                disabled="@(!hasEnabledFilters)"
+                @onclick="CopyScenarioJsonAsync"
+                title="Copy current filter rows as scenario-catalog JSON"
+                type="button">
+                <i aria-hidden="true" class="bi bi-clipboard-data"></i>
+            </button>
+
+            <button aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
+                aria-label="Save scenario JSON"
+                class="button icon-button"
+                disabled="@(!hasEnabledFilters)"
+                @onclick="SaveScenarioJsonAsync"
+                title="Save current filter rows as scenario-catalog JSON..."
+                type="button">
+                <i aria-hidden="true" class="bi bi-filetype-json"></i>
+            </button>
+
+            <span class="visually-hidden" id="scenario-export-empty-hint">
+                Enable a filter before exporting as a scenario.
+            </span>
+        }
+
+        <span class="visually-hidden" id="save-filters-empty-hint">
+            Add a filter before saving as a Filter Set.
+        </span>
+        <span class="visually-hidden" id="clear-filters-empty-hint">
+            There are no filters to clear.
+        </span>
+
+        @if (HasFilters || FilterProgressState.Value.IsLoading)
+        {
+            <span aria-label="@(_isFilterListVisible ? "Filters Expanded" : "Filters Collapsed")"
+                class="menu-toggle"
+                data-rotate="@MenuState"
+                @onclick="ToggleMenu"
+                @onkeydown="HandleKeyDown"
+                role="button"
+                tabindex="0">
+                <i class="bi bi-caret-up"></i>
+            </span>
+        }
+    </div>
+</div>
+
+<div class="filter-set" data-toggle="@MenuState">
+    @if (IsDateFilterVisible)
+    {
+        <EditForm class="filter-form flex-row" Model="_model">
+            <span>
+                After:
+                <InputDate aria-label="After" @bind-Value="_model.After" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
+            </span>
+            <span>
+                Before:
+                <InputDate aria-label="Before" @bind-Value="_model.Before" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
+            </span>
+
+            @if (_canEditDate)
+            {
                 <span>
-                    After:
-                    <InputDate aria-label="After" @bind-Value="_model.After" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
-                </span>
-                <span>
-                    Before:
-                    <InputDate aria-label="Before" @bind-Value="_model.Before" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
+                    Quick range:
+                    <DateRangeQuickPick AriaLabel="Quick date range" CssClass="input filter-datetime" OnRangeSelected="SetQuickDateRange" />
                 </span>
 
-                @if (_canEditDate)
+                <button class="button button-green" @onclick="ApplyDateFilter" type="button">
+                    <i class="bi bi-check-circle"></i> Apply
+                </button>
+
+                <button class="button button-red" @onclick="RemoveDateFilter" type="button">
+                    <i class="bi bi-dash-circle"></i> Remove
+                </button>
+            }
+            else
+            {
+                <button class="button" @onclick="EditDateFilter" type="button">
+                    <i class="bi bi-funnel"></i> Edit
+                </button>
+
+                <button class="button button-red" @onclick="RemoveDateFilter" type="button">
+                    <i class="bi bi-dash-circle"></i> Remove
+                </button>
+
+                @if (FilterPaneState.Value.FilteredDateRange?.IsEnabled is true)
                 {
-                    <button class="button button-green" @onclick="ApplyDateFilter">
-                        <i class="bi bi-check-circle"></i> Apply
-                    </button>
-
-                    <button class="button button-red" @onclick="RemoveDateFilter" type="button">
-                        <i class="bi bi-dash-circle"></i> Remove
+                    <button class="button button-red" @onclick="ToggleDateFilter" type="button">
+                        <i class="bi bi-dash-circle"></i> Disable
                     </button>
                 }
                 else
                 {
-                    <button class="button" @onclick="EditDateFilter">
-                        <i class="bi bi-funnel"></i> Edit
+                    <button class="button button-green" @onclick="ToggleDateFilter" type="button">
+                        <i class="bi bi-plus-circle"></i> Enable
                     </button>
-
-                    <button class="button button-red" @onclick="RemoveDateFilter" type="button">
-                        <i class="bi bi-dash-circle"></i> Remove
-                    </button>
-
-                    @if (FilterPaneState.Value.FilteredDateRange?.IsEnabled is true)
-                    {
-                        <button class="button button-red" @onclick="ToggleDateFilter">
-                            <i class="bi bi-dash-circle"></i> Disable
-                        </button>
-                    }
-                    else
-                    {
-                        <button class="button button-green" @onclick="ToggleDateFilter">
-                            <i class="bi bi-plus-circle"></i> Enable
-                        </button>
-                    }
                 }
-            </EditForm>
-        }
+            }
+        </EditForm>
+    }
 
-        @if (IsFilterSetPickerVisible)
-        {
-            <div class="filter-form flex-row">
-                @if (HasFilterSets)
+    @if (IsFilterSetPickerVisible)
+    {
+        <div class="filter-form flex-row">
+            @if (HasFilterSets)
+            {
+                @if (AvailableFilterSetTags is { Count: > 0 } setTags)
                 {
-                    @if (AvailableFilterSetTags is { Count: > 0 } setTags)
-                    {
-                        <span>
-                            Tags:
-                            <ValueSelect AriaLabel="Narrow filter sets by tag"
-                                CssClass="input filter-multiselect-dropdown"
-                                EmptyText="All tags"
-                                IsMultiSelect="true"
-                                T="string"
-                                Values="_filterSetTags"
-                                ValuesChanged="OnFilterSetTagsChanged">
-                                <ValueSelectItem ClearItem T="string">All tags</ValueSelectItem>
-                                @foreach (var tag in setTags)
-                                {
-                                    <ValueSelectItem T="string" Value="@tag">@tag</ValueSelectItem>
-                                }
-                            </ValueSelect>
-                        </span>
-                    }
-
                     <span>
-                        Filter Set:
-                        <ValueSelect AriaLabel="Filter Set"
-                            CssClass="input filter-set-dropdown"
-                            T="LibraryEntryId"
-                            ToStringFunc="@(GetFilterSetName)"
-                            Value="SelectedFilterSetId"
-                            ValueChanged="id => SelectedFilterSetId = id">
-                            @foreach (var filterSet in VisibleFilterSets)
+                        Tags:
+                        <ValueSelect AriaLabel="Narrow filter sets by tag"
+                            CssClass="input filter-multiselect-dropdown"
+                            EmptyText="All tags"
+                            IsMultiSelect="true"
+                            T="string"
+                            Values="_filterSetTags"
+                            ValuesChanged="OnFilterSetTagsChanged">
+                            <ValueSelectItem ClearItem T="string">All tags</ValueSelectItem>
+                            @foreach (var tag in setTags)
                             {
-                                <ValueSelectItem T="LibraryEntryId" Value="filterSet.Id">
-                                    <span class="filter-set-option-row" title="@FormatFilterSetLabel(filterSet)">
-                                        <span class="filter-set-option-name">@filterSet.Name</span>
-                                        <span class="filter-set-option-meta">(@FormatFilterSetDetail(filterSet))</span>
-                                    </span>
-                                </ValueSelectItem>
+                                <ValueSelectItem T="string" Value="@tag">@tag</ValueSelectItem>
                             }
                         </ValueSelect>
                     </span>
-
-                    <button class="button button-green" disabled="@(SelectedFilterSetId == default)" @onclick="ApplyFilterSetSelection">
-                        <i class="bi bi-check-circle"></i> Apply
-                    </button>
-                }
-                else
-                {
-                    <span class="filter-empty-state">
-                        @if (HasSavableFilters)
-                        {
-                            @:No saved filter sets yet — use <strong>Save as Filter Set</strong> on the right
-                            @:to create one from the current pane.
-                        }
-                        else
-                        {
-                            @:No saved filter sets yet. Add and apply filters first, then use
-                            @:<strong>Save as Filter Set</strong> on the right to create one.
-                        }
-                    </span>
                 }
 
-                <button class="button button-red" @onclick="CancelFilterSetPicker" type="button">
-                    <i class="bi bi-dash-circle"></i> Cancel
+                <span>
+                    Filter Set:
+                    <ValueSelect AriaLabel="Filter Set"
+                        CssClass="input filter-set-dropdown"
+                        T="LibraryEntryId"
+                        ToStringFunc="@(GetFilterSetName)"
+                        Value="SelectedFilterSetId"
+                        ValueChanged="id => SelectedFilterSetId = id">
+                        @foreach (var filterSet in VisibleFilterSets)
+                        {
+                            <ValueSelectItem T="LibraryEntryId" Value="filterSet.Id">
+                                <span class="filter-set-option-row" title="@FormatFilterSetLabel(filterSet)">
+                                    <span class="filter-set-option-name">@filterSet.Name</span>
+                                    <span class="filter-set-option-meta">(@FormatFilterSetDetail(filterSet))</span>
+                                </span>
+                            </ValueSelectItem>
+                        }
+                    </ValueSelect>
+                </span>
+
+                <button class="button button-green" disabled="@(SelectedFilterSetId == default)" @onclick="ApplyFilterSetSelection">
+                    <i class="bi bi-check-circle"></i> Apply
                 </button>
-            </div>
+
+                <button aria-label="Replace filters with selected filter set"
+                    class="button"
+                    disabled="@(SelectedFilterSetId == default)"
+                    @onclick="ReplaceFilterSetSelection"
+                    type="button">
+                    <i class="bi bi-arrow-repeat"></i> Replace
+                </button>
+            }
+            else
+            {
+                <span class="filter-empty-state">
+                    @if (HasSavableFilters)
+                    {
+                        @:No saved filter sets yet - use <strong>Save as Filter Set</strong> on the right
+                        @:to create one from the current pane.
+                    }
+                    else
+                    {
+                        @:No saved filter sets yet. Add and apply filters first, then use
+                        @:<strong>Save as Filter Set</strong> on the right to create one.
+                    }
+                </span>
+            }
+
+            <button class="button button-red" @onclick="CancelFilterSetPicker" type="button">
+                <i class="bi bi-dash-circle"></i> Cancel
+            </button>
+        </div>
+    }
+
+    @if (IsScenarioPickerVisible)
+    {
+        <div class="filter-form flex-row" id="scenario-picker">
+            @if (ScenarioMatchGroups.Count > 0)
+            {
+                @foreach (var group in ScenarioMatchGroups)
+                {
+                    <div class="scenario-picker-group">
+                        <span class="scenario-picker-group-header">@group.Key.DisplayName()</span>
+
+                        @foreach (var scenario in group)
+                        {
+                            <span class="scenario-picker-row" title="@scenario.Purpose">
+                                <span class="scenario-picker-name">@scenario.Name</span>
+
+                                <button aria-label="@($"Apply scenario {scenario.Name}")"
+                                    class="button button-green"
+                                    @onclick="() => ApplyScenario(scenario, false)"
+                                    type="button">
+                                    <i class="bi bi-check-circle"></i> Apply
+                                </button>
+
+                                <button aria-label="@($"Replace filters with scenario {scenario.Name}")"
+                                    class="button"
+                                    @onclick="() => ApplyScenario(scenario, true)"
+                                    type="button">
+                                    <i class="bi bi-arrow-repeat"></i> Replace
+                                </button>
+                            </span>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                <span class="filter-empty-state" role="status">No scenarios match the loaded logs.</span>
+            }
+
+            <button class="button button-red" @onclick="CancelScenarioPicker" type="button">
+                <i class="bi bi-dash-circle"></i> Cancel
+            </button>
+        </div>
+    }
+
+    <CascadingValue IsFixed="true" Value="_authoringContext">
+        @foreach (var item in FilterPaneState.Value.Filters)
+        {
+            <FilterRow Id="@ComponentId.For(item.Id, ComponentIdScope.PaneFilter).Value"
+                @key="item.Id"
+                OnDisposed="@OnRowDisposed"
+                OnRemoved="HandleRemovedFilter"
+                @ref="_rowRefs[item.Id]"
+                Value="item" />
         }
 
-        <CascadingValue IsFixed="true" Value="_authoringContext">
-            @foreach (var item in FilterPaneState.Value.Filters)
-            {
-                <FilterRow Id="@ComponentId.For(item.Id, ComponentIdScope.PaneFilter).Value"
-                    @key="item.Id"
-                    OnDisposed="@OnRowDisposed"
-                    OnRemoved="HandleRemovedFilter"
-                    @ref="_rowRefs[item.Id]"
-                    Value="item" />
-            }
-
-            @foreach (var draft in _pendingDrafts)
-            {
-                <FilterRow Id="@ComponentId.For(draft.Id, ComponentIdScope.PanePendingFilter).Value"
-                    @key="draft.Id"
-                    OnPendingDiscard="() => HandlePendingDiscard(draft)"
-                    OnPendingSave="filter => HandlePendingSave(draft, filter)"
-                    PendingDraft="draft" />
-            }
-        </CascadingValue>
-    </div>
+        @foreach (var draft in _pendingDrafts)
+        {
+            <FilterRow Id="@ComponentId.For(draft.Id, ComponentIdScope.PanePendingFilter).Value"
+                @key="draft.Id"
+                OnPendingDiscard="() => HandlePendingDiscard(draft)"
+                OnPendingSave="filter => HandlePendingSave(draft, filter)"
+                PendingDraft="draft" />
+        }
+    </CascadingValue>
+</div>
 </div>
