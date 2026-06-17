@@ -145,6 +145,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IFilterPaneCommands))]
     [InlineData(typeof(ILogTableCommands))]
     [InlineData(typeof(IScenarioFavoriteCommands))]
+    [InlineData(typeof(IEventLogQueries))]
     // UI capabilities.
     [InlineData(typeof(IHighlightSelector))]
     [InlineData(typeof(ILogTableColumnDefaultsProvider))]

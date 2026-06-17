@@ -36,6 +36,7 @@ namespace EventLogExpert.UI.Tests.FilterPane;
 public sealed class FilterPaneTests : BunitContext
 {
     private readonly IAnnouncementService _announcements = Substitute.For<IAnnouncementService>();
+    private readonly IEventLogQueries _eventLogQueries = Substitute.For<IEventLogQueries>();
     private readonly IState<EventLogState> _eventLogStateMock = Substitute.For<IState<EventLogState>>();
     private readonly IFilterLibraryCommands _filterLibraryCommands = Substitute.For<IFilterLibraryCommands>();
     private readonly IFilterPaneCommands _filterPaneCommands = Substitute.For<IFilterPaneCommands>();
@@ -75,12 +76,35 @@ public sealed class FilterPaneTests : BunitContext
 
         _eventLogStateMock.Value.Returns(new EventLogState());
         Services.AddSingleton(_eventLogStateMock);
+        Services.AddSingleton(_eventLogQueries);
 
         _settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
 
         Services.AddFluxor(options => options.ScanAssemblies(typeof(UI.FilterPane.FilterPane).Assembly));
 
         JSInterop.Mode = JSRuntimeMode.Loose;
+    }
+
+    [Fact]
+    public void AddDateFilter_PreFillsModelFromEventLogQueriesRange()
+    {
+        var timeZone = TimeZoneInfo.CreateCustomTimeZone("F1Plus05", TimeSpan.FromHours(5), "F1Plus05", "F1Plus05");
+        _settings.TimeZoneInfo.Returns(timeZone);
+        var after = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var before = new DateTime(2020, 1, 2, 8, 0, 0, DateTimeKind.Utc);
+        _eventLogQueries.GetEventDateRange(Arg.Any<DateTime>()).Returns((after, before));
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        typeof(UI.FilterPane.FilterPane)
+            .GetMethod("AddDateFilter", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(component.Instance, null);
+
+        var model = (DateFilter)typeof(UI.FilterPane.FilterPane)
+            .GetField("_model", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(component.Instance)!;
+        _eventLogQueries.Received(1).GetEventDateRange(Arg.Any<DateTime>());
+        Assert.Equal(TimeZoneInfo.ConvertTimeFromUtc(after, timeZone), model.After!.Value);
+        Assert.Equal(TimeZoneInfo.ConvertTimeFromUtc(before, timeZone), model.Before!.Value);
     }
 
     [Fact]

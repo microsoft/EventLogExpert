@@ -85,6 +85,8 @@ public sealed partial class FilterPane
             ? group
             : ScenarioMatchGroups.FirstOrDefault()?.Key;
 
+    [Inject] private IEventLogQueries EventLogQueries { get; init; } = null!;
+
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
@@ -489,7 +491,7 @@ public sealed partial class FilterPane
     {
         _currentTimeZone = Settings.TimeZoneInfo;
 
-        var (after, before) = EventLogState.Value.ActiveLogs.Values.GetEventDateRange(DateTime.UtcNow);
+        var (after, before) = EventLogQueries.GetEventDateRange(DateTime.UtcNow);
 
         _model.After = after.ConvertTimeZone(_currentTimeZone);
         _model.Before = before.ConvertTimeZone(_currentTimeZone);
