@@ -43,7 +43,7 @@ public sealed class FilterServiceTests
         var filter = new Filter(null, []);
 
         // Act + Assert — Dictionary.Add throws on the duplicate key.
-        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(logData, filter));
+        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(ToFilterInput(logData), filter));
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public sealed class FilterServiceTests
         var logData = new List<EventLogData> { original, duplicate };
 
         // Act + Assert
-        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(logData, filter));
+        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(ToFilterInput(logData), filter));
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public sealed class FilterServiceTests
             .ToList();
 
         // Act
-        var result = filterService.FilterActiveLogs(logData, filter);
+        var result = filterService.FilterActiveLogs(ToFilterInput(logData), filter);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -164,7 +164,7 @@ public sealed class FilterServiceTests
         var filter = new Filter(null, []);
 
         // Act
-        var result = filterService.FilterActiveLogs(logData, filter);
+        var result = filterService.FilterActiveLogs(ToFilterInput(logData), filter);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -189,7 +189,7 @@ public sealed class FilterServiceTests
         var filter = new Filter(null, []);
 
         // Act
-        var result = filterService.FilterActiveLogs(logData, filter);
+        var result = filterService.FilterActiveLogs(ToFilterInput(logData), filter);
 
         // Assert
         Assert.Equal(log1Events.Count, result[logData[0].Id].Count);
@@ -216,7 +216,7 @@ public sealed class FilterServiceTests
         var filter = new Filter(null, []);
 
         // Act
-        var result = filterService.FilterActiveLogs(logData, filter);
+        var result = filterService.FilterActiveLogs(ToFilterInput(logData), filter);
 
         // Assert
         var logId = logData[0].Id;
@@ -917,4 +917,8 @@ public sealed class FilterServiceTests
             []);
 
     private static FilterService CreateFilterService() => new();
+
+    private static IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> ToFilterInput(
+        IEnumerable<EventLogData> logs) =>
+        logs.Select(log => (log.Id, log.Events)).ToList();
 }

@@ -57,4 +57,28 @@ internal sealed class RawEventStoreReducers
 
         return changed ? state with { ByLog = builder.ToImmutable() } : state;
     }
+
+    [ReducerMethod]
+    public static RawEventStoreState ReduceLoadEvents(RawEventStoreState state, LoadEventsAction action)
+    {
+        if (!state.ByLog.TryGetValue(action.LogData.Id, out var existing)) { return state; }
+
+        var updated = RawEventList.Empty.Append(action.Events);
+
+        return ReferenceEquals(updated, existing)
+            ? state
+            : state with { ByLog = state.ByLog.SetItem(action.LogData.Id, updated) };
+    }
+
+    [ReducerMethod]
+    public static RawEventStoreState ReduceLoadEventsPartial(RawEventStoreState state, LoadEventsPartialAction action)
+    {
+        if (!state.ByLog.TryGetValue(action.LogData.Id, out var existing)) { return state; }
+
+        var updated = existing.Append(action.Events);
+
+        return ReferenceEquals(updated, existing)
+            ? state
+            : state with { ByLog = state.ByLog.SetItem(action.LogData.Id, updated) };
+    }
 }

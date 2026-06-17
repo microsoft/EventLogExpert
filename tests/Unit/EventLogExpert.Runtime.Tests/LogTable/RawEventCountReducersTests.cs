@@ -6,6 +6,8 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
 using CloseLogAction = EventLogExpert.Runtime.LogTable.CloseLogAction;
+using LoadEventsAction = EventLogExpert.Runtime.EventLog.LoadEventsAction;
+using LoadEventsPartialAction = EventLogExpert.Runtime.EventLog.LoadEventsPartialAction;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
 
@@ -53,6 +55,38 @@ public sealed class RawEventCountReducersTests
         AssertInSync(store, count);
         Assert.True(count.ByLog.IsEmpty);
         Assert.Equal(0, count.Total);
+    }
+
+    [Fact]
+    public void CountState_MirrorsStore_AcrossLoadLifecycle()
+    {
+        var store = new RawEventStoreState();
+        var count = new RawEventCountState();
+        var logA = new EventLogData("LogA", LogPathType.Channel, []);
+
+        (store, count) = AddTable(store, count, logA);
+        AssertInSync(store, count);
+
+        (store, count) = LoadPartial(store, count, logA, Events(1, 3));
+        AssertInSync(store, count);
+
+        (store, count) = LoadPartial(store, count, logA, Events(10, 2));
+        AssertInSync(store, count);
+        Assert.Equal(5, count.ByLog[logA.Id]);
+
+        (store, count) = Load(store, count, logA, Events(100, 1));
+        AssertInSync(store, count);
+        Assert.Equal(1, count.ByLog[logA.Id]);
+
+        var unopened = new EventLogData("LogB", LogPathType.Channel, []);
+        (store, count) = Load(store, count, unopened, Events(1, 4));
+        AssertInSync(store, count);
+        Assert.False(count.ByLog.ContainsKey(unopened.Id));
+
+        (store, count) = CloseLog(store, count, logA.Id);
+        (store, count) = LoadPartial(store, count, logA, Events(200, 2));
+        AssertInSync(store, count);
+        Assert.False(count.ByLog.ContainsKey(logA.Id));
     }
 
     [Fact]
@@ -133,5 +167,29 @@ public sealed class RawEventCountReducersTests
 
         return (RawEventStoreReducers.ReduceIngestRawEvents(store, action),
             RawEventCountReducers.ReduceIngestRawEvents(count, action));
+    }
+
+    private static (RawEventStoreState, RawEventCountState) Load(
+        RawEventStoreState store,
+        RawEventCountState count,
+        EventLogData log,
+        IReadOnlyList<ResolvedEvent> events)
+    {
+        var action = new LoadEventsAction(log, events);
+
+        return (RawEventStoreReducers.ReduceLoadEvents(store, action),
+            RawEventCountReducers.ReduceLoadEvents(count, action));
+    }
+
+    private static (RawEventStoreState, RawEventCountState) LoadPartial(
+        RawEventStoreState store,
+        RawEventCountState count,
+        EventLogData log,
+        IReadOnlyList<ResolvedEvent> events)
+    {
+        var action = new LoadEventsPartialAction(log, events);
+
+        return (RawEventStoreReducers.ReduceLoadEventsPartial(store, action),
+            RawEventCountReducers.ReduceLoadEventsPartial(count, action));
     }
 }

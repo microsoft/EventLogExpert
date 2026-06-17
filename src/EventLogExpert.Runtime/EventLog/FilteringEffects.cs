@@ -16,6 +16,7 @@ namespace EventLogExpert.Runtime.EventLog;
 
 internal sealed class FilteringEffects(
     IState<EventLogState> eventLogState,
+    IState<RawEventStoreState> rawEventStore,
     IFilterService filterService,
     ITraceLogger logger,
     LogCloseCoordinator closeCoordinator,
@@ -26,6 +27,7 @@ internal sealed class FilteringEffects(
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IFilterService _filterService = filterService;
     private readonly ITraceLogger _logger = logger;
+    private readonly IState<RawEventStoreState> _rawEventStore = rawEventStore;
 
     [EffectMethod]
     public Task HandleAddEvent(AddEventAction action, IDispatcher dispatcher)
@@ -38,8 +40,6 @@ internal sealed class FilteringEffects(
                 _eventLogState.Value.ActiveLogs,
                 [action.NewEvent]);
 
-            dispatcher.Dispatch(new AddEventSuccessAction(activeLogs));
-
             if (!activeLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog))
             {
                 return Task.CompletedTask;
@@ -50,6 +50,8 @@ internal sealed class FilteringEffects(
             dispatcher.Dispatch(new IngestRawEventsAction(
                 new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [owningLog.Id] = [action.NewEvent] },
                 RawIngestMode.Prepend));
+
+            dispatcher.Dispatch(new AddEventSuccessAction(activeLogs));
 
             var filteredNew = _filterService.GetFilteredEvents(
                 [action.NewEvent],
@@ -118,53 +120,52 @@ internal sealed class FilteringEffects(
 
     private async Task ApplyFilterAndPublishAsync(Filter filter, long filterToken, IDispatcher dispatcher)
     {
-        var activeLogsSnapshot = _eventLogState.Value.ActiveLogs.Values.ToList();
+        var snapshot = SnapshotOpenLogEvents();
 
         dispatcher.Dispatch(new SetFilterProgressAction(true));
 
         try
         {
-            var filteredActiveLogs = await Task.Run(() => _filterService.FilterActiveLogs(activeLogsSnapshot, filter));
+            var filteredActiveLogs = await Task.Run(() => _filterService.FilterActiveLogs(snapshot, filter));
 
             if (_concurrencyState.GetCurrentFilterToken() != filterToken) { return; }
 
-            var snapshotById = activeLogsSnapshot.ToDictionary(d => d.Id);
-            var currentByName = _eventLogState.Value.ActiveLogs;
+            var snapshotById = snapshot.ToDictionary(pair => pair.Id, pair => pair.Events);
+            var currentRaw = _rawEventStore.Value.ByLog;
             var fresh = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>(filteredActiveLogs.Count);
-            var staleLogs = new List<EventLogData>();
+            var staleIds = new List<EventLogId>();
 
             foreach (var (logId, filteredEvents) in filteredActiveLogs)
             {
-                if (!snapshotById.TryGetValue(logId, out var snapshotData)) { continue; }
+                if (!snapshotById.TryGetValue(logId, out var snapshotEvents)) { continue; }
 
-                if (!currentByName.TryGetValue(snapshotData.Name, out var currentData)) { continue; }
-
-                if (ReferenceEquals(snapshotData.Events, currentData.Events))
+                if (currentRaw.TryGetValue(logId, out var currentEvents) &&
+                    ReferenceEquals(snapshotEvents, currentEvents))
                 {
                     fresh[logId] = filteredEvents;
                 }
                 else
                 {
-                    staleLogs.Add(currentData);
+                    staleIds.Add(logId);
                 }
             }
 
-            if (staleLogs.Count > 0)
+            if (staleIds.Count > 0)
             {
-                var refiltered = await Task.Run(() => _filterService.FilterActiveLogs(staleLogs, filter));
+                var pass2Snapshot = SnapshotEventsForLogs(staleIds);
+                var refiltered = await Task.Run(() => _filterService.FilterActiveLogs(pass2Snapshot, filter));
 
                 if (_concurrencyState.GetCurrentFilterToken() != filterToken) { return; }
 
-                var pass2InputById = staleLogs.ToDictionary(d => d.Id);
-                currentByName = _eventLogState.Value.ActiveLogs;
+                var pass2InputById = pass2Snapshot.ToDictionary(pair => pair.Id, pair => pair.Events);
+                var nowRaw = _rawEventStore.Value.ByLog;
 
                 foreach (var (logId, filteredEvents) in refiltered)
                 {
-                    if (!pass2InputById.TryGetValue(logId, out var pass2Input)) { continue; }
+                    if (!pass2InputById.TryGetValue(logId, out var pass2Events)) { continue; }
 
-                    if (!currentByName.TryGetValue(pass2Input.Name, out var nowCurrent)) { continue; }
-
-                    if (ReferenceEquals(pass2Input.Events, nowCurrent.Events))
+                    if (nowRaw.TryGetValue(logId, out var nowEvents) &&
+                        ReferenceEquals(pass2Events, nowEvents))
                     {
                         fresh[logId] = filteredEvents;
                     }
@@ -295,5 +296,38 @@ internal sealed class FilteringEffects(
         {
             _closeCoordinator.ReleaseCoordinatorLock();
         }
+    }
+
+    private List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> SnapshotEventsForLogs(
+        IReadOnlyList<EventLogId> logIds)
+    {
+        var raw = _rawEventStore.Value.ByLog;
+        var snapshot = new List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>();
+
+        foreach (var logId in logIds)
+        {
+            if (raw.TryGetValue(logId, out var events))
+            {
+                snapshot.Add((logId, events));
+            }
+        }
+
+        return snapshot;
+    }
+
+    private List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> SnapshotOpenLogEvents()
+    {
+        var raw = _rawEventStore.Value.ByLog;
+        var snapshot = new List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>();
+
+        foreach (var info in _eventLogState.Value.OpenLogs.Values)
+        {
+            if (raw.TryGetValue(info.Id, out var events))
+            {
+                snapshot.Add((info.Id, events));
+            }
+        }
+
+        return snapshot;
     }
 }

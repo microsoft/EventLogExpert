@@ -30,14 +30,6 @@ internal sealed class LogReloadEffects(
 
         dispatcher.Dispatch(new UpdateTableAction(action.LogData.Id, filteredEvents));
 
-        if (_eventLogState.Value.ActiveLogs.TryGetValue(action.LogData.Name, out var ingestTarget) &&
-            ingestTarget.Id == action.LogData.Id)
-        {
-            dispatcher.Dispatch(new IngestRawEventsAction(
-                new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [action.LogData.Id] = action.Events },
-                RawIngestMode.Replace));
-        }
-
         if (!_closeCoordinator.TryConsumePendingRestore(action.LogData.Name, out var pending) ||
             pending is null ||
             (pending.SelectedIds.Count <= 0 && !pending.SelectedId.HasValue))
@@ -68,14 +60,6 @@ internal sealed class LogReloadEffects(
 
         _coordinator.Enqueue(action.LogData.Id, filteredEvents);
 
-        if (_eventLogState.Value.ActiveLogs.TryGetValue(action.LogData.Name, out var ingestTarget) &&
-            ingestTarget.Id == action.LogData.Id)
-        {
-            dispatcher.Dispatch(new IngestRawEventsAction(
-                new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [action.LogData.Id] = action.Events },
-                RawIngestMode.Append));
-        }
-
         return Task.CompletedTask;
     }
 
@@ -93,8 +77,6 @@ internal sealed class LogReloadEffects(
         IFilterService filterService)
     {
         var activeLogs = EventLogEffectsUtility.DistributeEventsToManyLogs(state.ActiveLogs, state.NewEventBuffer);
-
-        dispatcher.Dispatch(new AddEventSuccessAction(activeLogs));
 
         var batched = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>();
         var grouped = new Dictionary<EventLogId, List<ResolvedEvent>>();
@@ -120,6 +102,8 @@ internal sealed class LogReloadEffects(
         {
             dispatcher.Dispatch(new IngestRawEventsAction(rawByLog, RawIngestMode.Prepend));
         }
+
+        dispatcher.Dispatch(new AddEventSuccessAction(activeLogs));
 
         foreach (var (logId, events) in grouped)
         {

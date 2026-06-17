@@ -45,18 +45,38 @@ internal sealed class RawEventCountReducers
             var updated = action.Mode switch
             {
                 RawIngestMode.Replace => events.Count,
-                RawIngestMode.Append => existing + events.Count,
-                RawIngestMode.Prepend => existing + events.Count,
+                RawIngestMode.Append or RawIngestMode.Prepend => existing + events.Count,
                 _ => throw new ArgumentOutOfRangeException(nameof(action), action.Mode, "Unknown raw ingest mode.")
             };
 
-            if (updated != existing)
-            {
-                builder[logId] = updated;
-                changed = true;
-            }
+            if (updated == existing) { continue; }
+
+            builder[logId] = updated;
+            changed = true;
         }
 
         return changed ? state with { ByLog = builder.ToImmutable() } : state;
+    }
+
+    [ReducerMethod]
+    public static RawEventCountState ReduceLoadEvents(RawEventCountState state, LoadEventsAction action)
+    {
+        if (!state.ByLog.TryGetValue(action.LogData.Id, out var existing)) { return state; }
+
+        return existing == action.Events.Count
+            ? state
+            : state with { ByLog = state.ByLog.SetItem(action.LogData.Id, action.Events.Count) };
+    }
+
+    [ReducerMethod]
+    public static RawEventCountState ReduceLoadEventsPartial(RawEventCountState state, LoadEventsPartialAction action)
+    {
+        if (!state.ByLog.TryGetValue(action.LogData.Id, out var existing)) { return state; }
+
+        var updated = existing + action.Events.Count;
+
+        return updated == existing
+            ? state
+            : state with { ByLog = state.ByLog.SetItem(action.LogData.Id, updated) };
     }
 }
