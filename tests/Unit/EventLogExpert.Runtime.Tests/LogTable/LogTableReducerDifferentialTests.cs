@@ -91,7 +91,7 @@ public sealed class LogTableReducerDifferentialTests
 
         private LogModel AddLog()
         {
-            var data = new EventLogData($"Log{_logs.Count}", LogPathType.Channel, []);
+            var data = new EventLogData($"Log{_logs.Count}", LogPathType.Channel);
             var model = new LogModel(data.Id, data.Name, new DateTime(2026, 1, 1).AddDays(_logs.Count));
             _logs.Add(model);
             State = Reducers.ReduceAddTable(State, new AddTableAction(data));

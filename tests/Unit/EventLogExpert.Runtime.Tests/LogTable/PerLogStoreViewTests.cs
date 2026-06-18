@@ -21,7 +21,7 @@ public sealed class PerLogStoreViewTests
     [Fact]
     public void Assemble_JoinsMetadataRawEventsAndDisplayList()
     {
-        var logData = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
         var displayed = new ResolvedEvent(Constants.LogNameLog1, LogPathType.Channel) { Id = 1, RecordId = 10 };
 
         var logTable = new LogTableState();
@@ -43,7 +43,7 @@ public sealed class PerLogStoreViewTests
     [Fact]
     public void Assemble_RawEventsContainFilterHiddenEventsAbsentFromDisplayList()
     {
-        var logData = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
         var shown = new ResolvedEvent(Constants.LogNameLog1, LogPathType.Channel) { Id = 1, RecordId = 10 };
         var hidden = new ResolvedEvent(Constants.LogNameLog1, LogPathType.Channel) { Id = 2, RecordId = 20 };
 
@@ -69,7 +69,7 @@ public sealed class PerLogStoreViewTests
     [Fact]
     public void Assemble_WhenNoFilteredRowsYet_FallsBackToAnEmptyDisplayList()
     {
-        var logData = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
 
         var logTable = new LogTableState();
         logTable = LogTableReducers.ReduceAddTable(logTable, new AddTableAction(logData));
@@ -94,8 +94,8 @@ public sealed class PerLogStoreViewTests
     [Fact]
     public void AssembleAll_SkipsTheCombinedTab()
     {
-        var log1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
-        var log2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
+        var log1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
+        var log2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel);
 
         var logTable = new LogTableState();
         logTable = LogTableReducers.ReduceAddTable(logTable, new AddTableAction(log1));

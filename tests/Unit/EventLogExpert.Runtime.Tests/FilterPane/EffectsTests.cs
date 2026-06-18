@@ -198,10 +198,9 @@ public sealed class EffectsTests
             FilterEventBuilder.CreateTestEvent(timeCreated: oldest)
         };
 
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
 
-        var (effects, mockDispatcher) = CreateEffects(activeLogs: activeLogs);
+        var (effects, mockDispatcher) = CreateEffects(logsWithEvents: [(logData, events)]);
         var action = new SetFilterDateRangeAction(new DateFilter { Before = unrelatedBefore });
 
         // Act
@@ -229,10 +228,9 @@ public sealed class EffectsTests
             FilterEventBuilder.CreateTestEvent(timeCreated: oldest)
         };
 
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
 
-        var (effects, mockDispatcher) = CreateEffects(activeLogs: activeLogs);
+        var (effects, mockDispatcher) = CreateEffects(logsWithEvents: [(logData, events)]);
         var action = new SetFilterDateRangeAction(new DateFilter { After = unrelatedAfter });
 
         // Act
@@ -255,20 +253,26 @@ public sealed class EffectsTests
         var logBOldest = new DateTime(2024, 1, 5, 20, 0, 0, DateTimeKind.Utc);
         var logBNewest = new DateTime(2024, 1, 5, 22, 0, 0, DateTimeKind.Utc);
 
+        var eventsA = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(timeCreated: logANewest),
+            FilterEventBuilder.CreateTestEvent(timeCreated: logAOldest)
+        };
+
+        var eventsB = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(timeCreated: logBNewest),
+            FilterEventBuilder.CreateTestEvent(timeCreated: logBOldest)
+        };
+
         var logA = new EventLogData(
             "LogA",
-            LogPathType.Channel,
-            [FilterEventBuilder.CreateTestEvent(timeCreated: logANewest), FilterEventBuilder.CreateTestEvent(timeCreated: logAOldest)]);
+            LogPathType.Channel);
         var logB = new EventLogData(
             "LogB",
-            LogPathType.Channel,
-            [FilterEventBuilder.CreateTestEvent(timeCreated: logBNewest), FilterEventBuilder.CreateTestEvent(timeCreated: logBOldest)]);
+            LogPathType.Channel);
 
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty
-            .Add("LogA", logA)
-            .Add("LogB", logB);
-
-        var (effects, mockDispatcher) = CreateEffects(activeLogs: activeLogs);
+        var (effects, mockDispatcher) = CreateEffects(logsWithEvents: [(logA, eventsA), (logB, eventsB)]);
         var action = new SetFilterDateRangeAction(new DateFilter());
 
         // Act
@@ -537,7 +541,7 @@ public sealed class EffectsTests
         bool isEnabled = false,
         ImmutableList<SavedFilter>? filters = null,
         DateFilter? filteredDateRange = null,
-        ImmutableDictionary<string, EventLogData>? activeLogs = null,
+        IReadOnlyList<(EventLogData Log, IReadOnlyList<ResolvedEvent> Events)>? logsWithEvents = null,
         Filter? appliedFilter = null)
     {
         var mockFilterPaneState = Substitute.For<IState<FilterPaneState>>();
@@ -552,16 +556,16 @@ public sealed class EffectsTests
         var mockAppliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
         mockAppliedFilter.Value.Returns(appliedFilter ?? new Filter(null, []));
 
-        var logs = activeLogs ?? ImmutableDictionary<string, EventLogData>.Empty;
+        var logs = logsWithEvents ?? [];
         var rawStore = new RawEventStoreState();
 
-        foreach (var logData in logs.Values)
+        foreach (var (logData, logEvents) in logs)
         {
             rawStore = RawEventStoreReducers.ReduceAddTable(rawStore, new AddTableAction(logData));
             rawStore = RawEventStoreReducers.ReduceIngestRawEvents(
                 rawStore,
                 new IngestRawEventsAction(
-                    new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [logData.Id] = logData.Events },
+                    new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [logData.Id] = logEvents },
                     RawIngestMode.Append));
         }
 

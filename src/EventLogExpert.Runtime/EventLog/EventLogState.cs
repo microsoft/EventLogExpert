@@ -21,6 +21,12 @@ public sealed record EventLogState
     internal ImmutableDictionary<string, OpenLogInfo> OpenLogs { get; init; } =
         ImmutableDictionary<string, OpenLogInfo>.Empty;
 
+    internal ImmutableDictionary<string, ImmutableHashSet<string>> NamesByLog { get; init; } =
+        ImmutableDictionary<string, ImmutableHashSet<string>>.Empty;
+
+    public ImmutableHashSet<string> LoadedLogNames { get; init; } =
+        ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
+
     public bool IsLogOpen(string logPath) => OpenLogs.ContainsKey(logPath);
 
     public Filter AppliedFilter { get; init; } = new(null, []);

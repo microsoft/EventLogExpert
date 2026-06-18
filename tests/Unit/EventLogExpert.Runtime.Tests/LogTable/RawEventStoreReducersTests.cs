@@ -19,7 +19,7 @@ public sealed class RawEventStoreReducersTests
     [Fact]
     public void ReduceAddTable_SeedsAnEmptyRawEntryForTheRealLog()
     {
-        var logData = new EventLogData("LogA", LogPathType.Channel, []);
+        var logData = new EventLogData("LogA", LogPathType.Channel);
 
         var state = RawEventStoreReducers.ReduceAddTable(new RawEventStoreState(), new AddTableAction(logData));
 
@@ -95,6 +95,30 @@ public sealed class RawEventStoreReducersTests
     }
 
     [Fact]
+    public void ReduceLoadEvents_File_StoreAndEventLogReducers_AcceptAndRejectInLockstep()
+    {
+        var openLog = new EventLogData("LogA", LogPathType.File);
+
+        var eventLogState = new EventLogState
+        {
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(openLog.Name, openLog)
+        };
+
+        var rawState = RawEventStoreReducers.ReduceAddTable(new RawEventStoreState(), new AddTableAction(openLog));
+
+        var loadForOpenLog = new LoadEventsAction(openLog, [EvNamed(1, "Security"), EvNamed(2, "Setup")]);
+
+        Assert.NotSame(eventLogState, EventLogReducers.ReduceLoadEvents(eventLogState, loadForOpenLog));
+        Assert.NotSame(rawState, RawEventStoreReducers.ReduceLoadEvents(rawState, loadForOpenLog));
+
+        var staleReopenedLog = new EventLogData("LogA", LogPathType.File);
+        var loadForStaleId = new LoadEventsAction(staleReopenedLog, [EvNamed(3, "Security")]);
+
+        Assert.Same(eventLogState, EventLogReducers.ReduceLoadEvents(eventLogState, loadForStaleId));
+        Assert.Same(rawState, RawEventStoreReducers.ReduceLoadEvents(rawState, loadForStaleId));
+    }
+
+    [Fact]
     public void ReduceLoadEvents_ForAnOpenLog_ReplacesWithExactlyThoseEvents()
     {
         var (state, log) = OpenedLog();
@@ -108,37 +132,13 @@ public sealed class RawEventStoreReducersTests
     [Fact]
     public void ReduceLoadEvents_ForAnUnopenedLog_IsSkipped()
     {
-        var log = new EventLogData("LogA", LogPathType.Channel, []);
+        var log = new EventLogData("LogA", LogPathType.Channel);
 
         var state = RawEventStoreReducers.ReduceLoadEvents(
             new RawEventStoreState(),
             new LoadEventsAction(log, [Ev(1)]));
 
         Assert.False(state.ByLog.ContainsKey(log.Id));
-    }
-
-    [Fact]
-    public void ReduceLoadEvents_StoreAndEventLogReducers_AcceptAndRejectInLockstep()
-    {
-        var openLog = new EventLogData("LogA", LogPathType.Channel, []);
-
-        var eventLogState = new EventLogState
-        {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(openLog.Name, openLog)
-        };
-
-        var rawState = RawEventStoreReducers.ReduceAddTable(new RawEventStoreState(), new AddTableAction(openLog));
-
-        var loadForOpenLog = new LoadEventsAction(openLog, [Ev(1), Ev(2)]);
-
-        Assert.NotSame(eventLogState, EventLogReducers.ReduceLoadEvents(eventLogState, loadForOpenLog));
-        Assert.NotSame(rawState, RawEventStoreReducers.ReduceLoadEvents(rawState, loadForOpenLog));
-
-        var staleReopenedLog = new EventLogData("LogA", LogPathType.Channel, []);
-        var loadForStaleId = new LoadEventsAction(staleReopenedLog, [Ev(3)]);
-
-        Assert.Same(eventLogState, EventLogReducers.ReduceLoadEvents(eventLogState, loadForStaleId));
-        Assert.Same(rawState, RawEventStoreReducers.ReduceLoadEvents(rawState, loadForStaleId));
     }
 
     [Fact]
@@ -165,7 +165,7 @@ public sealed class RawEventStoreReducersTests
     [Fact]
     public void ReduceLoadEventsPartial_ForAnUnopenedLog_IsSkipped()
     {
-        var log = new EventLogData("LogA", LogPathType.Channel, []);
+        var log = new EventLogData("LogA", LogPathType.Channel);
 
         var state = RawEventStoreReducers.ReduceLoadEventsPartial(
             new RawEventStoreState(),
@@ -175,6 +175,9 @@ public sealed class RawEventStoreReducersTests
     }
 
     private static ResolvedEvent Ev(int id) => new("LogA", LogPathType.Channel) { Id = id };
+
+    private static ResolvedEvent EvNamed(int id, string logName) =>
+        new("LogA", LogPathType.File) { Id = id, LogName = logName };
 
     private static RawEventStoreState Ingest(
         RawEventStoreState state,
@@ -196,7 +199,7 @@ public sealed class RawEventStoreReducersTests
 
     private static (RawEventStoreState State, EventLogData Log) OpenedLog()
     {
-        var logData = new EventLogData("LogA", LogPathType.Channel, []);
+        var logData = new EventLogData("LogA", LogPathType.Channel);
         var state = RawEventStoreReducers.ReduceAddTable(new RawEventStoreState(), new AddTableAction(logData));
 
         return (state, logData);

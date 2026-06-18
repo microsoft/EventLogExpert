@@ -79,7 +79,7 @@ public sealed class RawEventStoreStateExtensionsTests
 
     private static (RawEventStoreState State, EventLogId Id) OpenedOn(RawEventStoreState state, string name)
     {
-        var logData = new EventLogData(name, LogPathType.Channel, []);
+        var logData = new EventLogData(name, LogPathType.Channel);
 
         return (RawEventStoreReducers.ReduceAddTable(state, new AddTableAction(logData)), logData.Id);
     }

@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Compilation;
@@ -26,24 +25,20 @@ public sealed class FilterServiceTests
     [Fact]
     public void FilterActiveLogs_WhenDuplicateLogIds_ShouldThrowOnSequentialPath()
     {
-        // Arrange — two logs sharing the same Id (record-copy preserves Id).
         // logs.Count == 2 + IsFilteringEnabled false routes through the sequential path.
         var filterService = CreateFilterService();
-        var original = new EventLogData("Log1", LogPathType.Channel, [FilterEventBuilder.CreateTestEvent(100)]);
+        var sharedId = EventLogId.Create();
 
-        var duplicate = original with
+        var logData = new List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>
         {
-            Name = "Log2",
-            Events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(200) }.AsReadOnly()
+            (sharedId, [FilterEventBuilder.CreateTestEvent(100)]),
+            (sharedId, [FilterEventBuilder.CreateTestEvent(200)])
         };
 
-        Assert.Equal(original.Id, duplicate.Id);
-
-        var logData = new List<EventLogData> { original, duplicate };
         var filter = new Filter(null, []);
 
         // Act + Assert — Dictionary.Add throws on the duplicate key.
-        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(ToFilterInput(logData), filter));
+        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(logData, filter));
     }
 
     [Fact]
@@ -66,15 +61,16 @@ public sealed class FilterServiceTests
                 FilterEventBuilder.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
             .ToList();
 
-        var original = new EventLogData("Log1", LogPathType.Channel, log1Events);
-        var duplicate = original with { Name = "Log2", Events = log2Events };
+        var sharedId = EventLogId.Create();
 
-        Assert.Equal(original.Id, duplicate.Id);
-
-        var logData = new List<EventLogData> { original, duplicate };
+        var logData = new List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>
+        {
+            (sharedId, log1Events),
+            (sharedId, log2Events)
+        };
 
         // Act + Assert
-        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(ToFilterInput(logData), filter));
+        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(logData, filter));
     }
 
     [Fact]
@@ -112,10 +108,10 @@ public sealed class FilterServiceTests
                 FilterEventBuilder.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
             .ToList();
 
-        var logData = new List<EventLogData>
+        var logData = new List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>
         {
-            new("Log1", LogPathType.Channel, log1Events),
-            new("Log2", LogPathType.Channel, log2Events)
+            (EventLogId.Create(), log1Events),
+            (EventLogId.Create(), log2Events)
         };
 
         var expectedLog1 = log1Events
@@ -127,7 +123,7 @@ public sealed class FilterServiceTests
             .ToList();
 
         // Act
-        var result = filterService.FilterActiveLogs(ToFilterInput(logData), filter);
+        var result = filterService.FilterActiveLogs(logData, filter);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -155,16 +151,16 @@ public sealed class FilterServiceTests
             FilterEventBuilder.CreateTestEvent(300, level: FilterTestConstants.EventLevelError)
         };
 
-        var logData = new List<EventLogData>
+        var logData = new List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>
         {
-            new("Log1", LogPathType.Channel, log1Events),
-            new("Log2", LogPathType.Channel, log2Events)
+            (EventLogId.Create(), log1Events),
+            (EventLogId.Create(), log2Events)
         };
 
         var filter = new Filter(null, []);
 
         // Act
-        var result = filterService.FilterActiveLogs(ToFilterInput(logData), filter);
+        var result = filterService.FilterActiveLogs(logData, filter);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -180,16 +176,16 @@ public sealed class FilterServiceTests
         var log1Events = Enumerable.Range(0, 6_000).Select(i => FilterEventBuilder.CreateTestEvent(i)).ToList();
         var log2Events = Enumerable.Range(0, 6_000).Select(i => FilterEventBuilder.CreateTestEvent(i)).ToList();
 
-        var logData = new List<EventLogData>
+        var logData = new List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>
         {
-            new("Log1", LogPathType.Channel, log1Events),
-            new("Log2", LogPathType.Channel, log2Events)
+            (EventLogId.Create(), log1Events),
+            (EventLogId.Create(), log2Events)
         };
 
         var filter = new Filter(null, []);
 
         // Act
-        var result = filterService.FilterActiveLogs(ToFilterInput(logData), filter);
+        var result = filterService.FilterActiveLogs(logData, filter);
 
         // Assert
         Assert.Equal(log1Events.Count, result[logData[0].Id].Count);
@@ -208,15 +204,15 @@ public sealed class FilterServiceTests
             FilterEventBuilder.CreateTestEvent(200)
         };
 
-        var logData = new List<EventLogData>
+        var logData = new List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>
         {
-            new("TestLog", LogPathType.Channel, events)
+            (EventLogId.Create(), events)
         };
 
         var filter = new Filter(null, []);
 
         // Act
-        var result = filterService.FilterActiveLogs(ToFilterInput(logData), filter);
+        var result = filterService.FilterActiveLogs(logData, filter);
 
         // Assert
         var logId = logData[0].Id;
@@ -917,8 +913,4 @@ public sealed class FilterServiceTests
             []);
 
     private static FilterService CreateFilterService() => new();
-
-    private static IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> ToFilterInput(
-        IEnumerable<EventLogData> logs) =>
-        logs.Select(log => (log.Id, log.Events)).ToList();
 }

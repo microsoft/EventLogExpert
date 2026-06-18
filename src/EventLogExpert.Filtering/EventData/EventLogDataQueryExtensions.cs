@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Common.Filtering;
 using System.Globalization;
@@ -10,10 +9,6 @@ namespace EventLogExpert.Filtering.EventData;
 
 internal static class EventLogDataQueryExtensions
 {
-    /// <summary>Gets a distinct list of values for the specified <paramref name="property" />.</summary>
-    public static IEnumerable<string> GetEventValues(this EventLogData log, EventProperty property) =>
-        log.Events.GetEventValues(property);
-
     /// <summary>
     ///     Gets a distinct list of values for the specified <paramref name="property" /> across
     ///     <paramref name="events" />.

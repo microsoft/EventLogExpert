@@ -40,7 +40,7 @@
             <i class="bi bi-plus-circle"></i> Apply Filter Set
         </button>
 
-        @if (EventLogState.Value.ActiveLogs.Count > 0)
+        @if (OpenLogCount.Value > 0)
         {
             <button aria-controls="scenario-picker"
                 aria-expanded="@(IsScenarioPickerVisible ? "true" : "false")"

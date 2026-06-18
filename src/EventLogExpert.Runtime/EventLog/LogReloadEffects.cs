@@ -76,14 +76,12 @@ internal sealed class LogReloadEffects(
         IDispatcher dispatcher,
         IFilterService filterService)
     {
-        var activeLogs = EventLogEffectsUtility.DistributeEventsToManyLogs(state.ActiveLogs, state.NewEventBuffer);
-
         var batched = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>();
         var grouped = new Dictionary<EventLogId, List<ResolvedEvent>>();
 
         foreach (var bufferedEvent in state.NewEventBuffer)
         {
-            if (!activeLogs.TryGetValue(bufferedEvent.OwningLog, out var owningLog)) { continue; }
+            if (!state.ActiveLogs.TryGetValue(bufferedEvent.OwningLog, out var owningLog)) { continue; }
 
             if (!grouped.TryGetValue(owningLog.Id, out var list))
             {
@@ -102,8 +100,6 @@ internal sealed class LogReloadEffects(
         {
             dispatcher.Dispatch(new IngestRawEventsAction(rawByLog, RawIngestMode.Prepend));
         }
-
-        dispatcher.Dispatch(new AddEventSuccessAction(activeLogs));
 
         foreach (var (logId, events) in grouped)
         {

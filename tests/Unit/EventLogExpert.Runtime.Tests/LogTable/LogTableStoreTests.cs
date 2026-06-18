@@ -21,7 +21,7 @@ public sealed class LogTableStoreTests
     [Fact]
     public void DisplayedEvents_WithSingleLog_ShouldResolveAClonedEventToTheLiveIndex()
     {
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
         state = Reducers.ReduceUpdateTable(
@@ -45,7 +45,7 @@ public sealed class LogTableStoreTests
     [Fact]
     public void DisplayedEvents_WithSingleLog_ShouldReturnAStableReferenceAcrossReads()
     {
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
         state = Reducers.ReduceAppendTableEvents(
@@ -64,7 +64,7 @@ public sealed class LogTableStoreTests
     public void DisplayedEvents_WithSingleLog_ShouldServeThePerLogListDirectly()
     {
         // Arrange - one open log with events.
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
         state = Reducers.ReduceAppendTableEvents(
@@ -85,8 +85,8 @@ public sealed class LogTableStoreTests
     {
         // Arrange - two open logs. Both tables are added before either is populated so that every
         // per-log list is built under the same (multi-log) sort context, matching the real load flow.
-        var first = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
-        var second = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
+        var first = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
+        var second = new EventLogData(Constants.LogNameLog2, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(first));
         state = Reducers.ReduceAddTable(state, new AddTableAction(second));
@@ -113,7 +113,7 @@ public sealed class LogTableStoreTests
     public void EventTableAction_AddTable_ShouldStoreLogData()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
 
         // Act
         var action = new AddTableAction(logData);
@@ -287,7 +287,7 @@ public sealed class LogTableStoreTests
     {
         // Arrange
         var state = new LogTableState();
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
 
         // Act - Add table
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
@@ -312,9 +312,9 @@ public sealed class LogTableStoreTests
     {
         // Arrange
         var state = new LogTableState();
-        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
-        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
-        var logData3 = new EventLogData(Constants.LogNameLog3, LogPathType.Channel, []);
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
+        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel);
+        var logData3 = new EventLogData(Constants.LogNameLog3, LogPathType.Channel);
 
         // Act - Open three logs
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData1));
@@ -371,7 +371,7 @@ public sealed class LogTableStoreTests
     public void LogView_ComputerName_AfterFirstEventArrives_ShouldBeStoredOnTable()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
 
@@ -403,7 +403,7 @@ public sealed class LogTableStoreTests
     public void LogView_ComputerName_WhenFirstEventHasEmptyComputerName_ShouldUseLaterEventInBatch()
     {
         // Arrange - first event has an empty ComputerName (resolver miss); second carries the name
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
 
@@ -451,13 +451,13 @@ public sealed class LogTableStoreTests
     public void ReduceAddTable_WhenCombinedExists_ShouldNotCreateAnotherCombined()
     {
         // Arrange
-        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
-        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
+        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData1));
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData2));
 
-        var logData3 = new EventLogData(Constants.LogNameLog3, LogPathType.Channel, []);
+        var logData3 = new EventLogData(Constants.LogNameLog3, LogPathType.Channel);
         var action = new AddTableAction(logData3);
 
         // Act
@@ -479,7 +479,7 @@ public sealed class LogTableStoreTests
 
         var result = Reducers.ReduceAddTable(
             state,
-            new AddTableAction(new EventLogData("Application", LogPathType.Channel, [])));
+            new AddTableAction(new EventLogData("Application", LogPathType.Channel)));
 
         Assert.NotNull(result.ActiveEventLogId);
         Assert.False(result.GroupsCollapsedByDefault);
@@ -491,7 +491,7 @@ public sealed class LogTableStoreTests
     {
         // Arrange
         var state = new LogTableState();
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var action = new AddTableAction(logData);
 
         // Act
@@ -506,7 +506,7 @@ public sealed class LogTableStoreTests
     {
         // Arrange
         var state = new LogTableState();
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var action = new AddTableAction(logData);
 
         // Act
@@ -524,7 +524,7 @@ public sealed class LogTableStoreTests
     {
         // Arrange
         var state = new LogTableState();
-        var logData = new EventLogData(Constants.FilePathTestEvtx, LogPathType.File, []);
+        var logData = new EventLogData(Constants.FilePathTestEvtx, LogPathType.File);
         var action = new AddTableAction(logData);
 
         // Act
@@ -540,7 +540,7 @@ public sealed class LogTableStoreTests
     {
         // Arrange
         var state = new LogTableState();
-        var logData = new EventLogData(Constants.LogNameApplication, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameApplication, LogPathType.Channel);
         var action = new AddTableAction(logData);
 
         // Act
@@ -557,7 +557,7 @@ public sealed class LogTableStoreTests
     {
         var state = Reducers.ReduceAddTable(
             new LogTableState(),
-            new AddTableAction(new EventLogData("First", LogPathType.Channel, [])));
+            new AddTableAction(new EventLogData("First", LogPathType.Channel)));
         state = state with
         {
             GroupsCollapsedByDefault = true,
@@ -566,7 +566,7 @@ public sealed class LogTableStoreTests
 
         var result = Reducers.ReduceAddTable(
             state,
-            new AddTableAction(new EventLogData("Second", LogPathType.Channel, [])));
+            new AddTableAction(new EventLogData("Second", LogPathType.Channel)));
 
         Assert.Contains(result.EventTables, t => t.IsCombined);
         Assert.Equal(result.EventTables.First(t => t.IsCombined).Id, result.ActiveEventLogId);
@@ -578,11 +578,11 @@ public sealed class LogTableStoreTests
     public void ReduceAddTable_WhenSecondTable_ShouldCreateCombinedTable()
     {
         // Arrange
-        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData1));
 
-        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
+        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel);
         var action = new AddTableAction(logData2);
 
         // Act
@@ -597,11 +597,11 @@ public sealed class LogTableStoreTests
     public void ReduceAddTable_WhenSecondTable_ShouldSetCombinedAsActive()
     {
         // Arrange
-        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData1));
 
-        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
+        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel);
         var action = new AddTableAction(logData2);
 
         // Act
@@ -616,7 +616,7 @@ public sealed class LogTableStoreTests
     public void ReduceAppendTableEvents_ShouldAppendEventsToExistingDisplayedEvents()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
 
@@ -651,7 +651,7 @@ public sealed class LogTableStoreTests
     public void ReduceAppendTableEvents_ShouldNotChangeIsLoading()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
 
@@ -675,7 +675,7 @@ public sealed class LogTableStoreTests
     public void ReduceAppendTableEvents_ShouldPreserveSortOrder()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
 
@@ -746,7 +746,7 @@ public sealed class LogTableStoreTests
     public void ReduceAppendTableEvents_WhenTableNotFound_ShouldReturnUnchangedState()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
 
@@ -767,7 +767,7 @@ public sealed class LogTableStoreTests
     public void ReduceAppendTableEventsBatch_WhenBatchTargetsClosedLog_ShouldSkipThatBatch()
     {
         // Arrange - open log plus a stale log id whose tab no longer exists (race: closed mid-flight)
-        var openLog = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
+        var openLog = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(openLog));
 
@@ -1123,7 +1123,7 @@ public sealed class LogTableStoreTests
         // then arrives with empty ActiveLogs (e.g. log opened mid-filter so the snapshot did
         // not include it). The omitted log's rows must stay in canonical - otherwise a fresh
         // load could be silently scrubbed by a stale filter result.
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
 
@@ -1153,8 +1153,8 @@ public sealed class LogTableStoreTests
         // Arrange - two logs, both populated via UpdateTable. Filter dispatch arrives for log A
         // only (e.g. log B opened or finished loading after the snapshot). Log A's rows must be
         // replaced by the filter result; log B's rows must be preserved untouched.
-        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
-        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
+        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData1));
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData2));
@@ -1202,7 +1202,7 @@ public sealed class LogTableStoreTests
     public void ReduceUpdateDisplayedEvents_WhenTableComputerNameEmpty_ShouldLatchFromFirstNonEmptyEvent()
     {
         // Arrange - log first becomes visible via UpdateDisplayedEvents (filter clear), not via append
-        var logData = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
 
@@ -1231,7 +1231,7 @@ public sealed class LogTableStoreTests
     public void ReduceUpdateTable_AfterPartialAppends_ShouldReplaceNotMergeWithPartials()
     {
         // Arrange - partial AppendTableEvents land first (live-load deltas), then UpdateTable arrives with the full filtered list
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var state = new LogTableState { IsDescending = false };
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
 
@@ -1279,7 +1279,7 @@ public sealed class LogTableStoreTests
     public void ReduceUpdateTable_ShouldUpdateTableEvents()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var state = new LogTableState();
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
 
@@ -1305,7 +1305,7 @@ public sealed class LogTableStoreTests
     public void ReduceUpdateTable_WhenCalledTwiceForSameLog_ShouldReplaceNotDuplicate()
     {
         // Arrange - first UpdateTable populates canonical with two events
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var state = new LogTableState { IsDescending = false };
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
 
@@ -1338,8 +1338,8 @@ public sealed class LogTableStoreTests
     public void ReduceUpdateTable_WhenDescendingOrderRequested_ShouldMergeInDescendingOrder()
     {
         // Arrange - two logs, descending sort
-        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
-        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
+        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel);
         var state = new LogTableState { IsDescending = true };
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData1));
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData2));
@@ -1411,8 +1411,8 @@ public sealed class LogTableStoreTests
     public void ReduceUpdateTable_WhenSecondLogIsEmpty_ShouldKeepFirstLogEvents()
     {
         // Arrange - one log populated, one log empty (but not loading), ascending RecordId order
-        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
-        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
+        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel);
         var state = new LogTableState { IsDescending = false };
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData1));
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData2));
@@ -1437,8 +1437,8 @@ public sealed class LogTableStoreTests
     public void ReduceUpdateTable_WhenSecondLogPopulated_ShouldMergeIntoCanonicalInSortedOrder()
     {
         // Arrange - two logs with interleaved RecordIds, ascending RecordId order
-        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
-        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
+        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel);
         var state = new LogTableState { IsDescending = false };
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData1));
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData2));
@@ -1503,8 +1503,8 @@ public sealed class LogTableStoreTests
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 21, RecordId = 2, TimeCreated = baseTime.AddSeconds(10) }
         };
 
-        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
-        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
+        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel);
         var state = new LogTableState { IsDescending = false };
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData1));
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData2));

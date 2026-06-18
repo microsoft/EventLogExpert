@@ -18,8 +18,8 @@ public sealed class RawEventCountReducersTests
     {
         var store = new RawEventStoreState();
         var count = new RawEventCountState();
-        var logA = new EventLogData("LogA", LogPathType.Channel, []);
-        var logB = new EventLogData("LogB", LogPathType.Channel, []);
+        var logA = new EventLogData("LogA", LogPathType.Channel);
+        var logB = new EventLogData("LogB", LogPathType.Channel);
 
         (store, count) = AddTable(store, count, logA);
         AssertInSync(store, count);
@@ -62,7 +62,7 @@ public sealed class RawEventCountReducersTests
     {
         var store = new RawEventStoreState();
         var count = new RawEventCountState();
-        var logA = new EventLogData("LogA", LogPathType.Channel, []);
+        var logA = new EventLogData("LogA", LogPathType.Channel);
 
         (store, count) = AddTable(store, count, logA);
         AssertInSync(store, count);
@@ -78,7 +78,7 @@ public sealed class RawEventCountReducersTests
         AssertInSync(store, count);
         Assert.Equal(1, count.ByLog[logA.Id]);
 
-        var unopened = new EventLogData("LogB", LogPathType.Channel, []);
+        var unopened = new EventLogData("LogB", LogPathType.Channel);
         (store, count) = Load(store, count, unopened, Events(1, 4));
         AssertInSync(store, count);
         Assert.False(count.ByLog.ContainsKey(unopened.Id));
@@ -92,7 +92,7 @@ public sealed class RawEventCountReducersTests
     [Fact]
     public void ReduceAddTable_SeedsZeroCount()
     {
-        var logData = new EventLogData("LogA", LogPathType.Channel, []);
+        var logData = new EventLogData("LogA", LogPathType.Channel);
 
         var count = RawEventCountReducers.ReduceAddTable(new RawEventCountState(), new AddTableAction(logData));
 
@@ -107,7 +107,7 @@ public sealed class RawEventCountReducersTests
         // count value is unchanged, so the count reducer must not drift from the store.
         var store = new RawEventStoreState();
         var count = new RawEventCountState();
-        var logData = new EventLogData("LogA", LogPathType.Channel, []);
+        var logData = new EventLogData("LogA", LogPathType.Channel);
         (store, count) = AddTable(store, count, logData);
 
         (store, count) = Ingest(store, count, RawIngestMode.Replace, (logData.Id, Events(1, 5)));

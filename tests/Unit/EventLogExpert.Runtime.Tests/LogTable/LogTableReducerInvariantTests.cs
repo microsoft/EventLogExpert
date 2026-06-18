@@ -22,7 +22,7 @@ public sealed class LogTableReducerInvariantTests
         var info2 = MakeEvent(0, 4, Time(0, 4), level: "Information");
         var critical = MakeEvent(0, 5, Time(0, 5), level: "Critical");
 
-        var data = new EventLogData("Log0", LogPathType.Channel, []);
+        var data = new EventLogData("Log0", LogPathType.Channel);
         var state = Reducers.ReduceAddTable(new LogTableState(), new AddTableAction(data));
         state = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Level));
 
@@ -75,7 +75,7 @@ public sealed class LogTableReducerInvariantTests
         var c = MakeEvent(1, 1, Time(1, 20));
         var d = MakeEvent(1, 2, Time(1, 5));
 
-        var log0 = new EventLogData("Log0", LogPathType.Channel, []);
+        var log0 = new EventLogData("Log0", LogPathType.Channel);
         var state = Reducers.ReduceAddTable(new LogTableState(), new AddTableAction(log0));
         state = AppendBatch(state, log0.Id, a, b);
 
@@ -85,7 +85,7 @@ public sealed class LogTableReducerInvariantTests
         AssertDisplayedExactly(state, [a, b]);
 
         // Opening a second log flips the default to DateAndTime.
-        var log1 = new EventLogData("Log1", LogPathType.Channel, []);
+        var log1 = new EventLogData("Log1", LogPathType.Channel);
         state = Reducers.ReduceAddTable(state, new AddTableAction(log1));
         state = AppendBatch(state, log1.Id, c, d);
 
@@ -231,7 +231,7 @@ public sealed class LogTableReducerInvariantTests
 
         for (int i = 0; i < perLog.Length; i++)
         {
-            var data = new EventLogData($"Log{i}", LogPathType.Channel, []);
+            var data = new EventLogData($"Log{i}", LogPathType.Channel);
             ids[i] = data.Id;
             state = Reducers.ReduceAddTable(state, new AddTableAction(data));
             batch[data.Id] = perLog[i];

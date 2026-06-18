@@ -32,26 +32,18 @@ internal sealed class FilteringEffects(
     [EffectMethod]
     public Task HandleAddEvent(AddEventAction action, IDispatcher dispatcher)
     {
-        if (!_eventLogState.Value.ActiveLogs.ContainsKey(action.NewEvent.OwningLog)) { return Task.CompletedTask; }
+        if (!_eventLogState.Value.ActiveLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog))
+        {
+            return Task.CompletedTask;
+        }
 
         if (_eventLogState.Value.ContinuouslyUpdate)
         {
-            var activeLogs = EventLogEffectsUtility.DistributeEventsToManyLogs(
-                _eventLogState.Value.ActiveLogs,
-                [action.NewEvent]);
-
-            if (!activeLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog))
-            {
-                return Task.CompletedTask;
-            }
-
             // Ingest the raw event unconditionally (even when the filter hides it); the display append below
             // stays filter-gated.
             dispatcher.Dispatch(new IngestRawEventsAction(
                 new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [owningLog.Id] = [action.NewEvent] },
                 RawIngestMode.Prepend));
-
-            dispatcher.Dispatch(new AddEventSuccessAction(activeLogs));
 
             var filteredNew = _filterService.GetFilteredEvents(
                 [action.NewEvent],

@@ -4,7 +4,6 @@
 using AngleSharp.Dom;
 using Bunit;
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
@@ -30,6 +29,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
 using System.Reflection;
+using Reducers = EventLogExpert.Runtime.EventLog.Reducers;
 
 namespace EventLogExpert.UI.Tests.FilterPane;
 
@@ -41,6 +41,10 @@ public sealed class FilterPaneTests : BunitContext
     private readonly IFilterLibraryCommands _filterLibraryCommands = Substitute.For<IFilterLibraryCommands>();
     private readonly IFilterPaneCommands _filterPaneCommands = Substitute.For<IFilterPaneCommands>();
     private readonly IState<FilterLibraryState> _libraryStateMock = Substitute.For<IState<FilterLibraryState>>();
+    private readonly IStateSelection<EventLogState, ImmutableHashSet<string>> _loadedLogNames =
+        Substitute.For<IStateSelection<EventLogState, ImmutableHashSet<string>>>();
+    private readonly IStateSelection<EventLogState, int> _openLogCount =
+        Substitute.For<IStateSelection<EventLogState, int>>();
     private readonly IState<FilterPaneState> _paneStateMock = Substitute.For<IState<FilterPaneState>>();
     private readonly IScenarioApplyService _scenarioApply = Substitute.For<IScenarioApplyService>();
     private readonly IScenarioQueryService _scenarioQuery = Substitute.For<IScenarioQueryService>();
@@ -77,6 +81,11 @@ public sealed class FilterPaneTests : BunitContext
         _eventLogStateMock.Value.Returns(new EventLogState());
         Services.AddSingleton(_eventLogStateMock);
         Services.AddSingleton(_eventLogQueries);
+
+        _loadedLogNames.Value.Returns(ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase));
+        _openLogCount.Value.Returns(0);
+        Services.AddSingleton(_loadedLogNames);
+        Services.AddSingleton(_openLogCount);
 
         _settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
 
@@ -186,7 +195,8 @@ public sealed class FilterPaneTests : BunitContext
     public void ApplyScenarioButton_WhenLogsLoaded_IsShownAsExpander()
     {
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(EventLogStateWithChannel("System"));
+        SetLoadedLogNames("System");
+        SetOpenLogCount(1);
 
         var component = Render<UI.FilterPane.FilterPane>();
         var button = FindApplyScenarioButton(component);
@@ -466,30 +476,6 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
-    public void LoadedLogNames_CombinesChannelNamesAndFileEventLogNames_DistinctOrdinalIgnoreCase()
-    {
-        var channel = new EventLogData("System", LogPathType.Channel, []);
-        var file = new EventLogData(
-            "Forwarded.evtx",
-            LogPathType.File,
-            [
-                new ResolvedEvent("Forwarded.evtx", LogPathType.File) { LogName = "Security" },
-                new ResolvedEvent("Forwarded.evtx", LogPathType.File) { LogName = "security" },
-                new ResolvedEvent("Forwarded.evtx", LogPathType.File) { LogName = string.Empty },
-                new ResolvedEvent("Forwarded.evtx", LogPathType.File) { LogName = "Application" },
-            ]);
-        var logs = ImmutableDictionary<string, EventLogData>.Empty.Add("a", channel).Add("b", file);
-
-        var names = UI.FilterPane.FilterPane.LoadedLogNames(logs);
-
-        Assert.Equal(3, names.Count);
-        Assert.Contains("System", names);
-        Assert.Contains("Security", names);
-        Assert.Contains("Application", names);
-        Assert.DoesNotContain(string.Empty, names);
-    }
-
-    [Fact]
     public void OnRowDisposed_RemovesMatchingRowRef()
     {
         var pane = new UI.FilterPane.FilterPane();
@@ -585,15 +571,9 @@ public sealed class FilterPaneTests : BunitContext
     [Fact]
     public async Task OpenScenarioPicker_FileLog_SurfacesScenariosFromEventLogName()
     {
-        var fileLog = new EventLogData(
-            "Forwarded.evtx",
-            LogPathType.File,
-            [new ResolvedEvent("Forwarded.evtx", LogPathType.File) { LogName = "Security" }]);
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(new EventLogState
-        {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add("file", fileLog),
-        });
+        SetLoadedLogNames("Security");
+        SetOpenLogCount(1);
 
         IReadOnlyCollection<string>? capturedNames = null;
         _scenarioQuery.GetInAppScenarios(Arg.Do<IReadOnlyCollection<string>>(names => capturedNames = names))
@@ -611,7 +591,8 @@ public sealed class FilterPaneTests : BunitContext
     public async Task OpenScenarioPicker_ListsFirstCategoryScenariosInDeclarationOrder()
     {
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(EventLogStateWithChannel("System"));
+        SetLoadedLogNames("System");
+        SetOpenLogCount(1);
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>())
             .Returns(
             [
@@ -676,7 +657,8 @@ public sealed class FilterPaneTests : BunitContext
     public async Task OpenScenarioPicker_WhenNoMatches_ShowsEmptyStateStatus()
     {
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(EventLogStateWithChannel("System"));
+        SetLoadedLogNames("System");
+        SetOpenLogCount(1);
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([]);
 
         var component = Render<UI.FilterPane.FilterPane>();
@@ -760,6 +742,83 @@ public sealed class FilterPaneTests : BunitContext
             .Invoke(pane, null);
 
         Assert.DoesNotContain(filter.Id, rowRefs.Keys);
+    }
+
+    [Fact]
+    public async Task RenderIsolation_WhenFileLoadAddsName_ReRendersAndUpdatesScenarioGroups()
+    {
+        var initial = Reducers.ReduceOpenLog(
+            new EventLogState(), new OpenLogAction(@"C:\F.evtx", LogPathType.File));
+        var fLog = initial.ActiveLogs[@"C:\F.evtx"];
+        initial = Reducers.ReduceLoadEvents(
+            initial, new LoadEventsAction(fLog, [EventWithName("Security")]));
+
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+
+        IReadOnlyCollection<string>? capturedNames = null;
+        _scenarioQuery.GetInAppScenarios(Arg.Do<IReadOnlyCollection<string>>(names => capturedNames = names))
+            .Returns([Scenario("sec", ScenarioGroup.Security)]);
+
+        var feature = WireRealSelections(initial);
+        var component = Render<UI.FilterPane.FilterPane>();
+        await FindApplyScenarioButton(component)!.ClickAsync(new MouseEventArgs());
+
+        Assert.NotNull(capturedNames);
+        Assert.Contains("Security", capturedNames!);
+        var renderCountBefore = component.RenderCount;
+
+        var next = Reducers.ReduceLoadEventsPartial(
+            initial, new LoadEventsPartialAction(fLog, [EventWithName("Application")]));
+
+        await component.InvokeAsync(() => feature.Publish(next));
+
+        Assert.True(component.RenderCount > renderCountBefore);
+        Assert.Contains("Application", capturedNames!);
+    }
+
+    [Fact]
+    public async Task RenderIsolation_WhenNamesByLogChangesButLoadedNamesUnionUnchanged_DoesNotReRender()
+    {
+        var initial = Reducers.ReduceOpenLog(
+            new EventLogState(), new OpenLogAction(@"C:\F.evtx", LogPathType.File));
+        initial = Reducers.ReduceOpenLog(
+            initial, new OpenLogAction(@"C:\G.evtx", LogPathType.File));
+        var fLog = initial.ActiveLogs[@"C:\F.evtx"];
+        var gLog = initial.ActiveLogs[@"C:\G.evtx"];
+        initial = Reducers.ReduceLoadEvents(
+            initial, new LoadEventsAction(fLog, [EventWithName("A"), EventWithName("B")]));
+        initial = Reducers.ReduceLoadEvents(
+            initial, new LoadEventsAction(gLog, [EventWithName("B")]));
+
+        var feature = WireRealSelections(initial);
+        var component = Render<UI.FilterPane.FilterPane>();
+        var renderCountBefore = component.RenderCount;
+
+        var next = Reducers.ReduceLoadEvents(
+            initial, new LoadEventsAction(fLog, [EventWithName("A")]));
+
+        Assert.Same(initial.LoadedLogNames, next.LoadedLogNames);
+        await component.InvokeAsync(() => feature.Publish(next));
+
+        Assert.Equal(renderCountBefore, component.RenderCount);
+    }
+
+    [Fact]
+    public async Task RenderIsolation_WhenOpenLogCountChanges_ReRenders()
+    {
+        var initial = Reducers.ReduceOpenLog(
+            new EventLogState(), new OpenLogAction("System", LogPathType.Channel));
+
+        var feature = WireRealSelections(initial);
+        var component = Render<UI.FilterPane.FilterPane>();
+        var renderCountBefore = component.RenderCount;
+
+        var closed = Reducers.ReduceCloseLog(
+            initial, new CloseLogAction(initial.ActiveLogs["System"].Id, "System"));
+
+        await component.InvokeAsync(() => feature.Publish(closed));
+
+        Assert.True(component.RenderCount > renderCountBefore);
     }
 
     [Fact]
@@ -857,7 +916,8 @@ public sealed class FilterPaneTests : BunitContext
     {
         var scenario = Scenario("sys", ScenarioGroup.SystemHealth);
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(EventLogStateWithChannel("System"));
+        SetLoadedLogNames("System");
+        SetOpenLogCount(1);
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([scenario]);
 
         var component = Render<UI.FilterPane.FilterPane>();
@@ -886,7 +946,8 @@ public sealed class FilterPaneTests : BunitContext
     {
         var scenario = Scenario("sys", ScenarioGroup.SystemHealth);
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(EventLogStateWithChannel("System"));
+        SetLoadedLogNames("System");
+        SetOpenLogCount(1);
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([scenario]);
 
         var component = Render<UI.FilterPane.FilterPane>();
@@ -939,12 +1000,8 @@ public sealed class FilterPaneTests : BunitContext
         };
     }
 
-    private static EventLogState EventLogStateWithChannel(string channelName) =>
-        new()
-        {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty
-                .Add(channelName, new EventLogData(channelName, LogPathType.Channel, [])),
-        };
+    private static ResolvedEvent EventWithName(string logName) =>
+        new("file", LogPathType.File) { LogName = logName };
 
     private static IElement? FindApplyScenarioButton(IRenderedComponent<UI.FilterPane.FilterPane> component) =>
         component.FindAll("button").FirstOrDefault(button => button.TextContent.Contains("Apply Scenario"));
@@ -960,9 +1017,42 @@ public sealed class FilterPaneTests : BunitContext
             Filters = [],
         };
 
-    private void SetEventLogState(EventLogState state) => _eventLogStateMock.Value.Returns(state);
-
     private void SetLibraryState(FilterLibraryState state) => _libraryStateMock.Value.Returns(state);
 
+    private void SetLoadedLogNames(params string[] names) =>
+        _loadedLogNames.Value.Returns(ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, names));
+
+    private void SetOpenLogCount(int count) => _openLogCount.Value.Returns(count);
+
     private void SetPaneState(FilterPaneState state) => _paneStateMock.Value.Returns(state);
+
+    private TestEventLogFeature WireRealSelections(EventLogState initial)
+    {
+        var feature = new TestEventLogFeature(initial);
+        Services.AddSingleton<IState<EventLogState>>(new State<EventLogState>(feature));
+        Services.AddSingleton<IStateSelection<EventLogState, ImmutableHashSet<string>>>(
+            new StateSelection<EventLogState, ImmutableHashSet<string>>(feature));
+        Services.AddSingleton<IStateSelection<EventLogState, int>>(
+            new StateSelection<EventLogState, int>(feature));
+
+        return feature;
+    }
+
+    private sealed class TestEventLogFeature : Feature<EventLogState>
+    {
+        private readonly EventLogState _initial;
+
+        public TestEventLogFeature(EventLogState initial)
+        {
+            _initial = initial;
+            MaximumStateChangedNotificationsPerSecond = 0;
+            State = initial;
+        }
+
+        public override string GetName() => "EventLog";
+
+        public void Publish(EventLogState state) => State = state;
+
+        protected override EventLogState GetInitialState() => _initial;
+    }
 }
