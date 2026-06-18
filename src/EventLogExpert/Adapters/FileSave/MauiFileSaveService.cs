@@ -12,43 +12,6 @@ namespace EventLogExpert.Adapters.FileSave;
 
 public sealed class MauiFileSaveService : IFileSaveService
 {
-    public async Task<string?> SaveAsync(
-        string suggestedFileName,
-        IReadOnlyDictionary<string, IReadOnlyList<string>> fileTypes,
-        Func<Stream, Task> writeContent)
-    {
-        ArgumentNullException.ThrowIfNull(suggestedFileName);
-        ArgumentNullException.ThrowIfNull(fileTypes);
-        ArgumentNullException.ThrowIfNull(writeContent);
-
-        var pickedFile = await PickSaveFileAsync(suggestedFileName, fileTypes);
-
-        if (pickedFile is null) { return null; }
-
-        // Buffer first; picked file stays untouched if writeContent throws.
-        using var buffer = new MemoryStream();
-        await writeContent(buffer);
-        buffer.Position = 0;
-
-        CachedFileManager.DeferUpdates(pickedFile);
-
-        FileUpdateStatus status;
-
-        try
-        {
-            await using var fileStream = await pickedFile.OpenStreamForWriteAsync();
-            // OpenStreamForWriteAsync does not truncate; without this, larger files leave stale trailing bytes.
-            fileStream.SetLength(0);
-            await buffer.CopyToAsync(fileStream);
-        }
-        finally
-        {
-            status = await CachedFileManager.CompleteUpdatesAsync(pickedFile);
-        }
-
-        return ToResultPath(pickedFile, status);
-    }
-
     public async Task<string?> SaveStreamingAsync(
         string suggestedFileName,
         IReadOnlyDictionary<string, IReadOnlyList<string>> fileTypes,
