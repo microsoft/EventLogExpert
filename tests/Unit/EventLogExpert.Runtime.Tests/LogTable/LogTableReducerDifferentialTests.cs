@@ -332,7 +332,15 @@ public sealed class LogTableReducerDifferentialTests
                 activeLogs[log.Id] = kept;
             }
 
-            State = Reducers.ReduceUpdateDisplayedEvents(State, new UpdateDisplayedEventsAction(activeLogs));
+            var context = State.SortContext;
+            var lists = new Dictionary<EventLogId, SegmentedSortedList>(activeLogs.Count);
+
+            foreach (var (logId, events) in activeLogs)
+            {
+                lists[logId] = SegmentedSortedList.CreateSorted(events, context);
+            }
+
+            State = Reducers.ReduceDisplayReady(State, new DisplayReadyAction { Lists = lists });
         }
 
         private IEnumerable<int> SampleIndices(int count)

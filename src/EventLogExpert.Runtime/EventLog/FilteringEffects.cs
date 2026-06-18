@@ -17,6 +17,7 @@ namespace EventLogExpert.Runtime.EventLog;
 internal sealed class FilteringEffects(
     IState<EventLogState> eventLogState,
     IState<RawEventStoreState> rawEventStore,
+    IState<LogTableState> logTableState,
     IFilterService filterService,
     ITraceLogger logger,
     LogCloseCoordinator closeCoordinator,
@@ -27,6 +28,7 @@ internal sealed class FilteringEffects(
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IFilterService _filterService = filterService;
     private readonly ITraceLogger _logger = logger;
+    private readonly IState<LogTableState> _logTableState = logTableState;
     private readonly IState<RawEventStoreState> _rawEventStore = rawEventStore;
 
     [EffectMethod]
@@ -113,28 +115,29 @@ internal sealed class FilteringEffects(
     private async Task ApplyFilterAndPublishAsync(Filter filter, long filterToken, IDispatcher dispatcher)
     {
         var snapshot = SnapshotOpenLogEvents();
+        var capturedContext = _logTableState.Value.SortContext;
 
         dispatcher.Dispatch(new SetFilterProgressAction(true));
 
         try
         {
-            var filteredActiveLogs = await Task.Run(() => _filterService.FilterActiveLogs(snapshot, filter));
+            var sortedActiveLogs = await Task.Run(() => FilterAndSort(snapshot, filter, capturedContext));
 
             if (_concurrencyState.GetCurrentFilterToken() != filterToken) { return; }
 
             var snapshotById = snapshot.ToDictionary(pair => pair.Id, pair => pair.Events);
             var currentRaw = _rawEventStore.Value.ByLog;
-            var fresh = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>(filteredActiveLogs.Count);
+            var fresh = new Dictionary<EventLogId, SegmentedSortedList>(sortedActiveLogs.Count);
             var staleIds = new List<EventLogId>();
 
-            foreach (var (logId, filteredEvents) in filteredActiveLogs)
+            foreach (var (logId, sortedList) in sortedActiveLogs)
             {
                 if (!snapshotById.TryGetValue(logId, out var snapshotEvents)) { continue; }
 
                 if (currentRaw.TryGetValue(logId, out var currentEvents) &&
                     ReferenceEquals(snapshotEvents, currentEvents))
                 {
-                    fresh[logId] = filteredEvents;
+                    fresh[logId] = sortedList;
                 }
                 else
                 {
@@ -145,26 +148,26 @@ internal sealed class FilteringEffects(
             if (staleIds.Count > 0)
             {
                 var pass2Snapshot = SnapshotEventsForLogs(staleIds);
-                var refiltered = await Task.Run(() => _filterService.FilterActiveLogs(pass2Snapshot, filter));
+                var refilteredSorted = await Task.Run(() => FilterAndSort(pass2Snapshot, filter, capturedContext));
 
                 if (_concurrencyState.GetCurrentFilterToken() != filterToken) { return; }
 
                 var pass2InputById = pass2Snapshot.ToDictionary(pair => pair.Id, pair => pair.Events);
                 var nowRaw = _rawEventStore.Value.ByLog;
 
-                foreach (var (logId, filteredEvents) in refiltered)
+                foreach (var (logId, sortedList) in refilteredSorted)
                 {
                     if (!pass2InputById.TryGetValue(logId, out var pass2Events)) { continue; }
 
                     if (nowRaw.TryGetValue(logId, out var nowEvents) &&
                         ReferenceEquals(pass2Events, nowEvents))
                     {
-                        fresh[logId] = filteredEvents;
+                        fresh[logId] = sortedList;
                     }
                 }
             }
 
-            dispatcher.Dispatch(new UpdateDisplayedEventsAction(fresh));
+            dispatcher.Dispatch(new DisplayReadyAction { Lists = fresh });
         }
         finally
         {
@@ -173,6 +176,22 @@ internal sealed class FilteringEffects(
                 dispatcher.Dispatch(new SetFilterProgressAction(false));
             }
         }
+    }
+
+    private Dictionary<EventLogId, SegmentedSortedList> FilterAndSort(
+        IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> snapshot,
+        Filter filter,
+        SortContext context)
+    {
+        var filtered = _filterService.FilterActiveLogs(snapshot, filter);
+        var sorted = new Dictionary<EventLogId, SegmentedSortedList>(filtered.Count);
+
+        foreach (var (logId, events) in filtered)
+        {
+            sorted[logId] = SegmentedSortedList.CreateSorted(events, context);
+        }
+
+        return sorted;
     }
 
     private async Task ReloadLogsWithXmlAsync(

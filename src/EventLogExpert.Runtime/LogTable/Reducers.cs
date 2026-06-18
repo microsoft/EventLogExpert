@@ -218,6 +218,57 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
+    public static LogTableState ReduceDisplayReady(
+        LogTableState state,
+        DisplayReadyAction action)
+    {
+        // Skip log ids absent from EventTables: log closed while filter ran.
+        var tablesById = state.EventTables
+            .Where(table => !table.IsCombined)
+            .ToDictionary(table => table.Id);
+
+        // A background filter may pre-date a sort change; re-sort under the post-update context.
+        int postCount = 0;
+
+        foreach (var (logId, _) in tablesById)
+        {
+            if (action.Lists.ContainsKey(logId) || state.PerLogEvents.ContainsKey(logId)) { postCount++; }
+        }
+
+        var context = EffectiveSortContext(
+            state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending, postCount);
+        var perLogBuilder = ImmutableDictionary.CreateBuilder<EventLogId, SegmentedSortedList>();
+        var counts = state.EventCountByLog;
+        var tables = state.EventTables;
+
+        foreach (var (logId, table) in tablesById)
+        {
+            if (action.Lists.TryGetValue(logId, out var list))
+            {
+                perLogBuilder[logId] = list.HasContext(context) ? list : SegmentedSortedList.CreateSorted(list, context);
+                counts = counts.SetItem(logId, list.Count);
+
+                var updatedTable = SetComputerNameIfFirstEvent(table, list);
+
+                if (!ReferenceEquals(updatedTable, table)) { tables = tables.Replace(table, updatedTable); }
+            }
+            else if (state.PerLogEvents.TryGetValue(logId, out var existingList))
+            {
+                perLogBuilder[logId] = existingList.HasContext(context)
+                    ? existingList
+                    : SegmentedSortedList.CreateSorted(existingList, context);
+            }
+        }
+
+        return state with
+        {
+            PerLogEvents = ReconcileToLogCount(perLogBuilder.ToImmutable(), state),
+            EventTables = tables,
+            EventCountByLog = counts
+        };
+    }
+
+    [ReducerMethod]
     public static LogTableState ReduceLoadColumnsCompleted(
         LogTableState state,
         LoadColumnsCompletedAction action)
@@ -369,57 +420,6 @@ internal sealed class Reducers
     [ReducerMethod(typeof(ToggleSortingAction))]
     public static LogTableState ReduceToggleSorting(LogTableState state) =>
         SortDisplayEvents(state, state.OrderBy, !state.IsDescending);
-
-    [ReducerMethod]
-    public static LogTableState ReduceUpdateDisplayedEvents(
-        LogTableState state,
-        UpdateDisplayedEventsAction action)
-    {
-        // Skip log ids absent from EventTables: log closed while filter ran.
-        var tablesById = state.EventTables
-            .Where(table => !table.IsCombined)
-            .ToDictionary(table => table.Id);
-
-        // A background filter may pre-date a sort change; re-sort under the post-update context.
-        int postCount = 0;
-
-        foreach (var (logId, _) in tablesById)
-        {
-            if (action.ActiveLogs.ContainsKey(logId) || state.PerLogEvents.ContainsKey(logId)) { postCount++; }
-        }
-
-        var context = EffectiveSortContext(
-            state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending, postCount);
-        var perLogBuilder = ImmutableDictionary.CreateBuilder<EventLogId, SegmentedSortedList>();
-        var counts = state.EventCountByLog;
-        var tables = state.EventTables;
-
-        foreach (var (logId, table) in tablesById)
-        {
-            if (action.ActiveLogs.TryGetValue(logId, out var events))
-            {
-                perLogBuilder[logId] = SegmentedSortedList.CreateSorted(events, context);
-                counts = counts.SetItem(logId, events.Count);
-
-                var updatedTable = SetComputerNameIfFirstEvent(table, events);
-
-                if (!ReferenceEquals(updatedTable, table)) { tables = tables.Replace(table, updatedTable); }
-            }
-            else if (state.PerLogEvents.TryGetValue(logId, out var existingList))
-            {
-                perLogBuilder[logId] = existingList.HasContext(context)
-                    ? existingList
-                    : SegmentedSortedList.CreateSorted(existingList, context);
-            }
-        }
-
-        return state with
-        {
-            PerLogEvents = ReconcileToLogCount(perLogBuilder.ToImmutable(), state),
-            EventTables = tables,
-            EventCountByLog = counts
-        };
-    }
 
     [ReducerMethod]
     public static LogTableState ReduceUpdateTable(LogTableState state, UpdateTableAction action)

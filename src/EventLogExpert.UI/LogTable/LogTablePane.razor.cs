@@ -179,7 +179,7 @@ public sealed partial class LogTablePane
         SelectedEvents.Select(s => s.SelectedEvents);
 
         SubscribeToAction<SetActiveTableAction>(OnSetActiveTable);
-        SubscribeToAction<UpdateDisplayedEventsAction>(_ => RescrollToSelected());
+        SubscribeToAction<DisplayReadyAction>(_ => RescrollToSelected());
         SubscribeToAction<AppendTableEventsAction>(_ => RescrollToSelected());
         SubscribeToAction<AppendTableEventsBatchAction>(_ => RescrollToSelected());
         SubscribeToAction<UpdateTableAction>(_ => RescrollToSelected());
