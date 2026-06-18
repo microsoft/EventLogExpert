@@ -7,6 +7,10 @@ namespace EventLogExpert.Runtime.Common.Files;
 
 public static class FileSaveFileTypes
 {
+    public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> Csv =
+        ImmutableDictionary<string, IReadOnlyList<string>>.Empty
+            .Add("CSV", [".csv"]);
+
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> Json =
         ImmutableDictionary<string, IReadOnlyList<string>>.Empty
             .Add("JSON", [".json"]);

@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.Export;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
@@ -128,6 +129,9 @@ public sealed partial class MenuBar
             MenuItem.SubMenu("Combine", BuildOpenSubMenu(true), hasActiveLogs),
             MenuItem.Separator(),
             MenuItem.Item("Close All", () => Actions.CloseAllLogsAsync(), isEnabled: hasActiveLogs),
+            MenuItem.Separator(),
+            MenuItem.Item("Export to CSV", () => Actions.ExportEventsAsync(ExportFormat.Csv), isEnabled: hasActiveLogs),
+            MenuItem.Item("Export to JSON", () => Actions.ExportEventsAsync(ExportFormat.Json), isEnabled: hasActiveLogs),
             MenuItem.Item("Exit", Actions.Exit),
         ];
     }

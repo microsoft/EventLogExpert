@@ -24,25 +24,11 @@
                     @oncontextmenu:preventDefault="true"
                     @oncontextmenu:stopPropagation="true"
                     role="gridcell">
-                    @switch (capturedColumn)
+                    @if (capturedColumn == ColumnName.Level)
                     {
-                        case ColumnName.RecordId: @evt.RecordId break;
-                        case ColumnName.Level:
-                            <span aria-hidden="true" class="@GetLevelClass(evt.Level)"></span>
-                            @evt.Level
-                            break;
-                        case ColumnName.DateAndTime: @evt.TimeCreated.ConvertTimeZone(_timeZoneSettings) break;
-                        case ColumnName.ActivityId: @evt.ActivityId break;
-                        case ColumnName.Log: @GetLogShortName(evt.OwningLog) break;
-                        case ColumnName.ComputerName: @evt.ComputerName break;
-                        case ColumnName.Source: @evt.Source break;
-                        case ColumnName.EventId: @evt.Id break;
-                        case ColumnName.TaskCategory: @evt.TaskCategory break;
-                        case ColumnName.Keywords: @evt.KeywordsDisplayName break;
-                        case ColumnName.ProcessId: @evt.ProcessId break;
-                        case ColumnName.ThreadId: @evt.ThreadId break;
-                        case ColumnName.User: @evt.UserId break;
+                        <span aria-hidden="true" class="@GetLevelClass(evt.Level)"></span>
                     }
+                    @EventTableColumnFormatter.GetCellText(evt, capturedColumn, _timeZoneSettings)
                 </td>
             }
 

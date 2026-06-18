@@ -243,23 +243,7 @@ public sealed class MauiClipboardService : IClipboardService
     }
 
     private string GetColumnText(ColumnName column, ResolvedEvent @event) =>
-        column switch
-        {
-            ColumnName.Level => @event.Level,
-            ColumnName.DateAndTime => @event.TimeCreated.ConvertTimeZone(_settings.TimeZoneInfo).ToString(),
-            ColumnName.ActivityId => @event.ActivityId?.ToString() ?? string.Empty,
-            ColumnName.Log => GetLogShortName(@event.OwningLog),
-            ColumnName.ComputerName => @event.ComputerName,
-            ColumnName.Source => @event.Source,
-            ColumnName.EventId => @event.Id.ToString(),
-            ColumnName.TaskCategory => @event.TaskCategory,
-            ColumnName.Keywords => @event.KeywordsDisplayName,
-            ColumnName.ProcessId => @event.ProcessId?.ToString() ?? string.Empty,
-            ColumnName.ThreadId => @event.ThreadId?.ToString() ?? string.Empty,
-            ColumnName.User => @event.UserId?.ToString() ?? string.Empty,
-            ColumnName.RecordId => @event.RecordId?.ToString() ?? string.Empty,
-            _ => string.Empty
-        };
+        EventTableColumnFormatter.GetCellText(@event, column, _settings.TimeZoneInfo);
 
     private async Task<string> GetFormattedEvent(EventCopyFormat? format)
     {

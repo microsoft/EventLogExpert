@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Export;
 
 namespace EventLogExpert.Runtime.Menu;
 
@@ -14,6 +15,8 @@ public interface IMenuActionService
     Task CopySelectedAsync(EventCopyFormat? format);
 
     void Exit();
+
+    Task ExportEventsAsync(ExportFormat format);
 
     /// <summary>
     ///     Returns the names of every event log channel known to the host. Cached on first call; subsequent calls return
