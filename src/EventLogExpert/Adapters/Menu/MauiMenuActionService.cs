@@ -190,16 +190,20 @@ public sealed class MauiMenuActionService(
             savedPath = await _fileSaveService.SaveStreamingAsync(
                 suggestedFileName,
                 fileTypes,
-                (stream, token) =>
+                async (stream, token) =>
                 {
                     // Begin only once the picker has returned a destination and the streaming write is
                     // starting; dismissing the picker never reaches here, so it stays silent. The finished
-                    // flag turns a late Cancel click (after End) into a clean no-op.
+                    // flag turns a late Cancel click into a clean no-op.
                     _exportProgress.Begin(
                         "Exporting events…", () => { if (!Volatile.Read(ref finished)) { cancellation.Cancel(); } });
 
-                    return _eventTableExporter.ExportAsync(
+                    await _eventTableExporter.ExportAsync(
                         stream, format, events, columns, timeZone, includeDescription: true, token);
+
+                    // The streaming write is done; stop honoring Cancel before SaveStreamingAsync runs its
+                    // post-write cancel gates, so a late Cancel can't abort an already-written export's commit.
+                    Volatile.Write(ref finished, true);
                 },
                 cancellation.Token);
         }

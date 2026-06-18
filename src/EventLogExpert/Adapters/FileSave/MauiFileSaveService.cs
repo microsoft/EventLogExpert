@@ -22,6 +22,8 @@ public sealed class MauiFileSaveService : IFileSaveService
         ArgumentNullException.ThrowIfNull(fileTypes);
         ArgumentNullException.ThrowIfNull(writeContent);
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         var pickedFile = await PickSaveFileAsync(suggestedFileName, fileTypes);
 
         if (pickedFile is null) { return null; }
