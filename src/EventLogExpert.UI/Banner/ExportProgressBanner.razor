@@ -1,0 +1,13 @@
+<aside class="banner banner-export-progress" role="status">
+    <i aria-hidden="true" class="banner-spinner bi bi-arrow-repeat"></i>
+
+    <span class="banner-message">@Export.Message</span>
+
+    @CycleNav
+
+    <button class="banner-action button"
+        @onclick="() => OnCancelExportClickedAsync(Export)"
+        type="button">
+        Cancel
+    </button>
+</aside>

@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Versioning;
@@ -55,6 +56,7 @@ public sealed class MauiMenuActionService(
     IState<LogTableState> logTableState,
     ILogTableColumnDefaultsProvider columnDefaults,
     IEventTableExporter eventTableExporter,
+    IExportProgressBannerService exportProgressBannerService,
     IFileSaveService fileSaveService) : IMenuActionService, IDisposable
 {
     private readonly IClipboardService _clipboardService = clipboardService;
@@ -65,6 +67,7 @@ public sealed class MauiMenuActionService(
     private readonly IEventLogCommands _eventLogCommands = eventLogCommands;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IEventTableExporter _eventTableExporter = eventTableExporter;
+    private readonly IExportProgressBannerService _exportProgress = exportProgressBannerService;
     private readonly IFileSaveService _fileSaveService = fileSaveService;
     private readonly IFilterLibraryCommands _filterLibraryCommands = filterLibraryCommands;
     private readonly IFilterPaneCommands _filterPaneCommands = filterPaneCommands;
@@ -80,6 +83,7 @@ public sealed class MauiMenuActionService(
     private IReadOnlyList<string>? _cachedLogNames;
     private CancellationTokenSource _cancellationTokenSource = new();
     private bool _disposed;
+    private int _exportInFlight;
 
     public async Task CheckForUpdatesAsync()
     {
@@ -165,24 +169,74 @@ public sealed class MauiMenuActionService(
         string suggestedFileName =
             $"events-{DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)}{extension}";
 
-        string? savedPath;
+        // Only one export may run at a time: the progress banner holds a single entry and the cancel
+        // affordance owns a single CTS, so a concurrent export would orphan the first cancellation.
+        if (Interlocked.CompareExchange(ref _exportInFlight, 1, 0) != 0)
+        {
+            await _dialogService.ShowAlert(
+                "Export events", "An export is already in progress.", "Ok", AlertPresentation.Banner);
+
+            return;
+        }
+
+        CancellationTokenSource cancellation = new();
+        bool finished = false;
+        string? savedPath = null;
+        Exception? failure = null;
+        bool canceled = false;
 
         try
         {
+            // The Cancel button captures this delegate; the finished flag turns a late click (after End
+            // tears the banner down) into a clean no-op instead of relying on a swallowed ObjectDisposedException.
+            _exportProgress.Begin(
+                "Exporting events…", () => { if (!Volatile.Read(ref finished)) { cancellation.Cancel(); } });
+
             savedPath = await _fileSaveService.SaveStreamingAsync(
                 suggestedFileName,
                 fileTypes,
                 (stream, token) => _eventTableExporter.ExportAsync(
                     stream, format, events, columns, timeZone, includeDescription: true, token),
-                // No user-facing cancel affordance exists for export yet; the pipeline threads a token end to end,
-                // so a cancel control can be wired here later without a signature change.
-                CancellationToken.None);
+                cancellation.Token);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            canceled = true;
         }
         catch (Exception ex)
         {
-            _traceLogger.Error($"Failed to export events: {ex}");
+            failure = ex;
+        }
+        finally
+        {
+            Volatile.Write(ref finished, true);
 
-            await _dialogService.ShowAlert("Export failed", ex.Message, "Ok", AlertPresentation.Banner);
+            // End() raises StateChanged; isolate it so a throwing subscriber can never skip the CTS
+            // disposal or the in-flight reset, which would otherwise wedge every later export.
+            try
+            {
+                _exportProgress.End();
+            }
+            finally
+            {
+                cancellation.Dispose();
+                Interlocked.Exchange(ref _exportInFlight, 0);
+            }
+        }
+
+        if (canceled)
+        {
+            await _dialogService.ShowAlert(
+                "Export canceled", "The export was canceled.", "Ok", AlertPresentation.Banner);
+
+            return;
+        }
+
+        if (failure is not null)
+        {
+            _traceLogger.Error($"Failed to export events: {failure}");
+
+            await _dialogService.ShowAlert("Export failed", failure.Message, "Ok", AlertPresentation.Banner);
 
             return;
         }

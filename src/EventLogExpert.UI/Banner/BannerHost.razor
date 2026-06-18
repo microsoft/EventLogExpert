@@ -10,6 +10,7 @@
     IReadOnlyList<BannerInfoEntry> infos = InfoBannerService.InfoBanners;
     IReadOnlyList<DatabaseEntry> attentionEntries = AttentionBannerService.AttentionEntries;
     BannerProgressEntry? backgroundProgress = ProgressBannerService.BackgroundProgress;
+    ExportProgressEntry? exportProgress = ExportProgressBannerService.CurrentExport;
 
     bool showCyclePagination = items.Count > 1 && view != BannerView.Critical;
 
@@ -53,8 +54,13 @@
 
             break;
 
-        case BannerView.UpgradeProgress when backgroundProgress is { } progress:
-            <UpgradeProgressBanner CycleNav="cycleNav" Progress="progress" />
+        case BannerView.UpgradeProgress when backgroundProgress != null:
+            <UpgradeProgressBanner CycleNav="cycleNav" Progress="backgroundProgress" />
+
+            break;
+
+        case BannerView.ExportProgress when exportProgress != null:
+            <ExportProgressBanner CycleNav="cycleNav" Export="exportProgress" />
 
             break;
 

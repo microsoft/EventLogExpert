@@ -44,6 +44,11 @@
     color: var(--text-on-statusbar);
 }
 
+.banner-export-progress {
+    background-color: var(--clr-statusbar);
+    color: var(--text-on-statusbar);
+}
+
 .banner-spinner {
     flex: 0 0 auto;
     animation: banner-spin 1.5s linear infinite;

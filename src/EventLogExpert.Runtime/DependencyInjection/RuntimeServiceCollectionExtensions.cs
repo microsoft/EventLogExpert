@@ -171,6 +171,11 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IErrorBannerService>(static sp => sp.GetRequiredService<BannerService>());
             services.AddSingleton<IInfoBannerService>(static sp => sp.GetRequiredService<BannerService>());
 
+            // Export progress is a standalone banner facet with no database coupling, so it is a
+            // separate singleton from BannerService. The UI BannerCycleStateService consumes it as a
+            // 7th source; the head menu driver brackets a streaming export with Begin/End.
+            services.AddSingleton<IExportProgressBannerService, ExportProgressBannerService>();
+
             services.AddSingleton<IAnnouncementService, AnnouncementService>();
 
             services.AddSingleton<DebugLogService>();
