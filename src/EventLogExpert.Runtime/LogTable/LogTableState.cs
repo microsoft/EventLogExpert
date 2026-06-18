@@ -83,8 +83,19 @@ public sealed record LogTableState
             .ToHashSet();
 
         var order = ColumnOrder.IsEmpty ? columnDefaults.ColumnOrder : ColumnOrder;
-        var ordered = order.Where(enabledColumns.Contains).ToList();
-        var present = ordered.ToHashSet();
+
+        HashSet<ColumnName> present = [];
+        List<ColumnName> ordered = [];
+
+        // De-duplicate while preserving first occurrence: a persisted ColumnOrder may contain duplicates
+        // that would otherwise become duplicate export headers (rejected by TabularExportWriter).
+        foreach (var column in order)
+        {
+            if (enabledColumns.Contains(column) && present.Add(column))
+            {
+                ordered.Add(column);
+            }
+        }
 
         // Append any enabled column missing from the active order (e.g. enabled but absent from a persisted
         // ColumnOrder) so it is never silently dropped from the table or an export.
