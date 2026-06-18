@@ -22,6 +22,7 @@ using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Scenarios;
+using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
@@ -126,6 +127,11 @@ public static class RuntimeServiceCollectionExtensions
         ///             implementation.
         ///         </item>
         ///         <item>
+        ///             <c>IScenarioFavoriteStore</c> - the scenario favorites effects depend on it. Register the default
+        ///             SQLite-backed store via <c>services.AddScenarioFavoriteSqliteStore(<i>dbPath</i>)</c>, or supply a custom
+        ///             implementation.
+        ///         </item>
+        ///         <item>
         ///             <c>IMenuActionService</c> - the scenario launch service depends on it to open a scenario's channels. The
         ///             host registers the concrete implementation (e.g., <c>MauiMenuActionService</c>).
         ///         </item>
@@ -144,6 +150,7 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IFilterLibraryCommands, FilterLibraryCommands>();
             services.AddSingleton<IFilterPaneCommands, FilterPaneCommands>();
             services.AddSingleton<ILogTableCommands, LogTableCommands>();
+            services.AddSingleton<IScenarioFavoriteCommands, ScenarioFavoriteCommands>();
 
             // Shared coordination state for EventLog effects classes.
             services.AddSingleton<LogCloseCoordinator>();

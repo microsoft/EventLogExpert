@@ -1,0 +1,12 @@
+@inherits FluxorComponent
+
+@if (HasActiveLogs.Value)
+{
+    <FilterPane />
+    <LogTablePane />
+    <DetailsPane />
+}
+else
+{
+    <EmptyStateDashboard />
+}

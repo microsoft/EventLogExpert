@@ -1,0 +1,61 @@
+@using EventLogExpert.Scenarios.Catalog
+<div aria-labelledby="@_nameId" class="scenario-detail" role="region">
+    <p class="scenario-detail__eyebrow">
+        <i aria-hidden="true" class="bi @EmptyStateDashboard.ScenarioIcon(Scenario.Group)"></i>
+        <span>@Scenario.Group.DisplayName()</span>
+    </p>
+    <h3 class="scenario-detail__name" id="@_nameId">@Scenario.Name</h3>
+    <p class="scenario-detail__purpose">@Scenario.Purpose</p>
+    <div class="scenario-detail__facts">
+        <div class="scenario-detail__fact">
+            <span class="scenario-detail__fact-label">Logs</span>
+            <span class="scenario-detail__fact-value">@string.Join(", ", Scenario.Channels)</span>
+            @if (!Scenario.OptionalChannels.IsDefaultOrEmpty)
+            {
+                <span class="scenario-detail__fact-muted">Also if present: @string.Join(", ", Scenario.OptionalChannels)</span>
+            }
+        </div>
+        @if (Scenario.RequiresAdmin)
+        {
+            <div class="scenario-detail__fact">
+                <span class="scenario-detail__admin-badge">
+                    <i aria-hidden="true" class="bi bi-shield-lock"></i>
+                    <span>Requires administrator</span>
+                </span>
+            </div>
+        }
+        @if (FilterLines.Count > 0)
+        {
+            <div class="scenario-detail__fact">
+                <span class="scenario-detail__fact-label">Filters</span>
+                @foreach (var line in FilterLines)
+                {
+                    <span class="scenario-detail__filter">
+                        @if (line.Color is not HighlightColor.None)
+                        {
+                            <span aria-hidden="true" class="scenario-detail__swatch" data-highlight="@line.Color.ToCssName()"></span>
+                        }
+                        <span class="scenario-detail__fact-value">@line.Text</span>
+                    </span>
+                }
+            </div>
+        }
+    </div>
+    <div class="scenario-detail__actions">
+        <button aria-label="@(IsFavored ? $"Remove {Scenario.Name} from favorites" : $"Add {Scenario.Name} to favorites")"
+            aria-pressed="@(IsFavored ? "true" : "false")"
+            class="scenario-detail__star"
+            @onclick="OnToggleFavorite"
+            type="button">
+            <i aria-hidden="true" class="bi @(IsFavored ? "bi-star-fill" : "bi-star")"></i>
+        </button>
+        <button aria-describedby="@(IsDisabled ? ElevationReasonId : null)"
+            aria-disabled="@(IsDisabled ? "true" : "false")"
+            class="scenario-detail__launch"
+            disabled="@IsBusy"
+            @onclick="LaunchAsync"
+            type="button">
+            <i aria-hidden="true" class="bi bi-play-fill"></i><span>Launch</span>
+        </button>
+    </div>
+</div>

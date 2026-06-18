@@ -1,6 +1,6 @@
 @inherits FluxorComponent
 
-<nav aria-label="Main menu" aria-orientation="horizontal" class="menu-bar" role="menubar">
+<nav aria-label="Main menu" aria-orientation="horizontal" class="menu-bar" @ref="_menuBarRootRef" role="menubar">
     @for (int index = 0; index < _bars.Count; index++)
     {
         var bar = _bars[index];

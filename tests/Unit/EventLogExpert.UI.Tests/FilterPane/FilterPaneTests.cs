@@ -159,7 +159,7 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
-    public void ApplyScenarioButton_WhenLogsLoaded_IsShownWithPopupAttributes()
+    public void ApplyScenarioButton_WhenLogsLoaded_IsShownAsExpander()
     {
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
         SetEventLogState(EventLogStateWithChannel("System"));
@@ -168,7 +168,7 @@ public sealed class FilterPaneTests : BunitContext
         var button = FindApplyScenarioButton(component);
 
         Assert.NotNull(button);
-        Assert.Equal("true", button!.GetAttribute("aria-haspopup"));
+        Assert.Null(button!.GetAttribute("aria-haspopup"));
         Assert.Equal("false", button.GetAttribute("aria-expanded"));
         Assert.Equal("scenario-picker", button.GetAttribute("aria-controls"));
     }
@@ -184,6 +184,57 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public void ApplyScenarioSelection_AfterCategoryChange_AppliesScenarioFromNewCategory()
+    {
+        var sys = Scenario("sys", ScenarioGroup.SystemHealth);
+        var sec = Scenario("sec", ScenarioGroup.Security);
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetEventLogState(EventLogStateWithChannel("System"));
+        _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([sys, sec]);
+
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.OpenScenarioPicker();
+        component.Instance.OnScenarioGroupChanged(ScenarioGroup.Security);
+
+        component.Instance.ApplyScenarioSelection();
+
+        _scenarioApply.Received(1).ApplyInApp(sec, false);
+    }
+
+    [Fact]
+    public void ApplyScenarioSelection_WhenNoMatches_AnnouncesAndDoesNotApply()
+    {
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetEventLogState(EventLogStateWithChannel("System"));
+        _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([]);
+
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.OpenScenarioPicker();
+
+        component.Instance.ApplyScenarioSelection();
+
+        _announcements.Received(1).Announce(FilterPaneAnnouncements.SelectedScenarioMissing);
+        _scenarioApply.DidNotReceiveWithAnyArgs().ApplyInApp(null!, false);
+    }
+
+    [Fact]
+    public void ApplyScenarioSelection_WhenSelectionStale_AppliesFirstVisibleScenario()
+    {
+        var match = Scenario("sys", ScenarioGroup.SystemHealth);
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetEventLogState(EventLogStateWithChannel("System"));
+        _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([match]);
+
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.OpenScenarioPicker();
+        component.Instance.SelectedScenarioId = "no-such-scenario";
+
+        component.Instance.ApplyScenarioSelection();
+
+        _scenarioApply.Received(1).ApplyInApp(match, false);
+    }
+
+    [Fact]
     public void AvailableTagsForSets_ReturnsDistinctSortedUnion()
     {
         var a = BuildFilterSet("A", ["zebra", "alpha"]);
@@ -192,6 +243,25 @@ public sealed class FilterPaneTests : BunitContext
         var tags = UI.FilterPane.FilterPane.AvailableTagsForSets([a, b]);
 
         Assert.Equal(new[] { "alpha", "mid", "zebra" }, tags.ToArray());
+    }
+
+    [Fact]
+    public async Task CancelScenarioPicker_ResetsSelectedScenarioId()
+    {
+        var scenario = Scenario("sys", ScenarioGroup.SystemHealth);
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetEventLogState(EventLogStateWithChannel("System"));
+        _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([scenario]);
+
+        var component = Render<UI.FilterPane.FilterPane>();
+        await FindApplyScenarioButton(component)!.ClickAsync(new MouseEventArgs());
+        Assert.Equal(scenario.Id, component.Instance.SelectedScenarioId);
+
+        await component.Find("#scenario-picker button.button-red").ClickAsync(new MouseEventArgs());
+
+        Assert.False(component.Instance.IsScenarioPickerVisible);
+        Assert.Null(component.Instance.SelectedScenarioGroup);
+        Assert.Null(component.Instance.SelectedScenarioId);
     }
 
     [Fact]
@@ -414,6 +484,25 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public void OnScenarioGroupChanged_ResetsScenarioToFirstOfNewCategory()
+    {
+        var sys = Scenario("sys", ScenarioGroup.SystemHealth);
+        var sec1 = Scenario("sec1", ScenarioGroup.Security);
+        var sec2 = Scenario("sec2", ScenarioGroup.Security);
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetEventLogState(EventLogStateWithChannel("System"));
+        _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([sys, sec1, sec2]);
+
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.OpenScenarioPicker();
+
+        component.Instance.OnScenarioGroupChanged(ScenarioGroup.Security);
+
+        Assert.Equal(ScenarioGroup.Security, component.Instance.SelectedScenarioGroup);
+        Assert.Equal("sec1", component.Instance.SelectedScenarioId);
+    }
+
+    [Fact]
     public void OpenFilterSetPicker_PreSelectsFirstFilterSetCaseInsensitive()
     {
         var filterSetZ = BuildFilterSet("ZebraGroup");
@@ -491,11 +580,11 @@ public sealed class FilterPaneTests : BunitContext
 
         Assert.NotNull(capturedNames);
         Assert.Contains("Security", capturedNames!);
-        Assert.NotNull(component.Find("button[aria-label='Apply scenario sec']"));
+        Assert.Contains(component.FindAll(".filter-set-option-name"), option => option.TextContent == "sec");
     }
 
     [Fact]
-    public async Task OpenScenarioPicker_GroupsInDeclarationOrderAndExpandsButton()
+    public async Task OpenScenarioPicker_ListsFirstCategoryScenariosInDeclarationOrder()
     {
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
         SetEventLogState(EventLogStateWithChannel("System"));
@@ -510,12 +599,53 @@ public sealed class FilterPaneTests : BunitContext
         var component = Render<UI.FilterPane.FilterPane>();
         await FindApplyScenarioButton(component)!.ClickAsync(new MouseEventArgs());
 
-        var headers = component.FindAll(".scenario-picker-group-header").Select(header => header.TextContent).ToArray();
-        Assert.Equal([ScenarioGroup.SystemHealth.DisplayName(), ScenarioGroup.Security.DisplayName()], headers);
+        var optionNames = component.FindAll(".filter-set-option-name").Select(option => option.TextContent).ToArray();
+        Assert.Equal(["bravo"], optionNames);
         Assert.Equal("true", FindApplyScenarioButton(component)!.GetAttribute("aria-expanded"));
+    }
 
-        Assert.NotNull(component.Find("button[aria-label='Apply scenario alpha']"));
-        Assert.NotNull(component.Find("button[aria-label='Apply scenario charlie']"));
+    [Fact]
+    public async Task OpenScenarioPicker_MultipleCategories_RendersCategoryDropdown()
+    {
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetEventLogState(EventLogStateWithChannel("System"));
+        _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>())
+            .Returns([Scenario("sys", ScenarioGroup.SystemHealth), Scenario("sec", ScenarioGroup.Security)]);
+
+        var component = Render<UI.FilterPane.FilterPane>();
+        await FindApplyScenarioButton(component)!.ClickAsync(new MouseEventArgs());
+
+        Assert.Contains("Category:", component.Find("#scenario-picker").TextContent);
+    }
+
+    [Fact]
+    public void OpenScenarioPicker_PreselectsFirstMatch()
+    {
+        var first = Scenario("first", ScenarioGroup.SystemHealth);
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetEventLogState(EventLogStateWithChannel("System"));
+        _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>())
+            .Returns([first, Scenario("second", ScenarioGroup.SystemHealth)]);
+
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.OpenScenarioPicker();
+
+        Assert.Equal(ScenarioGroup.SystemHealth, component.Instance.SelectedScenarioGroup);
+        Assert.Equal(first.Id, component.Instance.SelectedScenarioId);
+    }
+
+    [Fact]
+    public async Task OpenScenarioPicker_SingleCategory_OmitsCategoryDropdown()
+    {
+        SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
+        SetEventLogState(EventLogStateWithChannel("System"));
+        _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>())
+            .Returns([Scenario("one", ScenarioGroup.SystemHealth), Scenario("two", ScenarioGroup.SystemHealth)]);
+
+        var component = Render<UI.FilterPane.FilterPane>();
+        await FindApplyScenarioButton(component)!.ClickAsync(new MouseEventArgs());
+
+        Assert.DoesNotContain("Category:", component.Find("#scenario-picker").TextContent);
     }
 
     [Fact]
@@ -699,7 +829,7 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
-    public async Task ScenarioApplyButton_InvokesApplyInAppMergeAndClosesPicker()
+    public void ScenarioApplySelection_InvokesApplyInAppMergeAndClosesPicker()
     {
         var scenario = Scenario("sys", ScenarioGroup.SystemHealth);
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
@@ -707,9 +837,8 @@ public sealed class FilterPaneTests : BunitContext
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([scenario]);
 
         var component = Render<UI.FilterPane.FilterPane>();
-        await FindApplyScenarioButton(component)!.ClickAsync(new MouseEventArgs());
-
-        await component.Find("button[aria-label='Apply scenario sys']").ClickAsync(new MouseEventArgs());
+        component.Instance.OpenScenarioPicker();
+        component.Instance.ApplyScenarioSelection();
 
         _scenarioApply.Received(1).ApplyInApp(scenario, false);
         Assert.False(component.Instance.IsScenarioPickerVisible);
@@ -729,7 +858,7 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
-    public async Task ScenarioReplaceButton_InvokesApplyInAppReplace()
+    public void ScenarioReplaceSelection_InvokesApplyInAppReplace()
     {
         var scenario = Scenario("sys", ScenarioGroup.SystemHealth);
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
@@ -737,9 +866,8 @@ public sealed class FilterPaneTests : BunitContext
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([scenario]);
 
         var component = Render<UI.FilterPane.FilterPane>();
-        await FindApplyScenarioButton(component)!.ClickAsync(new MouseEventArgs());
-
-        await component.Find("button[aria-label='Replace filters with scenario sys']").ClickAsync(new MouseEventArgs());
+        component.Instance.OpenScenarioPicker();
+        component.Instance.ReplaceScenarioSelection();
 
         _scenarioApply.Received(1).ApplyInApp(scenario, true);
     }
@@ -760,7 +888,7 @@ public sealed class FilterPaneTests : BunitContext
 
         Assert.Contains("2024-06-08", component.Find("input[aria-label='After']").GetAttribute("value"));
         Assert.Contains("2024-06-15", component.Find("input[aria-label='Before']").GetAttribute("value"));
-        _filterPaneCommands.DidNotReceiveWithAnyArgs().SetFilterDateRange(default);
+        _filterPaneCommands.DidNotReceiveWithAnyArgs().SetFilterDateRange(null);
     }
 
     private static LibraryEntryFilterSet BuildFilterSet(string name, ImmutableList<string>? tags = null) =>

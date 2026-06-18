@@ -39,6 +39,8 @@ public sealed partial class FilterPane
     internal bool IsFilterSetPickerVisible;
     internal bool IsScenarioPickerVisible;
     internal LibraryEntryId SelectedFilterSetId;
+    internal ScenarioGroup? SelectedScenarioGroup;
+    internal string? SelectedScenarioId;
 
     private readonly List<string> _filterSetTags = [];
     private readonly DateFilter _model = new();
@@ -52,12 +54,14 @@ public sealed partial class FilterPane
     private bool _canEditDate;
     private ScenarioClipboardExporter _clipboardExporter = null!;
     private TimeZoneInfo _currentTimeZone = TimeZoneInfo.Utc;
+    private ElementReference _filterPaneRootRef;
     private bool _focusAddButtonAfterRemove;
     private FilterId? _focusTargetAfterRemove;
     private bool _isFilterListVisible;
     private IJSObjectReference? _menuAnchorModule;
     private IReadOnlyList<IGrouping<ScenarioGroup, ScenarioDefinition>> _scenarioMatchGroups = [];
     private ImmutableDictionary<string, EventLogData>? _scenarioMatchSource;
+    private IJSObjectReference? _scrollSuppressorModule;
 
     internal IReadOnlyList<string> AvailableFilterSetTags =>
         AvailableTagsForSets([.. FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>()]);
@@ -75,6 +79,11 @@ public sealed partial class FilterPane
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
+
+    private ScenarioGroup? EffectiveScenarioGroup =>
+        SelectedScenarioGroup is { } group && ScenarioMatchGroups.Any(match => match.Key == group)
+            ? group
+            : ScenarioMatchGroups.FirstOrDefault()?.Key;
 
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
@@ -125,11 +134,17 @@ public sealed partial class FilterPane
 
     [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
 
+    private ScenarioDefinition? ResolvedScenario =>
+        VisibleScenarioMatches.FirstOrDefault(match => match.Id == SelectedScenarioId)
+            ?? VisibleScenarioMatches.FirstOrDefault();
+
     [Inject] private IScenarioApplyService ScenarioApplyService { get; init; } = null!;
 
     [Inject] private ScenarioAuthoringOptions ScenarioAuthoringOptions { get; init; } = null!;
 
     [Inject] private IScenarioAuthoringService ScenarioAuthoringService { get; init; } = null!;
+
+    private IReadOnlyList<ScenarioDefinition> ScenarioMatches => [.. ScenarioMatchGroups.SelectMany(group => group)];
 
     private IReadOnlyList<IGrouping<ScenarioGroup, ScenarioDefinition>> ScenarioMatchGroups
     {
@@ -158,6 +173,11 @@ public sealed partial class FilterPane
     [Inject] private IScenarioQueryService ScenarioQueryService { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
+
+    private IReadOnlyList<ScenarioDefinition> VisibleScenarioMatches =>
+        EffectiveScenarioGroup is { } group
+            ? [.. ScenarioMatchGroups.First(match => match.Key == group)]
+            : [];
 
     internal static IReadOnlyList<string> AvailableTagsForSets(IReadOnlyList<LibraryEntryFilterSet> sets) =>
         [.. sets.SelectMany(s => s.Tags).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase)];
@@ -196,6 +216,17 @@ public sealed partial class FilterPane
         CancelFilterSetPicker();
     }
 
+    internal void ApplyScenarioSelection()
+    {
+        if (ResolvedScenario is not { } scenario)
+        {
+            AnnouncementService.Announce(FilterPaneAnnouncements.SelectedScenarioMissing);
+            return;
+        }
+
+        ApplyScenario(scenario, replace: false);
+    }
+
     internal IReadOnlyList<MenuItem> BuildAddFilterMenu() =>
     [
         MenuItem.Item("Basic", AddBasicFilterFromMenu),
@@ -218,6 +249,12 @@ public sealed partial class FilterPane
         return !FilterLibraryState.Value.IsLoaded ?
             FilterPaneAnnouncements.LoadingTryAgain :
             FilterPaneAnnouncements.RecentNoneAvailable;
+    }
+
+    internal void OnScenarioGroupChanged(ScenarioGroup? group)
+    {
+        SelectedScenarioGroup = group;
+        SelectedScenarioId = VisibleScenarioMatches.FirstOrDefault()?.Id;
     }
 
     internal void OpenFilterSetPicker()
@@ -254,6 +291,8 @@ public sealed partial class FilterPane
         if (IsScenarioPickerVisible) { return; }
 
         IsScenarioPickerVisible = true;
+        SelectedScenarioGroup = ScenarioMatchGroups.FirstOrDefault()?.Key;
+        SelectedScenarioId = VisibleScenarioMatches.FirstOrDefault()?.Id;
         _isFilterListVisible = true;
     }
 
@@ -263,6 +302,17 @@ public sealed partial class FilterPane
 
         FilterLibraryCommands.ReplaceWithEntry(SelectedFilterSetId);
         CancelFilterSetPicker();
+    }
+
+    internal void ReplaceScenarioSelection()
+    {
+        if (ResolvedScenario is not { } scenario)
+        {
+            AnnouncementService.Announce(FilterPaneAnnouncements.SelectedScenarioMissing);
+            return;
+        }
+
+        ApplyScenario(scenario, replace: true);
     }
 
     internal void SetQuickDateRange(DateFilter dateFilter) => UpdateFilterDate(dateFilter);
@@ -307,9 +357,14 @@ public sealed partial class FilterPane
             Settings.TimeZoneChanged -= UpdateFilterDateTimeZone;
             MenuService.StateChanged -= OnMenuServiceStateChanged;
 
+            await JsModuleInterop.DisposeModuleSafelyAsync(
+                _scrollSuppressorModule,
+                module => module.InvokeVoidAsync("release", _filterPaneRootRef));
+
             await JsModuleInterop.DisposeModuleSafelyAsync(_menuAnchorModule);
 
             _menuAnchorModule = null;
+            _scrollSuppressorModule = null;
         }
 
         await base.DisposeAsyncCore(disposing);
@@ -317,6 +372,27 @@ public sealed partial class FilterPane
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            try
+            {
+                _scrollSuppressorModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/EventLogExpert.UI/Common/keyboardScrollSuppressor.js");
+
+                await _scrollSuppressorModule.InvokeVoidAsync(
+                    "suppress",
+                    _filterPaneRootRef,
+                    new[]
+                    {
+                        new { selector = ".split-button-chevron", keys = new[] { "ArrowUp", "ArrowDown" } },
+                        new { selector = ".menu-toggle", keys = new[] { "Enter", " " } }
+                    });
+            }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+        }
+
         PruneStaleRowRefs();
         PruneStaleFilterSetTags();
 
@@ -468,6 +544,8 @@ public sealed partial class FilterPane
     private void CancelScenarioPicker()
     {
         IsScenarioPickerVisible = false;
+        SelectedScenarioGroup = null;
+        SelectedScenarioId = null;
         _scenarioMatchSource = null;
         _scenarioMatchGroups = [];
     }
@@ -529,6 +607,13 @@ public sealed partial class FilterPane
         var set = FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().FirstOrDefault(p => p.Id.Equals(id));
 
         return set is null ? string.Empty : FormatFilterSetLabel(set);
+    }
+
+    private string GetScenarioName(string? id)
+    {
+        var scenario = ScenarioMatches.FirstOrDefault(match => match.Id == id);
+
+        return scenario is null ? string.Empty : scenario.Name;
     }
 
     private async Task HandleAddFilterChevronKeyDownAsync(KeyboardEventArgs e)

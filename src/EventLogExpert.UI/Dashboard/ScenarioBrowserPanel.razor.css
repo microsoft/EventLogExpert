@@ -1,0 +1,114 @@
+.scenario-browser {
+    display: flex;
+    flex: 1 1 0;
+    gap: 1rem;
+    min-height: 0;
+    padding: 0.5rem 0 0.5rem 0.5rem;
+}
+
+.scenario-browser__list {
+    flex: 0 0 18rem;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.scenario-browser__option {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: calc(var(--control-height) + 0.5rem);
+    padding: 0.5rem 0.85rem;
+    border-bottom: 1px solid var(--border-divider);
+    border-left: 3px solid transparent;
+    cursor: pointer;
+}
+
+.scenario-browser__option:last-child {
+    border-bottom: 0;
+}
+
+.scenario-browser__option:hover {
+    background-color: var(--background-darkgray);
+}
+
+.scenario-browser__option--selected {
+    border-left-color: var(--clr-lightblue);
+    background-color: var(--background-darkgray);
+}
+
+.scenario-browser__option--disabled {
+    cursor: default;
+}
+
+.scenario-browser__option--disabled .scenario-browser__option-icon,
+.scenario-browser__option--disabled .scenario-browser__option-body {
+    opacity: 0.55;
+}
+
+.scenario-browser__option:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: -2px;
+}
+
+.scenario-browser__option-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--control-height);
+    height: var(--control-height);
+    border-radius: 6px;
+    background-color: color-mix(in srgb, var(--clr-lightblue) 14%, transparent);
+    color: var(--clr-lightblue);
+    font-size: 1.1rem;
+}
+
+.scenario-browser__option-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.scenario-browser__option-name {
+    display: -webkit-box;
+    overflow: hidden;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--toggle-accent);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.scenario-browser__detail {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.scenario-browser__empty {
+    margin: 0;
+    padding: 1rem;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+@container (max-width: 960px) {
+    .scenario-browser {
+        flex-direction: column;
+    }
+
+    .scenario-browser__list {
+        flex: 0 0 auto;
+        max-height: 45%;
+    }
+
+    .scenario-browser__detail {
+        flex: 1 1 0;
+    }
+}

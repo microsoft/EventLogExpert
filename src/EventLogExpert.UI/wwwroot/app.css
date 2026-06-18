@@ -287,13 +287,15 @@ input[type="text"].input { padding: 0; }
     max-width: 100%;
 }
 
-.input.filter-multiselect-dropdown {
+.input.filter-multiselect-dropdown,
+.input.scenario-category-dropdown {
     flex: 1 1 auto;
     min-width: 240px;
     max-width: 420px;
 }
 
-.input.filter-set-dropdown { width: 600px; }
+.input.filter-set-dropdown,
+.input.scenario-item-dropdown { width: 600px; }
 
 .input.filter-value-dropdown,
 .input.filter-description {

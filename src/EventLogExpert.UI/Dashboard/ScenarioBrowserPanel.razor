@@ -1,0 +1,41 @@
+<div class="scenario-browser" @ref="_scenarioBrowserRootRef">
+    @if (Scenarios.Count == 0)
+    {
+        <p class="scenario-browser__empty" role="status">No scenarios available in this category.</p>
+    }
+    else
+    {
+        <ul aria-label="Scenarios" class="scenario-browser__list" @onkeydown="OnListKeyDownAsync" role="listbox">
+            @foreach (var scenario in Scenarios)
+            {
+                <li aria-describedby="@(IsScenarioDisabled(scenario) ? ElevationReasonId : null)"
+                    aria-disabled="@(IsScenarioDisabled(scenario) ? "true" : "false")"
+                    aria-selected="@(IsSelected(scenario) ? "true" : "false")"
+                    class="@OptionClass(scenario)"
+                    @onclick="() => OnSelect.InvokeAsync(scenario)"
+                    @ref="_optionRefs[scenario.Id]"
+                    role="option"
+                    tabindex="@(IsSelected(scenario) ? "0" : "-1")"
+                    title="@scenario.Purpose">
+                    <span aria-hidden="true" class="scenario-browser__option-icon"><i class="bi @EmptyStateDashboard.ScenarioIcon(scenario.Group)"></i></span>
+                    <span class="scenario-browser__option-body">
+                        <span class="scenario-browser__option-name">@scenario.Name</span>
+                    </span>
+                </li>
+            }
+        </ul>
+
+        <div class="scenario-browser__detail">
+            @if (Selected is not null)
+            {
+                <ScenarioDetail ElevationReasonId="@ElevationReasonId"
+                    IsBusy="IsBusy"
+                    IsDisabled="IsScenarioDisabled(Selected)"
+                    IsFavored="IsFavored(Selected)"
+                    OnLaunch="() => OnLaunch.InvokeAsync(Selected)"
+                    OnToggleFavorite="() => OnToggleFavorite.InvokeAsync(Selected)"
+                    Scenario="Selected" />
+            }
+        </div>
+    }
+</div>
