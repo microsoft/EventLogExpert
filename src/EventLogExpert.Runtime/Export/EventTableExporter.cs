@@ -10,9 +10,9 @@ namespace EventLogExpert.Runtime.Export;
 
 internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTableExporter
 {
-    private const string IsoDateTimeFormat = "yyyy-MM-dd HH:mm:ss";
+    private const string ExportDateTimeFormat = "yyyy-MM-dd HH:mm:ss";
 
-    private static readonly SearchValues<char> s_formulaInjectionTriggers = SearchValues.Create("=+-@\t\r");
+    private static readonly SearchValues<char> s_formulaInjectionTriggers = SearchValues.Create("=+-@");
 
     public async Task ExportAsync(
         Stream destination,
@@ -49,8 +49,25 @@ internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTa
             .ConfigureAwait(false);
     }
 
-    private static string NeutralizeCsvFormula(string value) =>
-        value.Length > 0 && s_formulaInjectionTriggers.Contains(value[0]) ? "'" + value : value;
+    private static string NeutralizeCsvFormula(string value)
+    {
+        if (value.Length == 0) { return value; }
+
+        // A leading TAB or CR is itself a CSV-injection vector; neutralize it directly (it is whitespace,
+        // so the scan below would otherwise skip past it).
+        if (value[0] is '\t' or '\r') { return "'" + value; }
+
+        // Spreadsheet apps trim leading whitespace before evaluating a cell, so a value like " =SUM(A1)"
+        // is still a formula. Neutralize when the first non-whitespace character is a formula trigger.
+        foreach (char character in value)
+        {
+            if (char.IsWhiteSpace(character)) { continue; }
+
+            return s_formulaInjectionTriggers.Contains(character) ? "'" + value : value;
+        }
+
+        return value;
+    }
 
     private static async IAsyncEnumerable<IReadOnlyList<string?>> ProjectRows(
         IReadOnlyList<ResolvedEvent> events,
@@ -77,7 +94,7 @@ internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTa
 
             for (int i = 0; i < columns.Count; i++)
             {
-                string cell = EventTableColumnFormatter.GetCellText(@event, columns[i], timeZone, IsoDateTimeFormat);
+                string cell = EventTableColumnFormatter.GetCellText(@event, columns[i], timeZone, ExportDateTimeFormat);
                 cells[i] = neutralizeCsvFormula ? NeutralizeCsvFormula(cell) : cell;
             }
 

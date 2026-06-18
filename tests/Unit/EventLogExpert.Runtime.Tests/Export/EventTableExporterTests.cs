@@ -90,6 +90,12 @@ public sealed class EventTableExporterTests
     [InlineData("\rCarriage", "Source\r\n\"'\rCarriage\"\r\n")]
     [InlineData("Alpha", "Source\r\nAlpha\r\n")]
     [InlineData("a=b", "Source\r\na=b\r\n")]
+    [InlineData(" =SUM(A1)", "Source\r\n' =SUM(A1)\r\n")]
+    [InlineData(" +1", "Source\r\n' +1\r\n")]
+    [InlineData("  -2", "Source\r\n'  -2\r\n")]
+    [InlineData(" @cmd", "Source\r\n' @cmd\r\n")]
+    [InlineData("  hello", "Source\r\n  hello\r\n")]
+    [InlineData("   ", "Source\r\n   \r\n")]
     public async Task ExportAsync_Csv_NeutralizesLeadingFormulaTriggers(string sourceValue, string expectedCsv)
     {
         ResolvedEvent[] events = [new("Log", LogPathType.Channel) { Id = 1, Source = sourceValue }];
