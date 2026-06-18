@@ -21,6 +21,15 @@ public sealed class EventLogDataTests
     }
 
     [Fact]
+    public void New_DistinctInstances_AreNotEqual()
+    {
+        var a = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var b = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+
+        Assert.NotEqual(a, b);
+    }
+
+    [Fact]
     public void New_DistinctInstances_GetDistinctIds()
     {
         // Arrange + Act
@@ -29,6 +38,16 @@ public sealed class EventLogDataTests
 
         // Assert
         Assert.NotEqual(a.Id, b.Id);
+    }
+
+    [Fact]
+    public void New_WithInitId_CarriesProvidedId()
+    {
+        var id = EventLogId.Create();
+
+        var data = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel) { Id = id };
+
+        Assert.Equal(id, data.Id);
     }
 
     [Fact]

@@ -81,7 +81,7 @@ internal sealed class LogReloadEffects(
 
         foreach (var bufferedEvent in state.NewEventBuffer)
         {
-            if (!state.ActiveLogs.TryGetValue(bufferedEvent.OwningLog, out var owningLog)) { continue; }
+            if (!state.OpenLogs.TryGetValue(bufferedEvent.OwningLog, out var owningLog)) { continue; }
 
             if (!grouped.TryGetValue(owningLog.Id, out var list))
             {

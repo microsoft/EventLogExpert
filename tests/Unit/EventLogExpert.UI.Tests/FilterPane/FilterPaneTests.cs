@@ -1,9 +1,10 @@
-// // Copyright (c) Microsoft Corporation.
+﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using AngleSharp.Dom;
 using Bunit;
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
@@ -749,7 +750,7 @@ public sealed class FilterPaneTests : BunitContext
     {
         var initial = Reducers.ReduceOpenLog(
             new EventLogState(), new OpenLogAction(@"C:\F.evtx", LogPathType.File));
-        var fLog = initial.ActiveLogs[@"C:\F.evtx"];
+        var fLog = new EventLogData(@"C:\F.evtx", LogPathType.File) { Id = initial.OpenLogs[@"C:\F.evtx"].Id };
         initial = Reducers.ReduceLoadEvents(
             initial, new LoadEventsAction(fLog, [EventWithName("Security")]));
 
@@ -783,8 +784,8 @@ public sealed class FilterPaneTests : BunitContext
             new EventLogState(), new OpenLogAction(@"C:\F.evtx", LogPathType.File));
         initial = Reducers.ReduceOpenLog(
             initial, new OpenLogAction(@"C:\G.evtx", LogPathType.File));
-        var fLog = initial.ActiveLogs[@"C:\F.evtx"];
-        var gLog = initial.ActiveLogs[@"C:\G.evtx"];
+        var fLog = new EventLogData(@"C:\F.evtx", LogPathType.File) { Id = initial.OpenLogs[@"C:\F.evtx"].Id };
+        var gLog = new EventLogData(@"C:\G.evtx", LogPathType.File) { Id = initial.OpenLogs[@"C:\G.evtx"].Id };
         initial = Reducers.ReduceLoadEvents(
             initial, new LoadEventsAction(fLog, [EventWithName("A"), EventWithName("B")]));
         initial = Reducers.ReduceLoadEvents(
@@ -814,7 +815,7 @@ public sealed class FilterPaneTests : BunitContext
         var renderCountBefore = component.RenderCount;
 
         var closed = Reducers.ReduceCloseLog(
-            initial, new CloseLogAction(initial.ActiveLogs["System"].Id, "System"));
+            initial, new CloseLogAction(initial.OpenLogs["System"].Id, "System"));
 
         await component.InvokeAsync(() => feature.Publish(closed));
 

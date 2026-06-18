@@ -7,5 +7,5 @@ namespace EventLogExpert.Eventing.Common.EventLogs;
 
 public sealed record EventLogData(string Name, LogPathType Type)
 {
-    public EventLogId Id { get; } = EventLogId.Create();
+    public EventLogId Id { get; init; } = EventLogId.Create();
 }

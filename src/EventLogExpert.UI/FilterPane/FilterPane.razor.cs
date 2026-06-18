@@ -409,7 +409,7 @@ public sealed partial class FilterPane
     protected override void OnInitialized()
     {
         LoadedLogNames.Select(s => s.LoadedLogNames);
-        OpenLogCount.Select(s => s.ActiveLogs.Count);
+        OpenLogCount.Select(s => s.OpenLogCount);
 
         SubscribeToAction<ClearAllFiltersAction>(action =>
         {

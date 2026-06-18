@@ -9,20 +9,6 @@ namespace EventLogExpert.Runtime.Tests.EventLog;
 public sealed class OpenLogsReducerTests
 {
     [Fact]
-    public void OpenLogs_KeysAndMetadataMirrorActiveLogs_AcrossOpenCloseSequence()
-    {
-        var state = new EventLogState();
-        state = Reducers.ReduceOpenLog(state, new OpenLogAction("Application", LogPathType.Channel));
-        state = Reducers.ReduceOpenLog(state, new OpenLogAction("C:/logs/security.evtx", LogPathType.File));
-        state = Reducers.ReduceOpenLog(state, new OpenLogAction("System", LogPathType.Channel));
-
-        var systemId = state.OpenLogs["System"].Id;
-        state = Reducers.ReduceCloseLog(state, new CloseLogAction(systemId, "System"));
-
-        AssertOpenLogsMirrorActiveLogs(state);
-    }
-
-    [Fact]
     public void ReduceCloseAll_ClearsOpenLogs()
     {
         var state = Reducers.ReduceOpenLog(new EventLogState(), new OpenLogAction("Application", LogPathType.Channel));
@@ -58,26 +44,13 @@ public sealed class OpenLogsReducerTests
     }
 
     [Fact]
-    public void ReduceOpenLog_SeedsOpenLogsWithSameIdAndTypeAsActiveLogs()
+    public void ReduceOpenLog_SeedsOpenLogsWithCorrectIdAndType()
     {
         var state = Reducers.ReduceOpenLog(new EventLogState(), new OpenLogAction("Application", LogPathType.Channel));
 
         Assert.True(state.OpenLogs.ContainsKey("Application"));
         Assert.Equal(LogPathType.Channel, state.OpenLogs["Application"].Type);
-        Assert.Equal(state.ActiveLogs["Application"].Id, state.OpenLogs["Application"].Id);
+        Assert.NotEqual(default, state.OpenLogs["Application"].Id);
         Assert.True(state.IsLogOpen("Application"));
-    }
-
-    private static void AssertOpenLogsMirrorActiveLogs(EventLogState state)
-    {
-        Assert.Equal(
-            state.ActiveLogs.Keys.OrderBy(name => name),
-            state.OpenLogs.Keys.OrderBy(name => name));
-
-        foreach (var (name, logData) in state.ActiveLogs)
-        {
-            Assert.Equal(logData.Id, state.OpenLogs[name].Id);
-            Assert.Equal(logData.Type, state.OpenLogs[name].Type);
-        }
     }
 }

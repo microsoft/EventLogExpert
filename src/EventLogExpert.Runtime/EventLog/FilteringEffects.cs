@@ -32,7 +32,7 @@ internal sealed class FilteringEffects(
     [EffectMethod]
     public Task HandleAddEvent(AddEventAction action, IDispatcher dispatcher)
     {
-        if (!_eventLogState.Value.ActiveLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog))
+        if (!_eventLogState.Value.OpenLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog))
         {
             return Task.CompletedTask;
         }
@@ -78,10 +78,10 @@ internal sealed class FilteringEffects(
 
         bool newRequiresXml = action.Filter.RequiresXml;
 
-        var logsNeedingReload = newRequiresXml && !_eventLogState.Value.ActiveLogs.IsEmpty
-            ? _eventLogState.Value.ActiveLogs.Values
-                .Where(d => !_concurrencyState.IsLoadedWithXml(d.Id))
-                .Select(d => (d.Id, d.Name, d.Type))
+        var logsNeedingReload = newRequiresXml && !_eventLogState.Value.OpenLogs.IsEmpty
+            ? _eventLogState.Value.OpenLogs
+                .Where(kvp => !_concurrencyState.IsLoadedWithXml(kvp.Value.Id))
+                .Select(kvp => (kvp.Value.Id, Name: kvp.Key, kvp.Value.Type))
                 .ToList()
             : [];
 

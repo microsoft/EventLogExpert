@@ -11,6 +11,7 @@ using EventLogReducers = EventLogExpert.Runtime.EventLog.Reducers;
 using EventLogState = EventLogExpert.Runtime.EventLog.EventLogState;
 using LoadEventsAction = EventLogExpert.Runtime.EventLog.LoadEventsAction;
 using LoadEventsPartialAction = EventLogExpert.Runtime.EventLog.LoadEventsPartialAction;
+using OpenLogInfo = EventLogExpert.Runtime.EventLog.OpenLogInfo;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
 
@@ -79,7 +80,7 @@ public sealed class RawEventStoreReducersTests
         state = Ingest(state, id, RawIngestMode.Append, Ev(1), Ev(2));
         state = Ingest(state, id, RawIngestMode.Prepend, Ev(3));
 
-        // Live-tail order: newest prepended ahead of the earlier events (matches ActiveLogs.Events).
+        // Live-tail order: newest prepended ahead of the earlier events.
         Assert.Equal([3, 1, 2], state.ByLog[id].Select(e => e.Id));
     }
 
@@ -101,7 +102,7 @@ public sealed class RawEventStoreReducersTests
 
         var eventLogState = new EventLogState
         {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(openLog.Name, openLog)
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty.Add(openLog.Name, new OpenLogInfo(openLog.Id, openLog.Type))
         };
 
         var rawState = RawEventStoreReducers.ReduceAddTable(new RawEventStoreState(), new AddTableAction(openLog));

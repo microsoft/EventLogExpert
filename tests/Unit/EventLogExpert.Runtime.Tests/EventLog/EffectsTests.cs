@@ -1,4 +1,4 @@
-// // Copyright (c) Microsoft Corporation.
+﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
@@ -223,7 +223,6 @@ public sealed class EffectsTests
         var openState = new EventLogState
         {
             ContinuouslyUpdate = false,
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
             OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
                 .Add(Constants.LogNameTestLog, new OpenLogInfo(snapshotData.Id, LogPathType.Channel)),
             NewEventBuffer = [],
@@ -237,7 +236,6 @@ public sealed class EffectsTests
 
         var closedState = openState with
         {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
             OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
         };
 
@@ -294,7 +292,6 @@ public sealed class EffectsTests
         var state = new EventLogState
         {
             ContinuouslyUpdate = false,
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
             OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
                 .Add(Constants.LogNameTestLog, new OpenLogInfo(snapshotData.Id, LogPathType.Channel)),
             NewEventBuffer = [],
@@ -385,7 +382,6 @@ public sealed class EffectsTests
         var state = new EventLogState
         {
             ContinuouslyUpdate = false,
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
             OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
                 .Add(Constants.LogNameTestLog, new OpenLogInfo(snapshotData.Id, LogPathType.Channel)),
             NewEventBuffer = [],
@@ -662,7 +658,7 @@ public sealed class EffectsTests
 
         mockEventLogState.Value.Returns(new EventLogState
         {
-            ActiveLogs = activeLogs,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty.Add(Constants.LogNameTestLog, new OpenLogInfo(logData.Id, LogPathType.Channel)),
             SelectedEvents = [selectedEvent],
             AppliedFilter = new Filter(null, [])
         });
@@ -881,7 +877,7 @@ public sealed class EffectsTests
 
         mockEventLogState.Value.Returns(new EventLogState
         {
-            ActiveLogs = activeLogs,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty.Add(Constants.LogNameTestLog, new OpenLogInfo(logData.Id, LogPathType.Channel)),
             SelectedEvents = [selectedEvent],
             AppliedFilter = new Filter(null, [])
         });
@@ -1005,7 +1001,7 @@ public sealed class EffectsTests
         // is parked must NOT cause the parked reload to skip its reopen. The newer filter
         // only bumps filter token; only CloseAll bumps reload token. Without
         // that distinction, the round-2 guard treated any token bump as supersession
-        // and left the user's logs closed (the newer ApplyFilter sees empty ActiveLogs
+        // and left the user's logs closed (the newer ApplyFilter sees empty OpenLogs
         // because the CloseLog reducer already removed them, finds nothing to reload, and
         // returns).
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
@@ -1154,7 +1150,6 @@ public sealed class EffectsTests
 
         mockEventLogState.Value.Returns(new EventLogState
         {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
             AppliedFilter = new Filter(null, [])
         });
 
@@ -1243,7 +1238,6 @@ public sealed class EffectsTests
 
         mockEventLogState.Value.Returns(new EventLogState
         {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
             AppliedFilter = new Filter(null, [])
         });
 
@@ -1510,23 +1504,21 @@ public sealed class EffectsTests
     public async Task HandleOpenLog_LogClosedDuringClassificationAwait_DoesNotDispatchAddTable()
     {
         // Arrange — simulate the user closing the log (HandleCloseLog dispatch already removed
-        // it from ActiveLogs and canceled its CTS) while HandleOpenLog is parked on the
+        // it from OpenLogs and canceled its CTS) while HandleOpenLog is parked on the
         // classification await. After the await releases, HandleOpenLog must bail BEFORE
         // calling LoadLogAsync — otherwise LoadLogAsync's AddTable dispatch would resurrect
         // a table entry the user already dismissed, leaving an orphan in LogTableState.
         var logData = new EventLogData(Constants.LogNameApplication, LogPathType.Channel);
 
-        var initialActiveLogs =
-            ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameApplication, logData);
 
         var classificationTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        // Use a mutable IState so we can flip ActiveLogs to "log closed" partway through.
+        // Use a mutable IState so we can flip OpenLogs to "log closed" partway through.
         var mockEventLogState = Substitute.For<IState<EventLogState>>();
 
         var initialState = new EventLogState
         {
-            ActiveLogs = initialActiveLogs,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty.Add(Constants.LogNameApplication, new OpenLogInfo(logData.Id, LogPathType.Channel)),
             AppliedFilter = new Filter(null, [])
         };
 
@@ -1564,10 +1556,10 @@ public sealed class EffectsTests
         // Act 1 — start the open; await yields back at InitialClassificationTask.
         var openTask = effects.HandleOpenLog(action, mockDispatcher);
 
-        // Act 2 — simulate HandleCloseLog: remove the log from ActiveLogs.
+        // Act 2 - simulate HandleCloseLog: remove the log from OpenLogs.
         mockEventLogState.Value.Returns(new EventLogState
         {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty,
             AppliedFilter = new Filter(null, [])
         });
 
@@ -1609,6 +1601,27 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleOpenLog_ShouldThreadOpenLogsIdIntoDispatchedAddTableAction()
+    {
+        var logData = new EventLogData(Constants.LogNameApplication, LogPathType.Channel);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameApplication, logData);
+
+        var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        var (effects, mockDispatcher) = CreateEffects(
+            activeLogs: activeLogs,
+            hasEventResolver: true);
+
+        var action = new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel, cts.Token);
+
+        await effects.HandleOpenLog(action, mockDispatcher);
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddTableAction>(a => a.LogData.Id == logData.Id));
+        mockDispatcher.Received().Dispatch(Arg.Is<CloseLogAction>(a => a.LogId == logData.Id));
+    }
+
+    [Fact]
     public async Task HandleOpenLog_WhenCancelled_ShouldDispatchCloseAndClearStatus()
     {
         // Arrange
@@ -1633,7 +1646,7 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleOpenLog_WhenLogNotInActiveLogs_ShouldDispatchError()
+    public async Task HandleOpenLog_WhenLogNotInOpenLogs_ShouldDispatchError()
     {
         // Arrange
         var (effects, mockDispatcher) = CreateEffects(hasEventResolver: true);
@@ -1833,7 +1846,6 @@ public sealed class EffectsTests
         mockEventLogState.Value.Returns(new EventLogState
         {
             ContinuouslyUpdate = continuouslyUpdate,
-            ActiveLogs = effectiveActiveLogs,
             OpenLogs = openLogs,
             NewEventBuffer = newEventBuffer ?? [],
             AppliedFilter = new Filter(null, [])
@@ -1908,7 +1920,6 @@ public sealed class EffectsTests
 
         mockEventLogState.Value.Returns(new EventLogState
         {
-            ActiveLogs = activeLogs,
             OpenLogs = openLogs,
             AppliedFilter = new Filter(null, [])
         });
@@ -2019,7 +2030,6 @@ public sealed class EffectsTests
         mockEventLogState.Value.Returns(new EventLogState
         {
             ContinuouslyUpdate = continuouslyUpdate,
-            ActiveLogs = effectiveActiveLogs,
             OpenLogs = openLogs,
             NewEventBuffer = newEventBuffer ?? [],
             AppliedFilter = new Filter(null, [])

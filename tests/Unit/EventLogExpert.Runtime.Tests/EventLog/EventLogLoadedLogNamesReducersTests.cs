@@ -1,4 +1,4 @@
-// // Copyright (c) Microsoft Corporation.
+﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
@@ -33,7 +33,7 @@ public sealed class EventLogLoadedLogNamesReducersTests
         var state = Reducers.ReduceOpenLog(new EventLogState(), new OpenLogAction("System", LogPathType.Channel));
         state = Reducers.ReduceOpenLog(state, new OpenLogAction(ChannelName, LogPathType.Channel));
 
-        state = Reducers.ReduceCloseLog(state, new CloseLogAction(state.ActiveLogs[ChannelName].Id, ChannelName));
+        state = Reducers.ReduceCloseLog(state, new CloseLogAction(state.OpenLogs[ChannelName].Id, ChannelName));
 
         Assert.Contains("System", state.LoadedLogNames);
         Assert.DoesNotContain(ChannelName, state.LoadedLogNames);
@@ -44,7 +44,7 @@ public sealed class EventLogLoadedLogNamesReducersTests
     public void ReduceLoadEvents_Channel_IsNoOpForNamesByLog()
     {
         var state = Reducers.ReduceOpenLog(new EventLogState(), new OpenLogAction(ChannelName, LogPathType.Channel));
-        var logData = state.ActiveLogs[ChannelName];
+        var logData = new EventLogData(ChannelName, LogPathType.Channel) { Id = state.OpenLogs[ChannelName].Id };
         var priorNamesByLog = state.NamesByLog;
         var priorLoadedLogNames = state.LoadedLogNames;
 
@@ -60,7 +60,7 @@ public sealed class EventLogLoadedLogNamesReducersTests
     public void ReduceLoadEvents_File_ExcludesEmptyLogNames()
     {
         var state = Reducers.ReduceOpenLog(new EventLogState(), new OpenLogAction(FileA, LogPathType.File));
-        var logData = state.ActiveLogs[FileA];
+        var logData = new EventLogData(FileA, LogPathType.File) { Id = state.OpenLogs[FileA].Id };
 
         state = Reducers.ReduceLoadEvents(
             state,
@@ -74,7 +74,7 @@ public sealed class EventLogLoadedLogNamesReducersTests
     public void ReduceLoadEvents_File_ReplacesPerLogNamesAndRecomputesUnion()
     {
         var state = Reducers.ReduceOpenLog(new EventLogState(), new OpenLogAction(FileA, LogPathType.File));
-        var logData = state.ActiveLogs[FileA];
+        var logData = new EventLogData(FileA, LogPathType.File) { Id = state.OpenLogs[FileA].Id };
 
         state = Reducers.ReduceLoadEvents(state, new LoadEventsAction(logData, EventsWithLogNames("Security", "Setup")));
 
@@ -110,8 +110,8 @@ public sealed class EventLogLoadedLogNamesReducersTests
         var state = Reducers.ReduceOpenLog(new EventLogState(), new OpenLogAction(FileA, LogPathType.File));
         state = Reducers.ReduceOpenLog(state, new OpenLogAction(FileB, LogPathType.File));
 
-        var logA = state.ActiveLogs[FileA];
-        var logB = state.ActiveLogs[FileB];
+        var logA = new EventLogData(FileA, LogPathType.File) { Id = state.OpenLogs[FileA].Id };
+        var logB = new EventLogData(FileB, LogPathType.File) { Id = state.OpenLogs[FileB].Id };
 
         state = Reducers.ReduceLoadEvents(state, new LoadEventsAction(logA, EventsWithLogNames("A", "B")));
         state = Reducers.ReduceLoadEvents(state, new LoadEventsAction(logB, EventsWithLogNames("B")));
@@ -130,7 +130,7 @@ public sealed class EventLogLoadedLogNamesReducersTests
     public void ReduceLoadEventsPartial_File_UnionsPerLogNames()
     {
         var state = Reducers.ReduceOpenLog(new EventLogState(), new OpenLogAction(FileA, LogPathType.File));
-        var logData = state.ActiveLogs[FileA];
+        var logData = new EventLogData(FileA, LogPathType.File) { Id = state.OpenLogs[FileA].Id };
 
         state = Reducers.ReduceLoadEvents(state, new LoadEventsAction(logData, EventsWithLogNames("Security")));
         state = Reducers.ReduceLoadEventsPartial(state, new LoadEventsPartialAction(logData, EventsWithLogNames("Setup")));
@@ -143,7 +143,7 @@ public sealed class EventLogLoadedLogNamesReducersTests
     public void ReduceOpenLog_AfterClose_ReopensWithSeededNames()
     {
         var state = Reducers.ReduceOpenLog(new EventLogState(), new OpenLogAction(ChannelName, LogPathType.Channel));
-        state = Reducers.ReduceCloseLog(state, new CloseLogAction(state.ActiveLogs[ChannelName].Id, ChannelName));
+        state = Reducers.ReduceCloseLog(state, new CloseLogAction(state.OpenLogs[ChannelName].Id, ChannelName));
 
         Assert.Empty(state.LoadedLogNames);
 

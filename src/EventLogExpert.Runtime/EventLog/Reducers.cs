@@ -33,7 +33,6 @@ internal sealed class Reducers
     public static EventLogState ReduceCloseAll(EventLogState state) =>
         state with
         {
-            ActiveLogs = [],
             OpenLogs = [],
             NamesByLog = s_emptyNamesByLog,
             LoadedLogNames = RecomputeLoadedLogNames(s_emptyNamesByLog, state.LoadedLogNames),
@@ -69,7 +68,6 @@ internal sealed class Reducers
 
         return state with
         {
-            ActiveLogs = state.ActiveLogs.Remove(action.LogName),
             OpenLogs = state.OpenLogs.Remove(action.LogName),
             NamesByLog = newNamesByLog,
             LoadedLogNames = RecomputeLoadedLogNames(newNamesByLog, state.LoadedLogNames),
@@ -87,7 +85,7 @@ internal sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceLoadEvents(EventLogState state, LoadEventsAction action)
     {
-        if (!state.ActiveLogs.TryGetValue(action.LogData.Name, out var existing) ||
+        if (!state.OpenLogs.TryGetValue(action.LogData.Name, out var existing) ||
             existing.Id != action.LogData.Id ||
             action.LogData.Type != LogPathType.File)
         {
@@ -114,7 +112,7 @@ internal sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceLoadEventsPartial(EventLogState state, LoadEventsPartialAction action)
     {
-        if (!state.ActiveLogs.TryGetValue(action.LogData.Name, out var existingLog) ||
+        if (!state.OpenLogs.TryGetValue(action.LogData.Name, out var existingLog) ||
             existingLog.Id != action.LogData.Id ||
             action.LogData.Type != LogPathType.File)
         {
@@ -143,9 +141,9 @@ internal sealed class Reducers
     {
         // Idempotent: re-opening an already-active log is a no-op so callers (menu, drag/drop, command line,
         // SettingsModal.ReloadOpenLogs, effects) don't need to coordinate to avoid ImmutableDictionary.Add throwing.
-        if (state.ActiveLogs.ContainsKey(action.LogName)) { return state; }
+        if (state.OpenLogs.ContainsKey(action.LogName)) { return state; }
 
-        var logData = GetEmptyLogData(action.LogName, action.LogPathType);
+        var openLogId = EventLogId.Create();
 
         var perLogNames = action.LogPathType == LogPathType.Channel
             ? s_emptyNames.Add(action.LogName)
@@ -155,8 +153,7 @@ internal sealed class Reducers
 
         return state with
         {
-            ActiveLogs = state.ActiveLogs.Add(action.LogName, logData),
-            OpenLogs = state.OpenLogs.SetItem(action.LogName, new OpenLogInfo(logData.Id, action.LogPathType)),
+            OpenLogs = state.OpenLogs.SetItem(action.LogName, new OpenLogInfo(openLogId, action.LogPathType)),
             NamesByLog = newNamesByLog,
             LoadedLogNames = RecomputeLoadedLogNames(newNamesByLog, state.LoadedLogNames)
         };
@@ -337,9 +334,6 @@ internal sealed class Reducers
 
         return builder.ToImmutable();
     }
-
-    private static EventLogData GetEmptyLogData(string logName, LogPathType pathType) =>
-        new(logName, pathType);
 
     private static ImmutableHashSet<string> RecomputeLoadedLogNames(
         ImmutableDictionary<string, ImmutableHashSet<string>> namesByLog,

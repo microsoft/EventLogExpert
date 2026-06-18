@@ -37,17 +37,17 @@ internal sealed class OpenLogEffects(
     private static readonly int s_maxGlobalConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
     private static readonly SemaphoreSlim s_resolutionThrottle = new(s_maxGlobalConcurrency, s_maxGlobalConcurrency);
 
-    private readonly ICriticalErrorService _criticalErrorService = criticalErrorService;
     private readonly LogCloseCoordinator _closeCoordinator = closeCoordinator;
     private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
     private readonly PartialLoadCoordinator _coordinator = coordinator;
+    private readonly ICriticalErrorService _criticalErrorService = criticalErrorService;
     private readonly IDatabaseService _databaseService = databaseService;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly Lock _globalCtsLock = new();
     private readonly ConcurrentDictionary<EventLogId, CancellationTokenSource> _logCts = new();
+    private readonly ITraceLogger _logger = logger;
     private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logLoadCompletions = new();
     private readonly ILogWatcherService _logWatcherService = logWatcherService;
-    private readonly ITraceLogger _logger = logger;
     private readonly IEventResolverCache _resolverCache = resolverCache;
     private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
     private readonly IEventXmlResolver _xmlResolver = xmlResolver;
@@ -58,7 +58,7 @@ internal sealed class OpenLogEffects(
     [EffectMethod(typeof(CloseAllLogsAction))]
     public async Task HandleCloseAll(IDispatcher dispatcher)
     {
-        _logger.Trace($"{nameof(HandleCloseAll)} requested ({_eventLogState.Value.ActiveLogs.Count} active logs).");
+        _logger.Trace($"{nameof(HandleCloseAll)} requested ({_eventLogState.Value.OpenLogs.Count} active logs).");
 
         _coordinator.DiscardAll();
 
@@ -111,7 +111,7 @@ internal sealed class OpenLogEffects(
 
             dispatcher.Dispatch(new LogTable.CloseLogAction(action.LogId));
 
-            if (_eventLogState.Value.ActiveLogs.IsEmpty)
+            if (_eventLogState.Value.OpenLogs.IsEmpty)
             {
                 _resolverCache.ClearAll();
             }
@@ -131,14 +131,16 @@ internal sealed class OpenLogEffects(
 
         long cancelTokenAtStart = Volatile.Read(ref _cancelToken);
 
-        if (!_eventLogState.Value.ActiveLogs.TryGetValue(action.LogName, out var logData))
+        if (!_eventLogState.Value.OpenLogs.TryGetValue(action.LogName, out var openInfo))
         {
-            _logger.Warning($"Open '{action.LogName}' aborted: log not found in ActiveLogs (no prior AddLog dispatch).");
+            _logger.Warning($"Open '{action.LogName}' aborted: log not found in OpenLogs (no prior AddLog dispatch).");
 
             dispatcher.Dispatch(new SetResolverStatusAction($"Error: Failed to open {action.LogName}"));
 
             return;
         }
+
+        var logData = new EventLogData(action.LogName, openInfo.Type) { Id = openInfo.Id };
 
         CancellationTokenSource perLoadCts;
 
@@ -171,7 +173,7 @@ internal sealed class OpenLogEffects(
                 _logger.Trace($"InitialClassificationTask faulted unexpectedly during HandleOpenLog: {ex}");
             }
 
-            if (!_eventLogState.Value.ActiveLogs.TryGetValue(action.LogName, out var current)
+            if (!_eventLogState.Value.OpenLogs.TryGetValue(action.LogName, out var current)
                 || current.Id != logData.Id)
             {
                 _logger.Trace($"Open '{action.LogName}': log was closed or replaced before resolver scope creation; aborting after {stopwatch.ElapsedMilliseconds}ms.");
@@ -417,7 +419,7 @@ internal sealed class OpenLogEffects(
 
             _logger.Trace($"Open '{action.LogName}': canceled after {stopwatch.ElapsedMilliseconds}ms ({Volatile.Read(ref resolved)} resolved, {Volatile.Read(ref failed)} failed).");
 
-            if (_eventLogState.Value.ActiveLogs.TryGetValue(logData.Name, out var currentLog)
+            if (_eventLogState.Value.OpenLogs.TryGetValue(logData.Name, out var currentLog)
                 && currentLog.Id == logData.Id)
             {
                 dispatcher.Dispatch(new CloseLogAction(logData.Id, logData.Name));
@@ -435,7 +437,7 @@ internal sealed class OpenLogEffects(
 
             _closeCoordinator.ClearPendingRestore(logData.Name);
 
-            if (_eventLogState.Value.ActiveLogs.TryGetValue(logData.Name, out var currentLog)
+            if (_eventLogState.Value.OpenLogs.TryGetValue(logData.Name, out var currentLog)
                 && currentLog.Id == logData.Id)
             {
                 dispatcher.Dispatch(new CloseLogAction(logData.Id, logData.Name));
@@ -457,7 +459,7 @@ internal sealed class OpenLogEffects(
 
         token.ThrowIfCancellationRequested();
 
-        if (!_eventLogState.Value.ActiveLogs.TryGetValue(logData.Name, out var activeLog)
+        if (!_eventLogState.Value.OpenLogs.TryGetValue(logData.Name, out var activeLog)
             || activeLog.Id != logData.Id)
         {
             _logger.Trace($"Open '{action.LogName}': log was closed or replaced after producer completed; discarding {events.Count} resolved events after {stopwatch.ElapsedMilliseconds}ms.");
