@@ -15,7 +15,9 @@ namespace EventLogExpert.UI.LogTable;
 public sealed partial class LogTabBar
 {
     private IJSObjectReference? _logTabBarModule;
+    private ElementReference _logTabBarRootRef;
     private LogTableState _logTableState = null!;
+    private IJSObjectReference? _scrollSuppressorModule;
     private List<LogView> _sortedTabs = [];
 
     [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
@@ -30,9 +32,14 @@ public sealed partial class LogTabBar
     {
         if (disposing)
         {
+            await JsModuleInterop.DisposeModuleSafelyAsync(
+                _scrollSuppressorModule,
+                module => module.InvokeVoidAsync("release", _logTabBarRootRef));
+
             await JsModuleInterop.DisposeModuleSafelyAsync(_logTabBarModule);
 
             _logTabBarModule = null;
+            _scrollSuppressorModule = null;
         }
 
         await base.DisposeAsyncCore(disposing);
@@ -49,6 +56,15 @@ public sealed partial class LogTabBar
                     "./_content/EventLogExpert.UI/LogTable/LogTabBar.razor.js");
 
                 await _logTabBarModule.InvokeVoidAsync("registerLogTabBarEvents");
+
+                _scrollSuppressorModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/EventLogExpert.UI/Common/keyboardScrollSuppressor.js");
+
+                await _scrollSuppressorModule.InvokeVoidAsync(
+                    "suppress",
+                    _logTabBarRootRef,
+                    new[] { new { selector = "[role='button']", keys = new[] { "Enter", " " } } });
             }
             catch (JSDisconnectedException) { }
             catch (JSException) { }

@@ -24,6 +24,7 @@ using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Scenarios;
+using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
@@ -143,6 +144,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IFilterLibraryCommands))]
     [InlineData(typeof(IFilterPaneCommands))]
     [InlineData(typeof(ILogTableCommands))]
+    [InlineData(typeof(IScenarioFavoriteCommands))]
     // UI capabilities.
     [InlineData(typeof(IHighlightSelector))]
     [InlineData(typeof(ILogTableColumnDefaultsProvider))]
@@ -199,6 +201,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IWindowsIdentityProvider>());
         services.AddSingleton(Substitute.For<IFilePickerService>());
         services.AddSingleton(Substitute.For<IState<EventLogState>>());
+        services.AddSingleton(Substitute.For<IState<FilterPaneState>>());
         services.AddSingleton(Substitute.For<IStateSelection<EventLogState, bool>>());
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
         services.AddSingleton<HttpClient>();
@@ -218,6 +221,24 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         Assert.NotNull(resolved);
     }
 
+    [Fact]
+    public async Task BothSqliteStores_ShareOneDatabasePath_ResolveIndependently()
+    {
+        var dbPath = Path.Combine(Path.GetTempPath(), $"EventLogExpertDualStore_{Guid.NewGuid()}.db");
+        var services = new ServiceCollection();
+        services.AddSingleton(Substitute.For<ITraceLogger>());
+        services.AddFilterLibrarySqliteStore(dbPath);
+        services.AddScenarioFavoriteSqliteStore(dbPath);
+
+        await using var provider = services.BuildServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+
+        await using var scope = provider.CreateAsyncScope();
+
+        Assert.NotNull(scope.ServiceProvider.GetService<IFilterLibraryStore>());
+        Assert.NotNull(scope.ServiceProvider.GetService<IScenarioFavoriteStore>());
+    }
+
     private static void RegisterHostDependencies(IServiceCollection services)
     {
         services.AddSingleton(Substitute.For<IDispatcher>());
@@ -231,6 +252,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IWindowsIdentityProvider>());
         services.AddSingleton(Substitute.For<IFilePickerService>());
         services.AddSingleton(Substitute.For<IState<EventLogState>>());
+        services.AddSingleton(Substitute.For<IState<FilterPaneState>>());
         services.AddSingleton(Substitute.For<IStateSelection<EventLogState, bool>>());
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
         services.AddSingleton<HttpClient>();

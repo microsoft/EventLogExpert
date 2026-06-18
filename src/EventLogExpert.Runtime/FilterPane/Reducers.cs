@@ -63,6 +63,10 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
+    public static FilterPaneState ReduceRestoreFilterPaneState(FilterPaneState state, RestoreFilterPaneStateAction action) =>
+        action.State;
+
+    [ReducerMethod]
     public static FilterPaneState ReduceSetFilter(FilterPaneState state, SetFilterAction action)
     {
         // Upsert: replace-by-Id (preserving position) or append.

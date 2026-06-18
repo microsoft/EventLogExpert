@@ -71,6 +71,13 @@ internal sealed class Effects
         return Task.CompletedTask;
     }
 
+    [EffectMethod(typeof(RestoreFilterPaneStateAction))]
+    public Task HandleRestoreFilterPaneState(IDispatcher dispatcher)
+    {
+        UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+        return Task.CompletedTask;
+    }
+
     [EffectMethod]
     public Task HandleSetFilter(SetFilterAction action, IDispatcher dispatcher)
     {

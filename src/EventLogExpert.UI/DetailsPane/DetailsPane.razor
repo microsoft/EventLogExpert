@@ -1,6 +1,6 @@
 @inherits FluxorComponent
 
-<div class="details-pane" data-toggle="@IsVisible" hidden="@(_selectedEvent is null)">
+<div class="details-pane" data-toggle="@IsVisible" hidden="@(_selectedEvent is null)" @ref="_detailsPaneRootRef">
     <div class="details-resizer"></div>
 
     <div aria-expanded="@_isVisible.ToString().ToLower()"

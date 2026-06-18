@@ -1,0 +1,89 @@
+@inherits FluxorComponent
+
+<section aria-labelledby="empty-dashboard-title" class="empty-dashboard" role="region">
+    <header class="empty-dashboard__masthead">
+        <div class="empty-dashboard__brand">
+            <span aria-hidden="true" class="empty-dashboard__brand-mark"><i class="bi bi-journal-text"></i></span>
+            <div>
+                <h1 class="empty-dashboard__title" id="empty-dashboard-title">EventLogExpert</h1>
+                <p class="empty-dashboard__lead">Open a log to get started, or jump straight into a common investigation.</p>
+            </div>
+        </div>
+        <div class="empty-dashboard__masthead-actions">
+            @if (FilterApplied.Value)
+            {
+                <div class="empty-dashboard__chip" role="status">
+                    <i aria-hidden="true" class="bi bi-funnel"></i>
+                    <span class="empty-dashboard__chip-text">A filter is still applied and will affect your next open.</span>
+                    <button class="button" disabled="@_isBusy" @onclick="ClearFilter" type="button">Clear filter</button>
+                </div>
+            }
+            <button class="empty-dashboard__utility" disabled="@_isBusy" @onclick="OpenDatabaseToolsAsync" type="button">
+                <i aria-hidden="true" class="bi bi-database-gear"></i><span>Manage databases...</span>
+            </button>
+        </div>
+    </header>
+
+    <section aria-labelledby="empty-dashboard-quickstart-heading" class="empty-dashboard__section">
+        <h2 class="empty-dashboard__heading" id="empty-dashboard-quickstart-heading">Quick Launch</h2>
+        <div class="empty-dashboard__launchbar">
+            <button aria-label="Open Application + System (live)" class="empty-dashboard__launch empty-dashboard__launch--primary" disabled="@_isBusy" @onclick="OpenApplicationAndSystemAsync" type="button">
+                <i aria-hidden="true" class="bi bi-collection"></i><span>Application + System (live)</span>
+            </button>
+            <button aria-label="Open Application (live)" class="empty-dashboard__launch" disabled="@_isBusy" @onclick="OpenApplicationAsync" type="button">
+                <i aria-hidden="true" class="bi bi-window"></i><span>Application (live)</span>
+            </button>
+            <button aria-label="Open System (live)" class="empty-dashboard__launch" disabled="@_isBusy" @onclick="OpenSystemAsync" type="button">
+                <i aria-hidden="true" class="bi bi-pc-display"></i><span>System (live)</span>
+            </button>
+            @if (Version.IsAdmin)
+            {
+                <button aria-label="Open Security (live)" class="empty-dashboard__launch" disabled="@_isBusy" @onclick="OpenSecurityAsync" type="button">
+                    <i aria-hidden="true" class="bi bi-shield-lock"></i><span>Security (live)</span>
+                </button>
+            }
+            else
+            {
+                <button aria-describedby="@ElevationReasonId" aria-disabled="true" aria-label="Open Security (live)" class="empty-dashboard__launch empty-dashboard__launch--disabled" type="button">
+                    <i aria-hidden="true" class="bi bi-shield-lock"></i><span>Security (live)</span>
+                </button>
+            }
+            <span aria-hidden="true" class="empty-dashboard__launch-divider"></span>
+            <button aria-label="Open Log file..." class="empty-dashboard__launch" disabled="@_isBusy" @onclick="OpenFileAsync" type="button">
+                <i aria-hidden="true" class="bi bi-file-earmark-text"></i><span>Log file...</span>
+            </button>
+            <button aria-label="Open Folder..." class="empty-dashboard__launch" disabled="@_isBusy" @onclick="OpenFolderAsync" type="button">
+                <i aria-hidden="true" class="bi bi-folder2-open"></i><span>Folder...</span>
+            </button>
+        </div>
+    </section>
+
+    <div class="empty-dashboard__catalog">
+        @if (_splashScenarios is null)
+        {
+            <p class="empty-dashboard__loading">Loading scenarios...</p>
+        }
+        else if (_categories.Count == 0)
+        {
+            <p class="empty-dashboard__empty" role="status">No scenarios are available for this machine.</p>
+        }
+        else
+        {
+            <SidebarTabs @bind-ActiveTab="_activeCategory" @ref="_sidebarTabs" TablistAriaLabel="Scenario categories" Tabs="_tabs" TTab="SplashCategory">
+                <TabContent Context="category">
+                    <ScenarioBrowserPanel ElevationReasonId="@ElevationReasonId"
+                        IsBusy="_isBusy"
+                        IsFavored="IsFavored"
+                        IsScenarioDisabled="IsScenarioDisabled"
+                        OnLaunch="LaunchScenarioAsync"
+                        OnSelect="scenario => Select(category, scenario)"
+                        OnToggleFavorite="ToggleFavorite"
+                        Scenarios="ScenariosFor(category)"
+                        Selected="_selectedByCategory.GetValueOrDefault(category)" />
+                </TabContent>
+            </SidebarTabs>
+        }
+    </div>
+
+    <span class="empty-dashboard__sr-only" id="@ElevationReasonId">Requires running as administrator.</span>
+</section>

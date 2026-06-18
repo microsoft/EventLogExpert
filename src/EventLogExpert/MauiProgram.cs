@@ -9,6 +9,7 @@ using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Scenarios;
+using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using Fluxor;
@@ -76,8 +77,9 @@ public static class MauiProgram
         builder.Services.AddTransient<IEventResolver, EventResolver>();
 
         // FilterLibrary persistence
-        builder.Services.AddFilterLibrarySqliteStore(
-            Path.Combine(FileSystem.AppDataDirectory, "filter-library.db"));
+        var appDbPath = Path.Combine(FileSystem.AppDataDirectory, "filter-library.db");
+        builder.Services.AddFilterLibrarySqliteStore(appDbPath);
+        builder.Services.AddScenarioFavoriteSqliteStore(appDbPath);
 
         builder.Services.AddFilterLibraryExport();
 

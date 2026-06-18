@@ -1,7 +1,7 @@
 @using EventLogExpert.Scenarios.Catalog
 @inherits FluxorComponent
 
-<div class="filter-pane">
+<div class="filter-pane" @ref="_filterPaneRootRef">
 <div class="filter-header">
     <div class="filter-header-actions">
         <div class="split-button">
@@ -25,18 +25,18 @@
             </button>
         </div>
 
-        <button class="button" @onclick="AddExclusion">
+        <button class="button" @onclick="AddExclusion" type="button">
             <i class="bi bi-plus-circle"></i> Add Exclusion
         </button>
 
         @if (!IsDateFilterVisible)
         {
-            <button class="button" @onclick="AddDateFilter">
+            <button class="button" @onclick="AddDateFilter" type="button">
                 <i class="bi bi-plus-circle"></i> Add Date Filter
             </button>
         }
 
-        <button class="button" @onclick="OpenFilterSetPicker">
+        <button class="button" @onclick="OpenFilterSetPicker" type="button">
             <i class="bi bi-plus-circle"></i> Apply Filter Set
         </button>
 
@@ -44,7 +44,6 @@
         {
             <button aria-controls="scenario-picker"
                 aria-expanded="@(IsScenarioPickerVisible ? "true" : "false")"
-                aria-haspopup="true"
                 class="button"
                 @onclick="OpenScenarioPicker"
                 type="button">
@@ -243,7 +242,7 @@
                     </ValueSelect>
                 </span>
 
-                <button class="button button-green" disabled="@(SelectedFilterSetId == default)" @onclick="ApplyFilterSetSelection">
+                <button class="button button-green" disabled="@(SelectedFilterSetId == default)" @onclick="ApplyFilterSetSelection" type="button">
                     <i class="bi bi-check-circle"></i> Apply
                 </button>
 
@@ -280,35 +279,56 @@
     @if (IsScenarioPickerVisible)
     {
         <div class="filter-form flex-row" id="scenario-picker">
-            @if (ScenarioMatchGroups.Count > 0)
+            @if (ScenarioMatches.Count > 0)
             {
-                @foreach (var group in ScenarioMatchGroups)
+                @if (ScenarioMatchGroups.Count > 1)
                 {
-                    <div class="scenario-picker-group">
-                        <span class="scenario-picker-group-header">@group.Key.DisplayName()</span>
-
-                        @foreach (var scenario in group)
-                        {
-                            <span class="scenario-picker-row" title="@scenario.Purpose">
-                                <span class="scenario-picker-name">@scenario.Name</span>
-
-                                <button aria-label="@($"Apply scenario {scenario.Name}")"
-                                    class="button button-green"
-                                    @onclick="() => ApplyScenario(scenario, false)"
-                                    type="button">
-                                    <i class="bi bi-check-circle"></i> Apply
-                                </button>
-
-                                <button aria-label="@($"Replace filters with scenario {scenario.Name}")"
-                                    class="button"
-                                    @onclick="() => ApplyScenario(scenario, true)"
-                                    type="button">
-                                    <i class="bi bi-arrow-repeat"></i> Replace
-                                </button>
-                            </span>
-                        }
-                    </div>
+                    <span>
+                        Category:
+                        <ValueSelect AriaLabel="Category"
+                            CssClass="input scenario-category-dropdown"
+                            T="ScenarioGroup?"
+                            ToStringFunc="@(group => group?.DisplayName() ?? string.Empty)"
+                            Value="EffectiveScenarioGroup"
+                            ValueChanged="OnScenarioGroupChanged">
+                            @foreach (var match in ScenarioMatchGroups)
+                            {
+                                <ValueSelectItem T="ScenarioGroup?" Value="match.Key">@match.Key.DisplayName()</ValueSelectItem>
+                            }
+                        </ValueSelect>
+                    </span>
                 }
+
+                <span>
+                    Scenario:
+                    <ValueSelect AriaLabel="Scenario"
+                        CssClass="input scenario-item-dropdown"
+                        T="string"
+                        ToStringFunc="@(GetScenarioName)"
+                        Value="ResolvedScenario?.Id"
+                        ValueChanged="id => SelectedScenarioId = id">
+                        @foreach (var scenario in VisibleScenarioMatches)
+                        {
+                            <ValueSelectItem T="string" Value="scenario.Id">
+                                <span class="filter-set-option-row" title="@($"{scenario.Group.DisplayName()} - {scenario.Purpose}")">
+                                    <span class="filter-set-option-name">@scenario.Name</span>
+                                </span>
+                            </ValueSelectItem>
+                        }
+                    </ValueSelect>
+                </span>
+
+                <button class="button button-green" disabled="@(ResolvedScenario is null)" @onclick="ApplyScenarioSelection" type="button">
+                    <i class="bi bi-check-circle"></i> Apply
+                </button>
+
+                <button aria-label="Replace filters with selected scenario"
+                    class="button"
+                    disabled="@(ResolvedScenario is null)"
+                    @onclick="ReplaceScenarioSelection"
+                    type="button">
+                    <i class="bi bi-arrow-repeat"></i> Replace
+                </button>
             }
             else
             {

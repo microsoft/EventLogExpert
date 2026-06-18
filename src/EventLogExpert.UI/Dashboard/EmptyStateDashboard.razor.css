@@ -1,0 +1,267 @@
+.empty-dashboard {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.empty-dashboard__masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 2rem;
+    border-bottom: 1px solid var(--border-divider);
+    background-color: var(--background-dark);
+}
+
+.empty-dashboard__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.empty-dashboard__brand-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 8px;
+    background-color: color-mix(in srgb, var(--clr-lightblue) 14%, transparent);
+    color: var(--clr-lightblue);
+    font-size: 1.25rem;
+}
+
+.empty-dashboard__title {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.empty-dashboard__lead {
+    margin: 0.15rem 0 0;
+    color: var(--text-secondary);
+}
+
+.empty-dashboard__chip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    border-left: 3px solid var(--clr-yellow);
+    border-radius: 4px;
+    background-color: var(--surface-inset);
+}
+
+.empty-dashboard__chip > .bi {
+    color: var(--clr-yellow);
+}
+
+.empty-dashboard__chip-text {
+    color: var(--text-primary);
+}
+
+.empty-dashboard__masthead-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.empty-dashboard__utility {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: var(--control-height);
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--border-divider);
+    border-radius: 6px;
+    background-color: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.empty-dashboard__utility > .bi {
+    color: var(--clr-lightblue);
+}
+
+.empty-dashboard__utility:hover:not(:disabled) {
+    border-color: var(--clr-lightblue);
+    color: var(--text-primary);
+    background-color: var(--background-darkgray);
+}
+
+.empty-dashboard__utility:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: 2px;
+}
+
+.empty-dashboard__utility:disabled {
+    color: var(--clr-placeholder);
+    cursor: default;
+}
+
+.empty-dashboard__section {
+    margin-top: 1.25rem;
+    padding-inline: 2rem;
+}
+
+.empty-dashboard__heading {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.empty-dashboard__heading::before {
+    content: "";
+    flex-shrink: 0;
+    width: 3px;
+    height: 1em;
+    border-radius: 2px;
+    background-color: color-mix(in srgb, var(--clr-lightblue) 40%, transparent);
+}
+
+.empty-dashboard__heading:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+.empty-dashboard__launchbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.empty-dashboard__launch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: var(--control-height);
+    padding: 0.4rem 0.85rem;
+    border: 1px solid var(--border-divider);
+    border-radius: 6px;
+    background-color: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.empty-dashboard__launch > .bi {
+    color: var(--clr-lightblue);
+}
+
+.empty-dashboard__launch:hover:not(:disabled):not(.empty-dashboard__launch--disabled):not(.empty-dashboard__launch--primary) {
+    border-color: var(--clr-lightblue);
+    background-color: var(--background-darkgray);
+}
+
+.empty-dashboard__launch--primary {
+    flex-shrink: 0;
+    border-color: var(--clr-lightblue);
+    background-color: var(--clr-lightblue);
+    color: var(--accent-on-fill);
+    font-weight: 600;
+}
+
+.empty-dashboard__launch--primary > .bi {
+    color: var(--accent-on-fill);
+}
+
+.empty-dashboard__launch--primary:hover:not(:disabled) {
+    box-shadow: var(--shadow-menu);
+}
+
+.empty-dashboard__launch:disabled,
+.empty-dashboard__launch--disabled {
+    color: var(--clr-placeholder);
+    cursor: default;
+}
+
+.empty-dashboard__launch--disabled > .bi {
+    color: var(--clr-placeholder);
+}
+
+.empty-dashboard__launch:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: 2px;
+}
+
+.empty-dashboard__launch-divider {
+    align-self: stretch;
+    width: 1px;
+    margin: 0.1rem 0.25rem;
+    background-color: var(--border-divider);
+}
+
+.empty-dashboard__catalog {
+    flex: 1 1 0;
+    min-height: 0;
+    padding: 1.25rem 2rem 2rem;
+    overflow: hidden;
+    container-type: inline-size;
+}
+
+.empty-dashboard__catalog ::deep .sidebar-tabs {
+    height: 100%;
+    gap: 0;
+}
+
+.empty-dashboard__catalog ::deep .sidebar-tabs-list {
+    flex: 0 0 13rem;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-right: 0;
+    border-right: 1px solid var(--border-divider);
+    scrollbar-gutter: stable;
+}
+
+.empty-dashboard__catalog ::deep .sidebar-tabs-list .tab {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: var(--control-height);
+}
+
+.empty-dashboard__catalog ::deep .sidebar-tabs-list .tab .sidebar-tabs-tab-label {
+    display: -webkit-box;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    line-height: 1.25;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.empty-dashboard__loading {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.empty-dashboard__empty {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.empty-dashboard__sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+}

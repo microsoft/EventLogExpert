@@ -9,7 +9,9 @@ internal static class FilterPaneAnnouncements
 
     public const string LoadingTryAgain = "Filter library is still loading. Please try again.";
 
-    public const string RecentNoneAvailable = "No recent filters yet — apply a Basic or Advanced filter to populate.";
+    public const string RecentNoneAvailable = "No recent filters yet - apply a Basic or Advanced filter to populate.";
 
     public const string SelectedFilterSetMissing = "Selected filter set no longer exists.";
+
+    public const string SelectedScenarioMissing = "Selected scenario no longer matches the loaded logs.";
 }

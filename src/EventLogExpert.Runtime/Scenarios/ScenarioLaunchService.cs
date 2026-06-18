@@ -13,9 +13,11 @@ namespace EventLogExpert.Runtime.Scenarios;
 internal sealed class ScenarioLaunchService(
     BuiltInScenarioRegistry registry,
     IMenuActionService menuActionService,
+    IState<FilterPaneState> filterPaneState,
     IDispatcher dispatcher) : IScenarioLaunchService
 {
     private readonly IDispatcher _dispatcher = dispatcher;
+    private readonly IState<FilterPaneState> _filterPaneState = filterPaneState;
     private readonly IMenuActionService _menuActionService = menuActionService;
     private readonly BuiltInScenarioRegistry _registry = registry;
 
@@ -25,6 +27,8 @@ internal sealed class ScenarioLaunchService(
         bool combineLog = false)
     {
         ArgumentNullException.ThrowIfNull(scenario);
+
+        var priorFilterState = _filterPaneState.Value;
 
         var filters = _registry.BuildFilterSet(scenario);
 
@@ -36,6 +40,7 @@ internal sealed class ScenarioLaunchService(
         if (result.Opened == 0 && !combineLog)
         {
             _dispatcher.Dispatch(new CloseAllLogsAction());
+            _dispatcher.Dispatch(new RestoreFilterPaneStateAction(priorFilterState));
         }
 
         return new ScenarioLaunchResult(result.Opened, result.Empty, result.Failed);

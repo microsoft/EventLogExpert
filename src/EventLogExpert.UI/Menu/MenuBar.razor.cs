@@ -28,7 +28,9 @@ public sealed partial class MenuBar
     private ElementReference[] _barElements = [];
     private int _focusedBarIndex;
     private IJSObjectReference? _menuAnchorModule;
+    private ElementReference _menuBarRootRef;
     private long _openRequestId;
+    private IJSObjectReference? _scrollSuppressorModule;
 
     [Inject] private IMenuActionService Actions { get; init; } = null!;
 
@@ -67,12 +69,39 @@ public sealed partial class MenuBar
             MenuService.StateChanged -= OnMenuServiceStateChanged;
             MenuService.NavigateBarRequested -= OnNavigateBarRequested;
 
+            await JsModuleInterop.DisposeModuleSafelyAsync(
+                _scrollSuppressorModule,
+                module => module.InvokeVoidAsync("release", _menuBarRootRef));
+
             await JsModuleInterop.DisposeModuleSafelyAsync(_menuAnchorModule);
 
             _menuAnchorModule = null;
+            _scrollSuppressorModule = null;
         }
 
         await base.DisposeAsyncCore(disposing);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _scrollSuppressorModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/EventLogExpert.UI/Common/keyboardScrollSuppressor.js");
+
+                await _scrollSuppressorModule.InvokeVoidAsync(
+                    "suppress",
+                    _menuBarRootRef,
+                    new[] { new { selector = "[role='menuitem']", keys = new[] { "ArrowRight", "ArrowLeft", "Home", "End", "ArrowDown", "ArrowUp" } } });
+            }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
     }
 
     protected override void OnInitialized()

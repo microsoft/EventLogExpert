@@ -1,0 +1,184 @@
+.scenario-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 100%;
+    padding: 1.25rem;
+    border: 1px solid var(--border-divider);
+    border-radius: 6px;
+    background-color: var(--background-darkgray);
+    box-shadow: var(--shadow-menu);
+}
+
+.scenario-detail__eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.scenario-detail__eyebrow > .bi {
+    color: var(--clr-lightblue);
+}
+
+.scenario-detail__name {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--toggle-accent);
+}
+
+.scenario-detail__purpose {
+    margin: 0;
+    line-height: 1.4;
+    color: var(--text-secondary);
+}
+
+.scenario-detail__facts {
+    display: flex;
+    flex-direction: column;
+    margin: 0.25rem 0;
+    border: 1px solid var(--border-divider);
+    border-radius: 6px;
+    background-color: var(--surface-inset);
+}
+
+.scenario-detail__fact {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid var(--border-divider);
+}
+
+.scenario-detail__fact:last-child {
+    border-bottom: 0;
+}
+
+.scenario-detail__fact-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.scenario-detail__fact-value {
+    line-height: 1.35;
+    color: var(--text-secondary);
+}
+
+.scenario-detail__fact-muted {
+    font-size: 0.85rem;
+    color: color-mix(in srgb, var(--text-secondary) 78%, transparent);
+}
+
+.scenario-detail__admin-badge {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 0.4rem;
+    padding: 0.25rem 0.65rem;
+    border: 1px solid var(--border-divider);
+    border-radius: 999px;
+    background-color: transparent;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.scenario-detail__admin-badge > .bi {
+    color: var(--clr-yellow);
+}
+
+.scenario-detail__filter {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.scenario-detail__swatch {
+    flex: 0 0 auto;
+    width: 0.85rem;
+    height: 0.85rem;
+    border: 1px solid var(--border-divider);
+    border-radius: 3px;
+    background-color: var(--hl-bg);
+}
+
+.scenario-detail__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.scenario-detail__star {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--control-height);
+    height: var(--control-height);
+    padding: 0;
+    border: 1px solid var(--border-divider);
+    border-radius: 6px;
+    background-color: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.scenario-detail__star[aria-pressed="true"] {
+    color: var(--clr-yellow);
+}
+
+.scenario-detail__star[aria-pressed="false"]:hover {
+    border-color: var(--clr-lightblue);
+}
+
+.scenario-detail__star:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: 2px;
+}
+
+.scenario-detail__launch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: var(--control-height);
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--clr-lightblue);
+    border-radius: 6px;
+    background-color: var(--clr-lightblue);
+    color: var(--accent-on-fill);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.scenario-detail__launch > .bi {
+    color: var(--accent-on-fill);
+}
+
+.scenario-detail__launch:hover:not(:disabled):not([aria-disabled="true"]) {
+    box-shadow: var(--shadow-menu);
+}
+
+.scenario-detail__launch:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: 2px;
+}
+
+.scenario-detail__launch:disabled,
+.scenario-detail__launch[aria-disabled="true"] {
+    border-color: var(--border-divider);
+    background-color: var(--surface-inset);
+    color: var(--text-secondary);
+    cursor: default;
+}
+
+.scenario-detail__launch[aria-disabled="true"] > .bi {
+    color: var(--text-secondary);
+}
