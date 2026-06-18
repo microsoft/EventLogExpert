@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.Runtime.Export;
 
-internal enum ExportFormat
+public enum ExportFormat
 {
     Csv,
     Json

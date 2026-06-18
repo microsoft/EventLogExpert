@@ -61,11 +61,46 @@ public sealed record LogTableState
         ImmutableDictionary<EventLogId, SegmentedSortedList> perLog) =>
         new(perLog.Values, perLog.Values.First().Context);
 
-    public bool IsGroupCollapsed(string groupKey) =>
-        GroupsCollapsedByDefault ^ GroupCollapseOverrides.Contains(groupKey);
-
     public IReadOnlyList<ResolvedEvent> EventsForLog(EventLogId logId) =>
         PerLogEvents.TryGetValue(logId, out var list) ? list : [];
+
+    public IReadOnlyList<ResolvedEvent> GetActiveDisplayedEvents()
+    {
+        var activeTable = EventTables.FirstOrDefault(table => table.Id == ActiveEventLogId);
+
+        if (activeTable is null) { return []; }
+
+        return activeTable.IsCombined ? DisplayedEvents : EventsForLog(activeTable.Id);
+    }
+
+    public IReadOnlyList<ColumnName> GetOrderedEnabledColumns(ILogTableColumnDefaultsProvider columnDefaults)
+    {
+        ArgumentNullException.ThrowIfNull(columnDefaults);
+
+        var enabledColumns = Columns
+            .Where(column => column.Value)
+            .Select(column => column.Key)
+            .ToHashSet();
+
+        var order = ColumnOrder.IsEmpty ? columnDefaults.ColumnOrder : ColumnOrder;
+        var ordered = order.Where(enabledColumns.Contains).ToList();
+        var present = ordered.ToHashSet();
+
+        // Append any enabled column missing from the active order (e.g. enabled but absent from a persisted
+        // ColumnOrder) so it is never silently dropped from the table or an export.
+        foreach (var column in columnDefaults.ColumnOrder)
+        {
+            if (enabledColumns.Contains(column) && present.Add(column))
+            {
+                ordered.Add(column);
+            }
+        }
+
+        return ordered;
+    }
+
+    public bool IsGroupCollapsed(string groupKey) =>
+        GroupsCollapsedByDefault ^ GroupCollapseOverrides.Contains(groupKey);
 
     // Each call must carry a single log's events (one OwningLog).
     internal LogTableState WithLogEvents(EventLogId logId, params ResolvedEvent[] events)

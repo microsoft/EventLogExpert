@@ -270,9 +270,6 @@ public sealed partial class LogTablePane
             _ => string.Empty,
         };
 
-    private static string GetLogShortName(string owningLog) =>
-        owningLog[(owningLog.LastIndexOf('\\') + 1)..];
-
     private static ResolvedEvent? ResolveByKey(
         IReadOnlyList<ResolvedEvent> displayedEvents,
         ResolvedEvent? candidate) =>
@@ -459,9 +456,7 @@ public sealed partial class LogTablePane
     }
 
     private string GetDateColumnHeader() =>
-        Settings.TimeZoneInfo.Equals(TimeZoneInfo.Local) ?
-            "Date and Time" :
-            $"Date and Time {Settings.TimeZoneInfo.DisplayName.Split(" ").First()}";
+        EventTableColumnFormatter.GetColumnHeader(ColumnName.DateAndTime, Settings.TimeZoneInfo);
 
     private string GetGroupName() => _logTableState.GroupBy?.ToFullString() ?? string.Empty;
 
@@ -514,22 +509,8 @@ public sealed partial class LogTablePane
         return color;
     }
 
-    private ColumnName[] GetOrderedEnabledColumns()
-    {
-        var enabledSet = _logTableState.Columns
-            .Where(column => column.Value)
-            .Select(column => column.Key)
-            .ToHashSet();
-
-        if (_logTableState.ColumnOrder.IsEmpty)
-        {
-            return ColumnDefaults.ColumnOrder.Where(enabledSet.Contains).ToArray();
-        }
-
-        return _logTableState.ColumnOrder
-            .Where(enabledSet.Contains)
-            .ToArray();
-    }
+    private ColumnName[] GetOrderedEnabledColumns() =>
+        [.. _logTableState.GetOrderedEnabledColumns(ColumnDefaults)];
 
     private int GetRowIndex(ResolvedEvent evt)
     {

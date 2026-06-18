@@ -9,6 +9,7 @@ using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.Export;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
@@ -23,6 +24,7 @@ using EventLogExpert.UI.Settings;
 using EventLogExpert.WindowsPlatform.Activation;
 using Fluxor;
 using System.Collections.Immutable;
+using System.Globalization;
 using Application = Microsoft.Maui.Controls.Application;
 using IDispatcher = Fluxor.IDispatcher;
 using MauiFilePicker = Microsoft.Maui.Storage.FilePicker;
@@ -49,19 +51,27 @@ public sealed class MauiMenuActionService(
     ICurrentVersionProvider currentVersionProvider,
     ITraceLogger traceLogger,
     IFolderPickerService folderPickerService,
-    IState<EventLogState> eventLogState) : IMenuActionService, IDisposable
+    IState<EventLogState> eventLogState,
+    IState<LogTableState> logTableState,
+    ILogTableColumnDefaultsProvider columnDefaults,
+    IEventTableExporter eventTableExporter,
+    IFileSaveService fileSaveService) : IMenuActionService, IDisposable
 {
     private readonly IClipboardService _clipboardService = clipboardService;
+    private readonly ILogTableColumnDefaultsProvider _columnDefaults = columnDefaults;
     private readonly ICurrentVersionProvider _currentVersionProvider = currentVersionProvider;
     private readonly IAlertDialogService _dialogService = dialogService;
     private readonly IDispatcher _dispatcher = dispatcher;
     private readonly IEventLogCommands _eventLogCommands = eventLogCommands;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
+    private readonly IEventTableExporter _eventTableExporter = eventTableExporter;
+    private readonly IFileSaveService _fileSaveService = fileSaveService;
     private readonly IFilterLibraryCommands _filterLibraryCommands = filterLibraryCommands;
     private readonly IFilterPaneCommands _filterPaneCommands = filterPaneCommands;
     private readonly IFolderPickerService _folderPickerService = folderPickerService;
     private readonly SemaphoreSlim _logNamesLock = new(1, 1);
     private readonly ILogTableCommands _logTableCommands = logTableCommands;
+    private readonly IState<LogTableState> _logTableState = logTableState;
     private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
     private readonly ISettingsService _settings = settings;
     private readonly ITraceLogger _traceLogger = traceLogger;
@@ -120,6 +130,56 @@ public sealed class MauiMenuActionService(
         if (current is not null && window is not null)
         {
             current.CloseWindow(window);
+        }
+    }
+
+    public async Task ExportEventsAsync(ExportFormat format)
+    {
+        var state = _logTableState.Value;
+        var events = state.GetActiveDisplayedEvents();
+
+        if (events.Count == 0)
+        {
+            await _dialogService.ShowAlert(
+                "Export events", "There are no events to export.", "Ok", AlertPresentation.Banner);
+
+            return;
+        }
+
+        // Snapshot everything the export needs before opening the picker, so a state change while the dialog is open
+        // cannot mutate the rows/columns/timezone being written.
+        var columns = state.GetOrderedEnabledColumns(_columnDefaults);
+
+        if (columns.Count == 0)
+        {
+            await _dialogService.ShowAlert(
+                "Export events", "There are no visible columns to export.", "Ok", AlertPresentation.Banner);
+
+            return;
+        }
+
+        var timeZone = _settings.TimeZoneInfo;
+        bool isCsv = format == ExportFormat.Csv;
+        var fileTypes = isCsv ? FileSaveFileTypes.Csv : FileSaveFileTypes.Json;
+        string extension = isCsv ? ".csv" : ".json";
+        string suggestedFileName =
+            $"events-{DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)}{extension}";
+
+        try
+        {
+            await _fileSaveService.SaveStreamingAsync(
+                suggestedFileName,
+                fileTypes,
+                (stream, token) => _eventTableExporter.ExportAsync(stream, format, events, columns, timeZone, token),
+                // No user-facing cancel affordance exists for export yet; the pipeline threads a token end to end,
+                // so a cancel control can be wired here later without a signature change.
+                CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _traceLogger.Error($"Failed to export events: {ex}");
+
+            await _dialogService.ShowAlert("Export failed", ex.Message, "Ok", AlertPresentation.Banner);
         }
     }
 

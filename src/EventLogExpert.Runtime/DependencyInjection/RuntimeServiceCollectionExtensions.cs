@@ -64,8 +64,11 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<IDatabaseOperationCoordinator, DatabaseOperationCoordinator>();
     }
 
-    private static void AddExportServices(IServiceCollection services) =>
+    private static void AddExportServices(IServiceCollection services)
+    {
         services.AddSingleton<ITabularExportWriter, TabularExportWriter>();
+        services.AddSingleton<IEventTableExporter, EventTableExporter>();
+    }
 
     extension(IServiceCollection services)
     {

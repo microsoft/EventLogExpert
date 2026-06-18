@@ -31,4 +31,18 @@ public interface IFileSaveService
         string suggestedFileName,
         IReadOnlyDictionary<string, IReadOnlyList<string>> fileTypes,
         Func<Stream, Task> writeContent);
+
+    /// <summary>
+    ///     Like <see cref="SaveAsync" /> but streams <paramref name="writeContent" /> to disk without buffering the whole
+    ///     output in memory. When the picked file's folder is writable, the output is staged in a sibling temp file and
+    ///     committed with an atomic replace, so a failed or cancelled write leaves any existing file untouched. For
+    ///     provider-backed destinations whose folder is not directly accessible (e.g. some cloud locations), the commit falls
+    ///     back to a platform-mediated replace from a fully-staged temp copy; this is best-effort rather than guaranteed
+    ///     atomic, so a failure during the final replace may leave an existing file partially overwritten.
+    /// </summary>
+    Task<string?> SaveStreamingAsync(
+        string suggestedFileName,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> fileTypes,
+        Func<Stream, CancellationToken, Task> writeContent,
+        CancellationToken cancellationToken);
 }
