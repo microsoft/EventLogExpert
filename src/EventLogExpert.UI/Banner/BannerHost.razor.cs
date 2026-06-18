@@ -18,6 +18,8 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
 
     [Inject] private IErrorBannerService ErrorBannerService { get; init; } = null!;
 
+    [Inject] private IExportProgressBannerService ExportProgressBannerService { get; init; } = null!;
+
     [Inject] private IInfoBannerService InfoBannerService { get; init; } = null!;
 
     [Inject] private IProgressBannerService ProgressBannerService { get; init; } = null!;

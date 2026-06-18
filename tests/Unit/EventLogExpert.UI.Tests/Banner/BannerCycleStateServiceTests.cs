@@ -16,6 +16,7 @@ public sealed class BannerCycleStateServiceTests
     private readonly IAttentionBannerService _attention = Substitute.For<IAttentionBannerService>();
     private readonly ICriticalErrorService _critical = Substitute.For<ICriticalErrorService>();
     private readonly IErrorBannerService _errors = Substitute.For<IErrorBannerService>();
+    private readonly IExportProgressBannerService _exportProgress = Substitute.For<IExportProgressBannerService>();
     private readonly IInfoBannerService _infos = Substitute.For<IInfoBannerService>();
     private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
     private readonly IProgressBannerService _progress = Substitute.For<IProgressBannerService>();
@@ -28,6 +29,7 @@ public sealed class BannerCycleStateServiceTests
         _attention.AttentionEntries.Returns([]);
         _attention.AttentionDismissed.Returns(false);
         _progress.BackgroundProgress.Returns((BannerProgressEntry?)null);
+        _exportProgress.CurrentExport.Returns((ExportProgressEntry?)null);
         _modalCoordinator.ActiveSession.Returns((ModalSession?)null);
     }
 
@@ -68,10 +70,46 @@ public sealed class BannerCycleStateServiceTests
         _attention.StateChanged += Raise.Event<Action>();
         _infos.StateChanged += Raise.Event<Action>();
         _progress.StateChanged += Raise.Event<Action>();
+        _exportProgress.StateChanged += Raise.Event<Action>();
         _critical.StateChanged += Raise.Event<Action>();
         _modalCoordinator.StateChanged += Raise.Event<Action>();
 
         Assert.Equal(0, stateChangedFires);
+    }
+
+    [Fact]
+    public void ExportProgress_Present_AddsExportProgressItemToCycle()
+    {
+        _exportProgress.CurrentExport.Returns(MakeExport());
+
+        var service = CreateService();
+
+        Assert.Single(service.Items);
+        Assert.Equal(BannerView.ExportProgress, service.SelectedItem?.View);
+    }
+
+    [Fact]
+    public void ExportProgress_PriorityStolenSelection_NotClearedByUnrelatedRebuild()
+    {
+        BannerInfoEntry info0 = MakeInfo();
+        BannerInfoEntry info1 = MakeInfo();
+        _infos.InfoBanners.Returns([info0, info1]);
+        var service = CreateService();
+
+        // Two infos give a navigable cycle; select the second so it becomes the user-preferred item.
+        service.MoveNext();
+        Assert.Equal(info1.Id, service.SelectedItem?.EntryId);
+
+        // Export arrives and outranks Info, so it priority-steals the selection.
+        _exportProgress.CurrentExport.Returns(MakeExport());
+        _exportProgress.StateChanged += Raise.Event<Action>();
+        Assert.Equal(BannerView.ExportProgress, service.SelectedItem?.View);
+
+        // An unrelated rebuild must keep the priority-stolen export selected: export is still in the
+        // source fingerprint, so it is neither re-stolen nor cleared back to the user-preferred info.
+        _infos.InfoBanners.Returns([info0, info1, MakeInfo()]);
+        _infos.StateChanged += Raise.Event<Action>();
+        Assert.Equal(BannerView.ExportProgress, service.SelectedItem?.View);
     }
 
     [Fact]
@@ -548,6 +586,8 @@ public sealed class BannerCycleStateServiceTests
     private static ErrorBannerEntry MakeError() =>
         new(BannerId.Create(), "Title", "msg", null, null, DateTime.UtcNow);
 
+    private static ExportProgressEntry MakeExport() => new("Exporting events…", () => { });
+
     private static BannerInfoEntry MakeInfo() =>
         new(BannerId.Create(), "Title", "msg", BannerSeverity.Info, DateTime.UtcNow);
 
@@ -563,5 +603,5 @@ public sealed class BannerCycleStateServiceTests
             () => { });
 
     private BannerCycleStateService CreateService() =>
-        new(_attention, _errors, _infos, _progress, _critical, _modalCoordinator);
+        new(_attention, _errors, _infos, _progress, _exportProgress, _critical, _modalCoordinator);
 }

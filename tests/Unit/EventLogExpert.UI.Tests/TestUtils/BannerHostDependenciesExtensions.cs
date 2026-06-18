@@ -36,6 +36,10 @@ internal static class BannerHostDependenciesExtensions
             progress.BackgroundProgress.Returns((BannerProgressEntry?)null);
             services.AddSingleton(progress);
 
+            var exportProgress = Substitute.For<IExportProgressBannerService>();
+            exportProgress.CurrentExport.Returns((ExportProgressEntry?)null);
+            services.AddSingleton(exportProgress);
+
             var modalCoordinator = Substitute.For<IModalCoordinator>();
             modalCoordinator.ActiveSession.Returns((ModalSession?)null);
             services.AddSingleton(modalCoordinator);

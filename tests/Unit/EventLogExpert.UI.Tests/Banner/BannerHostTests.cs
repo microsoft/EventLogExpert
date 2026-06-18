@@ -26,6 +26,7 @@ public sealed class BannerHostTests : BunitContext
     private readonly IClipboardService _clipboardService = Substitute.For<IClipboardService>();
     private readonly ICriticalErrorService _criticalErrorService;
     private readonly IErrorBannerService _errorBannerService;
+    private readonly IExportProgressBannerService _exportProgressBannerService;
     private readonly IInfoBannerService _infoBannerService;
     private readonly IMenuActionService _menuActionService = Substitute.For<IMenuActionService>();
     private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
@@ -34,7 +35,7 @@ public sealed class BannerHostTests : BunitContext
 
     public BannerHostTests()
     {
-        Services.AddBannerSubstitutes(out _attentionBannerService, out _progressBannerService, out _criticalErrorService, out _errorBannerService, out _infoBannerService);
+        Services.AddBannerSubstitutes(out _attentionBannerService, out _progressBannerService, out _exportProgressBannerService, out _criticalErrorService, out _errorBannerService, out _infoBannerService);
         Services.AddSingleton<IBannerCycleStateService, BannerCycleStateService>();
 
         _criticalErrorService.CurrentCritical.Returns((Exception?)null);
@@ -43,6 +44,7 @@ public sealed class BannerHostTests : BunitContext
         _attentionBannerService.AttentionEntries.Returns([]);
         _attentionBannerService.AttentionDismissed.Returns(false);
         _progressBannerService.BackgroundProgress.Returns((BannerProgressEntry?)null);
+        _exportProgressBannerService.CurrentExport.Returns((ExportProgressEntry?)null);
         _modalCoordinator.ActiveSession.Returns((ModalSession?)null);
 
         Services.AddSingleton(_applicationRestartService);
@@ -242,6 +244,32 @@ public sealed class BannerHostTests : BunitContext
         // because the old (Error, 1) tuple matched e2's new (Error, 1) position.
         Assert.Contains("Second: second message", component.Find("aside.banner-error").TextContent);
         Assert.DoesNotContain("Third", component.Find("aside.banner-error").TextContent);
+    }
+
+    [Fact]
+    public async Task BannerHost_ExportCancelClicked_InvokesCancelDelegate()
+    {
+        bool canceled = false;
+        _exportProgressBannerService.CurrentExport.Returns(
+            new ExportProgressEntry("Exporting events…", () => canceled = true));
+
+        var component = Render<BannerHost>();
+        await component.Find("aside.banner-export-progress button.banner-action").ClickAsync(new MouseEventArgs());
+
+        Assert.True(canceled);
+    }
+
+    [Fact]
+    public void BannerHost_ExportInProgress_RendersExportProgressBannerWithMessage()
+    {
+        _exportProgressBannerService.CurrentExport.Returns(
+            new ExportProgressEntry("Exporting events…", () => { }));
+
+        var component = Render<BannerHost>();
+
+        var banner = component.Find("aside.banner-export-progress");
+        Assert.Contains("Exporting events…", banner.TextContent);
+        Assert.Single(component.FindAll("aside.banner-export-progress button.banner-action"));
     }
 
     [Fact]

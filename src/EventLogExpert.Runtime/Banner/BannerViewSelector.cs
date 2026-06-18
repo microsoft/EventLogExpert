@@ -12,6 +12,7 @@ public enum BannerView
     Error,
     Attention,
     UpgradeProgress,
+    ExportProgress,
     Info
 }
 
@@ -26,6 +27,7 @@ public static class BannerViewSelector
         bool attentionDismissed,
         bool attentionSuppressedByModalContext,
         BannerProgressEntry? backgroundProgress,
+        ExportProgressEntry? exportProgress,
         IReadOnlyList<BannerInfoEntry> infoBanners)
     {
         ArgumentNullException.ThrowIfNull(errorBanners);
@@ -41,9 +43,10 @@ public static class BannerViewSelector
             && !attentionDismissed
             && !attentionSuppressedByModalContext;
 
-        var items = new List<BannerCycleItem>(
+        List<BannerCycleItem> items = new(
             errorBanners.Count + (includeAttention ? 1 : 0)
-            + (backgroundProgress is not null ? 1 : 0) + infoBanners.Count);
+            + (backgroundProgress is not null ? 1 : 0)
+            + (exportProgress is not null ? 1 : 0) + infoBanners.Count);
 
         for (int i = 0; i < errorBanners.Count; i++)
         {
@@ -58,6 +61,11 @@ public static class BannerViewSelector
         if (backgroundProgress is not null)
         {
             items.Add(new BannerCycleItem(BannerView.UpgradeProgress, 0, null));
+        }
+
+        if (exportProgress is not null)
+        {
+            items.Add(new BannerCycleItem(BannerView.ExportProgress, 0, null));
         }
 
         for (int i = 0; i < infoBanners.Count; i++)

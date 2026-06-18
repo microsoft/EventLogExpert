@@ -13,6 +13,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
     private readonly IAttentionBannerService _attention;
     private readonly ICriticalErrorService _critical;
     private readonly IErrorBannerService _errors;
+    private readonly IExportProgressBannerService _exportProgress;
     private readonly IInfoBannerService _infos;
     private readonly IModalCoordinator _modalCoordinator;
     private readonly IProgressBannerService _progress;
@@ -42,6 +43,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
         IErrorBannerService errors,
         IInfoBannerService infos,
         IProgressBannerService progress,
+        IExportProgressBannerService exportProgress,
         ICriticalErrorService critical,
         IModalCoordinator modalCoordinator)
     {
@@ -49,6 +51,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
         _errors = errors;
         _infos = infos;
         _progress = progress;
+        _exportProgress = exportProgress;
         _critical = critical;
         _modalCoordinator = modalCoordinator;
 
@@ -56,6 +59,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
         _errors.StateChanged += OnFacetChanged;
         _infos.StateChanged += OnFacetChanged;
         _progress.StateChanged += OnFacetChanged;
+        _exportProgress.StateChanged += OnFacetChanged;
         _critical.StateChanged += OnFacetChanged;
         _modalCoordinator.StateChanged += OnFacetChanged;
 
@@ -95,6 +99,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
         _errors.StateChanged -= OnFacetChanged;
         _infos.StateChanged -= OnFacetChanged;
         _progress.StateChanged -= OnFacetChanged;
+        _exportProgress.StateChanged -= OnFacetChanged;
         _critical.StateChanged -= OnFacetChanged;
         _modalCoordinator.StateChanged -= OnFacetChanged;
     }
@@ -185,6 +190,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
         IReadOnlyList<ErrorBannerEntry> errors,
         IReadOnlyList<DatabaseEntry> attentionEntries,
         BannerProgressEntry? backgroundProgress,
+        ExportProgressEntry? exportProgress,
         IReadOnlyList<BannerInfoEntry> infos)
     {
         var result = new HashSet<(BannerView View, BannerId? EntryId)>();
@@ -196,6 +202,8 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
         if (attentionEntries.Count > 0) { result.Add((BannerView.Attention, null)); }
 
         if (backgroundProgress is not null) { result.Add((BannerView.UpgradeProgress, null)); }
+
+        if (exportProgress is not null) { result.Add((BannerView.ExportProgress, null)); }
 
         foreach (var info in infos) { result.Add((BannerView.Info, info.Id)); }
 
@@ -212,10 +220,11 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
     // BannerView enum is ordered for display, not priority — use this rank for comparisons.
     private static int PriorityRank(BannerView view) => view switch
     {
-        BannerView.Critical => 5,
-        BannerView.Error => 4,
-        BannerView.Attention => 3,
-        BannerView.UpgradeProgress => 2,
+        BannerView.Critical => 6,
+        BannerView.Error => 5,
+        BannerView.Attention => 4,
+        BannerView.UpgradeProgress => 3,
+        BannerView.ExportProgress => 2,
         BannerView.Info => 1,
         _ => 0
     };
@@ -254,6 +263,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
         var attentionEntries = _attention.AttentionEntries;
         var attentionDismissed = _attention.AttentionDismissed;
         var backgroundProgress = _progress.BackgroundProgress;
+        var exportProgress = _exportProgress.CurrentExport;
         var infos = _infos.InfoBanners;
 
         IReadOnlyList<BannerCycleItem> items = BannerViewSelector.BuildCycle(
@@ -263,6 +273,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
             attentionDismissed,
             attentionSuppressed,
             backgroundProgress,
+            exportProgress,
             infos);
 
         // Fingerprint is built from the UNFILTERED source — otherwise modal close would re-introduce
@@ -272,6 +283,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
             errors,
             attentionEntries,
             backgroundProgress,
+            exportProgress,
             infos);
 
         BannerCycleItem? priorityOverride = ComputePriorityOverride(

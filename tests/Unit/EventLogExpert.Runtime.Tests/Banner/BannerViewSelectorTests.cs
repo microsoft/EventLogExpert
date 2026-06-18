@@ -22,6 +22,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
+                exportProgress: null,
                 infoBanners: []);
 
         // Assert
@@ -46,6 +47,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: BuildProgress(),
+                exportProgress: null,
                 infoBanners: [i0, i1, i2]);
 
         // Assert
@@ -70,6 +72,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: true,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
+                exportProgress: null,
                 infoBanners: []);
 
         // Assert
@@ -93,6 +96,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: dismissed,
                 attentionSuppressedByModalContext: suppressedByModalContext,
                 backgroundProgress: null,
+                exportProgress: null,
                 infoBanners: []);
 
         if (expectAttention)
@@ -117,6 +121,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
+                exportProgress: null,
                 infoBanners: []);
 
         // Assert
@@ -134,6 +139,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
+                exportProgress: null,
                 infoBanners: []));
     }
 
@@ -150,6 +156,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: true,
                 backgroundProgress: BuildProgress(),
+                exportProgress: null,
                 infoBanners: [info]);
 
         Assert.Equal(3, result.Count);
@@ -168,6 +175,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: true,
                 backgroundProgress: null,
+                exportProgress: null,
                 infoBanners: []);
 
         Assert.Empty(result);
@@ -184,6 +192,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: BuildProgress(),
+                exportProgress: null,
                 infoBanners: [BuildInfo()]);
 
         // Assert
@@ -204,6 +213,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
+                exportProgress: null,
                 infoBanners: []));
     }
 
@@ -218,6 +228,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
+                exportProgress: null,
                 infoBanners: null!));
     }
 
@@ -232,6 +243,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
+                exportProgress: null,
                 infoBanners: []);
 
         // Assert
@@ -255,6 +267,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
+                exportProgress: null,
                 infoBanners: []);
 
         // Assert
@@ -262,6 +275,25 @@ public sealed class BannerViewSelectorTests
         Assert.Equal(new BannerCycleItem(BannerView.Error, 0, e0.Id), result[0]);
         Assert.Equal(new BannerCycleItem(BannerView.Error, 1, e1.Id), result[1]);
         Assert.Equal(new BannerCycleItem(BannerView.Error, 2, e2.Id), result[2]);
+    }
+
+    [Fact]
+    public void BuildCycle_OnlyExportProgress_ReturnsSingleExportProgressItem()
+    {
+        // Act
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [],
+                attentionEntries: [],
+                attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
+                backgroundProgress: null,
+                exportProgress: BuildExportProgress(),
+                infoBanners: []);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal(new BannerCycleItem(BannerView.ExportProgress, 0, null), result[0]);
     }
 
     [Fact]
@@ -279,6 +311,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
+                exportProgress: null,
                 infoBanners: [i0, i1]);
 
         // Assert
@@ -298,6 +331,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: BuildProgress(),
+                exportProgress: null,
                 infoBanners: []);
 
         // Assert
@@ -321,6 +355,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
+                exportProgress: null,
                 infoBanners: []);
 
         IReadOnlyList<BannerCycleItem> after = BannerViewSelector
@@ -330,6 +365,7 @@ public sealed class BannerViewSelectorTests
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
+                exportProgress: null,
                 infoBanners: []);
 
         // Assert
@@ -339,11 +375,38 @@ public sealed class BannerViewSelectorTests
         Assert.Equal(new BannerCycleItem(BannerView.Error, 1, e2.Id), after[1]);
     }
 
+    [Fact]
+    public void BuildCycle_UpgradeAndExportProgress_OrdersUpgradeBeforeExportBeforeInfos()
+    {
+        // Arrange
+        BannerInfoEntry info = BuildInfo();
+
+        // Act
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [],
+                attentionEntries: [],
+                attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
+                backgroundProgress: BuildProgress(),
+                exportProgress: BuildExportProgress(),
+                infoBanners: [info]);
+
+        // Assert
+        Assert.Equal(3, result.Count);
+        Assert.Equal(new BannerCycleItem(BannerView.UpgradeProgress, 0, null), result[0]);
+        Assert.Equal(new BannerCycleItem(BannerView.ExportProgress, 0, null), result[1]);
+        Assert.Equal(new BannerCycleItem(BannerView.Info, 0, info.Id), result[2]);
+    }
+
     private static DatabaseEntry BuildAttention(string fileName) =>
         new(fileName, $@"C:\dbs\{fileName}", IsEnabled: false, DatabaseStatus.UpgradeRequired);
 
     private static ErrorBannerEntry BuildError() =>
         new(BannerId.Create(), "Error Title", "Error Message", null, null, s_testTime);
+
+    private static ExportProgressEntry BuildExportProgress() =>
+        new("Exporting events…", () => { });
 
     private static BannerInfoEntry BuildInfo() =>
         new(BannerId.Create(), "Info Title", "Info Message", BannerSeverity.Info, s_testTime);
