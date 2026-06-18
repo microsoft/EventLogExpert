@@ -112,10 +112,40 @@ internal sealed class FilteringEffects(
         return Task.CompletedTask;
     }
 
+    [EffectMethod]
+    public async Task HandleSetGroupBy(SetGroupByAction action, IDispatcher dispatcher) =>
+        await RepublishForSortAsync(dispatcher);
+
+    [EffectMethod]
+    public async Task HandleSetOrderBy(SetOrderByAction action, IDispatcher dispatcher) =>
+        await RepublishForSortAsync(dispatcher);
+
+    [EffectMethod(typeof(ToggleGroupSortingAction))]
+    public async Task HandleToggleGroupSorting(IDispatcher dispatcher)
+    {
+        if (_logTableState.Value.RequestedGroupBy is null) { return; }
+
+        await RepublishForSortAsync(dispatcher);
+    }
+
+    [EffectMethod(typeof(ToggleSortingAction))]
+    public async Task HandleToggleSorting(IDispatcher dispatcher) =>
+        await RepublishForSortAsync(dispatcher);
+
+    [EffectMethod(typeof(UpdateTableAction))]
+    public async Task HandleUpdateTable(IDispatcher dispatcher)
+    {
+        // An XML-reload reopen settles under the live sort and drops the in-flight rebuild; if a sort is still pending, republish so it applies.
+        if (!_logTableState.Value.HasPendingSortChange) { return; }
+
+        await RepublishForSortAsync(dispatcher);
+    }
+
     private async Task ApplyFilterAndPublishAsync(Filter filter, long filterToken, IDispatcher dispatcher)
     {
         var snapshot = SnapshotOpenLogEvents();
         var capturedContext = _logTableState.Value.SortContext;
+        var generation = _logTableState.Value.DisplayListGeneration;
 
         dispatcher.Dispatch(new SetFilterProgressAction(true));
 
@@ -167,7 +197,7 @@ internal sealed class FilteringEffects(
                 }
             }
 
-            dispatcher.Dispatch(new DisplayReadyAction { Lists = fresh });
+            dispatcher.Dispatch(new DisplayReadyAction { Lists = fresh, Generation = generation });
         }
         finally
         {
@@ -308,6 +338,12 @@ internal sealed class FilteringEffects(
             _closeCoordinator.ReleaseCoordinatorLock();
         }
     }
+
+    private Task RepublishForSortAsync(IDispatcher dispatcher) =>
+        ApplyFilterAndPublishAsync(
+            _eventLogState.Value.AppliedFilter,
+            _concurrencyState.InvalidateInFlightFilters(),
+            dispatcher);
 
     private List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> SnapshotEventsForLogs(
         IReadOnlyList<EventLogId> logIds)

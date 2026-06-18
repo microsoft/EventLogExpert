@@ -9,6 +9,7 @@ using EventLogExpert.Filtering.TestUtils.Constants;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
+using ApplyFilterAction = EventLogExpert.Runtime.EventLog.ApplyFilterAction;
 using CloseLogAction = EventLogExpert.Runtime.LogTable.CloseLogAction;
 using Reducers = EventLogExpert.Runtime.LogTable.Reducers;
 
@@ -828,6 +829,29 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
+    public void ReduceApplyFilter_BumpsGenerationAndPreservesRequestedSort()
+    {
+        var state = new LogTableState
+        {
+            RequestedOrderBy = ColumnName.Source,
+            RequestedGroupBy = ColumnName.EventId,
+            RequestedIsDescending = false,
+            RequestedIsGroupDescending = true,
+            DisplayListGeneration = 3
+        };
+
+        var result = Reducers.ReduceApplyFilter(
+            state,
+            new ApplyFilterAction(new Filter(null, [])));
+
+        Assert.Equal(4, result.DisplayListGeneration);
+        Assert.Equal(ColumnName.Source, result.RequestedOrderBy);
+        Assert.Equal(ColumnName.EventId, result.RequestedGroupBy);
+        Assert.False(result.RequestedIsDescending);
+        Assert.True(result.RequestedIsGroupDescending);
+    }
+
+    [Fact]
     public void ReduceCloseAll_ResetsCollapse()
     {
         var table = new LogView(EventLogId.Create()) { LogName = "A" };
@@ -868,6 +892,74 @@ public sealed class LogTableStoreTests
         Assert.Equal(tableA.Id, result.ActiveEventLogId);
         Assert.False(result.GroupsCollapsedByDefault);
         Assert.Empty(result.GroupCollapseOverrides);
+    }
+
+    [Fact]
+    public void ReduceDisplayReady_WhenFilterSupersedesSort_DropsSortRebuildAndAppliesLatest()
+    {
+        var seeded = SeedTabled(new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+        });
+
+        var afterSort = Reducers.ReduceSetOrderBy(seeded, new SetOrderByAction(ColumnName.Source));
+        var afterFilter = Reducers.ReduceApplyFilter(
+            afterSort,
+            new ApplyFilterAction(new Filter(null, [])));
+
+        var lists = new Dictionary<EventLogId, SegmentedSortedList>(afterFilter.PerLogEvents.Count);
+
+        foreach (var (logId, list) in afterFilter.PerLogEvents)
+        {
+            lists[logId] = SegmentedSortedList.CreateSorted(list, afterFilter.SortContext);
+        }
+
+        var droppedSortRebuild = Reducers.ReduceDisplayReady(
+            afterFilter,
+            new DisplayReadyAction { Lists = lists, Generation = afterSort.DisplayListGeneration });
+
+        Assert.Same(afterFilter, droppedSortRebuild);
+        Assert.Null(droppedSortRebuild.OrderBy);
+
+        var appliedFilterRebuild = Reducers.ReduceDisplayReady(
+            afterFilter,
+            new DisplayReadyAction { Lists = lists, Generation = afterFilter.DisplayListGeneration });
+
+        Assert.Equal(ColumnName.Source, appliedFilterRebuild.OrderBy);
+        Assert.Equal(ColumnName.Source, appliedFilterRebuild.RequestedOrderBy);
+    }
+
+    [Fact]
+    public void ReduceDisplayReady_WhenGenerationStale_ShouldDropAndWhenMatching_ShouldApply()
+    {
+        var requested = Reducers.ReduceSetOrderBy(
+            SeedTabled(new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+                FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+            }),
+            new SetOrderByAction(ColumnName.Source));
+
+        var lists = new Dictionary<EventLogId, SegmentedSortedList>(requested.PerLogEvents.Count);
+
+        foreach (var (logId, list) in requested.PerLogEvents)
+        {
+            lists[logId] = SegmentedSortedList.CreateSorted(list, requested.SortContext);
+        }
+
+        var stale = Reducers.ReduceDisplayReady(
+            requested,
+            new DisplayReadyAction { Lists = lists, Generation = requested.DisplayListGeneration - 1 });
+
+        Assert.Same(requested, stale);
+        Assert.Null(stale.OrderBy);
+
+        var applied = Reducers.ReduceDisplayReady(
+            requested,
+            new DisplayReadyAction { Lists = lists, Generation = requested.DisplayListGeneration });
+
+        Assert.Equal(ColumnName.Source, applied.OrderBy);
     }
 
     [Fact]
@@ -929,7 +1021,13 @@ public sealed class LogTableStoreTests
     public void ReduceDisplayReady_WhenPrebuiltContextStale_ShouldHealToLiveContext()
     {
         var logData = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
-        var state = new LogTableState { OrderBy = ColumnName.DateAndTime, IsDescending = true };
+        var state = new LogTableState
+        {
+            OrderBy = ColumnName.DateAndTime,
+            IsDescending = true,
+            RequestedOrderBy = ColumnName.DateAndTime,
+            RequestedIsDescending = true
+        };
         state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
 
         var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -950,6 +1048,68 @@ public sealed class LogTableStoreTests
         Assert.NotSame(prebuilt, after.PerLogEvents[logData.Id]);
         Assert.Equal(3, after.PerLogEvents[logData.Id].Count);
         Assert.Equal(new[] { 30, 20, 10 }, after.DisplayedEvents.Select(e => e.Id).ToArray());
+    }
+
+    [Fact]
+    public void ReduceDisplayReady_WhenRequestedDiffersFromLive_ShouldSwapReferenceAndFlipLiveAtomically()
+    {
+        var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "B", timeCreated: baseTime.AddMinutes(2)),
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "A", timeCreated: baseTime.AddMinutes(1))
+        };
+
+        var seeded = SeedTabled(events, orderBy: ColumnName.DateAndTime, isDescending: true);
+        var requested = seeded with
+        {
+            RequestedOrderBy = ColumnName.Source,
+            RequestedIsDescending = false,
+            DisplayListGeneration = seeded.DisplayListGeneration + 1
+        };
+
+        var logId = requested.PerLogEvents.Keys.Single();
+        var prebuilt = SegmentedSortedList.CreateSorted(events, requested.SortContext);
+        var lists = new Dictionary<EventLogId, SegmentedSortedList> { { logId, prebuilt } };
+
+        var after = Reducers.ReduceDisplayReady(
+            requested,
+            new DisplayReadyAction { Lists = lists, Generation = requested.DisplayListGeneration });
+
+        Assert.Same(prebuilt, after.PerLogEvents[logId]);
+        Assert.Equal(ColumnName.Source, after.OrderBy);
+        Assert.False(after.IsDescending);
+        Assert.Equal(new[] { "A", "B" }, after.DisplayedEvents.Select(e => e.Source));
+    }
+
+    [Fact]
+    public void ReduceDisplayReady_WhenRequestedGroupByDiffers_ShouldResetCollapseState()
+    {
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+        };
+
+        var seeded = SeedTabled(events, collapseOverrides: ImmutableHashSet.Create("stale"));
+        var requested = seeded with
+        {
+            RequestedGroupBy = ColumnName.Source,
+            DisplayListGeneration = seeded.DisplayListGeneration + 1,
+            GroupsCollapsedByDefault = true
+        };
+
+        var logId = requested.PerLogEvents.Keys.Single();
+        var prebuilt = SegmentedSortedList.CreateSorted(events, requested.SortContext);
+        var lists = new Dictionary<EventLogId, SegmentedSortedList> { { logId, prebuilt } };
+
+        var after = Reducers.ReduceDisplayReady(
+            requested,
+            new DisplayReadyAction { Lists = lists, Generation = requested.DisplayListGeneration });
+
+        Assert.Equal(ColumnName.Source, after.GroupBy);
+        Assert.False(after.GroupsCollapsedByDefault);
+        Assert.Empty(after.GroupCollapseOverrides);
     }
 
     [Fact]
@@ -1079,6 +1239,75 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
+    public void ReduceLoadColumnsCompleted_WhenLiveAndRequestedGroupBothHidden_ClearsBoth()
+    {
+        var state = new LogTableState
+        {
+            GroupBy = ColumnName.Source,
+            IsGroupDescending = true,
+            RequestedGroupBy = ColumnName.Source,
+            RequestedIsGroupDescending = true
+        };
+
+        var columns = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.Source, false)
+            .Add(ColumnName.Level, true);
+
+        var result = Reducers.ReduceLoadColumnsCompleted(
+            state,
+            new LoadColumnsCompletedAction(columns, ImmutableDictionary<ColumnName, int>.Empty, []));
+
+        Assert.Null(result.GroupBy);
+        Assert.False(result.IsGroupDescending);
+        Assert.Null(result.RequestedGroupBy);
+        Assert.False(result.RequestedIsGroupDescending);
+    }
+
+    [Fact]
+    public void ReduceLoadColumnsCompleted_WhenLiveGroupHiddenButRequestedGroupVisible_PreservesPendingRegroup()
+    {
+        var state = new LogTableState
+        {
+            GroupBy = ColumnName.Source,
+            RequestedGroupBy = ColumnName.Level
+        };
+
+        var columns = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.Source, false)
+            .Add(ColumnName.Level, true);
+
+        var result = Reducers.ReduceLoadColumnsCompleted(
+            state,
+            new LoadColumnsCompletedAction(columns, ImmutableDictionary<ColumnName, int>.Empty, []));
+
+        Assert.Null(result.GroupBy);
+        Assert.Equal(ColumnName.Level, result.RequestedGroupBy);
+    }
+
+    [Fact]
+    public void ReduceLoadColumnsCompleted_WhenRequestedGroupHiddenWhileLiveUngrouped_ClearsPendingRequest()
+    {
+        var state = new LogTableState
+        {
+            GroupBy = null,
+            RequestedGroupBy = ColumnName.Source,
+            RequestedIsGroupDescending = true
+        };
+
+        var columns = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.Source, false)
+            .Add(ColumnName.Level, true);
+
+        var result = Reducers.ReduceLoadColumnsCompleted(
+            state,
+            new LoadColumnsCompletedAction(columns, ImmutableDictionary<ColumnName, int>.Empty, []));
+
+        Assert.Null(result.RequestedGroupBy);
+        Assert.False(result.RequestedIsGroupDescending);
+        Assert.Null(result.GroupBy);
+    }
+
+    [Fact]
     public void ReduceLoadColumnsCompleted_WhenResetDefaultsHidesGroupColumn_ClearsGroup()
     {
         var state = new LogTableState { GroupBy = ColumnName.ActivityId };
@@ -1153,23 +1382,36 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
-    public void ReduceSetGroupBy_SetsGroupResortsAndResetsDirectionAndCollapse()
+    public void ReduceSetGroupBy_IsLightweight_SetsRequestedWithoutTouchingLiveOrLists()
     {
-        var state = new LogTableState
+        var state = SeedTabled(new List<ResolvedEvent>
         {
-            PerLogEvents = BuildPerLog(
-                new List<ResolvedEvent>
-                {
-                    FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
-                    FilterEventBuilder.CreateTestEvent(id: 1, source: "A")
-                },
-                [],
-                isGroupDescending: true),
-            IsGroupDescending = true,
-            GroupCollapseOverrides = ImmutableHashSet.Create("stale")
-        };
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+        });
 
         var result = Reducers.ReduceSetGroupBy(state, new SetGroupByAction(ColumnName.Source));
+
+        Assert.Same(state.PerLogEvents, result.PerLogEvents);
+        Assert.Equal(state.DisplayListGeneration + 1, result.DisplayListGeneration);
+        Assert.Equal(ColumnName.Source, result.RequestedGroupBy);
+        Assert.False(result.RequestedIsGroupDescending);
+        Assert.Null(result.GroupBy);
+    }
+
+    [Fact]
+    public void ReduceSetGroupBy_SetsGroupResortsAndResetsDirectionAndCollapse()
+    {
+        var state = SeedTabled(
+            new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
+                FilterEventBuilder.CreateTestEvent(id: 1, source: "A")
+            },
+            isGroupDescending: true,
+            collapseOverrides: ImmutableHashSet.Create("stale"));
+
+        var result = Settle(Reducers.ReduceSetGroupBy(state, new SetGroupByAction(ColumnName.Source)));
 
         Assert.Equal(ColumnName.Source, result.GroupBy);
         Assert.False(result.IsGroupDescending);
@@ -1180,22 +1422,17 @@ public sealed class LogTableStoreTests
     [Fact]
     public void ReduceSetGroupBy_WhenNull_ClearsGroupingAndResortsUngrouped()
     {
-        var state = new LogTableState
-        {
-            GroupBy = ColumnName.Source,
-            OrderBy = ColumnName.EventId,
-            IsDescending = false,
-            PerLogEvents = BuildPerLog(
-                new List<ResolvedEvent>
-                {
-                    FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
-                    FilterEventBuilder.CreateTestEvent(id: 1, source: "A")
-                },
-                [],
-                orderBy: ColumnName.EventId, isDescending: false, groupBy: ColumnName.Source)
-        };
+        var state = SeedTabled(
+            new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(id: 2, source: "B"),
+                FilterEventBuilder.CreateTestEvent(id: 1, source: "A")
+            },
+            orderBy: ColumnName.EventId,
+            isDescending: false,
+            groupBy: ColumnName.Source);
 
-        var result = Reducers.ReduceSetGroupBy(state, new SetGroupByAction(null));
+        var result = Settle(Reducers.ReduceSetGroupBy(state, new SetGroupByAction(null)));
 
         Assert.Null(result.GroupBy);
         Assert.Equal(new[] { 1, 2 }, result.DisplayedEvents.Select(e => e.Id));
@@ -1207,14 +1444,56 @@ public sealed class LogTableStoreTests
         var state = new LogTableState
         {
             GroupBy = ColumnName.Source,
+            RequestedGroupBy = ColumnName.Source,
             IsGroupDescending = true,
+            RequestedIsGroupDescending = true,
             GroupCollapseOverrides = ImmutableHashSet.Create("kept")
         };
 
         var result = Reducers.ReduceSetGroupBy(state, new SetGroupByAction(ColumnName.Source));
 
+        Assert.Same(state, result);
         Assert.True(result.IsGroupDescending);
         Assert.Contains("kept", result.GroupCollapseOverrides);
+    }
+
+    [Fact]
+    public void ReduceSetOrderBy_IsLightweight_SetsRequestedWithoutTouchingLiveOrLists()
+    {
+        var state = SeedTabled(new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+        });
+
+        var result = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Source));
+
+        Assert.Same(state.PerLogEvents, result.PerLogEvents);
+        Assert.Equal(state.DisplayListGeneration + 1, result.DisplayListGeneration);
+        Assert.Equal(ColumnName.Source, result.RequestedOrderBy);
+        Assert.Null(result.OrderBy);
+    }
+
+    [Fact]
+    public void ReduceSetOrderBy_LeavesPerLogListsConsistentWithLiveDisplayedContext()
+    {
+        var state = SeedTabled(
+            new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+                FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+            },
+            groupBy: ColumnName.Source);
+
+        var afterSort = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.EventId));
+
+        var displayed = new SortContext(
+            ResolvedEventOrdering.ResolveDefaultOrderBy(afterSort.OrderBy, afterSort.GroupBy, afterSort.PerLogEvents.Count),
+            afterSort.IsDescending,
+            afterSort.GroupBy,
+            afterSort.IsGroupDescending);
+
+        Assert.All(afterSort.PerLogEvents.Values, list => Assert.True(list.HasContext(displayed)));
     }
 
     [Fact]
@@ -1242,23 +1521,37 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
-    public void ReduceToggleGroupSorting_WhenGrouped_FlipsDirectionAndResorts()
+    public void ReduceToggleGroupSorting_IsLightweight_SetsRequestedWithoutTouchingLiveOrLists()
     {
-        var state = new LogTableState
-        {
-            GroupBy = ColumnName.Source,
-            IsGroupDescending = false,
-            PerLogEvents = BuildPerLog(
-                new List<ResolvedEvent>
-                {
-                    FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
-                    FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
-                },
-                [],
-                groupBy: ColumnName.Source)
-        };
+        var state = SeedTabled(
+            new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+                FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+            },
+            groupBy: ColumnName.Source);
 
         var result = Reducers.ReduceToggleGroupSorting(state);
+
+        Assert.Same(state.PerLogEvents, result.PerLogEvents);
+        Assert.Equal(state.DisplayListGeneration + 1, result.DisplayListGeneration);
+        Assert.True(result.RequestedIsGroupDescending);
+        Assert.False(result.IsGroupDescending);
+        Assert.Equal(ColumnName.Source, result.GroupBy);
+    }
+
+    [Fact]
+    public void ReduceToggleGroupSorting_WhenGrouped_FlipsDirectionAndResorts()
+    {
+        var state = SeedTabled(
+            new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+                FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+            },
+            groupBy: ColumnName.Source);
+
+        var result = Settle(Reducers.ReduceToggleGroupSorting(state));
 
         Assert.True(result.IsGroupDescending);
         Assert.Equal(new[] { "B", "A" }, result.DisplayedEvents.Select(e => e.Source));
@@ -1272,6 +1565,45 @@ public sealed class LogTableStoreTests
         var result = Reducers.ReduceToggleGroupSorting(state);
 
         Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void ReduceToggleSorting_ComposesOffRequestedWithoutTouchingLive()
+    {
+        var seeded = SeedTabled(new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+        });
+        var state = seeded with { IsDescending = true, RequestedIsDescending = false };
+
+        var afterFirst = Reducers.ReduceToggleSorting(state);
+
+        Assert.True(afterFirst.RequestedIsDescending);
+        Assert.True(afterFirst.IsDescending);
+
+        var afterSecond = Reducers.ReduceToggleSorting(afterFirst);
+
+        Assert.False(afterSecond.RequestedIsDescending);
+        Assert.True(afterSecond.IsDescending);
+        Assert.Equal(state.DisplayListGeneration + 2, afterSecond.DisplayListGeneration);
+    }
+
+    [Fact]
+    public void ReduceToggleSorting_IsLightweight_SetsRequestedWithoutTouchingLiveOrLists()
+    {
+        var state = SeedTabled(new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+        });
+
+        var result = Reducers.ReduceToggleSorting(state);
+
+        Assert.Same(state.PerLogEvents, result.PerLogEvents);
+        Assert.Equal(state.DisplayListGeneration + 1, result.DisplayListGeneration);
+        Assert.False(result.RequestedIsDescending);
+        Assert.True(result.IsDescending);
     }
 
     [Fact]
@@ -1596,5 +1928,47 @@ public sealed class LogTableStoreTests
             .ToImmutableDictionary(
                 group => idByName.TryGetValue(group.Key, out var id) ? id : EventLogId.Create(),
                 group => SegmentedSortedList.CreateSorted(group, context));
+    }
+
+    private static LogTableState SeedTabled(
+        IReadOnlyList<ResolvedEvent> events,
+        ColumnName? orderBy = null,
+        bool isDescending = true,
+        ColumnName? groupBy = null,
+        bool isGroupDescending = false,
+        ImmutableHashSet<string>? collapseOverrides = null)
+    {
+        var logData = new EventLogData(events[0].OwningLog, LogPathType.Channel);
+        var state = Reducers.ReduceAddTable(new LogTableState(), new AddTableAction(logData));
+        var tables = state.EventTables.Where(table => !table.IsCombined).ToList();
+
+        return state with
+        {
+            OrderBy = orderBy,
+            RequestedOrderBy = orderBy,
+            IsDescending = isDescending,
+            RequestedIsDescending = isDescending,
+            GroupBy = groupBy,
+            RequestedGroupBy = groupBy,
+            IsGroupDescending = isGroupDescending,
+            RequestedIsGroupDescending = isGroupDescending,
+            PerLogEvents = BuildPerLog(events, tables, orderBy, isDescending, groupBy, isGroupDescending),
+            GroupCollapseOverrides = collapseOverrides ?? ImmutableHashSet.Create<string>(StringComparer.Ordinal)
+        };
+    }
+
+    private static LogTableState Settle(LogTableState state)
+    {
+        var context = state.SortContext;
+        var lists = new Dictionary<EventLogId, SegmentedSortedList>(state.PerLogEvents.Count);
+
+        foreach (var (logId, list) in state.PerLogEvents)
+        {
+            lists[logId] = SegmentedSortedList.CreateSorted(list, context);
+        }
+
+        return Reducers.ReduceDisplayReady(
+            state,
+            new DisplayReadyAction { Lists = lists, Generation = state.DisplayListGeneration });
     }
 }

@@ -149,6 +149,10 @@ internal sealed class Reducers
         };
     }
 
+    [ReducerMethod]
+    public static LogTableState ReduceApplyFilter(LogTableState state, ApplyFilterAction action) =>
+        state with { DisplayListGeneration = state.DisplayListGeneration + 1 };
+
     [ReducerMethod(typeof(CloseAllLogsAction))]
     public static LogTableState ReduceCloseAll(LogTableState state) =>
         ResetGroupCollapse(state with
@@ -222,12 +226,22 @@ internal sealed class Reducers
         LogTableState state,
         DisplayReadyAction action)
     {
+        if (action.Generation != state.DisplayListGeneration) { return state; }
+
+        var flipped = state with
+        {
+            OrderBy = state.RequestedOrderBy,
+            IsDescending = state.RequestedIsDescending,
+            GroupBy = state.RequestedGroupBy,
+            IsGroupDescending = state.RequestedIsGroupDescending
+        };
+
         // Skip log ids absent from EventTables: log closed while filter ran.
         var tablesById = state.EventTables
             .Where(table => !table.IsCombined)
             .ToDictionary(table => table.Id);
 
-        // A background filter may pre-date a sort change; re-sort under the post-update context.
+        // The lists were built under the requested context; heal any that pre-date it.
         int postCount = 0;
 
         foreach (var (logId, _) in tablesById)
@@ -236,7 +250,7 @@ internal sealed class Reducers
         }
 
         var context = EffectiveSortContext(
-            state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending, postCount);
+            flipped.OrderBy, flipped.IsDescending, flipped.GroupBy, flipped.IsGroupDescending, postCount);
         var perLogBuilder = ImmutableDictionary.CreateBuilder<EventLogId, SegmentedSortedList>();
         var counts = state.EventCountByLog;
         var tables = state.EventTables;
@@ -260,12 +274,14 @@ internal sealed class Reducers
             }
         }
 
-        return state with
+        var result = flipped with
         {
-            PerLogEvents = ReconcileToLogCount(perLogBuilder.ToImmutable(), state),
+            PerLogEvents = ReconcileToLogCount(perLogBuilder.ToImmutable(), flipped),
             EventTables = tables,
             EventCountByLog = counts
         };
+
+        return state.RequestedGroupBy != state.GroupBy ? ResetGroupCollapse(result) : result;
     }
 
     [ReducerMethod]
@@ -280,21 +296,36 @@ internal sealed class Reducers
             ColumnOrder = action.ColumnOrder
         };
 
-        bool groupColumnHidden = updated.GroupBy is { } groupColumn &&
-            (!action.LoadedColumns.TryGetValue(groupColumn, out bool isVisible) || !isVisible);
+        bool liveGroupHidden = updated.GroupBy is { } liveGroup && IsHidden(liveGroup);
+        bool requestedGroupHidden = updated.RequestedGroupBy is { } requestedGroup && IsHidden(requestedGroup);
 
-        if (!groupColumnHidden) { return updated; }
+        if (!liveGroupHidden && !requestedGroupHidden) { return updated; }
 
-        return updated with
+        var result = updated;
+
+        if (requestedGroupHidden)
         {
-            GroupBy = null,
-            IsGroupDescending = false,
-            GroupsCollapsedByDefault = false,
-            GroupCollapseOverrides = ImmutableHashSet.Create<string>(StringComparer.Ordinal),
-            PerLogEvents = ResortAllLogs(
-                updated.PerLogEvents,
-                EffectiveSortContext(updated.OrderBy, updated.IsDescending, null, false, updated.PerLogEvents.Count))
-        };
+            result = result with { RequestedGroupBy = null, RequestedIsGroupDescending = false };
+        }
+
+        if (liveGroupHidden)
+        {
+            result = result with
+            {
+                GroupBy = null,
+                IsGroupDescending = false,
+                GroupsCollapsedByDefault = false,
+                GroupCollapseOverrides = ImmutableHashSet.Create<string>(StringComparer.Ordinal),
+                PerLogEvents = ResortAllLogs(
+                    updated.PerLogEvents,
+                    EffectiveSortContext(updated.OrderBy, updated.IsDescending, null, false, updated.PerLogEvents.Count))
+            };
+        }
+
+        return result;
+
+        bool IsHidden(ColumnName column) =>
+            !action.LoadedColumns.TryGetValue(column, out bool isVisible) || !isVisible;
     }
 
     [ReducerMethod]
@@ -351,25 +382,30 @@ internal sealed class Reducers
     [ReducerMethod]
     public static LogTableState ReduceSetGroupBy(LogTableState state, SetGroupByAction action)
     {
-        if (state.GroupBy == action.GroupBy) { return state; }
+        if (state.RequestedGroupBy == action.GroupBy) { return state; }
 
         return state with
         {
-            GroupBy = action.GroupBy,
-            IsGroupDescending = false,
-            GroupsCollapsedByDefault = false,
-            GroupCollapseOverrides = ImmutableHashSet.Create<string>(StringComparer.Ordinal),
-            PerLogEvents = ResortAllLogs(
-                state.PerLogEvents,
-                EffectiveSortContext(state.OrderBy, state.IsDescending, action.GroupBy, false, state.PerLogEvents.Count))
+            RequestedGroupBy = action.GroupBy,
+            RequestedIsGroupDescending = false,
+            DisplayListGeneration = state.DisplayListGeneration + 1
         };
     }
 
     [ReducerMethod]
     public static LogTableState ReduceSetOrderBy(LogTableState state, SetOrderByAction action) =>
-        state.OrderBy.Equals(action.OrderBy) ?
-            SortDisplayEvents(state, null, true) :
-            SortDisplayEvents(state, action.OrderBy, state.IsDescending);
+        state.RequestedOrderBy.Equals(action.OrderBy) ?
+            state with
+            {
+                RequestedOrderBy = null,
+                RequestedIsDescending = true,
+                DisplayListGeneration = state.DisplayListGeneration + 1
+            } :
+            state with
+            {
+                RequestedOrderBy = action.OrderBy,
+                DisplayListGeneration = state.DisplayListGeneration + 1
+            };
 
     [ReducerMethod]
     public static LogTableState ReduceToggleGroupCollapsed(
@@ -389,16 +425,12 @@ internal sealed class Reducers
     [ReducerMethod(typeof(ToggleGroupSortingAction))]
     public static LogTableState ReduceToggleGroupSorting(LogTableState state)
     {
-        if (state.GroupBy is null) { return state; }
-
-        bool isGroupDescending = !state.IsGroupDescending;
+        if (state.RequestedGroupBy is null) { return state; }
 
         return state with
         {
-            IsGroupDescending = isGroupDescending,
-            PerLogEvents = ResortAllLogs(
-                state.PerLogEvents,
-                EffectiveSortContext(state.OrderBy, state.IsDescending, state.GroupBy, isGroupDescending, state.PerLogEvents.Count))
+            RequestedIsGroupDescending = !state.RequestedIsGroupDescending,
+            DisplayListGeneration = state.DisplayListGeneration + 1
         };
     }
 
@@ -419,7 +451,11 @@ internal sealed class Reducers
 
     [ReducerMethod(typeof(ToggleSortingAction))]
     public static LogTableState ReduceToggleSorting(LogTableState state) =>
-        SortDisplayEvents(state, state.OrderBy, !state.IsDescending);
+        state with
+        {
+            RequestedIsDescending = !state.RequestedIsDescending,
+            DisplayListGeneration = state.DisplayListGeneration + 1
+        };
 
     [ReducerMethod]
     public static LogTableState ReduceUpdateTable(LogTableState state, UpdateTableAction action)
@@ -548,21 +584,4 @@ internal sealed class Reducers
         IReadOnlyList<ResolvedEvent> events,
         SortContext context) =>
         perLog.SetItem(logId, SegmentedSortedList.CreateSorted(events, context));
-
-    private static LogTableState SortDisplayEvents(LogTableState state, ColumnName? orderBy, bool isDescending)
-    {
-        var context = EffectiveSortContext(
-            orderBy,
-            isDescending,
-            state.GroupBy,
-            state.IsGroupDescending,
-            state.PerLogEvents.Count);
-
-        return state with
-        {
-            PerLogEvents = ResortAllLogs(state.PerLogEvents, context),
-            OrderBy = orderBy,
-            IsDescending = isDescending
-        };
-    }
 }

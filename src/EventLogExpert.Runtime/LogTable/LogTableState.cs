@@ -47,16 +47,32 @@ public sealed record LogTableState
 
     public bool IsGroupDescending { get; init; }
 
+    internal ColumnName? RequestedOrderBy { get; init; }
+
+    internal bool RequestedIsDescending { get; init; } = true;
+
+    internal ColumnName? RequestedGroupBy { get; init; }
+
+    internal bool RequestedIsGroupDescending { get; init; }
+
+    internal int DisplayListGeneration { get; init; }
+
     public bool GroupsCollapsedByDefault { get; init; }
 
     public ImmutableHashSet<string> GroupCollapseOverrides { get; init; } =
         ImmutableHashSet.Create<string>(StringComparer.Ordinal);
 
     internal SortContext SortContext =>
-        new(ResolvedEventOrdering.ResolveDefaultOrderBy(OrderBy, GroupBy, PerLogEvents.Count),
-            IsDescending,
-            GroupBy,
-            IsGroupDescending);
+        new(ResolvedEventOrdering.ResolveDefaultOrderBy(RequestedOrderBy, RequestedGroupBy, PerLogEvents.Count),
+            RequestedIsDescending,
+            RequestedGroupBy,
+            RequestedIsGroupDescending);
+
+    internal bool HasPendingSortChange =>
+        RequestedOrderBy != OrderBy ||
+        RequestedIsDescending != IsDescending ||
+        RequestedGroupBy != GroupBy ||
+        RequestedIsGroupDescending != IsGroupDescending;
 
     private static readonly ConditionalWeakTable<
         ImmutableDictionary<EventLogId, SegmentedSortedList>, CombinedEventView> s_combinedViews = [];

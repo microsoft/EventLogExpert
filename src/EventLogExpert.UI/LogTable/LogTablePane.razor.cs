@@ -1171,7 +1171,10 @@ public sealed partial class LogTablePane
 
         var groupItems = new List<MenuItem>
         {
-            MenuItem.Item("(none)", () => LogTableCommands.SetGroupBy(null), isChecked: state.GroupBy is null)
+            MenuItem.Item(
+                "(none)",
+                () => { if (state.GroupBy is not null) { LogTableCommands.SetGroupBy(null); } },
+                isChecked: state.GroupBy is null)
         };
 
         foreach (var (column, _) in state.Columns)
@@ -1179,7 +1182,7 @@ public sealed partial class LogTablePane
             var capturedColumn = column;
             groupItems.Add(MenuItem.Item(
                 column.ToFullString(),
-                () => LogTableCommands.SetGroupBy(capturedColumn),
+                () => { if (!state.GroupBy.Equals(capturedColumn)) { LogTableCommands.SetGroupBy(capturedColumn); } },
                 isChecked: state.GroupBy.Equals(capturedColumn)));
         }
 

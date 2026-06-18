@@ -25,6 +25,7 @@ public sealed class LogTableReducerInvariantTests
         var data = new EventLogData("Log0", LogPathType.Channel);
         var state = Reducers.ReduceAddTable(new LogTableState(), new AddTableAction(data));
         state = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Level));
+        state = Settle(state);
 
         state = AppendBatch(state, data.Id, info, error);
         Assert.Equal(1, SegmentCountOf(state, data.Id));
@@ -139,6 +140,7 @@ public sealed class LogTableReducerInvariantTests
         var (state, ids) = SeedLogs(log0, log1);
 
         state = Reducers.ReduceSetGroupBy(state, new SetGroupByAction(ColumnName.Source));
+        state = Settle(state);
 
         AssertEveryLogIsOnTheCurrentContext(state);
 
@@ -163,6 +165,7 @@ public sealed class LogTableReducerInvariantTests
         var (state, ids) = SeedLogs(log0, log1);
 
         state = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Level));
+        state = Settle(state);
 
         // Atomicity: no list may lag the old context.
         AssertEveryLogIsOnTheCurrentContext(state);
@@ -207,9 +210,15 @@ public sealed class LogTableReducerInvariantTests
 
     private static void AssertEveryLogIsOnTheCurrentContext(LogTableState state)
     {
+        var displayed = new SortContext(
+            ResolvedEventOrdering.ResolveDefaultOrderBy(state.OrderBy, state.GroupBy, state.PerLogEvents.Count),
+            state.IsDescending,
+            state.GroupBy,
+            state.IsGroupDescending);
+
         foreach (var list in state.PerLogEvents.Values)
         {
-            Assert.True(list.HasContext(state.SortContext), "A per-log list lagged the state's sort context.");
+            Assert.True(list.HasContext(displayed), "A per-log list lagged the state's displayed context.");
         }
     }
 
@@ -243,6 +252,21 @@ public sealed class LogTableReducerInvariantTests
     }
 
     private static int SegmentCountOf(LogTableState state, EventLogId logId) => state.PerLogEvents[logId].SegmentCount;
+
+    private static LogTableState Settle(LogTableState state)
+    {
+        var context = state.SortContext;
+        var lists = new Dictionary<EventLogId, SegmentedSortedList>(state.PerLogEvents.Count);
+
+        foreach (var (logId, list) in state.PerLogEvents)
+        {
+            lists[logId] = SegmentedSortedList.CreateSorted(list, context);
+        }
+
+        return Reducers.ReduceDisplayReady(
+            state,
+            new DisplayReadyAction { Lists = lists, Generation = state.DisplayListGeneration });
+    }
 
     private static DateTime Time(int logIndex, int seconds) =>
         new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddDays(logIndex).AddSeconds(seconds);
