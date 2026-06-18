@@ -63,7 +63,7 @@ public sealed class EventTableColumnFormatterTests
     }
 
     [Fact]
-    public void GetCellText_MissingNullableValues_ReturnEmpty()
+    public void GetCellText_MissingNullableValues_ReturnsEmpty()
     {
         var bare = new ResolvedEvent("Log", LogPathType.Channel);
 

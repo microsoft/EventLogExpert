@@ -187,16 +187,20 @@ public sealed class MauiMenuActionService(
 
         try
         {
-            // The Cancel button captures this delegate; the finished flag turns a late click (after End
-            // tears the banner down) into a clean no-op instead of relying on a swallowed ObjectDisposedException.
-            _exportProgress.Begin(
-                "Exporting events…", () => { if (!Volatile.Read(ref finished)) { cancellation.Cancel(); } });
-
             savedPath = await _fileSaveService.SaveStreamingAsync(
                 suggestedFileName,
                 fileTypes,
-                (stream, token) => _eventTableExporter.ExportAsync(
-                    stream, format, events, columns, timeZone, includeDescription: true, token),
+                (stream, token) =>
+                {
+                    // Begin only once the picker has returned a destination and the streaming write is
+                    // starting; dismissing the picker never reaches here, so it stays silent. The finished
+                    // flag turns a late Cancel click (after End) into a clean no-op.
+                    _exportProgress.Begin(
+                        "Exporting events…", () => { if (!Volatile.Read(ref finished)) { cancellation.Cancel(); } });
+
+                    return _eventTableExporter.ExportAsync(
+                        stream, format, events, columns, timeZone, includeDescription: true, token);
+                },
                 cancellation.Token);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
