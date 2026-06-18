@@ -15,6 +15,7 @@ using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.Export;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
@@ -62,6 +63,9 @@ public static class RuntimeServiceCollectionExtensions
 
         services.AddSingleton<IDatabaseOperationCoordinator, DatabaseOperationCoordinator>();
     }
+
+    private static void AddExportServices(IServiceCollection services) =>
+        services.AddSingleton<ITabularExportWriter, TabularExportWriter>();
 
     extension(IServiceCollection services)
     {
@@ -130,6 +134,7 @@ public static class RuntimeServiceCollectionExtensions
             ArgumentNullException.ThrowIfNull(services);
 
             AddDatabaseServices(services);
+            AddExportServices(services);
 
             // Command facades.
             services.AddSingleton<IEventLogCommands, EventLogCommands>();
