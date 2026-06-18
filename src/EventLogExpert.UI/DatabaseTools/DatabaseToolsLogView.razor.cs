@@ -222,7 +222,7 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 
         try
         {
-            await FileSaveService.SaveAsync(suggestedFileName, FileSaveFileTypes.Log, async stream =>
+            await FileSaveService.SaveStreamingAsync(suggestedFileName, FileSaveFileTypes.Log, async (stream, _) =>
             {
                 await using var writer = new StreamWriter(stream, leaveOpen: true);
 
@@ -232,7 +232,7 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 
                     await writer.WriteAsync(snapshot[i]);
                 }
-            });
+            }, CancellationToken.None);
         }
         catch (Exception ex)
         {

@@ -404,7 +404,7 @@ public sealed class DebugLogModalTests : BunitContext
     }
 
     [Fact]
-    public async Task DebugLogModal_ExportClick_CallsSaveAsyncWithEnvironmentNewLineJoinedDisplayed()
+    public async Task DebugLogModal_ExportClick_CallsSaveStreamingAsyncWithEnvironmentNewLineJoinedDisplayed()
     {
         // Arrange
         var lines = new[]
@@ -415,12 +415,13 @@ public sealed class DebugLogModalTests : BunitContext
 
         _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
-        Func<Stream, Task>? capturedWriter = null;
+        Func<Stream, CancellationToken, Task>? capturedWriter = null;
 
-        _fileSaveService.SaveAsync(
+        _fileSaveService.SaveStreamingAsync(
                 Arg.Any<string>(),
                 Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>>(),
-                Arg.Do<Func<Stream, Task>>(writer => capturedWriter = writer))
+                Arg.Do<Func<Stream, CancellationToken, Task>>(writer => capturedWriter = writer),
+                Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<string?>("C:\\debug-log.log"));
 
         var component = Render<DebugLogModal>();
@@ -434,10 +435,11 @@ public sealed class DebugLogModalTests : BunitContext
         await component.Find("button:contains('Export')").ClickAsync(new MouseEventArgs());
 
         // Assert
-        await _fileSaveService.Received(1).SaveAsync(
+        await _fileSaveService.Received(1).SaveStreamingAsync(
             Arg.Is<string>(name => name.StartsWith("debug-log-") && name.EndsWith(".log")),
             FileSaveFileTypes.Log,
-            Arg.Any<Func<Stream, Task>>());
+            Arg.Any<Func<Stream, CancellationToken, Task>>(),
+            Arg.Any<CancellationToken>());
 
         Assert.NotNull(capturedWriter);
         Assert.Equal(expectedContent, await InvokeWriterAndDecodeAsync(capturedWriter));
@@ -456,12 +458,13 @@ public sealed class DebugLogModalTests : BunitContext
 
         _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
-        Func<Stream, Task>? capturedWriter = null;
+        Func<Stream, CancellationToken, Task>? capturedWriter = null;
 
-        _fileSaveService.SaveAsync(
+        _fileSaveService.SaveStreamingAsync(
                 Arg.Any<string>(),
                 Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>>(),
-                Arg.Do<Func<Stream, Task>>(writer => capturedWriter = writer))
+                Arg.Do<Func<Stream, CancellationToken, Task>>(writer => capturedWriter = writer),
+                Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<string?>("C:\\debug-log.log"));
 
         var component = Render<DebugLogModal>();
@@ -474,10 +477,11 @@ public sealed class DebugLogModalTests : BunitContext
         await component.Find("button:contains('Export')").ClickAsync(new MouseEventArgs());
 
         // Assert
-        await _fileSaveService.Received(1).SaveAsync(
+        await _fileSaveService.Received(1).SaveStreamingAsync(
             Arg.Any<string>(),
             FileSaveFileTypes.Log,
-            Arg.Any<Func<Stream, Task>>());
+            Arg.Any<Func<Stream, CancellationToken, Task>>(),
+            Arg.Any<CancellationToken>());
 
         Assert.NotNull(capturedWriter);
         Assert.Equal(lines[1], await InvokeWriterAndDecodeAsync(capturedWriter));
@@ -490,10 +494,11 @@ public sealed class DebugLogModalTests : BunitContext
         var lines = new[] { DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogTestMessage) };
 
         _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
-        _fileSaveService.SaveAsync(
+        _fileSaveService.SaveStreamingAsync(
                 Arg.Any<string>(),
                 Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>>(),
-                Arg.Any<Func<Stream, Task>>())
+                Arg.Any<Func<Stream, CancellationToken, Task>>(),
+                Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<string?>(null));
 
         var component = Render<DebugLogModal>();
@@ -516,10 +521,11 @@ public sealed class DebugLogModalTests : BunitContext
         var lines = new[] { DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogTestMessage) };
 
         _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
-        _fileSaveService.SaveAsync(
+        _fileSaveService.SaveStreamingAsync(
                 Arg.Any<string>(),
                 Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>>(),
-                Arg.Any<Func<Stream, Task>>())
+                Arg.Any<Func<Stream, CancellationToken, Task>>(),
+                Arg.Any<CancellationToken>())
             .ThrowsAsync(new InvalidOperationException("disk full"));
 
         var component = Render<DebugLogModal>();
@@ -996,11 +1002,11 @@ public sealed class DebugLogModalTests : BunitContext
         }
     }
 
-    private static async Task<string> InvokeWriterAndDecodeAsync(Func<Stream, Task> writer)
+    private static async Task<string> InvokeWriterAndDecodeAsync(Func<Stream, CancellationToken, Task> writer)
     {
         using var stream = new MemoryStream();
 
-        await writer(stream);
+        await writer(stream, CancellationToken.None);
 
         return Encoding.UTF8.GetString(stream.ToArray());
     }
