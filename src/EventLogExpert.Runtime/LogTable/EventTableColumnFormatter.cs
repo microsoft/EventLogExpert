@@ -9,11 +9,8 @@ namespace EventLogExpert.Runtime.LogTable;
 
 public static class EventTableColumnFormatter
 {
-    /// <param name="dateTimeFormat">
-    ///     When <c>null</c>, the DateAndTime cell uses the current culture's default formatting
-    ///     (on-screen display parity); when non-null, the format is applied with <see cref="CultureInfo.InvariantCulture" />
-    ///     (stable export).
-    /// </param>
+    public const string DescriptionColumnHeader = "Description";
+
     public static string GetCellText(
         ResolvedEvent @event, ColumnName column, TimeZoneInfo timeZone, string? dateTimeFormat = null) =>
         column switch

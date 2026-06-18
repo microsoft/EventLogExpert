@@ -20,6 +20,7 @@ internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTa
         IReadOnlyList<ResolvedEvent> events,
         IReadOnlyList<ColumnName> columns,
         TimeZoneInfo timeZone,
+        bool includeDescription,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(destination);
@@ -27,18 +28,23 @@ internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTa
         ArgumentNullException.ThrowIfNull(columns);
         ArgumentNullException.ThrowIfNull(timeZone);
 
-        var headers = new string[columns.Count];
+        string[] headers = new string[columns.Count + (includeDescription ? 1 : 0)];
 
         for (int i = 0; i < columns.Count; i++)
         {
             headers[i] = EventTableColumnFormatter.GetColumnHeader(columns[i], timeZone);
         }
 
+        if (includeDescription)
+        {
+            headers[columns.Count] = EventTableColumnFormatter.DescriptionColumnHeader;
+        }
+
         await writer.WriteAsync(
                 destination,
                 format,
                 headers,
-                ProjectRows(events, columns, timeZone, format, cancellationToken),
+                ProjectRows(events, columns, timeZone, format, includeDescription, cancellationToken),
                 cancellationToken)
             .ConfigureAwait(false);
     }
@@ -51,6 +57,7 @@ internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTa
         IReadOnlyList<ColumnName> columns,
         TimeZoneInfo timeZone,
         ExportFormat format,
+        bool includeDescription,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         // The projection is synchronous over a materialized list; this await only satisfies the async-iterator
@@ -58,6 +65,7 @@ internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTa
         await Task.CompletedTask.ConfigureAwait(false);
 
         bool neutralizeCsvFormula = format == ExportFormat.Csv;
+        int cellCount = columns.Count + (includeDescription ? 1 : 0);
 
         // Enumerate, never index: events may be a CombinedEventView whose indexer is O(n) per access (it merge-walks
         // from a seek point), so indexed iteration would be O(n^2). foreach is the O(n) designed access path.
@@ -65,12 +73,19 @@ internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTa
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var cells = new string?[columns.Count];
+            string?[] cells = new string?[cellCount];
 
             for (int i = 0; i < columns.Count; i++)
             {
                 string cell = EventTableColumnFormatter.GetCellText(@event, columns[i], timeZone, IsoDateTimeFormat);
                 cells[i] = neutralizeCsvFormula ? NeutralizeCsvFormula(cell) : cell;
+            }
+
+            if (includeDescription)
+            {
+                cells[columns.Count] = neutralizeCsvFormula
+                    ? NeutralizeCsvFormula(@event.Description)
+                    : @event.Description;
             }
 
             yield return cells;

@@ -80,7 +80,7 @@
                 </th>
             }
 
-            <th aria-colindex="@(_enabledColumns.Length + 1)" class="description" role="columnheader">Description</th>
+            <th aria-colindex="@(_enabledColumns.Length + 1)" class="description" role="columnheader">@EventTableColumnFormatter.DescriptionColumnHeader</th>
         </tr>
         </thead>
         <tbody @oncontextmenu="InvokeContextMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
