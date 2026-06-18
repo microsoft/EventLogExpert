@@ -165,12 +165,15 @@ public sealed class MauiMenuActionService(
         string suggestedFileName =
             $"events-{DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)}{extension}";
 
+        string? savedPath;
+
         try
         {
-            await _fileSaveService.SaveStreamingAsync(
+            savedPath = await _fileSaveService.SaveStreamingAsync(
                 suggestedFileName,
                 fileTypes,
-                (stream, token) => _eventTableExporter.ExportAsync(stream, format, events, columns, timeZone, token),
+                (stream, token) => _eventTableExporter.ExportAsync(
+                    stream, format, events, columns, timeZone, includeDescription: true, token),
                 // No user-facing cancel affordance exists for export yet; the pipeline threads a token end to end,
                 // so a cancel control can be wired here later without a signature change.
                 CancellationToken.None);
@@ -180,6 +183,18 @@ public sealed class MauiMenuActionService(
             _traceLogger.Error($"Failed to export events: {ex}");
 
             await _dialogService.ShowAlert("Export failed", ex.Message, "Ok", AlertPresentation.Banner);
+
+            return;
+        }
+
+        // A null path means the user dismissed the save picker; only confirm an actual write.
+        if (savedPath is not null)
+        {
+            await _dialogService.ShowAlert(
+                "Export complete",
+                $"Exported {events.Count:N0} {(events.Count == 1 ? "event" : "events")} to {savedPath}.",
+                "Ok",
+                AlertPresentation.Banner);
         }
     }
 

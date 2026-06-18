@@ -14,5 +14,6 @@ public interface IEventTableExporter
         IReadOnlyList<ResolvedEvent> events,
         IReadOnlyList<ColumnName> columns,
         TimeZoneInfo timeZone,
+        bool includeDescription,
         CancellationToken cancellationToken);
 }
