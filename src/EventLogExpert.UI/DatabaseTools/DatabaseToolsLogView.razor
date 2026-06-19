@@ -17,19 +17,19 @@
         }
 
         <div class="toolbar-trailing">
-            <button class="button" disabled="@(Entries.Count == 0)" @onclick="CopyAllAsync" type="button">
+            <Button Disabled="@(Entries.Count == 0)" OnClick="CopyAllAsync">
                 <i aria-hidden="true" class="bi bi-clipboard"></i> Copy
-            </button>
+            </Button>
 
-            <button class="button" disabled="@(Entries.Count == 0)" @onclick="ExportAsync" type="button">
+            <Button Disabled="@(Entries.Count == 0)" OnClick="ExportAsync">
                 <i aria-hidden="true" class="bi bi-download"></i> Export
-            </button>
+            </Button>
 
             @if (_showJumpToLatest)
             {
-                <button class="button jump-to-latest" @onclick="JumpToLatest" type="button">
+                <Button CssClass="jump-to-latest" OnClick="JumpToLatest">
                     <i aria-hidden="true" class="bi bi-arrow-down"></i> Jump to latest
-                </button>
+                </Button>
             }
         </div>
     </div>

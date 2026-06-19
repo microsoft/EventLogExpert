@@ -23,18 +23,12 @@
         </p>
 
         <div class="recovery-batch-actions">
-            <button class="button"
-                disabled="@_isApplying"
-                @onclick="RestoreAll"
-                type="button">
+            <Button Disabled="@_isApplying" OnClick="RestoreAll">
                 Restore all
-            </button>
-            <button class="button"
-                disabled="@_isApplying"
-                @onclick="DeleteAll"
-                type="button">
+            </Button>
+            <Button Disabled="@_isApplying" OnClick="DeleteAll">
                 Delete all
-            </button>
+            </Button>
         </div>
 
         <ul class="recovery-rows">

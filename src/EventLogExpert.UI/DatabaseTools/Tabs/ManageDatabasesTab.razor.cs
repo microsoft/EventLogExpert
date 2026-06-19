@@ -10,6 +10,7 @@ using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Database;
+using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
@@ -27,19 +28,19 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     private readonly HashSet<string> _selectedForBulk = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _upgradeBlockedHelpId = ComponentId.NewUnique("manage-upgrade-blocked").Value;
 
-    private ElementReference _bulkRemoveButtonRef;
-    private ElementReference _bulkUpgradeButtonRef;
+    private DangerButton? _bulkRemoveButton;
+    private PrimaryButton? _bulkUpgradeButton;
     private CancellationTokenSource? _classificationObservationCts;
     private volatile bool _disposed;
     private int _eligibleUpgradeCount;
     private (string FileName, FocusTarget Target)? _focusRestorationTarget;
-    private ElementReference _importButtonRef;
+    private Button? _importButton;
     private ImmutableHashSet<string> _initialActiveSnapshot = ImmutableHashSet<string>.Empty;
     private bool _isSelectionModeActive;
     private ElementReference _masterCheckboxRef;
     private bool _restorationOccurred;
     private bool _schemaUpgradeOccurred;
-    private ElementReference _selectButtonRef;
+    private Button? _selectButton;
     private string _selectionAnnouncement = string.Empty;
 
     private enum FocusTarget
@@ -126,7 +127,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         ExitSelectionMode();
         StateHasChanged();
 
-        try { await _selectButtonRef.FocusAsync(preventScroll: true); }
+        try { await (_selectButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask); }
         catch (ObjectDisposedException) { }
         catch (JSDisconnectedException) { }
         catch (JSException) { }
@@ -182,9 +183,9 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
                     FocusTarget.SameRowName when !string.IsNullOrEmpty(target.FileName) =>
                         FocusEntryRowNameAsync(target.FileName),
                     FocusTarget.BulkRemoveButton when HasBulkSelection =>
-                        _bulkRemoveButtonRef.FocusAsync(preventScroll: true),
+                        _bulkRemoveButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask,
                     FocusTarget.ImportButton =>
-                        _importButtonRef.FocusAsync(preventScroll: true),
+                        _importButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask,
                     _ => ValueTask.CompletedTask
                 });
             }
@@ -556,7 +557,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         // button so keyboard users have a stable anchor.
         if (!_isSelectionModeActive)
         {
-            try { await _selectButtonRef.FocusAsync(preventScroll: true); }
+            try { await (_selectButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask); }
             catch (ObjectDisposedException) { }
             catch (JSDisconnectedException) { }
             catch (JSException) { }
@@ -576,7 +577,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             return;
         }
 
-        try { await _selectButtonRef.FocusAsync(preventScroll: true); }
+        try { await (_selectButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask); }
         catch (ObjectDisposedException) { }
         catch (JSDisconnectedException) { }
         catch (JSException) { }
@@ -595,7 +596,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             return;
         }
 
-        try { await _importButtonRef.FocusAsync(preventScroll: true); }
+        try { await (_importButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask); }
         catch (ObjectDisposedException) { }
         catch (JSDisconnectedException) { }
         catch (JSException) { }
@@ -782,7 +783,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             {
                 if (_disposed) { return; }
 
-                try { await _bulkUpgradeButtonRef.FocusAsync(preventScroll: true); }
+                try { await (_bulkUpgradeButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask); }
                 catch (ObjectDisposedException) { }
                 catch (JSDisconnectedException) { }
                 catch (JSException) { }

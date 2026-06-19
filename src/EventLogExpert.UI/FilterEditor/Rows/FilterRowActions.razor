@@ -3,30 +3,24 @@
     <div class="filter-row-actions">
         @if (ShowScenarioCopy)
         {
-            <button aria-label="@($"Copy {DescribeFilter(savedFilter)} as scenario JSON")"
-                class="button icon-button"
-                @onclick="@(() => CopyScenarioJsonAsync(savedFilter))"
-                title="Copy as scenario JSON"
-                type="button">
-                <i aria-hidden="true" class="bi bi-filetype-json"></i>
-            </button>
+            <Button aria-label="@($"Copy {DescribeFilter(savedFilter)} as scenario JSON")"
+                IconClass="bi bi-filetype-json"
+                IconOnly
+                OnClick="@(() => CopyScenarioJsonAsync(savedFilter))"
+                title="Copy as scenario JSON" />
         }
-        <button aria-label="@($"Edit {DescribeFilter(savedFilter)}")"
-            class="button icon-button"
-            @onclick="OnEdit"
-            @ref="_editButtonRef"
-            title="Edit filter"
-            type="button">
-            <i aria-hidden="true" class="bi bi-funnel"></i>
-        </button>
+        <Button aria-label="@($"Edit {DescribeFilter(savedFilter)}")"
+            IconClass="bi bi-funnel"
+            IconOnly
+            OnClick="OnEdit"
+            @ref="_editButton"
+            title="Edit filter" />
 
-        <button aria-label="@($"Remove {DescribeFilter(savedFilter)}")"
-            class="button button-red icon-button"
-            @onclick="OnRemove"
-            title="Remove filter"
-            type="button">
-            <i aria-hidden="true" class="bi bi-dash-circle"></i>
-        </button>
+        <DangerButton aria-label="@($"Remove {DescribeFilter(savedFilter)}")"
+            IconClass="bi bi-dash-circle"
+            IconOnly
+            OnClick="OnRemove"
+            title="Remove filter" />
 
         <span class="visually-hidden" id="@_enableToggleLabelId">Enable filter</span>
 

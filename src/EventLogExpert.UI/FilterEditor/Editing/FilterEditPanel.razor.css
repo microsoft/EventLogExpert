@@ -42,7 +42,7 @@
    so the whole action cluster appears vertically aligned. Scoped to
    FilterEditPanel actions only; other .button-green call sites elsewhere in
    the app stay ghost-styled. */
-.filter-edit-panel-actions button.button-green {
+.filter-edit-panel-actions ::deep button.button-green {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
@@ -55,33 +55,33 @@
     border-radius: 4px;
 }
 
-.filter-edit-panel-actions button.button-green:hover {
+.filter-edit-panel-actions ::deep button.button-green:hover {
     filter: brightness(1.1);
 }
 
-.filter-edit-panel-actions button.button-green:focus-visible {
+.filter-edit-panel-actions ::deep button.button-green:focus-visible {
     outline: 2px solid var(--clr-green);
     outline-offset: 2px;
 }
 
 /* Leftmost icon toggle for include/exclude. Slash-circle icon = excluded state;
    muted gray = included. Uses aria-pressed for SR + visible color cue. */
-.filter-exclude-toggle {
+.filter-edit-panel-content ::deep .filter-exclude-toggle {
     color: var(--text-secondary);
     transition: color 0.1s ease-in-out;
 }
 
-.filter-exclude-toggle[data-excluded="true"] {
+.filter-edit-panel-content ::deep .filter-exclude-toggle[data-excluded="true"] {
     color: var(--clr-red);
 }
 
-.filter-exclude-toggle:focus-visible {
+.filter-edit-panel-content ::deep .filter-exclude-toggle:focus-visible {
     outline: 2px solid var(--toggle-accent);
     outline-offset: 2px;
 }
 
 @media (forced-colors: active) {
-    .filter-exclude-toggle[data-excluded="true"] {
+    .filter-edit-panel-content ::deep .filter-exclude-toggle[data-excluded="true"] {
         color: Highlight;
     }
 }

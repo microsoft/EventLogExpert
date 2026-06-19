@@ -5,6 +5,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Restart;
+using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
@@ -14,7 +15,7 @@ public sealed partial class CriticalBanner : ComponentBase, IDisposable
 {
     private CancellationTokenSource? _copiedFeedbackCts;
     private string? _recoveryFailureMessage;
-    private ElementReference _reloadButtonRef;
+    private Button? _reloadButton;
     private string? _restartFailureMessage;
     private bool _showCopiedFeedback;
 
@@ -42,7 +43,7 @@ public sealed partial class CriticalBanner : ComponentBase, IDisposable
         {
             try
             {
-                await _reloadButtonRef.FocusAsync();
+                await (_reloadButton?.FocusAsync() ?? ValueTask.CompletedTask);
             }
             catch (JSDisconnectedException) { /* Circuit gone — nothing to focus. */ }
             catch (TaskCanceledException) { /* Focus cancelled mid-render; harmless. */ }

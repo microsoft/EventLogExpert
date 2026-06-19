@@ -14,23 +14,21 @@
     <div class="manage-databases-import-row">
         @if (DatabaseService.Entries.Count > 0)
         {
-            <button aria-pressed="@(_isSelectionModeActive ? "true" : "false")"
-                class="button manage-databases-select-btn"
+            <Button aria-pressed="@(_isSelectionModeActive ? "true" : "false")"
+                CssClass="manage-databases-select-btn"
                 id="manage-select-button"
-                @onclick="ToggleSelectionMode"
-                @ref="_selectButtonRef"
-                type="button">
+                OnClick="ToggleSelectionMode"
+                @ref="_selectButton">
                 <i aria-hidden="true" class="bi bi-check2-square"></i>
                 @(_isSelectionModeActive ? "Done" : "Select")
-            </button>
+            </Button>
         }
-        <button class="button manage-databases-import-btn"
+        <Button CssClass="manage-databases-import-btn"
             id="manage-import-button"
-            @onclick="ImportDatabase"
-            @ref="_importButtonRef"
-            type="button">
+            OnClick="ImportDatabase"
+            @ref="_importButton">
             <i aria-hidden="true" class="bi bi-plus-circle"></i> Import database&hellip;
-        </button>
+        </Button>
     </div>
 
     @if (_isSelectionModeActive && DatabaseService.Entries.Count > 0)
@@ -97,21 +95,17 @@
             </span>
             @if (_eligibleUpgradeCount > 0)
             {
-                <button aria-describedby="@(IsUpgradeBlocked ? _upgradeBlockedHelpId : null)"
-                    class="button button-green"
-                    disabled="@IsUpgradeBlocked"
-                    @onclick="OnBulkUpgradeClickAsync"
-                    @ref="_bulkUpgradeButtonRef"
-                    type="button">
+                <PrimaryButton aria-describedby="@(IsUpgradeBlocked ? _upgradeBlockedHelpId : null)"
+                    Disabled="@IsUpgradeBlocked"
+                    OnClick="OnBulkUpgradeClickAsync"
+                    @ref="_bulkUpgradeButton">
                     Upgrade @_eligibleUpgradeCount
-                </button>
+                </PrimaryButton>
             }
-            <button class="button button-red"
-                @onclick="OnBulkRemoveClickAsync"
-                @ref="_bulkRemoveButtonRef"
-                type="button">
+            <DangerButton OnClick="OnBulkRemoveClickAsync"
+                @ref="_bulkRemoveButton">
                 Remove @_selectedForBulk.Count
-            </button>
+            </DangerButton>
             <span class="visually-hidden" id="@_upgradeBlockedHelpId">
                 @(IsUpgradeBlocked
                     ? "Cannot upgrade: another upgrade is already in progress."
@@ -126,19 +120,15 @@
             <span class="manage-databases-pending-count">
                 @_pendingToggles.Count pending change@(_pendingToggles.Count == 1 ? "" : "s")
             </span>
-            <button class="button"
-                @onclick="DiscardPending"
-                type="button">
+            <Button OnClick="DiscardPending">
                 Discard
-            </button>
-            <button aria-describedby="@(IsUpgradeBlocked ? _saveBlockedHelpId : null)"
-                class="button button-green"
-                disabled="@IsUpgradeBlocked"
+            </Button>
+            <PrimaryButton aria-describedby="@(IsUpgradeBlocked ? _saveBlockedHelpId : null)"
+                Disabled="@IsUpgradeBlocked"
                 id="manage-save"
-                @onclick="OnSaveClickAsync"
-                type="button">
+                OnClick="OnSaveClickAsync">
                 Save changes
-            </button>
+            </PrimaryButton>
             <span class="visually-hidden" id="@_saveBlockedHelpId">
                 @(IsUpgradeBlocked ? "Cannot save: a database upgrade is in progress." : string.Empty)
             </span>

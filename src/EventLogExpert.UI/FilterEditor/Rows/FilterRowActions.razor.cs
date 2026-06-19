@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Focus;
+using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.FilterEditor.Rows;
@@ -12,7 +13,7 @@ public sealed partial class FilterRowActions : ComponentBase
 {
     private readonly string _enableToggleLabelId = ComponentId.NewUnique("filter-row-toggle").Value;
 
-    private ElementReference _editButtonRef;
+    private Button? _editButton;
 
     [CascadingParameter] public ScenarioAuthoringRowContext? AuthoringContext { get; set; }
 
@@ -33,7 +34,7 @@ public sealed partial class FilterRowActions : ComponentBase
 
     private bool ShowScenarioCopy => AuthoringContext is { Enabled: true };
 
-    internal ValueTask FocusEditAsync() => ElementFocus.SafelyAsync(_editButtonRef);
+    internal ValueTask FocusEditAsync() => _editButton is { } button ? ElementFocus.SafelyAsync(button.Element) : ValueTask.CompletedTask;
 
     private static string DescribeFilter(SavedFilter filter) =>
         string.IsNullOrWhiteSpace(filter.ComparisonText) ? "filter" : $"filter '{filter.ComparisonText}'";

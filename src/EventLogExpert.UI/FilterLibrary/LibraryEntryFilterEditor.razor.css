@@ -16,7 +16,7 @@
     font-style: italic;
 }
 
-.library-entry-filter-editor-add-button {
+::deep .library-entry-filter-editor-add-button {
     align-self: flex-start;
     margin-top: .25rem;
 }

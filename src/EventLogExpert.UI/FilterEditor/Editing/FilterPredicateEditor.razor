@@ -15,22 +15,18 @@
             Id="@ComponentId.For(Value.Id, ComponentIdScope.Predicate).Value"
             OnChanged="OnComparisonChanged" />
 
-        <button aria-label="Done editing predicate"
-            class="button icon-button"
-            disabled="@(!Value.IsComplete)"
-            @onclick="OnDoneClick"
-            title="@(Value.IsComplete ? "Done" : "Complete the predicate before continuing")"
-            type="button">
-            <i aria-hidden="true" class="bi bi-check-circle"></i>
-        </button>
+        <Button aria-label="Done editing predicate"
+            Disabled="@(!Value.IsComplete)"
+            IconClass="bi bi-check-circle"
+            IconOnly
+            OnClick="OnDoneClick"
+            title="@(Value.IsComplete ? "Done" : "Complete the predicate before continuing")" />
 
-        <button aria-label="@($"Remove predicate: {SummaryText}")"
-            class="button button-red icon-button"
-            @onclick="OnRemoveChip"
-            title="Remove predicate"
-            type="button">
-            <i aria-hidden="true" class="bi bi-x-circle"></i>
-        </button>
+        <DangerButton aria-label="@($"Remove predicate: {SummaryText}")"
+            IconClass="bi bi-x-circle"
+            IconOnly
+            OnClick="OnRemoveChip"
+            title="Remove predicate" />
     </div>
 }
 else

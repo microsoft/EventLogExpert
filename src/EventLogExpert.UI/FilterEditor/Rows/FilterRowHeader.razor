@@ -1,15 +1,14 @@
 @if (Value is { } savedFilter)
 {
     <div class="filter-row-header">
-        <button aria-label="@(savedFilter.IsExcluded ? $"Filter '{savedFilter.ComparisonText}' is excluded; activate to include" : $"Filter '{savedFilter.ComparisonText}' is included; activate to exclude")"
+        <Button aria-label="@(savedFilter.IsExcluded ? $"Filter '{savedFilter.ComparisonText}' is excluded; activate to include" : $"Filter '{savedFilter.ComparisonText}' is included; activate to exclude")"
             aria-pressed="@(savedFilter.IsExcluded ? "true" : "false")"
-            class="button filter-exclude-toggle icon-button"
+            CssClass="filter-exclude-toggle"
             data-excluded="@(savedFilter.IsExcluded ? "true" : "false")"
-            @onclick="@(() => OnExclusionChanged.InvokeAsync(!savedFilter.IsExcluded))"
-            title="@(savedFilter.IsExcluded ? "Excluded \u2014 click to include" : "Included \u2014 click to exclude")"
-            type="button">
-            <i aria-hidden="true" class="@(savedFilter.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"></i>
-        </button>
+            IconClass="@(savedFilter.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
+            IconOnly
+            OnClick="@(() => OnExclusionChanged.InvokeAsync(!savedFilter.IsExcluded))"
+            title="@(savedFilter.IsExcluded ? "Excluded \u2014 click to include" : "Included \u2014 click to exclude")" />
 
         <div aria-hidden="true"
             class="color-box"
