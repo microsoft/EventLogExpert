@@ -5,9 +5,9 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Restart;
+using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Banner;
 
@@ -39,14 +39,9 @@ public sealed partial class CriticalBanner : ComponentBase, IDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender && _reloadButton is { } reloadButton)
         {
-            try
-            {
-                await (_reloadButton?.FocusAsync() ?? ValueTask.CompletedTask);
-            }
-            catch (JSDisconnectedException) { /* Circuit gone — nothing to focus. */ }
-            catch (TaskCanceledException) { /* Focus cancelled mid-render; harmless. */ }
+            await ElementFocus.SafelyAsync(reloadButton.Element);
         }
     }
 
