@@ -22,6 +22,20 @@ public sealed class ButtonTests : BunitContext
     }
 
     [Fact]
+    public async Task Click_InvokesOnClickWithMouseEventArgs()
+    {
+        MouseEventArgs? received = null;
+        var component = Render<Button>(parameters => parameters
+            .Add(p => p.OnClick, e => received = e));
+
+        await component.Find("button").ClickAsync(new MouseEventArgs { Button = 1, CtrlKey = true });
+
+        Assert.NotNull(received);
+        Assert.Equal(1, received!.Button);
+        Assert.True(received.CtrlKey);
+    }
+
+    [Fact]
     public void Render_AdditionalAttributes_SplattedToButton()
     {
         var component = Render<Button>(parameters => parameters

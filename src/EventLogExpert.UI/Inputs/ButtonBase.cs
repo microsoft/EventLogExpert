@@ -3,6 +3,7 @@
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace EventLogExpert.UI.Inputs;
 
@@ -25,7 +26,7 @@ public abstract class ButtonBase : ComponentBase
 
     [Parameter] public bool IconOnly { get; set; }
 
-    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
 
     [Parameter] public string Type { get; set; } = "button";
 
