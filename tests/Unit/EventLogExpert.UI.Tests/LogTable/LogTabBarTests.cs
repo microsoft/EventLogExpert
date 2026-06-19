@@ -47,6 +47,67 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
+    public void ChevronClick_DispatchesSetTabGroupCollapsed()
+    {
+        var (state, groupId, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        _logTableState.Value.Returns(state);
+        var cut = Render<LogTabBar>();
+
+        cut.Find("button.chevron").Click();
+
+        _logTableCommands.Received(1).SetTabGroupCollapsed(groupId, true);
+    }
+
+    [Fact]
+    public void CollapsedGroup_HidesInactiveMembers()
+    {
+        var (state, _, _, _, _) = GroupedState(collapsed: true, activeIsMember1: true);
+        _logTableState.Value.Returns(state);
+
+        var cut = Render<LogTabBar>();
+
+        Assert.Contains("Alpha", cut.Markup);
+        Assert.DoesNotContain("Beta", cut.Markup);
+    }
+
+    [Fact]
+    public async Task CollapseOnlyChange_Rerenders()
+    {
+        var (state1, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        _logTableState.Value.Returns(state1);
+        var cut = Render<LogTabBar>();
+        int before = cut.RenderCount;
+
+        var state2 = state1 with
+        {
+            Groups = state1.Groups.SetItem(0, state1.Groups[0] with { IsCollapsed = true })
+        };
+        await RaiseStateChange(cut, state2);
+
+        Assert.True(cut.RenderCount > before);
+    }
+
+    [Fact]
+    public void CombinedHeader_RendersCombinedLabel()
+    {
+        var allLogsId = EventLogId.Create();
+        var logId = EventLogId.Create();
+        var state = new LogTableState
+        {
+            ActiveEventLogId = allLogsId,
+            EventTables = ImmutableList.Create(
+                new LogView(allLogsId) { GroupId = LogTabGroupId.AllLogs },
+                new LogView(logId) { LogName = "Alpha" }),
+            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(logId, 1)
+        };
+        _logTableState.Value.Returns(state);
+
+        var cut = Render<LogTabBar>();
+
+        Assert.Contains("Combined", cut.Markup);
+    }
+
+    [Fact]
     public async Task EmptinessSwapSameTotal_Rerenders()
     {
         var alpha = EventLogId.Create();
@@ -104,6 +165,19 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
+    public void ExpandedGroup_RendersHeaderNameAndMembers()
+    {
+        var (state, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        _logTableState.Value.Returns(state);
+
+        var cut = Render<LogTabBar>();
+
+        Assert.Contains("MyGroup", cut.Markup);
+        Assert.Contains("Alpha", cut.Markup);
+        Assert.Contains("Beta", cut.Markup);
+    }
+
+    [Fact]
     public void FirstRender_WithPopulatedState_ShowsTabs()
     {
         var alpha = EventLogId.Create();
@@ -114,6 +188,30 @@ public sealed class LogTabBarTests : BunitContext
 
         Assert.Contains("Alpha", cut.Markup);
         Assert.Contains("Beta", cut.Markup);
+    }
+
+    [Fact]
+    public void GroupClose_DispatchesCloseGroup()
+    {
+        var (state, groupId, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        _logTableState.Value.Returns(state);
+        var cut = Render<LogTabBar>();
+
+        cut.Find(".group-header > i.bi-x").Click();
+
+        _logTableCommands.Received(1).CloseGroup(groupId);
+    }
+
+    [Fact]
+    public void GroupHeaderName_MouseDown_DispatchesSetActiveTable()
+    {
+        var (state, _, headerId, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        _logTableState.Value.Returns(state);
+        var cut = Render<LogTabBar>();
+
+        cut.Find(".group-header > span").MouseDown();
+
+        _logTableCommands.Received(1).SetActiveTable(headerId);
     }
 
     [Fact]
@@ -146,6 +244,32 @@ public sealed class LogTabBarTests : BunitContext
         await RaiseStateChange(cut, state2);
 
         Assert.Equal(before, cut.RenderCount);
+    }
+
+    private static (LogTableState State, LogTabGroupId GroupId, EventLogId HeaderId, EventLogId Member1, EventLogId Member2)
+        GroupedState(bool collapsed, bool activeIsMember1)
+    {
+        var groupId = LogTabGroupId.Create();
+        var headerId = EventLogId.Create();
+        var member1 = EventLogId.Create();
+        var member2 = EventLogId.Create();
+
+        var state = new LogTableState
+        {
+            ActiveEventLogId = activeIsMember1 ? member1 : headerId,
+            EventTables = ImmutableList.Create(
+                new LogView(headerId) { GroupId = groupId, LogName = "MyGroup" },
+                new LogView(member1) { LogName = "Alpha" },
+                new LogView(member2) { LogName = "Beta" }),
+            Groups = ImmutableList.Create(
+                new LogTabGroup(groupId, "MyGroup", ImmutableHashSet.Create(member1, member2))
+                {
+                    IsCollapsed = collapsed
+                }),
+            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(member1, 1).Add(member2, 1)
+        };
+
+        return (state, groupId, headerId, member1, member2);
     }
 
     private static LogTableState TwoTabState(EventLogId alpha, EventLogId beta, int alphaCount, int betaCount) =>

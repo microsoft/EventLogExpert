@@ -10,19 +10,28 @@
     align-items: flex-end;
 }
 
+.tab-group {
+    display: inline-flex;
+    align-items: flex-end;
+}
+
 .tab {
+    position: relative;
+    top: 2px;
+
+    flex: 0 1 auto;
+    min-width: 120px;
+    max-width: 240px;
     margin: 0 1px 0 0;
     padding: 4px 22px;
     border-radius: 3px 3px 0 0;
 
+    text-align: center;
+
     background: var(--background-darkgray);
-    cursor: pointer;
-    position: relative;
-    top: 2px;
     transition: background-color 0.1s ease-in-out, padding 0.1s ease-in-out, border-top 0.1s ease-in-out;
 
-    width: 30ch;
-    text-align: center;
+    cursor: pointer;
 
     &:hover,
     &.active {
@@ -31,25 +40,46 @@
     }
 
     & > i {
-        visibility: hidden;
-
         position: absolute;
         right: 3px;
         top: 4px;
 
         width: 1.5em;
-    }
-
-    &:hover > i {
-        visibility: visible;
-
-        border-radius: 3px;
         border: 1px solid transparent;
+        border-radius: 3px;
+
+        opacity: 0.35;
 
         &:hover {
             border-color: var(--clr-lightblue);
+            opacity: 1;
         }
     }
+
+    &:hover > i,
+    &.active > i {
+        opacity: 1;
+    }
+}
+
+.tab-group > .tab {
+    box-shadow: inset 0 2px 0 0 var(--clr-lightgray);
+}
+
+.group-header > .chevron {
+    position: absolute;
+    z-index: 1;
+    top: 3px;
+    left: 2px;
+
+    padding: 0;
+    border: none;
+
+    color: inherit;
+
+    background: transparent;
+
+    cursor: pointer;
 }
 
 span {

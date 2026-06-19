@@ -2,27 +2,76 @@
 
 <div class="log-tab-bar" hidden="@(LogTableState.Value.EventTables.Count <= 1)" @ref="_logTabBarRootRef">
     <div class="tab-row">
-        @foreach (var table in _sortedTabs)
+        @foreach (var row in _tabRows)
         {
-            <div class="@GetActiveTab(table)" title="@GetTabTooltip(table)">
-                <span aria-disabled="@(table.IsLoading ? "true" : null)"
-                    @onkeydown="e => OnTabKeyDown(e, table)"
-                    @onmousedown="() => SetActiveLog(table)"
-                    role="button"
-                    tabindex="@(table.IsLoading ? -1 : 0)">
-                    @if (table.IsLoading)
+            if (row is AllLogsRow allLogs)
+            {
+                <div class="@GetActiveTab(allLogs.Header)" title="@GetTabTooltip(allLogs.Header)">
+                    <span @onkeydown="e => OnTabKeyDown(e, allLogs.Header)"
+                        @onmousedown="() => SetActiveLog(allLogs.Header)"
+                        role="button"
+                        tabindex="0">
+                        @GetTabName(allLogs.Header)
+                    </span>
+                </div>
+            }
+            else if (row is GroupRow group)
+            {
+                <div class="tab-group">
+                    <div class="@GetActiveTab(group.Header) group-header" title="@GetTabTooltip(group.Header)">
+                        <button aria-expanded="@(group.Group.IsCollapsed ? "false" : "true")"
+                            aria-label="@(group.Group.IsCollapsed ? "Expand group" : "Collapse group")"
+                            class="chevron"
+                            @onclick="() => ToggleCollapse(group.Group)"
+                            type="button">
+                            <i class="bi bi-chevron-@(group.Group.IsCollapsed ? "right" : "down")"></i>
+                        </button>
+                        <span @onkeydown="e => OnTabKeyDown(e, group.Header)"
+                            @onmousedown="() => SetActiveLog(group.Header)"
+                            role="button"
+                            tabindex="0">
+                            @GetTabName(group.Header)
+                        </span>
+                        <i aria-label="Close group" class="bi bi-x" @onclick="() => CloseGroup(group.Group)"></i>
+                    </div>
+                    @foreach (var member in VisibleMembers(group))
                     {
-                        <i aria-label="Loading" class="spinner-border" role="status"></i>
-                        @:&nbsp;
+                        <div class="@GetTabClass(member, true)" title="@GetTabTooltip(member)">
+                            <span aria-disabled="@(member.IsLoading ? "true" : null)"
+                                @onkeydown="e => OnTabKeyDown(e, member)"
+                                @onmousedown="() => SetActiveLog(member)"
+                                role="button"
+                                tabindex="@(member.IsLoading ? -1 : 0)">
+                                @if (member.IsLoading)
+                                {
+                                    <i aria-label="Loading" class="spinner-border" role="status"></i>
+                                    @:&nbsp;
+                                }
+                                @GetTabName(member)
+                            </span>
+                            <i aria-label="Close log" class="bi bi-x" @onmousedown="() => CloseLog(member)"></i>
+                        </div>
                     }
-                    @GetTabName(table)
-                </span>
-
-                @if (!table.IsCombined)
-                {
-                    <i class="bi bi-x" @onmousedown="() => CloseLog(table)"></i>
-                }
-            </div>
+                </div>
+            }
+            else if (row is StandaloneRow standalone)
+            {
+                <div class="@GetActiveTab(standalone.Tab)" title="@GetTabTooltip(standalone.Tab)">
+                    <span aria-disabled="@(standalone.Tab.IsLoading ? "true" : null)"
+                        @onkeydown="e => OnTabKeyDown(e, standalone.Tab)"
+                        @onmousedown="() => SetActiveLog(standalone.Tab)"
+                        role="button"
+                        tabindex="@(standalone.Tab.IsLoading ? -1 : 0)">
+                        @if (standalone.Tab.IsLoading)
+                        {
+                            <i aria-label="Loading" class="spinner-border" role="status"></i>
+                            @:&nbsp;
+                        }
+                        @GetTabName(standalone.Tab)
+                    </span>
+                    <i aria-label="Close log" class="bi bi-x" @onmousedown="() => CloseLog(standalone.Tab)"></i>
+                </div>
+            }
         }
     </div>
 </div>
