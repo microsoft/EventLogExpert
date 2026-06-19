@@ -43,7 +43,7 @@ public abstract class ButtonBase : ComponentBase
             builder.AddMultipleAttributes(1, AdditionalAttributes);
         }
 
-        builder.AddAttribute(2, "type", Type);
+        builder.AddAttribute(2, "type", string.IsNullOrWhiteSpace(Type) ? "button" : Type);
         builder.AddAttribute(3, "class", BuildCssClass());
         builder.AddAttribute(4, "disabled", Disabled);
         builder.AddAttribute(5, "onclick", OnClick);
