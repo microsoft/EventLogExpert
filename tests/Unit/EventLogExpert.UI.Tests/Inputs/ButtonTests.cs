@@ -154,7 +154,8 @@ public sealed class ButtonTests : BunitContext
             .AddChildContent("Apply"));
 
         var button = component.Find("button");
-        Assert.Contains("</i> Apply", button.InnerHtml);
+        Assert.Equal("I", button.FirstChild?.NodeName);
+        Assert.Equal(" Apply", button.TextContent);
     }
 
     [Fact]
@@ -186,7 +187,7 @@ public sealed class ButtonTests : BunitContext
             .Add(p => p.IconOnly, true));
 
         var button = component.Find("button");
-        Assert.DoesNotContain("</i> ", button.InnerHtml);
+        Assert.Empty(button.TextContent);
     }
 
     [Fact]
