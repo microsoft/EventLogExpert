@@ -194,6 +194,47 @@ public sealed class LogTabGroupTests
     }
 
     [Fact]
+    public void ReduceMoveTabToGroup_IntoACollapsedGroup_WhenTheMovedTabIsActive_RedirectsToHeader()
+    {
+        var (state, ids) = SeedLogs(
+            [MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))], [MakeEvent(2, 1, Time(2, 1))]);
+        var groupId = NewGroup(ref state, ids[0]);
+        var header = state.EventTables.Single(table => table.GroupId == groupId);
+        state = Reducers.ReduceSetTabGroupCollapsed(state, new SetTabGroupCollapsedAction(groupId, true));
+        state = state with { ActiveEventLogId = ids[1] };
+
+        state = Reducers.ReduceMoveTabToGroup(state, new MoveTabToGroupAction(ids[1], groupId));
+
+        Assert.Equal(header.Id, state.ActiveEventLogId);
+    }
+
+    [Fact]
+    public void ReduceMoveTabToGroup_IntoACollapsedGroup_WhenTheMovedTabIsNotActive_LeavesActiveUnchanged()
+    {
+        var (state, ids) = SeedLogs(
+            [MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))], [MakeEvent(2, 1, Time(2, 1))]);
+        var groupId = NewGroup(ref state, ids[0]);
+        state = Reducers.ReduceSetTabGroupCollapsed(state, new SetTabGroupCollapsedAction(groupId, true));
+        state = state with { ActiveEventLogId = ids[2] };
+
+        state = Reducers.ReduceMoveTabToGroup(state, new MoveTabToGroupAction(ids[1], groupId));
+
+        Assert.Equal(ids[2], state.ActiveEventLogId);
+    }
+
+    [Fact]
+    public void ReduceMoveTabToGroup_IntoAnExpandedGroup_KeepsTheMovedTabActive()
+    {
+        var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
+        var groupId = NewGroup(ref state, ids[0]);
+        state = state with { ActiveEventLogId = ids[1] };
+
+        state = Reducers.ReduceMoveTabToGroup(state, new MoveTabToGroupAction(ids[1], groupId));
+
+        Assert.Equal(ids[1], state.ActiveEventLogId);
+    }
+
+    [Fact]
     public void ReduceMoveTabToGroup_ToTheAllLogsTarget_UngroupsTheTab()
     {
         var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
@@ -364,6 +405,19 @@ public sealed class LogTabGroupTests
     }
 
     [Fact]
+    public void ReduceSetTabGroupCollapsed_OnExpand_DoesNotRedirectActive()
+    {
+        var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
+        var groupId = NewGroup(ref state, ids[0]);
+        state = Reducers.ReduceSetTabGroupCollapsed(state, new SetTabGroupCollapsedAction(groupId, true));
+        state = state with { ActiveEventLogId = ids[0] };
+
+        state = Reducers.ReduceSetTabGroupCollapsed(state, new SetTabGroupCollapsedAction(groupId, false));
+
+        Assert.Equal(ids[0], state.ActiveEventLogId);
+    }
+
+    [Fact]
     public void ReduceSetTabGroupCollapsed_SetsTheGroupsCollapsedState()
     {
         var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
@@ -372,6 +426,31 @@ public sealed class LogTabGroupTests
         state = Reducers.ReduceSetTabGroupCollapsed(state, new SetTabGroupCollapsedAction(groupId, true));
 
         Assert.True(state.Groups.Single(group => group.Id == groupId).IsCollapsed);
+    }
+
+    [Fact]
+    public void ReduceSetTabGroupCollapsed_WhenActiveIsNotAMember_LeavesActiveUnchanged()
+    {
+        var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
+        var groupId = NewGroup(ref state, ids[0]);
+        state = state with { ActiveEventLogId = ids[1] };
+
+        state = Reducers.ReduceSetTabGroupCollapsed(state, new SetTabGroupCollapsedAction(groupId, true));
+
+        Assert.Equal(ids[1], state.ActiveEventLogId);
+    }
+
+    [Fact]
+    public void ReduceSetTabGroupCollapsed_WhenActiveMemberIsHidden_RedirectsActiveToHeader()
+    {
+        var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
+        var groupId = NewGroup(ref state, ids[0]);
+        var header = state.EventTables.Single(table => table.GroupId == groupId);
+        state = state with { ActiveEventLogId = ids[0] };
+
+        state = Reducers.ReduceSetTabGroupCollapsed(state, new SetTabGroupCollapsedAction(groupId, true));
+
+        Assert.Equal(header.Id, state.ActiveEventLogId);
     }
 
     [Fact]

@@ -54,6 +54,11 @@
             border-color: var(--clr-lightblue);
             opacity: 1;
         }
+
+        &:focus-visible {
+            border-color: var(--clr-lightblue);
+            opacity: 1;
+        }
     }
 
     &:hover > i,
@@ -69,9 +74,15 @@
 .group-header > .chevron {
     position: absolute;
     z-index: 1;
-    top: 3px;
-    left: 2px;
+    top: 0;
+    bottom: 0;
+    left: 0;
 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 20px;
     padding: 0;
     border: none;
 
@@ -80,6 +91,11 @@
     background: transparent;
 
     cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+        color: var(--clr-lightblue);
+    }
 }
 
 span {

@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
@@ -10,6 +11,7 @@ using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -35,6 +37,8 @@ public sealed partial class MenuBar
     [Inject] private IMenuActionService Actions { get; init; } = null!;
 
     private TopLevel? ActiveBar { get; set; }
+
+    [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
     [Inject]
     private IStateSelection<EventLogState, bool> ContinuouslyUpdate { get; init; } = null!;
@@ -157,7 +161,7 @@ public sealed partial class MenuBar
             MenuItem.SubMenu("Open", BuildOpenSubMenu(false)),
             MenuItem.SubMenu("Combine", BuildOpenSubMenu(true), hasActiveLogs),
             MenuItem.Separator(),
-            MenuItem.Item("Close All", () => Actions.CloseAllLogsAsync(), isEnabled: hasActiveLogs),
+            MenuItem.Item("Close All", ConfirmCloseAllLogsAsync, isEnabled: hasActiveLogs),
             MenuItem.Separator(),
             MenuItem.Item("Export to CSV", () => Actions.ExportEventsAsync(ExportFormat.Csv), isEnabled: hasActiveLogs),
             MenuItem.Item("Export to JSON", () => Actions.ExportEventsAsync(ExportFormat.Json), isEnabled: hasActiveLogs),
@@ -304,6 +308,14 @@ public sealed partial class MenuBar
                 isEnabled: isGrouping,
                 disabledReason: isGrouping ? null : GroupDisabledReason),
         ];
+    }
+
+    private async Task ConfirmCloseAllLogsAsync()
+    {
+        if (await CloseAllLogsConfirmation.ConfirmAsync(AlertDialogService))
+        {
+            await Actions.CloseAllLogsAsync();
+        }
     }
 
     private void InvalidatePendingOpen() => Interlocked.Increment(ref _openRequestId);

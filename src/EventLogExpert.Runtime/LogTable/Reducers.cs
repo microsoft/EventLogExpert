@@ -362,7 +362,8 @@ internal sealed class Reducers
         var headerId = tables.FirstOrDefault(table => table.GroupId == action.TargetGroupId)?.Id;
         var updated = state with { Groups = updatedGroups, EventTables = tables };
 
-        return ResetGroupCollapseIfActiveChanged(RepairActiveTab(updated, headerId), state.ActiveEventLogId);
+        return ResetGroupCollapseIfActiveChanged(
+            RedirectActiveToGroupIfHidden(RepairActiveTab(updated, headerId)), state.ActiveEventLogId);
     }
 
     [ReducerMethod]
@@ -500,7 +501,11 @@ internal sealed class Reducers
 
         if (group is null || group.IsCollapsed == action.Collapsed) { return state; }
 
-        return state with { Groups = state.Groups.Replace(group, group with { IsCollapsed = action.Collapsed }) };
+        var updated = state with { Groups = state.Groups.Replace(group, group with { IsCollapsed = action.Collapsed }) };
+
+        return action.Collapsed
+            ? ResetGroupCollapseIfActiveChanged(RedirectActiveToGroupIfHidden(updated), state.ActiveEventLogId)
+            : updated;
     }
 
     [ReducerMethod]
@@ -639,6 +644,20 @@ internal sealed class Reducers
                 state.GroupBy,
                 state.IsGroupDescending,
                 perLog.Count));
+
+    private static LogTableState RedirectActiveToGroupIfHidden(LogTableState state)
+    {
+        if (state.ActiveEventLogId is not { } activeId) { return state; }
+
+        var group = state.Groups.FirstOrDefault(
+            candidate => candidate.IsCollapsed && candidate.MemberIds.Contains(activeId));
+
+        if (group is null) { return state; }
+
+        var header = state.EventTables.FirstOrDefault(table => table.GroupId == group.Id);
+
+        return header is null ? state : state with { ActiveEventLogId = header.Id };
+    }
 
     private static (ImmutableList<LogTabGroup> Groups, ImmutableList<LogView> Tables) RemoveLogFromGroups(
         ImmutableList<LogTabGroup> groups, ImmutableList<LogView> tables, EventLogId logId)
