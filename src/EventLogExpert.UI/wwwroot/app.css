@@ -341,6 +341,21 @@ input[type="text"].input { padding: 0; }
 
 .button.fixed-width { width: 11ch; }
 
+.button.library-saved-tab-new-button {
+    width: 100%;
+    height: var(--control-height);
+    padding: 0 .5rem;
+    text-align: left;
+    border: 1px solid var(--clr-statusbar);
+    border-radius: .25rem;
+    color: var(--text-primary);
+    background: transparent;
+}
+
+.button.library-saved-tab-new-button:hover {
+    background: color-mix(in srgb, var(--clr-statusbar) 10%, transparent);
+}
+
 /* Compact icon-only buttons. Maintain WCAG 2.5.5 AA 24x24 hit target. */
 .button.icon-button {
     display: inline-flex;

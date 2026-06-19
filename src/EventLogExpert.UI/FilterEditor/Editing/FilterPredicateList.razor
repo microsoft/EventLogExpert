@@ -12,14 +12,13 @@
                 Value="predicate" />
         }
 
-        <button aria-label="@(CanAddPredicate ? "Add predicate" : "Complete the current predicate before adding another")"
-            class="add-filter-predicate-button button icon-button"
-            disabled="@(!CanAddPredicate)"
-            @onclick="AddPredicate"
-            @ref="_addButtonRef"
-            title="@(CanAddPredicate ? "Add predicate" : "Complete the current predicate before adding another")"
-            type="button">
-            <i aria-hidden="true" class="bi bi-plus-circle"></i>
-        </button>
+        <Button aria-label="@(CanAddPredicate ? "Add predicate" : "Complete the current predicate before adding another")"
+            CssClass="add-filter-predicate-button"
+            Disabled="@(!CanAddPredicate)"
+            IconClass="bi bi-plus-circle"
+            IconOnly
+            OnClick="AddPredicate"
+            @ref="_addButton"
+            title="@(CanAddPredicate ? "Add predicate" : "Complete the current predicate before adding another")" />
     </span>
 </div>

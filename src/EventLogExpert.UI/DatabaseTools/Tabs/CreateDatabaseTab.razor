@@ -15,7 +15,7 @@
                     placeholder="C:\path\to\new-database.db"
                     type="text"
                     value="@_targetPath" />
-                <button class="button" disabled="@IsRunning" @onclick="PickTargetAsync" type="button">Browse…</button>
+                <Button Disabled="@IsRunning" OnClick="PickTargetAsync">Browse…</Button>
             </div>
         </div>
 
@@ -33,7 +33,7 @@
                     placeholder="Leave empty for local providers, or pick / paste a path"
                     type="text"
                     value="@_sourcePath" />
-                <button class="button" disabled="@IsRunning" @onclick="PickSourceAsync" type="button">Browse…</button>
+                <Button Disabled="@IsRunning" OnClick="PickSourceAsync">Browse…</Button>
             </div>
         </div>
 
@@ -73,7 +73,7 @@
                     placeholder="Optional — path to .db or .evtx whose providers are excluded"
                     type="text"
                     value="@_skipPath" />
-                <button class="button" disabled="@IsRunning" @onclick="PickSkipAsync" type="button">Browse…</button>
+                <Button Disabled="@IsRunning" OnClick="PickSkipAsync">Browse…</Button>
             </div>
         </div>
 
@@ -83,7 +83,11 @@
                 <div class="elevation-warning" role="alert">
                     <i aria-hidden="true" class="bi bi-shield-exclamation"></i>
                     <span>Running without elevation — some local providers (Security, etc.) will be skipped or return incomplete metadata.</span>
-                    <button class="button" disabled="@IsRunning" @onclick="RunElevatedAsync" title="Run this operation in an elevated helper process; main app stays running." type="button">Run Elevated</button>
+                    <Button Disabled="@IsRunning"
+                        OnClick="RunElevatedAsync"
+                        title="Run this operation in an elevated helper process; main app stays running.">
+                        Run Elevated
+                    </Button>
                 </div>
             </div>
         }
@@ -95,22 +99,22 @@
             {
                 @if (IsCancelling)
                 {
-                    <button class="button" disabled type="button">
+                    <Button Disabled>
                         <i aria-hidden="true" class="bi bi-hourglass-split"></i> Cancelling…
-                    </button>
+                    </Button>
                 }
                 else
                 {
-                    <button class="button button-red" @onclick="CancelRun" type="button">
+                    <DangerButton OnClick="CancelRun">
                         <i aria-hidden="true" class="bi bi-x-circle"></i> Cancel
-                    </button>
+                    </DangerButton>
                 }
             }
             else
             {
-                <button class="button button-green" disabled="@(!CanRun)" @onclick="RunAsync" type="button">
+                <PrimaryButton Disabled="@(!CanRun)" OnClick="RunAsync">
                     <i aria-hidden="true" class="bi bi-play-fill"></i> Run
-                </button>
+                </PrimaryButton>
             }
         </ToolbarLeadingContent>
     </DatabaseToolsLogView>

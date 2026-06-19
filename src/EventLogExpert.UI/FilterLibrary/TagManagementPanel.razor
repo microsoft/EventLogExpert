@@ -32,67 +32,59 @@
                         @ref="_editInputRef"
                         type="text" />
                     <span class="library-tag-management-row-count">(@count)</span>
+
                     @if (_mergeTargetTag is not null)
                     {
-                        <button aria-label="@($"Merge tag {tag} into {_mergeTargetTag}, affects {count} entries")"
-                            class="button button-yellow"
-                            @onclick="ConfirmMergeAsync"
-                            type="button">
+                        <WarningButton aria-label="@($"Merge tag {tag} into {_mergeTargetTag}, affects {count} entries")"
+                            OnClick="ConfirmMergeAsync">
                             <i aria-hidden="true" class="bi bi-union"></i> Merge into '@_mergeTargetTag'
-                        </button>
+                        </WarningButton>
                     }
                     else
                     {
-                        <button aria-label="@($"Save renamed tag {tag}")"
-                            class="button button-green icon-button"
-                            @onclick="ConfirmRenameAsync"
-                            type="button">
-                            <i aria-hidden="true" class="bi bi-check2"></i>
-                        </button>
+                        <PrimaryButton aria-label="@($"Save renamed tag {tag}")"
+                            IconClass="bi bi-check2"
+                            IconOnly
+                            OnClick="ConfirmRenameAsync" />
                     }
-                    <button aria-label="Cancel rename"
-                        class="button icon-button"
-                        @onclick="CancelEdit"
-                        type="button">
-                        <i aria-hidden="true" class="bi bi-x"></i>
-                    </button>
+
+                    <Button aria-label="Cancel rename"
+                        IconClass="bi bi-x"
+                        IconOnly
+                        OnClick="CancelEdit" />
                 }
                 else if (_deleteConfirmTag == tag)
                 {
                     <span class="library-tag-management-row-name">@tag</span>
                     <span class="library-tag-management-row-count">(@count)</span>
                     <span class="library-tag-management-row-confirm">Remove from @count entries?</span>
-                    <button aria-label="@($"Confirm delete tag {tag}")"
-                        class="button button-red icon-button"
-                        @onclick="ConfirmDeleteAsync"
-                        type="button">
-                        <i aria-hidden="true" class="bi bi-check2"></i>
-                    </button>
-                    <button aria-label="Cancel delete"
-                        class="button icon-button"
-                        @onclick="CancelDelete"
-                        type="button">
-                        <i aria-hidden="true" class="bi bi-x"></i>
-                    </button>
+
+                    <DangerButton aria-label="@($"Confirm delete tag {tag}")"
+                        IconClass="bi bi-check2"
+                        IconOnly
+                        OnClick="ConfirmDeleteAsync" />
+
+                    <Button aria-label="Cancel delete"
+                        IconClass="bi bi-x"
+                        IconOnly
+                        OnClick="CancelDelete" />
                 }
                 else
                 {
                     <span class="library-tag-management-row-name">@tag</span>
                     <span class="library-tag-management-row-count">(@count)</span>
-                    <button aria-label="@($"Rename tag {tag}")"
-                        class="button icon-button"
-                        @onclick="@(() => BeginRename(tag))"
-                        title="Rename"
-                        type="button">
-                        <i aria-hidden="true" class="bi bi-pencil"></i>
-                    </button>
-                    <button aria-label="@($"Delete tag {tag}")"
-                        class="button button-red icon-button"
-                        @onclick="@(() => BeginDelete(tag))"
-                        title="Delete"
-                        type="button">
-                        <i aria-hidden="true" class="bi bi-trash"></i>
-                    </button>
+
+                    <Button aria-label="@($"Rename tag {tag}")"
+                        IconClass="bi bi-pencil"
+                        IconOnly
+                        OnClick="@(() => BeginRename(tag))"
+                        title="Rename" />
+
+                    <DangerButton aria-label="@($"Delete tag {tag}")"
+                        IconClass="bi bi-trash"
+                        IconOnly
+                        OnClick="@(() => BeginDelete(tag))"
+                        title="Delete" />
                 }
             </div>
         }

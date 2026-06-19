@@ -17,7 +17,7 @@
                     placeholder="Path to .db or .evtx (paste a folder path to use a directory)"
                     type="text"
                     value="@_sourcePath" />
-                <button class="button" disabled="@IsRunning" @onclick="PickSourceAsync" type="button">Browse…</button>
+                <Button Disabled="@IsRunning" OnClick="PickSourceAsync">Browse…</Button>
             </div>
         </div>
 
@@ -33,7 +33,7 @@
                     placeholder="C:\path\to\existing-database.db"
                     type="text"
                     value="@_targetPath" />
-                <button class="button" disabled="@IsRunning" @onclick="PickTargetAsync" type="button">Browse…</button>
+                <Button Disabled="@IsRunning" OnClick="PickTargetAsync">Browse…</Button>
             </div>
         </div>
 
@@ -56,22 +56,22 @@
             {
                 @if (IsCancelling)
                 {
-                    <button class="button" disabled type="button">
+                    <Button Disabled>
                         <i aria-hidden="true" class="bi bi-hourglass-split"></i> Cancelling…
-                    </button>
+                    </Button>
                 }
                 else
                 {
-                    <button class="button button-red" @onclick="CancelRun" type="button">
+                    <DangerButton OnClick="CancelRun">
                         <i aria-hidden="true" class="bi bi-x-circle"></i> Cancel
-                    </button>
+                    </DangerButton>
                 }
             }
             else
             {
-                <button class="button button-green" disabled="@(!CanRun)" @onclick="RunAsync" type="button">
+                <PrimaryButton Disabled="@(!CanRun)" OnClick="RunAsync">
                     <i aria-hidden="true" class="bi bi-play-fill"></i> Run
-                </button>
+                </PrimaryButton>
             }
         </ToolbarLeadingContent>
     </DatabaseToolsLogView>

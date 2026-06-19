@@ -9,6 +9,7 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.Focus;
+using EventLogExpert.UI.Inputs;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -27,7 +28,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     private bool _isEditingTags;
     private bool _isExpanded;
     private IJSObjectReference? _menuAnchorModule;
-    private ElementReference _moreMenuButtonRef;
+    private Button? _moreMenuButton;
     private long _moreMenuId;
     private bool _pendingFocusMoreButton;
     private bool _pendingScrollEditIntoView;
@@ -113,7 +114,10 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         _menuAnchorModule = null;
     }
 
-    internal ValueTask<bool> FocusMoreActionsButtonAsync() => ElementFocus.TrySafelyAsync(_moreMenuButtonRef);
+    internal ValueTask<bool> FocusMoreActionsButtonAsync() =>
+        _moreMenuButton is { } button ?
+            ElementFocus.TrySafelyAsync(button.Element) :
+            ValueTask.FromResult(false);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -410,12 +414,14 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     {
         if (IsMoreMenuOpen) { MenuService.Close(); return; }
 
+        if (_moreMenuButton is not { } moreMenuButton) { return; }
+
         try
         {
             _menuAnchorModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
                 "import", "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
 
-            var rect = await _menuAnchorModule.InvokeAsync<MenuAnchorRect>("getMenuElementRect", _moreMenuButtonRef);
+            var rect = await _menuAnchorModule.InvokeAsync<MenuAnchorRect>("getMenuElementRect", moreMenuButton.Element);
             MenuService.OpenAt(rect.Left, rect.Bottom, BuildMoreMenu(), focusFirst: true);
             _moreMenuId = MenuService.ActiveMenuId;
             StateHasChanged();

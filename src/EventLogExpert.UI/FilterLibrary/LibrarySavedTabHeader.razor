@@ -1,10 +1,8 @@
 @if (!_isExpanded)
 {
-    <button class="button library-saved-tab-new-button"
-        @onclick="ExpandAsync"
-        type="button">
+    <Button CssClass="library-saved-tab-new-button" OnClick="ExpandAsync">
         <i aria-hidden="true" class="bi bi-plus-circle"></i> New saved filter
-    </button>
+    </Button>
 }
 else
 {

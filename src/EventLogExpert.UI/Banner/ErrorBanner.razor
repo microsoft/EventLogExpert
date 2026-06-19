@@ -5,17 +5,14 @@
 
     @if (Entry is { ActionLabel: { } actionLabel, Action: { } action })
     {
-        <button class="banner-action button"
-            @onclick="() => OnErrorActionClickedAsync(action)"
-            type="button">
+        <Button CssClass="banner-action"
+            OnClick="() => OnErrorActionClickedAsync(action)">
             @actionLabel
-        </button>
+        </Button>
     }
 
-    <button aria-label="Dismiss error banner"
-        class="banner-dismiss button"
-        @onclick="OnDismissError"
-        type="button">
-        <i aria-hidden="true" class="bi bi-x"></i>
-    </button>
+    <Button aria-label="Dismiss error banner"
+        CssClass="banner-dismiss"
+        IconClass="bi bi-x"
+        OnClick="OnDismissError" />
 </aside>

@@ -4,14 +4,13 @@
 
         @if (Entry is LibraryEntryFilterSet)
         {
-            <button aria-controls="@_filterEditorRegionId"
+            <Button aria-controls="@_filterEditorRegionId"
                 aria-expanded="@(_isExpanded ? "true" : "false")"
                 aria-label="@($"Filters for {Entry.Name}")"
-                class="button icon-button library-entry-expand-toggle"
-                @onclick="ToggleExpand"
-                type="button">
-                <i aria-hidden="true" class="@(_isExpanded ? "bi bi-chevron-down" : "bi bi-chevron-right")"></i>
-            </button>
+                CssClass="library-entry-expand-toggle"
+                IconClass="@(_isExpanded ? "bi bi-chevron-down" : "bi bi-chevron-right")"
+                IconOnly
+                OnClick="ToggleExpand" />
         }
 
         <div class="library-entry-name">
@@ -63,54 +62,46 @@
 
                     @if (inlineHidden > 0)
                     {
-                        <button aria-label="@($"Show all {Entry.Tags.Count} tags")"
-                            class="button library-entry-tag-chip-more"
-                            @onclick="ToggleEditTagsMode"
-                            title="@string.Join(", ", Entry.Tags.Skip(inlineVisible))"
-                            type="button">
+                        <Button aria-label="@($"Show all {Entry.Tags.Count} tags")"
+                            CssClass="library-entry-tag-chip-more"
+                            OnClick="ToggleEditTagsMode"
+                            title="@string.Join(", ", Entry.Tags.Skip(inlineVisible))">
                             +@inlineHidden more
-                        </button>
+                        </Button>
                     }
                 }
-                <button aria-label="@(Entry.Tags.Count == 0 ? $"Add tags to {Entry.Name}" : $"Edit tags for {Entry.Name}")"
-                    class="button icon-button library-entry-tag-add-inline"
-                    @onclick="ToggleEditTagsMode"
-                    title="@(Entry.Tags.Count == 0 ? "Add tags" : "Edit tags")"
-                    type="button">
-                    <i aria-hidden="true" class="bi bi-plus-circle"></i>
-                </button>
+                <Button aria-label="@(Entry.Tags.Count == 0 ? $"Add tags to {Entry.Name}" : $"Edit tags for {Entry.Name}")"
+                    CssClass="library-entry-tag-add-inline"
+                    IconClass="bi bi-plus-circle"
+                    IconOnly
+                    OnClick="ToggleEditTagsMode"
+                    title="@(Entry.Tags.Count == 0 ? "Add tags" : "Edit tags")" />
             </div>
         }
 
-        <button aria-label="@($"Apply {Entry.Name} additively to current filters")"
-            class="button button-green"
-            @onclick="OnApplyAsync"
-            type="button">
+        <PrimaryButton aria-label="@($"Apply {Entry.Name} additively to current filters")"
+            OnClick="OnApplyAsync">
             <i aria-hidden="true" class="bi bi-plus-circle"></i> Apply
-        </button>
+        </PrimaryButton>
 
         @if (IsFavoritable)
         {
-            <button aria-label="@FavoriteAriaLabel"
+            <WarningButton aria-label="@FavoriteAriaLabel"
                 aria-pressed="@(Entry.IsFavorite ? "true" : "false")"
-                class="button button-yellow icon-button"
-                @onclick="OnToggleFavoriteAsync"
-                title="@FavoriteTitle"
-                type="button">
-                <i aria-hidden="true" class="@FavoriteIconClass"></i>
-            </button>
+                IconClass="@FavoriteIconClass"
+                IconOnly
+                OnClick="OnToggleFavoriteAsync"
+                title="@FavoriteTitle" />
         }
 
-        <button aria-expanded="@(IsMoreMenuOpen ? "true" : "false")"
+        <Button aria-expanded="@(IsMoreMenuOpen ? "true" : "false")"
             aria-haspopup="menu"
             aria-label="@($"More actions for {Entry.Name}")"
-            class="button icon-button"
-            @onclick="ToggleMoreMenuAsync"
-            @ref="_moreMenuButtonRef"
-            title="More actions"
-            type="button">
-            <i aria-hidden="true" class="bi bi-three-dots-vertical"></i>
-        </button>
+            IconClass="bi bi-three-dots-vertical"
+            IconOnly
+            OnClick="ToggleMoreMenuAsync"
+            @ref="_moreMenuButton"
+            title="More actions" />
     </div>
 
     @if (_isEditingTags)
@@ -121,13 +112,12 @@
                 Value="@Entry.Tags"
                 ValueChanged="@OnTagsChangedAsync" />
 
-            <button aria-label="Done editing tags"
-                class="button icon-button library-entry-tags-done"
-                @onclick="ToggleEditTagsMode"
-                title="Done"
-                type="button">
-                <i aria-hidden="true" class="bi bi-check2"></i>
-            </button>
+            <Button aria-label="Done editing tags"
+                CssClass="library-entry-tags-done"
+                IconClass="bi bi-check2"
+                IconOnly
+                OnClick="ToggleEditTagsMode"
+                title="Done" />
         </div>
     }
 
