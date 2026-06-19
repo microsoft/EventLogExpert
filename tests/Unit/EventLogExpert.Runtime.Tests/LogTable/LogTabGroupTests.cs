@@ -317,6 +317,85 @@ public sealed class LogTabGroupTests
         Assert.Contains(state.EventTables, table => table.Id == state.ActiveEventLogId);
     }
 
+    [Fact]
+    public void ReduceRenameGroup_ToTheCurrentName_IsANoOp()
+    {
+        var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
+        var groupId = NewGroup(ref state, ids[0]);
+        var currentName = state.Groups.Single(group => group.Id == groupId).Name;
+
+        var result = Reducers.ReduceRenameGroup(state, new RenameGroupAction(groupId, currentName));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void ReduceRenameGroup_UpdatesBothTheGroupNameAndTheHeaderLogName()
+    {
+        var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
+        var groupId = NewGroup(ref state, ids[0]);
+
+        state = Reducers.ReduceRenameGroup(state, new RenameGroupAction(groupId, "Renamed"));
+
+        Assert.Equal("Renamed", state.Groups.Single(group => group.Id == groupId).Name);
+        Assert.Equal("Renamed", state.EventTables.Single(table => table.GroupId == groupId).LogName);
+    }
+
+    [Fact]
+    public void ReduceRenameGroup_WithUnknownGroup_IsANoOp()
+    {
+        var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
+        _ = NewGroup(ref state, ids[0]);
+
+        var result = Reducers.ReduceRenameGroup(state, new RenameGroupAction(LogTabGroupId.Create(), "Renamed"));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void ReduceRenameGroup_WithWhitespaceName_IsANoOp()
+    {
+        var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
+        var groupId = NewGroup(ref state, ids[0]);
+
+        var result = Reducers.ReduceRenameGroup(state, new RenameGroupAction(groupId, "   "));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void ReduceSetTabGroupCollapsed_SetsTheGroupsCollapsedState()
+    {
+        var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
+        var groupId = NewGroup(ref state, ids[0]);
+
+        state = Reducers.ReduceSetTabGroupCollapsed(state, new SetTabGroupCollapsedAction(groupId, true));
+
+        Assert.True(state.Groups.Single(group => group.Id == groupId).IsCollapsed);
+    }
+
+    [Fact]
+    public void ReduceSetTabGroupCollapsed_WhenAlreadyAtTheValue_IsANoOp()
+    {
+        var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
+        var groupId = NewGroup(ref state, ids[0]);
+
+        var result = Reducers.ReduceSetTabGroupCollapsed(state, new SetTabGroupCollapsedAction(groupId, false));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void ReduceSetTabGroupCollapsed_WithUnknownGroup_IsANoOp()
+    {
+        var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
+        _ = NewGroup(ref state, ids[0]);
+
+        var result = Reducers.ReduceSetTabGroupCollapsed(state, new SetTabGroupCollapsedAction(LogTabGroupId.Create(), true));
+
+        Assert.Same(state, result);
+    }
+
     private static LogTableState AppendBatch(LogTableState state, EventLogId logId, params ResolvedEvent[] events) =>
         Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction(
             new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [logId] = events }));

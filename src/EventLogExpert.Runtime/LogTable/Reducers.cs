@@ -397,6 +397,24 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
+    public static LogTableState ReduceRenameGroup(LogTableState state, RenameGroupAction action)
+    {
+        if (string.IsNullOrWhiteSpace(action.NewName)) { return state; }
+
+        var group = state.Groups.FirstOrDefault(candidate => candidate.Id == action.GroupId);
+
+        if (group is null || group.Name == action.NewName) { return state; }
+
+        var groups = state.Groups.Replace(group, group with { Name = action.NewName });
+        var header = state.EventTables.FirstOrDefault(table => table.GroupId == action.GroupId);
+        var tables = header is null
+            ? state.EventTables
+            : state.EventTables.Replace(header, header with { LogName = action.NewName });
+
+        return state with { Groups = groups, EventTables = tables };
+    }
+
+    [ReducerMethod]
     public static LogTableState ReduceReorderColumn(LogTableState state, ReorderColumnAction action)
     {
         var order = state.ColumnOrder;
@@ -474,6 +492,16 @@ internal sealed class Reducers
                 RequestedOrderBy = action.OrderBy,
                 DisplayListVersion = state.DisplayListVersion + 1
             };
+
+    [ReducerMethod]
+    public static LogTableState ReduceSetTabGroupCollapsed(LogTableState state, SetTabGroupCollapsedAction action)
+    {
+        var group = state.Groups.FirstOrDefault(candidate => candidate.Id == action.GroupId);
+
+        if (group is null || group.IsCollapsed == action.Collapsed) { return state; }
+
+        return state with { Groups = state.Groups.Replace(group, group with { IsCollapsed = action.Collapsed }) };
+    }
 
     [ReducerMethod]
     public static LogTableState ReduceToggleGroupCollapsed(
