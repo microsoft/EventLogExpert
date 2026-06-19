@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using AngleSharp.Dom;
@@ -224,7 +224,8 @@ public sealed class FilterPaneTests : BunitContext
         var sys = Scenario("sys", ScenarioGroup.SystemHealth);
         var sec = Scenario("sec", ScenarioGroup.Security);
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(EventLogStateWithChannel("System"));
+        SetLoadedLogNames("System");
+        SetOpenLogCount(1);
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([sys, sec]);
 
         var component = Render<UI.FilterPane.FilterPane>();
@@ -240,7 +241,8 @@ public sealed class FilterPaneTests : BunitContext
     public void ApplyScenarioSelection_WhenNoMatches_AnnouncesAndDoesNotApply()
     {
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(EventLogStateWithChannel("System"));
+        SetLoadedLogNames("System");
+        SetOpenLogCount(1);
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([]);
 
         var component = Render<UI.FilterPane.FilterPane>();
@@ -257,7 +259,8 @@ public sealed class FilterPaneTests : BunitContext
     {
         var match = Scenario("sys", ScenarioGroup.SystemHealth);
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(EventLogStateWithChannel("System"));
+        SetLoadedLogNames("System");
+        SetOpenLogCount(1);
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([match]);
 
         var component = Render<UI.FilterPane.FilterPane>();
@@ -285,7 +288,8 @@ public sealed class FilterPaneTests : BunitContext
     {
         var scenario = Scenario("sys", ScenarioGroup.SystemHealth);
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(EventLogStateWithChannel("System"));
+        SetLoadedLogNames("System");
+        SetOpenLogCount(1);
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([scenario]);
 
         var component = Render<UI.FilterPane.FilterPane>();
@@ -501,7 +505,8 @@ public sealed class FilterPaneTests : BunitContext
         var sec1 = Scenario("sec1", ScenarioGroup.Security);
         var sec2 = Scenario("sec2", ScenarioGroup.Security);
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(EventLogStateWithChannel("System"));
+        SetLoadedLogNames("System");
+        SetOpenLogCount(1);
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>()).Returns([sys, sec1, sec2]);
 
         var component = Render<UI.FilterPane.FilterPane>();
@@ -614,7 +619,8 @@ public sealed class FilterPaneTests : BunitContext
     public async Task OpenScenarioPicker_MultipleCategories_RendersCategoryDropdown()
     {
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(EventLogStateWithChannel("System"));
+        SetLoadedLogNames("System");
+        SetOpenLogCount(1);
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>())
             .Returns([Scenario("sys", ScenarioGroup.SystemHealth), Scenario("sec", ScenarioGroup.Security)]);
 
@@ -629,7 +635,8 @@ public sealed class FilterPaneTests : BunitContext
     {
         var first = Scenario("first", ScenarioGroup.SystemHealth);
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(EventLogStateWithChannel("System"));
+        SetLoadedLogNames("System");
+        SetOpenLogCount(1);
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>())
             .Returns([first, Scenario("second", ScenarioGroup.SystemHealth)]);
 
@@ -644,7 +651,8 @@ public sealed class FilterPaneTests : BunitContext
     public async Task OpenScenarioPicker_SingleCategory_OmitsCategoryDropdown()
     {
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
-        SetEventLogState(EventLogStateWithChannel("System"));
+        SetLoadedLogNames("System");
+        SetOpenLogCount(1);
         _scenarioQuery.GetInAppScenarios(Arg.Any<IReadOnlyCollection<string>>())
             .Returns([Scenario("one", ScenarioGroup.SystemHealth), Scenario("two", ScenarioGroup.SystemHealth)]);
 

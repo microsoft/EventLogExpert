@@ -1,11 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -58,10 +58,10 @@ public sealed class RestoreFilterPaneStateTests
         var appliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
         appliedFilter.Value.Returns(new Filter(null, []));
 
-        var eventDateRange = Substitute.For<IStateSelection<EventLogState, (DateTime After, DateTime Before)?>>();
-        eventDateRange.Value.Returns(((DateTime, DateTime)?)null);
+        var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
+        rawEventStore.Value.Returns(new RawEventStoreState());
 
-        var effects = new Effects(appliedFilter, eventDateRange, filterPaneState);
+        var effects = new Effects(appliedFilter, rawEventStore, filterPaneState);
 
         return (effects, Substitute.For<IDispatcher>());
     }

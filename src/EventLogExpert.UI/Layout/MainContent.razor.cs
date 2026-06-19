@@ -15,7 +15,7 @@ public sealed partial class MainContent : FluxorComponent
 
     protected override void OnInitialized()
     {
-        HasActiveLogs.Select(state => !state.ActiveLogs.IsEmpty);
+        HasActiveLogs.Select(state => state.OpenLogCount > 0);
         base.OnInitialized();
     }
 }
