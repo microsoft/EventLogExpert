@@ -55,7 +55,7 @@ public sealed record LogTableState
 
     internal bool RequestedIsGroupDescending { get; init; }
 
-    internal int DisplayListGeneration { get; init; }
+    internal int DisplayListVersion { get; init; }
 
     public bool GroupsCollapsedByDefault { get; init; }
 
@@ -73,6 +73,9 @@ public sealed record LogTableState
         RequestedIsDescending != IsDescending ||
         RequestedGroupBy != GroupBy ||
         RequestedIsGroupDescending != IsGroupDescending;
+
+    internal ImmutableDictionary<EventLogId, int> PerLogListVersion { get; init; } =
+        ImmutableDictionary<EventLogId, int>.Empty;
 
     private static readonly ConditionalWeakTable<
         ImmutableDictionary<EventLogId, SegmentedSortedList>, CombinedEventView> s_combinedViews = [];

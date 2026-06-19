@@ -145,7 +145,7 @@ internal sealed class FilteringEffects(
     {
         var snapshot = SnapshotOpenLogEvents();
         var capturedContext = _logTableState.Value.SortContext;
-        var generation = _logTableState.Value.DisplayListGeneration;
+        var version = _logTableState.Value.DisplayListVersion;
 
         dispatcher.Dispatch(new SetFilterProgressAction(true));
 
@@ -197,7 +197,7 @@ internal sealed class FilteringEffects(
                 }
             }
 
-            dispatcher.Dispatch(new DisplayReadyAction { Lists = fresh, Generation = generation });
+            dispatcher.Dispatch(new DisplayReadyAction { Lists = fresh, Version = version });
         }
         finally
         {

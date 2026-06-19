@@ -829,7 +829,7 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
-    public void ReduceApplyFilter_BumpsGenerationAndPreservesRequestedSort()
+    public void ReduceApplyFilter_BumpsVersionAndPreservesRequestedSort()
     {
         var state = new LogTableState
         {
@@ -837,14 +837,14 @@ public sealed class LogTableStoreTests
             RequestedGroupBy = ColumnName.EventId,
             RequestedIsDescending = false,
             RequestedIsGroupDescending = true,
-            DisplayListGeneration = 3
+            DisplayListVersion = 3
         };
 
         var result = Reducers.ReduceApplyFilter(
             state,
             new ApplyFilterAction(new Filter(null, [])));
 
-        Assert.Equal(4, result.DisplayListGeneration);
+        Assert.Equal(4, result.DisplayListVersion);
         Assert.Equal(ColumnName.Source, result.RequestedOrderBy);
         Assert.Equal(ColumnName.EventId, result.RequestedGroupBy);
         Assert.False(result.RequestedIsDescending);
@@ -917,49 +917,17 @@ public sealed class LogTableStoreTests
 
         var droppedSortRebuild = Reducers.ReduceDisplayReady(
             afterFilter,
-            new DisplayReadyAction { Lists = lists, Generation = afterSort.DisplayListGeneration });
+            new DisplayReadyAction { Lists = lists, Version = afterSort.DisplayListVersion });
 
         Assert.Same(afterFilter, droppedSortRebuild);
         Assert.Null(droppedSortRebuild.OrderBy);
 
         var appliedFilterRebuild = Reducers.ReduceDisplayReady(
             afterFilter,
-            new DisplayReadyAction { Lists = lists, Generation = afterFilter.DisplayListGeneration });
+            new DisplayReadyAction { Lists = lists, Version = afterFilter.DisplayListVersion });
 
         Assert.Equal(ColumnName.Source, appliedFilterRebuild.OrderBy);
         Assert.Equal(ColumnName.Source, appliedFilterRebuild.RequestedOrderBy);
-    }
-
-    [Fact]
-    public void ReduceDisplayReady_WhenGenerationStale_ShouldDropAndWhenMatching_ShouldApply()
-    {
-        var requested = Reducers.ReduceSetOrderBy(
-            SeedTabled(new List<ResolvedEvent>
-            {
-                FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
-                FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
-            }),
-            new SetOrderByAction(ColumnName.Source));
-
-        var lists = new Dictionary<EventLogId, SegmentedSortedList>(requested.PerLogEvents.Count);
-
-        foreach (var (logId, list) in requested.PerLogEvents)
-        {
-            lists[logId] = SegmentedSortedList.CreateSorted(list, requested.SortContext);
-        }
-
-        var stale = Reducers.ReduceDisplayReady(
-            requested,
-            new DisplayReadyAction { Lists = lists, Generation = requested.DisplayListGeneration - 1 });
-
-        Assert.Same(requested, stale);
-        Assert.Null(stale.OrderBy);
-
-        var applied = Reducers.ReduceDisplayReady(
-            requested,
-            new DisplayReadyAction { Lists = lists, Generation = requested.DisplayListGeneration });
-
-        Assert.Equal(ColumnName.Source, applied.OrderBy);
     }
 
     [Fact]
@@ -1065,7 +1033,7 @@ public sealed class LogTableStoreTests
         {
             RequestedOrderBy = ColumnName.Source,
             RequestedIsDescending = false,
-            DisplayListGeneration = seeded.DisplayListGeneration + 1
+            DisplayListVersion = seeded.DisplayListVersion + 1
         };
 
         var logId = requested.PerLogEvents.Keys.Single();
@@ -1074,7 +1042,7 @@ public sealed class LogTableStoreTests
 
         var after = Reducers.ReduceDisplayReady(
             requested,
-            new DisplayReadyAction { Lists = lists, Generation = requested.DisplayListGeneration });
+            new DisplayReadyAction { Lists = lists, Version = requested.DisplayListVersion });
 
         Assert.Same(prebuilt, after.PerLogEvents[logId]);
         Assert.Equal(ColumnName.Source, after.OrderBy);
@@ -1095,7 +1063,7 @@ public sealed class LogTableStoreTests
         var requested = seeded with
         {
             RequestedGroupBy = ColumnName.Source,
-            DisplayListGeneration = seeded.DisplayListGeneration + 1,
+            DisplayListVersion = seeded.DisplayListVersion + 1,
             GroupsCollapsedByDefault = true
         };
 
@@ -1105,7 +1073,7 @@ public sealed class LogTableStoreTests
 
         var after = Reducers.ReduceDisplayReady(
             requested,
-            new DisplayReadyAction { Lists = lists, Generation = requested.DisplayListGeneration });
+            new DisplayReadyAction { Lists = lists, Version = requested.DisplayListVersion });
 
         Assert.Equal(ColumnName.Source, after.GroupBy);
         Assert.False(after.GroupsCollapsedByDefault);
@@ -1186,6 +1154,38 @@ public sealed class LogTableStoreTests
         // Assert - DisplayReady also latches ComputerName, not just the append paths
         var updatedTable = newState.EventTables.First(t => t.Id == logData.Id);
         Assert.Equal(FilterTestConstants.EventComputerServer01, updatedTable.ComputerName);
+    }
+
+    [Fact]
+    public void ReduceDisplayReady_WhenVersionStale_ShouldDropAndWhenMatching_ShouldApply()
+    {
+        var requested = Reducers.ReduceSetOrderBy(
+            SeedTabled(new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+                FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+            }),
+            new SetOrderByAction(ColumnName.Source));
+
+        var lists = new Dictionary<EventLogId, SegmentedSortedList>(requested.PerLogEvents.Count);
+
+        foreach (var (logId, list) in requested.PerLogEvents)
+        {
+            lists[logId] = SegmentedSortedList.CreateSorted(list, requested.SortContext);
+        }
+
+        var stale = Reducers.ReduceDisplayReady(
+            requested,
+            new DisplayReadyAction { Lists = lists, Version = requested.DisplayListVersion - 1 });
+
+        Assert.Same(requested, stale);
+        Assert.Null(stale.OrderBy);
+
+        var applied = Reducers.ReduceDisplayReady(
+            requested,
+            new DisplayReadyAction { Lists = lists, Version = requested.DisplayListVersion });
+
+        Assert.Equal(ColumnName.Source, applied.OrderBy);
     }
 
     [Fact]
@@ -1393,7 +1393,7 @@ public sealed class LogTableStoreTests
         var result = Reducers.ReduceSetGroupBy(state, new SetGroupByAction(ColumnName.Source));
 
         Assert.Same(state.PerLogEvents, result.PerLogEvents);
-        Assert.Equal(state.DisplayListGeneration + 1, result.DisplayListGeneration);
+        Assert.Equal(state.DisplayListVersion + 1, result.DisplayListVersion);
         Assert.Equal(ColumnName.Source, result.RequestedGroupBy);
         Assert.False(result.RequestedIsGroupDescending);
         Assert.Null(result.GroupBy);
@@ -1469,7 +1469,7 @@ public sealed class LogTableStoreTests
         var result = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Source));
 
         Assert.Same(state.PerLogEvents, result.PerLogEvents);
-        Assert.Equal(state.DisplayListGeneration + 1, result.DisplayListGeneration);
+        Assert.Equal(state.DisplayListVersion + 1, result.DisplayListVersion);
         Assert.Equal(ColumnName.Source, result.RequestedOrderBy);
         Assert.Null(result.OrderBy);
     }
@@ -1534,7 +1534,7 @@ public sealed class LogTableStoreTests
         var result = Reducers.ReduceToggleGroupSorting(state);
 
         Assert.Same(state.PerLogEvents, result.PerLogEvents);
-        Assert.Equal(state.DisplayListGeneration + 1, result.DisplayListGeneration);
+        Assert.Equal(state.DisplayListVersion + 1, result.DisplayListVersion);
         Assert.True(result.RequestedIsGroupDescending);
         Assert.False(result.IsGroupDescending);
         Assert.Equal(ColumnName.Source, result.GroupBy);
@@ -1586,7 +1586,7 @@ public sealed class LogTableStoreTests
 
         Assert.False(afterSecond.RequestedIsDescending);
         Assert.True(afterSecond.IsDescending);
-        Assert.Equal(state.DisplayListGeneration + 2, afterSecond.DisplayListGeneration);
+        Assert.Equal(state.DisplayListVersion + 2, afterSecond.DisplayListVersion);
     }
 
     [Fact]
@@ -1601,7 +1601,7 @@ public sealed class LogTableStoreTests
         var result = Reducers.ReduceToggleSorting(state);
 
         Assert.Same(state.PerLogEvents, result.PerLogEvents);
-        Assert.Equal(state.DisplayListGeneration + 1, result.DisplayListGeneration);
+        Assert.Equal(state.DisplayListVersion + 1, result.DisplayListVersion);
         Assert.False(result.RequestedIsDescending);
         Assert.True(result.IsDescending);
     }
@@ -1787,6 +1787,150 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
+    public void ReduceUpdateTable_WhenListVersionMatchesAndCountEqual_SkipsResort()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var state = Reducers.ReduceAddTable(new LogTableState(), new AddTableAction(logData));
+
+        var events = new List<ResolvedEvent>
+        {
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1 },
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2 }
+        };
+        state = Reducers.ReduceAppendTableEventsBatch(
+            state,
+            new AppendTableEventsBatchAction(
+                new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [logData.Id] = events })
+            {
+                VersionByLog = new Dictionary<EventLogId, int> { [logData.Id] = 0 }
+            });
+
+        var before = state.PerLogEvents[logData.Id];
+
+        var result = Reducers.ReduceUpdateTable(
+            state,
+            new UpdateTableAction(logData.Id, events) { Version = 0 });
+
+        Assert.Same(before, result.PerLogEvents[logData.Id]);
+    }
+
+    [Fact]
+    public void ReduceUpdateTable_WhenListVersionSetByDisplayReady_SkipsResort()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var state = Reducers.ReduceAddTable(new LogTableState(), new AddTableAction(logData));
+        state = state with { DisplayListVersion = 5 };
+
+        var events = new List<ResolvedEvent>
+        {
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1 },
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2 }
+        };
+        var fresh = SegmentedSortedList.CreateSorted(events, state.SortContext);
+
+        state = Reducers.ReduceDisplayReady(
+            state,
+            new DisplayReadyAction
+            {
+                Lists = new Dictionary<EventLogId, SegmentedSortedList> { [logData.Id] = fresh },
+                Version = 5
+            });
+
+        var installed = state.PerLogEvents[logData.Id];
+
+        var result = Reducers.ReduceUpdateTable(
+            state,
+            new UpdateTableAction(logData.Id, events) { Version = 5 });
+
+        Assert.Same(installed, result.PerLogEvents[logData.Id]);
+    }
+
+    [Fact]
+    public void ReduceUpdateTable_WhenListVersionStaleFromMidLoadFilterChange_HealsToFinalizeSlice()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var state = Reducers.ReduceAddTable(new LogTableState(), new AddTableAction(logData));
+
+        var streamed = new List<ResolvedEvent>
+        {
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1 },
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2 }
+        };
+        state = state with { DisplayListVersion = 1 };
+
+        state = Reducers.ReduceAppendTableEventsBatch(
+            state,
+            new AppendTableEventsBatchAction(
+                new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [logData.Id] = streamed })
+            {
+                VersionByLog = new Dictionary<EventLogId, int> { [logData.Id] = 0 }
+            });
+
+        var finalizeSlice = new List<ResolvedEvent>
+        {
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 20, RecordId = 3 },
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 21, RecordId = 4 }
+        };
+        var result = Reducers.ReduceUpdateTable(
+            state,
+            new UpdateTableAction(logData.Id, finalizeSlice) { Version = 1 });
+
+        Assert.Equal([3L, 4L], result.DisplayedEvents.Select(e => e.RecordId).OrderBy(r => r));
+    }
+
+    [Fact]
+    public void ReduceUpdateTable_WhenOlderBatchAppendsAfterDisplayReadyTag_HealsAtFinalize()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var state = Reducers.ReduceAddTable(new LogTableState(), new AddTableAction(logData));
+        state = state with { DisplayListVersion = 2 };
+
+        var rebuilt = new List<ResolvedEvent>
+        {
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 20, RecordId = 3 },
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 21, RecordId = 4 }
+        };
+        state = Reducers.ReduceDisplayReady(
+            state,
+            new DisplayReadyAction
+            {
+                Lists = new Dictionary<EventLogId, SegmentedSortedList>
+                {
+                    [logData.Id] = SegmentedSortedList.CreateSorted(rebuilt, state.SortContext)
+                },
+                Version = 2
+            });
+        Assert.Equal(2, state.PerLogListVersion[logData.Id]);
+
+        state = Reducers.ReduceAppendTableEventsBatch(
+            state,
+            new AppendTableEventsBatchAction(
+                new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
+                {
+                    [logData.Id] = new List<ResolvedEvent>
+                    {
+                        new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1 }
+                    }
+                })
+            {
+                VersionByLog = new Dictionary<EventLogId, int> { [logData.Id] = 1 }
+            });
+        Assert.Equal(1, state.PerLogListVersion[logData.Id]);
+
+        var finalizeSlice = new List<ResolvedEvent>
+        {
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 20, RecordId = 3 },
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 21, RecordId = 4 },
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 22, RecordId = 5 }
+        };
+        var result = Reducers.ReduceUpdateTable(
+            state,
+            new UpdateTableAction(logData.Id, finalizeSlice) { Version = 2 });
+
+        Assert.Equal([3L, 4L, 5L], result.DisplayedEvents.Select(e => e.RecordId).OrderBy(r => r));
+    }
+
+    [Fact]
     public void ReduceUpdateTable_WhenSecondLogIsEmpty_ShouldKeepFirstLogEvents()
     {
         // Arrange - one log populated, one log empty (but not loading), ascending RecordId order
@@ -1846,6 +1990,32 @@ public sealed class LogTableStoreTests
         Assert.Equal(4L, state.DisplayedEvents[3].RecordId);
         Assert.Equal(Constants.LogNameLog1, state.DisplayedEvents[0].OwningLog);
         Assert.Equal(Constants.LogNameLog2, state.DisplayedEvents[1].OwningLog);
+    }
+
+    [Fact]
+    public void ReduceUpdateTable_WhenStreamingListHasNoVersionTag_RebuildsAtFinalize()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var state = Reducers.ReduceAddTable(new LogTableState(), new AddTableAction(logData));
+
+        var events = new List<ResolvedEvent>
+        {
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1 },
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2 }
+        };
+        state = Reducers.ReduceAppendTableEventsBatch(
+            state,
+            new AppendTableEventsBatchAction(
+                new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [logData.Id] = events }));
+
+        Assert.False(state.PerLogListVersion.ContainsKey(logData.Id));
+
+        var before = state.PerLogEvents[logData.Id];
+        var result = Reducers.ReduceUpdateTable(
+            state,
+            new UpdateTableAction(logData.Id, events) { Version = 0 });
+
+        Assert.NotSame(before, result.PerLogEvents[logData.Id]);
     }
 
     [Fact]
@@ -1969,6 +2139,6 @@ public sealed class LogTableStoreTests
 
         return Reducers.ReduceDisplayReady(
             state,
-            new DisplayReadyAction { Lists = lists, Generation = state.DisplayListGeneration });
+            new DisplayReadyAction { Lists = lists, Version = state.DisplayListVersion });
     }
 }

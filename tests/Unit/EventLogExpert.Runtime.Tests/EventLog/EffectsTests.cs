@@ -896,7 +896,7 @@ public sealed class EffectsTests
     public async Task HandleApplyFilter_WhenCloseAllSupersedesReload_ShouldNotReopenClosedLogs()
     {
         // Arrange — pin down that a CloseAll landing WHILE ReloadLogsWithXmlAsync is parked
-        // on the close-completion TCS suppresses the reopen loop. Without the generation
+        // on the close-completion TCS suppresses the reopen loop. Without the version
         // recheck in ReloadLogsWithXmlAsync, the reload would re-add the just-closed logs
         // because OpenLogAction's reducer treats missing logs as adds.
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
@@ -1891,7 +1891,7 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleSetOrderBy_SortEffect_ShouldRepublishUnderRequestedContextAtCapturedGeneration()
+    public async Task HandleSetOrderBy_SortEffect_ShouldRepublishUnderRequestedContextAtCapturedVersion()
     {
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
 
@@ -1919,7 +1919,7 @@ public sealed class EffectsTests
         var logTableState = new LogTableState
         {
             RequestedOrderBy = ColumnName.Source,
-            DisplayListGeneration = 7
+            DisplayListVersion = 7
         };
 
         var (effects, mockDispatcher, mockFilterService) =
@@ -1936,7 +1936,7 @@ public sealed class EffectsTests
             Arg.Any<Filter>());
 
         mockDispatcher.Received(1).Dispatch(Arg.Is<DisplayReadyAction>(a =>
-            a.Generation == 7 &&
+            a.Version == 7 &&
             a.Lists.ContainsKey(logData.Id) &&
             a.Lists[logData.Id].HasContext(new SortContext(ColumnName.Source, true, null, false))));
     }
@@ -2012,7 +2012,7 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleUpdateTable_WhenSortPending_RepublishesUnderRequestedContextAtCapturedGeneration()
+    public async Task HandleUpdateTable_WhenSortPending_RepublishesUnderRequestedContextAtCapturedVersion()
     {
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
 
@@ -2040,7 +2040,7 @@ public sealed class EffectsTests
         var logTableState = new LogTableState
         {
             RequestedOrderBy = ColumnName.Source,
-            DisplayListGeneration = 7
+            DisplayListVersion = 7
         };
 
         var (effects, mockDispatcher, mockFilterService) =
@@ -2057,7 +2057,7 @@ public sealed class EffectsTests
             Arg.Any<Filter>());
 
         mockDispatcher.Received(1).Dispatch(Arg.Is<DisplayReadyAction>(a =>
-            a.Generation == 7 &&
+            a.Version == 7 &&
             a.Lists.ContainsKey(logData.Id) &&
             a.Lists[logData.Id].HasContext(new SortContext(ColumnName.Source, true, null, false))));
     }
@@ -2091,7 +2091,7 @@ public sealed class EffectsTests
         var logTableState = new LogTableState
         {
             RequestedOrderBy = ColumnName.Source,
-            DisplayListGeneration = 3
+            DisplayListVersion = 3
         };
 
         var (effects, mockDispatcher, mockFilterService) =
@@ -2109,7 +2109,7 @@ public sealed class EffectsTests
 
         var requested = new SortContext(ColumnName.Source, true, null, false);
         mockDispatcher.Received(1).Dispatch(Arg.Is<DisplayReadyAction>(a =>
-            a.Generation == 3 &&
+            a.Version == 3 &&
             a.Lists.ContainsKey(logA.Id) && a.Lists[logA.Id].HasContext(requested) &&
             a.Lists.ContainsKey(logB.Id) && a.Lists[logB.Id].HasContext(requested)));
     }
@@ -2185,6 +2185,7 @@ public sealed class EffectsTests
 
         var logReload = new LogReloadEffects(
             eventLogState,
+            logTableState,
             filterService,
             closeCoordinator,
             coordinator);

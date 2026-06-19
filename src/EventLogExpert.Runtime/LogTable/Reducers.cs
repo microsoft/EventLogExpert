@@ -100,6 +100,7 @@ internal sealed class Reducers
         // Skip batches for closed logs: avoid resurrecting events and stale counts.
         int totalNew = 0;
         var perLog = state.PerLogEvents;
+        var perLogVersion = state.PerLogListVersion;
         var counts = state.EventCountByLog;
         var updatedTables = state.EventTables;
 
@@ -125,6 +126,17 @@ internal sealed class Reducers
 
             if (table is null || table.IsCombined) { continue; }
 
+            if (action.VersionByLog.TryGetValue(logId, out var version))
+            {
+                perLogVersion = perLogVersion.SetItem(
+                    logId,
+                    perLogVersion.TryGetValue(logId, out var existingVersion) ? Math.Min(existingVersion, version) : version);
+            }
+            else
+            {
+                perLogVersion = perLogVersion.Remove(logId);
+            }
+
             perLog = AppendToLog(perLog, logId, events, context);
             counts = IncrementCount(counts, logId, events.Count);
             totalNew += events.Count;
@@ -144,6 +156,7 @@ internal sealed class Reducers
         return state with
         {
             PerLogEvents = perLog,
+            PerLogListVersion = perLogVersion,
             EventTables = updatedTables,
             EventCountByLog = counts
         };
@@ -151,7 +164,7 @@ internal sealed class Reducers
 
     [ReducerMethod]
     public static LogTableState ReduceApplyFilter(LogTableState state, ApplyFilterAction action) =>
-        state with { DisplayListGeneration = state.DisplayListGeneration + 1 };
+        state with { DisplayListVersion = state.DisplayListVersion + 1 };
 
     [ReducerMethod(typeof(CloseAllLogsAction))]
     public static LogTableState ReduceCloseAll(LogTableState state) =>
@@ -159,6 +172,7 @@ internal sealed class Reducers
         {
             EventTables = [],
             PerLogEvents = ImmutableDictionary<EventLogId, SegmentedSortedList>.Empty,
+            PerLogListVersion = ImmutableDictionary<EventLogId, int>.Empty,
             EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty,
             ActiveEventLogId = null
         });
@@ -176,6 +190,7 @@ internal sealed class Reducers
 
         var counts = state.EventCountByLog.Remove(action.LogId);
         var perLog = ReconcileToLogCount(state.PerLogEvents.Remove(action.LogId), state);
+        var perLogVersion = state.PerLogListVersion.Remove(action.LogId);
 
         switch (remainingPerLogTables.Count)
         {
@@ -185,6 +200,7 @@ internal sealed class Reducers
                     {
                         EventTables = [],
                         PerLogEvents = ImmutableDictionary<EventLogId, SegmentedSortedList>.Empty,
+                        PerLogListVersion = ImmutableDictionary<EventLogId, int>.Empty,
                         EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty,
                         ActiveEventLogId = null
                     },
@@ -198,6 +214,7 @@ internal sealed class Reducers
                         {
                             EventTables = remainingPerLogTables,
                             PerLogEvents = perLog,
+                            PerLogListVersion = perLogVersion,
                             EventCountByLog = counts,
                             ActiveEventLogId = soleRemaining.Id
                         },
@@ -212,6 +229,7 @@ internal sealed class Reducers
                         {
                             EventTables = remainingPerLogTables.Insert(0, combinedTable),
                             PerLogEvents = perLog,
+                            PerLogListVersion = perLogVersion,
                             EventCountByLog = counts,
                             ActiveEventLogId = remainingPerLogTables.Any(t => t.Id == state.ActiveEventLogId) ?
                                 state.ActiveEventLogId : combinedTable.Id
@@ -226,7 +244,7 @@ internal sealed class Reducers
         LogTableState state,
         DisplayReadyAction action)
     {
-        if (action.Generation != state.DisplayListGeneration) { return state; }
+        if (action.Version != state.DisplayListVersion) { return state; }
 
         var flipped = state with
         {
@@ -252,6 +270,7 @@ internal sealed class Reducers
         var context = EffectiveSortContext(
             flipped.OrderBy, flipped.IsDescending, flipped.GroupBy, flipped.IsGroupDescending, postCount);
         var perLogBuilder = ImmutableDictionary.CreateBuilder<EventLogId, SegmentedSortedList>();
+        var perLogVersion = state.PerLogListVersion;
         var counts = state.EventCountByLog;
         var tables = state.EventTables;
 
@@ -260,6 +279,7 @@ internal sealed class Reducers
             if (action.Lists.TryGetValue(logId, out var list))
             {
                 perLogBuilder[logId] = list.HasContext(context) ? list : SegmentedSortedList.CreateSorted(list, context);
+                perLogVersion = perLogVersion.SetItem(logId, action.Version);
                 counts = counts.SetItem(logId, list.Count);
 
                 var updatedTable = SetComputerNameIfFirstEvent(table, list);
@@ -277,6 +297,7 @@ internal sealed class Reducers
         var result = flipped with
         {
             PerLogEvents = ReconcileToLogCount(perLogBuilder.ToImmutable(), flipped),
+            PerLogListVersion = perLogVersion,
             EventTables = tables,
             EventCountByLog = counts
         };
@@ -388,7 +409,7 @@ internal sealed class Reducers
         {
             RequestedGroupBy = action.GroupBy,
             RequestedIsGroupDescending = false,
-            DisplayListGeneration = state.DisplayListGeneration + 1
+            DisplayListVersion = state.DisplayListVersion + 1
         };
     }
 
@@ -399,12 +420,12 @@ internal sealed class Reducers
             {
                 RequestedOrderBy = null,
                 RequestedIsDescending = true,
-                DisplayListGeneration = state.DisplayListGeneration + 1
+                DisplayListVersion = state.DisplayListVersion + 1
             } :
             state with
             {
                 RequestedOrderBy = action.OrderBy,
-                DisplayListGeneration = state.DisplayListGeneration + 1
+                DisplayListVersion = state.DisplayListVersion + 1
             };
 
     [ReducerMethod]
@@ -430,7 +451,7 @@ internal sealed class Reducers
         return state with
         {
             RequestedIsGroupDescending = !state.RequestedIsGroupDescending,
-            DisplayListGeneration = state.DisplayListGeneration + 1
+            DisplayListVersion = state.DisplayListVersion + 1
         };
     }
 
@@ -454,7 +475,7 @@ internal sealed class Reducers
         state with
         {
             RequestedIsDescending = !state.RequestedIsDescending,
-            DisplayListGeneration = state.DisplayListGeneration + 1
+            DisplayListVersion = state.DisplayListVersion + 1
         };
 
     [ReducerMethod]
@@ -470,7 +491,20 @@ internal sealed class Reducers
         var context = EffectiveSortContext(
             state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending, postCount);
 
-        var perLog = SetLog(state.PerLogEvents, table.Id, action.Events, context);
+        // A tag matching the action version proves no filter change between the off-thread filter pass and this finalize; with HasContext + equal Count the existing list already equals the slice, so skip the re-sort.
+        var skip = state.PerLogEvents.TryGetValue(table.Id, out var existing)
+            && state.PerLogListVersion.TryGetValue(table.Id, out var listVersion)
+            && listVersion == action.Version
+            && existing.HasContext(context)
+            && existing.Count == action.Events.Count;
+
+        var perLog = skip
+            ? state.PerLogEvents
+            : SetLog(state.PerLogEvents, table.Id, action.Events, context);
+        var perLogVersion = skip
+            ? state.PerLogListVersion
+            : state.PerLogListVersion.SetItem(table.Id, action.Version);
+
         perLog = ReconcileToLogCount(perLog, state);
         var updatedTable = SetComputerNameIfFirstEvent(table, action.Events) with { IsLoading = false };
         var counts = state.EventCountByLog.SetItem(table.Id, action.Events.Count);
@@ -478,6 +512,7 @@ internal sealed class Reducers
         return state with
         {
             PerLogEvents = perLog,
+            PerLogListVersion = perLogVersion,
             EventTables = state.EventTables.Replace(table, updatedTable),
             EventCountByLog = counts
         };

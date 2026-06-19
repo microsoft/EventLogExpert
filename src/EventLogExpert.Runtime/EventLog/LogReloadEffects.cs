@@ -12,6 +12,7 @@ namespace EventLogExpert.Runtime.EventLog;
 
 internal sealed class LogReloadEffects(
     IState<EventLogState> eventLogState,
+    IState<LogTableState> logTableState,
     IFilterService filterService,
     LogCloseCoordinator closeCoordinator,
     PartialLoadCoordinator coordinator)
@@ -20,15 +21,17 @@ internal sealed class LogReloadEffects(
     private readonly PartialLoadCoordinator _coordinator = coordinator;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IFilterService _filterService = filterService;
+    private readonly IState<LogTableState> _logTableState = logTableState;
 
     [EffectMethod]
     public Task HandleLoadEvents(LoadEventsAction action, IDispatcher dispatcher)
     {
+        var version = _logTableState.Value.DisplayListVersion;
         var filteredEvents = _filterService.GetFilteredEvents(action.Events, _eventLogState.Value.AppliedFilter);
 
         _coordinator.MarkFinalized(action.LogData.Id);
 
-        dispatcher.Dispatch(new UpdateTableAction(action.LogData.Id, filteredEvents));
+        dispatcher.Dispatch(new UpdateTableAction(action.LogData.Id, filteredEvents) { Version = version });
 
         if (!_closeCoordinator.TryConsumePendingRestore(action.LogData.Name, out var pending) ||
             pending is null ||
@@ -56,9 +59,10 @@ internal sealed class LogReloadEffects(
     [EffectMethod]
     public Task HandleLoadEventsPartial(LoadEventsPartialAction action, IDispatcher dispatcher)
     {
+        var version = _logTableState.Value.DisplayListVersion;
         var filteredEvents = _filterService.GetFilteredEvents(action.Events, _eventLogState.Value.AppliedFilter);
 
-        _coordinator.Enqueue(action.LogData.Id, filteredEvents);
+        _coordinator.Enqueue(action.LogData.Id, filteredEvents, version);
 
         return Task.CompletedTask;
     }

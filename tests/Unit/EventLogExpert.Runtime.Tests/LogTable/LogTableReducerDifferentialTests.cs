@@ -28,7 +28,7 @@ public sealed class LogTableReducerDifferentialTests
 
         var requested = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Level));
         Assert.Same(state.PerLogEvents, requested.PerLogEvents);
-        Assert.Equal(state.DisplayListGeneration + 1, requested.DisplayListGeneration);
+        Assert.Equal(state.DisplayListVersion + 1, requested.DisplayListVersion);
 
         var afterOrderBy = Settle(requested);
         Assert.NotSame(state.PerLogEvents, afterOrderBy.PerLogEvents);
@@ -66,7 +66,7 @@ public sealed class LogTableReducerDifferentialTests
 
         return Reducers.ReduceDisplayReady(
             state,
-            new DisplayReadyAction { Lists = lists, Generation = state.DisplayListGeneration });
+            new DisplayReadyAction { Lists = lists, Version = state.DisplayListVersion });
     }
 
     private sealed class Harness
@@ -197,7 +197,7 @@ public sealed class LogTableReducerDifferentialTests
 
         private void ApplySort(LogTableState requested)
         {
-            State = requested.DisplayListGeneration != State.DisplayListGeneration ? Settle(requested) : requested;
+            State = requested.DisplayListVersion != State.DisplayListVersion ? Settle(requested) : requested;
         }
 
         private void AssertDisplayedMatchesOracle(int step)
@@ -365,7 +365,7 @@ public sealed class LogTableReducerDifferentialTests
 
             State = Reducers.ReduceDisplayReady(
                 State,
-                new DisplayReadyAction { Lists = lists, Generation = State.DisplayListGeneration });
+                new DisplayReadyAction { Lists = lists, Version = State.DisplayListVersion });
         }
 
         private IEnumerable<int> SampleIndices(int count)

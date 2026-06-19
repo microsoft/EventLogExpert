@@ -265,7 +265,7 @@ public sealed class LogTableReducerInvariantTests
 
         return Reducers.ReduceDisplayReady(
             state,
-            new DisplayReadyAction { Lists = lists, Generation = state.DisplayListGeneration });
+            new DisplayReadyAction { Lists = lists, Version = state.DisplayListVersion });
     }
 
     private static DateTime Time(int logIndex, int seconds) =>

@@ -11,5 +11,5 @@ public sealed record DisplayReadyAction
     internal IReadOnlyDictionary<EventLogId, SegmentedSortedList> Lists { get; init; } =
         ImmutableDictionary<EventLogId, SegmentedSortedList>.Empty;
 
-    internal int Generation { get; init; }
+    internal int Version { get; init; }
 }
