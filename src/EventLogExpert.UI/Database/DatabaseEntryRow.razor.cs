@@ -7,9 +7,9 @@ using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Common;
+using EventLogExpert.UI.Focus;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Database;
 
@@ -110,7 +110,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
-    public ValueTask FocusNameAsync() => _nameButtonRef.FocusAsync(preventScroll: true);
+    public ValueTask FocusNameAsync() => ElementFocus.SafelyAsync(_nameButtonRef, preventScroll: true);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -118,10 +118,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
         _shouldFocusNameAfterRender = false;
 
-        try { await _nameButtonRef.FocusAsync(preventScroll: true); }
-        catch (ObjectDisposedException) { }
-        catch (JSDisconnectedException) { }
-        catch (JSException) { }
+        await FocusNameAsync();
     }
 
     private static string PhaseVerb(UpgradePhase phase) => phase switch
