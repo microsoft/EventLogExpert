@@ -10,9 +10,9 @@ using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Database;
+using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 using System.Collections.Immutable;
 using System.Text;
 
@@ -127,11 +127,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         ExitSelectionMode();
         StateHasChanged();
 
-        try { await (_selectButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask); }
-        catch (ObjectDisposedException) { }
-        catch (JSDisconnectedException) { }
-        catch (JSException) { }
-        catch (TaskCanceledException) { }
+        await FocusRestoreAsync(_selectButton);
     }
 
     /// <summary>
@@ -176,22 +172,16 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         {
             _focusRestorationTarget = null;
 
-            try
+            await (target.Target switch
             {
-                await (target.Target switch
-                {
-                    FocusTarget.SameRowName when !string.IsNullOrEmpty(target.FileName) =>
-                        FocusEntryRowNameAsync(target.FileName),
-                    FocusTarget.BulkRemoveButton when HasBulkSelection =>
-                        _bulkRemoveButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask,
-                    FocusTarget.ImportButton =>
-                        _importButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask,
-                    _ => ValueTask.CompletedTask
-                });
-            }
-            catch (ObjectDisposedException) { }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
+                FocusTarget.SameRowName when !string.IsNullOrEmpty(target.FileName) =>
+                    FocusEntryRowNameAsync(target.FileName),
+                FocusTarget.BulkRemoveButton when HasBulkSelection =>
+                    FocusRestoreAsync(_bulkRemoveButton),
+                FocusTarget.ImportButton =>
+                    FocusRestoreAsync(_importButton),
+                _ => ValueTask.CompletedTask
+            });
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -222,6 +212,9 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         return $"Are you sure you want to remove these {fileNames.Count} databases? ({list}{more})";
     }
+
+    private static ValueTask FocusRestoreAsync(ButtonBase? button) =>
+        button != null ? ElementFocus.SafelyAsync(button.Element, preventScroll: true) : ValueTask.CompletedTask;
 
     private static string GetSkipReason(DatabaseEntry entry, bool isUpgrading)
     {
@@ -557,49 +550,31 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         // button so keyboard users have a stable anchor.
         if (!_isSelectionModeActive)
         {
-            try { await (_selectButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask); }
-            catch (ObjectDisposedException) { }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
-            catch (TaskCanceledException) { }
+            await FocusRestoreAsync(_selectButton);
 
             return;
         }
 
         if (_selectedForBulk.Count > 0)
         {
-            try { await _masterCheckboxRef.FocusAsync(preventScroll: true); }
-            catch (ObjectDisposedException) { }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
-            catch (TaskCanceledException) { }
+            await ElementFocus.SafelyAsync(_masterCheckboxRef, preventScroll: true);
 
             return;
         }
 
-        try { await (_selectButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask); }
-        catch (ObjectDisposedException) { }
-        catch (JSDisconnectedException) { }
-        catch (JSException) { }
-        catch (TaskCanceledException) { }
+        await FocusRestoreAsync(_selectButton);
     }
 
     private async ValueTask FocusEntryRowNameAsync(string fileName)
     {
         if (_rowRefs.TryGetValue(fileName, out var rowRef) && rowRef is not null)
         {
-            try { await rowRef.FocusNameAsync(); }
-            catch (ObjectDisposedException) { }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
+            await rowRef.FocusNameAsync();
 
             return;
         }
 
-        try { await (_importButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask); }
-        catch (ObjectDisposedException) { }
-        catch (JSDisconnectedException) { }
-        catch (JSException) { }
+        await FocusRestoreAsync(_importButton);
     }
 
     // Lookup by batch membership (active + queued) for the cancel-then-remove flow. Distinct from
@@ -783,11 +758,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             {
                 if (_disposed) { return; }
 
-                try { await (_bulkUpgradeButton?.FocusAsync(preventScroll: true) ?? ValueTask.CompletedTask); }
-                catch (ObjectDisposedException) { }
-                catch (JSDisconnectedException) { }
-                catch (JSException) { }
-                catch (TaskCanceledException) { }
+                await FocusRestoreAsync(_bulkUpgradeButton);
 
                 return;
             }
@@ -887,11 +858,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             SelectAll();
         }
 
-        try { await _masterCheckboxRef.FocusAsync(preventScroll: true); }
-        catch (ObjectDisposedException) { }
-        catch (JSDisconnectedException) { }
-        catch (JSException) { }
-        catch (TaskCanceledException) { }
+        await ElementFocus.SafelyAsync(_masterCheckboxRef, preventScroll: true);
     }
 
     private async Task OnSaveClickAsync()
