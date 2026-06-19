@@ -43,7 +43,7 @@ dialog:not(:modal) {
     color: var(--clr-lightblue);
 }
 
-::deep .dialog-close {
+.dialog-header ::deep .dialog-close {
     padding: 0 .5rem;
 
     line-height: 1;

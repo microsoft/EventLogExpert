@@ -14,7 +14,7 @@
     padding: .5rem 1rem;
 }
 
-::deep .manage-databases-import-btn {
+.manage-databases-tab ::deep .manage-databases-import-btn {
     margin-left: auto;
 }
 

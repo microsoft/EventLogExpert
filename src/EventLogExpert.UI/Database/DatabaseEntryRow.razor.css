@@ -91,7 +91,7 @@
     gap: .5rem;
 }
 
-::deep .db-entry-upgrade-btn {
+.db-entry-row ::deep .db-entry-upgrade-btn {
     white-space: nowrap;
 }
 
@@ -128,7 +128,7 @@
     animation: db-entry-spin 1.5s linear infinite;
 }
 
-::deep .db-entry-cancel-btn {
+.db-entry-row ::deep .db-entry-cancel-btn {
     flex: 0 0 auto;
     padding: .15rem .65rem;
 
@@ -152,7 +152,7 @@
         transition: none;
     }
 
-    ::deep .db-entry-cancel-btn {
+    .db-entry-row ::deep .db-entry-cancel-btn {
         animation: none;
         transition: none;
     }

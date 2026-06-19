@@ -22,7 +22,7 @@
     font-size: 1rem;
 }
 
-::deep .library-entry-expand-toggle {
+.library-entry ::deep .library-entry-expand-toggle {
     flex-shrink: 0;
 }
 
@@ -137,7 +137,7 @@
     outline-offset: 1px;
 }
 
-::deep .library-entry-tag-chip-more {
+.library-entry ::deep .library-entry-tag-chip-more {
     flex: 0 0 auto;
     padding: 0 .375rem;
     font-size: .75rem;
@@ -147,12 +147,12 @@
     border-radius: .2rem;
 }
 
-::deep .library-entry-tag-chip-more:hover {
+.library-entry ::deep .library-entry-tag-chip-more:hover {
     color: var(--text-primary);
     background: color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
-::deep .library-entry-tag-add-inline {
+.library-entry ::deep .library-entry-tag-add-inline {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -169,23 +169,23 @@
     transition: background 120ms ease, color 120ms ease;
 }
 
-::deep .library-entry-tag-add-inline > .bi {
+.library-entry ::deep .library-entry-tag-add-inline > .bi {
     font-size: 14px;
     line-height: 1;
 }
 
-::deep .library-entry-tag-add-inline:hover,
-::deep .library-entry-tag-add-inline:focus-visible {
+.library-entry ::deep .library-entry-tag-add-inline:hover,
+.library-entry ::deep .library-entry-tag-add-inline:focus-visible {
     color: var(--clr-statusbar);
     background: color-mix(in srgb, var(--clr-statusbar) 10%, transparent);
 }
 
-::deep .library-entry-tag-add-inline:focus-visible {
+.library-entry ::deep .library-entry-tag-add-inline:focus-visible {
     outline: 2px solid var(--clr-statusbar);
     outline-offset: 1px;
 }
 
-::deep .library-entry-tags-done {
+.library-entry ::deep .library-entry-tags-done {
     padding: 0 .25rem;
     flex-shrink: 0;
 }
