@@ -20,6 +20,7 @@ using EventLogExpert.UI.LogTable.Grouping;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.Web.Virtualization;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
 
@@ -41,6 +42,7 @@ public sealed partial class LogTablePane
     private TableCursor? _cursor;
     private DotNetObjectReference<LogTablePane>? _dotNetRef;
     private ColumnName[] _enabledColumns = null!;
+    private Virtualize<ResolvedEvent>? _eventVirtualize;
     private ImmutableList<SavedFilter> _filters = [];
     private int _filtersHighlightKey;
     private bool _focusActiveOnNextRender;
@@ -49,6 +51,8 @@ public sealed partial class LogTablePane
     private LogTableState _logTableState = null!;
     private int _pageSize = DefaultPageSize;
     private ColumnName[] _previousEnabledColumns = [];
+    private bool _refreshEventViewportOnRender;
+    private bool _repaintViewportOnNextRender;
     private bool _resortSelectionOnNextRender;
     private GroupedRowView? _rowView;
     private (IReadOnlyList<ResolvedEvent> Events, EventLogId? TableId, ColumnName? GroupBy, bool GroupDescending, bool CollapsedDefault, ImmutableHashSet<string>? Overrides) _rowViewSnapshot;
@@ -170,6 +174,26 @@ public sealed partial class LogTablePane
             ResortSelectionForCurrentTable();
         }
 
+        if (_refreshEventViewportOnRender)
+        {
+            _refreshEventViewportOnRender = false;
+
+            if (_rowView is null && _eventVirtualize is not null)
+            {
+                try
+                {
+                    await _eventVirtualize.RefreshDataAsync();
+                    _repaintViewportOnNextRender = true;
+                    StateHasChanged();
+                }
+                catch (JSDisconnectedException) { /* Circuit gone - nothing to refresh. */ }
+                catch (Exception e)
+                {
+                    TraceLogger.Error($"Failed to refresh the event viewport: {e}");
+                }
+            }
+        }
+
         await base.OnAfterRenderAsync(firstRender);
     }
 
@@ -212,13 +236,16 @@ public sealed partial class LogTablePane
         bool filtersChanged = !ReferenceEquals(currentFilters, _filters);
         bool selectedEventChanged = !ReferenceEquals(SelectedEvent.Value, _selectedEvent);
 
-        // Also render on a pending focus move, which changes no Fluxor state.
+        // Also render for a pending focus move or a post-refresh viewport repaint, neither of which changes Fluxor state.
         if (!_focusActiveOnNextRender &&
+            !_repaintViewportOnNextRender &&
             ReferenceEquals(LogTableState.Value, _logTableState) &&
             ReferenceEquals(SelectedEvents.Value, _selectedEvents) &&
             !selectedEventChanged &&
             !filtersChanged &&
             Settings.TimeZoneInfo.Equals(_timeZoneSettings)) { return false; }
+
+        _repaintViewportOnNextRender = false;
 
         bool selectionChanged = !ReferenceEquals(SelectedEvents.Value, _selectedEvents);
 
@@ -763,6 +790,19 @@ public sealed partial class LogTablePane
         return false;
     }
 
+    private ValueTask<ItemsProviderResult<ResolvedEvent>> LoadEventViewport(ItemsProviderRequest request)
+    {
+        var displayedEvents = _activeDisplayedEvents;
+        int totalCount = displayedEvents.Count;
+        int start = Math.Min(request.StartIndex, totalCount);
+        int count = Math.Min(request.Count, totalCount - start);
+
+        IReadOnlyList<ResolvedEvent> window =
+            count <= 0 ? [] : ResolvedEventIndex.Slice(displayedEvents, start, count);
+
+        return ValueTask.FromResult(new ItemsProviderResult<ResolvedEvent>(window, totalCount));
+    }
+
     private void NavigateGroupedTo(
         IReadOnlyList<ResolvedEvent> displayedEvents,
         int targetRow,
@@ -895,6 +935,7 @@ public sealed partial class LogTablePane
         {
             _lastIndexedDisplayedEvents = displayedEvents;
             _highlightCache.Clear();
+            _refreshEventViewportOnRender = true;
 
             if (displayedEvents.Count == 0)
             {

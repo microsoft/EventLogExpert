@@ -88,7 +88,9 @@
         {
             @if (_rowView is null)
             {
-                <Virtualize Context="evt" Items="@(_activeDisplayedEvents as ICollection<ResolvedEvent> ?? [])">
+                @* Ungrouped: ItemsProvider fetches one Slice per viewport window (a single cursor walk),
+                   avoiding the Items= binding's per-row this[i] re-seek over the K-way merge. *@
+                <Virtualize Context="evt" ItemsProvider="LoadEventViewport" @ref="_eventVirtualize">
                     @RenderEventRow(evt)
                 </Virtualize>
             }

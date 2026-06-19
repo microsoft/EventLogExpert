@@ -11,6 +11,9 @@ namespace EventLogExpert.Runtime.LogTable;
 // Cross-log ties are impossible: OwningLog is the comparer's final tiebreak.
 internal sealed class CombinedEventView : IReadOnlyList<ResolvedEvent>, IList<ResolvedEvent>
 {
+    // Offset scratch is stack-allocated per positional read; cap K so a many-log combined view can't overflow
+    // the stack (heap fallback above the cap).
+    private const int MaxStackOffsets = 256;
     private const int Stride = 64;
 
     private readonly Dictionary<string, SegmentedSortedList> _byOwningLog;
@@ -58,17 +61,19 @@ internal sealed class CombinedEventView : IReadOnlyList<ResolvedEvent>, IList<Re
         {
             if ((uint)index >= (uint)_count) { throw new ArgumentOutOfRangeException(nameof(index)); }
 
-            var cursors = SeekTo(index, out int position);
+            int k = _lists.Length;
+            Span<int> listOffsets = k <= MaxStackOffsets ? stackalloc int[k] : new int[k];
+            int position = SeekTo(index, listOffsets);
 
             while (position < index)
             {
-                cursors[PickBest(cursors)]++;
+                listOffsets[PickBest(listOffsets)]++;
                 position++;
             }
 
-            int best = PickBest(cursors);
+            int best = PickBest(listOffsets);
 
-            return _lists[best][cursors[best]];
+            return _lists[best][listOffsets[best]];
         }
 
         set => throw new NotSupportedException();
@@ -95,17 +100,17 @@ internal sealed class CombinedEventView : IReadOnlyList<ResolvedEvent>, IList<Re
 
     public IEnumerator<ResolvedEvent> GetEnumerator()
     {
-        var cursors = new int[_lists.Length];
+        var listOffsets = new int[_lists.Length];
 
         while (true)
         {
-            int best = PickBest(cursors);
+            int best = PickBest(listOffsets);
 
             if (best < 0) { yield break; }
 
-            yield return _lists[best][cursors[best]];
+            yield return _lists[best][listOffsets[best]];
 
-            cursors[best]++;
+            listOffsets[best]++;
         }
     }
 
@@ -201,11 +206,13 @@ internal sealed class CombinedEventView : IReadOnlyList<ResolvedEvent>, IList<Re
 
         if (start >= end) { return []; }
 
-        var cursors = SeekTo(start, out int position);
+        int k = _lists.Length;
+        Span<int> listOffsets = k <= MaxStackOffsets ? stackalloc int[k] : new int[k];
+        int position = SeekTo(start, listOffsets);
 
         while (position < start)
         {
-            cursors[PickBest(cursors)]++;
+            listOffsets[PickBest(listOffsets)]++;
             position++;
         }
 
@@ -213,9 +220,9 @@ internal sealed class CombinedEventView : IReadOnlyList<ResolvedEvent>, IList<Re
 
         for (int i = 0; position < end; i++, position++)
         {
-            int best = PickBest(cursors);
-            result[i] = _lists[best][cursors[best]];
-            cursors[best]++;
+            int best = PickBest(listOffsets);
+            result[i] = _lists[best][listOffsets[best]];
+            listOffsets[best]++;
         }
 
         return result;
@@ -224,19 +231,19 @@ internal sealed class CombinedEventView : IReadOnlyList<ResolvedEvent>, IList<Re
     private int[][] BuildIndex()
     {
         var checkpoints = new List<int[]>(_count / Stride);
-        var cursors = new int[_lists.Length];
+        var listOffsets = new int[_lists.Length];
         int produced = 0;
 
         while (true)
         {
-            int best = PickBest(cursors);
+            int best = PickBest(listOffsets);
 
             if (best < 0) { break; }
 
-            cursors[best]++;
+            listOffsets[best]++;
             produced++;
 
-            if (produced % Stride == 0) { checkpoints.Add((int[])cursors.Clone()); }
+            if (produced % Stride == 0) { checkpoints.Add((int[])listOffsets.Clone()); }
         }
 
         return [.. checkpoints];
@@ -272,33 +279,33 @@ internal sealed class CombinedEventView : IReadOnlyList<ResolvedEvent>, IList<Re
         return low;
     }
 
-    private int PickBest(int[] cursors)
+    private int PickBest(ReadOnlySpan<int> listOffsets)
     {
         int best = -1;
 
         for (int k = 0; k < _lists.Length; k++)
         {
-            if (cursors[k] >= _lists[k].Count) { continue; }
+            if (listOffsets[k] >= _lists[k].Count) { continue; }
 
-            if (best < 0 || _comparer(_lists[k][cursors[k]], _lists[best][cursors[best]]) < 0) { best = k; }
+            if (best < 0 || _comparer(_lists[k][listOffsets[k]], _lists[best][listOffsets[best]]) < 0) { best = k; }
         }
 
         return best;
     }
 
-    private int[] SeekTo(int index, out int position)
+    private int SeekTo(int index, Span<int> listOffsets)
     {
         if (index < Stride)
         {
-            position = 0;
+            listOffsets.Clear();
 
-            return new int[_lists.Length];
+            return 0;
         }
 
         var checkpoints = GetIndex();
         int checkpoint = index / Stride;
-        position = checkpoint * Stride;
+        checkpoints[checkpoint - 1].CopyTo(listOffsets);
 
-        return (int[])checkpoints[checkpoint - 1].Clone();
+        return checkpoint * Stride;
     }
 }

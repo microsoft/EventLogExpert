@@ -17,8 +17,6 @@ public sealed record LogTableState
 
     public ImmutableList<LogView> EventTables { get; init; } = [];
 
-    // One open log needs no cross-log merge: serve its SegmentedSortedList directly (allocation-free
-    // O(log segments) indexer) instead of a CombinedEventView (per-access cursor alloc + K-way stride walk).
     // The multi-log path stays memoized by PerLogEvents identity; each CombinedEventView maps to one SortContext.
     public IReadOnlyList<ResolvedEvent> DisplayedEvents =>
         PerLogEvents.IsEmpty
