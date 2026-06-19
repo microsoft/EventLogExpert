@@ -8,11 +8,11 @@ namespace EventLogExpert.UI.Focus;
 
 internal static class ElementFocus
 {
-    public static async ValueTask SafelyAsync(ElementReference target)
+    public static async ValueTask SafelyAsync(ElementReference target, bool preventScroll = false)
     {
         try
         {
-            await target.FocusAsync();
+            await target.FocusAsync(preventScroll);
         }
         catch (ObjectDisposedException) { }
         catch (JSDisconnectedException) { }
@@ -20,11 +20,11 @@ internal static class ElementFocus
         catch (TaskCanceledException) { }
     }
 
-    public static async ValueTask<bool> TrySafelyAsync(ElementReference target)
+    public static async ValueTask<bool> TrySafelyAsync(ElementReference target, bool preventScroll = false)
     {
         try
         {
-            await target.FocusAsync();
+            await target.FocusAsync(preventScroll);
 
             return true;
         }
