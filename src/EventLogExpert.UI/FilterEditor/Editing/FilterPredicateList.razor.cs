@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.UI.Focus;
+using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.FilterEditor.Editing;
@@ -12,7 +13,7 @@ public sealed partial class FilterPredicateList : ComponentBase
 {
     private readonly Dictionary<FilterId, FilterPredicateEditor?> _editorRefs = new();
 
-    private ElementReference _addButtonRef;
+    private Button? _addButton;
     private FilterId? _editingPredicateId;
     private bool _focusAddButtonAfterRender;
     private FilterId? _focusChipAfterRender;
@@ -55,7 +56,8 @@ public sealed partial class FilterPredicateList : ComponentBase
         else if (_focusAddButtonAfterRender)
         {
             _focusAddButtonAfterRender = false;
-            await ElementFocus.SafelyAsync(_addButtonRef);
+
+            if (_addButton is { } button) { await ElementFocus.SafelyAsync(button.Element); }
         }
 
         await base.OnAfterRenderAsync(firstRender);

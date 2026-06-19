@@ -17,10 +17,10 @@
     min-width: 0;
 }
 
-.add-filter-predicate-button {
+.filter-predicate-list ::deep .add-filter-predicate-button {
     color: var(--text-secondary);
 }
 
-.add-filter-predicate-button:hover {
+.filter-predicate-list ::deep .add-filter-predicate-button:hover {
     color: var(--clr-lightblue);
 }

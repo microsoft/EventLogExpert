@@ -17,22 +17,22 @@
    user sees the same control in the same position across saved + edit modes.
    Filled icon when excluded (works in forced-colors via SVG shape difference,
    not color). */
-.filter-exclude-toggle {
+.filter-row-header ::deep .filter-exclude-toggle {
     color: var(--text-secondary);
     transition: color 0.1s ease-in-out;
 }
 
-.filter-exclude-toggle[data-excluded="true"] {
+.filter-row-header ::deep .filter-exclude-toggle[data-excluded="true"] {
     color: var(--clr-red);
 }
 
-.filter-exclude-toggle:focus-visible {
+.filter-row-header ::deep .filter-exclude-toggle:focus-visible {
     outline: 2px solid var(--toggle-accent);
     outline-offset: 2px;
 }
 
 @media (forced-colors: active) {
-    .filter-exclude-toggle[data-excluded="true"] {
+    .filter-row-header ::deep .filter-exclude-toggle[data-excluded="true"] {
         color: Highlight;
     }
 }

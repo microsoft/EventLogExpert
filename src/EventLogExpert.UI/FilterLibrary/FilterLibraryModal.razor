@@ -18,7 +18,7 @@
         {
             <div class="filter-library-error" role="alert">
                 <p>Could not load saved filters or filter sets. See trace log for details.</p>
-                <button class="button" @onclick="RetryLoad" type="button">Retry</button>
+                <Button OnClick="RetryLoad">Retry</Button>
             </div>
         }
         else if (!FilterLibraryState.Value.IsLoaded)
@@ -46,15 +46,14 @@
                                 @onkeydown="HandleTagFilterBarKeyDown"
                                 role="group">
                                 <span class="library-tag-filter-bar-label">Tags:</span>
-                                <button aria-controls="@(_isTagManagementExpanded ? tagManagementPanelId : null)"
+                                <Button aria-controls="@(_isTagManagementExpanded ? tagManagementPanelId : null)"
                                     aria-expanded="@(_isTagManagementExpanded ? "true" : "false")"
                                     aria-label="@(_isTagManagementExpanded ? "Hide tag management" : "Manage tags")"
-                                    class="button icon-button library-tag-management-trigger"
-                                    @onclick="ToggleTagManagement"
-                                    title="Manage tags"
-                                    type="button">
-                                    <i aria-hidden="true" class="bi bi-gear"></i>
-                                </button>
+                                    CssClass="library-tag-management-trigger"
+                                    IconClass="bi bi-gear"
+                                    IconOnly
+                                    OnClick="ToggleTagManagement"
+                                    title="Manage tags" />
                                 @{
                                     var visibleTags = AllLibraryTags.Take(TagFilterBarMaxVisible).ToList();
                                     var hiddenTagsCount = AllLibraryTags.Count - visibleTags.Count;

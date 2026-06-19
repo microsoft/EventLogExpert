@@ -25,30 +25,28 @@
             </button>
         </div>
 
-        <button class="button" @onclick="AddExclusion" type="button">
+        <Button OnClick="AddExclusion">
             <i class="bi bi-plus-circle"></i> Add Exclusion
-        </button>
+        </Button>
 
         @if (!IsDateFilterVisible)
         {
-            <button class="button" @onclick="AddDateFilter" type="button">
+            <Button OnClick="AddDateFilter">
                 <i class="bi bi-plus-circle"></i> Add Date Filter
-            </button>
+            </Button>
         }
 
-        <button class="button" @onclick="OpenFilterSetPicker" type="button">
+        <Button OnClick="OpenFilterSetPicker">
             <i class="bi bi-plus-circle"></i> Apply Filter Set
-        </button>
+        </Button>
 
         @if (OpenLogCount.Value > 0)
         {
-            <button aria-controls="scenario-picker"
+            <Button aria-controls="scenario-picker"
                 aria-expanded="@(IsScenarioPickerVisible ? "true" : "false")"
-                class="button"
-                @onclick="OpenScenarioPicker"
-                type="button">
+                OnClick="OpenScenarioPicker">
                 <i class="bi bi-plus-circle"></i> Apply Scenario
-            </button>
+            </Button>
         }
     </div>
 
@@ -64,57 +62,52 @@
     }
 
     <div class="filter-header-secondary">
-        <button aria-describedby="@(HasSavableFilters ? null : "save-filters-empty-hint")"
+        <Button aria-describedby="@(HasSavableFilters ? null : "save-filters-empty-hint")"
             aria-label="Save as Filter Set"
-            class="button icon-button"
-            disabled="@(!HasSavableFilters)"
-            @onclick="SaveFiltersAsFilterSetAsync"
-            title="@(HasSavableFilters ? "Save as Filter Set..." : "No filters to save")"
-            type="button">
+            Disabled="@(!HasSavableFilters)"
+            IconOnly
+            OnClick="SaveFiltersAsFilterSetAsync"
+            title="@(HasSavableFilters ? "Save as Filter Set..." : "No filters to save")">
             <i class="bi bi-bookmark-plus"></i>
-        </button>
+        </Button>
 
-        <button aria-describedby="@(HasClearableFilters ? null : "clear-filters-empty-hint")"
+        <Button aria-describedby="@(HasClearableFilters ? null : "clear-filters-empty-hint")"
             aria-label="Clear All Filters"
-            class="button icon-button"
-            disabled="@(!HasClearableFilters)"
-            @onclick="ClearAllFiltersAsync"
-            title="@(HasClearableFilters ? "Clear All Filters..." : "No filters to clear")"
-            type="button">
+            Disabled="@(!HasClearableFilters)"
+            IconOnly
+            OnClick="ClearAllFiltersAsync"
+            title="@(HasClearableFilters ? "Clear All Filters..." : "No filters to clear")">
             <i class="bi bi-trash"></i>
-        </button>
+        </Button>
 
-        <button aria-label="Open Filter Library"
-            class="button icon-button"
-            @onclick="OpenFilterLibraryAsync"
-            title="Open Filter Library"
-            type="button">
+        <Button aria-label="Open Filter Library"
+            IconOnly
+            OnClick="OpenFilterLibraryAsync"
+            title="Open Filter Library">
             <i class="bi bi-bookmarks"></i>
-        </button>
+        </Button>
 
         @if (ScenarioAuthoringEnabled)
         {
             var hasEnabledFilters = HasEnabledFilters;
 
-            <button aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
+            <Button aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
                 aria-label="Copy scenario JSON"
-                class="button icon-button"
-                disabled="@(!hasEnabledFilters)"
-                @onclick="CopyScenarioJsonAsync"
-                title="Copy current filter rows as scenario-catalog JSON"
-                type="button">
+                Disabled="@(!hasEnabledFilters)"
+                IconOnly
+                OnClick="CopyScenarioJsonAsync"
+                title="Copy current filter rows as scenario-catalog JSON">
                 <i aria-hidden="true" class="bi bi-clipboard-data"></i>
-            </button>
+            </Button>
 
-            <button aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
+            <Button aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
                 aria-label="Save scenario JSON"
-                class="button icon-button"
-                disabled="@(!hasEnabledFilters)"
-                @onclick="SaveScenarioJsonAsync"
-                title="Save current filter rows as scenario-catalog JSON..."
-                type="button">
+                Disabled="@(!hasEnabledFilters)"
+                IconOnly
+                OnClick="SaveScenarioJsonAsync"
+                title="Save current filter rows as scenario-catalog JSON...">
                 <i aria-hidden="true" class="bi bi-filetype-json"></i>
-            </button>
+            </Button>
 
             <span class="visually-hidden" id="scenario-export-empty-hint">
                 Enable a filter before exporting as a scenario.
@@ -163,35 +156,35 @@
                     <DateRangeQuickPick AriaLabel="Quick date range" CssClass="input filter-datetime" OnRangeSelected="SetQuickDateRange" />
                 </span>
 
-                <button class="button button-green" @onclick="ApplyDateFilter" type="button">
+                <PrimaryButton OnClick="ApplyDateFilter">
                     <i class="bi bi-check-circle"></i> Apply
-                </button>
+                </PrimaryButton>
 
-                <button class="button button-red" @onclick="RemoveDateFilter" type="button">
+                <DangerButton OnClick="RemoveDateFilter">
                     <i class="bi bi-dash-circle"></i> Remove
-                </button>
+                </DangerButton>
             }
             else
             {
-                <button class="button" @onclick="EditDateFilter" type="button">
+                <Button OnClick="EditDateFilter">
                     <i class="bi bi-funnel"></i> Edit
-                </button>
+                </Button>
 
-                <button class="button button-red" @onclick="RemoveDateFilter" type="button">
+                <DangerButton OnClick="RemoveDateFilter">
                     <i class="bi bi-dash-circle"></i> Remove
-                </button>
+                </DangerButton>
 
                 @if (FilterPaneState.Value.FilteredDateRange?.IsEnabled is true)
                 {
-                    <button class="button button-red" @onclick="ToggleDateFilter" type="button">
+                    <DangerButton OnClick="ToggleDateFilter">
                         <i class="bi bi-dash-circle"></i> Disable
-                    </button>
+                    </DangerButton>
                 }
                 else
                 {
-                    <button class="button button-green" @onclick="ToggleDateFilter" type="button">
+                    <PrimaryButton OnClick="ToggleDateFilter">
                         <i class="bi bi-plus-circle"></i> Enable
-                    </button>
+                    </PrimaryButton>
                 }
             }
         </EditForm>
@@ -242,17 +235,15 @@
                     </ValueSelect>
                 </span>
 
-                <button class="button button-green" disabled="@(SelectedFilterSetId == default)" @onclick="ApplyFilterSetSelection" type="button">
+                <PrimaryButton Disabled="@(SelectedFilterSetId == default)" OnClick="ApplyFilterSetSelection">
                     <i class="bi bi-check-circle"></i> Apply
-                </button>
+                </PrimaryButton>
 
-                <button aria-label="Replace filters with selected filter set"
-                    class="button"
-                    disabled="@(SelectedFilterSetId == default)"
-                    @onclick="ReplaceFilterSetSelection"
-                    type="button">
+                <Button aria-label="Replace filters with selected filter set"
+                    Disabled="@(SelectedFilterSetId == default)"
+                    OnClick="ReplaceFilterSetSelection">
                     <i class="bi bi-arrow-repeat"></i> Replace
-                </button>
+                </Button>
             }
             else
             {
@@ -270,9 +261,9 @@
                 </span>
             }
 
-            <button class="button button-red" @onclick="CancelFilterSetPicker" type="button">
+            <DangerButton OnClick="CancelFilterSetPicker">
                 <i class="bi bi-dash-circle"></i> Cancel
-            </button>
+            </DangerButton>
         </div>
     }
 
@@ -318,26 +309,24 @@
                     </ValueSelect>
                 </span>
 
-                <button class="button button-green" disabled="@(ResolvedScenario is null)" @onclick="ApplyScenarioSelection" type="button">
+                <PrimaryButton Disabled="@(ResolvedScenario is null)" OnClick="ApplyScenarioSelection">
                     <i class="bi bi-check-circle"></i> Apply
-                </button>
+                </PrimaryButton>
 
-                <button aria-label="Replace filters with selected scenario"
-                    class="button"
-                    disabled="@(ResolvedScenario is null)"
-                    @onclick="ReplaceScenarioSelection"
-                    type="button">
+                <Button aria-label="Replace filters with selected scenario"
+                    Disabled="@(ResolvedScenario is null)"
+                    OnClick="ReplaceScenarioSelection">
                     <i class="bi bi-arrow-repeat"></i> Replace
-                </button>
+                </Button>
             }
             else
             {
                 <span class="filter-empty-state" role="status">No scenarios match the loaded logs.</span>
             }
 
-            <button class="button button-red" @onclick="CancelScenarioPicker" type="button">
+            <DangerButton OnClick="CancelScenarioPicker">
                 <i class="bi bi-dash-circle"></i> Cancel
-            </button>
+            </DangerButton>
         </div>
     }
 

@@ -60,12 +60,12 @@
     text-align: center;
 }
 
-.icon-button:disabled {
+.filter-header-secondary ::deep .icon-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.icon-button:disabled:hover { filter: none; }
+.filter-header-secondary ::deep .icon-button:disabled:hover { filter: none; }
 
 .filter-empty-state {
     color: var(--text-secondary);

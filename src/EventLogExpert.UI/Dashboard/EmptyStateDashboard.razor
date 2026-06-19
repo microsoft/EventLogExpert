@@ -15,7 +15,7 @@
                 <div class="empty-dashboard__chip" role="status">
                     <i aria-hidden="true" class="bi bi-funnel"></i>
                     <span class="empty-dashboard__chip-text">A filter is still applied and will affect your next open.</span>
-                    <button class="button" disabled="@_isBusy" @onclick="ClearFilter" type="button">Clear filter</button>
+                    <Button Disabled="@_isBusy" OnClick="ClearFilter">Clear filter</Button>
                 </div>
             }
             <button class="empty-dashboard__utility" disabled="@_isBusy" @onclick="OpenDatabaseToolsAsync" type="button">

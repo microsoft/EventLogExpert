@@ -61,7 +61,7 @@
                 value="@_pendingStringFilter" />
         </div>
         <div aria-busy="@(_hasLoaded ? "false" : "true")" aria-label="Debug log entries" class="debug-log-viewport" role="region" tabindex="0">
-            <Virtualize Context="line" ItemSize="@RowHeightPx" Items="_displayedView" OverscanCount="20">
+            <Virtualize Context="line" Items="_displayedView" ItemSize="@RowHeightPx" OverscanCount="20">
                 <ItemContent>
                     <div class="debug-log-row" title="@line">@line</div>
                 </ItemContent>
@@ -77,25 +77,21 @@
     <ExtraFooterContent>
         <div class="debug-log-footer">
             <div class="debug-log-footer-actions debug-log-footer-left">
-                <button class="button"
-                    disabled="@(!_hasLoaded || _filteredEntryCount == 0)"
-                    @onclick="HandleExportAsync"
-                    type="button">
+                <Button Disabled="@(!_hasLoaded || _filteredEntryCount == 0)"
+                    OnClick="HandleExportAsync">
                     Export
-                </button>
-                <button class="button"
-                    disabled="@(!_hasLoaded || _filteredEntryCount == 0)"
-                    @onclick="HandleCopyAsync"
-                    type="button">
+                </Button>
+                <Button Disabled="@(!_hasLoaded || _filteredEntryCount == 0)"
+                    OnClick="HandleCopyAsync">
                     Copy
-                </button>
+                </Button>
             </div>
             <span aria-atomic="true" aria-live="polite" class="debug-log-footer-counter" role="status">
                 @($"{_filteredEntryCount:N0} of {_entries.Count:N0} {(_entries.Count == 1 ? "entry" : "entries")}")
             </span>
             <div class="debug-log-footer-actions debug-log-footer-right">
-                <button class="button" @onclick="Refresh" type="button">Refresh</button>
-                <button class="button" @onclick="Clear" type="button">Clear</button>
+                <Button OnClick="Refresh">Refresh</Button>
+                <Button OnClick="Clear">Clear</Button>
             </div>
         </div>
     </ExtraFooterContent>

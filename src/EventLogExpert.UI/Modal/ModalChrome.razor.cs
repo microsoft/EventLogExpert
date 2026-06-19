@@ -19,8 +19,8 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     private readonly string _titleId = ComponentId.NewUnique("modal-title").Value;
 
     private ElementReference _dialogRef;
-    private ElementReference _inlineAlertAcceptButtonRef;
-    private ElementReference _inlineAlertCancelButtonRef;
+    private PrimaryButton? _inlineAlertAcceptButton;
+    private Button? _inlineAlertCancelButton;
     private InlineAlertRequest? _inlineAlertInitializedFor;
     private TextInput? _inlineAlertInput;
     private string _inlineAlertPromptValue = string.Empty;
@@ -228,12 +228,12 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
             if (!string.IsNullOrEmpty(InlineAlert.AcceptLabel))
             {
-                await _inlineAlertAcceptButtonRef.FocusAsync(true);
+                await (_inlineAlertAcceptButton?.FocusAsync(true) ?? ValueTask.CompletedTask);
 
                 return;
             }
 
-            await _inlineAlertCancelButtonRef.FocusAsync(true);
+            await (_inlineAlertCancelButton?.FocusAsync(true) ?? ValueTask.CompletedTask);
         }
         catch
         {

@@ -18,20 +18,18 @@
                                    @if (showCyclePagination)
                                    {
                                        <span class="banner-pagination">@(displayedIndex + 1) of @items.Count</span>
-                                       <button aria-label="Previous banner"
-                                           class="banner-cycle-prev button"
-                                           disabled="@(displayedIndex == 0)"
-                                           @onclick="CycleState.MovePrev"
-                                           type="button">
-                                           <i aria-hidden="true" class="bi bi-chevron-left"></i>
-                                       </button>
-                                       <button aria-label="Next banner"
-                                           class="banner-cycle-next button"
-                                           disabled="@(displayedIndex == items.Count - 1)"
-                                           @onclick="CycleState.MoveNext"
-                                           type="button">
-                                           <i aria-hidden="true" class="bi bi-chevron-right"></i>
-                                       </button>
+
+                                       <Button aria-label="Previous banner"
+                                           CssClass="banner-cycle-prev"
+                                           Disabled="@(displayedIndex == 0)"
+                                           IconClass="bi bi-chevron-left"
+                                           OnClick="CycleState.MovePrev" />
+
+                                       <Button aria-label="Next banner"
+                                           CssClass="banner-cycle-next"
+                                           Disabled="@(displayedIndex == items.Count - 1)"
+                                           IconClass="bi bi-chevron-right"
+                                           OnClick="CycleState.MoveNext" />
                                    }
                                </text>;
 
