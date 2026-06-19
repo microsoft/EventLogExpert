@@ -16,7 +16,10 @@ public sealed record LogView(EventLogId Id)
 
     public LogPathType LogPathType { get; init; }
 
-    public bool IsCombined { get; init; }
+    // null = standalone single-log tab; a group id (incl. the implicit AllLogs) = a merged tab.
+    public LogTabGroupId? GroupId { get; init; }
+
+    public bool IsCombined => GroupId is not null;
 
     public bool IsLoading { get; init; }
 }

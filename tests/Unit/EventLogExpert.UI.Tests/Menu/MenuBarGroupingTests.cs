@@ -54,7 +54,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     {
         _logTableState = new LogTableState
         {
-            EventTables = [new LogView(new EventLogId(Guid.NewGuid())) { LogName = "Application", IsCombined = false }],
+            EventTables = [new LogView(new EventLogId(Guid.NewGuid())) { LogName = "Application" }],
         };
 
         var items = await OpenMenu("File");
@@ -70,9 +70,9 @@ public sealed class MenuBarGroupingTests : BunitContext
         {
             EventTables =
             [
-                new LogView(new EventLogId(Guid.NewGuid())) { IsCombined = true },
-                new LogView(new EventLogId(Guid.NewGuid())) { LogName = "Application", IsCombined = false },
-                new LogView(new EventLogId(Guid.NewGuid())) { LogName = "System", IsCombined = false },
+                new LogView(new EventLogId(Guid.NewGuid())) { GroupId = LogTabGroupId.AllLogs },
+                new LogView(new EventLogId(Guid.NewGuid())) { LogName = "Application" },
+                new LogView(new EventLogId(Guid.NewGuid())) { LogName = "System" },
             ],
         };
 
@@ -98,7 +98,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     {
         _logTableState = new LogTableState
         {
-            EventTables = [new LogView(new EventLogId(Guid.NewGuid())) { IsCombined = true }],
+            EventTables = [new LogView(new EventLogId(Guid.NewGuid())) { GroupId = LogTabGroupId.AllLogs }],
         };
 
         var items = await OpenMenu("File");

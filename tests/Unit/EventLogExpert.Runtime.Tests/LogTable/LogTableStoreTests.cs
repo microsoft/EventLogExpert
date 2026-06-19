@@ -875,7 +875,7 @@ public sealed class LogTableStoreTests
     {
         var tableA = new LogView(EventLogId.Create()) { LogName = "A" };
         var tableB = new LogView(EventLogId.Create()) { LogName = "B" };
-        var combined = new LogView(EventLogId.Create()) { IsCombined = true };
+        var combined = new LogView(EventLogId.Create()) { GroupId = LogTabGroupId.AllLogs };
         var state = new LogTableState
         {
             EventTables = ImmutableList.Create(combined, tableA, tableB),
@@ -1753,7 +1753,7 @@ public sealed class LogTableStoreTests
         var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
         var log1 = new LogView(EventLogId.Create()) { LogName = "Log1" };
         var log2 = new LogView(EventLogId.Create()) { LogName = "Log2" };
-        var combined = new LogView(EventLogId.Create()) { IsCombined = true };
+        var combined = new LogView(EventLogId.Create()) { GroupId = LogTabGroupId.AllLogs };
 
         var existing = new List<ResolvedEvent>
         {

@@ -37,7 +37,7 @@ internal sealed class Reducers
                 state.ActiveEventLogId);
         }
 
-        var combinedTable = state.EventTables.FirstOrDefault(table => table.IsCombined);
+        var combinedTable = state.EventTables.FirstOrDefault(table => table.GroupId?.IsAll == true);
 
         if (combinedTable is not null)
         {
@@ -48,7 +48,7 @@ internal sealed class Reducers
             };
         }
 
-        combinedTable = new LogView(EventLogId.Create()) { IsCombined = true };
+        combinedTable = new LogView(EventLogId.Create()) { GroupId = LogTabGroupId.AllLogs };
 
         return ResetGroupCollapseIfActiveChanged(
             state with
@@ -222,7 +222,7 @@ internal sealed class Reducers
                 }
             default:
                 {
-                    var combinedTable = new LogView(EventLogId.Create()) { IsCombined = true };
+                    var combinedTable = new LogView(EventLogId.Create()) { GroupId = LogTabGroupId.AllLogs };
 
                     return ResetGroupCollapseIfActiveChanged(
                         state with
