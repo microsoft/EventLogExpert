@@ -120,6 +120,17 @@ public sealed class ButtonTests : BunitContext
     }
 
     [Fact]
+    public void Render_IconAndChildContent_SeparatedBySpace()
+    {
+        var component = Render<PrimaryButton>(parameters => parameters
+            .Add(p => p.IconClass, "bi bi-check-circle")
+            .AddChildContent("Apply"));
+
+        var button = component.Find("button");
+        Assert.Contains("</i> Apply", button.InnerHtml);
+    }
+
+    [Fact]
     public void Render_IconClass_RendersIconWithAriaHidden()
     {
         var component = Render<Button>(parameters => parameters
@@ -138,6 +149,17 @@ public sealed class ButtonTests : BunitContext
 
         var button = component.Find("button");
         Assert.Contains("icon-button", button.ClassList);
+    }
+
+    [Fact]
+    public void Render_IconOnly_NoTrailingSpaceAfterIcon()
+    {
+        var component = Render<Button>(parameters => parameters
+            .Add(p => p.IconClass, "bi bi-x")
+            .Add(p => p.IconOnly, true));
+
+        var button = component.Find("button");
+        Assert.DoesNotContain("</i> ", button.InnerHtml);
     }
 
     [Fact]

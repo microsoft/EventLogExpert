@@ -54,9 +54,14 @@ public abstract class ButtonBase : ComponentBase
             builder.AddAttribute(8, "aria-hidden", "true");
             builder.AddAttribute(9, "class", IconClass);
             builder.CloseElement();
+
+            if (ChildContent is not null)
+            {
+                builder.AddContent(10, " ");
+            }
         }
 
-        builder.AddContent(10, ChildContent);
+        builder.AddContent(11, ChildContent);
         builder.CloseElement();
     }
 
