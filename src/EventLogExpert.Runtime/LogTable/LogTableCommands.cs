@@ -12,6 +12,15 @@ internal sealed class LogTableCommands(IDispatcher dispatcher) : ILogTableComman
 
     public void LoadColumns() => _dispatcher.Dispatch(new LoadColumnsAction());
 
+    public void MoveTabToGroup(EventLogId tabId, LogTabGroupId targetGroupId) =>
+        _dispatcher.Dispatch(new MoveTabToGroupAction(tabId, targetGroupId));
+
+    public void NewGroupFromTab(EventLogId tabId, string groupName) =>
+        _dispatcher.Dispatch(new NewGroupFromTabAction(tabId, groupName));
+
+    public void RemoveTabFromGroup(EventLogId tabId) =>
+        _dispatcher.Dispatch(new RemoveTabFromGroupAction(tabId));
+
     public void ReorderColumn(ColumnName column, ColumnName target, bool insertAfter) =>
         _dispatcher.Dispatch(new ReorderColumnAction(column, target, insertAfter));
 

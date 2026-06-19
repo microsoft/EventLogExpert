@@ -171,6 +171,7 @@ internal sealed class Reducers
         ResetGroupCollapse(state with
         {
             EventTables = [],
+            Groups = [],
             PerLogEvents = ImmutableDictionary<EventLogId, SegmentedSortedList>.Empty,
             PerLogListVersion = ImmutableDictionary<EventLogId, int>.Empty,
             EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty,
@@ -184,59 +185,44 @@ internal sealed class Reducers
 
         if (closingTable is null || closingTable.IsCombined) { return state; }
 
-        var remainingPerLogTables = state.EventTables
-            .Where(table => table.Id != action.LogId && !table.IsCombined)
-            .ToImmutableList();
+        var (groups, healedTables) = RemoveLogFromGroups(state.Groups, state.EventTables, action.LogId);
+        var remainingTables = healedTables.RemoveAll(table => table.Id == action.LogId);
 
         var counts = state.EventCountByLog.Remove(action.LogId);
         var perLog = ReconcileToLogCount(state.PerLogEvents.Remove(action.LogId), state);
         var perLogVersion = state.PerLogListVersion.Remove(action.LogId);
 
-        switch (remainingPerLogTables.Count)
+        int perLogTabsRemaining = remainingTables.Count(table => !table.IsCombined);
+
+        if (perLogTabsRemaining == 0)
         {
-            case <= 0:
-                return ResetGroupCollapseIfActiveChanged(
-                    state with
-                    {
-                        EventTables = [],
-                        PerLogEvents = ImmutableDictionary<EventLogId, SegmentedSortedList>.Empty,
-                        PerLogListVersion = ImmutableDictionary<EventLogId, int>.Empty,
-                        EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty,
-                        ActiveEventLogId = null
-                    },
-                    state.ActiveEventLogId);
-            case 1:
+            return ResetGroupCollapseIfActiveChanged(
+                state with
                 {
-                    var soleRemaining = remainingPerLogTables[0];
-
-                    return ResetGroupCollapseIfActiveChanged(
-                        state with
-                        {
-                            EventTables = remainingPerLogTables,
-                            PerLogEvents = perLog,
-                            PerLogListVersion = perLogVersion,
-                            EventCountByLog = counts,
-                            ActiveEventLogId = soleRemaining.Id
-                        },
-                        state.ActiveEventLogId);
-                }
-            default:
-                {
-                    var combinedTable = new LogView(EventLogId.Create()) { GroupId = LogTabGroupId.AllLogs };
-
-                    return ResetGroupCollapseIfActiveChanged(
-                        state with
-                        {
-                            EventTables = remainingPerLogTables.Insert(0, combinedTable),
-                            PerLogEvents = perLog,
-                            PerLogListVersion = perLogVersion,
-                            EventCountByLog = counts,
-                            ActiveEventLogId = remainingPerLogTables.Any(t => t.Id == state.ActiveEventLogId) ?
-                                state.ActiveEventLogId : combinedTable.Id
-                        },
-                        state.ActiveEventLogId);
-                }
+                    EventTables = [],
+                    Groups = [],
+                    PerLogEvents = ImmutableDictionary<EventLogId, SegmentedSortedList>.Empty,
+                    PerLogListVersion = ImmutableDictionary<EventLogId, int>.Empty,
+                    EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty,
+                    ActiveEventLogId = null
+                },
+                state.ActiveEventLogId);
         }
+
+        var finalTables = perLogTabsRemaining == 1
+            ? remainingTables.RemoveAll(table => table.GroupId?.IsAll == true)
+            : remainingTables;
+
+        var updated = state with
+        {
+            EventTables = finalTables,
+            Groups = groups,
+            PerLogEvents = perLog,
+            PerLogListVersion = perLogVersion,
+            EventCountByLog = counts
+        };
+
+        return ResetGroupCollapseIfActiveChanged(RepairActiveTab(updated, null), state.ActiveEventLogId);
     }
 
     [ReducerMethod]
@@ -347,6 +333,67 @@ internal sealed class Reducers
 
         bool IsHidden(ColumnName column) =>
             !action.LoadedColumns.TryGetValue(column, out bool isVisible) || !isVisible;
+    }
+
+    [ReducerMethod]
+    public static LogTableState ReduceMoveTabToGroup(LogTableState state, MoveTabToGroupAction action)
+    {
+        var tab = state.EventTables.FirstOrDefault(table => table.Id == action.TabId);
+
+        if (tab is null || tab.IsCombined) { return state; }
+
+        if (action.TargetGroupId.IsAll)
+        {
+            if (!state.Groups.Any(group => group.MemberIds.Contains(action.TabId))) { return state; }
+
+            var (ungroupedGroups, ungroupedTables) =
+                RemoveLogFromGroups(state.Groups, state.EventTables, action.TabId);
+            var ungrouped = state with { Groups = ungroupedGroups, EventTables = ungroupedTables };
+
+            return ResetGroupCollapseIfActiveChanged(RepairActiveTab(ungrouped, null), state.ActiveEventLogId);
+        }
+
+        var target = state.Groups.FirstOrDefault(group => group.Id == action.TargetGroupId);
+
+        if (target is null || target.MemberIds.Contains(action.TabId)) { return state; }
+
+        var (groups, tables) = RemoveLogFromGroups(state.Groups, state.EventTables, action.TabId);
+        var updatedGroups = groups.Replace(target, target with { MemberIds = target.MemberIds.Add(action.TabId) });
+        var headerId = tables.FirstOrDefault(table => table.GroupId == action.TargetGroupId)?.Id;
+        var updated = state with { Groups = updatedGroups, EventTables = tables };
+
+        return ResetGroupCollapseIfActiveChanged(RepairActiveTab(updated, headerId), state.ActiveEventLogId);
+    }
+
+    [ReducerMethod]
+    public static LogTableState ReduceNewGroupFromTab(LogTableState state, NewGroupFromTabAction action)
+    {
+        var tab = state.EventTables.FirstOrDefault(table => table.Id == action.TabId);
+
+        if (tab is null || tab.IsCombined) { return state; }
+
+        var (prunedGroups, prunedTables) = RemoveLogFromGroups(state.Groups, state.EventTables, action.TabId);
+
+        var groupId = LogTabGroupId.Create();
+        var group = new LogTabGroup(groupId, action.GroupName, ImmutableHashSet.Create(action.TabId));
+        var header = new LogView(EventLogId.Create()) { GroupId = groupId, LogName = action.GroupName };
+
+        int childIndex = prunedTables.FindIndex(table => table.Id == action.TabId);
+        var tables = prunedTables.Insert(childIndex, header);
+        var updated = state with { Groups = prunedGroups.Add(group), EventTables = tables };
+
+        return ResetGroupCollapseIfActiveChanged(RepairActiveTab(updated, header.Id), state.ActiveEventLogId);
+    }
+
+    [ReducerMethod]
+    public static LogTableState ReduceRemoveTabFromGroup(LogTableState state, RemoveTabFromGroupAction action)
+    {
+        if (!state.Groups.Any(group => group.MemberIds.Contains(action.TabId))) { return state; }
+
+        var (groups, tables) = RemoveLogFromGroups(state.Groups, state.EventTables, action.TabId);
+        var updated = state with { Groups = groups, EventTables = tables };
+
+        return ResetGroupCollapseIfActiveChanged(RepairActiveTab(updated, null), state.ActiveEventLogId);
     }
 
     [ReducerMethod]
@@ -564,6 +611,57 @@ internal sealed class Reducers
                 state.GroupBy,
                 state.IsGroupDescending,
                 perLog.Count));
+
+    private static (ImmutableList<LogTabGroup> Groups, ImmutableList<LogView> Tables) RemoveLogFromGroups(
+        ImmutableList<LogTabGroup> groups, ImmutableList<LogView> tables, EventLogId logId)
+    {
+        List<LogTabGroupId>? emptiedGroupIds = null;
+        var updatedGroups = groups;
+
+        foreach (var group in groups)
+        {
+            if (!group.MemberIds.Contains(logId)) { continue; }
+
+            var remaining = group.MemberIds.Remove(logId);
+
+            if (remaining.IsEmpty)
+            {
+                updatedGroups = updatedGroups.Remove(group);
+                (emptiedGroupIds ??= []).Add(group.Id);
+            }
+            else
+            {
+                updatedGroups = updatedGroups.Replace(group, group with { MemberIds = remaining });
+            }
+        }
+
+        if (ReferenceEquals(updatedGroups, groups)) { return (groups, tables); }
+
+        if (emptiedGroupIds is null) { return (updatedGroups, tables); }
+
+        var prunedTables = tables.RemoveAll(
+            table => table.GroupId is { IsAll: false } groupId && emptiedGroupIds.Contains(groupId));
+
+        return (updatedGroups, prunedTables);
+    }
+
+    private static LogTableState RepairActiveTab(LogTableState state, EventLogId? preferred)
+    {
+        if (state.ActiveEventLogId is null ||
+            state.EventTables.Any(table => table.Id == state.ActiveEventLogId))
+        {
+            return state;
+        }
+
+        EventLogId? fallback =
+            preferred is not null && state.EventTables.Any(table => table.Id == preferred)
+                ? preferred
+                : state.EventTables.FirstOrDefault(table => table.GroupId?.IsAll == true)?.Id
+                    ?? state.EventTables.FirstOrDefault(table => !table.IsCombined)?.Id
+                    ?? state.EventTables.FirstOrDefault()?.Id;
+
+        return state with { ActiveEventLogId = fallback };
+    }
 
     private static LogTableState ResetGroupCollapse(LogTableState state) =>
         state is { GroupsCollapsedByDefault: false, GroupCollapseOverrides.IsEmpty: true }

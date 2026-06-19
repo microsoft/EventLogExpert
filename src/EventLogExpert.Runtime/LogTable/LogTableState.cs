@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using Fluxor;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 
@@ -17,13 +18,14 @@ public sealed record LogTableState
 
     public ImmutableList<LogView> EventTables { get; init; } = [];
 
-    // The multi-log path stays memoized by PerLogEvents identity; each CombinedEventView maps to one SortContext.
+    public ImmutableList<LogTabGroup> Groups { get; init; } = [];
+
     public IReadOnlyList<ResolvedEvent> DisplayedEvents =>
         PerLogEvents.IsEmpty
             ? CombinedEventView.Empty
             : PerLogEvents.Count == 1
                 ? SingleLogDisplayList()
-                : s_combinedViews.GetValue(PerLogEvents, CreateCombinedView);
+                : AllLogsView();
 
     public ImmutableDictionary<EventLogId, int> EventCountByLog { get; init; } =
         ImmutableDictionary<EventLogId, int>.Empty;
@@ -75,12 +77,70 @@ public sealed record LogTableState
     internal ImmutableDictionary<EventLogId, int> PerLogListVersion { get; init; } =
         ImmutableDictionary<EventLogId, int>.Empty;
 
-    private static readonly ConditionalWeakTable<
-        ImmutableDictionary<EventLogId, SegmentedSortedList>, CombinedEventView> s_combinedViews = [];
+    private static readonly object s_allLogsKey = new();
 
-    private static CombinedEventView CreateCombinedView(
-        ImmutableDictionary<EventLogId, SegmentedSortedList> perLog) =>
-        new(perLog.Values, perLog.Values.First().Context);
+    private static readonly ConditionalWeakTable<
+        ImmutableDictionary<EventLogId, SegmentedSortedList>,
+        ConcurrentDictionary<object, CombinedEventView>> s_viewsByGeneration = [];
+
+    public IReadOnlyList<ResolvedEvent> DisplayedEventsForTab(LogView tab)
+    {
+        if (tab.GroupId is null) { return EventsForLog(tab.Id); }
+
+        if (tab.GroupId.Value.IsAll) { return DisplayedEvents; }
+
+        var group = Groups.FirstOrDefault(candidate => candidate.Id == tab.GroupId.Value);
+
+        return group is null ? CombinedEventView.Empty : GroupView(group);
+    }
+
+    private IReadOnlyList<ResolvedEvent> AllLogsView() =>
+        InnerCache().GetOrAdd(
+            s_allLogsKey,
+            static (_, perLog) => new CombinedEventView(perLog.Values, perLog.Values.First().Context),
+            PerLogEvents);
+
+    private IReadOnlyList<ResolvedEvent> GroupView(LogTabGroup group)
+    {
+        SegmentedSortedList? firstPresent = null;
+        int presentCount = 0;
+
+        foreach (var memberId in group.MemberIds)
+        {
+            if (PerLogEvents.TryGetValue(memberId, out var list))
+            {
+                firstPresent ??= list;
+                presentCount++;
+            }
+        }
+
+        if (presentCount == 0) { return CombinedEventView.Empty; }
+
+        if (presentCount == 1) { return firstPresent!; }
+
+        return InnerCache().GetOrAdd(
+            group.MemberIds,
+            static (_, args) => BuildGroupView(args.PerLogEvents, args.MemberIds),
+            (PerLogEvents, group.MemberIds));
+    }
+
+    private static CombinedEventView BuildGroupView(
+        ImmutableDictionary<EventLogId, SegmentedSortedList> perLog,
+        ImmutableHashSet<EventLogId> memberIds)
+    {
+        var lists = new List<SegmentedSortedList>(memberIds.Count);
+
+        foreach (var memberId in memberIds)
+        {
+            if (perLog.TryGetValue(memberId, out var list)) { lists.Add(list); }
+        }
+
+        return new CombinedEventView(lists, lists[0].Context);
+    }
+
+    private ConcurrentDictionary<object, CombinedEventView> InnerCache() =>
+        s_viewsByGeneration.GetValue(
+            PerLogEvents, static _ => new ConcurrentDictionary<object, CombinedEventView>());
 
     // Caller guarantees PerLogEvents.Count == 1. Return that sole list via the struct enumerator instead of
     // LINQ .Values.First(), which boxes an enumerator on this render-path property read.

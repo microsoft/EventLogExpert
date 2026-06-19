@@ -27,8 +27,9 @@ public sealed partial class StatusBar
     private IStateSelection<LogTableState, (
         EventLogId? ActiveEventLogId,
         ImmutableList<LogView> EventTables,
-        IReadOnlyList<ResolvedEvent> DisplayedEvents,
-        ImmutableDictionary<EventLogId, int> EventCountByLog)> LogTableSelection
+        IReadOnlyList<ResolvedEvent> ActiveFilteredView,
+        ImmutableDictionary<EventLogId, int> EventCountByLog,
+        ImmutableList<LogTabGroup> Groups)> LogTableSelection
     { get; init; } = null!;
 
     [Inject]
@@ -49,9 +50,35 @@ public sealed partial class StatusBar
             (s.AppliedFilter, s.ContinuouslyUpdate, s.NewEventBuffer, s.NewEventBufferIsFull));
         RawCountSelection.Select(static s => (s.Total, s.ByLog));
         LogTableSelection.Select(static s =>
-            (s.ActiveEventLogId, s.EventTables, s.DisplayedEvents, s.EventCountByLog));
+        {
+            var activeTable = s.EventTables.FirstOrDefault(table => table.Id == s.ActiveEventLogId);
+
+            return (
+                s.ActiveEventLogId,
+                s.EventTables,
+                activeTable is null ? (IReadOnlyList<ResolvedEvent>)[] : s.DisplayedEventsForTab(activeTable),
+                s.EventCountByLog,
+                s.Groups);
+        });
         StatusBarSelection.Select(static s => (s.EventsLoading, s.ResolverStatus));
 
         base.OnInitialized();
+    }
+
+    private static int TotalRawCount(
+        LogView activeTable,
+        ImmutableList<LogTabGroup> groups,
+        (int Total, ImmutableDictionary<EventLogId, int> ByLog) rawCount)
+    {
+        if (activeTable.GroupId?.IsAll == true) { return rawCount.Total; }
+
+        if (activeTable.GroupId is { } groupId)
+        {
+            var group = groups.FirstOrDefault(candidate => candidate.Id == groupId);
+
+            return group is null ? 0 : group.MemberIds.Sum(id => rawCount.ByLog.GetValueOrDefault(id, 0));
+        }
+
+        return rawCount.ByLog.GetValueOrDefault(activeTable.Id, 0);
     }
 }

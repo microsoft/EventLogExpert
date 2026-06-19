@@ -1003,14 +1003,8 @@ public sealed partial class LogTablePane
         }
     }
 
-    private IReadOnlyList<ResolvedEvent> ResolveActiveDisplayedEvents()
-    {
-        if (_currentTable is null) { return []; }
-
-        return _currentTable.IsCombined
-            ? _logTableState.DisplayedEvents
-            : _logTableState.EventsForLog(_currentTable.Id);
-    }
+    private IReadOnlyList<ResolvedEvent> ResolveActiveDisplayedEvents() =>
+        _currentTable is null ? [] : _logTableState.DisplayedEventsForTab(_currentTable);
 
     private int ResolveCursorVisibleRow()
     {

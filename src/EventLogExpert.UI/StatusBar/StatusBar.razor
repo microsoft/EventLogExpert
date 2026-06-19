@@ -27,12 +27,10 @@
 
         if (activeTable is null) { return; }
 
-        var totalEvents = activeTable.IsCombined ?
-            rawCount.Total :
-            rawCount.ByLog.GetValueOrDefault(activeTable.Id, 0);
+        var totalEvents = TotalRawCount(activeTable, logTable.Groups, rawCount);
 
         var filteredEvents = activeTable.IsCombined ?
-            logTable.DisplayedEvents.Count :
+            logTable.ActiveFilteredView.Count :
             logTable.EventCountByLog.GetValueOrDefault(activeTable.Id, 0);
 
         <span>Visible: @(filteredEvents) Hidden by filter: @(totalEvents - filteredEvents)</span>

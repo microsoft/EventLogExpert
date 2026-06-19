@@ -10,6 +10,18 @@ public interface ILogTableCommands
     /// <summary>Loads persisted column visibility, widths, and order into the LogTable store.</summary>
     void LoadColumns();
 
+    /// <summary>
+    ///     Moves the tab for <paramref name="tabId" /> into <paramref name="targetGroupId" /> (or out of any group when
+    ///     it is the all-logs group).
+    /// </summary>
+    void MoveTabToGroup(EventLogId tabId, LogTabGroupId targetGroupId);
+
+    /// <summary>Creates a new tab group named <paramref name="groupName" /> seeded with the tab for <paramref name="tabId" />.</summary>
+    void NewGroupFromTab(EventLogId tabId, string groupName);
+
+    /// <summary>Removes the tab for <paramref name="tabId" /> from its group, deleting the group when it empties.</summary>
+    void RemoveTabFromGroup(EventLogId tabId);
+
     /// <summary>Moves <paramref name="column" /> immediately before or after <paramref name="target" />.</summary>
     void ReorderColumn(ColumnName column, ColumnName target, bool insertAfter);
 
