@@ -59,7 +59,7 @@
                                 tabindex="@(member.IsLoading ? -1 : 0)">
                                 @if (member.IsLoading)
                                 {
-                                    <i aria-label="Loading" class="spinner-border" role="status"></i>
+                                    <i aria-label="Loading" class="spinner-border loader-spin" role="status"></i>
                                     @:&nbsp;
                                 }
                                 @GetTabName(member)
@@ -88,7 +88,7 @@
                         tabindex="@(standalone.Tab.IsLoading ? -1 : 0)">
                         @if (standalone.Tab.IsLoading)
                         {
-                            <i aria-label="Loading" class="spinner-border" role="status"></i>
+                            <i aria-label="Loading" class="spinner-border loader-spin" role="status"></i>
                             @:&nbsp;
                         }
                         @GetTabName(standalone.Tab)

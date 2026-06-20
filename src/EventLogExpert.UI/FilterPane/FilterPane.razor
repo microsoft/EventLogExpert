@@ -52,7 +52,7 @@
     @if (FilterProgressState.Value.IsLoading)
     {
         <span class="filter-header-status">
-            [<i aria-label="Loading" class="spinner-border" role="status"></i> Applying Filters]
+            [<i aria-label="Loading" class="spinner-border loader-spin" role="status"></i> Applying Filters]
         </span>
     }
     else if (HasFilters && GetActiveFilters() > 0)
