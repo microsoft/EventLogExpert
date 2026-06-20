@@ -295,6 +295,19 @@ internal static partial class NativeMethods
         [MarshalAs(UnmanagedType.LPWStr)] string? query,
         LogPathType flags);
 
+    /// <summary>
+    ///     <c>EvtQuery</c> overload that takes the raw combined query-flags <see langword="int" /> (the path-type bits
+    ///     ORed with direction flags such as <c>EvtQueryReverseDirection</c> 0x200), so a caller can opt into newest-first
+    ///     reads. The typed <see cref="EvtQuery" /> binding remains the path for the default oldest-first reads and its other
+    ///     callers (the watcher and the XML resolver).
+    /// </summary>
+    [LibraryImport(EventLogApi, EntryPoint = "EvtQuery", SetLastError = true)]
+    internal static partial EvtHandle EvtQueryWithFlags(
+        EvtHandle session,
+        [MarshalAs(UnmanagedType.LPWStr)] string path,
+        [MarshalAs(UnmanagedType.LPWStr)] string? query,
+        int flags);
+
     /// <summary>Renders an XML fragment base on the render context that you specify</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

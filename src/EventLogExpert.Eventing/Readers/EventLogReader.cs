@@ -8,13 +8,19 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
 
-public sealed class EventLogReader(string path, LogPathType pathType, bool renderXml = false) : IDisposable
+public sealed class EventLogReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false) : IDisposable
 {
+    private const int EvtQueryReverseDirection = 0x200;
+
     private readonly Lock _eventLock = new();
-    private readonly EvtHandle _handle =
-        NativeMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, pathType);
+    private readonly EvtHandle _handle = reverseDirection
+        ? NativeMethods.EvtQueryWithFlags(EventLogSession.GlobalSession.Handle, path, null,
+            (int)pathType | EvtQueryReverseDirection)
+        : NativeMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, pathType);
 
     private int _disposed;
+    private bool _newestCaptured;
+    private string? _newestReverseBookmark;
 
     /// <summary>
     ///     <see langword="true" /> when the underlying <c>EvtQuery</c> handle was opened successfully. When
@@ -31,6 +37,16 @@ public sealed class EventLogReader(string path, LogPathType pathType, bool rende
     ///     either no error occurred or the last failure was a normal end-of-results condition.
     /// </summary>
     public int? LastErrorCode { get; private set; }
+
+    /// <summary>
+    ///     The bookmark of the NEWEST event this reader has returned, irrespective of read direction. It is the correct
+    ///     resume point for a live-tail watcher, because the genuinely new events are the ones created after the newest one
+    ///     already loaded. For a forward (oldest-first) read this is the most recently returned event and aliases
+    ///     <see cref="LastBookmark" />; for a reverse (newest-first) read it is the FIRST event returned and is captured once.
+    ///     Unlike <see cref="LastBookmark" />, which is always the last event ENUMERATED (and therefore the OLDEST event under
+    ///     a reverse read), this never points at the wrong end of the log.
+    /// </summary>
+    public string? NewestBookmark => reverseDirection ? _newestReverseBookmark : LastBookmark;
 
     public void Dispose()
     {
@@ -75,6 +91,12 @@ public sealed class EventLogReader(string path, LogPathType pathType, bool rende
             using (_eventLock.EnterScope())
             {
                 LastBookmark = CreateBookmark(new EvtHandle(buffer[count - 1], false));
+
+                if (reverseDirection && !_newestCaptured)
+                {
+                    _newestReverseBookmark = CreateBookmark(new EvtHandle(buffer[0], false));
+                    _newestCaptured = true;
+                }
             }
 
             events = new EventRecord[count];
