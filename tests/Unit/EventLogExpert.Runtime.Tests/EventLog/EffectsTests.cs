@@ -1888,6 +1888,164 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleOpenLog_ReverseEagerLoad_DispatchesExactlyOneEagerPartialBeforeFinal()
+    {
+        const int total = 250;
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(total, batchSize: 30), newestBookmark: "NEWEST"));
+
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory);
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        // The in-memory load finishes well under the 3-second partial timer, so the eager dispatch is the only
+        // partial - asserting the eager path fires exactly once.
+        var partials = AllPartialActions(dispatcher);
+        Assert.Single(partials);
+        Assert.NotEmpty(partials[0].Events);
+    }
+
+    [Fact]
+    public async Task HandleOpenLog_ReverseEagerLoad_EmptyLog_SeedsWatcherWithNullBookmark()
+    {
+        var fakeFactory = new FakeEventLogReaderFactory(new FakeEventLogReader([], newestBookmark: null));
+
+        var (openLog, dispatcher, watcher) = CreateEagerLoadEffects(fakeFactory);
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        watcher.Received(1).AddLog(Constants.LogNameApplication, null, Arg.Any<bool>());
+        Assert.Empty(SingleFinalEvents(dispatcher));
+    }
+
+    [Fact]
+    public async Task HandleOpenLog_ReverseEagerLoad_FinalListContainsEveryEventOnceSortedDescending()
+    {
+        // 250 > the eager first-paint threshold (200), so the eager dispatch fires.
+        const int total = 250;
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(total, batchSize: 30), newestBookmark: "NEWEST"));
+
+        // Delay the newest batch so older batches resolve and AddRange first, forcing the completion-order scramble
+        // that the final sort must correct.
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(
+            fakeFactory,
+            resolveDelayMs: recordId => recordId > total - 30 ? 15 : 0);
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        var finalIds = SingleFinalEvents(dispatcher).Select(resolved => resolved.RecordId).ToList();
+        Assert.Equal(total, finalIds.Count);
+        Assert.Equal(total, finalIds.Distinct().Count());
+        Assert.Equal(
+            Enumerable.Range(1, total).Select(id => (long?)id).OrderByDescending(id => id).ToList(),
+            finalIds);
+    }
+
+    [Fact]
+    public async Task HandleOpenLog_ReverseEagerLoad_PartialDeltasAreDisjointAndSubsetOfFinal()
+    {
+        const int total = 250;
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(total, batchSize: 30), newestBookmark: "NEWEST"));
+
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory);
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        var partialIds = AllPartialEvents(dispatcher).Select(resolved => resolved.RecordId).ToList();
+        Assert.NotEmpty(partialIds);
+        Assert.Equal(partialIds.Count, partialIds.Distinct().Count());
+
+        var finalIds = SingleFinalEvents(dispatcher).Select(resolved => resolved.RecordId).ToHashSet();
+        Assert.All(partialIds, id => Assert.Contains(id, finalIds));
+    }
+
+    [Fact]
+    public async Task HandleOpenLog_ReverseEagerLoad_PartialDeltasAreSortedNewestFirstDespiteCompletionOrder()
+    {
+        const int total = 250; // > eager threshold (200) so a partial dispatches mid-load
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(total, batchSize: 30), newestBookmark: "NEWEST"));
+
+        // Delay a second-newest batch so it resolves after older batches, scrambling completion order WITHIN the
+        // eager partial. Without the partial sort the dispatched delta would be out of newest-first order, breaking
+        // the raw-store index-0-is-newest invariant during load.
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(
+            fakeFactory,
+            resolveDelayMs: recordId => recordId is >= 191 and <= 220 ? 30 : 0);
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        var partials = dispatcher.ReceivedCalls()
+            .Select(call => call.GetArguments()[0])
+            .OfType<LoadEventsPartialAction>()
+            .ToList();
+
+        Assert.NotEmpty(partials);
+
+        foreach (var partial in partials)
+        {
+            var ids = partial.Events.Select(resolved => resolved.RecordId).ToList();
+            Assert.Equal(ids.OrderByDescending(id => id).ToList(), ids);
+        }
+    }
+
+    [Fact]
+    public async Task HandleOpenLog_ReverseEagerLoad_SeedsWatcherFromNewestBookmark()
+    {
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(50, batchSize: 30), newestBookmark: "NEWEST_BOOKMARK"));
+
+        var (openLog, dispatcher, watcher) = CreateEagerLoadEffects(fakeFactory);
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        // Under a reverse read the watcher must resume from the newest event; the reader exposes only NewestBookmark.
+        watcher.Received(1).AddLog(Constants.LogNameApplication, "NEWEST_BOOKMARK", Arg.Any<bool>());
+
+        // Lock the activation contract: the load path requested a reverse (newest-first) read.
+        Assert.True(fakeFactory.ReverseDirectionRequested);
+    }
+
+    [Fact]
+    public async Task HandleOpenLog_ReverseEagerLoad_WhenReaderInvalid_SurfacesLoadFailureNotEmptyLog()
+    {
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader([], newestBookmark: null) { IsValid = false, OpenErrorCode = 5 });
+
+        var (openLog, dispatcher, watcher) = CreateEagerLoadEffects(fakeFactory);
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        // A log that fails to open surfaces an error instead of a misleading empty final load, and never seeds the watcher.
+        dispatcher.Received().Dispatch(Arg.Is<SetResolverStatusAction>(a =>
+            a.ResolverStatus.Contains("Error") && a.ResolverStatus.Contains(Constants.LogNameApplication)));
+        Assert.Empty(dispatcher.ReceivedCalls().Select(call => call.GetArguments()[0]).OfType<LoadEventsAction>());
+        watcher.DidNotReceive().AddLog(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task HandleOpenLog_ReverseEagerLoad_WhenReadStopsOnError_SurfacesLoadFailureNotFinalLoad()
+    {
+        const int total = 60;
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(total, batchSize: 30), newestBookmark: "NEWEST")
+            {
+                LastErrorCode = 5 // a non-null error once the batches run out: a failed read, not a clean end-of-results
+            });
+
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory);
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        // A read that stops on a Win32 error is surfaced as a failure, not dispatched as a successful final load.
+        dispatcher.Received().Dispatch(Arg.Is<SetResolverStatusAction>(a =>
+            a.ResolverStatus.Contains("Error") && a.ResolverStatus.Contains(Constants.LogNameApplication)));
+        Assert.Empty(dispatcher.ReceivedCalls().Select(call => call.GetArguments()[0]).OfType<LoadEventsAction>());
+    }
+
+    [Fact]
     public async Task HandleOpenLog_ShouldThreadOpenLogsIdIntoDispatchedAddTableAction()
     {
         var logData = new EventLogData(Constants.LogNameApplication, LogPathType.Channel);
@@ -2265,6 +2423,15 @@ public sealed class EffectsTests
                 a.LogName == Constants.LogNameLog2 && a.LogPathType == LogPathType.File));
     }
 
+    private static List<LoadEventsPartialAction> AllPartialActions(IDispatcher dispatcher) =>
+        dispatcher.ReceivedCalls()
+            .Select(call => call.GetArguments()[0])
+            .OfType<LoadEventsPartialAction>()
+            .ToList();
+
+    private static IEnumerable<ResolvedEvent> AllPartialEvents(IDispatcher dispatcher) =>
+        AllPartialActions(dispatcher).SelectMany(partial => partial.Events);
+
     private static EffectsHarness BuildHarness(
         IState<EventLogState> eventLogState,
         IState<RawEventStoreState> rawEventStore,
@@ -2307,7 +2474,8 @@ public sealed class EffectsTests
             criticalErrorService,
             closeCoordinator,
             concurrencyState,
-            coordinator);
+            coordinator,
+            new EventLogReaderFactory());
 
         var logReload = new LogReloadEffects(
             eventLogState,
@@ -2348,6 +2516,93 @@ public sealed class EffectsTests
         rawStore.Value.Returns(new RawEventStoreState { ByLog = byLog });
 
         return (openLogs, rawStore);
+    }
+
+    private static IReadOnlyList<EventRecord[]> BuildReverseBatches(int total, int batchSize)
+    {
+        var batches = new List<EventRecord[]>();
+
+        // Newest first (descending RecordId), mirroring a reverse read.
+        for (int start = total; start >= 1; start -= batchSize)
+        {
+            int count = Math.Min(batchSize, start);
+            var batch = new EventRecord[count];
+
+            for (int offset = 0; offset < count; offset++)
+            {
+                batch[offset] = new EventRecord { RecordId = start - offset };
+            }
+
+            batches.Add(batch);
+        }
+
+        return batches;
+    }
+
+    private static (OpenLogEffects openLog, IDispatcher dispatcher, ILogWatcherService watcher) CreateEagerLoadEffects(
+        IEventLogReaderFactory readerFactory,
+        Func<long?, int>? resolveDelayMs = null)
+    {
+        var logData = new EventLogData(Constants.LogNameApplication, LogPathType.Channel);
+
+        var openLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
+            .SetItem(Constants.LogNameApplication, new OpenLogInfo(logData.Id, logData.Type));
+
+        var eventLogState = Substitute.For<IState<EventLogState>>();
+        eventLogState.Value.Returns(new EventLogState
+        {
+            OpenLogs = openLogs,
+            AppliedFilter = new Filter(null, [])
+        });
+
+        var resolver = Substitute.For<IEventResolver>();
+        resolver.ResolveEvent(Arg.Any<EventRecord>()).Returns(callInfo =>
+        {
+            var record = callInfo.Arg<EventRecord>();
+
+            if (resolveDelayMs is not null)
+            {
+                int delay = resolveDelayMs(record.RecordId);
+
+                if (delay > 0) { Thread.Sleep(delay); }
+            }
+
+            return FilterEventBuilder.CreateTestEvent(recordId: record.RecordId);
+        });
+
+        var serviceProvider = Substitute.For<IServiceProvider>();
+        serviceProvider.GetService(typeof(IEventResolver)).Returns(resolver);
+
+        var serviceScope = Substitute.For<IServiceScope>();
+        serviceScope.ServiceProvider.Returns(serviceProvider);
+
+        var serviceScopeFactory = Substitute.For<IServiceScopeFactory>();
+        serviceScopeFactory.CreateScope().Returns(serviceScope);
+
+        var databaseService = Substitute.For<IDatabaseService>();
+        databaseService.InitialClassificationTask.Returns(Task.CompletedTask);
+
+        var watcher = Substitute.For<ILogWatcherService>();
+        watcher.RemoveLogAsync(Arg.Any<string>()).Returns(Task.CompletedTask);
+        watcher.RemoveAllAsync().Returns(Task.CompletedTask);
+
+        var dispatcher = Substitute.For<IDispatcher>();
+
+        var openLog = new OpenLogEffects(
+            eventLogState,
+            Substitute.For<ITraceLogger>(),
+            watcher,
+            Substitute.For<IEventResolverCache>(),
+            Substitute.For<IEventXmlResolver>(),
+            serviceScopeFactory,
+            databaseService,
+            Substitute.For<ICriticalErrorService>(),
+            new LogCloseCoordinator(),
+            new EventLogConcurrencyState(),
+            new PartialLoadCoordinator(dispatcher, Timeout.InfiniteTimeSpan),
+            readerFactory);
+
+        return (openLog, dispatcher, watcher);
     }
 
     private static (EffectsHarness effects, IDispatcher mockDispatcher) CreateEffects(
@@ -2604,6 +2859,13 @@ public sealed class EffectsTests
         return rawStore;
     }
 
+    private static IReadOnlyList<ResolvedEvent> SingleFinalEvents(IDispatcher dispatcher) =>
+        dispatcher.ReceivedCalls()
+            .Select(call => call.GetArguments()[0])
+            .OfType<LoadEventsAction>()
+            .Single()
+            .Events;
+
     // Wrapper that bundles the post-split effects classes together with their
     // shared singletons so existing tests keep their `effects.HandleXxx(...)`
     // call shape. Each method delegates to the appropriate split class.
@@ -2651,5 +2913,47 @@ public sealed class EffectsTests
 
         public Task HandleSetContinuouslyUpdate(SetContinuouslyUpdateAction action, IDispatcher dispatcher) =>
             Filtering.HandleSetContinuouslyUpdate(action, dispatcher);
+    }
+
+    private sealed class FakeEventLogReader(IReadOnlyList<EventRecord[]> batches, string? newestBookmark)
+        : IEventLogReader
+    {
+        private int _index;
+
+        public bool IsValid { get; init; } = true;
+
+        public int? LastErrorCode { get; init; }
+
+        public string? NewestBookmark { get; } = newestBookmark;
+
+        public int? OpenErrorCode { get; init; }
+
+        public void Dispose() { }
+
+        public bool TryGetEvents(out EventRecord[] events, int batchSize = 30)
+        {
+            if (_index >= batches.Count)
+            {
+                events = [];
+
+                return false;
+            }
+
+            events = batches[_index++];
+
+            return true;
+        }
+    }
+
+    private sealed class FakeEventLogReaderFactory(IEventLogReader reader) : IEventLogReaderFactory
+    {
+        public bool ReverseDirectionRequested { get; private set; }
+
+        public IEventLogReader CreateReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false)
+        {
+            ReverseDirectionRequested = reverseDirection;
+
+            return reader;
+        }
     }
 }
