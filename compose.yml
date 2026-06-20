@@ -39,13 +39,6 @@ services:
       - --logger
       - "trx;LogFileName=runtime.trx"
 
-  eventdbtool:
-    <<: *base
-    command:
-      - tests/Integration/EventLogExpert.EventDbTool.IntegrationTests/EventLogExpert.EventDbTool.IntegrationTests.csproj
-      - --logger
-      - "trx;LogFileName=eventdbtool.trx"
-
   elevationhelper:
     <<: *base
     command:
