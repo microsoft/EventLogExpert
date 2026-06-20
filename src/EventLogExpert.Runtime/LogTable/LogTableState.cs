@@ -159,9 +159,7 @@ public sealed record LogTableState
     {
         var activeTable = EventTables.FirstOrDefault(table => table.Id == ActiveEventLogId);
 
-        if (activeTable is null) { return []; }
-
-        return activeTable.IsCombined ? DisplayedEvents : EventsForLog(activeTable.Id);
+        return activeTable is null ? [] : DisplayedEventsForTab(activeTable);
     }
 
     public IReadOnlyList<ColumnName> GetOrderedEnabledColumns(ILogTableColumnDefaultsProvider columnDefaults)

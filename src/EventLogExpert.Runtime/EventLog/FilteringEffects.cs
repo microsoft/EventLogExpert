@@ -10,6 +10,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
+using System.Collections.Immutable;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Runtime.EventLog;
@@ -21,10 +22,12 @@ internal sealed class FilteringEffects(
     IFilterService filterService,
     ITraceLogger logger,
     LogCloseCoordinator closeCoordinator,
-    EventLogConcurrencyState concurrencyState)
+    EventLogConcurrencyState concurrencyState,
+    TimeSpan? convergenceDelay = null)
 {
     private readonly LogCloseCoordinator _closeCoordinator = closeCoordinator;
     private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
+    private readonly TimeSpan _convergenceDelay = convergenceDelay ?? TimeSpan.FromMilliseconds(250);
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IFilterService _filterService = filterService;
     private readonly ITraceLogger _logger = logger;
@@ -102,6 +105,86 @@ internal sealed class FilteringEffects(
     }
 
     [EffectMethod]
+    public async Task HandleConvergeFilter(ConvergeFilterAction action, IDispatcher dispatcher)
+    {
+        long filterToken = action.OriginToken;
+
+        if (_concurrencyState.GetCurrentFilterToken() != filterToken) { return; }
+
+        var filter = _eventLogState.Value.AppliedFilter;
+        var context = _logTableState.Value.SortContext;
+        var version = _logTableState.Value.DisplayListVersion;
+
+        var targets = ResidualOpenStale(action.StaleIds);
+
+        if (targets.Length == 0)
+        {
+            if (_concurrencyState.GetCurrentFilterToken() == filterToken)
+            {
+                dispatcher.Dispatch(new SetFilterProgressAction(false));
+            }
+
+            return;
+        }
+
+        bool convergenceScheduled = false;
+
+        try
+        {
+            var snapshot = SnapshotEventsForLogs(targets);
+            var sorted = await Task.Run(() => FilterAndSort(snapshot, filter, context));
+
+            if (_concurrencyState.GetCurrentFilterToken() != filterToken) { return; }
+
+            var inputById = snapshot.ToDictionary(pair => pair.Id, pair => pair.Events);
+            var nowRaw = _rawEventStore.Value.ByLog;
+            var fresh = new Dictionary<EventLogId, SegmentedSortedList>(sorted.Count);
+            var residual = new List<EventLogId>();
+
+            foreach (var logId in targets)
+            {
+                if (sorted.TryGetValue(logId, out var sortedList) &&
+                    inputById.TryGetValue(logId, out var input) &&
+                    nowRaw.TryGetValue(logId, out var now) &&
+                    ReferenceEquals(input, now))
+                {
+                    fresh[logId] = sortedList;
+                }
+                else
+                {
+                    residual.Add(logId);
+                }
+            }
+
+            if (fresh.Count > 0)
+            {
+                dispatcher.Dispatch(new DisplayReadyAction { Lists = fresh, Version = version });
+            }
+
+            var stillStale = ResidualOpenStale(residual);
+
+            if (stillStale.Length > 0)
+            {
+                convergenceScheduled = true;
+
+                await Task.Delay(_convergenceDelay);
+
+                if (_concurrencyState.GetCurrentFilterToken() == filterToken)
+                {
+                    dispatcher.Dispatch(new ConvergeFilterAction(stillStale, filterToken));
+                }
+            }
+        }
+        finally
+        {
+            if (!convergenceScheduled && _concurrencyState.GetCurrentFilterToken() == filterToken)
+            {
+                dispatcher.Dispatch(new SetFilterProgressAction(false));
+            }
+        }
+    }
+
+    [EffectMethod]
     public Task HandleSetContinuouslyUpdate(SetContinuouslyUpdateAction action, IDispatcher dispatcher)
     {
         if (action.ContinuouslyUpdate)
@@ -148,6 +231,8 @@ internal sealed class FilteringEffects(
         var version = _logTableState.Value.DisplayListVersion;
 
         dispatcher.Dispatch(new SetFilterProgressAction(true));
+
+        bool convergenceScheduled = false;
 
         try
         {
@@ -198,10 +283,24 @@ internal sealed class FilteringEffects(
             }
 
             dispatcher.Dispatch(new DisplayReadyAction { Lists = fresh, Version = version });
+
+            var residualStale = ResidualOpenStale(staleIds.Where(id => !fresh.ContainsKey(id)));
+
+            if (residualStale.Length > 0)
+            {
+                convergenceScheduled = true;
+
+                await Task.Delay(_convergenceDelay);
+
+                if (_concurrencyState.GetCurrentFilterToken() == filterToken)
+                {
+                    dispatcher.Dispatch(new ConvergeFilterAction(residualStale, filterToken));
+                }
+            }
         }
         finally
         {
-            if (_concurrencyState.GetCurrentFilterToken() == filterToken)
+            if (!convergenceScheduled && _concurrencyState.GetCurrentFilterToken() == filterToken)
             {
                 dispatcher.Dispatch(new SetFilterProgressAction(false));
             }
@@ -344,6 +443,17 @@ internal sealed class FilteringEffects(
             _eventLogState.Value.AppliedFilter,
             _concurrencyState.InvalidateInFlightFilters(),
             dispatcher);
+
+    private ImmutableArray<EventLogId> ResidualOpenStale(IEnumerable<EventLogId> candidateStaleIds)
+    {
+        var openIds = new HashSet<EventLogId>();
+
+        foreach (var info in _eventLogState.Value.OpenLogs.Values) { openIds.Add(info.Id); }
+
+        var raw = _rawEventStore.Value.ByLog;
+
+        return [.. candidateStaleIds.Distinct().Where(id => openIds.Contains(id) && raw.ContainsKey(id))];
+    }
 
     private List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> SnapshotEventsForLogs(
         IReadOnlyList<EventLogId> logIds)

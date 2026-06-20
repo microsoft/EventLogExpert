@@ -119,6 +119,29 @@ public sealed class LogTabGroupTests
     }
 
     [Fact]
+    public void GetActiveDisplayedEvents_ActiveNamedGroupHeader_ReturnsGroupMembersNotAllLogs()
+    {
+        var (state, ids) = SeedLogs(
+            [MakeEvent(0, 1, Time(0, 1))],
+            [MakeEvent(1, 1, Time(1, 1))],
+            [MakeEvent(2, 1, Time(2, 1))]);
+
+        var groupId = NewGroup(ref state, ids[0]);
+        state = Reducers.ReduceMoveTabToGroup(state, new MoveTabToGroupAction(ids[1], groupId));
+
+        var header = state.EventTables.Single(table => table.GroupId == groupId);
+        state = state with { ActiveEventLogId = header.Id };
+
+        var active = state.GetActiveDisplayedEvents();
+
+        // Export scopes to the group's members (ids[0], ids[1]); NOT the all-logs view that also includes the
+        // standalone ids[2]. Before the fix this returned DisplayedEvents (every log).
+        Assert.True(ReferenceEquals(active, state.DisplayedEventsForTab(header)));
+        Assert.False(ReferenceEquals(active, state.DisplayedEvents));
+        Assert.Equal(2, active.Count);
+    }
+
+    [Fact]
     public void ReduceCloseAll_ClearsGroups()
     {
         var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);

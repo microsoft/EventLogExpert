@@ -523,9 +523,9 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleApplyFilter_FilterBranch_WhenLogStillStaleAfterRetry_ShouldOmitStaleSliceFromDispatch()
     {
-        // Arrange - the raw event list changes during pass 1 AND again during pass 2. Single-retry
-        // semantics mean the pass-2 result is still stale; the slice must be omitted so the reducer's
-        // preserve-omitted fallback keeps the existing rows (avoids losing live events).
+        // Arrange - the raw event list changes during pass 1 AND again during pass 2. The pass-2 result is
+        // still stale, so the slice is omitted (the reducer's carry-forward keeps the existing rows, avoiding
+        // lost live events) AND a ConvergeFilterAction is scheduled to re-filter the log once it stabilizes.
         var snapshotEvents = new List<ResolvedEvent>();
         var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var snapshotRaw = RawEventList.Empty.Append(snapshotEvents);
@@ -589,7 +589,8 @@ public sealed class EffectsTests
         // Act
         await effects.HandleApplyFilter(action, mockDispatcher);
 
-        // Assert - both filter passes ran; dispatch omits the still-stale log id.
+        // Assert - both filter passes ran; dispatch omits the still-stale log id, and a convergence pass is
+        // scheduled for it while the progress spinner stays on (cleared later by the converging pass).
         mockFilterService.Received(2)
             .FilterActiveLogs(
                 Arg.Any<IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>>(),
@@ -597,6 +598,11 @@ public sealed class EffectsTests
 
         mockDispatcher.Received(1)
             .Dispatch(Arg.Is<DisplayReadyAction>(a => !a.Lists.ContainsKey(snapshotData.Id)));
+
+        mockDispatcher.Received(1)
+            .Dispatch(Arg.Is<ConvergeFilterAction>(a => a.StaleIds.Contains(snapshotData.Id)));
+
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
     }
 
     [Fact]
@@ -1488,6 +1494,125 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleConvergeFilter_WhenSnapshotStable_PublishesFreshAndDoesNotReschedule()
+    {
+        // Arrange - the convergence target's raw list is stable across the pass; the converge must publish the
+        // re-filtered slice, clear the progress spinner, and NOT schedule another ConvergeFilterAction.
+        var events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var raw = RawEventList.Empty.Append(events);
+
+        var state = new EventLogState
+        {
+            ContinuouslyUpdate = false,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
+                .Add(Constants.LogNameTestLog, new OpenLogInfo(logData.Id, LogPathType.Channel)),
+            NewEventBuffer = [],
+            AppliedFilter = new Filter(null, [])
+        };
+
+        var rawState = new RawEventStoreState
+        {
+            ByLog = ImmutableDictionary<EventLogId, RawEventList>.Empty.Add(logData.Id, raw)
+        };
+
+        var (effects, mockDispatcher, mockFilterService) =
+            CreateEffectsWithMutableState(() => state, () => rawState);
+
+        mockFilterService.FilterActiveLogs(Arg.Any<IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>>(), Arg.Any<Filter>())
+            .Returns(new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [logData.Id] = raw });
+
+        // Act
+        await effects.HandleConvergeFilter(
+            new ConvergeFilterAction([logData.Id], effects.ConcurrencyState.GetCurrentFilterToken()),
+            mockDispatcher);
+
+        // Assert - converged slice published, progress cleared, no further convergence scheduled.
+        mockDispatcher.Received(1)
+            .Dispatch(Arg.Is<DisplayReadyAction>(a => a.Lists.ContainsKey(logData.Id)));
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
+
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<ConvergeFilterAction>());
+    }
+
+    [Fact]
+    public async Task HandleConvergeFilter_WhenSupersededByNewerToken_DoesNotPublish()
+    {
+        // Arrange - a newer operation bumps the filter token while the converge pass is inside FilterActiveLogs;
+        // the post-await token guard must drop the stale convergence without dispatching DisplayReady.
+        var events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var raw = RawEventList.Empty.Append(events);
+
+        var state = new EventLogState
+        {
+            ContinuouslyUpdate = false,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
+                .Add(Constants.LogNameTestLog, new OpenLogInfo(logData.Id, LogPathType.Channel)),
+            NewEventBuffer = [],
+            AppliedFilter = new Filter(null, [])
+        };
+
+        var rawState = new RawEventStoreState
+        {
+            ByLog = ImmutableDictionary<EventLogId, RawEventList>.Empty.Add(logData.Id, raw)
+        };
+
+        var (effects, mockDispatcher, mockFilterService) =
+            CreateEffectsWithMutableState(() => state, () => rawState);
+
+        mockFilterService.FilterActiveLogs(Arg.Any<IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>>(), Arg.Any<Filter>())
+            .Returns(_ =>
+            {
+                effects.ConcurrencyState.InvalidateInFlightFilters();
+                return new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [logData.Id] = raw };
+            });
+
+        // Act
+        await effects.HandleConvergeFilter(
+            new ConvergeFilterAction([logData.Id], effects.ConcurrencyState.GetCurrentFilterToken()),
+            mockDispatcher);
+
+        // Assert - superseded run published nothing.
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<DisplayReadyAction>());
+    }
+
+    [Fact]
+    public async Task HandleConvergeFilter_WhenTargetLogClosed_PrunesWithoutFilteringOrPublishing()
+    {
+        // Arrange - the convergence target closed before the converge ran; it must be pruned (no filter pass, no
+        // DisplayReady, no re-schedule) and the progress spinner cleared so it cannot spin on a gone log.
+        var closedId = EventLogId.Create();
+
+        var state = new EventLogState
+        {
+            ContinuouslyUpdate = false,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty,
+            NewEventBuffer = [],
+            AppliedFilter = new Filter(null, [])
+        };
+
+        var rawState = new RawEventStoreState();
+
+        var (effects, mockDispatcher, mockFilterService) =
+            CreateEffectsWithMutableState(() => state, () => rawState);
+
+        // Act
+        await effects.HandleConvergeFilter(
+            new ConvergeFilterAction([closedId], effects.ConcurrencyState.GetCurrentFilterToken()),
+            mockDispatcher);
+
+        // Assert - pruned to empty: no filtering, no publish, no re-converge; progress cleared.
+        mockFilterService.DidNotReceive()
+            .FilterActiveLogs(Arg.Any<IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>>(), Arg.Any<Filter>());
+
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<DisplayReadyAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<ConvergeFilterAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
+    }
+
+    [Fact]
     public async Task HandleLoadEvents_ShouldFilterAndDispatchUpdateTable()
     {
         // Arrange
@@ -2168,7 +2293,8 @@ public sealed class EffectsTests
             filterService,
             logger,
             closeCoordinator,
-            concurrencyState);
+            concurrencyState,
+            TimeSpan.Zero);
 
         var openLog = new OpenLogEffects(
             eventLogState,
@@ -2511,6 +2637,9 @@ public sealed class EffectsTests
 
         public Task HandleCloseLog(CloseLogAction action, IDispatcher dispatcher) =>
             OpenLog.HandleCloseLog(action, dispatcher);
+
+        public Task HandleConvergeFilter(ConvergeFilterAction action, IDispatcher dispatcher) =>
+            Filtering.HandleConvergeFilter(action, dispatcher);
 
         public Task HandleLoadEvents(LoadEventsAction action, IDispatcher dispatcher) =>
             LogReload.HandleLoadEvents(action, dispatcher);
