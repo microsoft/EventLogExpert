@@ -25,8 +25,13 @@ jobs:
       run: dotnet workload restore EventLogExpert.slnx
     - name: Restore dependencies
       run: dotnet restore EventLogExpert.slnx
-    - name: Build
-      run: dotnet build EventLogExpert.slnx --no-restore -c Release -p:PublishReadyToRun=false -m:1
+    # Build the MAUI app in its own step (after the tests), NOT as one solution build.
+    # Building the app together with the test projects makes MSBuild compile the shared
+    # libraries twice concurrently - the app resolves win-x64 while the tests are AnyCPU -
+    # which races on the libs' obj/bin (CS2012 / MSB3030). The old -m:1 flag masked this by
+    # serializing; this split fixes the root cause. Don't recombine into one slnx build.
+    - name: Build libraries and tests
+      run: dotnet build LibrariesAndTests.slnf --no-restore -c Release -p:PublishReadyToRun=false
     - name: Test (unit)
       shell: pwsh
       run: |
@@ -51,3 +56,5 @@ jobs:
           if ($LASTEXITCODE -ne 0) { $failed = $true }
         }
         if ($failed) { throw 'One or more integration test projects failed.' }
+    - name: Build app
+      run: dotnet build src/EventLogExpert/EventLogExpert.csproj --no-restore -c Release -p:PublishReadyToRun=false
