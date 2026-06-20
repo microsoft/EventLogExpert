@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update.Deployment;
 using EventLogExpert.Runtime.Update.ReleaseNotes;
+using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Runtime.Update;
 
@@ -158,11 +159,23 @@ internal sealed class UpdateService(
 
         try
         {
-            string downloadPath = latest.Value.Assets.First(x => x.Name.Contains(".msix")).Uri;
+            string? downloadPath = SelectUpdateDownloadUri(latest.Value.Assets);
 
             if (string.IsNullOrEmpty(downloadPath))
             {
-                traceLogger.Warning($"{nameof(CheckForUpdates)} Could not get asset download path.");
+                string availableAssets = latest.Value.Assets is null or { Count: 0 }
+                    ? "(none)"
+                    : string.Join(", ", latest.Value.Assets.Select(asset => string.IsNullOrEmpty(asset.Name) ? "(unnamed)" : asset.Name));
+
+                traceLogger.Warning($"{nameof(CheckForUpdates)} No update bundle (.msixbundle) was found in the " +
+                    $"latest release. OS architecture: {RuntimeInformation.OSArchitecture}. Available assets: {availableAssets}");
+
+                if (userInitiated)
+                {
+                    await alertDialogService.ShowAlert("Update Unavailable",
+                        "No compatible update package was found.",
+                        "OK");
+                }
 
                 return;
             }
@@ -215,5 +228,21 @@ internal sealed class UpdateService(
         var title = $"Release notes for v{versionProvider.CurrentVersion}";
 
         return new ReleaseNotesContent(title, markdown);
+    }
+
+    /// <summary>
+    ///     Selects the download URI of the multi-architecture app bundle (.msixbundle) from the release assets, or
+    ///     <see langword="null" /> when the release contains no bundle.
+    /// </summary>
+    internal static string? SelectUpdateDownloadUri(IReadOnlyList<GitHubReleaseAsset>? assets)
+    {
+        return assets?.Where(asset =>
+                asset.Name is not null &&
+                (asset.Name.StartsWith("EventLogExpert_", StringComparison.OrdinalIgnoreCase) ||
+                    asset.Name.StartsWith("EventLogExpert.", StringComparison.OrdinalIgnoreCase)) &&
+                asset.Name.EndsWith(".msixbundle", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(asset.Uri))
+            .Select(asset => asset.Uri)
+            .FirstOrDefault();
     }
 }
