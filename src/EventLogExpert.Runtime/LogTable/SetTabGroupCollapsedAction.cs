@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.Runtime.LogTable;
 
-public sealed record SetTabGroupCollapsedAction(LogTabGroupId GroupId, bool Collapsed);
+internal sealed record SetTabGroupCollapsedAction(LogTabGroupId GroupId, bool Collapsed);

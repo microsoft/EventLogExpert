@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.Runtime.LogTable;
 
-public sealed record CloseGroupAction(LogTabGroupId GroupId);
+internal sealed record CloseGroupAction(LogTabGroupId GroupId);

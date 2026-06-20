@@ -5,4 +5,4 @@ using EventLogExpert.Eventing.Common.EventLogs;
 
 namespace EventLogExpert.Runtime.LogTable;
 
-public sealed record RemoveTabFromGroupAction(EventLogId TabId);
+internal sealed record RemoveTabFromGroupAction(EventLogId TabId);

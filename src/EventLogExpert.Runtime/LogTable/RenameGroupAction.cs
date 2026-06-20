@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.Runtime.LogTable;
 
-public sealed record RenameGroupAction(LogTabGroupId GroupId, string NewName);
+internal sealed record RenameGroupAction(LogTabGroupId GroupId, string NewName);

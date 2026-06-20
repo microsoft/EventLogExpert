@@ -5,4 +5,4 @@ using EventLogExpert.Eventing.Common.EventLogs;
 
 namespace EventLogExpert.Runtime.LogTable;
 
-public sealed record MoveTabToGroupAction(EventLogId TabId, LogTabGroupId TargetGroupId);
+internal sealed record MoveTabToGroupAction(EventLogId TabId, LogTabGroupId TargetGroupId);

@@ -5,4 +5,4 @@ using EventLogExpert.Eventing.Common.EventLogs;
 
 namespace EventLogExpert.Runtime.LogTable;
 
-public sealed record CloseAllButThisAction(EventLogId TabId);
+internal sealed record CloseAllButThisAction(EventLogId TabId);
