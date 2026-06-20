@@ -77,13 +77,17 @@
     </ItemGroup>
 
     <!--
-      Derive the native vcxproj Platform from the current .NET RuntimeIdentifier. x64 and arm64
-      are supported (the vcxproj declares Debug|x64/Release|x64 + Debug|ARM64/Release|ARM64). Other
-      RIDs (e.g. win-x86) have no matching ProjectConfiguration; the BuildExplorerExtensionNative
-      target then fails fast with a clear message rather than a confusing MSB4126 from VS MSBuild.
+      Derive the native vcxproj Platform from the .NET RuntimeIdentifier, or from the MSBuild Platform when no
+      RID is set (mirrors the _ElevationHelperRid precedence below: RID wins, then Platform=ARM64, then x64). The
+      '$(RuntimeIdentifier)' == '' clause in the Platform=ARM64 branch is load-bearing - it keeps an explicit
+      -r win-x64 winning over /p:Platform=ARM64, so the native DLL and the ElevationHelper can never disagree.
+      x64 and arm64 are supported (the vcxproj declares Debug|x64/Release|x64 + Debug|ARM64/Release|ARM64). Other
+      RIDs (e.g. win-x86) have no matching ProjectConfiguration; the BuildExplorerExtensionNative target then
+      fails fast with a clear message rather than a confusing MSB4126 from VS MSBuild.
     -->
     <PropertyGroup>
       <ExplorerExtensionNativePlatform Condition="'$(RuntimeIdentifier)' != '' AND $(RuntimeIdentifier.Contains('-arm64'))">ARM64</ExplorerExtensionNativePlatform>
+      <ExplorerExtensionNativePlatform Condition="'$(ExplorerExtensionNativePlatform)' == '' AND '$(RuntimeIdentifier)' == '' AND '$(Platform)' == 'ARM64'">ARM64</ExplorerExtensionNativePlatform>
       <ExplorerExtensionNativePlatform Condition="'$(ExplorerExtensionNativePlatform)' == '' AND ('$(RuntimeIdentifier)' == '' OR $(RuntimeIdentifier.Contains('-x64')))">x64</ExplorerExtensionNativePlatform>
     </PropertyGroup>
 
@@ -124,7 +128,15 @@
         <_VswherePath>$(MSBuildProgramFiles32)\Microsoft Visual Studio\Installer\vswhere.exe</_VswherePath>
       </PropertyGroup>
       <Error Condition="'$(ExplorerExtensionNativePlatform)' == ''"
-             Text="EventLogExpert.ExplorerExtensionNative.vcxproj declares x64 and ARM64 ProjectConfiguration entries. RuntimeIdentifier=$(RuntimeIdentifier) does not map to a supported native platform (win-x64 or win-arm64). Build for win-x64/win-arm64 OR add matching ProjectConfiguration + ItemDefinitionGroup blocks (e.g. Win32) to the vcxproj." />
+             Text="EventLogExpert.ExplorerExtensionNative.vcxproj declares x64 and ARM64 ProjectConfiguration entries. RuntimeIdentifier=$(RuntimeIdentifier) (Platform=$(Platform)) does not map to a supported native platform (win-x64 or win-arm64). Build for win-x64/win-arm64 OR add matching ProjectConfiguration + ItemDefinitionGroup blocks (e.g. Win32) to the vcxproj." />
+      <!-- Consistency guard: the native shell-extension DLL and the ElevationHelper (see _ElevationHelperRid below)
+           must target the same architecture, or one MSIX would ship a mixed-arch payload. This fails the build for
+           any drift (e.g. if the two derivations are ever edited out of sync) instead of silently packaging a
+           mismatch. Never fires on a supported win-x64/win-arm64 path. -->
+      <Error Condition="'$(ExplorerExtensionNativePlatform)' == 'ARM64' AND !$(_ElevationHelperRid.Contains('-arm64'))"
+             Text="Architecture mismatch: the native ExplorerExtension resolved ARM64 but the ElevationHelper RID is '$(_ElevationHelperRid)' (RuntimeIdentifier=$(RuntimeIdentifier), Platform=$(Platform)). Both must target the same architecture within one MSIX." />
+      <Error Condition="'$(ExplorerExtensionNativePlatform)' == 'x64' AND !$(_ElevationHelperRid.Contains('-x64'))"
+             Text="Architecture mismatch: the native ExplorerExtension resolved x64 but the ElevationHelper RID is '$(_ElevationHelperRid)' (RuntimeIdentifier=$(RuntimeIdentifier), Platform=$(Platform)). Both must target the same architecture within one MSIX." />
       <!-- Locate VS MSBuild requiring the VC toolset specifically — bare Microsoft.Component.MSBuild
            can match a Build Tools install without the C++ workload, which can't process vcxproj. -->
       <PropertyGroup>
