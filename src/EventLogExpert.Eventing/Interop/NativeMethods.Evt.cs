@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
 using Microsoft.Win32.SafeHandles;
 using System.Buffers;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 
@@ -408,6 +409,81 @@ internal static partial class NativeMethods
         }
     }
 
+    /// <summary>Converts a buffer that was returned from <see cref="EvtRender" /> to an <see cref="EventRecord" /></summary>
+    /// <param name="eventBuffer">
+    ///     Pointer to a buffer returned from <see cref="EvtRender" />. Must stay pinned and valid for
+    ///     the duration of the call; the variants are read directly through this pointer.
+    /// </param>
+    /// <param name="propertyCount">Number of properties returned from <see cref="EvtRender" /></param>
+    /// <returns></returns>
+    internal static unsafe EventRecord GetEventRecord(IntPtr eventBuffer, int propertyCount)
+    {
+        EventRecord properties = new();
+
+        var variants = (EvtVariant*)eventBuffer;
+
+        for (int i = 0; i < propertyCount; i++)
+        {
+            ref readonly var variant = ref variants[i];
+
+            // Properties are returned in the order defined in EVT_SYSTEM_PROPERTY_ID enum. Value-type
+            // properties are read straight from the typed union field (no boxing); the string, SID and
+            // time properties stay on ConvertVariant (no boxing benefit, and it handles the
+            // FileTime/SysTime split for TimeCreated). Unmapped indices are intentionally skipped.
+            switch (i)
+            {
+                case (int)EvtSystemPropertyId.ProviderName:
+                    properties.ProviderName = (string)ConvertVariant(variant)!;
+                    break;
+                case (int)EvtSystemPropertyId.EventId:
+                    Debug.Assert(variant.Type == (uint)EvtVariantType.UInt16);
+                    properties.Id = variant.UInt16Val;
+                    break;
+                case (int)EvtSystemPropertyId.Qualifiers:
+                    properties.Qualifiers = ReadOptionalUInt16(variant);
+                    break;
+                case (int)EvtSystemPropertyId.Level:
+                    properties.Level = ReadOptionalByte(variant);
+                    break;
+                case (int)EvtSystemPropertyId.Task:
+                    properties.Task = ReadOptionalUInt16(variant);
+                    break;
+                case (int)EvtSystemPropertyId.Keywords:
+                    properties.Keywords = ReadOptionalInt64(variant);
+                    break;
+                case (int)EvtSystemPropertyId.TimeCreated:
+                    properties.TimeCreated = (DateTime)ConvertVariant(variant)!;
+                    break;
+                case (int)EvtSystemPropertyId.EventRecordId:
+                    properties.RecordId = ReadOptionalInt64(variant);
+                    break;
+                case (int)EvtSystemPropertyId.ActivityId:
+                    properties.ActivityId = ReadGuidOrNull(variant);
+                    break;
+                case (int)EvtSystemPropertyId.ProcessID:
+                    properties.ProcessId = ReadOptionalInt32(variant);
+                    break;
+                case (int)EvtSystemPropertyId.ThreadID:
+                    properties.ThreadId = ReadOptionalInt32(variant);
+                    break;
+                case (int)EvtSystemPropertyId.Channel:
+                    properties.LogName = (string)ConvertVariant(variant)!;
+                    break;
+                case (int)EvtSystemPropertyId.Computer:
+                    properties.ComputerName = (string)ConvertVariant(variant)!;
+                    break;
+                case (int)EvtSystemPropertyId.UserID:
+                    properties.UserId = (SecurityIdentifier?)ConvertVariant(variant);
+                    break;
+                case (int)EvtSystemPropertyId.Version:
+                    properties.Version = ReadOptionalByte(variant);
+                    break;
+            }
+        }
+
+        return properties;
+    }
+
     internal static object GetObjectArrayProperty(
         EvtHandle array,
         int index,
@@ -711,77 +787,6 @@ internal static partial class NativeMethods
         }
     }
 
-    /// <summary>Converts a buffer that was returned from <see cref="EvtRender" /> to an <see cref="EventRecord" /></summary>
-    /// <param name="eventBuffer">
-    ///     Pointer to a buffer returned from <see cref="EvtRender" />. Must stay pinned and valid for
-    ///     the duration of the call; the variants are read directly through this pointer.
-    /// </param>
-    /// <param name="propertyCount">Number of properties returned from <see cref="EvtRender" /></param>
-    /// <returns></returns>
-    private static unsafe EventRecord GetEventRecord(IntPtr eventBuffer, int propertyCount)
-    {
-        EventRecord properties = new();
-
-        var variants = (EvtVariant*)eventBuffer;
-
-        for (int i = 0; i < propertyCount; i++)
-        {
-            var variant = ConvertVariant(variants[i]);
-
-            // Properties are returned in the order defined in EVT_SYSTEM_PROPERTY_ID enum
-            switch (i)
-            {
-                case (int)EvtSystemPropertyId.ActivityId:
-                    properties.ActivityId = (Guid?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.Computer:
-                    properties.ComputerName = (string)variant!;
-                    break;
-                case (int)EvtSystemPropertyId.EventId:
-                    properties.Id = (ushort)variant!;
-                    break;
-                case (int)EvtSystemPropertyId.Qualifiers:
-                    properties.Qualifiers = (ushort?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.Keywords:
-                    properties.Keywords = (long?)(ulong?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.Level:
-                    properties.Level = (byte?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.Channel:
-                    properties.LogName = (string)variant!;
-                    break;
-                case (int)EvtSystemPropertyId.ProcessID:
-                    properties.ProcessId = (int?)(uint?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.EventRecordId:
-                    properties.RecordId = (long?)(ulong?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.ProviderName:
-                    properties.ProviderName = (string)variant!;
-                    break;
-                case (int)EvtSystemPropertyId.Task:
-                    properties.Task = (ushort?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.ThreadID:
-                    properties.ThreadId = (int?)(uint?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.TimeCreated:
-                    properties.TimeCreated = (DateTime)variant!;
-                    break;
-                case (int)EvtSystemPropertyId.UserID:
-                    properties.UserId = (SecurityIdentifier?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.Version:
-                    properties.Version = (byte?)variant;
-                    break;
-            }
-        }
-
-        return properties;
-    }
-
     private static unsafe T[] ReadBlittableArray<T>(IntPtr reference, uint count, EvtVariantType type) where T : unmanaged
     {
         if (count == 0)
@@ -801,5 +806,59 @@ internal static partial class NativeMethods
         new ReadOnlySpan<T>((void*)reference, length).CopyTo(result);
 
         return result;
+    }
+
+    private static unsafe Guid? ReadGuidOrNull(in EvtVariant variant)
+    {
+        if (variant.Type == (uint)EvtVariantType.Null) { return null; }
+
+        if (variant.Type != (uint)EvtVariantType.Guid)
+        {
+            throw new InvalidDataException(
+                $"Expected {nameof(EvtVariantType)}.{EvtVariantType.Guid} for the activity id, got type {variant.Type}");
+        }
+
+        if (variant.GuidVal == 0)
+        {
+            throw new InvalidDataException($"Null {nameof(EvtVariantType)}.{EvtVariantType.Guid} pointer for the activity id");
+        }
+
+        return *(Guid*)variant.GuidVal;
+    }
+
+    private static byte? ReadOptionalByte(in EvtVariant variant)
+    {
+        if (variant.Type == (uint)EvtVariantType.Null) { return null; }
+
+        Debug.Assert(variant.Type == (uint)EvtVariantType.Byte);
+
+        return variant.ByteVal;
+    }
+
+    private static int? ReadOptionalInt32(in EvtVariant variant)
+    {
+        if (variant.Type == (uint)EvtVariantType.Null) { return null; }
+
+        Debug.Assert(variant.Type == (uint)EvtVariantType.UInt32);
+
+        return unchecked((int)variant.UInt32Val);
+    }
+
+    private static long? ReadOptionalInt64(in EvtVariant variant)
+    {
+        if (variant.Type == (uint)EvtVariantType.Null) { return null; }
+
+        Debug.Assert(variant.Type is (uint)EvtVariantType.UInt64 or (uint)EvtVariantType.HexInt64);
+
+        return unchecked((long)variant.UInt64Val);
+    }
+
+    private static ushort? ReadOptionalUInt16(in EvtVariant variant)
+    {
+        if (variant.Type == (uint)EvtVariantType.Null) { return null; }
+
+        Debug.Assert(variant.Type == (uint)EvtVariantType.UInt16);
+
+        return variant.UInt16Val;
     }
 }
