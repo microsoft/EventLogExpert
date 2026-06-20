@@ -1,22 +1,20 @@
-.alert-modal-message {
-    margin: 0 0 .5rem 0;
+.prompt-modal-label {
+    display: block;
+    margin-bottom: .5rem;
 
     line-height: 1.4;
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
-.alert-modal-divider {
-    margin: .5rem 0;
-    border: 0;
-    border-top: 1px solid var(--clr-statusbar);
-}
+.prompt-modal-validation-error {
+    margin-top: .25rem;
+    margin-bottom: 0;
+    padding: .25rem .375rem;
 
-.alert-modal-input {
-    width: 100%;
-    padding: .25rem .5rem;
-
-    color: var(--text-primary);
-    background-color: var(--background-dark);
-    border: 1px solid var(--clr-statusbar);
+    overflow-wrap: anywhere;
+    color: var(--text-error);
+    background: color-mix(in srgb, var(--clr-red) 8%, transparent);
     border-radius: .2rem;
+    font-size: .85rem;
 }

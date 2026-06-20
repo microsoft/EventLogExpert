@@ -1,10 +1,13 @@
 @inherits ModalBase<string>
 
-<ModalChrome AcceptLabel="OK"
+<ModalChrome AcceptDisabled="@(ValidationError is not null)"
+    AcceptLabel="OK"
     AriaLabel="@AriaLabelText"
     CancelLabel="Cancel"
     Footer="FooterPreset.AcceptCancel"
     InlineAlert="@CurrentInlineAlert"
+    MaxWidth="min(34rem, calc(100vw - 2rem))"
+    MinWidth="min(34rem, calc(100vw - 2rem))"
     OnAccept="HandleAcceptClickedAsync"
     OnCancel="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
@@ -12,13 +15,23 @@
     @ref="ChromeRef"
     Title="@Title">
     <ChildContent>
-        <p class="alert-modal-message" id="@_messageId">@Message</p>
-        <hr class="alert-modal-divider" />
-        <input aria-labelledby="@_messageId"
-            @bind="_value"
-            @bind:event="oninput"
-            class="alert-modal-input"
-            @ref="_inputRef"
-            type="text" />
+        <label class="prompt-modal-label" for="@_inputId">@Message</label>
+        <TextInput AriaDescribedBy="@(ValidationError is not null ? _errorId : null)"
+            AriaInvalid="@(ValidationError is not null)"
+            CssClass="input dialog-input"
+            Id="@_inputId"
+            @ref="_input"
+            UpdateOnInput="true"
+            Value="@_value"
+            ValueChanged="HandleValueChanged" />
+
+        @if (ValidationError is not null)
+        {
+            <p aria-live="polite"
+                class="prompt-modal-validation-error"
+                id="@_errorId">
+                @ValidationError
+            </p>
+        }
     </ChildContent>
 </ModalChrome>

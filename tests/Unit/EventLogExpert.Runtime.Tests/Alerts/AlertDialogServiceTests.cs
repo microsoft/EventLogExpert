@@ -102,6 +102,29 @@ public sealed class ModalAlertDialogServiceTests
     }
 
     [Fact]
+    public async Task DisplayPrompt_WhenNoActiveHost_ShouldForwardValidatorToStandalonePrompt()
+    {
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(false);
+
+        IReadOnlyDictionary<string, object?>? capturedPrompt = null;
+        Func<string, string?> validate = value => string.IsNullOrWhiteSpace(value) ? "Required." : null;
+
+        var sut = new AlertDialogService(
+            coordinator,
+            PassthroughMainThread(),
+            Substitute.For<IErrorBannerService>(),
+            Substitute.For<IInfoBannerService>(),
+            _ => Task.FromResult(false),
+            parameters => { capturedPrompt = parameters; return Task.FromResult("user-typed"); });
+
+        await sut.DisplayPrompt("Rename", "Enter new name", "old-value", validate);
+
+        Assert.NotNull(capturedPrompt);
+        Assert.Same(validate, capturedPrompt!["Validate"]);
+    }
+
+    [Fact]
     public async Task ShowAlert_ShouldMarshalThroughMainThreadService()
     {
         // Arrange — capture that MainThread invocation happens before the routing decision runs.

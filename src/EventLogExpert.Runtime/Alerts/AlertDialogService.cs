@@ -75,6 +75,7 @@ public sealed class AlertDialogService(
                     ["Title"] = title,
                     ["Message"] = message,
                     ["InitialValue"] = initialValue ?? string.Empty,
+                    ["Validate"] = validate,
                 });
             }
 

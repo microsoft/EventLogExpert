@@ -1,9 +1,12 @@
 @inherits InputComponent<string>
 
 <input aria-describedby="@AriaDescribedBy"
+    aria-invalid="@(AriaInvalid ? "true" : null)"
     aria-label="@EffectiveAriaLabel"
     aria-labelledby="@AriaLabelledBy"
+    @attributes="_valueChangeBinding"
     class="@CssClass"
-    @onchange="UpdateValue"
+    id="@Id"
+    @ref="_element"
     type="text"
     value="@Value" />

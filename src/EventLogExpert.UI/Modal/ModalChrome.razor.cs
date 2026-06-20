@@ -5,6 +5,7 @@ using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
+using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
@@ -21,7 +22,7 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     private ElementReference _inlineAlertAcceptButtonRef;
     private ElementReference _inlineAlertCancelButtonRef;
     private InlineAlertRequest? _inlineAlertInitializedFor;
-    private ElementReference _inlineAlertInputRef;
+    private TextInput? _inlineAlertInput;
     private string _inlineAlertPromptValue = string.Empty;
     private bool _isClosed;
     private bool _isClosingByCancel;
@@ -30,6 +31,8 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     private InlineAlertRequest? _validationCacheAlert;
     private string? _validationCacheError;
     private string? _validationCacheValue;
+
+    [Parameter] public bool AcceptDisabled { get; set; }
 
     [Parameter] public string AcceptLabel { get; set; } = "OK";
 
@@ -215,7 +218,10 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         {
             if (InlineAlert.IsPrompt)
             {
-                await _inlineAlertInputRef.FocusAsync(true);
+                if (_inlineAlertInput is not null)
+                {
+                    await _inlineAlertInput.FocusAsync(true);
+                }
 
                 return;
             }
@@ -291,6 +297,8 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     private Task HandleInlineAlertCancelAsync() =>
         OnInlineAlertResolved.InvokeAsync(new InlineAlertResult(false, null));
+
+    private void HandleInlineAlertPromptValueChanged(string value) => _inlineAlertPromptValue = value;
 
     private Task HandleSaveAsync() => OnSave.InvokeAsync();
 

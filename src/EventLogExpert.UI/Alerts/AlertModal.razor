@@ -5,12 +5,14 @@
     CancelLabel="@CancelLabel"
     Footer="@(string.IsNullOrEmpty(AcceptLabel) ? FooterPreset.Dismiss : FooterPreset.AcceptCancel)"
     InlineAlert="@CurrentInlineAlert"
+    MaxWidth="min(34rem, calc(100vw - 2rem))"
+    MinWidth="min(34rem, calc(100vw - 2rem))"
     OnAccept="HandleAcceptClickedAsync"
     OnCancel="HandleCancelClickedAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
-    Title="@Title"
-    @ref="ChromeRef">
+    @ref="ChromeRef"
+    Title="@Title">
     <ChildContent>
         <p class="alert-modal-message">@Message</p>
     </ChildContent>
