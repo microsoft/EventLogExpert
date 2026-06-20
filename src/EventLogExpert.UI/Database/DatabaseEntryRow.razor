@@ -50,7 +50,7 @@
 
                         <span class="db-entry-upgrading">
                             <span class="db-entry-upgrading-status" role="status">
-                                <i aria-hidden="true" class="bi bi-arrow-repeat db-entry-spinner"></i>
+                                <i aria-hidden="true" class="bi bi-arrow-repeat db-entry-spinner loader-spin"></i>
                                 <span class="db-entry-upgrading-text" @key="verb">@displayText</span>
                                 @if (hasFile)
                                 {
@@ -65,7 +65,7 @@
                     else
                     {
                         <span class="db-entry-upgrading" role="status">
-                            <i aria-hidden="true" class="bi bi-arrow-repeat db-entry-spinner"></i>
+                            <i aria-hidden="true" class="bi bi-arrow-repeat db-entry-spinner loader-spin"></i>
                             <span>Upgrading&hellip;</span>
                         </span>
                     }
