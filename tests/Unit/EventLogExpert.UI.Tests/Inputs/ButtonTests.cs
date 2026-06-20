@@ -36,6 +36,19 @@ public sealed class ButtonTests : BunitContext
     }
 
     [Fact]
+    public async Task Click_WhenDisabled_DoesNotInvokeOnClick()
+    {
+        bool invoked = false;
+        var component = Render<Button>(parameters => parameters
+            .Add(p => p.Disabled, true)
+            .Add(p => p.OnClick, () => invoked = true));
+
+        await component.Find("button").ClickAsync(new MouseEventArgs());
+
+        Assert.False(invoked);
+    }
+
+    [Fact]
     public void Render_AdditionalAttributes_SplattedToButton()
     {
         var component = Render<Button>(parameters => parameters

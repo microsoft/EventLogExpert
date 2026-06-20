@@ -7,13 +7,13 @@
     min-height: 24px;
 }
 
-.filter-predicate:hover .filter-predicate-edit,
-.filter-predicate:hover .filter-predicate-remove {
+.filter-predicate:hover ::deep .filter-predicate-edit,
+.filter-predicate:hover ::deep .filter-predicate-remove {
     border-color: var(--clr-lightblue);
 }
 
-.filter-predicate-edit,
-.filter-predicate-remove {
+.filter-predicate ::deep .filter-predicate-edit,
+.filter-predicate ::deep .filter-predicate-remove {
     display: inline-flex;
     align-items: center;
 
@@ -29,7 +29,7 @@
     transition: color 0.1s ease-in-out, background-color 0.1s ease-in-out, border-color 0.1s ease-in-out;
 }
 
-.filter-predicate-edit {
+.filter-predicate ::deep .filter-predicate-edit {
     gap: 0.25rem;
     padding: 2px 6px 2px 12px;
     border-right: none;
@@ -56,7 +56,7 @@
     text-overflow: ellipsis;
 }
 
-.filter-predicate-remove {
+.filter-predicate ::deep .filter-predicate-remove {
     min-width: 32px;
     padding: 2px 12px 2px 8px;
 
@@ -67,19 +67,19 @@
     border-bottom-right-radius: 999px;
 }
 
-.filter-predicate-remove .bi {
+.filter-predicate ::deep .filter-predicate-remove .bi {
     font-size: 0.9rem;
     line-height: 1;
 }
 
-.filter-predicate-remove:hover {
+.filter-predicate ::deep .filter-predicate-remove:hover {
     color: var(--clr-on-status-fill);
     background: var(--clr-red);
     border-color: var(--clr-red) !important;
 }
 
-.filter-predicate-edit:focus-visible,
-.filter-predicate-remove:focus-visible {
+.filter-predicate ::deep .filter-predicate-edit:focus-visible,
+.filter-predicate ::deep .filter-predicate-remove:focus-visible {
     outline: 2px solid var(--toggle-accent);
     outline-offset: -2px;
 }
@@ -88,10 +88,10 @@
     .filter-predicate {
         border: 1px solid ButtonText;
     }
-    .filter-predicate-remove {
+    .filter-predicate ::deep .filter-predicate-remove {
         border-left: 1px solid ButtonText;
     }
-    .filter-predicate-remove:hover {
+    .filter-predicate ::deep .filter-predicate-remove:hover {
         background: Highlight;
         color: HighlightText;
     }
@@ -112,7 +112,7 @@
 }
 
 /* AND/OR toggle in editing mode \u2014 neutral pill matching the chip aesthetic. */
-.filter-predicate-and-or {
+.filter-predicate-editing ::deep .filter-predicate-and-or {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -136,23 +136,23 @@
     transition: color 0.1s ease-in-out, border-color 0.1s ease-in-out;
 }
 
-.filter-predicate-and-or[data-mode="or"] {
+.filter-predicate-editing ::deep .filter-predicate-and-or[data-mode="or"] {
     color: var(--clr-lightblue);
     border-color: var(--clr-lightblue);
 }
 
-.filter-predicate-and-or:hover {
+.filter-predicate-editing ::deep .filter-predicate-and-or:hover {
     color: var(--clr-lightblue);
     border-color: var(--clr-lightblue);
 }
 
-.filter-predicate-and-or:focus-visible {
+.filter-predicate-editing ::deep .filter-predicate-and-or:focus-visible {
     outline: 2px solid var(--toggle-accent);
     outline-offset: 2px;
 }
 
 @media (forced-colors: active) {
-    .filter-predicate-and-or[data-mode="or"] {
+    .filter-predicate-editing ::deep .filter-predicate-and-or[data-mode="or"] {
         color: Highlight;
         border-color: Highlight;
     }

@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.UI.Inputs;
 
-public sealed class WarningButton : ButtonBase
+public sealed class WarningButton : StyledButtonBase
 {
     protected override string VariantClass => "button-yellow";
 }

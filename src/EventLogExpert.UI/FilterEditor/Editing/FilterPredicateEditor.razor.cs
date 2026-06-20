@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.UI.Focus;
+using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.FilterEditor.Editing;
@@ -15,8 +16,8 @@ namespace EventLogExpert.UI.FilterEditor.Editing;
 /// </summary>
 public sealed partial class FilterPredicateEditor : ComponentBase
 {
-    private ElementReference _chipEditButtonRef;
-    private ElementReference _editorFirstInputRef;
+    private ChromelessButton? _chipEditButton;
+    private ChromelessButton? _editorFirstInput;
 
     [Parameter] public bool IsEditing { get; set; }
 
@@ -61,9 +62,11 @@ public sealed partial class FilterPredicateEditor : ComponentBase
         }
     }
 
-    internal ValueTask FocusChipEditButtonAsync() => ElementFocus.SafelyAsync(_chipEditButtonRef);
+    internal ValueTask FocusChipEditButtonAsync() =>
+        _chipEditButton is { } button ? ElementFocus.SafelyAsync(button.Element) : ValueTask.CompletedTask;
 
-    internal ValueTask FocusEditorFirstInputAsync() => ElementFocus.SafelyAsync(_editorFirstInputRef);
+    internal ValueTask FocusEditorFirstInputAsync() =>
+        _editorFirstInput is { } button ? ElementFocus.SafelyAsync(button.Element) : ValueTask.CompletedTask;
 
     /// <summary>
     ///     AND/OR joiner click handler. Toggles <see cref="FilterPredicateDraft.JoinWithAny" /> and bubbles the change up
