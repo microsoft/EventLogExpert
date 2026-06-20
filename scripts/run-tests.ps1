@@ -19,7 +19,7 @@
 .EXAMPLE
     ./scripts/run-tests.ps1
     ./scripts/run-tests.ps1 -Suite eventing
-    ./scripts/run-tests.ps1 -Suite runtime,eventdbtool
+    ./scripts/run-tests.ps1 -Suite runtime,elevationhelper
 #>
 [CmdletBinding()]
 param(
