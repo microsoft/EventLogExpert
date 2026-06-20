@@ -8,7 +8,7 @@
             <Button CssClass="split-button-primary"
                 IconClass="bi bi-plus-circle"
                 OnClick="AddBasicFilter"
-                @ref="_addFilterButtonRef"
+                @ref="_addFilterButton"
                 title="Add Basic filter (use chevron for Advanced or Recent)">
                 Add Filter
             </Button>
@@ -20,7 +20,7 @@
                 IconClass="bi bi-caret-down-fill"
                 OnClick="OpenAddFilterMenuAsync"
                 @onkeydown="HandleAddFilterChevronKeyDownAsync"
-                @ref="_addFilterChevronRef" />
+                @ref="_addFilterChevron" />
         </div>
 
         <Button IconClass="bi bi-plus-circle" OnClick="AddExclusion">

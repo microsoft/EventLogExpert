@@ -48,8 +48,8 @@ public sealed partial class FilterPane
     private readonly List<FilterDraft> _pendingDrafts = [];
     private readonly Dictionary<FilterId, FilterRow?> _rowRefs = new();
 
-    private Button? _addFilterButtonRef;
-    private Button? _addFilterChevronRef;
+    private Button? _addFilterButton;
+    private Button? _addFilterChevron;
     private long _addFilterMenuId;
     private ScenarioAuthoringRowContext? _authoringContext;
     private bool _canEditDate;
@@ -407,7 +407,7 @@ public sealed partial class FilterPane
         {
             _focusAddButtonAfterRemove = false;
 
-            if (_addFilterButtonRef is { } addFilterButton)
+            if (_addFilterButton is { } addFilterButton)
             {
                 await ElementFocus.SafelyAsync(addFilterButton.Element);
             }
@@ -682,7 +682,7 @@ public sealed partial class FilterPane
 
     private async Task OpenAddFilterMenuAtAsync(bool focusFirst)
     {
-        if (_addFilterChevronRef is not { } chevronButton) { return; }
+        if (_addFilterChevron is not { } chevronButton) { return; }
 
         _menuAnchorModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
             "import", "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
