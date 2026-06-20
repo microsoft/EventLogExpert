@@ -48,7 +48,7 @@ internal sealed class DatabaseCoordinationEffects(
             var selectionByLog = _eventLogState.Value.SelectedEvents
                 .Where(e => e.RecordId.HasValue && reloadNames.Contains(e.OwningLog))
                 .GroupBy(e => e.OwningLog)
-                .ToDictionary(g => g.Key, IReadOnlySet<long> (g) => g.Select(e => e.RecordId!.Value).ToHashSet());
+                .ToDictionary(g => g.Key, g => (IReadOnlySet<long>)g.Select(e => e.RecordId!.Value).ToHashSet());
 
             var selectedRecordId = _eventLogState.Value.SelectedEvent?.RecordId;
             var selectedLogName = _eventLogState.Value.SelectedEvent?.OwningLog;
