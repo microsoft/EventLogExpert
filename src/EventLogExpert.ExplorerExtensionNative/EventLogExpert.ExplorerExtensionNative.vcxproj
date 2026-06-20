@@ -15,8 +15,9 @@
     by the release pipeline) fail with `error MSB8036: The Windows SDK version ... was not found`
     because the bare WindowsTargetPlatformVersion '10.0' below resolves to "latest installed" and
     nothing is installed. The Exists() guards keep the build working when the packages are not
-    restored — it then falls back to the latest machine-installed SDK via the bare '10.0'. The
-    x64 package supplies only the x64 import libs (it carries no .targets). Versions are pinned in
+    restored, it then falls back to the latest machine-installed SDK via the bare '10.0'. The
+    per-architecture .x64 / .arm64 packages each supply only their own import libs (they carry no
+    .targets); the arm64 import below is gated to ARM64 builds. Versions are pinned in
     packages.config; bump in lockstep there. See docs/Explorer-Context-Menu.md.
   -->
   <Import Project="..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.8249\build\native\Microsoft.Windows.SDK.cpp.props" Condition="Exists('..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.8249\build\native\Microsoft.Windows.SDK.cpp.props')" />
