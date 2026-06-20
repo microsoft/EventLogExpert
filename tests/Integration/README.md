@@ -20,7 +20,7 @@ ensures tests fail loudly rather than silently polluting your local Application 
 ### To run integration tests
 
 Use the provided script, which handles Docker daemon mode switching automatically.
-The script runs all services defined in `compose.yml` (eventing, runtime, eventdbtool):
+The script runs all services defined in `compose.yml` (eventing, runtime, elevationhelper):
 
 ```powershell
 # Run all container-gated suites
@@ -28,7 +28,7 @@ The script runs all services defined in `compose.yml` (eventing, runtime, eventd
 
 # Run a specific suite
 ./scripts/run-tests.ps1 -Suite eventing
-./scripts/run-tests.ps1 -Suite runtime,eventdbtool
+./scripts/run-tests.ps1 -Suite runtime,elevationhelper
 ```
 
 Integration test projects that do not require a Windows container (e.g., ProviderDatabase)
@@ -47,7 +47,7 @@ Or run Docker Compose directly:
 ```powershell
 docker compose run --rm eventing
 docker compose run --rm runtime
-docker compose run --rm eventdbtool
+docker compose run --rm elevationhelper
 ```
 
 Or opt in on host explicitly (accepts event log pollution):
@@ -93,7 +93,7 @@ Run each integration test project **serially**:
 ```powershell
 docker compose run --rm eventing
 docker compose run --rm runtime
-docker compose run --rm eventdbtool
+docker compose run --rm elevationhelper
 ```
 
 Do **not** use `docker compose up`. The three services share the `build-artifacts`
