@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
 
-public sealed class EventLogReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false) : IDisposable
+public sealed class EventLogReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false) : IEventLogReader
 {
     private const int EvtQueryReverseDirection = 0x200;
 
@@ -17,6 +17,8 @@ public sealed class EventLogReader(string path, LogPathType pathType, bool rende
         ? NativeMethods.EvtQueryWithFlags(EventLogSession.GlobalSession.Handle, path, null,
             (int)pathType | EvtQueryReverseDirection)
         : NativeMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, pathType);
+
+    private readonly int _openError = Marshal.GetLastWin32Error();
 
     private int _disposed;
     private bool _newestCaptured;
@@ -47,6 +49,13 @@ public sealed class EventLogReader(string path, LogPathType pathType, bool rende
     ///     a reverse read), this never points at the wrong end of the log.
     /// </summary>
     public string? NewestBookmark => reverseDirection ? _newestReverseBookmark : LastBookmark;
+
+    /// <summary>
+    ///     The Win32 error from a failed <c>EvtQuery</c> open, or <see langword="null" /> when the log opened (
+    ///     <see cref="IsValid" /> is <see langword="true" />). Captured once at construction, so unlike the per-read
+    ///     <see cref="LastErrorCode" /> it is stable and reflects the open failure rather than a later read.
+    /// </summary>
+    public int? OpenErrorCode => IsValid ? null : _openError;
 
     public void Dispose()
     {
