@@ -159,6 +159,7 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<LogCloseCoordinator>();
             services.AddSingleton<EventLogConcurrencyState>();
             services.AddSingleton<PartialLoadCoordinator>();
+            services.AddSingleton<IEventLogReaderFactory, EventLogReaderFactory>();
 
             // UI capabilities.
             services.AddSingleton<IHighlightSelector, HighlightSelector>();
