@@ -156,7 +156,7 @@
         <VsMSBuildPath>$(VsMSBuildPath.Trim())</VsMSBuildPath>
       </PropertyGroup>
       <Error Condition="'$(VsMSBuildPath)' == '' OR !Exists('$(VsMSBuildPath)')"
-             Text="Could not locate Visual Studio MSBuild.exe with the required C++ workload components via vswhere ($(_VswherePath)). The native shell extension requires a VS install with $(_ExplorerExtensionVcComponents) AND the Windows 10/11 SDK. See docs/Explorer-Context-Menu.md for prereqs." />
+             Text="Could not locate Visual Studio MSBuild.exe with the required C++ workload components via vswhere ($(_VswherePath)). The native shell extension requires a VS install with $(_ExplorerExtensionVcComponents); the Windows 10/11 SDK is supplied by the restored Microsoft.Windows.SDK.CPP* NuGet packages (or a machine-installed SDK as a fallback). See docs/Explorer-Context-Menu.md for prereqs." />
       <Exec Command="where nuget.exe" ConsoleToMSBuild="true" ContinueOnError="true" IgnoreExitCode="true">
         <Output TaskParameter="ExitCode" PropertyName="_WhereNugetExitCode" />
         <Output TaskParameter="ConsoleOutput" PropertyName="_WhereNugetOutput" />
@@ -190,7 +190,7 @@
       <Exec Command="&quot;$(VsMSBuildPath)&quot; &quot;$(ExplorerExtensionNativeProject)&quot; /p:Configuration=$(Configuration) /p:Platform=$(ExplorerExtensionNativePlatform) /nologo /v:minimal"
             ContinueOnError="false" />
       <Error Condition="!Exists('$(ExplorerExtensionNativeDll)')"
-             Text="EventLogExpert.ExplorerExtension.dll native build did not produce output at $(ExplorerExtensionNativeDll). Check the C++ workload + Windows SDK install. See docs/Explorer-Context-Menu.md for prereqs." />
+             Text="EventLogExpert.ExplorerExtension.dll native build did not produce output at $(ExplorerExtensionNativeDll). Check the C++ workload and the restored Microsoft.Windows.SDK.CPP* packages (or a machine-installed Windows SDK). See docs/Explorer-Context-Menu.md for prereqs." />
     </Target>
 
     <!--
