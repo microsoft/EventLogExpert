@@ -29,7 +29,7 @@ The MAUI receiving side:
 
 ## Build prerequisites
 
-The native shell extension requires the **MSVC C++ workload** to build. The **Windows 10/11 SDK (10.0.26100+)** it compiles against is delivered as NuGet packages (`Microsoft.Windows.SDK.CPP` + `Microsoft.Windows.SDK.CPP.x64`, restored to `src/packages`), so a machine-installed Windows SDK is **not** required on build agents — the OneBranch release container ships the C++ toolset but no SDK, and the packages supply the headers, import libs, winmd, and SDK tools (`rc.exe`, `mt.exe`, `midlrt.exe`). Specifically:
+The native shell extension requires the **MSVC C++ workload** to build. The **Windows 10/11 SDK (10.0.26100+)** it compiles against is delivered as NuGet packages (`Microsoft.Windows.SDK.CPP` + the per-architecture `Microsoft.Windows.SDK.CPP.x64` / `Microsoft.Windows.SDK.CPP.arm64`, restored to `src/packages`), so a machine-installed Windows SDK is **not** required on build agents - the OneBranch release container ships the C++ toolset but no SDK, and the packages supply the headers, import libs, winmd, and SDK tools (`rc.exe`, `mt.exe`, `midlrt.exe`). Specifically:
 
 - Visual Studio 2026 (or 2022) with the **Desktop development with C++** workload
 - The Windows SDK NuGet packages above (restored automatically by the `BuildExplorerExtensionNative` target; see below). A locally-installed Windows SDK 10.0.26100+ is still honored as a fallback when those packages are not restored — the vcxproj's `WindowsTargetPlatformVersion` then stays a bare `10.0` (latest installed SDK).
@@ -46,7 +46,7 @@ cd src/EventLogExpert.ExplorerExtensionNative
 nuget restore packages.config -PackagesDirectory ..\packages
 ```
 
-This populates `src/packages/` with `Microsoft.Windows.CppWinRT.*`, `Microsoft.Windows.ImplementationLibrary.*` (WIL), and the Windows SDK packages `Microsoft.Windows.SDK.CPP.*` + `Microsoft.Windows.SDK.CPP.x64.*` (the SDK packages are large — several hundred MB extracted). All are gitignored.
+This populates `src/packages/` with `Microsoft.Windows.CppWinRT.*`, `Microsoft.Windows.ImplementationLibrary.*` (WIL), and the Windows SDK packages `Microsoft.Windows.SDK.CPP.*` + the per-architecture `Microsoft.Windows.SDK.CPP.x64.*` / `Microsoft.Windows.SDK.CPP.arm64.*` (the SDK packages are large - several hundred MB extracted). All are gitignored.
 
 ## Local dev install (signed MSIX)
 
