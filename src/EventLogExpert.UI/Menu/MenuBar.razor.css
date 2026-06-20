@@ -7,7 +7,7 @@
     flex: 0 0 auto;
 }
 
-.menu-bar-item {
+.menu-bar ::deep .menu-bar-item {
     display: inline-flex;
     align-items: center;
     padding: 0 12px;
@@ -17,17 +17,17 @@
     font-size: 0.9rem;
     cursor: default;
     outline: none;
+}
 
-    &:hover,
-    &.active {
-        background-color: var(--menu-hover-overlay);
-        color: var(--text-on-statusbar);
-    }
+.menu-bar ::deep .menu-bar-item:hover,
+.menu-bar ::deep .menu-bar-item.active {
+    background-color: var(--menu-hover-overlay);
+    color: var(--text-on-statusbar);
+}
 
-    &:focus-visible {
-        background-color: var(--menu-hover-overlay);
-        color: var(--text-on-statusbar);
-        outline: 2px solid var(--clr-lightblue);
-        outline-offset: -2px;
-    }
+.menu-bar ::deep .menu-bar-item:focus-visible {
+    background-color: var(--menu-hover-overlay);
+    color: var(--text-on-statusbar);
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: -2px;
 }

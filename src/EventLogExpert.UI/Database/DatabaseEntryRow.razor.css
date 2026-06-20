@@ -42,7 +42,7 @@
     min-width: 0;
 }
 
-.db-entry-name {
+.db-entry-row ::deep .db-entry-name {
     flex: 1 1 auto;
     min-width: 0;
 

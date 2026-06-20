@@ -37,7 +37,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     private Button? _importButton;
     private ImmutableHashSet<string> _initialActiveSnapshot = ImmutableHashSet<string>.Empty;
     private bool _isSelectionModeActive;
-    private ElementReference _masterCheckboxRef;
+    private ChromelessButton? _masterCheckbox;
     private bool _restorationOccurred;
     private bool _schemaUpgradeOccurred;
     private Button? _selectButton;
@@ -557,7 +557,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         if (_selectedForBulk.Count > 0)
         {
-            await ElementFocus.SafelyAsync(_masterCheckboxRef, preventScroll: true);
+            await FocusRestoreAsync(_masterCheckbox);
 
             return;
         }
@@ -858,7 +858,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             SelectAll();
         }
 
-        await ElementFocus.SafelyAsync(_masterCheckboxRef, preventScroll: true);
+        await FocusRestoreAsync(_masterCheckbox);
     }
 
     private async Task OnSaveClickAsync()

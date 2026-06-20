@@ -1,22 +1,19 @@
 @inherits FluxorComponent
 
-<div class="details-pane" data-toggle="@IsVisible" hidden="@(_selectedEvent is null)" @ref="_detailsPaneRootRef">
+<div class="details-pane" data-toggle="@IsVisible" hidden="@(_selectedEvent is null)">
     <div class="details-resizer"></div>
 
-    <div aria-expanded="@_isVisible.ToString().ToLower()"
+    <ChromelessButton aria-expanded="@_isVisible.ToString().ToLower()"
         aria-label="@(_isVisible ? "Details Expanded" : "Details Collapsed")"
-        class="flex-space-between"
+        CssClass="flex-space-between"
         id="details-header"
-        @onclick="ToggleMenu"
-        @onkeydown="HandleKeyDown"
-        role="button"
-        tabindex="0">
-        <div>Details</div>
+        OnClick="ToggleMenu">
+        <span>Details</span>
 
         <span class="menu-toggle" data-rotate="@IsVisible">
             <i class="bi bi-caret-up"></i>
         </span>
-    </div>
+    </ChromelessButton>
 
     @if (_selectedEvent is not null)
     {
@@ -39,18 +36,15 @@
 
         <hr />
 
-        <div aria-expanded="@_isXmlVisible.ToString().ToLower()"
+        <ChromelessButton aria-expanded="@_isXmlVisible.ToString().ToLower()"
             aria-label="@(_isXmlVisible ? "XML Expanded" : "XML Collapsed")"
-            class="details-row-xml flex-space-between"
-            @onclick="ToggleXml"
-            @onkeydown="HandleKeyDownXml"
-            role="button"
-            tabindex="0">
-            <div>XML</div>
+            CssClass="details-row-xml flex-space-between"
+            OnClick="ToggleXml">
+            <span>XML</span>
             <span class="menu-toggle" data-rotate="@_isXmlVisible.ToString().ToLower()">
                 <i class="bi bi-caret-up"></i>
             </span>
-        </div>
+        </ChromelessButton>
 
         <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">
             @if (_resolvedXml is null)

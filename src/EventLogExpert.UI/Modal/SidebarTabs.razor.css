@@ -14,7 +14,7 @@
     padding: 8px 4px 8px 0;
 }
 
-.sidebar-tabs-list .tab {
+.sidebar-tabs-list ::deep .tab {
     text-align: left;
     padding: 8px 12px;
     background: transparent;
@@ -26,22 +26,22 @@
     font: inherit;
 }
 
-.sidebar-tabs-list .tab:hover {
+.sidebar-tabs-list ::deep .tab:hover {
     background: var(--background-darkgray);
 }
 
-.sidebar-tabs-list .tab.active {
+.sidebar-tabs-list ::deep .tab.active {
     background: transparent;
     border-left-color: var(--clr-lightblue);
     color: var(--clr-lightblue);
     font-weight: 600;
 }
 
-.sidebar-tabs-list .tab.active:hover {
+.sidebar-tabs-list ::deep .tab.active:hover {
     background: var(--background-darkgray);
 }
 
-.sidebar-tabs-list .tab:focus-visible {
+.sidebar-tabs-list ::deep .tab:focus-visible {
     outline: 2px solid var(--clr-lightblue);
     outline-offset: -2px;
 }

@@ -49,6 +49,43 @@ public sealed class ButtonTests : BunitContext
     }
 
     [Fact]
+    public async Task KeyDown_InvokesOnKeyDown()
+    {
+        bool invoked = false;
+        var component = Render<Button>(parameters => parameters
+            .Add(p => p.OnKeyDown, () => invoked = true));
+
+        await component.Find("button").KeyDownAsync(new KeyboardEventArgs());
+
+        Assert.True(invoked);
+    }
+
+    [Fact]
+    public async Task KeyDown_WhenDisabled_DoesNotInvokeOnKeyDown()
+    {
+        bool invoked = false;
+        var component = Render<Button>(parameters => parameters
+            .Add(p => p.Disabled, true)
+            .Add(p => p.OnKeyDown, () => invoked = true));
+
+        await component.Find("button").KeyDownAsync(new KeyboardEventArgs());
+
+        Assert.False(invoked);
+    }
+
+    [Fact]
+    public async Task MouseEnter_InvokesOnMouseEnter()
+    {
+        bool invoked = false;
+        var component = Render<Button>(parameters => parameters
+            .Add(p => p.OnMouseEnter, () => invoked = true));
+
+        await component.Find("button").MouseEnterAsync(new MouseEventArgs());
+
+        Assert.True(invoked);
+    }
+
+    [Fact]
     public void Render_AdditionalAttributes_SplattedToButton()
     {
         var component = Render<Button>(parameters => parameters
