@@ -24,29 +24,29 @@ internal static partial class NativeMethods
             case (int)EvtVariantType.String:
                 return Marshal.PtrToStringUni(variant.StringVal);
             case (int)EvtVariantType.AnsiString:
-                return Marshal.PtrToStringAnsi(variant.AnsiString);
+                return Marshal.PtrToStringAnsi(variant.AnsiStringVal);
             case (int)EvtVariantType.SByte:
-                return variant.SByte;
+                return variant.SByteVal;
             case (int)EvtVariantType.Byte:
-                return variant.UInt8;
+                return variant.ByteVal;
             case (int)EvtVariantType.Int16:
-                return variant.Short;
+                return variant.Int16Val;
             case (int)EvtVariantType.UInt16:
-                return variant.UShort;
+                return variant.UInt16Val;
             case (int)EvtVariantType.Int32:
-                return variant.Integer;
+                return variant.Int32Val;
             case (int)EvtVariantType.UInt32:
-                return variant.UInteger;
+                return variant.UInt32Val;
             case (int)EvtVariantType.Int64:
-                return variant.Long;
+                return variant.Int64Val;
             case (int)EvtVariantType.UInt64:
-                return variant.ULong;
+                return variant.UInt64Val;
             case (int)EvtVariantType.Single:
-                return variant.Single;
+                return variant.SingleVal;
             case (int)EvtVariantType.Double:
-                return variant.Double;
+                return variant.DoubleVal;
             case (int)EvtVariantType.Boolean:
-                return variant.Bool != 0;
+                return variant.BooleanVal != 0;
             case (int)EvtVariantType.Binary:
                 if (variant.Count == 0)
                 {
@@ -55,23 +55,23 @@ internal static partial class NativeMethods
 
                 int byteCount = CheckedCount(variant.Count, EvtVariantType.Binary);
 
-                if (variant.Binary == IntPtr.Zero)
+                if (variant.BinaryVal == IntPtr.Zero)
                 {
                     throw new InvalidDataException(
                         $"Null reference with non-zero count {variant.Count} for {nameof(EvtVariantType)}.{EvtVariantType.Binary}");
                 }
 
                 byte[] bytes = new byte[byteCount];
-                Marshal.Copy(variant.Binary, bytes, 0, byteCount);
+                Marshal.Copy(variant.BinaryVal, bytes, 0, byteCount);
                 return bytes;
             case (int)EvtVariantType.Guid:
-                return Marshal.PtrToStructure<Guid>(variant.GuidReference);
+                return Marshal.PtrToStructure<Guid>(variant.GuidVal);
             case (int)EvtVariantType.SizeT:
-                return variant.SizeT;
+                return variant.SizeTVal;
             case (int)EvtVariantType.FileTime:
-                return DateTime.FromFileTimeUtc((long)variant.FileTime);
+                return DateTime.FromFileTimeUtc((long)variant.FileTimeVal);
             case (int)EvtVariantType.SysTime:
-                var sysTime = Marshal.PtrToStructure<SystemTime>(variant.SystemTime);
+                var sysTime = Marshal.PtrToStructure<SystemTime>(variant.SysTimeVal);
 
                 return new DateTime(
                     sysTime.Year,
@@ -85,13 +85,13 @@ internal static partial class NativeMethods
             case (int)EvtVariantType.Sid:
                 return variant.SidVal == IntPtr.Zero ? null : new SecurityIdentifier(variant.SidVal);
             case (int)EvtVariantType.HexInt32:
-                return variant.Integer;
+                return variant.Int32Val;
             case (int)EvtVariantType.HexInt64:
-                return variant.ULong;
+                return variant.UInt64Val;
             case (int)EvtVariantType.Handle:
-                return new EvtHandle(variant.Handle);
+                return new EvtHandle(variant.EvtHandleVal);
             case (int)EvtVariantType.Xml:
-                return Marshal.PtrToStringUni(variant.StringVal);
+                return Marshal.PtrToStringUni(variant.XmlVal);
             case (int)EvtVariantType.StringArray:
                 if (variant.Count == 0)
                 {
@@ -100,7 +100,7 @@ internal static partial class NativeMethods
 
                 int stringCount = CheckedCount(variant.Count, EvtVariantType.StringArray);
 
-                if (variant.Reference == IntPtr.Zero)
+                if (variant.StringArr == IntPtr.Zero)
                 {
                     throw new InvalidDataException(
                         $"Null reference with non-zero count {variant.Count} for {nameof(EvtVariantType)}.{EvtVariantType.StringArray}");
@@ -110,20 +110,20 @@ internal static partial class NativeMethods
 
                 for (int i = 0; i < stringCount; i++)
                 {
-                    IntPtr stringRef = Marshal.ReadIntPtr(variant.Reference, i * IntPtr.Size);
+                    IntPtr stringRef = Marshal.ReadIntPtr(variant.StringArr, i * IntPtr.Size);
 
                     stringArray[i] = Marshal.PtrToStringAuto(stringRef) ?? string.Empty;
                 }
 
                 return stringArray;
             case (int)EvtVariantType.ByteArray:
-                return ReadBlittableArray<byte>(variant.Reference, variant.Count, EvtVariantType.ByteArray);
+                return ReadBlittableArray<byte>(variant.ByteArr, variant.Count, EvtVariantType.ByteArray);
             case (int)EvtVariantType.UInt16Array:
-                return ReadBlittableArray<ushort>(variant.Reference, variant.Count, EvtVariantType.UInt16Array);
+                return ReadBlittableArray<ushort>(variant.UInt16Arr, variant.Count, EvtVariantType.UInt16Array);
             case (int)EvtVariantType.UInt32Array:
-                return ReadBlittableArray<uint>(variant.Reference, variant.Count, EvtVariantType.UInt32Array);
+                return ReadBlittableArray<uint>(variant.UInt32Arr, variant.Count, EvtVariantType.UInt32Array);
             case (int)EvtVariantType.HexInt32Array:
-                return ReadBlittableArray<int>(variant.Reference, variant.Count, EvtVariantType.HexInt32Array);
+                return ReadBlittableArray<int>(variant.Int32Arr, variant.Count, EvtVariantType.HexInt32Array);
             default:
                 throw new InvalidDataException($"Invalid {nameof(EvtVariantType)}: {variant.Type}");
         }
@@ -454,7 +454,7 @@ internal static partial class NativeMethods
             {
                 fixed (char* bufferPtr = buffer)
                 {
-                    var variant = Marshal.PtrToStructure<EvtVariant>((IntPtr)bufferPtr);
+                    var variant = *(EvtVariant*)bufferPtr;
 
                     return ConvertVariant(variant) ??
                         throw new InvalidDataException($"Invalid Object Array for Property: {propertyId}");
@@ -594,15 +594,15 @@ internal static partial class NativeMethods
 
             var properties = new object[propertyCount];
 
-            for (int i = 0; i < propertyCount; i++)
+            unsafe
             {
-                unsafe
+                fixed (char* bufferPtr = buffer)
                 {
-                    fixed (char* bufferPtr = buffer)
-                    {
-                        var property = Marshal.PtrToStructure<EvtVariant>((IntPtr)bufferPtr + (i * Marshal.SizeOf<EvtVariant>()));
+                    var variants = (EvtVariant*)bufferPtr;
 
-                        properties[i] = ConvertVariant(property) ?? throw new InvalidDataException();
+                    for (int i = 0; i < propertyCount; i++)
+                    {
+                        properties[i] = ConvertVariant(variants[i]) ?? throw new InvalidDataException();
                     }
                 }
             }
@@ -712,17 +712,21 @@ internal static partial class NativeMethods
     }
 
     /// <summary>Converts a buffer that was returned from <see cref="EvtRender" /> to an <see cref="EventRecord" /></summary>
-    /// <param name="eventBuffer">Pointer to a buffer returned from <see cref="EvtRender" /></param>
+    /// <param name="eventBuffer">
+    ///     Pointer to a buffer returned from <see cref="EvtRender" />. Must stay pinned and valid for
+    ///     the duration of the call; the variants are read directly through this pointer.
+    /// </param>
     /// <param name="propertyCount">Number of properties returned from <see cref="EvtRender" /></param>
     /// <returns></returns>
-    private static EventRecord GetEventRecord(IntPtr eventBuffer, int propertyCount)
+    private static unsafe EventRecord GetEventRecord(IntPtr eventBuffer, int propertyCount)
     {
         EventRecord properties = new();
 
+        var variants = (EvtVariant*)eventBuffer;
+
         for (int i = 0; i < propertyCount; i++)
         {
-            var property = Marshal.PtrToStructure<EvtVariant>(eventBuffer + (i * Marshal.SizeOf<EvtVariant>()));
-            var variant = ConvertVariant(property);
+            var variant = ConvertVariant(variants[i]);
 
             // Properties are returned in the order defined in EVT_SYSTEM_PROPERTY_ID enum
             switch (i)
