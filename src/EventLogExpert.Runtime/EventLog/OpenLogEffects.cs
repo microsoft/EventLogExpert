@@ -14,7 +14,9 @@ using EventLogExpert.Runtime.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Security;
 using System.Threading.Channels;
 using IDispatcher = Fluxor.IDispatcher;
@@ -32,8 +34,13 @@ internal sealed class OpenLogEffects(
     ICriticalErrorService criticalErrorService,
     LogCloseCoordinator closeCoordinator,
     EventLogConcurrencyState concurrencyState,
-    PartialLoadCoordinator coordinator)
+    PartialLoadCoordinator coordinator,
+    IEventLogReaderFactory readerFactory)
 {
+    // A screenful of newest events: the eager first paint dispatches once this many are resolved so the newest rows
+    // render in ~1s instead of waiting for the 3-second partial timer.
+    private const int EagerFirstPaintThreshold = 200;
+
     private static readonly int s_maxGlobalConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
     private static readonly SemaphoreSlim s_resolutionThrottle = new(s_maxGlobalConcurrency, s_maxGlobalConcurrency);
 
@@ -48,6 +55,7 @@ internal sealed class OpenLogEffects(
     private readonly ITraceLogger _logger = logger;
     private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logLoadCompletions = new();
     private readonly ILogWatcherService _logWatcherService = logWatcherService;
+    private readonly IEventLogReaderFactory _readerFactory = readerFactory;
     private readonly IEventResolverCache _resolverCache = resolverCache;
     private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
     private readonly IEventXmlResolver _xmlResolver = xmlResolver;
@@ -289,6 +297,7 @@ internal sealed class OpenLogEffects(
         int resolved = 0;
         int lastPartialIndex = 0;
         int timerTick = 0;
+        int eagerFired = 0;
 
         dispatcher.Dispatch(new AddTableAction(logData));
 
@@ -307,19 +316,7 @@ internal sealed class OpenLogEffects(
 
                 if (Interlocked.Increment(ref timerTick) <= 1) { return; }
 
-                List<ResolvedEvent> delta;
-
-                lock (events)
-                {
-                    int fromIndex = Volatile.Read(ref lastPartialIndex);
-
-                    if (events.Count <= fromIndex) { return; }
-
-                    delta = events.GetRange(fromIndex, events.Count - fromIndex);
-                    Volatile.Write(ref lastPartialIndex, events.Count);
-                }
-
-                dispatcher.Dispatch(new LoadEventsPartialAction(logData, delta.AsReadOnly()));
+                TryDispatchPartial();
             },
             null,
             TimeSpan.Zero,
@@ -327,7 +324,7 @@ internal sealed class OpenLogEffects(
 
         bool renderXml = _eventLogState.Value.AppliedFilter.RequiresXml;
 
-        using var reader = new EventLogReader(action.LogName, action.LogPathType, renderXml);
+        using var reader = _readerFactory.CreateReader(action.LogName, action.LogPathType, renderXml, reverseDirection: true);
 
         var producerTask = Task.Run(async () =>
         {
@@ -354,6 +351,13 @@ internal sealed class OpenLogEffects(
 
         try
         {
+            if (!reader.IsValid)
+            {
+                int openError = reader.OpenErrorCode ?? 0;
+
+                throw new Win32Exception(openError, $"Opening '{action.LogName}' failed (Win32 {openError}: {Marshal.GetPInvokeErrorMessage(openError)}).");
+            }
+
             await Parallel.ForEachAsync(
                 channel.Reader.ReadAllAsync(token),
                 new ParallelOptions
@@ -399,6 +403,15 @@ internal sealed class OpenLogEffects(
                             lock (events) { events.AddRange(localBatch); }
 
                             Interlocked.Add(ref resolved, localResolved);
+
+                            // Eager first paint: once the first screenful of (newest, because the read is reversed)
+                            // events is resolved, dispatch them immediately instead of waiting for the 3-second timer.
+                            // Fires exactly once across the resolve workers and reuses the shared partial cursor.
+                            if (Volatile.Read(ref resolved) >= EagerFirstPaintThreshold &&
+                                Interlocked.Exchange(ref eagerFired, 1) == 0)
+                            {
+                                TryDispatchPartial();
+                            }
                         }
                     }
                     finally
@@ -409,7 +422,12 @@ internal sealed class OpenLogEffects(
 
             await producerTask;
 
-            lastEvent = reader.LastBookmark;
+            lastEvent = reader.NewestBookmark;
+
+            if (reader.LastErrorCode is { } readErrorCode)
+            {
+                throw new Win32Exception(readErrorCode, $"Reading '{action.LogName}' stopped (Win32 {readErrorCode}: {Marshal.GetPInvokeErrorMessage(readErrorCode)}).");
+            }
         }
         catch (OperationCanceledException)
         {
@@ -486,5 +504,30 @@ internal sealed class OpenLogEffects(
         dispatcher.Dispatch(new SetResolverStatusAction(string.Empty));
 
         _logger.Information($"Loaded '{action.LogName}': {events.Count} events ({failed} failed) in {stopwatch.ElapsedMilliseconds}ms.");
+
+        return;
+
+        void TryDispatchPartial()
+        {
+            List<ResolvedEvent> delta;
+
+            lock (events)
+            {
+                int fromIndex = lastPartialIndex;
+
+                if (events.Count <= fromIndex) { return; }
+
+                delta = events.GetRange(fromIndex, events.Count - fromIndex);
+                lastPartialIndex = events.Count;
+            }
+
+            // Parallel resolution finishes batches out of order, so sort this delta newest-first (matching the final
+            // LoadEventsAction sort) before it is appended to the raw store. With the reverse newest-first read each
+            // delta covers an older range than the last, so the raw store stays index-0-is-newest for the
+            // date-range/endpoint queries that read it during load.
+            delta.Sort((a, b) => Comparer<long?>.Default.Compare(b.RecordId, a.RecordId));
+
+            dispatcher.Dispatch(new LoadEventsPartialAction(logData, delta.AsReadOnly()));
+        }
     }
 }
