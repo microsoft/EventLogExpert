@@ -59,7 +59,11 @@ public abstract class ButtonBase : ComponentBase
         }
 
         builder.AddAttribute(4, "disabled", Disabled);
-        builder.AddAttribute(5, "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync));
+
+        if (OnClick.HasDelegate || StopPropagation)
+        {
+            builder.AddAttribute(5, "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync));
+        }
 
         if (StopPropagation)
         {
@@ -76,7 +80,11 @@ public abstract class ButtonBase : ComponentBase
             builder.AddEventStopPropagationAttribute(8, "onkeydown", true);
         }
 
-        builder.AddAttribute(9, "onmouseenter", OnMouseEnter);
+        if (OnMouseEnter.HasDelegate)
+        {
+            builder.AddAttribute(9, "onmouseenter", OnMouseEnter);
+        }
+
         builder.AddElementReferenceCapture(10, capturedRef => _element = capturedRef);
 
         if (!string.IsNullOrWhiteSpace(IconClass))
