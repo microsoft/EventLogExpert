@@ -35,7 +35,7 @@
     animation: manage-databases-selection-header-fade-in 200ms ease-out;
 }
 
-.manage-databases-master-btn {
+.manage-databases-tab ::deep .manage-databases-master-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -59,7 +59,7 @@
     overflow: hidden;
 }
 
-.manage-databases-master-btn:focus-visible {
+.manage-databases-tab ::deep .manage-databases-master-btn:focus-visible {
     outline: 2px solid var(--clr-lightblue);
     outline-offset: 2px;
     border-radius: 2px;

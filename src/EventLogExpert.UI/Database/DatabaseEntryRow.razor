@@ -11,7 +11,7 @@
 
     <div class="db-entry-row-content">
         <div class="db-entry-info">
-            <button class="db-entry-name" id="@_nameButtonId" @ref="_nameButtonRef" type="button">@Entry.FileName</button>
+            <ChromelessButton CssClass="db-entry-name" id="@_nameButtonId" @ref="_nameButton">@Entry.FileName</ChromelessButton>
             @if (ShouldShowBadge)
             {
                 <span class="db-entry-badge" data-badge="@BadgeKind">@BadgeLabel</span>

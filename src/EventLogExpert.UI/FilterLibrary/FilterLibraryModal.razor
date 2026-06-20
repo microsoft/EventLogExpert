@@ -61,23 +61,22 @@
                                 @foreach (var tag in visibleTags)
                                 {
                                     var isSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.OrdinalIgnoreCase);
-                                    <button aria-pressed="@(isSelected ? "true" : "false")"
-                                        class="library-tag-filter-chip"
-                                        @onclick="@(() => ToggleTagFilter(tag))"
-                                        type="button">
+
+                                    <ChromelessButton aria-pressed="@(isSelected ? "true" : "false")"
+                                        CssClass="library-tag-filter-chip"
+                                        OnClick="@(() => ToggleTagFilter(tag))">
                                         @tag
-                                    </button>
+                                    </ChromelessButton>
                                 }
                                 @if (hiddenTagsCount > 0)
                                 {
-                                    <button aria-controls="@(_isTagOverflowExpanded ? tagOverflowRegionId : null)"
+                                    <ChromelessButton aria-controls="@(_isTagOverflowExpanded ? tagOverflowRegionId : null)"
                                         aria-expanded="@(_isTagOverflowExpanded ? "true" : "false")"
                                         aria-label="@(_isTagOverflowExpanded ? "Hide additional tags" : $"Show {hiddenTagsCount} additional tags")"
-                                        class="library-tag-filter-chip-overflow"
-                                        @onclick="ToggleTagOverflowExpanded"
-                                        type="button">
-                                        @(_isTagOverflowExpanded ? "− less" : $"+{hiddenTagsCount} more")
-                                    </button>
+                                        CssClass="library-tag-filter-chip-overflow"
+                                        OnClick="ToggleTagOverflowExpanded">
+                                        @(_isTagOverflowExpanded ? "- less" : $"+{hiddenTagsCount} more")
+                                    </ChromelessButton>
                                 }
                                 @if (_isTagOverflowExpanded && hiddenTagsCount > 0)
                                 {
@@ -85,12 +84,12 @@
                                         @foreach (var tag in AllLibraryTags.Skip(TagFilterBarMaxVisible))
                                         {
                                             var isOverflowSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.OrdinalIgnoreCase);
-                                            <button aria-pressed="@(isOverflowSelected ? "true" : "false")"
-                                                class="library-tag-filter-chip"
-                                                @onclick="@(() => ToggleTagFilter(tag))"
-                                                type="button">
+
+                                            <ChromelessButton aria-pressed="@(isOverflowSelected ? "true" : "false")"
+                                                CssClass="library-tag-filter-chip"
+                                                OnClick="@(() => ToggleTagFilter(tag))">
                                                 @tag
-                                            </button>
+                                            </ChromelessButton>
                                         }
                                     </div>
                                 }

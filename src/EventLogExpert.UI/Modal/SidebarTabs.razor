@@ -8,19 +8,18 @@
         role="tablist">
         @foreach (var (tab, label) in Tabs)
         {
-            <button aria-controls="@($"sidebar-tabpanel-{TablistId}-{tab}")"
+            <ChromelessButton aria-controls="@($"sidebar-tabpanel-{TablistId}-{tab}")"
                 aria-selected="@(tab.Equals(ActiveTab) ? "true" : "false")"
-                class="@(tab.Equals(ActiveTab) ? "tab active" : "tab")"
+                CssClass="@(tab.Equals(ActiveTab) ? "tab active" : "tab")"
                 id="@($"sidebar-tab-{TablistId}-{tab}")"
                 @key="tab"
-                @onclick="() => SetActiveTabAsync(tab)"
-                @onkeydown="e => OnTabKeyDownAsync(e, tab)"
+                OnClick="@(() => SetActiveTabAsync(tab))"
+                OnKeyDown="@(e => OnTabKeyDownAsync(e, tab))"
                 @ref="_tabButtonRefs[tab]"
                 role="tab"
-                tabindex="@(tab.Equals(ActiveTab) ? "0" : "-1")"
-                type="button">
+                tabindex="@(tab.Equals(ActiveTab) ? "0" : "-1")">
                 <span class="sidebar-tabs-tab-label">@label</span>
-            </button>
+            </ChromelessButton>
         }
     </div>
 

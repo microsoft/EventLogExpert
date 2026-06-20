@@ -14,10 +14,10 @@
     &[data-toggle="false"] {
         height: auto;
         min-height: 0;
-
-        & > :not(#details-header) { display: none; }
     }
 }
+
+.details-pane[data-toggle="false"] ::deep > :not(#details-header) { display: none; }
 
 .details-resizer {
     height: 10px;
@@ -33,7 +33,14 @@
     cursor: n-resize;
 }
 
-#details-header {
+.details-pane ::deep #details-header {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
     user-select: none;
     cursor: pointer;
 }
@@ -52,7 +59,14 @@
     white-space: pre-wrap;
 }
 
-.details-row-xml {
+.details-pane ::deep .details-row-xml {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
     user-select: none;
     cursor: pointer;
 }

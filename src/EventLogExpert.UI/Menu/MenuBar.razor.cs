@@ -13,6 +13,7 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
+using EventLogExpert.UI.Inputs;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -27,7 +28,7 @@ public sealed partial class MenuBar
 
     private readonly List<TopLevel> _bars = [];
 
-    private ElementReference[] _barElements = [];
+    private ChromelessButton[] _barElements = [];
     private int _focusedBarIndex;
     private IJSObjectReference? _menuAnchorModule;
     private ElementReference _menuBarRootRef;
@@ -121,7 +122,7 @@ public sealed partial class MenuBar
         MenuService.NavigateBarRequested += OnNavigateBarRequested;
 
         _bars.AddRange(BuildTopLevel());
-        _barElements = new ElementReference[_bars.Count];
+        _barElements = new ChromelessButton[_bars.Count];
 
         _ = PrewarmOtherLogNamesAsync();
 
@@ -349,7 +350,9 @@ public sealed partial class MenuBar
 
         StateHasChanged();
 
-        try { await _barElements[index].FocusAsync(); }
+        if (_barElements[index] is not { } barButton) { return; }
+
+        try { await barButton.FocusAsync(); }
         catch { /* element may not be in the DOM yet */ }
     }
 
@@ -437,9 +440,11 @@ public sealed partial class MenuBar
         _menuAnchorModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
             "import", "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
 
+        if (_barElements[index] is not { } barButton) { return; }
+
         var rect = await _menuAnchorModule.InvokeAsync<MenuAnchorRect>(
             "getMenuElementRect",
-            _barElements[index]);
+            barButton.Element);
 
         if (requestId != Volatile.Read(ref _openRequestId)) { return; }
 

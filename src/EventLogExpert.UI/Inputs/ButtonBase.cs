@@ -26,6 +26,12 @@ public abstract class ButtonBase : ComponentBase
 
     [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
 
+    [Parameter] public EventCallback<KeyboardEventArgs> OnKeyDown { get; set; }
+
+    [Parameter] public EventCallback<MouseEventArgs> OnMouseEnter { get; set; }
+
+    [Parameter] public bool StopKeyDownPropagation { get; set; }
+
     [Parameter] public bool StopPropagation { get; set; }
 
     [Parameter] public string? Type { get; set; } = "button";
@@ -60,24 +66,37 @@ public abstract class ButtonBase : ComponentBase
             builder.AddEventStopPropagationAttribute(6, "onclick", true);
         }
 
-        builder.AddElementReferenceCapture(7, capturedRef => _element = capturedRef);
+        if (OnKeyDown.HasDelegate)
+        {
+            builder.AddAttribute(7, "onkeydown", EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync));
+        }
+
+        if (StopKeyDownPropagation)
+        {
+            builder.AddEventStopPropagationAttribute(8, "onkeydown", true);
+        }
+
+        builder.AddAttribute(9, "onmouseenter", OnMouseEnter);
+        builder.AddElementReferenceCapture(10, capturedRef => _element = capturedRef);
 
         if (!string.IsNullOrWhiteSpace(IconClass))
         {
-            builder.OpenElement(8, "i");
-            builder.AddAttribute(9, "aria-hidden", "true");
-            builder.AddAttribute(10, "class", IconClass);
+            builder.OpenElement(11, "i");
+            builder.AddAttribute(12, "aria-hidden", "true");
+            builder.AddAttribute(13, "class", IconClass);
             builder.CloseElement();
 
             if (ChildContent is not null)
             {
-                builder.AddContent(11, " ");
+                builder.AddContent(14, " ");
             }
         }
 
-        builder.AddContent(12, ChildContent);
+        builder.AddContent(15, ChildContent);
         builder.CloseElement();
     }
 
     private Task HandleClickAsync(MouseEventArgs args) => Disabled ? Task.CompletedTask : OnClick.InvokeAsync(args);
+
+    private Task HandleKeyDownAsync(KeyboardEventArgs args) => Disabled ? Task.CompletedTask : OnKeyDown.InvokeAsync(args);
 }

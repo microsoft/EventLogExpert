@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
+using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
@@ -12,7 +13,7 @@ namespace EventLogExpert.UI.Modal;
 public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
     where TTab : struct, Enum
 {
-    private readonly Dictionary<TTab, ElementReference> _tabButtonRefs = new();
+    private readonly Dictionary<TTab, ChromelessButton> _tabButtonRefs = new();
     private readonly string _tablistId = ComponentId.NewUnique().Value;
 
     private TTab? _pendingFocusTab;
@@ -48,11 +49,11 @@ public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
 
     public async ValueTask<bool> FocusActiveTabAsync()
     {
-        if (!_tabButtonRefs.TryGetValue(ActiveTab, out var elementRef)) { return false; }
+        if (!_tabButtonRefs.TryGetValue(ActiveTab, out var tabButton)) { return false; }
 
         try
         {
-            await elementRef.FocusAsync();
+            await tabButton.FocusAsync();
 
             return true;
         }
@@ -78,12 +79,12 @@ public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
             catch (JSException) { }
         }
 
-        if (_pendingFocusTab is { } tab && _tabButtonRefs.TryGetValue(tab, out var elementRef))
+        if (_pendingFocusTab is { } tab && _tabButtonRefs.TryGetValue(tab, out var tabButton))
         {
             _pendingFocusTab = null;
 
-            try { await elementRef.FocusAsync(); }
-            catch { }
+            try { await tabButton.FocusAsync(); }
+            catch { /* Ignore focus errors */ }
         }
 
         await base.OnAfterRenderAsync(firstRender);

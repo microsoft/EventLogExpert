@@ -23,11 +23,11 @@ th {
     background-color: var(--background-darkgray);
     cursor: default;
     user-select: none;
+}
 
-    & > span {
-        position: absolute;
-        right: 5px;
-    }
+th ::deep .menu-toggle {
+    position: absolute;
+    right: 5px;
 }
 
 th, td {
@@ -95,7 +95,7 @@ tr {
    forced-color-adjust: none below is LOAD-BEARING: per css-color-adjust-1
    §3.1, box-shadow computes to none in forced-colors mode whenever
    forced-color-adjust is auto, regardless of color value. Removing it
-   silently erases the inset stripe — the very non-color cue this rule
+   silently erases the inset stripe - the very non-color cue this rule
    exists to provide. */
 @media (forced-colors: active) {
     .table-row[data-highlight] {

@@ -8,19 +8,18 @@
         bool isActive = IsActive(bar);
         bool isFocused = capturedIndex == _focusedBarIndex;
 
-        <button aria-expanded="@isActive.ToString().ToLowerInvariant()"
+        <ChromelessButton aria-expanded="@isActive.ToString().ToLowerInvariant()"
             aria-haspopup="menu"
-            class="@($"menu-bar-item{(isActive ? " active" : string.Empty)}")"
+            CssClass="@($"menu-bar-item{(isActive ? " active" : string.Empty)}")"
             @key="bar.Label"
-            @onclick="async _ => await OnBarClick(bar, capturedIndex)"
-            @onclick:stopPropagation
-            @onkeydown="async args => await OnBarKeyDown(args, capturedIndex)"
-            @onmouseenter="async _ => await OnBarHover(bar, capturedIndex)"
+            OnClick="@(async _ => await OnBarClick(bar, capturedIndex))"
+            OnKeyDown="@(async args => await OnBarKeyDown(args, capturedIndex))"
+            OnMouseEnter="@(async _ => await OnBarHover(bar, capturedIndex))"
             @ref="_barElements[capturedIndex]"
             role="menuitem"
-            tabindex="@(isFocused ? 0 : -1)"
-            type="button">
+            StopPropagation="true"
+            tabindex="@(isFocused ? 0 : -1)">
             @bar.Label
-        </button>
+        </ChromelessButton>
     }
 </nav>
