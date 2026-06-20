@@ -42,6 +42,9 @@ internal sealed class OpenLogEffects(
     // render in ~1s instead of waiting for the 3-second partial timer.
     private const int EagerFirstPaintThreshold = 200;
 
+    // EvtNext batch: benchmarked Win11 throughput sweet spot; 512 regresses.
+    private const int ReadBatchSize = 256;
+
     private static readonly int s_maxGlobalConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
     private static readonly PrioritySemaphore s_resolutionGate = new(s_maxGlobalConcurrency);
 
@@ -332,7 +335,7 @@ internal sealed class OpenLogEffects(
         {
             try
             {
-                while (reader.TryGetEvents(out EventRecord[] batch))
+                while (reader.TryGetEvents(out EventRecord[] batch, ReadBatchSize))
                 {
                     token.ThrowIfCancellationRequested();
 
