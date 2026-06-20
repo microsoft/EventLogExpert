@@ -3,10 +3,8 @@
 
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Drafts;
-using EventLogExpert.Filtering.EventData;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.UI.Common;
-using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
 
@@ -31,7 +29,7 @@ public sealed partial class FilterComparisonEditor : ComponentBase
 
     [Parameter] public string? PropertyAriaLabelledBy { get; set; }
 
-    [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
+    [Inject] private IEventLogQueries EventLogQueries { get; init; } = null!;
 
     private List<string> FilteredItems
     {
@@ -54,8 +52,7 @@ public sealed partial class FilterComparisonEditor : ComponentBase
         }
     } = [];
 
-    private ImmutableArray<string> Items =>
-        EventPropertyValuesCache.GetValues(EventLogState.Value.ActiveLogs, Comparison.Property);
+    private ImmutableArray<string> Items => EventLogQueries.GetPropertyValues(Comparison.Property);
 
     private EventProperty PropertyBinding
     {

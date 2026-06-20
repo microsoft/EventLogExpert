@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Evaluation;
 using Fluxor;
@@ -15,8 +14,18 @@ public sealed record EventLogState
     /// <summary>The maximum number of new events we will hold in the state before we turn off the watcher.</summary>
     public static int MaxNewEvents => 1000;
 
-    public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } =
-        [];
+    internal ImmutableDictionary<string, OpenLogInfo> OpenLogs { get; init; } =
+        ImmutableDictionary<string, OpenLogInfo>.Empty;
+
+    public int OpenLogCount => OpenLogs.Count;
+
+    internal ImmutableDictionary<string, ImmutableHashSet<string>> NamesByLog { get; init; } =
+        ImmutableDictionary<string, ImmutableHashSet<string>>.Empty;
+
+    public ImmutableHashSet<string> LoadedLogNames { get; init; } =
+        ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
+
+    public bool IsLogOpen(string logPath) => OpenLogs.ContainsKey(logPath);
 
     public Filter AppliedFilter { get; init; } = new(null, []);
 

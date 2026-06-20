@@ -10,7 +10,7 @@ namespace EventLogExpert.Filtering.Compilation;
 public interface IFilterService
 {
     IReadOnlyDictionary<EventLogId, IReadOnlyList<ResolvedEvent>> FilterActiveLogs(
-        IEnumerable<EventLogData> logData,
+        IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> logs,
         Filter filter);
 
     IReadOnlyList<ResolvedEvent> GetFilteredEvents(IEnumerable<ResolvedEvent> events, Filter filter);

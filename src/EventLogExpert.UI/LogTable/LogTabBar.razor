@@ -2,27 +2,106 @@
 
 <div class="log-tab-bar" hidden="@(LogTableState.Value.EventTables.Count <= 1)" @ref="_logTabBarRootRef">
     <div class="tab-row">
-        @foreach (var table in _sortedTabs)
+        @foreach (var row in _tabRows)
         {
-            <div class="@GetActiveTab(table)" title="@GetTabTooltip(table)">
-                <span aria-disabled="@(table.IsLoading ? "true" : null)"
-                    @onkeydown="e => OnTabKeyDown(e, table)"
-                    @onmousedown="() => SetActiveLog(table)"
-                    role="button"
-                    tabindex="@(table.IsLoading ? -1 : 0)">
-                    @if (table.IsLoading)
+            if (row is AllLogsRow allLogs)
+            {
+                <div class="@GetActiveTab(allLogs.Header)" @oncontextmenu="OpenAllLogsMenu"
+                    @oncontextmenu:preventDefault="true"
+                    @oncontextmenu:stopPropagation="true"
+                    title="@GetTabTooltip(allLogs.Header)">
+                    <span @onkeydown="e => OnTabKeyDown(e, allLogs.Header)"
+                        @onmousedown="e => OnTabMouseDown(e, allLogs.Header)"
+                        role="button"
+                        tabindex="0">
+                        @GetTabName(allLogs.Header)
+                    </span>
+                </div>
+            }
+            else if (row is GroupRow group)
+            {
+                <div class="tab-group">
+                    <div class="@GetActiveTab(group.Header) group-header" @oncontextmenu="args => OpenGroupHeaderMenu(args, group.Group)"
+                        @oncontextmenu:preventDefault="true"
+                        @oncontextmenu:stopPropagation="true"
+                        title="@GetTabTooltip(group.Header)">
+                        <button aria-expanded="@(group.Group.IsCollapsed ? "false" : "true")"
+                            aria-label="@(group.Group.IsCollapsed ? "Expand group" : "Collapse group")"
+                            class="chevron"
+                            @onclick="() => ToggleCollapse(group.Group)"
+                            type="button">
+                            <i class="bi bi-chevron-@(group.Group.IsCollapsed ? "down" : "right")"></i>
+                        </button>
+                        <span @onkeydown="e => OnTabKeyDown(e, group.Header)"
+                            @onmousedown="e => OnTabMouseDown(e, group.Header)"
+                            role="button"
+                            tabindex="0">
+                            @GetTabName(group.Header)
+                        </span>
+                        <i aria-label="Close group"
+                            class="bi bi-x"
+                            @onclick="() => CloseGroup(group.Group)"
+                            @onkeydown="e => OnCloseGroupKeyDown(e, group.Group)"
+                            role="button"
+                            tabindex="0">
+                        </i>
+                    </div>
+                    @foreach (var member in VisibleMembers(group))
                     {
-                        <i aria-label="Loading" class="spinner-border" role="status"></i>
-                        @:&nbsp;
+                        <div class="@GetTabClass(member, true)" @oncontextmenu="args => OpenMemberMenu(args, member, group.Group)"
+                            @oncontextmenu:preventDefault="true"
+                            @oncontextmenu:stopPropagation="true"
+                            title="@GetTabTooltip(member)">
+                            <span aria-disabled="@(member.IsLoading ? "true" : null)"
+                                @onkeydown="e => OnTabKeyDown(e, member)"
+                                @onmousedown="e => OnTabMouseDown(e, member)"
+                                role="button"
+                                tabindex="@(member.IsLoading ? -1 : 0)">
+                                @if (member.IsLoading)
+                                {
+                                    <i aria-label="Loading" class="spinner-border" role="status"></i>
+                                    @:&nbsp;
+                                }
+                                @GetTabName(member)
+                            </span>
+                            <i aria-label="Close log"
+                                class="bi bi-x"
+                                @onkeydown="e => OnCloseLogKeyDown(e, member)"
+                                @onmousedown="e => OnCloseLogMouseDown(e, member)"
+                                role="button"
+                                tabindex="0">
+                            </i>
+                        </div>
                     }
-                    @GetTabName(table)
-                </span>
-
-                @if (!table.IsCombined)
-                {
-                    <i class="bi bi-x" @onmousedown="() => CloseLog(table)"></i>
-                }
-            </div>
+                </div>
+            }
+            else if (row is StandaloneRow standalone)
+            {
+                <div class="@GetActiveTab(standalone.Tab)" @oncontextmenu="args => OpenStandaloneMenu(args, standalone.Tab)"
+                    @oncontextmenu:preventDefault="true"
+                    @oncontextmenu:stopPropagation="true"
+                    title="@GetTabTooltip(standalone.Tab)">
+                    <span aria-disabled="@(standalone.Tab.IsLoading ? "true" : null)"
+                        @onkeydown="e => OnTabKeyDown(e, standalone.Tab)"
+                        @onmousedown="e => OnTabMouseDown(e, standalone.Tab)"
+                        role="button"
+                        tabindex="@(standalone.Tab.IsLoading ? -1 : 0)">
+                        @if (standalone.Tab.IsLoading)
+                        {
+                            <i aria-label="Loading" class="spinner-border" role="status"></i>
+                            @:&nbsp;
+                        }
+                        @GetTabName(standalone.Tab)
+                    </span>
+                    <i aria-label="Close log"
+                        class="bi bi-x"
+                        @onkeydown="e => OnCloseLogKeyDown(e, standalone.Tab)"
+                        @onmousedown="e => OnCloseLogMouseDown(e, standalone.Tab)"
+                        role="button"
+                        tabindex="0">
+                    </i>
+                </div>
+            }
         }
     </div>
 </div>

@@ -2,6 +2,8 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
@@ -21,6 +23,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     private const string DisabledReason = "Group events first (column header > Group By)";
 
     private readonly IMenuActionService _actions = Substitute.For<IMenuActionService>();
+    private readonly IAlertDialogService _alertDialogService = Substitute.For<IAlertDialogService>();
     private readonly IStateSelection<EventLogState, bool> _eventLogSelection = Substitute.For<IStateSelection<EventLogState, bool>>();
     private readonly IStateSelection<FilterPaneState, bool> _filterPaneIsEnabled = Substitute.For<IStateSelection<FilterPaneState, bool>>();
     private readonly List<IStateSelection<LogTableState, bool>> _logTableSelections = [];
@@ -33,6 +36,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     public MenuBarGroupingTests()
     {
         Services.AddSingleton(_actions);
+        Services.AddSingleton(_alertDialogService);
         Services.AddSingleton(_eventLogSelection);
         Services.AddSingleton(_filterPaneIsEnabled);
         Services.AddTransient<IStateSelection<LogTableState, bool>>(_ => CreateLogTableSelection());
@@ -49,11 +53,99 @@ public sealed class MenuBarGroupingTests : BunitContext
     }
 
     [Fact]
-    public void Render_SubscribesBothGroupingSelections()
+    public async Task File_CloseAll_ConfirmAccepted_InvokesCloseAllLogs()
+    {
+        _logTableState = new LogTableState
+        {
+            EventTables = [new LogView(new EventLogId(Guid.NewGuid())) { LogName = "Application" }],
+        };
+        _alertDialogService.ShowAlert("Close all logs", Arg.Any<string>(), "Close all", "Cancel").Returns(true);
+        var items = await OpenMenu("File");
+
+        await Item(items, "Close All").OnClickAsync!();
+
+        await _actions.Received(1).CloseAllLogsAsync();
+    }
+
+    [Fact]
+    public async Task File_CloseAll_ConfirmCancelled_DoesNotInvokeCloseAllLogs()
+    {
+        _logTableState = new LogTableState
+        {
+            EventTables = [new LogView(new EventLogId(Guid.NewGuid())) { LogName = "Application" }],
+        };
+        _alertDialogService.ShowAlert("Close all logs", Arg.Any<string>(), "Close all", "Cancel").Returns(false);
+        var items = await OpenMenu("File");
+
+        await Item(items, "Close All").OnClickAsync!();
+
+        await _actions.DidNotReceive().CloseAllLogsAsync();
+    }
+
+    [Fact]
+    public async Task File_WhenActiveLogOpen_CloseAllAndCombineEnabled()
+    {
+        _logTableState = new LogTableState
+        {
+            EventTables = [new LogView(new EventLogId(Guid.NewGuid())) { LogName = "Application" }],
+        };
+
+        var items = await OpenMenu("File");
+
+        Assert.True(Item(items, "Close All").IsEnabled);
+        Assert.True(Item(items, "Combine").IsEnabled);
+    }
+
+    [Fact]
+    public async Task File_WhenMultipleLogsWithCombinedView_CloseAllAndCombineEnabled()
+    {
+        _logTableState = new LogTableState
+        {
+            EventTables =
+            [
+                new LogView(new EventLogId(Guid.NewGuid())) { GroupId = LogTabGroupId.AllLogs },
+                new LogView(new EventLogId(Guid.NewGuid())) { LogName = "Application" },
+                new LogView(new EventLogId(Guid.NewGuid())) { LogName = "System" },
+            ],
+        };
+
+        var items = await OpenMenu("File");
+
+        Assert.True(Item(items, "Close All").IsEnabled);
+        Assert.True(Item(items, "Combine").IsEnabled);
+    }
+
+    [Fact]
+    public async Task File_WhenNoLogsOpen_CloseAllAndCombineDisabled()
+    {
+        _logTableState = new LogTableState();
+
+        var items = await OpenMenu("File");
+
+        Assert.False(Item(items, "Close All").IsEnabled);
+        Assert.False(Item(items, "Combine").IsEnabled);
+    }
+
+    [Fact]
+    public async Task File_WhenOnlyCombinedView_CloseAllAndCombineDisabled()
+    {
+        _logTableState = new LogTableState
+        {
+            EventTables = [new LogView(new EventLogId(Guid.NewGuid())) { GroupId = LogTabGroupId.AllLogs }],
+        };
+
+        var items = await OpenMenu("File");
+
+        Assert.False(Item(items, "Close All").IsEnabled);
+        Assert.False(Item(items, "Combine").IsEnabled);
+    }
+
+    [Fact]
+    public void Render_SubscribesAllLogTableSelections()
     {
         Render<MenuBar>();
 
-        Assert.Equal(2, _logTableSelections.Count);
+        Assert.Equal(3, _logTableSelections.Count);
         Assert.All(_logTableSelections, s => s.Received(1).Select(Arg.Any<Func<LogTableState, bool>>()));
     }
 
@@ -114,7 +206,7 @@ public sealed class MenuBarGroupingTests : BunitContext
         return selection;
     }
 
-    private async Task<IReadOnlyList<MenuItem>> OpenViewMenu()
+    private async Task<IReadOnlyList<MenuItem>> OpenMenu(string barLabel)
     {
         IReadOnlyList<MenuItem>? items = null;
         _menuService
@@ -125,11 +217,13 @@ public sealed class MenuBarGroupingTests : BunitContext
 
         var cut = Render<MenuBar>();
         await cut.FindAll("button.menu-bar-item")
-            .Single(button => button.TextContent.Trim() == "View")
+            .Single(button => button.TextContent.Trim() == barLabel)
             .ClickAsync(new MouseEventArgs());
 
         Assert.NotNull(items);
 
         return items!;
     }
+
+    private Task<IReadOnlyList<MenuItem>> OpenViewMenu() => OpenMenu("View");
 }

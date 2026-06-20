@@ -18,6 +18,7 @@ internal sealed class PartialLoadCoordinator : IDisposable
     private readonly Lock _gate = new();
     private readonly HashSet<EventLogId> _seen = [];
     private readonly Timer _timer;
+    private readonly Dictionary<EventLogId, int> _versions = [];
 
     private bool _disposed;
 
@@ -34,6 +35,7 @@ internal sealed class PartialLoadCoordinator : IDisposable
         lock (_gate)
         {
             _buffers.Remove(logId);
+            _versions.Remove(logId);
             _finalized.Remove(logId);
             _seen.Remove(logId);
         }
@@ -44,6 +46,7 @@ internal sealed class PartialLoadCoordinator : IDisposable
         lock (_gate)
         {
             _buffers.Clear();
+            _versions.Clear();
             _finalized.Clear();
             _seen.Clear();
         }
@@ -55,6 +58,7 @@ internal sealed class PartialLoadCoordinator : IDisposable
         {
             _disposed = true;
             _buffers.Clear();
+            _versions.Clear();
             _finalized.Clear();
             _seen.Clear();
         }
@@ -62,7 +66,7 @@ internal sealed class PartialLoadCoordinator : IDisposable
         _timer.Dispose();
     }
 
-    public void Enqueue(EventLogId logId, IReadOnlyList<ResolvedEvent> filteredEvents)
+    public void Enqueue(EventLogId logId, IReadOnlyList<ResolvedEvent> filteredEvents, int version)
     {
         if (filteredEvents.Count == 0) { return; }
 
@@ -79,6 +83,11 @@ internal sealed class PartialLoadCoordinator : IDisposable
 
             buffer.AddRange(filteredEvents);
 
+            // Use Math.Min so a buffer straddling a filter change adopts the older version, forcing a safe re-sort at finalize.
+            _versions[logId] = _versions.TryGetValue(logId, out var existingVersion)
+                ? Math.Min(existingVersion, version)
+                : version;
+
             if (_seen.Add(logId)) { FlushLocked(); }
         }
     }
@@ -89,6 +98,7 @@ internal sealed class PartialLoadCoordinator : IDisposable
         {
             _finalized.Add(logId);
             _buffers.Remove(logId);
+            _versions.Remove(logId);
         }
     }
 
@@ -102,17 +112,23 @@ internal sealed class PartialLoadCoordinator : IDisposable
         if (_disposed || _buffers.Count == 0) { return; }
 
         var batch = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>(_buffers.Count);
+        var versionByLog = new Dictionary<EventLogId, int>(_buffers.Count);
 
         foreach (var (logId, buffer) in _buffers)
         {
-            if (buffer.Count > 0) { batch[logId] = buffer.AsReadOnly(); }
+            if (buffer.Count <= 0) { continue; }
+
+            batch[logId] = buffer.AsReadOnly();
+
+            if (_versions.TryGetValue(logId, out var version)) { versionByLog[logId] = version; }
         }
 
         _buffers.Clear();
+        _versions.Clear();
 
         if (batch.Count == 0) { return; }
 
         // Dispatch under the lock so batches and the final UpdateTable keep FIFO order in Fluxor's queue.
-        _dispatcher.Dispatch(new AppendTableEventsBatchAction(batch));
+        _dispatcher.Dispatch(new AppendTableEventsBatchAction(batch) { VersionByLog = versionByLog });
     }
 }

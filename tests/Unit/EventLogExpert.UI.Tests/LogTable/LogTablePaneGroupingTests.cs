@@ -573,7 +573,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         {
             ActiveEventLogId = combinedId,
             EventTables = ImmutableList.Create(
-                new LogView(combinedId) { LogName = "Combined", IsCombined = true },
+                new LogView(combinedId) { LogName = "Combined", GroupId = LogTabGroupId.AllLogs },
                 new LogView(appId1) { LogName = "Application" },
                 new LogView(appId2) { LogName = "Application" }),
             EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(appId1, 1).Add(appId2, 1),

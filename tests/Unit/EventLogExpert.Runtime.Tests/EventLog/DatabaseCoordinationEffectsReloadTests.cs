@@ -25,7 +25,7 @@ public sealed class DatabaseCoordinationEffectsReloadTests
     [Fact]
     public void HasActiveLogs_NoActiveLogs_ReturnsFalse()
     {
-        _eventLogState.Value.Returns(new EventLogState { ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty });
+        _eventLogState.Value.Returns(StateWith());
 
         var sut = CreateSut();
 
@@ -35,11 +35,7 @@ public sealed class DatabaseCoordinationEffectsReloadTests
     [Fact]
     public void HasActiveLogs_OneActiveLog_ReturnsTrue()
     {
-        var log = new EventLogData("Application", LogPathType.Channel, []);
-        _eventLogState.Value.Returns(new EventLogState
-        {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add("Application", log),
-        });
+        _eventLogState.Value.Returns(StateWith(("Application", LogPathType.Channel)));
 
         var sut = CreateSut();
 
@@ -49,11 +45,7 @@ public sealed class DatabaseCoordinationEffectsReloadTests
     [Fact]
     public async Task PrepareForDatabaseRemovalAsync_CancelledBeforeEntry_ThrowsAndDoesNotMutateSnapshot()
     {
-        var logA = new EventLogData("Application", LogPathType.Channel, []);
-        _eventLogState.Value.Returns(new EventLogState
-        {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add("Application", logA),
-        });
+        _eventLogState.Value.Returns(StateWith(("Application", LogPathType.Channel)));
 
         using var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -71,16 +63,10 @@ public sealed class DatabaseCoordinationEffectsReloadTests
     [Fact]
     public async Task PrepareForDatabaseRemovalAsync_CloseFailureMidwayDispatchesAllAndSnapshotsAllDispatchedLogsForCallerReopen()
     {
-        var logA = new EventLogData("Application", LogPathType.Channel, []);
-        var logB = new EventLogData("Security", LogPathType.Channel, []);
-        var logC = new EventLogData("System", LogPathType.Channel, []);
-        _eventLogState.Value.Returns(new EventLogState
-        {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty
-                .Add("Application", logA)
-                .Add("Security", logB)
-                .Add("System", logC),
-        });
+        _eventLogState.Value.Returns(StateWith(
+            ("Application", LogPathType.Channel),
+            ("Security", LogPathType.Channel),
+            ("System", LogPathType.Channel)));
 
         using var cts = new CancellationTokenSource();
         _dispatcher.When(d => d.Dispatch(Arg.Any<CloseLogAction>())).Do(call =>
@@ -113,11 +99,7 @@ public sealed class DatabaseCoordinationEffectsReloadTests
     [Fact]
     public async Task ReloadAllActiveLogsAsync_CalledSequentiallyTwice_CoordinatorLockReleasedBetweenCallsAndBothComplete()
     {
-        var logA = new EventLogData("Application", LogPathType.Channel, []);
-        _eventLogState.Value.Returns(new EventLogState
-        {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add("Application", logA),
-        });
+        _eventLogState.Value.Returns(StateWith(("Application", LogPathType.Channel)));
 
         _dispatcher.When(d => d.Dispatch(Arg.Any<CloseLogAction>())).Do(call =>
         {
@@ -136,11 +118,7 @@ public sealed class DatabaseCoordinationEffectsReloadTests
     [Fact]
     public async Task ReloadAllActiveLogsAsync_CancelledBeforeEntry_ThrowsAndDoesNotMutateLogState()
     {
-        var logA = new EventLogData("Application", LogPathType.Channel, []);
-        _eventLogState.Value.Returns(new EventLogState
-        {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add("Application", logA),
-        });
+        _eventLogState.Value.Returns(StateWith(("Application", LogPathType.Channel)));
 
         using var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -156,11 +134,7 @@ public sealed class DatabaseCoordinationEffectsReloadTests
     [Fact]
     public async Task ReloadAllActiveLogsAsync_CloseCompletionNeverSignaledAndTokenCancelled_ThrowsAfterBestEffortReopen()
     {
-        var logA = new EventLogData("Application", LogPathType.Channel, []);
-        _eventLogState.Value.Returns(new EventLogState
-        {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add("Application", logA),
-        });
+        _eventLogState.Value.Returns(StateWith(("Application", LogPathType.Channel)));
 
         using var cts = new CancellationTokenSource();
         _dispatcher.When(d => d.Dispatch(Arg.Any<CloseLogAction>())).Do(_ => cts.Cancel());
@@ -175,11 +149,7 @@ public sealed class DatabaseCoordinationEffectsReloadTests
     [Fact]
     public async Task ReloadAllActiveLogsAsync_CloseThrowsThenSubsequentCallProceeds_LockReleasedOnFailurePath()
     {
-        var logA = new EventLogData("Application", LogPathType.Channel, []);
-        _eventLogState.Value.Returns(new EventLogState
-        {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add("Application", logA),
-        });
+        _eventLogState.Value.Returns(StateWith(("Application", LogPathType.Channel)));
 
         var signalCompletionOnDispatch = false;
         CancellationTokenSource? firstCallCts = null;
@@ -215,7 +185,7 @@ public sealed class DatabaseCoordinationEffectsReloadTests
     [Fact]
     public async Task ReloadAllActiveLogsAsync_NoActiveLogs_DoesNotDispatchOrOpen()
     {
-        _eventLogState.Value.Returns(new EventLogState { ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty });
+        _eventLogState.Value.Returns(StateWith());
 
         var sut = CreateSut();
         await sut.ReloadAllActiveLogsAsync(Ct);
@@ -227,14 +197,9 @@ public sealed class DatabaseCoordinationEffectsReloadTests
     [Fact]
     public async Task ReloadAllActiveLogsAsync_TwoActiveLogs_DispatchesPerLogCloseAndAwaitsCompletionBeforeOpening()
     {
-        var logA = new EventLogData("Application", LogPathType.Channel, []);
-        var logB = new EventLogData("C:/path/security.evtx", LogPathType.File, []);
-        _eventLogState.Value.Returns(new EventLogState
-        {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty
-                .Add("Application", logA)
-                .Add("C:/path/security.evtx", logB),
-        });
+        _eventLogState.Value.Returns(StateWith(
+            ("Application", LogPathType.Channel),
+            ("C:/path/security.evtx", LogPathType.File)));
 
         _dispatcher.When(d => d.Dispatch(Arg.Any<CloseLogAction>())).Do(call =>
         {
@@ -252,7 +217,18 @@ public sealed class DatabaseCoordinationEffectsReloadTests
         _eventLogCommands.Received(1).OpenLog("C:/path/security.evtx", LogPathType.File, Arg.Any<CancellationToken>());
     }
 
+    private static EventLogState StateWith(params (string Name, LogPathType Type)[] logs)
+    {
+        var openLogs = ImmutableDictionary<string, OpenLogInfo>.Empty;
+
+        foreach (var (name, type) in logs)
+        {
+            openLogs = openLogs.SetItem(name, new OpenLogInfo(EventLogId.Create(), type));
+        }
+
+        return new EventLogState { OpenLogs = openLogs };
+    }
+
     private DatabaseCoordinationEffects CreateSut() =>
         new(_eventLogState, _logger, _closeCoordinator, _dispatcher, _eventLogCommands);
 }
-

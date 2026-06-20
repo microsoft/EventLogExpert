@@ -11,6 +11,7 @@ internal static class NativeErrorResolver
 
     private static ConcurrentDictionary<uint, string> s_hResultCache = new();
     private static ConcurrentDictionary<uint, string> s_ntStatusCache = new();
+    private static ConcurrentDictionary<uint, string> s_systemMessageCache = new();
 
     /// <summary>
     ///     Resolves an HRESULT or Win32 error code to a human-readable string. Uses the system message table via
@@ -29,6 +30,19 @@ internal static class NativeErrorResolver
             NativeMethods.FormatNtStatusMessage(status) ??
             NativeMethods.FormatSystemMessage(status) ??
             $"0x{status:X8}");
+
+    /// <summary>
+    ///     Cached lookup of the system message table for a <c>%%N</c> description parameter code, used when the
+    ///     provider's own parameter table has no entry. Unlike <see cref="GetErrorMessage" /> this preserves the caller's
+    ///     "empty means leave the token unsubstituted" contract: a miss caches and returns <see cref="string.Empty" /> rather
+    ///     than a synthesized <c>0x...</c> fallback. Both hits AND misses are cached so foreign or uninstalled providers
+    ///     (whose codes never resolve) do not trigger a Win32 FormatMessage P/Invoke on every event.
+    /// </summary>
+    internal static string GetSystemMessageCached(uint code) =>
+        GetOrAddBounded(ref s_systemMessageCache, code, static c => NativeMethods.FormatSystemMessage(c) ?? string.Empty);
+
+    // Test seam: lets a unit test confirm a code's result (hit or miss) was cached rather than recomputed.
+    internal static bool IsSystemMessageCodeCached(uint code) => Volatile.Read(ref s_systemMessageCache).ContainsKey(code);
 
     /// <summary>
     ///     Bounded cache lookup with atomic swap eviction. On a cache hit the entry is returned immediately regardless of

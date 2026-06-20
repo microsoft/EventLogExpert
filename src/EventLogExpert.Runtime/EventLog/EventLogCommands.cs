@@ -12,6 +12,8 @@ internal sealed class EventLogCommands(IDispatcher dispatcher) : IEventLogComman
 {
     private readonly IDispatcher _dispatcher = dispatcher;
 
+    public void CloseAllLogs() => _dispatcher.Dispatch(new CloseAllLogsAction());
+
     public void CloseLog(EventLogId logId, string logName) => _dispatcher.Dispatch(new CloseLogAction(logId, logName));
 
     public void LoadNewEvents() => _dispatcher.Dispatch(new LoadNewEventsAction());

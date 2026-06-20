@@ -2,11 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Adapters.Menu;
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Activation;
 using EventLogExpert.Runtime.Common.AppTitle;
-using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
@@ -25,7 +23,7 @@ public sealed partial class App : Application
     public App(
         IFilterLibraryCommands filterLibraryCommands,
         ILogTableCommands logTableCommands,
-        IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogs,
+        IStateSelection<LogTableState, ImmutableList<LogView>> logTables,
         ISettingsService settings,
         IAppTitleService appTitleService,
         ITraceLogger traceLogger,
@@ -42,7 +40,7 @@ public sealed partial class App : Application
         _mainPage = new MainPage(
             filterLibraryCommands,
             logTableCommands,
-            activeLogs,
+            logTables,
             settings,
             appTitleService,
             traceLogger,

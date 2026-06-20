@@ -10,7 +10,26 @@ internal sealed class LogTableCommands(IDispatcher dispatcher) : ILogTableComman
 {
     private readonly IDispatcher _dispatcher = dispatcher;
 
+    public void CloseAllButThis(EventLogId tabId) => _dispatcher.Dispatch(new CloseAllButThisAction(tabId));
+
+    public void CloseGroup(LogTabGroupId groupId) => _dispatcher.Dispatch(new CloseGroupAction(groupId));
+
+    public void CloseOthersInGroup(LogTabGroupId groupId, EventLogId keepTabId) =>
+        _dispatcher.Dispatch(new CloseOthersInGroupAction(groupId, keepTabId));
+
     public void LoadColumns() => _dispatcher.Dispatch(new LoadColumnsAction());
+
+    public void MoveTabToGroup(EventLogId tabId, LogTabGroupId targetGroupId) =>
+        _dispatcher.Dispatch(new MoveTabToGroupAction(tabId, targetGroupId));
+
+    public void NewGroupFromTab(EventLogId tabId, string groupName) =>
+        _dispatcher.Dispatch(new NewGroupFromTabAction(tabId, groupName));
+
+    public void RemoveTabFromGroup(EventLogId tabId) =>
+        _dispatcher.Dispatch(new RemoveTabFromGroupAction(tabId));
+
+    public void RenameGroup(LogTabGroupId groupId, string newName) =>
+        _dispatcher.Dispatch(new RenameGroupAction(groupId, newName));
 
     public void ReorderColumn(ColumnName column, ColumnName target, bool insertAfter) =>
         _dispatcher.Dispatch(new ReorderColumnAction(column, target, insertAfter));
@@ -26,6 +45,9 @@ internal sealed class LogTableCommands(IDispatcher dispatcher) : ILogTableComman
     public void SetGroupBy(ColumnName? groupBy) => _dispatcher.Dispatch(new SetGroupByAction(groupBy));
 
     public void SetOrderBy(ColumnName? orderBy) => _dispatcher.Dispatch(new SetOrderByAction(orderBy));
+
+    public void SetTabGroupCollapsed(LogTabGroupId groupId, bool collapsed) =>
+        _dispatcher.Dispatch(new SetTabGroupCollapsedAction(groupId, collapsed));
 
     public void ToggleColumn(ColumnName column) => _dispatcher.Dispatch(new ToggleColumnAction(column));
 

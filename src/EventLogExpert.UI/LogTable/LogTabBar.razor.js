@@ -19,6 +19,8 @@ function registerLogTabBarScroller(logTabBar) {
     }
 
     logTabBar.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) { return; }
+
         canDrag = true;
 
         startPos = e.pageX - logTabBar.offsetLeft;

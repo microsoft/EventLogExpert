@@ -1,8 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
@@ -60,7 +58,7 @@ public sealed partial class FilterPane
     private bool _isFilterListVisible;
     private IJSObjectReference? _menuAnchorModule;
     private IReadOnlyList<IGrouping<ScenarioGroup, ScenarioDefinition>> _scenarioMatchGroups = [];
-    private ImmutableDictionary<string, EventLogData>? _scenarioMatchSource;
+    private ImmutableHashSet<string>? _scenarioMatchSource;
     private IJSObjectReference? _scrollSuppressorModule;
 
     internal IReadOnlyList<string> AvailableFilterSetTags =>
@@ -85,7 +83,7 @@ public sealed partial class FilterPane
             ? group
             : ScenarioMatchGroups.FirstOrDefault()?.Key;
 
-    [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
+    [Inject] private IEventLogQueries EventLogQueries { get; init; } = null!;
 
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
 
@@ -126,6 +124,8 @@ public sealed partial class FilterPane
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
+    [Inject] private IStateSelection<EventLogState, ImmutableHashSet<string>> LoadedLogNames { get; init; } = null!;
+
     [Inject] private IMenuActionService MenuActions { get; init; } = null!;
 
     [Inject] private IMenuService MenuService { get; init; } = null!;
@@ -133,6 +133,8 @@ public sealed partial class FilterPane
     private string MenuState => HasFilters ? _isFilterListVisible.ToString().ToLower() : "false";
 
     [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
+
+    [Inject] private IStateSelection<EventLogState, int> OpenLogCount { get; init; } = null!;
 
     private ScenarioDefinition? ResolvedScenario =>
         VisibleScenarioMatches.FirstOrDefault(match => match.Id == SelectedScenarioId)
@@ -150,18 +152,18 @@ public sealed partial class FilterPane
     {
         get
         {
-            var activeLogs = EventLogState.Value.ActiveLogs;
+            var names = LoadedLogNames.Value;
 
-            if (ReferenceEquals(activeLogs, _scenarioMatchSource))
+            if (ReferenceEquals(names, _scenarioMatchSource))
             {
                 return _scenarioMatchGroups;
             }
 
-            _scenarioMatchSource = activeLogs;
+            _scenarioMatchSource = names;
             _scenarioMatchGroups =
             [
                 .. ScenarioQueryService
-                        .GetInAppScenarios(LoadedLogNames(activeLogs))
+                        .GetInAppScenarios(names)
                         .GroupBy(scenario => scenario.Group)
                         .OrderBy(group => group.Key)
             ];
@@ -199,14 +201,6 @@ public sealed partial class FilterPane
                 .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
         ];
     }
-
-    internal static IReadOnlyList<string> LoadedLogNames(ImmutableDictionary<string, EventLogData> activeLogs) =>
-    [
-        .. activeLogs.Values
-            .SelectMany(LogNamesFor)
-            .Where(name => !string.IsNullOrEmpty(name))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-    ];
 
     internal void ApplyFilterSetSelection()
     {
@@ -414,6 +408,9 @@ public sealed partial class FilterPane
 
     protected override void OnInitialized()
     {
+        LoadedLogNames.Select(s => s.LoadedLogNames);
+        OpenLogCount.Select(s => s.OpenLogCount);
+
         SubscribeToAction<ClearAllFiltersAction>(action =>
         {
             _canEditDate = false;
@@ -456,11 +453,6 @@ public sealed partial class FilterPane
     private static string FormatFilterSetLabel(LibraryEntryFilterSet set) =>
         $"{set.Name} ({FormatFilterSetDetail(set)})";
 
-    private static IEnumerable<string> LogNamesFor(EventLogData log) =>
-        log.Type == LogPathType.Channel
-            ? [log.Name]
-            : log.Events.Select(resolvedEvent => resolvedEvent.LogName).Distinct();
-
     private void AddAdvancedFilter()
     {
         _pendingDrafts.Add(new FilterDraft { Mode = FilterMode.Advanced });
@@ -489,7 +481,7 @@ public sealed partial class FilterPane
     {
         _currentTimeZone = Settings.TimeZoneInfo;
 
-        var (after, before) = EventLogState.Value.ActiveLogs.Values.GetEventDateRange(DateTime.UtcNow);
+        var (after, before) = EventLogQueries.GetEventDateRange(DateTime.UtcNow);
 
         _model.After = after.ConvertTimeZone(_currentTimeZone);
         _model.Before = before.ConvertTimeZone(_currentTimeZone);
@@ -579,13 +571,7 @@ public sealed partial class FilterPane
     private Task CopyScenarioJsonAsync() =>
         _clipboardExporter.CopyAsync(ExportCurrentRows(), "Scenario JSON copied to the clipboard.", "these filters");
 
-    private IReadOnlyList<string> CurrentChannelNames() =>
-    [
-        .. EventLogState.Value.ActiveLogs.Values
-            .Where(log => log.Type == LogPathType.Channel)
-            .Select(log => log.Name)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-    ];
+    private IReadOnlyList<string> CurrentChannelNames() => EventLogQueries.GetChannelNames();
 
     private ScenarioExportResult ExportCurrentRows() =>
         ScenarioAuthoringService.ExportRows(

@@ -3,11 +3,9 @@
 
 using EventLogExpert.Adapters.Menu;
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Activation;
 using EventLogExpert.Runtime.Common.AppTitle;
-using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
@@ -25,9 +23,9 @@ namespace EventLogExpert;
 public sealed partial class MainPage : ContentPage, IDisposable
 {
     private readonly IActivationDispatcher _activationDispatcher;
-    private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogs;
     private readonly IAppTitleService _appTitleService;
     private readonly CancellationTokenSource _consumerCts = new();
+    private readonly IStateSelection<LogTableState, ImmutableList<LogView>> _logTables;
     private readonly MauiMenuActionService _menuActionService;
     private readonly ISettingsService _settings;
     private readonly ITraceLogger _traceLogger;
@@ -38,7 +36,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
     public MainPage(
         IFilterLibraryCommands filterLibraryCommands,
         ILogTableCommands logTableCommands,
-        IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogs,
+        IStateSelection<LogTableState, ImmutableList<LogView>> logTables,
         ISettingsService settings,
         IAppTitleService appTitleService,
         ITraceLogger traceLogger,
@@ -47,16 +45,16 @@ public sealed partial class MainPage : ContentPage, IDisposable
     {
         InitializeComponent();
 
-        _activeLogs = activeLogs;
+        _logTables = logTables;
         _appTitleService = appTitleService;
         _settings = settings;
         _traceLogger = traceLogger;
         _menuActionService = menuActionService;
         _activationDispatcher = activationDispatcher;
 
-        _activeLogs.Select(state => state.ActiveLogs);
+        _logTables.Select(state => state.EventTables);
+        _logTables.SelectedValueChanged += OnLogTablesChanged;
 
-        _activeLogs.SelectedValueChanged += OnActiveLogsChanged;
         _settings.ThemeChanged += OnThemeChanged;
 
         logTableCommands.LoadColumns();
@@ -74,7 +72,8 @@ public sealed partial class MainPage : ContentPage, IDisposable
     public void Dispose()
     {
         _disposed = true;
-        _activeLogs.SelectedValueChanged -= OnActiveLogsChanged;
+
+        _logTables.SelectedValueChanged -= OnLogTablesChanged;
         _settings.ThemeChanged -= OnThemeChanged;
 
         try { _consumerCts.Cancel(); }
@@ -174,7 +173,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _ = _coreWebView.AddScriptToExecuteOnDocumentCreatedAsync(script);
     }
 
-    private void OnActiveLogsChanged(object? sender, ImmutableDictionary<string, EventLogData> updatedActiveLogs)
+    private void OnLogTablesChanged(object? sender, ImmutableList<LogView> eventTables)
     {
         if (_disposed) { return; }
 
@@ -182,10 +181,9 @@ public sealed partial class MainPage : ContentPage, IDisposable
         {
             if (_disposed) { return; }
 
-            _appTitleService.SetLogName(
-                updatedActiveLogs.Count <= 0
-                    ? null
-                    : string.Join(" | ", updatedActiveLogs.Values.Select(log => log.Name)));
+            var logNames = eventTables.Where(table => !table.IsCombined).Select(table => table.LogName).ToList();
+
+            _appTitleService.SetLogName(logNames.Count <= 0 ? null : string.Join(" | ", logNames));
         });
     }
 

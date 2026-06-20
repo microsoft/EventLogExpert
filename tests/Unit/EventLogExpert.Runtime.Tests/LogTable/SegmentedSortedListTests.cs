@@ -251,6 +251,18 @@ public sealed class SegmentedSortedListTests
     }
 
     [Fact]
+    public void ResolvedEventIndex_IndexOf_MatchesByReferenceAndEquivalentKey_ElseMinusOne()
+    {
+        var events = new List<ResolvedEvent>();
+        for (int i = 1; i <= 300; i++) { events.Add(Ev("LogA", i, i)); }
+        var list = SegmentedSortedList.CreateSorted(events, s_byTime);
+
+        Assert.Equal(150, ResolvedEventIndex.IndexOf(list, events[150], ColumnName.DateAndTime));
+        Assert.Equal(150, ResolvedEventIndex.IndexOf(list, Ev("LogA", 151, 151), ColumnName.DateAndTime));
+        Assert.Equal(-1, ResolvedEventIndex.IndexOf(list, Ev("LogB", 999, 9999), ColumnName.DateAndTime));
+    }
+
+    [Fact]
     public void WhereSegmented_DropsEmptyMiddleSegment()
     {
         var middle = SegmentedSortedList.CreateSorted([Ev("LogC", 100, 1), Ev("LogC", 110, 2)], s_byTime);

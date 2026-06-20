@@ -12,9 +12,11 @@ namespace EventLogExpert.Runtime.EventLog;
 
 internal sealed class Reducers
 {
-    [ReducerMethod]
-    public static EventLogState ReduceAddEventSuccess(EventLogState state, AddEventSuccessAction action) =>
-        state with { ActiveLogs = action.ActiveLogs };
+    private static readonly ImmutableHashSet<string> s_emptyNames =
+        ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly ImmutableDictionary<string, ImmutableHashSet<string>> s_emptyNamesByLog =
+        ImmutableDictionary<string, ImmutableHashSet<string>>.Empty;
 
     [ReducerMethod]
     public static EventLogState ReduceApplyFilter(EventLogState state, ApplyFilterAction action)
@@ -31,7 +33,9 @@ internal sealed class Reducers
     public static EventLogState ReduceCloseAll(EventLogState state) =>
         state with
         {
-            ActiveLogs = [],
+            OpenLogs = [],
+            NamesByLog = s_emptyNamesByLog,
+            LoadedLogNames = RecomputeLoadedLogNames(s_emptyNamesByLog, state.LoadedLogNames),
             SelectedEvent = null,
             SelectedEvents = [],
             NewEventBuffer = [],
@@ -60,9 +64,13 @@ internal sealed class Reducers
                 ? null
                 : state.SelectedEvent;
 
+        var newNamesByLog = state.NamesByLog.Remove(action.LogName);
+
         return state with
         {
-            ActiveLogs = state.ActiveLogs.Remove(action.LogName),
+            OpenLogs = state.OpenLogs.Remove(action.LogName),
+            NamesByLog = newNamesByLog,
+            LoadedLogNames = RecomputeLoadedLogNames(newNamesByLog, state.LoadedLogNames),
             NewEventBuffer = newEventBuffer,
             NewEventBufferIsFull = newEventBuffer.Count >= EventLogState.MaxNewEvents,
             SelectedEvent = newSelectedEvent,
@@ -77,46 +85,79 @@ internal sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceLoadEvents(EventLogState state, LoadEventsAction action)
     {
-        if (!state.ActiveLogs.TryGetValue(action.LogData.Name, out var existing) ||
-            existing.Id != action.LogData.Id)
+        if (!state.OpenLogs.TryGetValue(action.LogData.Name, out var existing) ||
+            existing.Id != action.LogData.Id ||
+            action.LogData.Type != LogPathType.File)
         {
             return state;
         }
 
-        return UpdateActiveLog(state, action.LogData, action.Events);
+        var newSet = DistinctLogNames(action.Events);
+
+        if (state.NamesByLog.TryGetValue(action.LogData.Name, out var existingSet) &&
+            newSet.SetEquals(existingSet))
+        {
+            return state;
+        }
+
+        var newNamesByLog = state.NamesByLog.SetItem(action.LogData.Name, newSet);
+
+        return state with
+        {
+            NamesByLog = newNamesByLog,
+            LoadedLogNames = RecomputeLoadedLogNames(newNamesByLog, state.LoadedLogNames)
+        };
     }
 
     [ReducerMethod]
     public static EventLogState ReduceLoadEventsPartial(EventLogState state, LoadEventsPartialAction action)
     {
-        if (!state.ActiveLogs.TryGetValue(action.LogData.Name, out var existingLog) ||
-            existingLog.Id != action.LogData.Id)
+        if (!state.OpenLogs.TryGetValue(action.LogData.Name, out var existingLog) ||
+            existingLog.Id != action.LogData.Id ||
+            action.LogData.Type != LogPathType.File)
         {
             return state;
         }
 
-        var merged = new List<ResolvedEvent>(existingLog.Events.Count + action.Events.Count);
-        merged.AddRange(existingLog.Events);
-        merged.AddRange(action.Events);
+        var existingSet = state.NamesByLog.TryGetValue(action.LogData.Name, out var current)
+            ? current
+            : s_emptyNames;
+
+        var newSet = existingSet.Union(DistinctLogNames(action.Events));
+
+        if (ReferenceEquals(newSet, existingSet)) { return state; }
+
+        var newNamesByLog = state.NamesByLog.SetItem(action.LogData.Name, newSet);
 
         return state with
         {
-            ActiveLogs = state.ActiveLogs
-                .Remove(action.LogData.Name)
-                .Add(action.LogData.Name, existingLog with { Events = merged.AsReadOnly() })
+            NamesByLog = newNamesByLog,
+            LoadedLogNames = RecomputeLoadedLogNames(newNamesByLog, state.LoadedLogNames)
         };
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceOpenLog(EventLogState state, OpenLogAction action) =>
+    public static EventLogState ReduceOpenLog(EventLogState state, OpenLogAction action)
+    {
         // Idempotent: re-opening an already-active log is a no-op so callers (menu, drag/drop, command line,
         // SettingsModal.ReloadOpenLogs, effects) don't need to coordinate to avoid ImmutableDictionary.Add throwing.
-        state.ActiveLogs.ContainsKey(action.LogName)
-            ? state
-            : state with
-            {
-                ActiveLogs = state.ActiveLogs.Add(action.LogName, GetEmptyLogData(action.LogName, action.LogPathType))
-            };
+        if (state.OpenLogs.ContainsKey(action.LogName)) { return state; }
+
+        var openLogId = EventLogId.Create();
+
+        var perLogNames = action.LogPathType == LogPathType.Channel
+            ? s_emptyNames.Add(action.LogName)
+            : s_emptyNames;
+
+        var newNamesByLog = state.NamesByLog.SetItem(action.LogName, perLogNames);
+
+        return state with
+        {
+            OpenLogs = state.OpenLogs.SetItem(action.LogName, new OpenLogInfo(openLogId, action.LogPathType)),
+            NamesByLog = newNamesByLog,
+            LoadedLogNames = RecomputeLoadedLogNames(newNamesByLog, state.LoadedLogNames)
+        };
+    }
 
     [ReducerMethod]
     public static EventLogState ReduceSelectEvent(EventLogState state, SelectEventAction action)
@@ -282,8 +323,30 @@ internal sealed class Reducers
         return false;
     }
 
-    private static EventLogData GetEmptyLogData(string logName, LogPathType pathType) =>
-        new(logName, pathType, new List<ResolvedEvent>().AsReadOnly());
+    private static ImmutableHashSet<string> DistinctLogNames(IReadOnlyList<ResolvedEvent> events)
+    {
+        var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var resolvedEvent in events)
+        {
+            if (!string.IsNullOrEmpty(resolvedEvent.LogName)) { builder.Add(resolvedEvent.LogName); }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static ImmutableHashSet<string> RecomputeLoadedLogNames(
+        ImmutableDictionary<string, ImmutableHashSet<string>> namesByLog,
+        ImmutableHashSet<string> priorLoadedLogNames)
+    {
+        var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var perLogNames in namesByLog.Values) { builder.UnionWith(perLogNames); }
+
+        var union = builder.ToImmutable();
+
+        return union.SetEquals(priorLoadedLogNames) ? priorLoadedLogNames : union;
+    }
 
     private static ImmutableList<ResolvedEvent> RemoveByReference(
         ImmutableList<ResolvedEvent> list,
@@ -315,15 +378,4 @@ internal sealed class Reducers
 
         return true;
     }
-
-    private static EventLogState UpdateActiveLog(
-        EventLogState state,
-        EventLogData logData,
-        IReadOnlyList<ResolvedEvent> events) =>
-        state with
-        {
-            ActiveLogs = state.ActiveLogs
-                .Remove(logData.Name)
-                .Add(logData.Name, logData with { Events = events })
-        };
 }

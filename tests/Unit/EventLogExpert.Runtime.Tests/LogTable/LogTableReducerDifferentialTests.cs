@@ -26,8 +26,11 @@ public sealed class LogTableReducerDifferentialTests
         var resorted = Reducers.ReduceToggleGroupSorting(state); // no GroupBy -> no-op, returns same state
         Assert.Same(state, resorted);
 
-        // A sort-context change must mint a fresh PerLogEvents.
-        var afterOrderBy = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Level));
+        var requested = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Level));
+        Assert.Same(state.PerLogEvents, requested.PerLogEvents);
+        Assert.Equal(state.DisplayListVersion + 1, requested.DisplayListVersion);
+
+        var afterOrderBy = Settle(requested);
         Assert.NotSame(state.PerLogEvents, afterOrderBy.PerLogEvents);
         Assert.NotSame(state.DisplayedEvents, afterOrderBy.DisplayedEvents);
 
@@ -49,6 +52,21 @@ public sealed class LogTableReducerDifferentialTests
         var harness = new Harness(seed);
 
         harness.Run(operationCount: 300);
+    }
+
+    private static LogTableState Settle(LogTableState state)
+    {
+        var context = state.SortContext;
+        var lists = new Dictionary<EventLogId, SegmentedSortedList>(state.PerLogEvents.Count);
+
+        foreach (var (logId, list) in state.PerLogEvents)
+        {
+            lists[logId] = SegmentedSortedList.CreateSorted(list, context);
+        }
+
+        return Reducers.ReduceDisplayReady(
+            state,
+            new DisplayReadyAction { Lists = lists, Version = state.DisplayListVersion });
     }
 
     private sealed class Harness
@@ -91,7 +109,7 @@ public sealed class LogTableReducerDifferentialTests
 
         private LogModel AddLog()
         {
-            var data = new EventLogData($"Log{_logs.Count}", LogPathType.Channel, []);
+            var data = new EventLogData($"Log{_logs.Count}", LogPathType.Channel);
             var model = new LogModel(data.Id, data.Name, new DateTime(2026, 1, 1).AddDays(_logs.Count));
             _logs.Add(model);
             State = Reducers.ReduceAddTable(State, new AddTableAction(data));
@@ -156,25 +174,30 @@ public sealed class LogTableReducerDifferentialTests
             }
             else if (roll < 83)
             {
-                State = Reducers.ReduceSetOrderBy(State, new SetOrderByAction(_orderBys[_rng.Next(_orderBys.Length)]));
+                ApplySort(Reducers.ReduceSetOrderBy(State, new SetOrderByAction(_orderBys[_rng.Next(_orderBys.Length)])));
             }
             else if (roll < 89)
             {
-                State = Reducers.ReduceSetGroupBy(State, new SetGroupByAction(_groupBys[_rng.Next(_groupBys.Length)]));
+                ApplySort(Reducers.ReduceSetGroupBy(State, new SetGroupByAction(_groupBys[_rng.Next(_groupBys.Length)])));
             }
             else if (roll < 93)
             {
-                State = Reducers.ReduceToggleGroupSorting(State);
+                ApplySort(Reducers.ReduceToggleGroupSorting(State));
             }
             else if (roll < 97)
             {
-                State = Reducers.ReduceToggleSorting(State);
+                ApplySort(Reducers.ReduceToggleSorting(State));
             }
             else
             {
                 // May close the last open log (the K->0 reconciliation branch).
                 CloseLog(open[_rng.Next(open.Count)]);
             }
+        }
+
+        private void ApplySort(LogTableState requested)
+        {
+            State = requested.DisplayListVersion != State.DisplayListVersion ? Settle(requested) : requested;
         }
 
         private void AssertDisplayedMatchesOracle(int step)
@@ -332,7 +355,17 @@ public sealed class LogTableReducerDifferentialTests
                 activeLogs[log.Id] = kept;
             }
 
-            State = Reducers.ReduceUpdateDisplayedEvents(State, new UpdateDisplayedEventsAction(activeLogs));
+            var context = State.SortContext;
+            var lists = new Dictionary<EventLogId, SegmentedSortedList>(activeLogs.Count);
+
+            foreach (var (logId, events) in activeLogs)
+            {
+                lists[logId] = SegmentedSortedList.CreateSorted(events, context);
+            }
+
+            State = Reducers.ReduceDisplayReady(
+                State,
+                new DisplayReadyAction { Lists = lists, Version = State.DisplayListVersion });
         }
 
         private IEnumerable<int> SampleIndices(int count)

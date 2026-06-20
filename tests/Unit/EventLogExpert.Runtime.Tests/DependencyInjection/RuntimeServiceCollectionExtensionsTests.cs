@@ -145,6 +145,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IFilterPaneCommands))]
     [InlineData(typeof(ILogTableCommands))]
     [InlineData(typeof(IScenarioFavoriteCommands))]
+    [InlineData(typeof(IEventLogQueries))]
     // UI capabilities.
     [InlineData(typeof(IHighlightSelector))]
     [InlineData(typeof(ILogTableColumnDefaultsProvider))]
@@ -202,6 +203,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IFilePickerService>());
         services.AddSingleton(Substitute.For<IState<EventLogState>>());
         services.AddSingleton(Substitute.For<IState<FilterPaneState>>());
+        services.AddSingleton(Substitute.For<IState<RawEventStoreState>>());
         services.AddSingleton(Substitute.For<IStateSelection<EventLogState, bool>>());
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
         services.AddSingleton<HttpClient>();
@@ -253,6 +255,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IFilePickerService>());
         services.AddSingleton(Substitute.For<IState<EventLogState>>());
         services.AddSingleton(Substitute.For<IState<FilterPaneState>>());
+        services.AddSingleton(Substitute.For<IState<RawEventStoreState>>());
         services.AddSingleton(Substitute.For<IStateSelection<EventLogState, bool>>());
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
         services.AddSingleton<HttpClient>();

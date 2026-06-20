@@ -23,7 +23,7 @@ internal sealed class DatabaseCoordinationEffects(
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly ITraceLogger _logger = logger;
 
-    public bool HasActiveLogs => !_eventLogState.Value.ActiveLogs.IsEmpty;
+    public bool HasActiveLogs => !_eventLogState.Value.OpenLogs.IsEmpty;
 
     public async Task PrepareForDatabaseRemovalAsync(
         LogReopenSnapshot snapshot,
@@ -33,15 +33,17 @@ internal sealed class DatabaseCoordinationEffects(
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var activeLogs = _eventLogState.Value.ActiveLogs.Values.ToList();
+        var openLogs = _eventLogState.Value.OpenLogs
+            .Select(entry => (entry.Value.Id, Name: entry.Key, entry.Value.Type))
+            .ToList();
 
-        if (activeLogs.Count == 0) { return; }
+        if (openLogs.Count == 0) { return; }
 
         await _closeCoordinator.AcquireCoordinatorLockAsync(cancellationToken);
 
         try
         {
-            var reloadNames = activeLogs.Select(l => l.Name).ToHashSet(StringComparer.Ordinal);
+            var reloadNames = openLogs.Select(l => l.Name).ToHashSet(StringComparer.Ordinal);
 
             var selectionByLog = _eventLogState.Value.SelectedEvents
                 .Where(e => e.RecordId.HasValue && reloadNames.Contains(e.OwningLog))
@@ -59,9 +61,9 @@ internal sealed class DatabaseCoordinationEffects(
                 selectionByLog[selectedLogName] = new HashSet<long>();
             }
 
-            var waiters = new List<(EventLogId Id, string Name, LogPathType Type, Task Task)>(activeLogs.Count);
+            var waiters = new List<(EventLogId Id, string Name, LogPathType Type, Task Task)>(openLogs.Count);
 
-            foreach (var log in activeLogs)
+            foreach (var log in openLogs)
             {
                 var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 _closeCoordinator.RegisterCloseCompletion(log.Id, tcs);
@@ -125,8 +127,11 @@ internal sealed class DatabaseCoordinationEffects(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var activeLogsBeforeClose = _eventLogState.Value.ActiveLogs.Values.ToArray();
-        if (activeLogsBeforeClose.Length == 0) { return; }
+        var openLogsBeforeClose = _eventLogState.Value.OpenLogs
+            .Select(entry => (entry.Value.Id, Name: entry.Key, entry.Value.Type))
+            .ToArray();
+
+        if (openLogsBeforeClose.Length == 0) { return; }
 
         await _closeCoordinator.AcquireCoordinatorLockAsync(cancellationToken);
 
@@ -134,9 +139,9 @@ internal sealed class DatabaseCoordinationEffects(
 
         try
         {
-            var waiters = new List<(EventLogId Id, string Name, Task Task)>(activeLogsBeforeClose.Length);
+            var waiters = new List<(EventLogId Id, string Name, Task Task)>(openLogsBeforeClose.Length);
 
-            foreach (var log in activeLogsBeforeClose)
+            foreach (var log in openLogsBeforeClose)
             {
                 var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 _closeCoordinator.RegisterCloseCompletion(log.Id, tcs);
@@ -175,7 +180,7 @@ internal sealed class DatabaseCoordinationEffects(
             _closeCoordinator.ReleaseCoordinatorLock();
         }
 
-        foreach (var log in activeLogsBeforeClose)
+        foreach (var log in openLogsBeforeClose)
         {
             _eventLogCommands.OpenLog(log.Name, log.Type, CancellationToken.None);
         }

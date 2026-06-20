@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
@@ -18,6 +19,7 @@ internal static class LogTablePaneDependenciesExtensions
     {
         public IServiceCollection AddLogTablePaneDependencies()
         {
+            services.AddSingleton(Substitute.For<IAlertDialogService>());
             services.AddSingleton(Substitute.For<IClipboardService>());
             services.AddSingleton(Substitute.For<IFilterPaneCommands>());
             services.AddSingleton(Substitute.For<IFilterService>());

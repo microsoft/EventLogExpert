@@ -22,9 +22,10 @@ public sealed class LogTableReducerInvariantTests
         var info2 = MakeEvent(0, 4, Time(0, 4), level: "Information");
         var critical = MakeEvent(0, 5, Time(0, 5), level: "Critical");
 
-        var data = new EventLogData("Log0", LogPathType.Channel, []);
+        var data = new EventLogData("Log0", LogPathType.Channel);
         var state = Reducers.ReduceAddTable(new LogTableState(), new AddTableAction(data));
         state = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Level));
+        state = Settle(state);
 
         state = AppendBatch(state, data.Id, info, error);
         Assert.Equal(1, SegmentCountOf(state, data.Id));
@@ -75,7 +76,7 @@ public sealed class LogTableReducerInvariantTests
         var c = MakeEvent(1, 1, Time(1, 20));
         var d = MakeEvent(1, 2, Time(1, 5));
 
-        var log0 = new EventLogData("Log0", LogPathType.Channel, []);
+        var log0 = new EventLogData("Log0", LogPathType.Channel);
         var state = Reducers.ReduceAddTable(new LogTableState(), new AddTableAction(log0));
         state = AppendBatch(state, log0.Id, a, b);
 
@@ -85,7 +86,7 @@ public sealed class LogTableReducerInvariantTests
         AssertDisplayedExactly(state, [a, b]);
 
         // Opening a second log flips the default to DateAndTime.
-        var log1 = new EventLogData("Log1", LogPathType.Channel, []);
+        var log1 = new EventLogData("Log1", LogPathType.Channel);
         state = Reducers.ReduceAddTable(state, new AddTableAction(log1));
         state = AppendBatch(state, log1.Id, c, d);
 
@@ -139,6 +140,7 @@ public sealed class LogTableReducerInvariantTests
         var (state, ids) = SeedLogs(log0, log1);
 
         state = Reducers.ReduceSetGroupBy(state, new SetGroupByAction(ColumnName.Source));
+        state = Settle(state);
 
         AssertEveryLogIsOnTheCurrentContext(state);
 
@@ -163,6 +165,7 @@ public sealed class LogTableReducerInvariantTests
         var (state, ids) = SeedLogs(log0, log1);
 
         state = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Level));
+        state = Settle(state);
 
         // Atomicity: no list may lag the old context.
         AssertEveryLogIsOnTheCurrentContext(state);
@@ -207,9 +210,15 @@ public sealed class LogTableReducerInvariantTests
 
     private static void AssertEveryLogIsOnTheCurrentContext(LogTableState state)
     {
+        var displayed = new SortContext(
+            ResolvedEventOrdering.ResolveDefaultOrderBy(state.OrderBy, state.GroupBy, state.PerLogEvents.Count),
+            state.IsDescending,
+            state.GroupBy,
+            state.IsGroupDescending);
+
         foreach (var list in state.PerLogEvents.Values)
         {
-            Assert.True(list.HasContext(state.SortContext), "A per-log list lagged the state's sort context.");
+            Assert.True(list.HasContext(displayed), "A per-log list lagged the state's displayed context.");
         }
     }
 
@@ -231,7 +240,7 @@ public sealed class LogTableReducerInvariantTests
 
         for (int i = 0; i < perLog.Length; i++)
         {
-            var data = new EventLogData($"Log{i}", LogPathType.Channel, []);
+            var data = new EventLogData($"Log{i}", LogPathType.Channel);
             ids[i] = data.Id;
             state = Reducers.ReduceAddTable(state, new AddTableAction(data));
             batch[data.Id] = perLog[i];
@@ -243,6 +252,21 @@ public sealed class LogTableReducerInvariantTests
     }
 
     private static int SegmentCountOf(LogTableState state, EventLogId logId) => state.PerLogEvents[logId].SegmentCount;
+
+    private static LogTableState Settle(LogTableState state)
+    {
+        var context = state.SortContext;
+        var lists = new Dictionary<EventLogId, SegmentedSortedList>(state.PerLogEvents.Count);
+
+        foreach (var (logId, list) in state.PerLogEvents)
+        {
+            lists[logId] = SegmentedSortedList.CreateSorted(list, context);
+        }
+
+        return Reducers.ReduceDisplayReady(
+            state,
+            new DisplayReadyAction { Lists = lists, Version = state.DisplayListVersion });
+    }
 
     private static DateTime Time(int logIndex, int seconds) =>
         new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddDays(logIndex).AddSeconds(seconds);

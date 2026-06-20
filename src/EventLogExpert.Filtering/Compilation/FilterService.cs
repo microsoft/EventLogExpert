@@ -14,11 +14,9 @@ internal sealed class FilterService : IFilterService
     private const int OuterParallelTotalEventThreshold = 10_000;
 
     public IReadOnlyDictionary<EventLogId, IReadOnlyList<ResolvedEvent>> FilterActiveLogs(
-        IEnumerable<EventLogData> logData,
+        IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> logs,
         Filter filter)
     {
-        var logs = logData as IReadOnlyList<EventLogData> ?? [.. logData];
-
         // Single log, no filters, or trivial total work: sequential per-log (inner PLINQ still
         // engages for >=10k events on a single large log).
         if (logs.Count <= 1 ||
@@ -89,7 +87,8 @@ internal sealed class FilterService : IFilterService
             .ToList()
             .AsReadOnly();
 
-    private static bool ShouldParallelizeAcrossLogs(IReadOnlyList<EventLogData> logs)
+    private static bool ShouldParallelizeAcrossLogs(
+        IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> logs)
     {
         long totalEvents = 0;
 
@@ -113,7 +112,7 @@ internal sealed class FilterService : IFilterService
     }
 
     private Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> BuildSequentialResult(
-        IReadOnlyList<EventLogData> logs,
+        IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> logs,
         Filter filter)
     {
         var filtered = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>(logs.Count);

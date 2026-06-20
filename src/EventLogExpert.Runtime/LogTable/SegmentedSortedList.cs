@@ -85,22 +85,22 @@ internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IList<
         return false;
     }
 
-public void CopyTo(ResolvedEvent[] array, int arrayIndex)
-{
-    ArgumentNullException.ThrowIfNull(array);
-    ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
-
-    if (array.Length - arrayIndex < Count)
+    public void CopyTo(ResolvedEvent[] array, int arrayIndex)
     {
-        throw new ArgumentException("Destination array is not long enough.", nameof(array));
-    }
+        ArgumentNullException.ThrowIfNull(array);
+        ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
 
-    foreach (var segment in _segments)
-    {
-        segment.CopyTo(array, arrayIndex);
-        arrayIndex += segment.Length;
+        if (array.Length - arrayIndex < Count)
+        {
+            throw new ArgumentException("Destination array is not long enough.", nameof(array));
+        }
+
+        foreach (var segment in _segments)
+        {
+            segment.CopyTo(array, arrayIndex);
+            arrayIndex += segment.Length;
+        }
     }
-}
 
     public IEnumerator<ResolvedEvent> GetEnumerator()
     {
@@ -207,10 +207,24 @@ public void CopyTo(ResolvedEvent[] array, int arrayIndex)
             else { high = mid; }
         }
 
-        // Scan the comparer-equal window (null-RecordId error reads) for the exact instance.
+        // Scan the comparer-equal window for the target: by reference, then by key (RecordId + time + log) so a
+        // reloaded/cloned instance still ranks - matching this type's own ResolveByKey and CombinedEventView.Rank.
         for (int i = low; i < Count && _comparer(this[i], target) == 0; i++)
         {
-            if (ReferenceEquals(this[i], target)) { return i; }
+            var current = this[i];
+
+            if (ReferenceEquals(current, target)) { return i; }
+
+            // Skip null RecordId: null == null would merge distinct error-read events.
+            if (current.RecordId is null || target.RecordId is null) { continue; }
+
+            if (current.RecordId == target.RecordId &&
+                current.TimeCreated == target.TimeCreated &&
+                string.Equals(current.OwningLog, target.OwningLog, StringComparison.Ordinal) &&
+                string.Equals(current.LogName, target.LogName, StringComparison.Ordinal))
+            {
+                return i;
+            }
         }
 
         return -1;

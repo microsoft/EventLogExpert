@@ -6,4 +6,7 @@ using EventLogExpert.Eventing.Common.Events;
 
 namespace EventLogExpert.Runtime.LogTable;
 
-public sealed record UpdateTableAction(EventLogId LogId, IReadOnlyList<ResolvedEvent> Events);
+public sealed record UpdateTableAction(EventLogId LogId, IReadOnlyList<ResolvedEvent> Events)
+{
+    internal int Version { get; init; }
+}

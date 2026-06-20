@@ -152,6 +152,9 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<ILogTableCommands, LogTableCommands>();
             services.AddSingleton<IScenarioFavoriteCommands, ScenarioFavoriteCommands>();
 
+            // Query facades.
+            services.AddSingleton<IEventLogQueries, EventLogQueries>();
+
             // Shared coordination state for EventLog effects classes.
             services.AddSingleton<LogCloseCoordinator>();
             services.AddSingleton<EventLogConcurrencyState>();
