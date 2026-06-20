@@ -8,6 +8,7 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
+using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.StatusBar;
@@ -42,7 +43,7 @@ internal sealed class OpenLogEffects(
     private const int EagerFirstPaintThreshold = 200;
 
     private static readonly int s_maxGlobalConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
-    private static readonly SemaphoreSlim s_resolutionThrottle = new(s_maxGlobalConcurrency, s_maxGlobalConcurrency);
+    private static readonly PrioritySemaphore s_resolutionGate = new(s_maxGlobalConcurrency);
 
     private readonly LogCloseCoordinator _closeCoordinator = closeCoordinator;
     private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
@@ -298,6 +299,7 @@ internal sealed class OpenLogEffects(
         int lastPartialIndex = 0;
         int timerTick = 0;
         int eagerFired = 0;
+        long highAdmitted = 0;
 
         dispatcher.Dispatch(new AddTableAction(logData));
 
@@ -367,7 +369,19 @@ internal sealed class OpenLogEffects(
                 },
                 async (batch, innerToken) =>
                 {
-                    await s_resolutionThrottle.WaitAsync(innerToken);
+                    // First-screenful resolution preempts in-flight bulk across all loads. Classify by ADMITTED
+                    // (not completed) events so a slow-resolving load still demotes to Bulk after its first
+                    // screenful instead of monopolizing the high-priority lane.
+                    var priority = Volatile.Read(ref highAdmitted) < EagerFirstPaintThreshold
+                        ? ResolutionPriority.FirstScreenful
+                        : ResolutionPriority.Bulk;
+
+                    if (priority == ResolutionPriority.FirstScreenful)
+                    {
+                        Interlocked.Add(ref highAdmitted, batch.Length);
+                    }
+
+                    await s_resolutionGate.WaitAsync(priority, innerToken);
 
                     try
                     {
@@ -416,7 +430,7 @@ internal sealed class OpenLogEffects(
                     }
                     finally
                     {
-                        s_resolutionThrottle.Release();
+                        s_resolutionGate.Release();
                     }
                 });
 
