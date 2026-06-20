@@ -77,14 +77,14 @@
     </ItemGroup>
 
     <!--
-      Derive the native vcxproj Platform from the current .NET RuntimeIdentifier. Only x64 is
-      supported today — the vcxproj only declares Debug|x64/Release|x64 configurations. Other
-      RIDs (win-arm64, win-x86) require matching ProjectConfiguration entries in the vcxproj
-      first; the BuildExplorerExtensionNative target fails fast with a clear message rather
-      than producing a confusing MSB4126 from VS MSBuild.
+      Derive the native vcxproj Platform from the current .NET RuntimeIdentifier. x64 and arm64
+      are supported (the vcxproj declares Debug|x64/Release|x64 + Debug|ARM64/Release|ARM64). Other
+      RIDs (e.g. win-x86) have no matching ProjectConfiguration; the BuildExplorerExtensionNative
+      target then fails fast with a clear message rather than a confusing MSB4126 from VS MSBuild.
     -->
     <PropertyGroup>
-      <ExplorerExtensionNativePlatform Condition="'$(RuntimeIdentifier)' == '' OR $(RuntimeIdentifier.Contains('-x64'))">x64</ExplorerExtensionNativePlatform>
+      <ExplorerExtensionNativePlatform Condition="'$(RuntimeIdentifier)' != '' AND $(RuntimeIdentifier.Contains('-arm64'))">ARM64</ExplorerExtensionNativePlatform>
+      <ExplorerExtensionNativePlatform Condition="'$(ExplorerExtensionNativePlatform)' == '' AND ('$(RuntimeIdentifier)' == '' OR $(RuntimeIdentifier.Contains('-x64')))">x64</ExplorerExtensionNativePlatform>
     </PropertyGroup>
 
     <!--
@@ -124,10 +124,16 @@
         <_VswherePath>$(MSBuildProgramFiles32)\Microsoft Visual Studio\Installer\vswhere.exe</_VswherePath>
       </PropertyGroup>
       <Error Condition="'$(ExplorerExtensionNativePlatform)' == ''"
-             Text="EventLogExpert.ExplorerExtensionNative.vcxproj only declares x64 ProjectConfiguration entries. RuntimeIdentifier=$(RuntimeIdentifier) does not map to a supported native platform. Build for win-x64 OR add matching arm64/Win32 ProjectConfiguration + ItemDefinitionGroup blocks to the vcxproj." />
+             Text="EventLogExpert.ExplorerExtensionNative.vcxproj declares x64 and ARM64 ProjectConfiguration entries. RuntimeIdentifier=$(RuntimeIdentifier) does not map to a supported native platform (win-x64 or win-arm64). Build for win-x64/win-arm64 OR add matching ProjectConfiguration + ItemDefinitionGroup blocks (e.g. Win32) to the vcxproj." />
       <!-- Locate VS MSBuild requiring the VC toolset specifically — bare Microsoft.Component.MSBuild
            can match a Build Tools install without the C++ workload, which can't process vcxproj. -->
-      <Exec Command="&quot;$(_VswherePath)&quot; -latest -products * -requires Microsoft.Component.MSBuild Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find MSBuild\Current\Bin\amd64\MSBuild.exe"
+      <PropertyGroup>
+        <!-- ARM64 cross-compile from an x64 host needs BOTH the x64 host toolset AND the arm64 target
+             toolset. x64 builds require only x86.x64, so x64-only dev/CI machines are unaffected. -->
+        <_ExplorerExtensionVcComponents>Microsoft.VisualStudio.Component.VC.Tools.x86.x64</_ExplorerExtensionVcComponents>
+        <_ExplorerExtensionVcComponents Condition="'$(ExplorerExtensionNativePlatform)' == 'ARM64'">Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.Tools.ARM64</_ExplorerExtensionVcComponents>
+      </PropertyGroup>
+      <Exec Command="&quot;$(_VswherePath)&quot; -latest -products * -requires Microsoft.Component.MSBuild $(_ExplorerExtensionVcComponents) -find MSBuild\Current\Bin\amd64\MSBuild.exe"
             ConsoleToMSBuild="true"
             ContinueOnError="true">
         <Output TaskParameter="ConsoleOutput" PropertyName="VsMSBuildPath" />
@@ -138,7 +144,7 @@
         <VsMSBuildPath>$(VsMSBuildPath.Trim())</VsMSBuildPath>
       </PropertyGroup>
       <Error Condition="'$(VsMSBuildPath)' == '' OR !Exists('$(VsMSBuildPath)')"
-             Text="Could not locate Visual Studio MSBuild.exe with the C++ workload via vswhere ($(_VswherePath)). The native shell extension requires the Desktop Development with C++ workload (Microsoft.VisualStudio.Component.VC.Tools.x86.x64) AND the Windows 10/11 SDK. See docs/Explorer-Context-Menu.md for prereqs." />
+             Text="Could not locate Visual Studio MSBuild.exe with the required C++ workload components via vswhere ($(_VswherePath)). The native shell extension requires a VS install with $(_ExplorerExtensionVcComponents) AND the Windows 10/11 SDK. See docs/Explorer-Context-Menu.md for prereqs." />
       <Exec Command="where nuget.exe" ConsoleToMSBuild="true" ContinueOnError="true" IgnoreExitCode="true">
         <Output TaskParameter="ExitCode" PropertyName="_WhereNugetExitCode" />
         <Output TaskParameter="ConsoleOutput" PropertyName="_WhereNugetOutput" />
