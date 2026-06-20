@@ -1,6 +1,7 @@
 @inherits ModalBase<string>
 
-<ModalChrome AcceptLabel="OK"
+<ModalChrome AcceptDisabled="@(ValidationError is not null)"
+    AcceptLabel="OK"
     AriaLabel="@AriaLabelText"
     CancelLabel="Cancel"
     Footer="FooterPreset.AcceptCancel"
@@ -15,11 +16,22 @@
     Title="@Title">
     <ChildContent>
         <label class="prompt-modal-label" for="@_inputId">@Message</label>
-        <TextInput CssClass="input dialog-input"
+        <TextInput AriaDescribedBy="@(ValidationError is not null ? _errorId : null)"
+            AriaInvalid="@(ValidationError is not null)"
+            CssClass="input dialog-input"
             Id="@_inputId"
             @ref="_input"
             UpdateOnInput="true"
             Value="@_value"
             ValueChanged="HandleValueChanged" />
+
+        @if (ValidationError is not null)
+        {
+            <p aria-live="polite"
+                class="prompt-modal-validation-error"
+                id="@_errorId">
+                @ValidationError
+            </p>
+        }
     </ChildContent>
 </ModalChrome>

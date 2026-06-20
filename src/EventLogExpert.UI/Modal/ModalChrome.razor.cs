@@ -32,6 +32,8 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     private string? _validationCacheError;
     private string? _validationCacheValue;
 
+    [Parameter] public bool AcceptDisabled { get; set; }
+
     [Parameter] public string AcceptLabel { get; set; } = "OK";
 
     [Parameter] public string? AriaLabel { get; set; }

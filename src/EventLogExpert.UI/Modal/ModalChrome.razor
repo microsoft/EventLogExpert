@@ -112,7 +112,7 @@
                 case FooterPreset.AcceptCancel:
                     <button autofocus
                         class="button button-green"
-                        disabled="@(HasInlineAlert || FooterDisabled)"
+                        disabled="@(HasInlineAlert || FooterDisabled || AcceptDisabled)"
                         @onclick="HandleAcceptAsync"
                         type="button">
                         @AcceptLabel
@@ -152,7 +152,7 @@
             {
                 <TextInput AriaDescribedBy="@(ValidationError is not null ? _inlineAlertValidationErrorId : null)"
                     AriaInvalid="@(ValidationError is not null)"
-                    AriaLabel="@(string.IsNullOrEmpty(InlineAlert.Title) ? InlineAlert.Message : InlineAlert.Title)"
+                    AriaLabelledBy="@_inlineAlertMessageId"
                     CssClass="input dialog-input"
                     @ref="_inlineAlertInput"
                     UpdateOnInput="true"

@@ -46,6 +46,28 @@ public sealed class ModalChromeValidateAsyncTests : BunitContext
     }
 
     [Fact]
+    public void Prompt_InputLabelledByMessage()
+    {
+        var alert = new InlineAlertRequest(
+            Title: "Rename",
+            Message: "New name:",
+            AcceptLabel: "OK",
+            CancelLabel: "Cancel",
+            IsPrompt: true,
+            PromptInitialValue: "current");
+
+        var component = Render<ModalChrome>(p => p
+            .Add(x => x.InlineAlert, alert)
+            .AddChildContent("<p>body</p>"));
+
+        var input = component.Find("input.dialog-input");
+        var message = component.Find(".inline-alert-message");
+
+        Assert.Equal(message.Id, input.GetAttribute("aria-labelledby"));
+        Assert.False(input.HasAttribute("aria-label"));
+    }
+
+    [Fact]
     public void Prompt_ValidationErrorId_StableAcrossRenders()
     {
         var alert = new InlineAlertRequest(
