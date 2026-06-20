@@ -13,7 +13,7 @@ namespace EventLogExpert.UI.Modal;
 public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
     where TTab : struct, Enum
 {
-    private readonly Dictionary<TTab, ChromelessButton> _tabButtonRefs = new();
+    private readonly Dictionary<TTab, ChromelessButton?> _tabButtonRefs = new();
     private readonly string _tablistId = ComponentId.NewUnique().Value;
 
     private TTab? _pendingFocusTab;
@@ -49,7 +49,7 @@ public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
 
     public async ValueTask<bool> FocusActiveTabAsync()
     {
-        if (!_tabButtonRefs.TryGetValue(ActiveTab, out var tabButton)) { return false; }
+        if (!_tabButtonRefs.TryGetValue(ActiveTab, out var tabButton) || tabButton is null) { return false; }
 
         try
         {
@@ -79,7 +79,7 @@ public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
             catch (JSException) { }
         }
 
-        if (_pendingFocusTab is { } tab && _tabButtonRefs.TryGetValue(tab, out var tabButton))
+        if (_pendingFocusTab is { } tab && _tabButtonRefs.TryGetValue(tab, out var tabButton) && tabButton is not null)
         {
             _pendingFocusTab = null;
 
