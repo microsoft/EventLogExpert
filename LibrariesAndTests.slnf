@@ -1,0 +1,40 @@
+{
+  "solution": {
+    "path": "EventLogExpert.slnx",
+    "projects": [
+      "src\\EventLogExpert.DatabaseTools\\EventLogExpert.DatabaseTools.csproj",
+      "src\\EventLogExpert.ElevationHelper\\EventLogExpert.ElevationHelper.csproj",
+      "src\\EventLogExpert.EventDbTool\\EventLogExpert.EventDbTool.csproj",
+      "src\\EventLogExpert.Eventing\\EventLogExpert.Eventing.csproj",
+      "src\\EventLogExpert.Filtering\\EventLogExpert.Filtering.csproj",
+      "src\\EventLogExpert.Logging\\EventLogExpert.Logging.csproj",
+      "src\\EventLogExpert.Provider\\EventLogExpert.Provider.csproj",
+      "src\\EventLogExpert.Provider.Database\\EventLogExpert.Provider.Database.csproj",
+      "src\\EventLogExpert.Runtime\\EventLogExpert.Runtime.csproj",
+      "src\\EventLogExpert.Scenarios\\EventLogExpert.Scenarios.csproj",
+      "src\\EventLogExpert.UI\\EventLogExpert.UI.csproj",
+      "src\\EventLogExpert.WindowsPlatform\\EventLogExpert.WindowsPlatform.csproj",
+      "tests\\Integration\\EventLogExpert.DatabaseTools.IntegrationTests\\EventLogExpert.DatabaseTools.IntegrationTests.csproj",
+      "tests\\Integration\\EventLogExpert.ElevationHelper.IntegrationTests\\EventLogExpert.ElevationHelper.IntegrationTests.csproj",
+      "tests\\Integration\\EventLogExpert.EventDbTool.IntegrationTests\\EventLogExpert.EventDbTool.IntegrationTests.csproj",
+      "tests\\Integration\\EventLogExpert.Eventing.IntegrationTests\\EventLogExpert.Eventing.IntegrationTests.csproj",
+      "tests\\Integration\\EventLogExpert.Filtering.IntegrationTests\\EventLogExpert.Filtering.IntegrationTests.csproj",
+      "tests\\Integration\\EventLogExpert.Provider.Database.IntegrationTests\\EventLogExpert.Provider.Database.IntegrationTests.csproj",
+      "tests\\Integration\\EventLogExpert.Runtime.IntegrationTests\\EventLogExpert.Runtime.IntegrationTests.csproj",
+      "tests\\Integration\\EventLogExpert.UI.IntegrationTests\\EventLogExpert.UI.IntegrationTests.csproj",
+      "tests\\Shared\\EventLogExpert.Eventing.TestUtils\\EventLogExpert.Eventing.TestUtils.csproj",
+      "tests\\Shared\\EventLogExpert.Filtering.TestUtils\\EventLogExpert.Filtering.TestUtils.csproj",
+      "tests\\Unit\\EventLogExpert.DatabaseTools.Tests\\EventLogExpert.DatabaseTools.Tests.csproj",
+      "tests\\Unit\\EventLogExpert.EventDbTool.Tests\\EventLogExpert.EventDbTool.Tests.csproj",
+      "tests\\Unit\\EventLogExpert.Eventing.Tests\\EventLogExpert.Eventing.Tests.csproj",
+      "tests\\Unit\\EventLogExpert.Filtering.Tests\\EventLogExpert.Filtering.Tests.csproj",
+      "tests\\Unit\\EventLogExpert.Logging.Tests\\EventLogExpert.Logging.Tests.csproj",
+      "tests\\Unit\\EventLogExpert.Provider.Database.Tests\\EventLogExpert.Provider.Database.Tests.csproj",
+      "tests\\Unit\\EventLogExpert.Provider.Tests\\EventLogExpert.Provider.Tests.csproj",
+      "tests\\Unit\\EventLogExpert.Runtime.Tests\\EventLogExpert.Runtime.Tests.csproj",
+      "tests\\Unit\\EventLogExpert.Scenarios.Tests\\EventLogExpert.Scenarios.Tests.csproj",
+      "tests\\Unit\\EventLogExpert.UI.Tests\\EventLogExpert.UI.Tests.csproj",
+      "tests\\Unit\\EventLogExpert.Windows.Tests\\EventLogExpert.Windows.Tests.csproj"
+    ]
+  }
+}
