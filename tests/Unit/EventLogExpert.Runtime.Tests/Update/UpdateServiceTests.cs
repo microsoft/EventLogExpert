@@ -362,6 +362,64 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
+    public async Task CheckForUpdates_NoCompatiblePackageAutoScan_ShouldStaySilentAndNotDeploy()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns(Task.FromResult(CreateRuntimeOnlyRelease()));
+
+        var mockDeploymentService = Substitute.For<IDeploymentService>();
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService,
+            deploymentService: mockDeploymentService,
+            alertDialogService: mockAlertDialogService);
+
+        // Act
+        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: false);
+
+        // Assert
+        await mockAlertDialogService.DidNotReceive().ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+        mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
+        mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task CheckForUpdates_NoCompatiblePackageUserInitiated_ShouldAlertAndNotDeploy()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns(Task.FromResult(CreateRuntimeOnlyRelease()));
+
+        var mockDeploymentService = Substitute.For<IDeploymentService>();
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService,
+            deploymentService: mockDeploymentService,
+            alertDialogService: mockAlertDialogService);
+
+        // Act
+        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: true);
+
+        // Assert
+        await mockAlertDialogService.Received(1).ShowAlert("Update Unavailable", Arg.Any<string>(), "OK");
+        mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
+        mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
+    }
+
+    [Fact]
     public async Task CheckForUpdates_NoReleases_ShouldShowAlert()
     {
         // Arrange
@@ -661,41 +719,6 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
-    public async Task CheckForUpdates_WhenRunningPreReleaseAndChannelPreviouslyEnabledThenDisabled_ShouldPromptRollback()
-    {
-        // Arrange
-        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
-        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.GitHubPrereleaseVersion[1..]));
-        mockCurrentVersionProvider.IsDevBuild.Returns(false);
-
-        var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
-
-        var mockAppTitleService = Substitute.For<IAppTitleService>();
-        var mockDeploymentService = Substitute.For<IDeploymentService>();
-
-        var mockSettings = Substitute.For<ISettingsService>();
-        mockSettings.IsPreReleaseEnabled.Returns(false);
-        mockSettings.HasEverEnabledPreRelease.Returns(true);
-
-        var updateService = CreateUpdateService(
-            mockCurrentVersionProvider,
-            appTitleService: mockAppTitleService,
-            gitHubService: mockGitHubService,
-            deploymentService: mockDeploymentService,
-            settings: mockSettings);
-
-        // Act
-        await updateService.CheckForUpdates(usePreRelease: false);
-
-        // Assert
-        mockAppTitleService.Received(1).SetIsPrerelease(true);
-        mockSettings.DidNotReceive().IsPreReleaseEnabled = Arg.Any<bool>();
-
-        mockDeploymentService.Received(1).UpdateOnNextRestart(Constants.GitHubLatestUri);
-    }
-
-    [Fact]
     public async Task CheckForUpdates_WhenRunningPreReleaseAndChannelNeverEnabled_ShouldEnableChannelAndSuppressRollbackPrompt()
     {
         // Arrange
@@ -734,6 +757,41 @@ public sealed class UpdateServiceTests
 
         mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
         mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task CheckForUpdates_WhenRunningPreReleaseAndChannelPreviouslyEnabledThenDisabled_ShouldPromptRollback()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.GitHubPrereleaseVersion[1..]));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
+
+        var mockAppTitleService = Substitute.For<IAppTitleService>();
+        var mockDeploymentService = Substitute.For<IDeploymentService>();
+
+        var mockSettings = Substitute.For<ISettingsService>();
+        mockSettings.IsPreReleaseEnabled.Returns(false);
+        mockSettings.HasEverEnabledPreRelease.Returns(true);
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            appTitleService: mockAppTitleService,
+            gitHubService: mockGitHubService,
+            deploymentService: mockDeploymentService,
+            settings: mockSettings);
+
+        // Act
+        await updateService.CheckForUpdates(usePreRelease: false);
+
+        // Assert
+        mockAppTitleService.Received(1).SetIsPrerelease(true);
+        mockSettings.DidNotReceive().IsPreReleaseEnabled = Arg.Any<bool>();
+
+        mockDeploymentService.Received(1).UpdateOnNextRestart(Constants.GitHubLatestUri);
     }
 
     [Fact]
@@ -853,6 +911,27 @@ public sealed class UpdateServiceTests
         await mockAlertDialogService.DidNotReceive()
             .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
     }
+
+    // A release newer than the installed version whose only asset is the WindowsAppRuntime dependency (no
+    // EventLogExpert package or bundle), so the bundle-only selector finds no compatible package.
+    private static IEnumerable<GitHubRelease> CreateRuntimeOnlyRelease() =>
+    [
+        new()
+        {
+            Version = "v23.1.1.2",
+            IsPreRelease = false,
+            ReleaseDate = DateTime.Now,
+            Assets =
+            [
+                new GitHubReleaseAsset
+                {
+                    Name = "Microsoft.WindowsAppRuntime.1.7.msix",
+                    Uri = "https://github.com/microsoft/EventLogExpert/releases/download/v23.1.1.2/Microsoft.WindowsAppRuntime.1.7.msix"
+                }
+            ],
+            RawChanges = string.Empty
+        }
+    ];
 
     private static UpdateService CreateUpdateService(
         ICurrentVersionProvider? currentVersionProvider = null,
