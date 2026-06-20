@@ -2,14 +2,14 @@
     <span class="banner-message">An unexpected error occurred: @Critical.GetType().Name: @Critical.Message</span>
 
     <div class="banner-actions">
-        <Button OnClick="OnReloadClickedAsync" @ref="_reloadButton">
-            <i aria-hidden="true" class="bi bi-arrow-clockwise"></i> Reload
+        <Button IconClass="bi bi-arrow-clockwise" OnClick="OnReloadClickedAsync" @ref="_reloadButton">
+            Reload
         </Button>
-        <Button OnClick="OnRelaunchClickedAsync">
-            <i aria-hidden="true" class="bi bi-power"></i> Relaunch
+        <Button IconClass="bi bi-power" OnClick="OnRelaunchClickedAsync">
+            Relaunch
         </Button>
-        <Button OnClick="() => OnCopyDetailsClickedAsync(Critical)">
-            <i aria-hidden="true" class="bi bi-clipboard"></i> Copy details
+        <Button IconClass="bi bi-clipboard" OnClick="() => OnCopyDetailsClickedAsync(Critical)">
+            Copy details
         </Button>
     </div>
 

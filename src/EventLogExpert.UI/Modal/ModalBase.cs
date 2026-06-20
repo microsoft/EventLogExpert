@@ -124,7 +124,7 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
         await base.DisposeAsyncCore(disposing);
     }
 
-    /// <summary>UI button (Cancel/Close) entry point — routes through the coordinator's veto pipeline.</summary>
+    /// <summary>UI button (Cancel/Close) entry point - routes through the coordinator's veto pipeline.</summary>
     protected Task HandleCancelButtonClickAsync() =>
         ModalCoordinator.RequestCloseActiveAsync(ModalCloseReason.UserDismiss);
 
@@ -173,14 +173,14 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
     /// <summary>Veto hook for modal close requests. Override to block close conditionally (return <see langword="false" />).</summary>
     /// <remarks>
     ///     Calling <see cref="IModalCoordinator.RequestCloseActiveAsync" /> from inside this method is unsupported and
-    ///     will deadlock on the coordinator's in-flight close TCS. Throwing <see cref="OperationCanceledException" />
-    ///     from this method is interpreted by the coordinator as accepting the close.
+    ///     will deadlock on the coordinator's in-flight close TCS. Throwing <see cref="OperationCanceledException" /> from
+    ///     this method is interpreted by the coordinator as accepting the close.
     /// </remarks>
     protected virtual Task<bool> OnRequestCloseAsync(ModalCloseRequest request) => Task.FromResult(true);
 
     protected virtual Task OnSaveAsync() => CompleteAsync(default);
 
-    // Sync dispose path for the cancellation callback (BCL Action delegate forces sync — see ShowInlineAlertAsync.Register).
+    // Sync dispose path for the cancellation callback (BCL Action delegate forces sync - see ShowInlineAlertAsync.Register).
     private void TryClearInlineAlertFromCallback(InlineAlertEntry expected, InlineAlertResult? result, bool cancel)
     {
         InlineAlertEntry? cleared;

@@ -110,7 +110,7 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
             if (_manageTab is { IsUpgradeInFlight: true }) { return false; }
         }
 
-        // 3. Existing AnyTabIsRunning prompt — preserves current behavior.
+        // 3. Existing AnyTabIsRunning prompt - preserves current behavior.
         if (AnyTabIsRunning)
         {
             var confirm = await ShowInlineAlertAsync(

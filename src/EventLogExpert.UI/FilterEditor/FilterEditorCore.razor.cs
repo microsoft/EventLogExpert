@@ -48,7 +48,9 @@ public sealed partial class FilterEditorCore : ComponentBase
         CachedOptions is null ? [] : AvailableTags(CachedOptions);
 
     private string CachedEmptyHint =>
-        _selectedTags.Count > 0 ? "No recent filters match the selected tags — clear tags to see all" : "No recent options available here";
+        _selectedTags.Count > 0 ?
+            "No recent filters match the selected tags - clear tags to see all" :
+            "No recent options available here";
 
     private string ErrorMessage { get; set; } = string.Empty;
 

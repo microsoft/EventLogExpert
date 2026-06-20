@@ -217,7 +217,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
         return selected.EntryId == candidate.EntryId;
     }
 
-    // BannerView enum is ordered for display, not priority — use this rank for comparisons.
+    // BannerView enum is ordered for display, not priority - use this rank for comparisons.
     private static int PriorityRank(BannerView view) => view switch
     {
         BannerView.Critical => 6,
@@ -257,7 +257,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
         bool attentionSuppressed =
             _modalCoordinator.ActiveSession?.ComponentType == typeof(DatabaseToolsModal);
 
-        // Capture each facet snapshot once — the same data drives BuildCycle AND the fingerprint.
+        // Capture each facet snapshot once - the same data drives BuildCycle AND the fingerprint.
         var critical = _critical.CurrentCritical;
         var errors = _errors.ErrorBanners;
         var attentionEntries = _attention.AttentionEntries;
@@ -276,7 +276,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
             exportProgress,
             infos);
 
-        // Fingerprint is built from the UNFILTERED source — otherwise modal close would re-introduce
+        // Fingerprint is built from the UNFILTERED source - otherwise modal close would re-introduce
         // Attention and wrongly trigger priorityOverride on every reentry.
         var currentSourceFingerprint = ComputeSourceFingerprintFromSnapshot(
             critical,
@@ -329,7 +329,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
 
         // Gate user-preferred restore against a still-active priority-stolen item only. This does NOT
         // block restore when a higher-priority item that COEXISTED with the user's preference is
-        // present — only blocks against a newly-arrived steal that is still in the cycle.
+        // present - only blocks against a newly-arrived steal that is still in the cycle.
         if (_priorityStolenSelection is null
             && TryApplySelection(_userPreferredItem, items))
         {

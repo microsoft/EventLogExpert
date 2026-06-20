@@ -50,7 +50,7 @@
             <div class="elevation-warning-slot">
                 <div class="elevation-warning" role="alert">
                     <i aria-hidden="true" class="bi bi-shield-exclamation"></i>
-                    <span>Running without elevation — some local providers (Security, etc.) will be skipped or return incomplete metadata.</span>
+                    <span>Running without elevation - some local providers (Security, etc.) will be skipped or return incomplete metadata.</span>
                     <Button Disabled="@IsRunning"
                         OnClick="RunElevatedAsync"
                         title="Run this operation in an elevated helper process; main app stays running.">
@@ -67,22 +67,16 @@
             {
                 @if (IsCancelling)
                 {
-                    <Button Disabled>
-                        <i aria-hidden="true" class="bi bi-hourglass-split"></i> Cancelling…
-                    </Button>
+                    <Button Disabled IconClass="bi bi-hourglass-split">Cancelling…</Button>
                 }
                 else
                 {
-                    <DangerButton OnClick="CancelRun">
-                        <i aria-hidden="true" class="bi bi-x-circle"></i> Cancel
-                    </DangerButton>
+                    <DangerButton IconClass="bi bi-x-circle" OnClick="CancelRun">Cancel</DangerButton>
                 }
             }
             else
             {
-                <PrimaryButton Disabled="@(!CanRun)" OnClick="RunAsync">
-                    <i aria-hidden="true" class="bi bi-play-fill"></i> Run
-                </PrimaryButton>
+                <PrimaryButton Disabled="@(!CanRun)" IconClass="bi bi-play-fill" OnClick="RunAsync">Run</PrimaryButton>
             }
         </ToolbarLeadingContent>
     </DatabaseToolsLogView>

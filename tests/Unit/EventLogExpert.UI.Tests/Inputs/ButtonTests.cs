@@ -58,7 +58,7 @@ public sealed class ButtonTests : BunitContext
     public void Render_BlankType_DefaultsToButton(string? type)
     {
         var component = Render<Button>(parameters => parameters
-            .Add(p => p.Type, type!));
+            .Add(p => p.Type, type));
 
         var button = component.Find("button");
         Assert.Equal("button", button.GetAttribute("type"));

@@ -131,7 +131,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private void HandleContextMenu(MouseEventArgs args)
     {
-        // Suppressed in selection mode — bulk strip is the action surface.
+        // Suppressed in selection mode - bulk strip is the action surface.
         if (IsSelectionModeActive) { return; }
 
         var items = new List<MenuItem>

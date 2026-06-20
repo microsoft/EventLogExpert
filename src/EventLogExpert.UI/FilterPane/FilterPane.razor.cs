@@ -21,6 +21,7 @@ using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.UI.Focus;
+using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.Modal;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -45,8 +46,8 @@ public sealed partial class FilterPane
     private readonly List<FilterDraft> _pendingDrafts = [];
     private readonly Dictionary<FilterId, FilterRow?> _rowRefs = new();
 
-    private ElementReference _addFilterButtonRef;
-    private ElementReference _addFilterChevronRef;
+    private Button? _addFilterButtonRef;
+    private Button? _addFilterChevronRef;
     private long _addFilterMenuId;
     private ScenarioAuthoringRowContext? _authoringContext;
     private bool _canEditDate;
@@ -379,8 +380,7 @@ public sealed partial class FilterPane
                     _filterPaneRootRef,
                     new[]
                     {
-                        new { selector = ".split-button-chevron", keys = new[] { "ArrowUp", "ArrowDown" } },
-                        new { selector = ".menu-toggle", keys = new[] { "Enter", " " } }
+                        new { selector = ".split-button-chevron", keys = new[] { "ArrowUp", "ArrowDown" } }
                     });
             }
             catch (JSDisconnectedException) { }
@@ -400,7 +400,11 @@ public sealed partial class FilterPane
         else if (_focusAddButtonAfterRemove)
         {
             _focusAddButtonAfterRemove = false;
-            await ElementFocus.SafelyAsync(_addFilterButtonRef);
+
+            if (_addFilterButtonRef is { } addFilterButton)
+            {
+                await ElementFocus.SafelyAsync(addFilterButton.Element);
+            }
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -614,14 +618,6 @@ public sealed partial class FilterPane
         }
     }
 
-    private void HandleKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key is "Enter" or " ")
-        {
-            ToggleMenu();
-        }
-    }
-
     private void HandlePendingDiscard(FilterDraft draft)
     {
         _pendingDrafts.Remove(draft);
@@ -672,10 +668,12 @@ public sealed partial class FilterPane
 
     private async Task OpenAddFilterMenuAtAsync(bool focusFirst)
     {
+        if (_addFilterChevronRef is not { } chevronButton) { return; }
+
         _menuAnchorModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
             "import", "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
 
-        var rect = await _menuAnchorModule.InvokeAsync<MenuAnchorRect>("getMenuElementRect", _addFilterChevronRef);
+        var rect = await _menuAnchorModule.InvokeAsync<MenuAnchorRect>("getMenuElementRect", chevronButton.Element);
         MenuService.OpenAt(rect.Left, rect.Bottom, BuildAddFilterMenu(), focusFirst);
         _addFilterMenuId = MenuService.ActiveMenuId;
         StateHasChanged();
