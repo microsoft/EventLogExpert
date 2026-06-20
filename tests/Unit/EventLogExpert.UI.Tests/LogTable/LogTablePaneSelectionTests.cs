@@ -185,11 +185,11 @@ public sealed class LogTablePaneSelectionTests : BunitContext
 
         var sortedHeader = cut.Find("th[data-column='Source']");
         Assert.Equal("descending", sortedHeader.GetAttribute("aria-sort"));
-        Assert.NotNull(sortedHeader.QuerySelector("span.menu-toggle"));
+        Assert.NotNull(sortedHeader.QuerySelector(".menu-toggle"));
 
         var unsortedHeader = cut.Find("th[data-column='Level']");
         Assert.Equal("none", unsortedHeader.GetAttribute("aria-sort"));
-        Assert.Null(unsortedHeader.QuerySelector("span.menu-toggle"));
+        Assert.Null(unsortedHeader.QuerySelector(".menu-toggle"));
     }
 
     [Fact]

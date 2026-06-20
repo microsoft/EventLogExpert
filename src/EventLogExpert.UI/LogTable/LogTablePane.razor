@@ -73,9 +73,12 @@
                     }
                     @if (_logTableState.OrderBy == columnHeader)
                     {
-                        <span class="menu-toggle" data-rotate="@_logTableState.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                            <i class="bi bi-caret-up"></i>
-                        </span>
+                        <ChromelessButton aria-label="Toggle sort direction"
+                            CssClass="menu-toggle"
+                            data-rotate="@_logTableState.IsDescending.ToString().ToLower()"
+                            IconClass="bi bi-caret-up"
+                            OnClick="ToggleSorting"
+                            StopKeyDownPropagation="true" />
                     }
                 </th>
             }

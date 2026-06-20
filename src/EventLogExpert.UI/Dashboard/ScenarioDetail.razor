@@ -42,13 +42,11 @@
         }
     </div>
     <div class="scenario-detail__actions">
-        <button aria-label="@(IsFavored ? $"Remove {Scenario.Name} from favorites" : $"Add {Scenario.Name} to favorites")"
+        <ChromelessButton aria-label="@(IsFavored ? $"Remove {Scenario.Name} from favorites" : $"Add {Scenario.Name} to favorites")"
             aria-pressed="@(IsFavored ? "true" : "false")"
-            class="scenario-detail__star"
-            @onclick="OnToggleFavorite"
-            type="button">
-            <i aria-hidden="true" class="bi @(IsFavored ? "bi-star-fill" : "bi-star")"></i>
-        </button>
+            CssClass="scenario-detail__star"
+            IconClass="@(IsFavored ? "bi bi-star-fill" : "bi bi-star")"
+            OnClick="OnToggleFavorite" />
         <ChromelessButton aria-describedby="@(IsDisabled ? ElevationReasonId : null)"
             aria-disabled="@(IsDisabled ? "true" : "false")"
             CssClass="scenario-detail__launch"

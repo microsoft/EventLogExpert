@@ -10,7 +10,6 @@ using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common.Interop;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Xml;
 using System.Xml.Linq;
@@ -20,7 +19,6 @@ namespace EventLogExpert.UI.DetailsPane;
 public sealed partial class DetailsPane
 {
     private IJSObjectReference? _detailsPaneModule;
-    private ElementReference _detailsPaneRootRef;
     private DotNetObjectReference<DetailsPane>? _dotNetRef;
     private bool _hasOpened;
     private bool _isVisible;
@@ -31,7 +29,6 @@ public sealed partial class DetailsPane
     ///     failure); any other value is the rendered XML.
     /// </summary>
     private string? _resolvedXml;
-    private IJSObjectReference? _scrollSuppressorModule;
     private ResolvedEvent? _selectedEvent;
     /// <summary>Cancels any in-flight XML resolution when the selection changes again before completion.</summary>
     private CancellationTokenSource? _xmlResolveCts;
@@ -73,12 +70,7 @@ public sealed partial class DetailsPane
                 _detailsPaneModule,
                 static module => module.InvokeVoidAsync("disposeDetailsPaneResizer"));
 
-            await JsModuleInterop.DisposeModuleSafelyAsync(
-                _scrollSuppressorModule,
-                module => module.InvokeVoidAsync("release", _detailsPaneRootRef));
-
             _detailsPaneModule = null;
-            _scrollSuppressorModule = null;
 
             _dotNetRef?.Dispose();
         }
@@ -100,20 +92,6 @@ public sealed partial class DetailsPane
                 "enableDetailsPaneResizer",
                 _dotNetRef,
                 PreferencesProvider.DetailsPaneHeightPreference);
-
-            try
-            {
-                _scrollSuppressorModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                    "import",
-                    "./_content/EventLogExpert.UI/Common/keyboardScrollSuppressor.js");
-
-                await _scrollSuppressorModule.InvokeVoidAsync(
-                    "suppress",
-                    _detailsPaneRootRef,
-                    new[] { new { selector = "#details-header, .details-row-xml", keys = new[] { "Enter", " " } } });
-            }
-            catch (JSDisconnectedException) { }
-            catch (JSException) { }
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -150,26 +128,6 @@ public sealed partial class DetailsPane
             TraceLogger.Trace($"DetailsPane: failed to parse XML for display, falling back to raw text: {ex.Message}");
 
             return _resolvedXml;
-        }
-    }
-
-    private void HandleKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Repeat) { return; }
-
-        if (e.Key is "Enter" or " ")
-        {
-            ToggleMenu();
-        }
-    }
-
-    private void HandleKeyDownXml(KeyboardEventArgs e)
-    {
-        if (e.Repeat) { return; }
-
-        if (e.Key is "Enter" or " ")
-        {
-            ToggleXml();
         }
     }
 

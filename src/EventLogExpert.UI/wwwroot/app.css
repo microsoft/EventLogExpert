@@ -332,6 +332,12 @@ input[type="text"].input.dialog-input { padding: .25rem 0; }
 }
 
 .menu-toggle {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -344,6 +350,8 @@ input[type="text"].input.dialog-input { padding: .25rem 0; }
         display: flex;
         align-items: center;
         justify-content: center;
+        width: 1em;
+        height: 1em;
         line-height: 1;
         vertical-align: 0;
     }

@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Focus;
+using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 
@@ -21,7 +22,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
     private readonly string _nameButtonId = ComponentId.NewUnique("db-row-name").Value;
     private readonly string _pendingStatusId = ComponentId.NewUnique("db-row-pending").Value;
 
-    private ElementReference _nameButtonRef;
+    private ChromelessButton? _nameButton;
     private bool _shouldFocusNameAfterRender;
 
     private enum ActionKind
@@ -110,7 +111,10 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
-    public ValueTask FocusNameAsync() => ElementFocus.SafelyAsync(_nameButtonRef, preventScroll: true);
+    public ValueTask FocusNameAsync() =>
+        _nameButton is { } button ?
+            ElementFocus.SafelyAsync(button.Element, preventScroll: true) :
+            ValueTask.CompletedTask;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

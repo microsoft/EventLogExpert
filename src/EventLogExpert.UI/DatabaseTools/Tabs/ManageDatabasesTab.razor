@@ -4,7 +4,7 @@
     @if (IsClassificationPending)
     {
         <div class="manage-status-banner manage-status-banner--info" role="status">
-            <i aria-hidden="true" class="bi bi-arrow-repeat manage-status-banner__spinner loader-spin"></i>
+            <i aria-hidden="true" class="bi bi-arrow-repeat loader-spin manage-status-banner__spinner"></i>
             <span class="manage-status-banner__message">Classifying databases&hellip;</span>
         </div>
     }
@@ -36,15 +36,13 @@
     {
         <div class="manage-databases-selection-header">
             <div class="manage-databases-master-checkbox">
-                <button aria-checked="@MasterCheckboxAriaChecked"
+                <ChromelessButton aria-checked="@MasterCheckboxAriaChecked"
                     aria-label="@MasterCheckboxAriaLabel"
-                    class="manage-databases-master-btn"
-                    @onclick="OnMasterCheckboxClickAsync"
-                    @ref="_masterCheckboxRef"
-                    role="checkbox"
-                    type="button">
-                    <i aria-hidden="true" class="bi @MasterCheckboxIconClass"></i>
-                </button>
+                    CssClass="manage-databases-master-btn"
+                    IconClass="@($"bi {MasterCheckboxIconClass}")"
+                    OnClick="OnMasterCheckboxClickAsync"
+                    @ref="_masterCheckbox"
+                    role="checkbox" />
             </div>
             <span class="manage-databases-selection-count">
                 @_selectedForBulk.Count of @DatabaseService.Entries.Count selected
