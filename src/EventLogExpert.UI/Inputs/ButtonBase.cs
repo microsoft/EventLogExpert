@@ -70,7 +70,7 @@ public abstract class ButtonBase : ComponentBase
             builder.AddEventStopPropagationAttribute(6, "onclick", true);
         }
 
-        if (OnKeyDown.HasDelegate)
+        if (OnKeyDown.HasDelegate || StopKeyDownPropagation)
         {
             builder.AddAttribute(7, "onkeydown", EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync));
         }
