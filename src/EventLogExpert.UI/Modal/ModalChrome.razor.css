@@ -37,8 +37,12 @@ dialog:not(:modal) {
 }
 
 .dialog-title {
+    min-width: 0;
     margin: 0;
+    overflow: hidden;
 
+    white-space: nowrap;
+    text-overflow: ellipsis;
     font-size: 1.1rem;
     color: var(--clr-lightblue);
 }
@@ -66,6 +70,11 @@ dialog[data-body-layout="flex"]:not([style*="--modal-height"]) .dialog-body {
     min-height: min(60vh, 24rem);
 }
 
+dialog[data-body-layout="content"] .dialog-body {
+    max-height: calc(100vh - 10rem);
+    overflow: hidden auto;
+}
+
 .inline-alert-overlay {
     position: absolute;
     inset: 0;
@@ -84,8 +93,8 @@ dialog[data-body-layout="flex"]:not([style*="--modal-height"]) .dialog-body {
     display: flex;
     flex-direction: column;
     gap: .85rem;
-    min-width: 22rem;
-    max-width: min(40rem, calc(100vw - 2rem));
+    width: min(34rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
     padding: 1.25rem 1.5rem;
 
     color: var(--clr-lightblue);
@@ -96,29 +105,24 @@ dialog[data-body-layout="flex"]:not([style*="--modal-height"]) .dialog-body {
 }
 
 .inline-alert-title {
+    min-width: 0;
     margin: 0;
+    overflow: hidden;
 
+    white-space: nowrap;
+    text-overflow: ellipsis;
     font-size: 1.05rem;
     color: var(--clr-lightblue);
 }
 
 .inline-alert-message {
+    min-height: 0;
     margin: 0;
+    overflow-y: auto;
 
     line-height: 1.5;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-}
-
-.inline-alert-input {
-    width: 100%;
-    padding: .25rem .5rem;
-
-    color: var(--text-primary);
-    background-color: var(--background-dark);
-    border: 1px solid var(--clr-statusbar);
-    border-radius: .2rem;
-    font-family: inherit;
 }
 
 .inline-alert-validation-error {
@@ -126,6 +130,7 @@ dialog[data-body-layout="flex"]:not([style*="--modal-height"]) .dialog-body {
     margin-bottom: 0;
     padding: .25rem .375rem;
 
+    overflow-wrap: anywhere;
     color: var(--text-error);
     background: color-mix(in srgb, var(--clr-red) 8%, transparent);
     border-radius: .2rem;

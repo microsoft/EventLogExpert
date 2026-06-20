@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Common;
+using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
 
@@ -14,10 +15,10 @@ namespace EventLogExpert.UI.Alerts;
 /// </summary>
 public sealed partial class PromptModal : ModalBase<string>
 {
-    private readonly string _messageId = ComponentId.NewUnique("prompt-modal-message").Value;
+    private readonly string _inputId = ComponentId.NewUnique("prompt-modal-input").Value;
 
     private bool _focusOnNextRender = true;
-    private ElementReference _inputRef;
+    private TextInput? _input;
     private string _value = string.Empty;
 
     [Parameter] public string InitialValue { get; set; } = string.Empty;
@@ -30,13 +31,13 @@ public sealed partial class PromptModal : ModalBase<string>
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_focusOnNextRender && CurrentInlineAlert is null)
+        if (_focusOnNextRender && _input is not null && CurrentInlineAlert is null)
         {
             _focusOnNextRender = false;
 
             try
             {
-                await _inputRef.FocusAsync(true);
+                await _input.FocusAsync(true);
             }
             catch
             {
@@ -56,4 +57,6 @@ public sealed partial class PromptModal : ModalBase<string>
     }
 
     private Task HandleAcceptClickedAsync() => CompleteAsync(_value);
+
+    private void HandleValueChanged(string value) => _value = value;
 }

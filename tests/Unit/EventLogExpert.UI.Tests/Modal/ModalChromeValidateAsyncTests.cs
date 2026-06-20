@@ -112,7 +112,7 @@ public sealed class ModalChromeValidateAsyncTests : BunitContext
             .Add(x => x.InlineAlert, alert)
             .AddChildContent("<p>body</p>"));
 
-        var input = component.Find("input.inline-alert-input");
+        var input = component.Find("input.dialog-input");
         Assert.Equal("true", input.GetAttribute("aria-invalid"));
         var describedBy = input.GetAttribute("aria-describedby");
         Assert.False(string.IsNullOrEmpty(describedBy));
@@ -185,7 +185,7 @@ public sealed class ModalChromeValidateAsyncTests : BunitContext
             .Add(x => x.InlineAlert, alert)
             .AddChildContent("<p>body</p>"));
 
-        var input = component.Find("input.inline-alert-input");
+        var input = component.Find("input.dialog-input");
         Assert.False(input.HasAttribute("aria-invalid"));
         Assert.False(input.HasAttribute("aria-describedby"));
     }

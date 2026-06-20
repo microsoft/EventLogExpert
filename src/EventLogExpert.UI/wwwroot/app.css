@@ -273,6 +273,17 @@ a { color: var(--clr-lightblue); }
 
 input[type="text"].input { padding: 0; }
 
+.input.dialog-input {
+    width: 100%;
+    margin: 0;
+    text-align: left;
+    font-family: inherit;
+    cursor: text;
+    user-select: text;
+}
+
+input[type="text"].input.dialog-input { padding: .25rem 0; }
+
 .input.filter-dropdown { width: 120px; }
 
 .input.filter-mode-dropdown { width: 90px; }

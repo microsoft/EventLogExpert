@@ -18,7 +18,7 @@
         @if (!string.IsNullOrEmpty(Title))
         {
             <header class="dialog-header" inert="@HasInlineAlert">
-                <h2 class="dialog-title" id="@_titleId">@Title</h2>
+                <h2 class="dialog-title" id="@_titleId" title="@Title">@Title</h2>
 
                 @if (ShowCloseButton)
                 {
@@ -143,21 +143,21 @@
             role="alertdialog">
             @if (!string.IsNullOrEmpty(InlineAlert.Title))
             {
-                <h3 class="inline-alert-title" id="@_inlineAlertTitleId">@InlineAlert.Title</h3>
+                <h3 class="inline-alert-title" id="@_inlineAlertTitleId" title="@InlineAlert.Title">@InlineAlert.Title</h3>
             }
 
             <p class="inline-alert-message" id="@_inlineAlertMessageId">@InlineAlert.Message</p>
 
             @if (InlineAlert.IsPrompt)
             {
-                <input aria-describedby="@(ValidationError is not null ? _inlineAlertValidationErrorId : null)"
-                    aria-invalid="@(ValidationError is not null ? "true" : null)"
-                    aria-label="@(string.IsNullOrEmpty(InlineAlert.Title) ? InlineAlert.Message : InlineAlert.Title)"
-                    @bind="_inlineAlertPromptValue"
-                    @bind:event="oninput"
-                    class="inline-alert-input"
-                    @ref="_inlineAlertInputRef"
-                    type="text" />
+                <TextInput AriaDescribedBy="@(ValidationError is not null ? _inlineAlertValidationErrorId : null)"
+                    AriaInvalid="@(ValidationError is not null)"
+                    AriaLabel="@(string.IsNullOrEmpty(InlineAlert.Title) ? InlineAlert.Message : InlineAlert.Title)"
+                    CssClass="input dialog-input"
+                    @ref="_inlineAlertInput"
+                    UpdateOnInput="true"
+                    Value="@_inlineAlertPromptValue"
+                    ValueChanged="HandleInlineAlertPromptValueChanged" />
 
                 @if (ValidationError is not null)
                 {
