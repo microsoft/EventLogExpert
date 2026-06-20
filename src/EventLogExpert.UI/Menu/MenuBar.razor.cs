@@ -28,7 +28,7 @@ public sealed partial class MenuBar
 
     private readonly List<TopLevel> _bars = [];
 
-    private ChromelessButton[] _barElements = [];
+    private ChromelessButton?[] _barElements = [];
     private int _focusedBarIndex;
     private IJSObjectReference? _menuAnchorModule;
     private ElementReference _menuBarRootRef;
@@ -122,7 +122,7 @@ public sealed partial class MenuBar
         MenuService.NavigateBarRequested += OnNavigateBarRequested;
 
         _bars.AddRange(BuildTopLevel());
-        _barElements = new ChromelessButton[_bars.Count];
+        _barElements = new ChromelessButton?[_bars.Count];
 
         _ = PrewarmOtherLogNamesAsync();
 
