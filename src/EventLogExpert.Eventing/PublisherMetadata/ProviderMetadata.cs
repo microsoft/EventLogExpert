@@ -465,9 +465,9 @@ internal sealed class ProviderMetadata
 
             var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
 
-            return variant.Handle == IntPtr.Zero ?
+            return variant.EvtHandleVal == IntPtr.Zero ?
                 EvtHandle.Zero :
-                new EvtHandle(variant.Handle);
+                new EvtHandle(variant.EvtHandleVal);
         }
         finally
         {
