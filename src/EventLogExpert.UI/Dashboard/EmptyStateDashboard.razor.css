@@ -72,7 +72,7 @@
     gap: 0.75rem;
 }
 
-.empty-dashboard__utility {
+.empty-dashboard__masthead-actions ::deep .empty-dashboard__utility {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
@@ -86,22 +86,22 @@
     transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
 
-.empty-dashboard__utility > .bi {
+.empty-dashboard__masthead-actions ::deep .empty-dashboard__utility > .bi {
     color: var(--clr-lightblue);
 }
 
-.empty-dashboard__utility:hover:not(:disabled) {
+.empty-dashboard__masthead-actions ::deep .empty-dashboard__utility:hover:not(:disabled) {
     border-color: var(--clr-lightblue);
     color: var(--text-primary);
     background-color: var(--background-darkgray);
 }
 
-.empty-dashboard__utility:focus-visible {
+.empty-dashboard__masthead-actions ::deep .empty-dashboard__utility:focus-visible {
     outline: 2px solid var(--clr-lightblue);
     outline-offset: 2px;
 }
 
-.empty-dashboard__utility:disabled {
+.empty-dashboard__masthead-actions ::deep .empty-dashboard__utility:disabled {
     color: var(--clr-placeholder);
     cursor: default;
 }
@@ -144,7 +144,7 @@
     gap: 0.5rem;
 }
 
-.empty-dashboard__launch {
+.empty-dashboard__launchbar ::deep .empty-dashboard__launch {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
@@ -158,16 +158,16 @@
     transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.empty-dashboard__launch > .bi {
+.empty-dashboard__launchbar ::deep .empty-dashboard__launch > .bi {
     color: var(--clr-lightblue);
 }
 
-.empty-dashboard__launch:hover:not(:disabled):not(.empty-dashboard__launch--disabled):not(.empty-dashboard__launch--primary) {
+.empty-dashboard__launchbar ::deep .empty-dashboard__launch:hover:not(:disabled):not(.empty-dashboard__launch--disabled):not(.empty-dashboard__launch--primary) {
     border-color: var(--clr-lightblue);
     background-color: var(--background-darkgray);
 }
 
-.empty-dashboard__launch--primary {
+.empty-dashboard__launchbar ::deep .empty-dashboard__launch--primary {
     flex-shrink: 0;
     border-color: var(--clr-lightblue);
     background-color: var(--clr-lightblue);
@@ -175,25 +175,25 @@
     font-weight: 600;
 }
 
-.empty-dashboard__launch--primary > .bi {
+.empty-dashboard__launchbar ::deep .empty-dashboard__launch--primary > .bi {
     color: var(--accent-on-fill);
 }
 
-.empty-dashboard__launch--primary:hover:not(:disabled) {
+.empty-dashboard__launchbar ::deep .empty-dashboard__launch--primary:hover:not(:disabled) {
     box-shadow: var(--shadow-menu);
 }
 
-.empty-dashboard__launch:disabled,
-.empty-dashboard__launch--disabled {
+.empty-dashboard__launchbar ::deep .empty-dashboard__launch:disabled,
+.empty-dashboard__launchbar ::deep .empty-dashboard__launch--disabled {
     color: var(--clr-placeholder);
     cursor: default;
 }
 
-.empty-dashboard__launch--disabled > .bi {
+.empty-dashboard__launchbar ::deep .empty-dashboard__launch--disabled > .bi {
     color: var(--clr-placeholder);
 }
 
-.empty-dashboard__launch:focus-visible {
+.empty-dashboard__launchbar ::deep .empty-dashboard__launch:focus-visible {
     outline: 2px solid var(--clr-lightblue);
     outline-offset: 2px;
 }

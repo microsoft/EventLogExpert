@@ -100,7 +100,7 @@
     margin-right: .125rem;
 }
 
-.library-entry-tag-chip-remove {
+.library-entry-tag-chip ::deep .library-entry-tag-chip-remove {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -118,20 +118,20 @@
     transition: width 120ms ease, opacity 120ms ease, background 120ms ease, color 120ms ease;
 }
 
-.library-entry-tag-chip:hover .library-entry-tag-chip-remove,
-.library-entry-tag-chip:focus-within .library-entry-tag-chip-remove {
+.library-entry-tag-chip:hover ::deep .library-entry-tag-chip-remove,
+.library-entry-tag-chip:focus-within ::deep .library-entry-tag-chip-remove {
     width: 16px;
     opacity: 0.6;
     margin-left: 2px;
 }
 
-.library-entry-tag-chip-remove:hover {
+.library-entry-tag-chip ::deep .library-entry-tag-chip-remove:hover {
     opacity: 1;
     color: var(--clr-red);
     background: color-mix(in srgb, var(--clr-red) 14%, transparent);
 }
 
-.library-entry-tag-chip-remove:focus-visible {
+.library-entry-tag-chip ::deep .library-entry-tag-chip-remove:focus-visible {
     opacity: 1;
     outline: 2px solid var(--clr-statusbar);
     outline-offset: 1px;

@@ -144,7 +144,7 @@
     outline-offset: 2px;
 }
 
-.scenario-detail__launch {
+.scenario-detail__actions ::deep .scenario-detail__launch {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
@@ -158,27 +158,27 @@
     cursor: pointer;
 }
 
-.scenario-detail__launch > .bi {
+.scenario-detail__actions ::deep .scenario-detail__launch > .bi {
     color: var(--accent-on-fill);
 }
 
-.scenario-detail__launch:hover:not(:disabled):not([aria-disabled="true"]) {
+.scenario-detail__actions ::deep .scenario-detail__launch:hover:not(:disabled):not([aria-disabled="true"]) {
     box-shadow: var(--shadow-menu);
 }
 
-.scenario-detail__launch:focus-visible {
+.scenario-detail__actions ::deep .scenario-detail__launch:focus-visible {
     outline: 2px solid var(--clr-lightblue);
     outline-offset: 2px;
 }
 
-.scenario-detail__launch:disabled,
-.scenario-detail__launch[aria-disabled="true"] {
+.scenario-detail__actions ::deep .scenario-detail__launch:disabled,
+.scenario-detail__actions ::deep .scenario-detail__launch[aria-disabled="true"] {
     border-color: var(--border-divider);
     background-color: var(--surface-inset);
     color: var(--text-secondary);
     cursor: default;
 }
 
-.scenario-detail__launch[aria-disabled="true"] > .bi {
+.scenario-detail__actions ::deep .scenario-detail__launch[aria-disabled="true"] > .bi {
     color: var(--text-secondary);
 }

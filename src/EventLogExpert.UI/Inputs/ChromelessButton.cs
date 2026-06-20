@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.UI.Inputs;
 
-public sealed class Button : StyledButtonBase
+public sealed class ChromelessButton : ButtonBase
 {
-    protected override string? VariantClass => null;
+    protected override string BuildCssClass() => CssClass;
 }

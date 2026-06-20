@@ -49,13 +49,13 @@
             type="button">
             <i aria-hidden="true" class="bi @(IsFavored ? "bi-star-fill" : "bi-star")"></i>
         </button>
-        <button aria-describedby="@(IsDisabled ? ElevationReasonId : null)"
+        <ChromelessButton aria-describedby="@(IsDisabled ? ElevationReasonId : null)"
             aria-disabled="@(IsDisabled ? "true" : "false")"
-            class="scenario-detail__launch"
-            disabled="@IsBusy"
-            @onclick="LaunchAsync"
-            type="button">
-            <i aria-hidden="true" class="bi bi-play-fill"></i><span>Launch</span>
-        </button>
+            CssClass="scenario-detail__launch"
+            Disabled="@IsBusy"
+            IconClass="bi bi-play-fill"
+            OnClick="LaunchAsync">
+            <span>Launch</span>
+        </ChromelessButton>
     </div>
 </div>

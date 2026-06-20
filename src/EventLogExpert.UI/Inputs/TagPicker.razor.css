@@ -36,7 +36,7 @@
     white-space: nowrap;
 }
 
-.tag-picker-chip-remove {
+.tag-picker-chip ::deep .tag-picker-chip-remove {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -50,7 +50,7 @@
     line-height: 1;
 }
 
-.tag-picker-chip-remove:hover {
+.tag-picker-chip ::deep .tag-picker-chip-remove:hover {
     color: var(--clr-red);
 }
 

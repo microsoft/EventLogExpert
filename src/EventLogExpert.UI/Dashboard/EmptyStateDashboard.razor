@@ -18,43 +18,43 @@
                     <Button Disabled="@_isBusy" OnClick="ClearFilter">Clear filter</Button>
                 </div>
             }
-            <button class="empty-dashboard__utility" disabled="@_isBusy" @onclick="OpenDatabaseToolsAsync" type="button">
-                <i aria-hidden="true" class="bi bi-database-gear"></i><span>Manage databases...</span>
-            </button>
+            <ChromelessButton CssClass="empty-dashboard__utility" Disabled="@_isBusy" IconClass="bi bi-database-gear" OnClick="OpenDatabaseToolsAsync">
+                <span>Manage databases...</span>
+            </ChromelessButton>
         </div>
     </header>
 
     <section aria-labelledby="empty-dashboard-quickstart-heading" class="empty-dashboard__section">
         <h2 class="empty-dashboard__heading" id="empty-dashboard-quickstart-heading">Quick Launch</h2>
         <div class="empty-dashboard__launchbar">
-            <button aria-label="Open Application + System (live)" class="empty-dashboard__launch empty-dashboard__launch--primary" disabled="@_isBusy" @onclick="OpenApplicationAndSystemAsync" type="button">
-                <i aria-hidden="true" class="bi bi-collection"></i><span>Application + System (live)</span>
-            </button>
-            <button aria-label="Open Application (live)" class="empty-dashboard__launch" disabled="@_isBusy" @onclick="OpenApplicationAsync" type="button">
-                <i aria-hidden="true" class="bi bi-window"></i><span>Application (live)</span>
-            </button>
-            <button aria-label="Open System (live)" class="empty-dashboard__launch" disabled="@_isBusy" @onclick="OpenSystemAsync" type="button">
-                <i aria-hidden="true" class="bi bi-pc-display"></i><span>System (live)</span>
-            </button>
+            <ChromelessButton aria-label="Open Application + System (live)" CssClass="empty-dashboard__launch empty-dashboard__launch--primary" Disabled="@_isBusy" IconClass="bi bi-collection" OnClick="OpenApplicationAndSystemAsync">
+                <span>Application + System (live)</span>
+            </ChromelessButton>
+            <ChromelessButton aria-label="Open Application (live)" CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-window" OnClick="OpenApplicationAsync">
+                <span>Application (live)</span>
+            </ChromelessButton>
+            <ChromelessButton aria-label="Open System (live)" CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-pc-display" OnClick="OpenSystemAsync">
+                <span>System (live)</span>
+            </ChromelessButton>
             @if (Version.IsAdmin)
             {
-                <button aria-label="Open Security (live)" class="empty-dashboard__launch" disabled="@_isBusy" @onclick="OpenSecurityAsync" type="button">
-                    <i aria-hidden="true" class="bi bi-shield-lock"></i><span>Security (live)</span>
-                </button>
+                <ChromelessButton aria-label="Open Security (live)" CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-shield-lock" OnClick="OpenSecurityAsync">
+                    <span>Security (live)</span>
+                </ChromelessButton>
             }
             else
             {
-                <button aria-describedby="@ElevationReasonId" aria-disabled="true" aria-label="Open Security (live)" class="empty-dashboard__launch empty-dashboard__launch--disabled" type="button">
-                    <i aria-hidden="true" class="bi bi-shield-lock"></i><span>Security (live)</span>
-                </button>
+                <ChromelessButton aria-describedby="@ElevationReasonId" aria-disabled="true" aria-label="Open Security (live)" CssClass="empty-dashboard__launch empty-dashboard__launch--disabled" IconClass="bi bi-shield-lock">
+                    <span>Security (live)</span>
+                </ChromelessButton>
             }
             <span aria-hidden="true" class="empty-dashboard__launch-divider"></span>
-            <button aria-label="Open Log file..." class="empty-dashboard__launch" disabled="@_isBusy" @onclick="OpenFileAsync" type="button">
-                <i aria-hidden="true" class="bi bi-file-earmark-text"></i><span>Log file...</span>
-            </button>
-            <button aria-label="Open Folder..." class="empty-dashboard__launch" disabled="@_isBusy" @onclick="OpenFolderAsync" type="button">
-                <i aria-hidden="true" class="bi bi-folder2-open"></i><span>Folder...</span>
-            </button>
+            <ChromelessButton aria-label="Open Log file..." CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-file-earmark-text" OnClick="OpenFileAsync">
+                <span>Log file...</span>
+            </ChromelessButton>
+            <ChromelessButton aria-label="Open Folder..." CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-folder2-open" OnClick="OpenFolderAsync">
+                <span>Folder...</span>
+            </ChromelessButton>
         </div>
     </section>
 
