@@ -36,8 +36,9 @@
                     @if (_mergeTargetTag is not null)
                     {
                         <WarningButton aria-label="@($"Merge tag {tag} into {_mergeTargetTag}, affects {count} entries")"
+                            IconClass="bi bi-union"
                             OnClick="ConfirmMergeAsync">
-                            <i aria-hidden="true" class="bi bi-union"></i> Merge into '@_mergeTargetTag'
+                            Merge into '@_mergeTargetTag'
                         </WarningButton>
                     }
                     else

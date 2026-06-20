@@ -28,7 +28,7 @@ public abstract class ButtonBase : ComponentBase
 
     [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
 
-    [Parameter] public string Type { get; set; } = "button";
+    [Parameter] public string? Type { get; set; } = "button";
 
     protected abstract string? VariantClass { get; }
 

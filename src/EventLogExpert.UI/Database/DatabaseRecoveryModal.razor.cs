@@ -27,9 +27,9 @@ public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
 
     protected override ModalScope Scope => ModalScope.Critical;
 
-    [Inject] private IErrorBannerService ErrorBannerService { get; init; } = null!;
-
     [Inject] private IDatabaseService DatabaseService { get; init; } = null!;
+
+    [Inject] private IErrorBannerService ErrorBannerService { get; init; } = null!;
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
@@ -115,7 +115,7 @@ public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
                 catch (InvalidOperationException invalidOperation)
                 {
                     TraceLogger.Warning(
-                        $"{nameof(DatabaseRecoveryModal)}: skipped '{fileName}' ({action}) — {invalidOperation.Message}");
+                        $"{nameof(DatabaseRecoveryModal)}: skipped '{fileName}' ({action}) - {invalidOperation.Message}");
                     continue;
                 }
                 catch (Exception unexpected)

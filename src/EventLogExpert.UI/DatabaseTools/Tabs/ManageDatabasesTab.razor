@@ -16,18 +16,19 @@
         {
             <Button aria-pressed="@(_isSelectionModeActive ? "true" : "false")"
                 CssClass="manage-databases-select-btn"
+                IconClass="bi bi-check2-square"
                 id="manage-select-button"
                 OnClick="ToggleSelectionMode"
                 @ref="_selectButton">
-                <i aria-hidden="true" class="bi bi-check2-square"></i>
                 @(_isSelectionModeActive ? "Done" : "Select")
             </Button>
         }
         <Button CssClass="manage-databases-import-btn"
+            IconClass="bi bi-plus-circle"
             id="manage-import-button"
             OnClick="ImportDatabase"
             @ref="_importButton">
-            <i aria-hidden="true" class="bi bi-plus-circle"></i> Import database&hellip;
+            Import database&hellip;
         </Button>
     </div>
 

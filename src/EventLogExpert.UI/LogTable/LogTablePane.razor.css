@@ -27,8 +27,6 @@ th {
     & > span {
         position: absolute;
         right: 5px;
-
-        &[data-rotate="true"] { top: 25%; }
     }
 }
 
