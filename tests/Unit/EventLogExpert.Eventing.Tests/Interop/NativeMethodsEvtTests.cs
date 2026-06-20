@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Interop;
+using EventLogExpert.Eventing.Readers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -822,6 +823,58 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
+    public void GetEventRecord_WhenActivityIdNullVsPresent_ShouldPreserveDistinction()
+    {
+        var expected = Guid.NewGuid();
+        IntPtr guidPtr = Marshal.AllocHGlobal(Marshal.SizeOf<Guid>());
+
+        try
+        {
+            Marshal.StructureToPtr(expected, guidPtr, false);
+
+            var absent = BuildAndReadSystemRecord((buffer, size) =>
+                SetSlotType(buffer, (int)EvtSystemPropertyId.ActivityId, size, EvtVariantType.Null));
+            var present = BuildAndReadSystemRecord((buffer, size) =>
+                WriteVariantSlot(buffer, (int)EvtSystemPropertyId.ActivityId, size, EvtVariantType.Guid, guidPtr));
+
+            Assert.Null(absent.ActivityId);
+            Assert.Equal(expected, present.ActivityId);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(guidPtr);
+        }
+    }
+
+    [Fact]
+    public void GetEventRecord_WhenKeywordsHighBitSet_ShouldReinterpretAsNegativeLong()
+    {
+        // Keywords renders as HexInt64; the unchecked (long) reinterpret must preserve the bits, so a
+        // high-bit-set UInt64 becomes a negative long rather than throwing or clamping.
+        const ulong highBit = 0x8000_0000_0000_0001;
+        var record = BuildAndReadSystemRecord((buffer, size) =>
+            SetSlotScalarUInt64(buffer, (int)EvtSystemPropertyId.Keywords, size, EvtVariantType.HexInt64, highBit));
+
+        Assert.Equal(unchecked((long)highBit), record.Keywords);
+        Assert.True(record.Keywords < 0);
+    }
+
+    [Fact]
+    public void GetEventRecord_WhenNullableTaskNullVsZero_ShouldPreserveDistinction()
+    {
+        // The absent-vs-zero distinction is load-bearing: Type=Null means the property is absent (-> null);
+        // Type=UInt16 value 0 means present-and-zero (-> 0). Reading the field without the Null guard would
+        // collapse both to 0.
+        var absent = BuildAndReadSystemRecord((buffer, size) =>
+            SetSlotType(buffer, (int)EvtSystemPropertyId.Task, size, EvtVariantType.Null));
+        var zero = BuildAndReadSystemRecord((buffer, size) =>
+            SetSlotScalarUInt16(buffer, (int)EvtSystemPropertyId.Task, size, 0));
+
+        Assert.Null(absent.Task);
+        Assert.Equal((ushort)0, zero.Task);
+    }
+
+    [Fact]
     public void ThrowEventLogException_WhenAccessDenied_ShouldThrowUnauthorizedAccessException()
     {
         // Arrange
@@ -951,6 +1004,33 @@ public sealed class NativeMethodsEvtTests
         Assert.Throws<Exception>(() => NativeMethods.ThrowEventLogException(error));
     }
 
+    // Builds an 18-slot EVT_VARIANT system-property buffer (every slot Null), pre-sets the required EventId +
+    // TimeCreated slots to valid values so GetEventRecord's asserted/dereferenced required reads don't fire,
+    // applies the per-test configuration, then reads it back through GetEventRecord.
+    private static unsafe EventRecord BuildAndReadSystemRecord(Action<IntPtr, int> configure)
+    {
+        int variantSize = Marshal.SizeOf<EvtVariant>();
+        const int count = 18;
+        IntPtr buffer = Marshal.AllocHGlobal(variantSize * count);
+
+        try
+        {
+            Unsafe.InitBlock((void*)buffer, 0, (uint)(variantSize * count));
+
+            SetSlotScalarUInt16(buffer, (int)EvtSystemPropertyId.EventId, variantSize, 1000);
+            SetSlotScalarUInt64(buffer, (int)EvtSystemPropertyId.TimeCreated, variantSize, EvtVariantType.FileTime,
+                (ulong)new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc).ToFileTimeUtc());
+
+            configure(buffer, variantSize);
+
+            return NativeMethods.GetEventRecord(buffer, count);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
     private static EvtVariant CreateVariant(EvtVariantType type, object? value = null)
     {
         return CreateVariantWithCount(type, value, 0);
@@ -1042,6 +1122,21 @@ public sealed class NativeMethodsEvtTests
             Marshal.FreeHGlobal(buffer);
         }
     }
+
+    private static unsafe void SetSlotScalarUInt16(IntPtr buffer, int index, int variantSize, ushort value)
+    {
+        *(ushort*)(buffer + (index * variantSize)) = value;
+        SetSlotType(buffer, index, variantSize, EvtVariantType.UInt16);
+    }
+
+    private static unsafe void SetSlotScalarUInt64(IntPtr buffer, int index, int variantSize, EvtVariantType type, ulong value)
+    {
+        *(ulong*)(buffer + (index * variantSize)) = value;
+        SetSlotType(buffer, index, variantSize, type);
+    }
+
+    private static unsafe void SetSlotType(IntPtr buffer, int index, int variantSize, EvtVariantType type) =>
+        *(uint*)(buffer + (index * variantSize) + 12) = (uint)type;
 
     // Helper methods to create EvtVariant instances
     private static unsafe void WriteVariantSlot(IntPtr buffer, int index, int variantSize, EvtVariantType type, IntPtr value)
