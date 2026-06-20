@@ -77,7 +77,10 @@ public sealed class EventLogReader(string path, LogPathType pathType, bool rende
     // With a maximum event size of 64 KB, the maximum batchSize that won't exceed the maximum buffer
     // size is 30 (32 minus some overhead; refer to MS-EVEN6 for details).
     // Windows 11 and later will stop filling out the buffer when the maximum size is reached, regardless
-    // of whether the requested batchSize was reached (but it will not exceed the requested count).
+    // of whether the requested batchSize was reached (but it will not exceed the requested count). The 30
+    // ceiling is a pre-Windows 11 constraint; on supported Windows 11+ deployments a larger batchSize is
+    // safe and faster (EvtNext just returns fewer when the 2 MB buffer fills first), so the log-load path
+    // requests more.
     public bool TryGetEvents(out EventRecord[] events, int batchSize = 30)
     {
         var buffer = ArrayPool<IntPtr>.Shared.Rent(batchSize);
@@ -97,18 +100,29 @@ public sealed class EventLogReader(string path, LogPathType pathType, bool rende
 
             LastErrorCode = null;
 
-            using (_eventLock.EnterScope())
+            try
             {
-                LastBookmark = CreateBookmark(new EvtHandle(buffer[count - 1], false));
-
-                if (reverseDirection && !_newestCaptured)
+                using (_eventLock.EnterScope())
                 {
-                    _newestReverseBookmark = CreateBookmark(new EvtHandle(buffer[0], false));
-                    _newestCaptured = true;
-                }
-            }
+                    LastBookmark = CreateBookmark(new EvtHandle(buffer[count - 1], false));
 
-            events = new EventRecord[count];
+                    if (reverseDirection && !_newestCaptured)
+                    {
+                        _newestReverseBookmark = CreateBookmark(new EvtHandle(buffer[0], false));
+                        _newestCaptured = true;
+                    }
+                }
+
+                events = new EventRecord[count];
+            }
+            catch
+            {
+                // Bookmark capture (or the result allocation) threw before the render loop disposed the
+                // batch handles; close them here so a failed read never leaks up to batchSize native event handles.
+                for (int i = 0; i < count; i++) { new EvtHandle(buffer[i]).Dispose(); }
+
+                throw;
+            }
 
             for (int i = 0; i < count; i++)
             {
