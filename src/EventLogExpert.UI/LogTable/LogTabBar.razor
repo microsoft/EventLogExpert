@@ -12,7 +12,7 @@
                     tabindex="@(table.IsLoading ? -1 : 0)">
                     @if (table.IsLoading)
                     {
-                        <i aria-label="Loading" class="spinner-border" role="status"></i>
+                        <i aria-label="Loading" class="spinner-border loader-spin" role="status"></i>
                         @:&nbsp;
                     }
                     @GetTabName(table)
