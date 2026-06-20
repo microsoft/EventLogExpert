@@ -49,13 +49,11 @@
                             var tag = Entry.Tags[i];
                             <span class="library-entry-tag-chip" role="listitem">
                                 <span class="library-entry-tag-chip-label">@tag</span>
-                                <button aria-label="@($"Remove tag {tag}")"
-                                    class="library-entry-tag-chip-remove"
-                                    @onclick="@(() => OnRemoveTagAsync(tag))"
-                                    @onclick:stopPropagation="true"
-                                    type="button">
-                                    <i aria-hidden="true" class="bi bi-x"></i>
-                                </button>
+                                <ChromelessButton aria-label="@($"Remove tag {tag}")"
+                                    CssClass="library-entry-tag-chip-remove"
+                                    IconClass="bi bi-x"
+                                    OnClick="@(() => OnRemoveTagAsync(tag))"
+                                    StopPropagation="true" />
                             </span>
                         }
                     </div>

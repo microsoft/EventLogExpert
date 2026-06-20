@@ -1,15 +1,14 @@
 @if (IsEditing)
 {
     <div class="filter-predicate-editing">
-        <button aria-label="@(Value.JoinWithAny ? "Joining with OR; click to switch to AND" : "Joining with AND; click to switch to OR")"
-            class="filter-predicate-and-or"
+        <ChromelessButton aria-label="@(Value.JoinWithAny ? "Joining with OR; click to switch to AND" : "Joining with AND; click to switch to OR")"
+            CssClass="filter-predicate-and-or"
             data-mode="@(Value.JoinWithAny ? "or" : "and")"
-            @onclick="OnAndOrClick"
-            @ref="_editorFirstInputRef"
-            title="@(Value.JoinWithAny ? "OR" : "AND")"
-            type="button">
+            OnClick="OnAndOrClick"
+            @ref="_editorFirstInput"
+            title="@(Value.JoinWithAny ? "OR" : "AND")">
             @(Value.JoinWithAny ? "OR" : "AND")
-        </button>
+        </ChromelessButton>
 
         <FilterComparisonEditor Comparison="Value.Comparison"
             Id="@ComponentId.For(Value.Id, ComponentIdScope.Predicate).Value"
@@ -32,22 +31,19 @@
 else
 {
     <div class="filter-predicate">
-        <button aria-label="@($"Edit predicate: {SummaryText}")"
-            class="filter-predicate-edit"
-            @onclick="OnEditChip"
-            @ref="_chipEditButtonRef"
-            title="Edit predicate"
-            type="button">
+        <ChromelessButton aria-label="@($"Edit predicate: {SummaryText}")"
+            CssClass="filter-predicate-edit"
+            OnClick="OnEditChip"
+            @ref="_chipEditButton"
+            title="Edit predicate">
             <span class="filter-predicate-joiner">@JoinerLabel</span>
             <span class="filter-predicate-summary">@SummaryText</span>
-        </button>
+        </ChromelessButton>
 
-        <button aria-label="@($"Remove predicate: {SummaryText}")"
-            class="filter-predicate-remove"
-            @onclick="OnRemoveChip"
-            title="Remove predicate"
-            type="button">
-            <i aria-hidden="true" class="bi bi-x-circle"></i>
-        </button>
+        <ChromelessButton aria-label="@($"Remove predicate: {SummaryText}")"
+            CssClass="filter-predicate-remove"
+            IconClass="bi bi-x-circle"
+            OnClick="OnRemoveChip"
+            title="Remove predicate" />
     </div>
 }

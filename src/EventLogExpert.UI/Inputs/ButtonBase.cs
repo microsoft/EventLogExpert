@@ -24,15 +24,15 @@ public abstract class ButtonBase : ComponentBase
 
     [Parameter] public string? IconClass { get; set; }
 
-    [Parameter] public bool IconOnly { get; set; }
-
     [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
+
+    [Parameter] public bool StopPropagation { get; set; }
 
     [Parameter] public string? Type { get; set; } = "button";
 
-    protected abstract string? VariantClass { get; }
-
     public ValueTask FocusAsync(bool preventScroll = false) => _element.FocusAsync(preventScroll);
+
+    protected abstract string BuildCssClass();
 
     protected override void BuildRenderTree(RenderTreeBuilder builder)
     {
@@ -44,38 +44,40 @@ public abstract class ButtonBase : ComponentBase
         }
 
         builder.AddAttribute(2, "type", string.IsNullOrWhiteSpace(Type) ? "button" : Type);
-        builder.AddAttribute(3, "class", BuildCssClass());
+
+        var cssClass = BuildCssClass();
+
+        if (!string.IsNullOrWhiteSpace(cssClass))
+        {
+            builder.AddAttribute(3, "class", cssClass);
+        }
+
         builder.AddAttribute(4, "disabled", Disabled);
-        builder.AddAttribute(5, "onclick", OnClick);
-        builder.AddElementReferenceCapture(6, capturedRef => _element = capturedRef);
+        builder.AddAttribute(5, "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync));
+
+        if (StopPropagation)
+        {
+            builder.AddEventStopPropagationAttribute(6, "onclick", true);
+        }
+
+        builder.AddElementReferenceCapture(7, capturedRef => _element = capturedRef);
 
         if (!string.IsNullOrWhiteSpace(IconClass))
         {
-            builder.OpenElement(7, "i");
-            builder.AddAttribute(8, "aria-hidden", "true");
-            builder.AddAttribute(9, "class", IconClass);
+            builder.OpenElement(8, "i");
+            builder.AddAttribute(9, "aria-hidden", "true");
+            builder.AddAttribute(10, "class", IconClass);
             builder.CloseElement();
 
             if (ChildContent is not null)
             {
-                builder.AddContent(10, " ");
+                builder.AddContent(11, " ");
             }
         }
 
-        builder.AddContent(11, ChildContent);
+        builder.AddContent(12, ChildContent);
         builder.CloseElement();
     }
 
-    private string BuildCssClass()
-    {
-        var classes = new List<string>(4) { "button" };
-
-        if (!string.IsNullOrWhiteSpace(VariantClass)) { classes.Add(VariantClass); }
-
-        if (IconOnly) { classes.Add("icon-button"); }
-
-        if (!string.IsNullOrWhiteSpace(CssClass)) { classes.Add(CssClass); }
-
-        return string.Join(' ', classes);
-    }
+    private Task HandleClickAsync(MouseEventArgs args) => Disabled ? Task.CompletedTask : OnClick.InvokeAsync(args);
 }

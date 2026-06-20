@@ -77,10 +77,7 @@
                         CssClass="db-entry-upgrade-btn"
                         Disabled="@IsUpgradeBlocked"
                         IconClass="bi bi-arrow-up-circle"
-                        OnClick="@(async () =>
-                                 {
-                                     if (!IsUpgradeBlocked) { await OnUpgrade.InvokeAsync(); }
-                                 })">
+                        OnClick="@(() => OnUpgrade.InvokeAsync())">
                         Upgrade
                     </Button>
 
@@ -91,10 +88,7 @@
                         CssClass="db-entry-upgrade-btn"
                         Disabled="@IsUpgradeBlocked"
                         IconClass="bi bi-arrow-clockwise"
-                        OnClick="@(async () =>
-                                 {
-                                     if (!IsUpgradeBlocked) { await OnUpgrade.InvokeAsync(); }
-                                 })">
+                        OnClick="@(() => OnUpgrade.InvokeAsync())">
                         Retry Upgrade
                     </DangerButton>
 
