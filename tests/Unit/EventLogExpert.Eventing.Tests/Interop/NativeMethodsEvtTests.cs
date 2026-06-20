@@ -402,10 +402,11 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
-    public void ConvertVariant_WhenSByte_ShouldReturnByte()
+    public void ConvertVariant_WhenSByte_ShouldReturnSByte()
     {
-        // Arrange
-        byte expectedValue = 127;
+        // Arrange - a negative value distinguishes the signed INT8 result from the prior byte
+        // return (the same 0xFF byte reads as -1 via SByteVal, but 255 if read as a byte).
+        sbyte expectedValue = -1;
         var variant = CreateVariant(EvtVariantType.SByte, expectedValue);
 
         // Act
@@ -413,7 +414,7 @@ public sealed class NativeMethodsEvtTests
 
         // Assert
         Assert.NotNull(result);
-        Assert.IsType<byte>(result);
+        Assert.IsType<sbyte>(result);
         Assert.Equal(expectedValue, result);
     }
 
@@ -447,10 +448,10 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
-    public void ConvertVariant_WhenSizeT_ShouldReturnIntPtr()
+    public void ConvertVariant_WhenSizeT_ShouldReturnUIntPtr()
     {
         // Arrange
-        nint expectedValue = 12345;
+        nuint expectedValue = 12345;
         var variant = CreateVariant(EvtVariantType.SizeT, expectedValue);
 
         // Act
@@ -458,7 +459,7 @@ public sealed class NativeMethodsEvtTests
 
         // Assert
         Assert.NotNull(result);
-        Assert.IsType<nint>(result);
+        Assert.IsType<nuint>(result);
         Assert.Equal(expectedValue, result);
     }
 
@@ -746,6 +747,81 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
+    public void EvtVariant_PointerIndexedRead_ShouldMatchMarshalledRead_ForInteriorPointerTypes()
+    {
+        // RenderEventProperties / GetEventRecord now read contiguous EvtVariant buffers via
+        // ((EvtVariant*)ptr)[i] instead of Marshal.PtrToStructure. Verify the pointer-indexed read
+        // is equivalent to the marshalled read at non-zero indices (stride-sensitive) and that
+        // ConvertVariant dereferences each variant's interior pointer (string/systime) correctly.
+        // String and SysTime are interior-pointer types, exercised at indices 0, 1 and 2.
+        const string firstString = "First property value";
+        const string thirdString = "Third property value";
+        var expectedDateTime = new DateTime(2024, 3, 15, 14, 30, 45, 123, DateTimeKind.Utc);
+
+        IntPtr firstStringPtr = Marshal.StringToHGlobalUni(firstString);
+        IntPtr thirdStringPtr = Marshal.StringToHGlobalUni(thirdString);
+        IntPtr sysTimePtr = Marshal.AllocHGlobal(Marshal.SizeOf<SystemTime>());
+        int variantSize = Marshal.SizeOf<EvtVariant>();
+        IntPtr buffer = Marshal.AllocHGlobal(variantSize * 3);
+
+        try
+        {
+            unsafe
+            {
+                short* sysTime = (short*)sysTimePtr;
+                sysTime[0] = 2024; // Year
+                sysTime[1] = 3;    // Month
+                sysTime[2] = 5;    // DayOfWeek
+                sysTime[3] = 15;   // Day
+                sysTime[4] = 14;   // Hour
+                sysTime[5] = 30;   // Minute
+                sysTime[6] = 45;   // Second
+                sysTime[7] = 123;  // Milliseconds
+
+                Unsafe.InitBlock((void*)buffer, 0, (uint)(variantSize * 3));
+                WriteVariantSlot(buffer, 0, variantSize, EvtVariantType.String, firstStringPtr);
+                WriteVariantSlot(buffer, 1, variantSize, EvtVariantType.SysTime, sysTimePtr);
+                WriteVariantSlot(buffer, 2, variantSize, EvtVariantType.String, thirdStringPtr);
+
+                for (int i = 0; i < 3; i++)
+                {
+                    var pointerRead = ((EvtVariant*)buffer)[i];
+                    var marshalledRead = Marshal.PtrToStructure<EvtVariant>(buffer + (i * variantSize));
+
+                    Assert.Equal(NativeMethods.ConvertVariant(marshalledRead), NativeMethods.ConvertVariant(pointerRead));
+                }
+
+                Assert.Equal(firstString, NativeMethods.ConvertVariant(((EvtVariant*)buffer)[0]));
+                Assert.Equal(expectedDateTime, NativeMethods.ConvertVariant(((EvtVariant*)buffer)[1]));
+                Assert.Equal(thirdString, NativeMethods.ConvertVariant(((EvtVariant*)buffer)[2]));
+            }
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+            Marshal.FreeHGlobal(sysTimePtr);
+            Marshal.FreeHGlobal(thirdStringPtr);
+            Marshal.FreeHGlobal(firstStringPtr);
+        }
+    }
+
+    [Fact]
+    public void EvtVariant_ShouldRemainBlittableWithStableLayout()
+    {
+        // The render path reads contiguous EvtVariant buffers directly through a pointer
+        // (((EvtVariant*)ptr)[i]), so the struct must stay blittable and keep the native
+        // EVT_VARIANT layout: no managed references, a managed pointer stride (Unsafe.SizeOf)
+        // equal to the native marshalled stride (Marshal.SizeOf), and Count/Type at offsets 8/12.
+        // A future field that breaks any of these fails here instead of mis-indexing at runtime.
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<EvtVariant>());
+        Assert.Equal(16, Unsafe.SizeOf<EvtVariant>());
+        Assert.Equal(16, Marshal.SizeOf<EvtVariant>());
+        Assert.Equal(Marshal.SizeOf<EvtVariant>(), Unsafe.SizeOf<EvtVariant>());
+        Assert.Equal(8, (int)Marshal.OffsetOf<EvtVariant>(nameof(EvtVariant.Count)));
+        Assert.Equal(12, (int)Marshal.OffsetOf<EvtVariant>(nameof(EvtVariant.Type)));
+    }
+
+    [Fact]
     public void ThrowEventLogException_WhenAccessDenied_ShouldThrowUnauthorizedAccessException()
     {
         // Arrange
@@ -875,7 +951,6 @@ public sealed class NativeMethodsEvtTests
         Assert.Throws<Exception>(() => NativeMethods.ThrowEventLogException(error));
     }
 
-    // Helper methods to create EvtVariant instances
     private static EvtVariant CreateVariant(EvtVariantType type, object? value = null)
     {
         return CreateVariantWithCount(type, value, 0);
@@ -921,6 +996,8 @@ public sealed class NativeMethodsEvtTests
                         *(nint*)buffer = (IntPtr)value;
                         break;
                     case EvtVariantType.SByte:
+                        *(sbyte*)buffer = (sbyte)value;
+                        break;
                     case EvtVariantType.Byte:
                         *(byte*)buffer = (byte)value;
                         break;
@@ -953,7 +1030,7 @@ public sealed class NativeMethodsEvtTests
                         *(double*)buffer = (double)value;
                         break;
                     case EvtVariantType.SizeT:
-                        *(nint*)buffer = (nint)value;
+                        *(nuint*)buffer = (nuint)value;
                         break;
                 }
 
@@ -964,5 +1041,13 @@ public sealed class NativeMethodsEvtTests
         {
             Marshal.FreeHGlobal(buffer);
         }
+    }
+
+    // Helper methods to create EvtVariant instances
+    private static unsafe void WriteVariantSlot(IntPtr buffer, int index, int variantSize, EvtVariantType type, IntPtr value)
+    {
+        IntPtr slot = buffer + (index * variantSize);
+        *(nint*)slot = value;             // interior pointer (union) at offset 0
+        *(uint*)(slot + 12) = (uint)type; // Type at offset 12
     }
 }
