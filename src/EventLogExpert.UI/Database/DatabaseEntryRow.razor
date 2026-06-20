@@ -76,11 +76,12 @@
                     <Button aria-label="@($"Upgrade database {Entry.FileName}")"
                         CssClass="db-entry-upgrade-btn"
                         Disabled="@IsUpgradeBlocked"
+                        IconClass="bi bi-arrow-up-circle"
                         OnClick="@(async () =>
                                  {
                                      if (!IsUpgradeBlocked) { await OnUpgrade.InvokeAsync(); }
                                  })">
-                        <i aria-hidden="true" class="bi bi-arrow-up-circle"></i> Upgrade
+                        Upgrade
                     </Button>
 
                     break;
@@ -89,11 +90,12 @@
                     <DangerButton aria-label="@($"Retry upgrade of database {Entry.FileName}")"
                         CssClass="db-entry-upgrade-btn"
                         Disabled="@IsUpgradeBlocked"
+                        IconClass="bi bi-arrow-clockwise"
                         OnClick="@(async () =>
                                  {
                                      if (!IsUpgradeBlocked) { await OnUpgrade.InvokeAsync(); }
                                  })">
-                        <i aria-hidden="true" class="bi bi-arrow-clockwise"></i> Retry Upgrade
+                        Retry Upgrade
                     </DangerButton>
 
                     break;
@@ -102,11 +104,12 @@
                     <Button aria-label="@($"Restore database {Entry.FileName} from backup")"
                         CssClass="db-entry-restore-btn"
                         Disabled="@IsRestoreBlocked"
+                        IconClass="bi bi-arrow-counterclockwise"
                         OnClick="@(async () =>
                                  {
                                      if (!IsRestoreBlocked) { await OnRestoreFromBackup.InvokeAsync(); }
                                  })">
-                        <i aria-hidden="true" class="bi bi-arrow-counterclockwise"></i> Restore
+                        Restore
                     </Button>
 
                     break;
@@ -114,8 +117,9 @@
                 case ActionKind.RetryClassification:
                     <Button aria-label="@($"Retry classification of database {Entry.FileName}")"
                         CssClass="db-entry-retry-classification-btn"
+                        IconClass="bi bi-arrow-repeat"
                         OnClick="@(async () => await OnRetryClassification.InvokeAsync())">
-                        <i aria-hidden="true" class="bi bi-arrow-repeat"></i> Retry classification
+                        Retry classification
                     </Button>
 
                     break;

@@ -320,7 +320,28 @@ input[type="text"].input { padding: 0; }
     }
 }
 
-.menu-toggle { cursor: pointer; }
+.menu-toggle {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+    .menu-toggle > .bi,
+    .menu-toggle > i {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        vertical-align: 0;
+    }
+
+    .menu-toggle > .bi::before,
+    .menu-toggle > i::before {
+        vertical-align: 0;
+        line-height: 0;
+    }
 
     .menu-toggle[data-rotate="true"] { transform: rotate(-180deg); }
 

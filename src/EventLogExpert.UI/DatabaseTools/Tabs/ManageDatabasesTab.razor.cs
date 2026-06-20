@@ -394,7 +394,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             }
         }
 
-        // Coordinator-only — adding IsFileInAnyKnownBatch here would 30s-hang on background batches
+        // Coordinator-only - adding IsFileInAnyKnownBatch here would 30s-hang on background batches
         // (no UpgradeStateChanged event ever fires to re-trigger). pendingBatches + stillAlive below
         // already gate Remove via UpgradeBatchCompleted.
         void StateChangedHandler()

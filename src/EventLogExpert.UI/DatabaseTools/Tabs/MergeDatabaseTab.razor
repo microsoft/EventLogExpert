@@ -44,8 +44,8 @@
                 CssClass="input filter-dropdown overwrite-mode-select"
                 T="bool"
                 ToStringFunc="@(v => v ? "Overwrite" : "Keep")">
-                <ValueSelectItem T="bool" Value="false">Keep — skip providers already in target</ValueSelectItem>
-                <ValueSelectItem T="bool" Value="true">Overwrite — replace providers already in target</ValueSelectItem>
+                <ValueSelectItem T="bool" Value="false">Keep - skip providers already in target</ValueSelectItem>
+                <ValueSelectItem T="bool" Value="true">Overwrite - replace providers already in target</ValueSelectItem>
             </ValueSelect>
         </div>
     </div>
@@ -56,22 +56,16 @@
             {
                 @if (IsCancelling)
                 {
-                    <Button Disabled>
-                        <i aria-hidden="true" class="bi bi-hourglass-split"></i> Cancelling…
-                    </Button>
+                    <Button Disabled IconClass="bi bi-hourglass-split">Cancelling…</Button>
                 }
                 else
                 {
-                    <DangerButton OnClick="CancelRun">
-                        <i aria-hidden="true" class="bi bi-x-circle"></i> Cancel
-                    </DangerButton>
+                    <DangerButton IconClass="bi bi-x-circle" OnClick="CancelRun">Cancel</DangerButton>
                 }
             }
             else
             {
-                <PrimaryButton Disabled="@(!CanRun)" OnClick="RunAsync">
-                    <i aria-hidden="true" class="bi bi-play-fill"></i> Run
-                </PrimaryButton>
+                <PrimaryButton Disabled="@(!CanRun)" IconClass="bi bi-play-fill" OnClick="RunAsync">Run</PrimaryButton>
             }
         </ToolbarLeadingContent>
     </DatabaseToolsLogView>
