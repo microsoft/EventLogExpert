@@ -4,7 +4,8 @@
 
 The main view has three regions: the **tab strip** (one tab per open log, plus a `Combined` tab when more than one log is open), the **event table**, and the **Details pane** (collapsible, bottom). The status bar runs along the very bottom — see [Opening Logs](Opening-Logs.md#live-log-behavior) for what it shows for live logs.
 
-<!-- screenshot: main-view --> ![Main view: tabs, event table, Details pane](.images/EventLogExpert-CombinedView.png)
+<!-- screenshot: main-view -->
+![Main view: tabs, event table, Details pane](.images/EventLogExpert-CombinedView.png)
 
 ### Tab strip
 

@@ -6,7 +6,8 @@ The Filter Library is the single persisted surface for filter reuse. It replaces
 
 Open it from the [Filter pane](Filtering.md) header — the bookmarks icon labeled `Open Filter Library`. When the library fails to load or is still loading, the filter pane's `Recent` menu item and the `Apply Filter Set` picker surface guidance pointing back to this same button (the library does not auto-open from those flows).
 
-<!-- screenshot: filter-library-saved --> ![Filter Library modal, Saved tab](.images/filter-library-saved.png)
+<!-- screenshot: filter-library-saved -->
+![Filter Library modal, Saved tab](.images/filter-library-saved.png)
 
 ### Modal layout
 

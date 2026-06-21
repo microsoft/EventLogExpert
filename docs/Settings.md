@@ -6,7 +6,8 @@
 
 `Save` writes the form fields and any pending enable/disable toggles you've made on database rows; `Exit` discards them. `Remove` and `Upgrade` are immediate side effects that persist regardless of `Save` / `Exit`. `Import Database` is also immediate, but a successful import additionally applies any pending form fields and toggles and closes the modal — make any other changes you want to keep before clicking it.
 
-<!-- screenshot: settings-modal --> ![Settings modal](.images/settings-modal.png)
+<!-- screenshot: settings-modal -->
+![Settings modal](.images/settings-modal.png)
 
 ### Time Zone
 
