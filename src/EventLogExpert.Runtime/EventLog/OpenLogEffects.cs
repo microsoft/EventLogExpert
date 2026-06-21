@@ -306,13 +306,18 @@ internal sealed class OpenLogEffects(
 
         dispatcher.Dispatch(new AddTableAction(logData));
 
-        var channel = Channel.CreateBounded<EventRecord[]>(new BoundedChannelOptions(s_maxGlobalConcurrency * 2)
+        var channel = Channel.CreateBounded<(long Seq, EventRecord[] Batch)>(new BoundedChannelOptions(s_maxGlobalConcurrency * 2)
         {
             SingleWriter = true,
             FullMode = BoundedChannelFullMode.Wait
         });
 
         List<ResolvedEvent> events = [];
+
+        var resolvedBySeq = new Dictionary<long, List<ResolvedEvent>>();
+        long nextDrainSeq = 0;
+
+        var partialDispatchGate = new object();
 
         await using var timer = new Timer(
             _ =>
@@ -333,6 +338,8 @@ internal sealed class OpenLogEffects(
 
         var producerTask = Task.Run(async () =>
         {
+            long sequence = 0;
+
             try
             {
                 while (reader.TryGetEvents(out EventRecord[] batch, ReadBatchSize))
@@ -341,7 +348,7 @@ internal sealed class OpenLogEffects(
 
                     if (batch.Length == 0) { continue; }
 
-                    await channel.Writer.WriteAsync(batch, token);
+                    await channel.Writer.WriteAsync((sequence++, batch), token);
                 }
             }
             catch (Exception ex)
@@ -370,8 +377,10 @@ internal sealed class OpenLogEffects(
                     CancellationToken = token,
                     MaxDegreeOfParallelism = s_maxGlobalConcurrency
                 },
-                async (batch, innerToken) =>
+                async (item, innerToken) =>
                 {
+                    EventRecord[] batch = item.Batch;
+
                     // First-screenful resolution preempts in-flight bulk across all loads. Classify by ADMITTED
                     // (not completed) events so a slow-resolving load still demotes to Bulk after its first
                     // screenful instead of monopolizing the high-priority lane.
@@ -415,21 +424,30 @@ internal sealed class OpenLogEffects(
                             }
                         }
 
-                        if (localBatch.Count > 0)
-                        {
-                            lock (events) { events.AddRange(localBatch); }
+                        bool dispatchEager = false;
 
-                            Interlocked.Add(ref resolved, localResolved);
+                        lock (events)
+                        {
+                            resolvedBySeq[item.Seq] = localBatch;
+
+                            while (resolvedBySeq.Remove(nextDrainSeq, out var ready))
+                            {
+                                events.AddRange(ready);
+                                nextDrainSeq++;
+                            }
 
                             // Eager first paint: once the first screenful of (newest, because the read is reversed)
-                            // events is resolved, dispatch them immediately instead of waiting for the 3-second timer.
+                            // events has drained in order, dispatch immediately instead of waiting for the 3s timer.
                             // Fires exactly once across the resolve workers and reuses the shared partial cursor.
-                            if (Volatile.Read(ref resolved) >= EagerFirstPaintThreshold &&
-                                Interlocked.Exchange(ref eagerFired, 1) == 0)
+                            if (events.Count >= EagerFirstPaintThreshold && Interlocked.Exchange(ref eagerFired, 1) == 0)
                             {
-                                TryDispatchPartial();
+                                dispatchEager = true;
                             }
                         }
+
+                        Interlocked.Add(ref resolved, localResolved);
+
+                        if (dispatchEager) { TryDispatchPartial(); }
                     }
                     finally
                     {
@@ -526,25 +544,22 @@ internal sealed class OpenLogEffects(
 
         void TryDispatchPartial()
         {
-            List<ResolvedEvent> delta;
-
-            lock (events)
+            lock (partialDispatchGate)
             {
-                int fromIndex = lastPartialIndex;
+                List<ResolvedEvent> delta;
 
-                if (events.Count <= fromIndex) { return; }
+                lock (events)
+                {
+                    int fromIndex = lastPartialIndex;
 
-                delta = events.GetRange(fromIndex, events.Count - fromIndex);
-                lastPartialIndex = events.Count;
+                    if (events.Count <= fromIndex) { return; }
+
+                    delta = events.GetRange(fromIndex, events.Count - fromIndex);
+                    lastPartialIndex = events.Count;
+                }
+
+                dispatcher.Dispatch(new LoadEventsPartialAction(logData, delta.AsReadOnly()));
             }
-
-            // Parallel resolution finishes batches out of order, so sort this delta newest-first (matching the final
-            // LoadEventsAction sort) before it is appended to the raw store. With the reverse newest-first read each
-            // delta covers an older range than the last, so the raw store stays index-0-is-newest for the
-            // date-range/endpoint queries that read it during load.
-            delta.Sort((a, b) => Comparer<long?>.Default.Compare(b.RecordId, a.RecordId));
-
-            dispatcher.Dispatch(new LoadEventsPartialAction(logData, delta.AsReadOnly()));
         }
     }
 }

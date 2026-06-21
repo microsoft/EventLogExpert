@@ -1992,6 +1992,29 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleOpenLog_ReverseEagerLoad_PartialDeltasStayNewestFirstAcrossDeltasDespiteLateNewestBatch()
+    {
+        const int Total = 250;
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(Total, batchSize: 30), newestBookmark: "NEWEST"));
+
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(
+            fakeFactory,
+            resolveDelayMs: recordId => recordId > Total - 30 ? 25 : 0);
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        var partialIds = AllPartialEvents(dispatcher).Select(resolved => resolved.RecordId).ToList();
+        Assert.NotEmpty(partialIds);
+
+        // Strictly newest-first across every delta (no cross-delta inversion).
+        Assert.Equal(partialIds.OrderByDescending(id => id).ToList(), partialIds);
+
+        var finalIds = SingleFinalEvents(dispatcher).Select(resolved => resolved.RecordId).ToList();
+        Assert.Equal(finalIds.Take(partialIds.Count).ToList(), partialIds);
+    }
+
+    [Fact]
     public async Task HandleOpenLog_ReverseEagerLoad_SeedsWatcherFromNewestBookmark()
     {
         var fakeFactory = new FakeEventLogReaderFactory(
