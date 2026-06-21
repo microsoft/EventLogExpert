@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
 using Microsoft.Win32.SafeHandles;
 using System.Buffers;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 
@@ -436,7 +435,11 @@ internal static partial class NativeMethods
                     properties.ProviderName = (string)ConvertVariant(variant)!;
                     break;
                 case (int)EvtSystemPropertyId.EventId:
-                    Debug.Assert(variant.Type == (uint)EvtVariantType.UInt16);
+                    if (variant.Type != (uint)EvtVariantType.UInt16)
+                    {
+                        throw new InvalidDataException($"Expected EVT_VARIANT type UInt16 for EventId, got {variant.Type}.");
+                    }
+
                     properties.Id = variant.UInt16Val;
                     break;
                 case (int)EvtSystemPropertyId.Qualifiers:
@@ -830,16 +833,19 @@ internal static partial class NativeMethods
     {
         if (variant.Type == (uint)EvtVariantType.Null) { return null; }
 
-        Debug.Assert(variant.Type == (uint)EvtVariantType.Byte);
-
-        return variant.ByteVal;
+        return variant.Type != (uint)EvtVariantType.Byte ?
+            throw new InvalidDataException($"Expected EVT_VARIANT type Byte, got {variant.Type}.") :
+            variant.ByteVal;
     }
 
     private static int? ReadOptionalInt32(in EvtVariant variant)
     {
         if (variant.Type == (uint)EvtVariantType.Null) { return null; }
 
-        Debug.Assert(variant.Type == (uint)EvtVariantType.UInt32);
+        if (variant.Type != (uint)EvtVariantType.UInt32)
+        {
+            throw new InvalidDataException($"Expected EVT_VARIANT type UInt32, got {variant.Type}.");
+        }
 
         return unchecked((int)variant.UInt32Val);
     }
@@ -848,7 +854,10 @@ internal static partial class NativeMethods
     {
         if (variant.Type == (uint)EvtVariantType.Null) { return null; }
 
-        Debug.Assert(variant.Type is (uint)EvtVariantType.UInt64 or (uint)EvtVariantType.HexInt64);
+        if (variant.Type is not ((uint)EvtVariantType.UInt64 or (uint)EvtVariantType.HexInt64))
+        {
+            throw new InvalidDataException($"Expected EVT_VARIANT type UInt64 or HexInt64, got {variant.Type}.");
+        }
 
         return unchecked((long)variant.UInt64Val);
     }
@@ -857,8 +866,8 @@ internal static partial class NativeMethods
     {
         if (variant.Type == (uint)EvtVariantType.Null) { return null; }
 
-        Debug.Assert(variant.Type == (uint)EvtVariantType.UInt16);
-
-        return variant.UInt16Val;
+        return variant.Type != (uint)EvtVariantType.UInt16 ?
+            throw new InvalidDataException($"Expected EVT_VARIANT type UInt16, got {variant.Type}.") :
+            variant.UInt16Val;
     }
 }
