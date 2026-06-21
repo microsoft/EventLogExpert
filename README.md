@@ -21,20 +21,14 @@ For more information, check our [docs](docs/Home.md).
 
 ## Quick Start
 
-Download the `EventLogExpert_{version}_x64.appinstaller` (or the matching `EventLogExpert_{version}_x64.msix`) from the latest release and run it: <https://github.com/microsoft/EventLogExpert/releases/latest>.
+Download `EventLogExpert_{version}.msixbundle` from the latest release and double-click it to install: <https://github.com/microsoft/EventLogExpert/releases/latest>.
 
-The `.appinstaller` declares its dependency on the Windows App Runtime (currently `Microsoft.WindowsAppRuntime.1.7.msix`, also published in the same release) so App Installer fetches the runtime automatically on a clean machine. Updates are checked on launch.
+The bundle runs natively on both x64 and ARM64, and Windows installs the matching architecture automatically. It is self-contained (the Windows App Runtime ships inside the package), so there is no separate runtime to install. Updates are checked on launch.
 
-If you'd rather install the runtime manually first, grab `Microsoft.WindowsAppRuntime.1.7.msix` from the release and install it with:
-
-```
-Add-AppxPackage $home\Downloads\Microsoft.WindowsAppRuntime.1.7.msix
-```
-
-Then install the app:
+Prefer the command line? Install the same bundle with:
 
 ```
-Add-AppxPackage $home\Downloads\EventLogExpert_{version}_x64.msix
+Add-AppxPackage $home\Downloads\EventLogExpert_{version}.msixbundle
 ```
 
 ### First time setup
