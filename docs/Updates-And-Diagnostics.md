@@ -29,7 +29,7 @@ The check ends with one of four user-facing alerts:
 
 Background checks (the automatic check that runs on app start) surface `Update Available` so a fresh release is offered as soon as the app launches. The other three alerts are suppressed on background checks so a missing network at startup does not produce a popup. `Update Failure` does fire on a background check, but only after you've accepted the `Update Available` prompt and the resulting installer attempt fails; pre-prompt failures (e.g., feed unreachable, or you click `No` on the prompt and the queued-for-next-restart scheduling fails) stay silent and only land in the debug log.
 
-The `.appinstaller` distributed with each release also wires up app-installer-driven background update checks on every launch, so this entry is mostly for "what's the latest right now" — the app finds new releases on its own.
+Because the app already runs that background check on launch, the `Check for Updates` entry is mostly a manual "what's the latest right now" lookup; the app finds new releases on its own.
 
 ### Release Notes
 
