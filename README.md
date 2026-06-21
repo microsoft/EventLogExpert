@@ -2,7 +2,7 @@
 
 A Windows Event Log viewer for tech support and IT professionals.
 
-![Screenshot showing a filtered combined view of three event logs](docs/.images/EventLogExpert-CombinedView.png)
+![EventLogExpert dashboard: Quick Launch live-log buttons and a categorized library of common investigations](docs/.images/EventLogExpert-Dashboard.png)
 
 ## Key features
 
@@ -24,6 +24,8 @@ For more information, check our [docs](docs/Home.md).
 Download `EventLogExpert_{version}.msixbundle` from the latest release and double-click it to install: <https://github.com/microsoft/EventLogExpert/releases/latest>.
 
 The bundle runs natively on both x64 and ARM64, and Windows installs the matching architecture automatically. It is self-contained (the Windows App Runtime ships inside the package), so there is no separate runtime to install. Updates are checked on launch.
+
+**Requirements:** Windows 11, Windows Server 2022, or Windows Server 2025 (x64 or ARM64).
 
 Prefer the command line? Install the same bundle with:
 
