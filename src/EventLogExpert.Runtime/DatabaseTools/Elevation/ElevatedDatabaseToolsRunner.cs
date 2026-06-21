@@ -248,7 +248,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         var graceCts = new CancellationTokenSource();
         killState.SetGraceTimer(graceCts);
 
-        _ = Task.Run(async () =>
+        var killTask = Task.Run(async () =>
         {
             try
             {
@@ -276,6 +276,8 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 _traceLogger.Warning($"{ElevatedHelperTag} kill-timer task threw {ex.GetType().Name}: {ex.Message}");
             }
         });
+
+        killState.SetKillTask(killTask);
     }
 
     private void MirrorMessageToDebugLog(DatabaseToolsIpcMessage message)
@@ -493,6 +495,13 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             // Helper sent a terminal message (or pipe closed). Cancel the kill-timer so it doesn't fire on a clean finish.
             killState.CancelGraceTimer();
 
+            // Join the kill-timer so its disposition write happens-before the TranslateOutcome read.
+            try { await killState.KillTaskOrCompleted.WaitAsync(_exitGrace); }
+            catch (TimeoutException)
+            {
+                _traceLogger.Warning($"{ElevatedHelperTag} kill-timer did not settle within {_exitGrace.TotalSeconds:N0}s; proceeding with current disposition.");
+            }
+
             // 7) Wait for helper to exit (bounded by _exitGrace, then force-kill if it lingers and is killable).
             int exitCode;
             try
@@ -684,6 +693,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         private int _cancelRequested;
         private int _disposition;
         private CancellationTokenSource? _graceTimerCts;
+        private Task? _killTask;
 
         public KillDisposition Disposition => (KillDisposition)Volatile.Read(ref _disposition);
 
@@ -711,5 +721,9 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         public void MarkKillSucceeded() => Interlocked.Exchange(ref _disposition, (int)KillDisposition.Succeeded);
 
         public void SetGraceTimer(CancellationTokenSource cts) => Volatile.Write(ref _graceTimerCts, cts);
+
+        public void SetKillTask(Task task) => Volatile.Write(ref _killTask, task);
+
+        public Task KillTaskOrCompleted => Volatile.Read(ref _killTask) ?? Task.CompletedTask;
     }
 }
