@@ -1,0 +1,7 @@
+<Project>
+    <ItemGroup Condition="'$(OutputType)' == 'Exe' or '$(OutputType)' == 'WinExe'">
+        <ProjectReference Update="@(ProjectReference)">
+            <GlobalPropertiesToRemove>$(GlobalPropertiesToRemoveFromProjectReferences);RuntimeIdentifier;SelfContained</GlobalPropertiesToRemove>
+        </ProjectReference>
+    </ItemGroup>
+</Project>
