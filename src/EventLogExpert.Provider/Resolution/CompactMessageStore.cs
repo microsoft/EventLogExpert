@@ -6,7 +6,7 @@ using System.Collections.Concurrent;
 
 namespace EventLogExpert.Provider.Resolution;
 
-internal sealed class CompactMessageStore
+internal sealed class CompactMessageStore : ILazyMessageSource
 {
     private static readonly IReadOnlyList<MessageModel> s_empty = [];
 
@@ -78,6 +78,8 @@ internal sealed class CompactMessageStore
         // The arg is NOT cast to ushort: a >65535 arg must not wrap and false-match (matches the prior
         // Dictionary keyed by (ushort)ShortId and looked up by the raw int id).
         _byShortIdCache.GetOrAdd(shortId, static (id, store) => store.MaterializeByShortId(id), this);
+
+    public IReadOnlyList<MessageModel> MaterializeAll() => [.. new MessageView(this)];
 
     private Dictionary<long, int> BuildRawIdLookup()
     {

@@ -7,9 +7,9 @@ public sealed class ProviderDetails
 {
     private IReadOnlyList<EventModel> _events = [];
     private Dictionary<long, List<EventModel>>? _eventsByIdLookup;
-    private CompactMessageStore? _messageStore;
+    private ILazyMessageSource? _messageStore;
     private IReadOnlyList<MessageModel>? _messagesView;
-    private CompactMessageStore? _parameterStore;
+    private ILazyMessageSource? _parameterStore;
     private IReadOnlyList<MessageModel>? _parametersView;
 
     /// <summary>Events and related items from modern provider</summary>
@@ -44,6 +44,8 @@ public sealed class ProviderDetails
         }
     }
 
+    public ILazyMessageSource? MessageSource => _messageStore;
+
     public IDictionary<int, string> Opcodes { get; set; } = new Dictionary<int, string>();
 
     public IReadOnlyList<MessageModel> Parameters
@@ -55,6 +57,8 @@ public sealed class ProviderDetails
             _parametersView = _parameterStore.AsView();
         }
     }
+
+    public ILazyMessageSource? ParameterSource => _parameterStore;
 
     public string ProviderName { get; set; } = string.Empty;
 
@@ -82,6 +86,18 @@ public sealed class ProviderDetails
     ///     first-wins. Materialized on demand from the compact store and cached.
     /// </summary>
     public MessageModel? GetParameterByRawId(long rawId) => _parameterStore?.GetByRawIdFirst(rawId);
+
+    public void SetLazyMessageSource(ILazyMessageSource source)
+    {
+        _messageStore = source;
+        _messagesView = source.AsView();
+    }
+
+    public void SetLazyParameterSource(ILazyMessageSource source)
+    {
+        _parameterStore = source;
+        _parametersView = source.AsView();
+    }
 
     private Dictionary<long, List<EventModel>> BuildEventsByIdLookup()
     {
