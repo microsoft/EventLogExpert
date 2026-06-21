@@ -115,6 +115,9 @@ internal static partial class NativeMethods
     [LibraryImport(Kernel32Api)]
     internal static partial IntPtr LockResource(IntPtr hResData);
 
+    [LibraryImport(Kernel32Api, SetLastError = true)]
+    internal static partial uint SizeofResource(LibraryHandle hModule, IntPtr hResInfo);
+
     private static string? FormatMessageFromModule(IntPtr moduleHandle, uint messageId) =>
         FormatMessageWithRetry(
             FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_IGNORE_INSERTS,
