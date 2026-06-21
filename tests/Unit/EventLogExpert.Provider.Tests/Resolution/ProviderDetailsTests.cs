@@ -101,6 +101,45 @@ public sealed class ProviderDetailsTests
     }
 
     [Fact]
+    public void GetMessagesByShortId_WhenMessageHasRareFields_PreservesThemByteIdentical()
+    {
+        // Arrange
+        var details = EventUtils.CreateProvider(
+            Constants.TestProviderLongName,
+            [new MessageModel { ShortId = 9, RawId = 9, Text = "rare", LogLink = "System", Tag = "t", Template = "<tmpl/>" }]);
+
+        // Act
+        var message = Assert.Single(details.GetMessagesByShortId(9));
+
+        // Assert
+        Assert.Equal("rare", message.Text);
+        Assert.Equal("System", message.LogLink);
+        Assert.Equal("t", message.Tag);
+        Assert.Equal("<tmpl/>", message.Template);
+        Assert.Equal(9, message.RawId);
+    }
+
+    [Fact]
+    public void GetMessagesByShortId_WhenMultipleShareShortId_PreservesOriginalOrder()
+    {
+        // Arrange
+        var details = EventUtils.CreateProvider(
+            Constants.TestProviderLongName,
+            [
+                new MessageModel { ShortId = 7, RawId = 0x00010007, Text = "first" },
+                new MessageModel { ShortId = 7, RawId = 0x00020007, Text = "second" },
+                new MessageModel { ShortId = 7, RawId = 0x00030007, Text = "third" }
+            ]);
+
+        // Act
+        var result = details.GetMessagesByShortId(7);
+
+        // Assert
+        Assert.Equal(["first", "second", "third"], result.Select(m => m.Text));
+        Assert.Equal([0x00010007, 0x00020007, 0x00030007], result.Select(m => m.RawId));
+    }
+
+    [Fact]
     public void GetMessagesByShortId_WhenNegativeShortId_MatchesViaUnsignedPromotion()
     {
         // Arrange — ShortId is signed short; (ushort)(-1) == 65535
@@ -246,6 +285,30 @@ public sealed class ProviderDetailsTests
 
         // Act + Assert
         Assert.False(details.IsEmpty);
+    }
+
+    [Fact]
+    public void Messages_ViewEnumeration_PreservesEveryFieldForCommonAndRareEntries()
+    {
+        // Arrange
+        var details = EventUtils.CreateProvider(
+            Constants.TestProviderLongName,
+            [
+                new MessageModel { ShortId = 1, RawId = 1, Text = "common", ProviderName = Constants.TestProviderLongName },
+                new MessageModel { ShortId = 2, RawId = 2, Text = "rare", LogLink = "Application", Tag = "x", ProviderName = Constants.TestProviderLongName }
+            ]);
+
+        // Act
+        var all = details.Messages.ToList();
+
+        // Assert
+        Assert.Equal(2, details.Messages.Count);
+        Assert.Equal("common", all[0].Text);
+        Assert.Null(all[0].LogLink);
+        Assert.Equal(Constants.TestProviderLongName, all[0].ProviderName);
+        Assert.Equal("rare", all[1].Text);
+        Assert.Equal("Application", all[1].LogLink);
+        Assert.Equal("x", all[1].Tag);
     }
 
     [Fact]
