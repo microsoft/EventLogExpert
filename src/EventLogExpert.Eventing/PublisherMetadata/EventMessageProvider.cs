@@ -39,197 +39,40 @@ public sealed class EventMessageProvider(
 
         foreach (var file in legacyProviderFiles)
         {
-            using LibraryHandle hModule = LoadMessageModule(file, logger);
+            if (!MessageTableReader.TryOpen(file, logger, out var handle, out nint memTable, out uint size)) { continue; }
 
-            if (hModule.IsInvalid)
-            {
-                continue;
-            }
-
-            // FindResourceEx returns an HRSRC that points into the already-loaded module's
-            // resource section. It is owned by the module handle and must NOT be FreeLibrary'd.
-            IntPtr msgTableInfo = NativeMethods.FindResourceExA(hModule, NativeMethods.RT_MESSAGETABLE, 1);
-            int error = Marshal.GetLastWin32Error();
-
-            if (msgTableInfo == IntPtr.Zero)
-            {
-                logger?.Debug(
-                    $"No message table found. Returning 0 messages from file:\n{file}\nFindResourceEx error: {error} ({NativeMethods.FormatSystemMessage((uint)error) ?? "unknown"}). Error 1813 (ERROR_RESOURCE_TYPE_NOT_FOUND) commonly means the message table lives in a localized .mui satellite the loader could not locate, but it can also indicate a missing message table, a non-default resource id, or an unavailable language fallback.");
-
-                continue;
-            }
-
-            var msgTable = NativeMethods.LoadResource(hModule, msgTableInfo);
-            int loadResourceError = Marshal.GetLastWin32Error();
-
-            if (msgTable == IntPtr.Zero)
-            {
-                logger?.Debug(
-                    $"LoadResource returned NULL for message table in file:\n{file}\nError: {loadResourceError} ({NativeMethods.FormatSystemMessage((uint)loadResourceError) ?? "unknown"}).");
-
-                continue;
-            }
-
-            var memTable = NativeMethods.LockResource(msgTable);
-
-            if (memTable == IntPtr.Zero)
-            {
-                logger?.Debug($"LockResource returned NULL for message table in file:\n{file}");
-
-                continue;
-            }
-
-            var numberOfBlocks = Marshal.ReadInt32(memTable);
-            var blockPtr = IntPtr.Add(memTable, 4);
-            var blockSize = Marshal.SizeOf<MessageResourceBlock>();
-
-            for (var i = 0; i < numberOfBlocks; i++)
-            {
-                var block = Marshal.PtrToStructure<MessageResourceBlock>(blockPtr);
-                var entryPtr = IntPtr.Add(memTable, block.OffsetToEntries);
-
-                for (var id = block.LowId; id <= block.HighId; id++)
-                {
-                    var length = Marshal.ReadInt16(entryPtr);
-                    var flags = Marshal.ReadInt16(entryPtr, 2);
-                    var textPtr = IntPtr.Add(entryPtr, 4);
-
-                    string? text = flags switch
-                    {
-                        0 => Marshal.PtrToStringAnsi(textPtr),
-                        1 => Marshal.PtrToStringUni(textPtr),
-                        2 => Marshal.PtrToStringAnsi(textPtr),
-                        // All the ESE messages are a single-byte character set
-                        // but have flags of 2, which is not defined. So just
-                        // treat it as ANSI I guess?
-                        _ => "Error: Bad flags. Could not get text.",
-                    };
-
-                    // This is an event
-                    messages.Add(new MessageModel
-                    {
-                        Text = text ?? string.Empty,
-                        ShortId = (short)id,
-                        ProviderName = providerName,
-                        RawId = id
-                    });
-
-                    // Advance to the next id
-                    entryPtr = IntPtr.Add(entryPtr, length);
-                }
-
-                // Advance to the next block
-                blockPtr = IntPtr.Add(blockPtr, blockSize);
-            }
+            try { MessageTableReader.AppendMatches(memTable, size, providerName, -1, messages); }
+            finally { handle.Dispose(); }
         }
 
         return messages;
     }
 
-    /// <summary>
-    ///     Loads a message-resource module using flags that honor MUI satellite resolution, with fallbacks for older
-    ///     binaries and unresolved paths. Returns an invalid handle on failure (the caller is expected to skip).
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <c>LOAD_LIBRARY_AS_DATAFILE</c> alone does NOT trigger MUI satellite loading. Modern Windows binaries (e.g.,
-    ///         DriverStore-installed services, in-box system EXEs/DLLs) keep their <c>RT_MESSAGETABLE</c> resources in
-    ///         <c>&lt;binary&gt;.mui</c> files under language subfolders rather than in the binary itself. <c>FindResource</c>
-    ///         on a module loaded with only <c>LOAD_LIBRARY_AS_DATAFILE</c> then returns 1813 (
-    ///         <c>ERROR_RESOURCE_TYPE_NOT_FOUND</c>). Combining <c>LOAD_LIBRARY_AS_IMAGE_RESOURCE</c> with
-    ///         <c>LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE</c> causes the loader to follow the MUI fallback chain — the same path
-    ///         <c>EvtFormatMessage</c> (and Event Viewer MMC) uses.
-    ///     </para>
-    /// </remarks>
-    private static LibraryHandle LoadMessageModule(string file, ITraceLogger? logger)
+    private LegacyMessageFileSource? BuildLazySource(IReadOnlyList<string> files)
     {
-        // LoadLibraryEx does not expand environment variables. Publisher manifests typically
-        // store paths like %SystemRoot%\System32\foo.dll, so normalize at the loader as the
-        // last chokepoint before the P/Invoke. Idempotent on already-expanded paths.
-        file = Environment.ExpandEnvironmentVariables(file);
+        if (files.Count == 0) { return null; }
 
-        // Primary attempt: MUI-aware load using the path as given. Mirrors EvtFormatMessage behavior.
-        const LoadLibraryFlags MuiAwareFlags =
-            LoadLibraryFlags.LOAD_LIBRARY_AS_IMAGE_RESOURCE |
-            LoadLibraryFlags.LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE;
+        var walkable = new List<string>();
+        int total = 0;
 
-        var hModule = NativeMethods.LoadLibraryExW(file, IntPtr.Zero, MuiAwareFlags);
-        int error = Marshal.GetLastWin32Error();
-
-        if (!hModule.IsInvalid)
+        foreach (var file in files)
         {
-            logger?.Debug(
-                $"LoadLibraryEx succeeded for {file} with flags LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE.");
+            if (!MessageTableReader.TryOpen(file, _logger, out var handle, out nint memTable, out uint size)) { continue; }
 
-            return hModule;
+            try
+            {
+                int count = MessageTableReader.CountEntries(memTable, size);
+
+                if (count > 0)
+                {
+                    walkable.Add(file);
+                    total += count;
+                }
+            }
+            finally { handle.Dispose(); }
         }
 
-        hModule.Dispose();
-
-        var primaryFailureMessage =
-            $"LoadLibraryEx failed for {file} with flags LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE. Error: {error} ({NativeMethods.FormatSystemMessage((uint)error) ?? "unknown"}).";
-
-        // Legacy fallback: re-attempt the load using the leaf filename only, resolved under the
-        // trusted system directory. Restrict this to inputs that are already pure leaf filenames
-        // (no directory information of any kind). Both rooted inputs (e.g., "C:\foo.dll",
-        // "C:foo.dll", "\Windows\foo.dll") and unrooted inputs that include a subdirectory
-        // (e.g., "subdir\foo.dll") would have their directory portion stripped here and the bare
-        // leaf name resolved against the default DLL search order, which could load a different
-        // same-named binary and produce wrong message text. Path.IsPathRooted alone does NOT
-        // catch the "subdir\foo.dll" case, so compare against Path.GetFileName instead.
-        if (!string.Equals(file, Path.GetFileName(file), StringComparison.Ordinal))
-        {
-            logger?.Debug($"{primaryFailureMessage} Skipping leaf-name fallback because the input contains directory information.");
-
-            return LibraryHandle.Zero;
-        }
-
-        var leafName = Path.GetFileName(file);
-
-        if (string.IsNullOrEmpty(leafName))
-        {
-            logger?.Debug($"{primaryFailureMessage} Skipping leaf-name fallback because no leaf filename could be extracted.");
-
-            return LibraryHandle.Zero;
-        }
-
-        // Constrain leaf-name resolution to the trusted system directory. Letting LoadLibraryEx
-        // resolve a bare leaf name through the default DLL search order would search the
-        // application directory first, which is a DLL planting / hijacking risk and could load
-        // a same-named binary with bogus message text. Historically this fallback existed for
-        // legacy registry values that named system binaries by leaf only (e.g., "wevtsvc.dll");
-        // pinning resolution to %SystemRoot%\System32 preserves that behavior safely.
-        var systemPath = Path.Combine(Environment.SystemDirectory, leafName);
-
-        if (!File.Exists(systemPath))
-        {
-            logger?.Debug(
-                $"{primaryFailureMessage} Skipping leaf-name fallback because '{leafName}' does not exist under {Environment.SystemDirectory}.");
-
-            return LibraryHandle.Zero;
-        }
-
-        logger?.Debug(
-            $"{primaryFailureMessage} Falling back to leaf-name resolution against the system directory: {systemPath}.");
-
-        hModule = NativeMethods.LoadLibraryExW(systemPath, IntPtr.Zero, MuiAwareFlags);
-
-        error = Marshal.GetLastWin32Error();
-
-        if (!hModule.IsInvalid)
-        {
-            logger?.Debug(
-                $"LoadLibraryEx succeeded for {systemPath} (leaf-name fallback) with flags LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE.");
-
-            return hModule;
-        }
-
-        hModule.Dispose();
-
-        logger?.Debug(
-            $"LoadLibraryEx failed for {systemPath} (leaf-name fallback) with flags LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE. Error: {error} ({NativeMethods.FormatSystemMessage((uint)error) ?? "unknown"}). Original requested file was: {file}.");
-
-        return LibraryHandle.Zero;
+        return total > 0 ? new LegacyMessageFileSource(walkable, _providerName, total, _logger) : null;
     }
 
     /// <summary>
@@ -320,48 +163,25 @@ public sealed class EventMessageProvider(
 
         var legacyProviderFiles = _registryProvider.GetMessageFilesForLegacyProvider(_providerName);
 
-        if (legacyProviderFiles.Count > 0 &&
-            TryLoadMessages(legacyProviderFiles, out var legacyMessages) &&
-            legacyMessages.Count > 0)
+        if (!TrySetLazyMessages(provider, legacyProviderFiles))
         {
-            provider.Messages = legacyMessages;
-        }
-        else if (!string.IsNullOrEmpty(providerMetadata?.MessageFilePath))
-        {
-            if (TryLoadMessages([providerMetadata.MessageFilePath], out var modernMessages) && modernMessages.Count > 0)
+            if (!string.IsNullOrEmpty(providerMetadata?.MessageFilePath) &&
+                TrySetLazyMessages(provider, [providerMetadata.MessageFilePath]))
             {
                 _logger?.Debug(
                     $"No legacy messages loaded for provider {_providerName}. Using message file from modern provider.");
-
-                provider.Messages = modernMessages;
             }
             else
             {
                 _logger?.Debug(
-                    $"No legacy messages loaded for provider {_providerName} and modern message file fallback produced no messages. Returning empty provider details.");
+                    $"No message table loaded for provider {_providerName}. Returning empty provider details.");
             }
-        }
-        else if (legacyProviderFiles.Count > 0)
-        {
-            _logger?.Debug(
-                $"Legacy message files for provider {_providerName} produced no messages and no modern fallback is available. Returning empty provider details.");
-        }
-        else
-        {
-            _logger?.Debug($"No message files found for provider {_providerName}. Returning empty provider details.");
         }
 
-        if (!string.IsNullOrEmpty(providerMetadata?.ParameterFilePath))
+        if (!string.IsNullOrEmpty(providerMetadata?.ParameterFilePath) &&
+            !TrySetLazyParameters(provider, [providerMetadata.ParameterFilePath]))
         {
-            if (TryLoadMessages([providerMetadata.ParameterFilePath], out var parameterMessages) && parameterMessages.Count > 0)
-            {
-                provider.Parameters = parameterMessages;
-            }
-            else
-            {
-                _logger?.Debug(
-                    $"Parameter file fallback for provider {_providerName} produced no messages.");
-            }
+            _logger?.Debug($"Parameter file for provider {_providerName} produced no messages.");
         }
 
         if (provider.IsEmpty)
@@ -425,8 +245,11 @@ public sealed class EventMessageProvider(
         }
 
         target.Events = ownerDetails.Events;
-        target.Messages = ownerDetails.Messages;
-        target.Parameters = ownerDetails.Parameters;
+
+        if (ownerDetails.MessageSource is not null) { target.SetLazyMessageSource(ownerDetails.MessageSource); }
+
+        if (ownerDetails.ParameterSource is not null) { target.SetLazyParameterSource(ownerDetails.ParameterSource); }
+
         target.Keywords = ownerDetails.Keywords;
         target.Opcodes = ownerDetails.Opcodes;
         target.Tasks = ownerDetails.Tasks;
@@ -523,25 +346,25 @@ public sealed class EventMessageProvider(
         }
     }
 
-    private bool TryLoadMessages(IEnumerable<string> messageFilePaths, out List<MessageModel> messages)
+    private bool TrySetLazyMessages(ProviderDetails provider, IReadOnlyList<string> files)
     {
-        _logger?.Debug($"{nameof(TryLoadMessages)} called for files {string.Join(", ", messageFilePaths)}");
+        var source = BuildLazySource(files);
 
-        try
-        {
-            messages = LoadMessagesFromFiles(messageFilePaths, _providerName, _logger);
+        if (source is null) { return false; }
 
-            _logger?.Debug($"Returning {messages.Count} messages for provider {_providerName}");
+        provider.SetLazyMessageSource(source);
 
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger?.Debug($"Failed to load provider data for {_providerName}.\n{ex}");
+        return true;
+    }
 
-            messages = [];
+    private bool TrySetLazyParameters(ProviderDetails provider, IReadOnlyList<string> files)
+    {
+        var source = BuildLazySource(files);
 
-            return false;
-        }
+        if (source is null) { return false; }
+
+        provider.SetLazyParameterSource(source);
+
+        return true;
     }
 }
