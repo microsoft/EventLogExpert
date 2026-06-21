@@ -7,15 +7,17 @@ using Microsoft.Win32.SafeHandles;
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace EventLogExpert.ElevationHelper.IntegrationTests.TestUtils;
 
 internal sealed class TestElevatedHelperProcessHost(ITraceLogger logger) : IElevatedHelperProcessHost
 {
     private const int MaxClientPidRejections = 32;
+    private const int MaxStderrChars = 4096;
     private const int PipeBufferSize = 65536;
 
-    private static readonly TimeSpan s_connectTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan s_connectTimeout = TimeSpan.FromSeconds(60);
 
     internal enum PidVerifyResult
     {
@@ -67,24 +69,72 @@ internal sealed class TestElevatedHelperProcessHost(ITraceLogger logger) : IElev
             helperProcess = Process.Start(psi) ?? throw new InvalidOperationException("Process.Start returned null without throwing.");
 
             var capturedPid = helperProcess.Id;
-            helperProcess.ErrorDataReceived += (_, e) => { if (e.Data is not null) { logger.Warning($"helper[{capturedPid}] stderr: {e.Data}"); } };
+            var stderrLock = new object();
+            var stderrBuffer = new StringBuilder();
+
+            helperProcess.ErrorDataReceived += (_, e) =>
+            {
+                if (e.Data is null) { return; }
+
+                logger.Warning($"helper[{capturedPid}] stderr: {e.Data}");
+
+                lock (stderrLock)
+                {
+                    var remaining = MaxStderrChars - stderrBuffer.Length;
+
+                    if (remaining <= 0) { return; }
+
+                    stderrBuffer.Append(e.Data.Length <= remaining ? e.Data : e.Data[..remaining]);
+
+                    if (stderrBuffer.Length < MaxStderrChars) { stderrBuffer.Append('\n'); }
+                }
+            };
             helperProcess.OutputDataReceived += (_, e) => { if (e.Data is not null) { logger.Information($"helper[{capturedPid}] stdout: {e.Data}"); } };
             helperProcess.BeginErrorReadLine();
             helperProcess.BeginOutputReadLine();
+
+            string SnapshotStderr() { lock (stderrLock) { return stderrBuffer.ToString(); } }
 
             logger.Information($"{nameof(TestElevatedHelperProcessHost)}: spawned helper PID {helperProcess.Id} (pipe={pipeName}, dotnet {helperDllPath})");
 
             using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             connectCts.CancelAfter(s_connectTimeout);
 
+            // Watch for early helper exit on its own source so a connect timeout cannot misreport it as an exit.
+            using var exitWatchCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+            var acceptTask = AcceptAndVerifyClientPidAsync(pipeServer, helperProcess.Id, logger, connectCts.Token);
+            var exitTask = WaitForExitOrCancelAsync(helperProcess, exitWatchCts.Token);
+
             try
             {
-                await AcceptAndVerifyClientPidAsync(pipeServer, helperProcess.Id, logger, connectCts.Token);
+                var winner = await Task.WhenAny(acceptTask, exitTask);
+
+                if (winner == exitTask && exitTask.Result && !acceptTask.IsCompletedSuccessfully)
+                {
+                    throw new InvalidOperationException(
+                        $"Elevated helper PID {helperProcess.Id} exited (exit code {helperProcess.ExitCode}) before connecting. stderr tail: {SnapshotStderr()}");
+                }
+
+                await acceptTask;
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (connectCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
+                if (helperProcess.HasExited)
+                {
+                    throw new InvalidOperationException(
+                        $"Elevated helper PID {helperProcess.Id} exited (exit code {helperProcess.ExitCode}) before connecting. stderr tail: {SnapshotStderr()}");
+                }
+
                 throw new TimeoutException(
-                    $"Elevated helper PID {helperProcess.Id} did not connect within {s_connectTimeout.TotalSeconds:N0}s.");
+                    $"Elevated helper PID {helperProcess.Id} did not connect within {s_connectTimeout.TotalSeconds:N0}s (helper still running). stderr tail: {SnapshotStderr()}");
+            }
+            finally
+            {
+                exitWatchCts.Cancel();
+                connectCts.Cancel();
+                await ObserveQuietly(acceptTask);
+                await ObserveQuietly(exitTask);
             }
 
             var handle = new TestElevatedHelperProcess(helperProcess, pipeServer, logger);
@@ -185,6 +235,12 @@ internal sealed class TestElevatedHelperProcessHost(ITraceLogger logger) : IElev
         return string.Join(' ', parts.Select(QuoteIfNeeded));
     }
 
+    private static async Task ObserveQuietly(Task task)
+    {
+        try { await task; }
+        catch { /* losing-race tasks throw on cleanup cancellation; observed and dropped */ }
+    }
+
     private static string QuoteIfNeeded(string arg)
     {
         if (string.IsNullOrEmpty(arg)) { return "\"\""; }
@@ -208,6 +264,20 @@ internal sealed class TestElevatedHelperProcessHost(ITraceLogger logger) : IElev
         }
 
         return testRuntimeConfig;
+    }
+
+    private static async Task<bool> WaitForExitOrCancelAsync(Process process, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken);
+
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
     }
 
     private static class NativeMethods
