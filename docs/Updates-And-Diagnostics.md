@@ -39,7 +39,8 @@ Opens the Release Notes modal, which renders the markdown body of the published 
 
 Opens the Debug Log modal — the in-app view of the rolling diagnostic log written by the running session. The same log is also accessible as a file under the per-user app data directory; `View Logs` is the in-app surface.
 
-<!-- screenshot: debug-log-modal --> ![Debug Log modal](.images/debug-log-modal.png)
+<!-- screenshot: debug-log-modal -->
+![Debug Log modal](.images/debug-log-modal.png)
 
 Filter bar:
 

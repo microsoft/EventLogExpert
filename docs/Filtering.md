@@ -4,7 +4,8 @@
 
 The Filter pane sits above the event table. Every event in the active log set is evaluated against the applied filters; non-matches are hidden.
 
-<!-- screenshot: filter-pane --> ![Filter pane header showing the left-side action buttons, active-filter indicator, and right-side icon trio](.images/filter-pane.png)
+<!-- screenshot: filter-pane -->
+![Filter pane header showing the left-side action buttons, active-filter indicator, and right-side icon trio](.images/filter-pane.png)
 
 The pane header carries the row-adding actions on the left and the persistence / management actions on the right:
 
