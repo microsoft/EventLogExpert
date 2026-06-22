@@ -283,6 +283,10 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Tasks)
             .HasConversion<CompressedJsonValueConverter<IDictionary<int, string>>>();
+
+        // Maps are recovered at runtime from the provider's WEVT_TEMPLATE resource and are not persisted to the cache.
+        modelBuilder.Entity<ProviderDetails>()
+            .Ignore(e => e.Maps);
     }
 
     private static bool IsType(string? actual, string expected) =>

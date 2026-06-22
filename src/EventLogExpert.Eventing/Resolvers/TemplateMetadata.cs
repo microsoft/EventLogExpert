@@ -22,7 +22,17 @@ namespace EventLogExpert.Eventing.Resolvers;
 ///     The outType attribute strings restricted to the visible nodes (length-provider nodes
 ///     filtered out), in document order. Equals <paramref name="AllOutTypes" /> when no length-provider nodes are present.
 /// </param>
+/// <param name="AllMaps">
+///     The map attribute string (manifest valueMap / bitMap symbolic name) for every &lt;data&gt; node
+///     in the template, in document order. Empty string when a node has no map attribute.
+/// </param>
+/// <param name="VisibleMaps">
+///     The map attribute strings restricted to the visible nodes, in document order. Equals
+///     <paramref name="AllMaps" /> when no length-provider nodes are present.
+/// </param>
 internal readonly record struct TemplateMetadata(
     int VisiblePropertyCount,
     ImmutableArray<string> AllOutTypes,
-    ImmutableArray<string> VisibleOutTypes);
+    ImmutableArray<string> VisibleOutTypes,
+    ImmutableArray<string> AllMaps,
+    ImmutableArray<string> VisibleMaps);

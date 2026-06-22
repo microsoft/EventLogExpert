@@ -79,7 +79,7 @@ internal sealed partial class DescriptionFormatter(
             return DefaultNoProviderDescription;
         }
 
-        var properties = GetFormattedProperties(modernEvent?.Template, eventRecord.Properties);
+        var properties = GetFormattedProperties(modernEvent?.Template, eventRecord.Properties, descriptionDetails.Maps);
 
         var descriptionFromSupplemental = supplemental is not null && ReferenceEquals(descriptionDetails, supplemental);
 
@@ -125,7 +125,7 @@ internal sealed partial class DescriptionFormatter(
                 {
                     _logger?.Debug($"{nameof(Resolve)}: Disambiguated via supplemental modern event - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
 
-                    var supplementalProperties = GetFormattedProperties(supplementalModernEvent!.Template, eventRecord.Properties);
+                    var supplementalProperties = GetFormattedProperties(supplementalModernEvent!.Template, eventRecord.Properties, supplemental.Maps);
 
                     // Description came from supplemental, so resolve %%n parameter substitutions
                     // against supplemental's parameter table first.
@@ -482,9 +482,13 @@ internal sealed partial class DescriptionFormatter(
         }
     }
 
-    private List<string> GetFormattedProperties(ReadOnlySpan<char> template, IReadOnlyList<object> properties)
+    private List<string> GetFormattedProperties(
+        ReadOnlySpan<char> template,
+        IReadOnlyList<object> properties,
+        IReadOnlyDictionary<string, ValueMapDefinition> maps)
     {
         ImmutableArray<string> dataNodes = default;
+        ImmutableArray<string> mapNodes = default;
         List<string> formattedValues = new(properties.Count);
 
         if (!template.IsEmpty)
@@ -497,10 +501,12 @@ internal sealed partial class DescriptionFormatter(
             if (meta.VisibleOutTypes.Length == properties.Count)
             {
                 dataNodes = meta.VisibleOutTypes;
+                mapNodes = meta.VisibleMaps;
             }
             else if (meta.AllOutTypes.Length == properties.Count)
             {
                 dataNodes = meta.AllOutTypes;
+                mapNodes = meta.AllMaps;
             }
         }
 
@@ -509,6 +515,7 @@ internal sealed partial class DescriptionFormatter(
         foreach (object property in properties)
         {
             string? outType = !dataNodes.IsDefault && index < dataNodes.Length ? dataNodes[index] : null;
+            string? mapName = !mapNodes.IsDefault && index < mapNodes.Length ? mapNodes[index] : null;
 
             switch (property)
             {
@@ -528,8 +535,19 @@ internal sealed partial class DescriptionFormatter(
                     formattedValues.Add(sid.Value);
 
                     break;
+                case Guid guidValue:
+                    // Match Windows EvtFormatMessage, which renders GUID properties wrapped in braces.
+                    formattedValues.Add(guidValue.ToString("B"));
+
+                    break;
                 default:
-                    if (string.IsNullOrEmpty(outType))
+                    if (!string.IsNullOrEmpty(mapName) &&
+                        maps.TryGetValue(mapName, out ValueMapDefinition? mapDefinition) &&
+                        mapDefinition.TryDecode(property, out string decodedValue))
+                    {
+                        formattedValues.Add(decodedValue);
+                    }
+                    else if (string.IsNullOrEmpty(outType))
                     {
                         formattedValues.Add(property?.ToString() ?? string.Empty);
                     }

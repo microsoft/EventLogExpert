@@ -27,7 +27,12 @@ namespace EventLogExpert.Eventing.Resolvers;
 /// </remarks>
 internal sealed class TemplateAnalyzer
 {
-    private static readonly TemplateMetadata s_empty = new(0, ImmutableArray<string>.Empty, ImmutableArray<string>.Empty);
+    private static readonly TemplateMetadata s_empty = new(
+        0,
+        ImmutableArray<string>.Empty,
+        ImmutableArray<string>.Empty,
+        ImmutableArray<string>.Empty,
+        ImmutableArray<string>.Empty);
 
     private readonly ConcurrentDictionary<string, TemplateMetadata> _cache =
         new(StringComparer.Ordinal);
@@ -120,31 +125,34 @@ internal sealed class TemplateAnalyzer
     }
 
     private static TemplateMetadata BuildMetadata(
-        List<(string name, string outType)> elements,
+        List<(string name, string outType, string map)> elements,
         HashSet<string> lengthProviderNames)
     {
         var allOutTypesArray = new string[elements.Count];
+        var allMapsArray = new string[elements.Count];
 
         for (int i = 0; i < elements.Count; i++)
         {
             allOutTypesArray[i] = elements[i].outType;
+            allMapsArray[i] = elements[i].map;
         }
 
         // Zero-alloc wrap: takes ownership of the existing array as an ImmutableArray.
         // Safe because allOutTypesArray is a fresh local with no other references.
         var allOutTypes = ImmutableCollectionsMarshal.AsImmutableArray(allOutTypesArray);
+        var allMaps = ImmutableCollectionsMarshal.AsImmutableArray(allMapsArray);
 
         if (lengthProviderNames.Count == 0)
         {
-            // No hidden length-provider elements — visible and all are identical.
+            // No hidden length-provider elements - visible and all are identical.
             // ImmutableArray<string> is a struct wrapping the same backing array;
             // both fields share the wrap so consumers cannot mutate the cache.
-            return new TemplateMetadata(elements.Count, allOutTypes, allOutTypes);
+            return new TemplateMetadata(elements.Count, allOutTypes, allOutTypes, allMaps, allMaps);
         }
 
         int visibleCount = 0;
 
-        foreach (var (name, _) in elements)
+        foreach (var (name, _, _) in elements)
         {
             if (string.IsNullOrEmpty(name) || !lengthProviderNames.Contains(name))
             {
@@ -153,19 +161,23 @@ internal sealed class TemplateAnalyzer
         }
 
         var visibleOutTypesArray = new string[visibleCount];
+        var visibleMapsArray = new string[visibleCount];
         int write = 0;
 
-        foreach (var (name, outType) in elements)
+        foreach (var (name, outType, map) in elements)
         {
             if (string.IsNullOrEmpty(name) || !lengthProviderNames.Contains(name))
             {
-                visibleOutTypesArray[write++] = outType;
+                visibleOutTypesArray[write] = outType;
+                visibleMapsArray[write] = map;
+                write++;
             }
         }
 
         var visibleOutTypes = ImmutableCollectionsMarshal.AsImmutableArray(visibleOutTypesArray);
+        var visibleMaps = ImmutableCollectionsMarshal.AsImmutableArray(visibleMapsArray);
 
-        return new TemplateMetadata(visibleCount, allOutTypes, visibleOutTypes);
+        return new TemplateMetadata(visibleCount, allOutTypes, visibleOutTypes, allMaps, visibleMaps);
     }
 
     private static string? ExtractAttribute(ReadOnlySpan<char> element, ReadOnlySpan<char> attributePrefix)
@@ -182,13 +194,14 @@ internal sealed class TemplateAnalyzer
 
     private static TemplateMetadata Parse(ReadOnlySpan<char> template)
     {
-        List<(string name, string outType)> elements = [];
+        List<(string name, string outType, string map)> elements = [];
         HashSet<string> lengthProviderNames = new(StringComparer.OrdinalIgnoreCase);
 
         ReadOnlySpan<char> dataTag = "<data";
         ReadOnlySpan<char> nameAttr = "name=\"";
         ReadOnlySpan<char> outTypeAttr = "outType=\"";
         ReadOnlySpan<char> lengthAttr = "length=\"";
+        ReadOnlySpan<char> mapAttr = "map=\"";
 
         int searchStart = 0;
 
@@ -231,7 +244,8 @@ internal sealed class TemplateAnalyzer
 
             string name = ExtractAttribute(element, nameAttr) ?? string.Empty;
             string outType = ExtractAttribute(element, outTypeAttr) ?? string.Empty;
-            elements.Add((name, outType));
+            string map = ExtractAttribute(element, mapAttr) ?? string.Empty;
+            elements.Add((name, outType, map));
 
             string? lengthRef = ExtractAttribute(element, lengthAttr);
 

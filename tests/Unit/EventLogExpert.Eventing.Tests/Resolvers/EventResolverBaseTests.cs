@@ -405,6 +405,44 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithBitMap_ShouldDecodeFlagsToCommaJoinedNames()
+    {
+        // Arrange - Kernel-Boot VsmPolicy: 643 = 512 | 128 | 2 | 1 decodes to the joined flag names.
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "VSM policies: %1",
+            """
+                <template>
+                  <data name="VsmPolicy" inType="win:UInt32" outType="xs:unsignedInt" map="VsmPolicyMap"/>
+                </template>
+                """,
+            [643u]);
+
+        details.Maps = new Dictionary<string, ValueMapDefinition>
+        {
+            ["VsmPolicyMap"] = new ValueMapDefinition(
+                isBitMap: true,
+                entries:
+                [
+                    new ValueMapEntry(1, "VBS Enabled"),
+                    new ValueMapEntry(2, "VSM Required"),
+                    new ValueMapEntry(128, "Hvci"),
+                    new ValueMapEntry(512, "Boot Chain Signer Soft Enforced")
+                ])
+        };
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains(
+            "VSM policies: VBS Enabled,VSM Required,Hvci,Boot Chain Signer Soft Enforced",
+            displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithCache_ShouldUseCachedStrings()
     {
         // Arrange
@@ -965,6 +1003,30 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithGuidProperty_ShouldRenderWithBraces()
+    {
+        // Arrange - Windows renders GUID insertions wrapped in braces.
+        var volumeId = new Guid("4cff5b8e-e659-4f3a-8b2f-1a2b3c4d5e6f");
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Volume Id: %1",
+            """
+                <template>
+                  <data name="VolumeId" inType="win:GUID" outType="xs:GUID"/>
+                </template>
+                """,
+            [volumeId]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Volume Id: {4cff5b8e-e659-4f3a-8b2f-1a2b3c4d5e6f}", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithHexOutTypeAfterMissingOutType_ShouldFormatCorrectly()
     {
         // Arrange - first data element has no outType, second has HexInt32
@@ -1413,6 +1475,29 @@ public sealed class EventResolverBaseTests
         Assert.NotNull(displayEvent);
         Assert.DoesNotContain("Channel A", displayEvent.Description);
         Assert.DoesNotContain("Channel B", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithMapAttributeButNoMapDefinition_ShouldFallBackToRawValue()
+    {
+        // Arrange - the template references a map, but no definition is loaded (DB/MTA provider path).
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Bus Type: %1",
+            """
+                <template>
+                  <data name="BusType" inType="win:UInt32" outType="xs:unsignedInt" map="BusTypeMap"/>
+                </template>
+                """,
+            [10u]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Bus Type: 10", displayEvent.Description);
     }
 
     [Fact]
@@ -3532,6 +3617,36 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.EndsWith("\r\n", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithValueMap_ShouldDecodeEnumValueToName()
+    {
+        // Arrange - Ntfs BusType: the raw value 10 decodes to "SAS" via a valueMap.
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Bus Type: %1",
+            """
+                <template>
+                  <data name="BusType" inType="win:UInt32" outType="xs:unsignedInt" map="BusTypeMap"/>
+                </template>
+                """,
+            [10u]);
+
+        details.Maps = new Dictionary<string, ValueMapDefinition>
+        {
+            ["BusTypeMap"] = new ValueMapDefinition(
+                isBitMap: false,
+                entries: [new ValueMapEntry(10, "SAS")])
+        };
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Bus Type: SAS", displayEvent.Description);
     }
 
     [Fact]

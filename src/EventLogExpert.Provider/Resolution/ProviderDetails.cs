@@ -1,6 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Collections.ObjectModel;
+
 namespace EventLogExpert.Provider.Resolution;
 
 public sealed class ProviderDetails
@@ -33,6 +35,9 @@ public sealed class ProviderDetails
         ResolvedFromOwningPublisher is null;
 
     public IDictionary<long, string> Keywords { get; set; } = new Dictionary<long, string>();
+
+    public IReadOnlyDictionary<string, ValueMapDefinition> Maps { get; set; } =
+        ReadOnlyDictionary<string, ValueMapDefinition>.Empty;
 
     public IReadOnlyList<MessageModel> Messages
     {
