@@ -144,6 +144,38 @@ public sealed class ValueMapDefinitionTests
     }
 
     [Fact]
+    public void TryDecodeBits_BitMap_JoinsMatchedFlagNames()
+    {
+        var definition = new ValueMapDefinition(
+            isBitMap: true,
+            entries: [new ValueMapEntry(1, "A"), new ValueMapEntry(2, "B"), new ValueMapEntry(4, "C")]);
+
+        Assert.True(definition.TryDecodeBits(0b101, out string result));
+        Assert.Equal("A,C", result);
+    }
+
+    [Fact]
+    public void TryDecodeBits_EmptyEntries_ReturnsFalse()
+    {
+        var definition = new ValueMapDefinition(isBitMap: false, entries: []);
+
+        Assert.False(definition.TryDecodeBits(10UL, out string result));
+        Assert.Equal(string.Empty, result);
+    }
+
+    [Fact]
+    public void TryDecodeBits_ValueMap_LooksUpByExactBits()
+    {
+        var definition = new ValueMapDefinition(
+            isBitMap: false,
+            entries: [new ValueMapEntry(10, "SAS")]);
+
+        Assert.True(definition.TryDecodeBits(10UL, out string result));
+        Assert.Equal("SAS", result);
+        Assert.False(definition.TryDecodeBits(99UL, out _));
+    }
+
+    [Fact]
     public void ValueMap_ExactMatch_ReturnsName()
     {
         // Matches the Ntfs BusType example: 10 -> SAS.

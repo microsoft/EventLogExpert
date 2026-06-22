@@ -21,7 +21,14 @@ public sealed class ValueMapDefinition(bool isBitMap, IReadOnlyList<ValueMapEntr
     {
         decoded = string.Empty;
 
-        if (_entries.Count == 0 || !TryGetUnsignedBits(value, out ulong bits))
+        return TryGetUnsignedBits(value, out ulong bits) && TryDecodeBits(bits, out decoded);
+    }
+
+    public bool TryDecodeBits(ulong bits, out string decoded)
+    {
+        decoded = string.Empty;
+
+        if (_entries.Count == 0)
         {
             return false;
         }
