@@ -69,6 +69,14 @@ internal static partial class NativeMethods
         int lpName,
         ushort wLanguage = 0);
 
+    // String-typed resource lookup (FindResourceExA only handles integer-typed resources). Used to locate the
+    // "WEVT_TEMPLATE" resource by name. Returns an HRSRC, a non-owning pointer; see FindResourceExA above.
+    [LibraryImport(Kernel32Api, StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+    internal static partial IntPtr FindResourceW(
+        LibraryHandle hModule,
+        string lpName,
+        string lpType);
+
     [LibraryImport(Kernel32Api, StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
     internal static partial int FormatMessageW(
         uint dwFlags,

@@ -286,6 +286,41 @@ internal sealed class ProviderMetadata
 
     internal bool IsLocaleMetadata { get; private init; }
 
+    internal Guid PublisherGuid
+    {
+        get
+        {
+            try
+            {
+                return GetPublisherMetadataObject(EvtPublisherMetadataPropertyId.PublisherGuid) as Guid? ?? Guid.Empty;
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException
+                                           and not StackOverflowException
+                                           and not AccessViolationException)
+            {
+                return Guid.Empty;
+            }
+        }
+    }
+
+    internal string ResourceFilePath
+    {
+        get
+        {
+            try
+            {
+                return Environment.ExpandEnvironmentVariables(
+                    GetPublisherMetadataObject(EvtPublisherMetadataPropertyId.ResourceFilePath) as string ?? string.Empty);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException
+                                           and not StackOverflowException
+                                           and not AccessViolationException)
+            {
+                return string.Empty;
+            }
+        }
+    }
+
     internal static ProviderMetadata? Create(
         string providerName,
         IReadOnlyList<string>? metadataPath = null,
@@ -326,6 +361,9 @@ internal sealed class ProviderMetadata
 
         return null;
     }
+
+    internal string FormatMessageById(uint messageId) =>
+        NativeMethods.FormatMessage(_publisherMetadataHandle, messageId);
 
     private static object GetEventMetadataProperty(EvtHandle metadataHandle, EvtEventMetadataPropertyId propertyId)
     {
@@ -375,6 +413,54 @@ internal sealed class ProviderMetadata
         }
 
         return null;
+    }
+
+    private object? GetPublisherMetadataObject(EvtPublisherMetadataPropertyId propertyId)
+    {
+        IntPtr buffer = IntPtr.Zero;
+
+        try
+        {
+            bool success = NativeMethods.EvtGetPublisherMetadataProperty(
+                _publisherMetadataHandle,
+                propertyId,
+                0,
+                0,
+                IntPtr.Zero,
+                out int bufferUsed);
+
+            int error = Marshal.GetLastWin32Error();
+
+            if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
+            {
+                NativeMethods.ThrowEventLogException(error);
+            }
+
+            buffer = Marshal.AllocHGlobal(bufferUsed);
+
+            success = NativeMethods.EvtGetPublisherMetadataProperty(
+                _publisherMetadataHandle,
+                propertyId,
+                0,
+                bufferUsed,
+                buffer,
+                out bufferUsed);
+
+            error = Marshal.GetLastWin32Error();
+
+            if (!success)
+            {
+                NativeMethods.ThrowEventLogException(error);
+            }
+
+            var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
+
+            return NativeMethods.ConvertVariant(variant);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
     }
 
     private string GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId propertyId)
