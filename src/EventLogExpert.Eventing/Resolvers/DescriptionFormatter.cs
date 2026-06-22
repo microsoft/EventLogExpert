@@ -255,6 +255,113 @@ internal sealed partial class DescriptionFormatter(
         }
     }
 
+    private static string FormatDisplayAsHex(EventProperty property) => property.Kind switch
+    {
+        EventPropertyKind.Byte => $"0x{property.AsByte:X}",
+        EventPropertyKind.SByte => $"0x{property.AsSByte:X}",
+        EventPropertyKind.Int16 => $"0x{property.AsInt16:X}",
+        EventPropertyKind.UInt16 => $"0x{property.AsUInt16:X}",
+        EventPropertyKind.Int32 => $"0x{property.AsInt32:X}",
+        EventPropertyKind.UInt32 => $"0x{property.AsUInt32:X}",
+        EventPropertyKind.Int64 => $"0x{property.AsInt64:X}",
+        EventPropertyKind.UInt64 => $"0x{property.AsUInt64:X}",
+        _ => FormatNumericToString(property)
+    };
+
+    private static string FormatNtStatus(EventProperty property)
+    {
+        uint statusCode;
+
+        switch (property.Kind)
+        {
+            case EventPropertyKind.UInt32: statusCode = property.AsUInt32; break;
+            case EventPropertyKind.Int32: statusCode = (uint)property.AsInt32; break;
+            case EventPropertyKind.UInt64: statusCode = (uint)property.AsUInt64; break;
+            case EventPropertyKind.Int64: statusCode = (uint)property.AsInt64; break;
+            case EventPropertyKind.UInt16: statusCode = property.AsUInt16; break;
+            case EventPropertyKind.Int16: statusCode = (uint)property.AsInt16; break;
+            case EventPropertyKind.Byte: statusCode = property.AsByte; break;
+            default: return FormatNumericToString(property);
+        }
+
+        return NativeErrorResolver.GetNtStatusMessage(statusCode);
+    }
+
+    private static string FormatNumericProperty(
+        EventProperty property,
+        string? outType,
+        string? mapName,
+        IReadOnlyDictionary<string, ValueMapDefinition> maps)
+    {
+        if (!string.IsNullOrEmpty(mapName) &&
+            maps.TryGetValue(mapName, out ValueMapDefinition? mapDefinition) &&
+            property.TryGetUnsignedBits(out ulong bits) &&
+            mapDefinition.TryDecodeBits(bits, out string decodedValue))
+        {
+            return decodedValue;
+        }
+
+        if (string.IsNullOrEmpty(outType))
+        {
+            return FormatNumericToString(property);
+        }
+
+        if (s_displayAsHexTypes.Contains(outType))
+        {
+            return FormatDisplayAsHex(property);
+        }
+
+        if (string.Equals(outType, "win:HResult", StringComparison.OrdinalIgnoreCase) &&
+            property.Kind == EventPropertyKind.Int32)
+        {
+            return NativeErrorResolver.GetErrorMessage((uint)property.AsInt32);
+        }
+
+        if (string.Equals(outType, "win:NTStatus", StringComparison.OrdinalIgnoreCase))
+        {
+            return FormatNtStatus(property);
+        }
+
+        return FormatNumericToString(property);
+    }
+
+    private static string FormatNumericToString(EventProperty property) => property.Kind switch
+    {
+        EventPropertyKind.SByte => property.AsSByte.ToString(),
+        EventPropertyKind.Byte => property.AsByte.ToString(),
+        EventPropertyKind.Int16 => property.AsInt16.ToString(),
+        EventPropertyKind.UInt16 => property.AsUInt16.ToString(),
+        EventPropertyKind.Int32 => property.AsInt32.ToString(),
+        EventPropertyKind.UInt32 => property.AsUInt32.ToString(),
+        EventPropertyKind.Int64 => property.AsInt64.ToString(),
+        EventPropertyKind.UInt64 => property.AsUInt64.ToString(),
+        EventPropertyKind.Single => property.AsSingle.ToString(),
+        EventPropertyKind.Double => property.AsDouble.ToString(),
+        EventPropertyKind.SizeT => property.AsSizeT.ToString(),
+        _ => string.Empty
+    };
+
+    private static string FormatProperty(
+        EventProperty property,
+        string? outType,
+        string? mapName,
+        IReadOnlyDictionary<string, ValueMapDefinition> maps) => property.Kind switch
+    {
+        EventPropertyKind.Boolean => property.AsBoolean ? "true" : "false",
+        EventPropertyKind.DateTime => property.AsDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"),
+        EventPropertyKind.Reference => FormatReferenceProperty(property.Reference),
+        _ => FormatNumericProperty(property, outType, mapName, maps)
+    };
+
+    private static string FormatReferenceProperty(object? reference) => reference switch
+    {
+        byte[] bytes => Convert.ToHexString(bytes),
+        SecurityIdentifier sid => sid.Value,
+        // Match Windows EvtFormatMessage, which renders GUID properties wrapped in braces.
+        Guid guidValue => guidValue.ToString("B"),
+        _ => reference?.ToString() ?? string.Empty
+    };
+
     private static void ResizeBuffer(ref char[] buffer, ref Span<char> source, int sizeToAdd)
     {
         char[] newBuffer = ArrayPool<char>.Shared.Rent(source.Length + sizeToAdd);
@@ -484,7 +591,7 @@ internal sealed partial class DescriptionFormatter(
 
     private List<string> GetFormattedProperties(
         ReadOnlySpan<char> template,
-        IReadOnlyList<object> properties,
+        IReadOnlyList<EventProperty> properties,
         IReadOnlyDictionary<string, ValueMapDefinition> maps)
     {
         ImmutableArray<string> dataNodes = default;
@@ -512,90 +619,12 @@ internal sealed partial class DescriptionFormatter(
 
         int index = 0;
 
-        foreach (object property in properties)
+        foreach (EventProperty property in properties)
         {
             string? outType = !dataNodes.IsDefault && index < dataNodes.Length ? dataNodes[index] : null;
             string? mapName = !mapNodes.IsDefault && index < mapNodes.Length ? mapNodes[index] : null;
 
-            switch (property)
-            {
-                case bool boolValue:
-                    formattedValues.Add(boolValue ? "true" : "false");
-
-                    break;
-                case DateTime eventTime:
-                    formattedValues.Add(eventTime.ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
-
-                    break;
-                case byte[] bytes:
-                    formattedValues.Add(Convert.ToHexString(bytes));
-
-                    break;
-                case SecurityIdentifier sid:
-                    formattedValues.Add(sid.Value);
-
-                    break;
-                case Guid guidValue:
-                    // Match Windows EvtFormatMessage, which renders GUID properties wrapped in braces.
-                    formattedValues.Add(guidValue.ToString("B"));
-
-                    break;
-                default:
-                    if (!string.IsNullOrEmpty(mapName) &&
-                        maps.TryGetValue(mapName, out ValueMapDefinition? mapDefinition) &&
-                        mapDefinition.TryDecode(property, out string decodedValue))
-                    {
-                        formattedValues.Add(decodedValue);
-                    }
-                    else if (string.IsNullOrEmpty(outType))
-                    {
-                        formattedValues.Add(property?.ToString() ?? string.Empty);
-                    }
-                    else if (s_displayAsHexTypes.Contains(outType))
-                    {
-                        formattedValues.Add(property switch
-                        {
-                            byte b => $"0x{b:X}",
-                            sbyte sb => $"0x{sb:X}",
-                            short s => $"0x{s:X}",
-                            ushort us => $"0x{us:X}",
-                            int i => $"0x{i:X}",
-                            uint ui => $"0x{ui:X}",
-                            long l => $"0x{l:X}",
-                            ulong ul => $"0x{ul:X}",
-                            _ => property?.ToString() ?? string.Empty
-                        });
-                    }
-                    else if (string.Equals(outType, "win:HResult", StringComparison.OrdinalIgnoreCase) && property is int hResult)
-                    {
-                        formattedValues.Add(NativeErrorResolver.GetErrorMessage((uint)hResult));
-                    }
-                    else if (string.Equals(outType, "win:NTStatus", StringComparison.OrdinalIgnoreCase))
-                    {
-                        uint statusCode = property switch
-                        {
-                            uint ui => ui,
-                            int i => (uint)i,
-                            ulong ul => (uint)ul,
-                            long l => (uint)l,
-                            ushort us => us,
-                            short s => (uint)s,
-                            byte b => b,
-                            _ => 0
-                        };
-
-                        formattedValues.Add(property is uint or int or ulong or long or ushort or short or byte
-                            ? NativeErrorResolver.GetNtStatusMessage(statusCode)
-                            : property?.ToString() ?? string.Empty);
-                    }
-                    else
-                    {
-                        formattedValues.Add(property?.ToString() ?? string.Empty);
-                    }
-
-                    break;
-            }
-
+            formattedValues.Add(FormatProperty(property, outType, mapName, maps));
             index++;
         }
 

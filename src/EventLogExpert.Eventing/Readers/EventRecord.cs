@@ -30,7 +30,7 @@ public sealed record EventRecord
 
     public long? RecordId { get; set; }
 
-    public IReadOnlyList<object> Properties { get; set; } = [];
+    internal IReadOnlyList<EventProperty> Properties { get; set; } = [];
 
     public string ProviderName { get; set; } = string.Empty;
 

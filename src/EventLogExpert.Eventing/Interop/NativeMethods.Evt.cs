@@ -71,17 +71,7 @@ internal static partial class NativeMethods
             case (int)EvtVariantType.FileTime:
                 return DateTime.FromFileTimeUtc((long)variant.FileTimeVal);
             case (int)EvtVariantType.SysTime:
-                var sysTime = Marshal.PtrToStructure<SystemTime>(variant.SysTimeVal);
-
-                return new DateTime(
-                    sysTime.Year,
-                    sysTime.Month,
-                    sysTime.Day,
-                    sysTime.Hour,
-                    sysTime.Minute,
-                    sysTime.Second,
-                    sysTime.Milliseconds,
-                    DateTimeKind.Utc);
+                return ReadSysTime(variant);
             case (int)EvtVariantType.Sid:
                 return variant.SidVal == IntPtr.Zero ? null : new SecurityIdentifier(variant.SidVal);
             case (int)EvtVariantType.HexInt32:
@@ -126,6 +116,47 @@ internal static partial class NativeMethods
                 return ReadBlittableArray<int>(variant.Int32Arr, variant.Count, EvtVariantType.HexInt32Array);
             default:
                 throw new InvalidDataException($"Invalid {nameof(EvtVariantType)}: {variant.Type}");
+        }
+    }
+
+    internal static EventProperty ConvertVariantToProperty(EvtVariant variant)
+    {
+        switch (variant.Type)
+        {
+            case (int)EvtVariantType.SByte:
+                return variant.SByteVal;
+            case (int)EvtVariantType.Byte:
+                return variant.ByteVal;
+            case (int)EvtVariantType.Int16:
+                return variant.Int16Val;
+            case (int)EvtVariantType.UInt16:
+                return variant.UInt16Val;
+            case (int)EvtVariantType.Int32:
+            case (int)EvtVariantType.HexInt32:
+                return variant.Int32Val;
+            case (int)EvtVariantType.UInt32:
+                return variant.UInt32Val;
+            case (int)EvtVariantType.Int64:
+                return variant.Int64Val;
+            case (int)EvtVariantType.UInt64:
+            case (int)EvtVariantType.HexInt64:
+                return variant.UInt64Val;
+            case (int)EvtVariantType.Single:
+                return variant.SingleVal;
+            case (int)EvtVariantType.Double:
+                return variant.DoubleVal;
+            case (int)EvtVariantType.Boolean:
+                return variant.BooleanVal != 0;
+            case (int)EvtVariantType.SizeT:
+                return variant.SizeTVal;
+            case (int)EvtVariantType.FileTime:
+                return DateTime.FromFileTimeUtc((long)variant.FileTimeVal);
+            case (int)EvtVariantType.SysTime:
+                return ReadSysTime(variant);
+            default:
+                // Reference shapes reuse the boxing converter (reference types add no allocation; the rare boxed
+                // Guid is acceptable). Null / unsupported types throw, preserving the boxed path's ?? throw contract.
+                return EventProperty.FromReference(ConvertVariant(variant) ?? throw new InvalidDataException());
         }
     }
 
@@ -621,7 +652,7 @@ internal static partial class NativeMethods
         }
     }
 
-    internal static IReadOnlyList<object> RenderEventProperties(EvtHandle eventHandle)
+    internal static IReadOnlyList<EventProperty> RenderEventProperties(EvtHandle eventHandle)
     {
         bool success = EvtRender(
             EventLogSession.GlobalSession.UserRenderContext,
@@ -671,7 +702,7 @@ internal static partial class NativeMethods
 
             if (propertyCount <= 0) { return []; }
 
-            var properties = new object[propertyCount];
+            var properties = new EventProperty[propertyCount];
 
             unsafe
             {
@@ -681,7 +712,7 @@ internal static partial class NativeMethods
 
                     for (int i = 0; i < propertyCount; i++)
                     {
-                        properties[i] = ConvertVariant(variants[i]) ?? throw new InvalidDataException();
+                        properties[i] = ConvertVariantToProperty(variants[i]);
                     }
                 }
             }
@@ -869,5 +900,20 @@ internal static partial class NativeMethods
         return variant.Type != (uint)EvtVariantType.UInt16 ?
             throw new InvalidDataException($"Expected EVT_VARIANT type UInt16, got {variant.Type}.") :
             variant.UInt16Val;
+    }
+
+    private static DateTime ReadSysTime(EvtVariant variant)
+    {
+        var sysTime = Marshal.PtrToStructure<SystemTime>(variant.SysTimeVal);
+
+        return new DateTime(
+            sysTime.Year,
+            sysTime.Month,
+            sysTime.Day,
+            sysTime.Hour,
+            sysTime.Minute,
+            sysTime.Second,
+            sysTime.Milliseconds,
+            DateTimeKind.Utc);
     }
 }

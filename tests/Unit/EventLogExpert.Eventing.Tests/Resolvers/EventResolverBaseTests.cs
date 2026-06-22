@@ -443,6 +443,45 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithBoolean_ShouldFormatLowercase()
+    {
+        var (trueDetails, trueRecord) = EventUtils.CreateModernEvent(
+            "Flag: %1",
+            """<template><data name="Flag" inType="win:Boolean"/></template>""",
+            [true]);
+
+        var (falseDetails, falseRecord) = EventUtils.CreateModernEvent(
+            "Flag: %1",
+            """<template><data name="Flag" inType="win:Boolean"/></template>""",
+            [false]);
+
+        var trueEvent = new TestEventResolver([trueDetails]).ResolveEvent(trueRecord);
+        var falseEvent = new TestEventResolver([falseDetails]).ResolveEvent(falseRecord);
+
+        Assert.NotNull(trueEvent);
+        Assert.NotNull(falseEvent);
+        Assert.Contains("Flag: true", trueEvent.Description);
+        Assert.Contains("Flag: false", falseEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithByteArrayAndHexOutType_ShouldStillFormatAsHexString()
+    {
+        // A byte[] is always rendered via Convert.ToHexString; a hex outType must not change that.
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Data: %1",
+            """<template><data name="Data" inType="win:Binary" outType="win:HexInt32"/></template>""",
+            [new byte[] { 0xAB, 0xCD }]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        Assert.NotNull(displayEvent);
+        Assert.Contains("ABCD", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithCache_ShouldUseCachedStrings()
     {
         // Arrange
@@ -963,6 +1002,24 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithEvtHandleProperty_RendersViaToStringWithoutThrowing()
+    {
+        // EvtHandle is one of the ConvertVariant outputs; it is a reference rendered via .ToString().
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Handle: %1",
+            """<template><data name="Handle" inType="win:EvtHandle"/></template>""",
+            [EventProperty.FromReference(new EvtHandle(IntPtr.Zero, ownsHandle: false))]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        Assert.NotNull(displayEvent);
+        Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
+        Assert.Contains(nameof(EvtHandle), displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithFormattingCharacters_ShouldCleanupDescription()
     {
         // Arrange
@@ -1003,6 +1060,22 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithGuid_ShouldFormatWithBraces()
+    {
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Id: %1",
+            """<template><data name="Id" inType="win:GUID"/></template>""",
+            [new Guid("12345678-1234-1234-1234-123456789abc")]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        Assert.NotNull(displayEvent);
+        Assert.Contains("{12345678-1234-1234-1234-123456789abc}", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithGuidProperty_ShouldRenderWithBraces()
     {
         // Arrange - Windows renders GUID insertions wrapped in braces.
@@ -1039,7 +1112,7 @@ public sealed class EventResolverBaseTests
                   <data name="Code" inType="win:UInt32" outType="win:HexInt32"/>
                 </template>
                 """,
-            ["TestApp", 255]);
+            ["TestApp", 255u]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -1107,7 +1180,7 @@ public sealed class EventResolverBaseTests
                   <data name="ErrorCode" inType="win:UInt32" outType="win:HexInt32"/>
                 </template>
                 """,
-            ["TestName", new byte[] { 0xAB, 0xCD }, 255]);
+            ["TestName", new byte[] { 0xAB, 0xCD }, 255u]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -1118,7 +1191,7 @@ public sealed class EventResolverBaseTests
             Id = 1000,
             Version = 0,
             LogName = Constants.ApplicationLogName,
-            Properties = ["TestName", new byte[] { 0xAB, 0xCD }, 255]
+            Properties = ["TestName", new byte[] { 0xAB, 0xCD }, 255u]
         };
 
         // Act
@@ -1129,6 +1202,40 @@ public sealed class EventResolverBaseTests
         Assert.NotNull(displayEvent);
         Assert.Contains("0xFF", displayEvent.Description);
         Assert.Contains("TestName", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithHighBitUInt32_ShouldFormatAsUnsignedDecimal()
+    {
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Value: %1",
+            """<template><data name="Value" inType="win:UInt32"/></template>""",
+            [uint.MaxValue]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        Assert.NotNull(displayEvent);
+        Assert.Contains("4294967295", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithHighBitUInt64_ShouldFormatAsUnsignedDecimal()
+    {
+        // Regression guard: ulong.MaxValue is packed as -1L in the property bit field; the no-outType
+        // decimal path must render the unsigned value, never "-1".
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Value: %1",
+            """<template><data name="Value" inType="win:UInt64"/></template>""",
+            [ulong.MaxValue]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        Assert.NotNull(displayEvent);
+        Assert.Contains("18446744073709551615", displayEvent.Description);
     }
 
     [Fact]
@@ -2117,6 +2224,39 @@ public sealed class EventResolverBaseTests
         Assert.Contains("StringValue", displayEvent.Description);
         Assert.Contains("42", displayEvent.Description);
         Assert.Contains("true", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithNegativeInt32_ShouldFormatAsSignedDecimal()
+    {
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Value: %1",
+            """<template><data name="Value" inType="win:Int32"/></template>""",
+            [-1]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Value: -1", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithNegativeSByteAndNTStatusOutType_ShouldFallBackToSignedDecimal()
+    {
+        // sbyte is excluded from NTStatus resolution and must render as its signed decimal value.
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Status: %1",
+            """<template><data name="Status" inType="win:Int8" outType="win:NTStatus"/></template>""",
+            [(sbyte)-1]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Status: -1", displayEvent.Description);
     }
 
     [Fact]
@@ -3129,6 +3269,48 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithReferenceArrayShapes_RenderViaToString()
+    {
+        // Array / Handle / Xml / AnsiString variants all share the reference default branch (-> ToString),
+        // matching the pre-unboxing behavior. uint[]/int[]/ushort[] reach EventProperty via FromReference
+        // (the path RenderEventProperties uses for them); string[] has a typed implicit operator.
+        var (uintArrayDetails, uintArrayRecord) = EventUtils.CreateModernEvent(
+            "Value: %1",
+            """<template><data name="Value" inType="win:UInt32" outType="win:HexInt32Array"/></template>""",
+            [EventProperty.FromReference(new uint[] { 1, 2, 3 })]);
+
+        var (stringArrayDetails, stringArrayRecord) = EventUtils.CreateModernEvent(
+            "Value: %1",
+            """<template><data name="Value" inType="win:UnicodeString"/></template>""",
+            [(string[])["a", "b"]]);
+
+        var uintArrayEvent = new TestEventResolver([uintArrayDetails]).ResolveEvent(uintArrayRecord);
+        var stringArrayEvent = new TestEventResolver([stringArrayDetails]).ResolveEvent(stringArrayRecord);
+
+        Assert.NotNull(uintArrayEvent);
+        Assert.NotNull(stringArrayEvent);
+        Assert.Contains("System.UInt32[]", uintArrayEvent.Description);
+        Assert.Contains("System.String[]", stringArrayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithSByteAndNTStatusOutType_ShouldFallBackToDecimal()
+    {
+        // NTStatus resolution excludes sbyte; an sbyte property must render as its decimal value.
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Status: %1",
+            """<template><data name="Status" inType="win:Int8" outType="win:NTStatus"/></template>""",
+            [(sbyte)5]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Status: 5", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithSeverityLevel_ShouldResolveLevelString()
     {
         // Arrange
@@ -3241,6 +3423,45 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithSid_ShouldFormatAsSddl()
+    {
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "User: %1",
+            """<template><data name="User" inType="win:SID"/></template>""",
+            [new SecurityIdentifier("S-1-5-18")]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        Assert.NotNull(displayEvent);
+        Assert.Contains("S-1-5-18", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithSingleAndDouble_ShouldRoundTripThroughBitField()
+    {
+        // Regression guard: Single/Double are stored via BitConverter reinterpret, not a numeric cast.
+        var (singleDetails, singleRecord) = EventUtils.CreateModernEvent(
+            "Value: %1",
+            """<template><data name="Value" inType="win:Float"/></template>""",
+            [3.5f]);
+
+        var (doubleDetails, doubleRecord) = EventUtils.CreateModernEvent(
+            "Value: %1",
+            """<template><data name="Value" inType="win:Double"/></template>""",
+            [2.5d]);
+
+        var singleEvent = new TestEventResolver([singleDetails]).ResolveEvent(singleRecord);
+        var doubleEvent = new TestEventResolver([doubleDetails]).ResolveEvent(doubleRecord);
+
+        Assert.NotNull(singleEvent);
+        Assert.NotNull(doubleEvent);
+        Assert.Contains("3.5", singleEvent.Description);
+        Assert.Contains("2.5", doubleEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithSinglePropertyAndNoTemplate_ShouldUsePropertyAsDescription()
     {
         // Arrange
@@ -3269,6 +3490,22 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Equal("This is the description from property", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithSizeT_ShouldFormatAsDecimal()
+    {
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Value: %1",
+            """<template><data name="Value" inType="win:Pointer"/></template>""",
+            [(nuint)4096]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        Assert.NotNull(displayEvent);
+        Assert.Contains("4096", displayEvent.Description);
     }
 
     [Fact]
@@ -3617,6 +3854,22 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.EndsWith("\r\n", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithUtcDateTime_ShouldFormatRoundTrip()
+    {
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Time: %1",
+            """<template><data name="Time" inType="win:FILETIME"/></template>""",
+            [new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc)]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        Assert.NotNull(displayEvent);
+        Assert.Contains("2024-01-01T12:00:00", displayEvent.Description);
     }
 
     [Fact]

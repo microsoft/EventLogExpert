@@ -13,4 +13,8 @@
     <PackageReference Include="Microsoft.Data.Sqlite" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="EventLogExpert.Eventing.Tests" />
+  </ItemGroup>
+
 </Project>

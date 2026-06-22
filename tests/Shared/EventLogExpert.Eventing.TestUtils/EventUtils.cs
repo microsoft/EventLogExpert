@@ -135,11 +135,31 @@ public static class EventUtils
             Text = text
         };
 
+    public static ProviderDetails CreateProvider(
+        string name,
+        IReadOnlyList<MessageModel>? messages = null,
+        IReadOnlyList<EventModel>? events = null,
+        IDictionary<long, string>? keywords = null,
+        IDictionary<int, string>? opcodes = null,
+        IDictionary<int, string>? tasks = null,
+        string? resolvedFromOwningPublisher = null) =>
+        new()
+        {
+            ProviderName = name,
+            Messages = messages ?? [],
+            Parameters = [],
+            Events = events ?? [],
+            Keywords = keywords ?? new Dictionary<long, string>(),
+            Opcodes = opcodes ?? new Dictionary<int, string>(),
+            Tasks = tasks ?? new Dictionary<int, string>(),
+            ResolvedFromOwningPublisher = resolvedFromOwningPublisher
+        };
+
     /// <summary>Creates a modern event with a template and description for property resolution tests.</summary>
-    public static (ProviderDetails Details, EventRecord Record) CreateModernEvent(
+    internal static (ProviderDetails Details, EventRecord Record) CreateModernEvent(
         string description,
         string template,
-        IReadOnlyList<object> properties,
+        IReadOnlyList<EventProperty> properties,
         ushort id = 1000,
         byte version = 0) =>
     (
@@ -172,24 +192,4 @@ public static class EventUtils
             Properties = properties
         }
     );
-
-    public static ProviderDetails CreateProvider(
-        string name,
-        IReadOnlyList<MessageModel>? messages = null,
-        IReadOnlyList<EventModel>? events = null,
-        IDictionary<long, string>? keywords = null,
-        IDictionary<int, string>? opcodes = null,
-        IDictionary<int, string>? tasks = null,
-        string? resolvedFromOwningPublisher = null) =>
-        new()
-        {
-            ProviderName = name,
-            Messages = messages ?? [],
-            Parameters = [],
-            Events = events ?? [],
-            Keywords = keywords ?? new Dictionary<long, string>(),
-            Opcodes = opcodes ?? new Dictionary<int, string>(),
-            Tasks = tasks ?? new Dictionary<int, string>(),
-            ResolvedFromOwningPublisher = resolvedFromOwningPublisher
-        };
 }
