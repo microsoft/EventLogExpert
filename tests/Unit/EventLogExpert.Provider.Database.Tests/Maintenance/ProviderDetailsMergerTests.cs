@@ -198,7 +198,48 @@ public sealed class ProviderDetailsMergerTests
     }
 
     [Fact]
-    public void MergeCaseInsensitiveDuplicates_OnDistinctVersionKeys_Throws()
+    public void MergeCaseInsensitiveDuplicates_OnDistinctVersionKeys_ConflictingContentCoexists()
+    {
+        var first = EventUtils.CreateProvider("Same-Provider",
+            events: [EventUtils.CreateEventModel(100, "first", logName: "App")]);
+        first.VersionKey = "vk1:aaa";
+
+        var second = EventUtils.CreateProvider("same-provider",
+            events: [EventUtils.CreateEventModel(100, "second", logName: "App")]);
+        second.VersionKey = "vk1:bbb";
+
+        // Same name + same event Id but DISTINCT VersionKeys are different provider versions, so they form separate
+        // groups and the conflicting event content is never compared. Name-only grouping would have merged them and
+        // thrown on the event conflict; tuple-keying lets both versions coexist.
+        var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates([first, second], TestDatabasePath);
+
+        Assert.Equal(2, merged.Count);
+        Assert.Equal(["vk1:aaa", "vk1:bbb"], merged.Select(p => p.VersionKey).OrderBy(v => v, StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
+    public void MergeCaseInsensitiveDuplicates_OnDistinctVersionKeys_MergesWithinVersionAndCoexistsAcross()
+    {
+        var firstV1 = EventUtils.CreateProvider("Foo");
+        firstV1.VersionKey = "vk1";
+
+        var secondV1 = EventUtils.CreateProvider("foo");
+        secondV1.VersionKey = "vk1";
+
+        var v2 = EventUtils.CreateProvider("Foo");
+        v2.VersionKey = "vk2";
+
+        var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates([firstV1, secondV1, v2], TestDatabasePath);
+
+        // The two vk1 rows case-fold into one (name, vk1) group and merge to a single canonical "Foo" row; vk2 is a
+        // distinct version and coexists - the realistic post-hashing shape (mixed versions of one name) yields 2 rows.
+        Assert.Equal(2, merged.Count);
+        Assert.Equal(["vk1", "vk2"], merged.Select(p => p.VersionKey).OrderBy(v => v, StringComparer.Ordinal).ToArray());
+        Assert.Equal("Foo", merged.Single(p => p.VersionKey == "vk1").ProviderName);
+    }
+
+    [Fact]
+    public void MergeCaseInsensitiveDuplicates_OnDistinctVersionKeys_PreservesBothVersions()
     {
         var first = EventUtils.CreateProvider("Same-Provider");
         first.VersionKey = "vk1:aaa";
@@ -206,10 +247,11 @@ public sealed class ProviderDetailsMergerTests
         var second = EventUtils.CreateProvider("same-provider");
         second.VersionKey = "vk1:bbb";
 
-        var ex = Assert.Throws<DatabaseUpgradeException>(() =>
-            ProviderDetailsMerger.MergeCaseInsensitiveDuplicates([first, second], TestDatabasePath));
+        var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates([first, second], TestDatabasePath);
 
-        Assert.Contains("VersionKey", ex.Reason);
+        // Distinct VersionKeys are distinct provider versions and must coexist, not collapse to one row.
+        Assert.Equal(2, merged.Count);
+        Assert.Equal(["vk1:aaa", "vk1:bbb"], merged.Select(p => p.VersionKey).OrderBy(v => v, StringComparer.Ordinal).ToArray());
     }
 
     [Fact]
