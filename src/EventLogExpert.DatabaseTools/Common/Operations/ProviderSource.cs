@@ -241,6 +241,8 @@ internal static class ProviderSource
 
             for (var offset = 0; offset < namesToLoad.Count; offset += MaxInClauseParameters)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var chunk = namesToLoad
                     .Skip(offset)
                     .Take(MaxInClauseParameters)

@@ -86,14 +86,17 @@ internal sealed class DatabaseClassificationService
             });
     }
 
-    private static DatabaseStatus MapSchemaVersionToStatus(int currentVersion) =>
-        currentVersion switch
+    private static DatabaseStatus MapSchemaStateToStatus(DatabaseSchemaState state)
+    {
+        if (!state.NeedsUpgrade) { return DatabaseStatus.Ready; }
+
+        return state.CurrentVersion switch
         {
-            DatabaseSchemaVersion.Current => DatabaseStatus.Ready,
-            3 => DatabaseStatus.UpgradeRequired,
             1 or 2 => DatabaseStatus.ObsoleteSchema,
-            _ => DatabaseStatus.UnrecognizedSchema,
+            DatabaseSchemaVersion.Unknown => DatabaseStatus.UnrecognizedSchema,
+            _ => DatabaseStatus.UpgradeRequired,
         };
+    }
 
     private (DatabaseStatus Status, bool BackupExists) ClassifyEntry(
         DatabaseEntry entry,
@@ -109,7 +112,7 @@ internal sealed class DatabaseClassificationService
             }
 
             var state = _maintenance.CheckSchemaState(entry.FullPath);
-            var status = MapSchemaVersionToStatus(state.CurrentVersion);
+            var status = MapSchemaStateToStatus(state);
             var backupExists = ProbeOrCleanupBackup(entry, status);
 
             return (status, backupExists);

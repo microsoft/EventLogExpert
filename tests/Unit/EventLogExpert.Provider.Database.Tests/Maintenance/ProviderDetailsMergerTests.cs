@@ -13,6 +13,21 @@ public sealed class ProviderDetailsMergerTests
     private const string TestDatabasePath = @"C:\test\fake.db";
 
     [Fact]
+    public void MergeCaseInsensitiveDuplicates_CarriesSharedVersionKeyThroughMerge()
+    {
+        var first = EventUtils.CreateProvider("Same-Provider");
+        first.VersionKey = "vk1:shared";
+
+        var second = EventUtils.CreateProvider("same-provider");
+        second.VersionKey = "vk1:shared";
+
+        var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates([first, second], TestDatabasePath);
+
+        Assert.Single(merged);
+        Assert.Equal("vk1:shared", merged[0].VersionKey);
+    }
+
+    [Fact]
     public void MergeCaseInsensitiveDuplicates_DeduplicatesIdenticalMessages()
     {
         var msg = EventUtils.CreateMessageModel("Same-Provider", 100, "duplicate-text", 100);
@@ -28,6 +43,29 @@ public sealed class ProviderDetailsMergerTests
         Assert.Single(merged);
         Assert.Single(merged[0].Messages);
         Assert.Equal("duplicate-text", merged[0].Messages[0].Text);
+    }
+
+    [Fact]
+    public void MergeCaseInsensitiveDuplicates_MergesDistinctMapsAcrossDuplicates()
+    {
+        var alpha = EventUtils.CreateProvider("Same-Provider");
+        alpha.Maps = new Dictionary<string, ValueMapDefinition>
+        {
+            ["BusType"] = new(isBitMap: false, [new ValueMapEntry(10, "SAS")])
+        };
+
+        var beta = EventUtils.CreateProvider("same-provider");
+        beta.Maps = new Dictionary<string, ValueMapDefinition>
+        {
+            ["State"] = new(isBitMap: false, [new ValueMapEntry(1, "Online")])
+        };
+
+        var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates([alpha, beta], TestDatabasePath);
+
+        Assert.Single(merged);
+        Assert.Equal(2, merged[0].Maps.Count);
+        Assert.Equal("SAS", merged[0].Maps["BusType"].Entries[0].Name);
+        Assert.Equal("Online", merged[0].Maps["State"].Entries[0].Name);
     }
 
     [Fact]
@@ -87,6 +125,28 @@ public sealed class ProviderDetailsMergerTests
     }
 
     [Fact]
+    public void MergeCaseInsensitiveDuplicates_OnConflictingMapDefinition_Throws()
+    {
+        var alpha = EventUtils.CreateProvider("Same-Provider");
+        alpha.Maps = new Dictionary<string, ValueMapDefinition>
+        {
+            ["BusType"] = new(isBitMap: false, [new ValueMapEntry(10, "SAS")])
+        };
+
+        var beta = EventUtils.CreateProvider("same-provider");
+        beta.Maps = new Dictionary<string, ValueMapDefinition>
+        {
+            ["BusType"] = new(isBitMap: false, [new ValueMapEntry(10, "NVMe")])
+        };
+
+        var ex = Assert.Throws<DatabaseUpgradeException>(() =>
+            ProviderDetailsMerger.MergeCaseInsensitiveDuplicates([alpha, beta], TestDatabasePath));
+
+        Assert.Contains("Map", ex.Reason);
+        Assert.Contains("BusType", ex.Reason);
+    }
+
+    [Fact]
     public void MergeCaseInsensitiveDuplicates_OnConflictingMessageText_Throws()
     {
         var rows = new List<ProviderDetails>
@@ -135,6 +195,21 @@ public sealed class ProviderDetailsMergerTests
             ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(rows, TestDatabasePath));
 
         Assert.Contains("Tasks", ex.Reason);
+    }
+
+    [Fact]
+    public void MergeCaseInsensitiveDuplicates_OnDistinctVersionKeys_Throws()
+    {
+        var first = EventUtils.CreateProvider("Same-Provider");
+        first.VersionKey = "vk1:aaa";
+
+        var second = EventUtils.CreateProvider("same-provider");
+        second.VersionKey = "vk1:bbb";
+
+        var ex = Assert.Throws<DatabaseUpgradeException>(() =>
+            ProviderDetailsMerger.MergeCaseInsensitiveDuplicates([first, second], TestDatabasePath));
+
+        Assert.Contains("VersionKey", ex.Reason);
     }
 
     [Fact]
