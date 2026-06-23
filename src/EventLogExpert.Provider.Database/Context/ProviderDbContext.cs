@@ -8,6 +8,7 @@ using EventLogExpert.Provider.Schema;
 using EventLogExpert.ProviderDatabase.Maintenance;
 using EventLogExpert.ProviderDatabase.Serialization;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.ObjectModel;
 using System.Data;
 using System.Data.Common;
 
@@ -37,9 +38,14 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
             ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
         }
 
-        if (ensureCreated)
+        if (!ensureCreated) { return; }
+
+        // EnsureCreated builds the ProviderDetails table from the current (canonical) model only when the database did
+        // not already exist. Stamp the canonical user_version on a freshly-created writable database so it is recognized
+        // as current; an existing database is left untouched here (a stale one is rebuilt by the upgrade path, not in place).
+        if (Database.EnsureCreated() && !readOnly)
         {
-            Database.EnsureCreated();
+            StampCanonicalUserVersion();
         }
     }
 
@@ -59,15 +65,39 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
 
         try
         {
+            int userVersion;
+
+            using (var versionCommand = connection.CreateCommand())
+            {
+                versionCommand.CommandText = "PRAGMA user_version";
+                userVersion = Convert.ToInt32(versionCommand.ExecuteScalar());
+            }
+
+            if (userVersion == DatabaseSchemaVersion.Current)
+            {
+                // Stamped canonical database - current shape, no rebuild. Skip the structural probe.
+                return LogResult(new DatabaseSchemaState(DatabaseSchemaVersion.Current));
+            }
+
+            if (userVersion > DatabaseSchemaVersion.Current)
+            {
+                // Stamped by a newer build than this one understands; never rebuild/downgrade it.
+                return LogResult(new DatabaseSchemaState(DatabaseSchemaVersion.Unknown) { NeedsUpgrade = true });
+            }
+
+            // userVersion below Current (0 for every database created before the stamp existed; also any sub-current
+            // stamp): classify structurally below (to distinguish v1/v2-unsupported and Unknown from rebuildable v3/v4),
+            // then flag for rebuild unconditionally - an unstamped/stale database is never canonical even when its columns
+            // already match the current shape (and a future Current bump correctly rebuilds old stamped databases).
             string? messagesType = null;
             string? eventsType = null;
             string? keywordsType = null;
             string? opcodesType = null;
             string? tasksType = null;
             string? parametersType = null;
-            var hasAnyColumn = false;
-            var hasParametersColumn = false;
-            var hasResolvedColumn = false;
+            bool hasAnyColumn = false;
+            bool hasParametersColumn = false;
+            bool hasResolvedColumn = false;
 
             using (var command = connection.CreateCommand())
             {
@@ -156,12 +186,15 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
                 }
             }
 
-            var state = new DatabaseSchemaState(currentVersion);
+            return LogResult(new DatabaseSchemaState(currentVersion) { NeedsUpgrade = true });
 
-            _logger?.Debug(
-                $"{nameof(ProviderDbContext)}.{nameof(IsUpgradeNeeded)}() for database {Path}. currentVersion: {currentVersion} needsUpgrade: {state.NeedsUpgrade}");
+            DatabaseSchemaState LogResult(DatabaseSchemaState result)
+            {
+                _logger?.Debug(
+                    $"{nameof(ProviderDbContext)}.{nameof(IsUpgradeNeeded)}() for database {Path}. currentVersion: {result.CurrentVersion} needsUpgrade: {result.NeedsUpgrade}");
 
-            return state;
+                return result;
+            }
         }
         finally
         {
@@ -246,6 +279,10 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
         size = new FileInfo(Path).Length;
 
         _logger?.Information($"ProviderDbContext upgrade completed. Size: {size} Path: {Path}");
+
+        // The rebuild produced the current model's shape (EnsureCreated above). Stamp the canonical user_version so the
+        // database is recognized as current on the next open.
+        StampCanonicalUserVersion();
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options) =>
@@ -253,8 +290,11 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // INVARIANT: any change to the persisted ProviderDetails model (columns, key, or converters) MUST bump
+        // DatabaseSchemaVersion.Current. Detection trusts the stored user_version stamp over the column shape, so a model
+        // change without a version bump would let a stamped-but-old-shape database read as canonical and crash EF.
         modelBuilder.Entity<ProviderDetails>()
-            .HasKey(e => e.ProviderName);
+            .HasKey(e => new { e.ProviderName, e.VersionKey });
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.ProviderName)
@@ -284,9 +324,9 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
             .Property(e => e.Tasks)
             .HasConversion<CompressedJsonValueConverter<IDictionary<int, string>>>();
 
-        // Maps are recovered at runtime from the provider's WEVT_TEMPLATE resource and are not persisted to the cache.
         modelBuilder.Entity<ProviderDetails>()
-            .Ignore(e => e.Maps);
+            .Property(e => e.Maps)
+            .HasConversion<CompressedJsonValueConverter<IReadOnlyDictionary<string, ValueMapDefinition>>>();
     }
 
     private static bool IsType(string? actual, string expected) =>
@@ -302,6 +342,8 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
             Keywords = CompressedJsonValueConverter<Dictionary<long, string>>.ConvertFromCompressedJson((byte[])reader["Keywords"]),
             Opcodes = CompressedJsonValueConverter<Dictionary<int, string>>.ConvertFromCompressedJson((byte[])reader["Opcodes"]),
             Tasks = CompressedJsonValueConverter<Dictionary<int, string>>.ConvertFromCompressedJson((byte[])reader["Tasks"]),
+            Maps = TryReadMaps(reader),
+            VersionKey = TryReadVersionKey(reader),
             ResolvedFromOwningPublisher = TryReadResolvedFromOwningPublisher(reader, providerName)
         };
 
@@ -355,6 +397,29 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
         return false;
     }
 
+    private static IReadOnlyDictionary<string, ValueMapDefinition> TryReadMaps(IDataReader reader)
+    {
+        for (var i = 0; i < reader.FieldCount; i++)
+        {
+            if (!string.Equals(reader.GetName(i),
+                nameof(Provider.Resolution.ProviderDetails.Maps),
+                StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (reader.IsDBNull(i))
+            {
+                break;
+            }
+
+            return CompressedJsonValueConverter<IReadOnlyDictionary<string, ValueMapDefinition>>
+                .ConvertFromCompressedJson((byte[])reader.GetValue(i));
+        }
+
+        return ReadOnlyDictionary<string, ValueMapDefinition>.Empty;
+    }
+
     private static string? TryReadResolvedFromOwningPublisher(IDataReader reader, string providerName)
     {
         for (var i = 0; i < reader.FieldCount; i++)
@@ -372,5 +437,40 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
         _ = providerName;
 
         return null;
+    }
+
+    private static string TryReadVersionKey(IDataReader reader)
+    {
+        for (var i = 0; i < reader.FieldCount; i++)
+        {
+            if (!string.Equals(reader.GetName(i),
+                nameof(Provider.Resolution.ProviderDetails.VersionKey),
+                StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            return reader.IsDBNull(i) ? string.Empty : reader.GetString(i);
+        }
+
+        return string.Empty;
+    }
+
+    private void StampCanonicalUserVersion()
+    {
+        var connection = Database.GetDbConnection();
+        Database.OpenConnection();
+
+        try
+        {
+            using var command = connection.CreateCommand();
+            // PRAGMA user_version does not accept parameters; the value is a compile-time constant integer.
+            command.CommandText = $"PRAGMA user_version = {DatabaseSchemaVersion.Current}";
+            command.ExecuteNonQuery();
+        }
+        finally
+        {
+            Database.CloseConnection();
+        }
     }
 }

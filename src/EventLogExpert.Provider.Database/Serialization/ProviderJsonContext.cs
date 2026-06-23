@@ -17,4 +17,8 @@ namespace EventLogExpert.ProviderDatabase.Serialization;
 [JsonSerializable(typeof(List<EventModel>))]
 [JsonSerializable(typeof(Dictionary<long, string>))]
 [JsonSerializable(typeof(Dictionary<int, string>))]
+[JsonSerializable(typeof(IReadOnlyDictionary<string, ValueMapDefinition>))]
+[JsonSerializable(typeof(Dictionary<string, ValueMapDefinition>))]
+[JsonSerializable(typeof(ValueMapDefinition))]
+[JsonSerializable(typeof(ValueMapEntry))]
 internal partial class ProviderJsonContext : JsonSerializerContext;

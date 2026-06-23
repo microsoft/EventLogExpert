@@ -20,6 +20,33 @@ public sealed class ProviderDbContextTests : IDisposable
     private readonly List<string> _tempDatabases = [];
 
     [Fact]
+    public void CompositePrimaryKey_AllowsSameNameDifferentVersionKey()
+    {
+        var dbPath = CreateTempDatabasePath();
+
+        using (var context = new ProviderDbContext(dbPath, false))
+        {
+            var first = EventUtils.CreateProvider("Test-Provider");
+            first.VersionKey = "vk1:aaa";
+            var second = EventUtils.CreateProvider("Test-Provider");
+            second.VersionKey = "vk1:bbb";
+            context.ProviderDetails.Add(first);
+            context.ProviderDetails.Add(second);
+            context.SaveChanges();
+        }
+
+        using var readContext = new ProviderDbContext(dbPath, true);
+
+        var versionKeys = readContext.ProviderDetails
+            .Where(p => p.ProviderName == "Test-Provider")
+            .Select(p => p.VersionKey)
+            .OrderBy(v => v)
+            .ToList();
+
+        Assert.Equal(["vk1:aaa", "vk1:bbb"], versionKeys);
+    }
+
+    [Fact]
     public void Constructor_ShouldCreateNewDatabase()
     {
         // Arrange
@@ -162,6 +189,79 @@ public sealed class ProviderDbContextTests : IDisposable
     }
 
     [Fact]
+    public void Detection_FreshDatabase_StampsCanonicalUserVersion()
+    {
+        // Arrange / Act - a freshly created writable database is built from the canonical model.
+        var dbPath = CreateTempDatabasePath();
+
+        using (var context = new ProviderDbContext(dbPath, false))
+        {
+            context.SaveChanges();
+        }
+
+        // Assert - the canonical user_version stamp is what marks the database current.
+        Assert.Equal(DatabaseSchemaVersion.Current, ReadUserVersion(dbPath));
+    }
+
+    [Fact]
+    public void Detection_FutureUserVersion_ReportsUnknownAndNeedsUpgradeWithoutDowngrading()
+    {
+        // Arrange - a database stamped by a newer build than this one understands.
+        var dbPath = CreateTempDatabasePath();
+
+        using (var context = new ProviderDbContext(dbPath, false))
+        {
+            context.SaveChanges();
+        }
+
+        SetUserVersion(dbPath, DatabaseSchemaVersion.Current + 1);
+
+        // Assert - detection refuses to treat it as canonical and reports Unknown (never a downgrade-rebuild).
+        using var readContext = new ProviderDbContext(dbPath, true);
+
+        var state = readContext.IsUpgradeNeeded();
+
+        Assert.Equal(DatabaseSchemaVersion.Unknown, state.CurrentVersion);
+        Assert.True(state.NeedsUpgrade);
+    }
+
+    [Fact]
+    public void Detection_UnstampedCurrentShapeDatabase_NeedsUpgradeThenRebuildsAndStamps()
+    {
+        // Arrange - a canonical-shaped database that predates the user_version stamp (an unfinalized prerelease
+        // database): identical columns and composite key, but user_version reset to 0.
+        var dbPath = CreateTempDatabasePath();
+
+        using (var context = new ProviderDbContext(dbPath, false))
+        {
+            context.ProviderDetails.Add(EventUtils.CreateProvider("Test-Provider"));
+            context.SaveChanges();
+        }
+
+        SetUserVersion(dbPath, 0);
+
+        // Assert - detection keys on the stamp, so the current-shape-but-unstamped database is flagged for rebuild.
+        using (var readContext = new ProviderDbContext(dbPath, true))
+        {
+            Assert.True(readContext.IsUpgradeNeeded().NeedsUpgrade);
+        }
+
+        // Act - the upgrade rebuilds the table and re-stamps the canonical user_version.
+        using (var upgradeContext = new ProviderDbContext(dbPath, false))
+        {
+            upgradeContext.PerformUpgradeIfNeeded();
+        }
+
+        // Assert - now stamped current, no further upgrade, and the row survived the rebuild.
+        Assert.Equal(DatabaseSchemaVersion.Current, ReadUserVersion(dbPath));
+
+        using var verifyContext = new ProviderDbContext(dbPath, true);
+
+        Assert.False(verifyContext.IsUpgradeNeeded().NeedsUpgrade);
+        Assert.NotNull(verifyContext.FindProvider("Test-Provider"));
+    }
+
+    [Fact]
     public void Detection_V3Schema_NeedsV4Upgrade()
     {
         // Arrange — V3 schema has BLOB columns but no ResolvedFromOwningPublisher and BINARY PK.
@@ -183,6 +283,33 @@ public sealed class ProviderDbContextTests : IDisposable
         {
             DeleteDatabaseFile(dbPath);
         }
+    }
+
+    [Fact]
+    public void FindProvider_RoundTripsPersistedValueMaps()
+    {
+        var dbPath = CreateTempDatabasePath();
+
+        var provider = EventUtils.CreateProvider("Test-Provider");
+        provider.Maps = new Dictionary<string, ValueMapDefinition>
+        {
+            ["BusType"] = new(isBitMap: false, [new ValueMapEntry(10, "SAS"), new ValueMapEntry(11, "SATA")])
+        };
+
+        using (var context = new ProviderDbContext(dbPath, false))
+        {
+            context.ProviderDetails.Add(provider);
+            context.SaveChanges();
+        }
+
+        using var readContext = new ProviderDbContext(dbPath, true);
+
+        var restored = readContext.FindProvider("Test-Provider");
+
+        Assert.NotNull(restored);
+        Assert.Single(restored.Maps);
+        Assert.Equal(2, restored.Maps["BusType"].Entries.Count);
+        Assert.Equal("SAS", restored.Maps["BusType"].Entries[0].Name);
     }
 
     [Fact]
@@ -527,6 +654,27 @@ public sealed class ProviderDbContextTests : IDisposable
         {
             Assert.Empty(context.ProviderDetails.Where(p => p.ProviderName == providerName));
         }
+    }
+
+    [Fact]
+    public void ProviderDetails_RoundTripsVersionKey()
+    {
+        var dbPath = CreateTempDatabasePath();
+
+        using (var context = new ProviderDbContext(dbPath, false))
+        {
+            var provider = EventUtils.CreateProvider("Test-Provider");
+            provider.VersionKey = "vk1:abc123";
+            context.ProviderDetails.Add(provider);
+            context.SaveChanges();
+        }
+
+        using var readContext = new ProviderDbContext(dbPath, true);
+
+        var restored = readContext.FindProvider("Test-Provider");
+
+        Assert.NotNull(restored);
+        Assert.Equal("vk1:abc123", restored.VersionKey);
     }
 
     [Fact]
@@ -1213,6 +1361,17 @@ public sealed class ProviderDbContextTests : IDisposable
         return string.Empty;
     }
 
+    private static int ReadUserVersion(string dbPath)
+    {
+        using var connection = new SqliteConnection($"Data Source={dbPath};Mode=ReadOnly");
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version";
+
+        return Convert.ToInt32(command.ExecuteScalar());
+    }
+
     private static void SeedLegacySchema(
         string dbPath,
         bool includeParameters,
@@ -1268,6 +1427,16 @@ public sealed class ProviderDbContextTests : IDisposable
             "\"Tasks\" BLOB NOT NULL)";
 
         cmd.ExecuteNonQuery();
+    }
+
+    private static void SetUserVersion(string dbPath, int value)
+    {
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA user_version = {value}";
+        command.ExecuteNonQuery();
     }
 
     private string CreateTempDatabasePath()

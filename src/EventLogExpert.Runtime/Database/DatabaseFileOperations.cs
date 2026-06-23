@@ -94,8 +94,7 @@ internal static class DatabaseFileOperations
     {
         try
         {
-            return maintenance.CheckSchemaState(fullPath, readOnly: true)
-                .CurrentVersion == DatabaseSchemaVersion.Current;
+            return !maintenance.CheckSchemaState(fullPath, readOnly: true).NeedsUpgrade;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -109,8 +108,6 @@ internal static class DatabaseFileOperations
     private static void SafeLog(Action log)
     {
         try { log(); }
-        catch
-        { /* Logger faults must not propagate from defensive logging sites. */
-        }
+        catch { /* Logger faults must not propagate from defensive logging sites. */ }
     }
 }

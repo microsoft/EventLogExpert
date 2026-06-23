@@ -20,6 +20,10 @@ public sealed class ProviderJsonContextTests
         typeof(List<EventModel>),
         typeof(Dictionary<long, string>),
         typeof(Dictionary<int, string>),
+        typeof(IReadOnlyDictionary<string, ValueMapDefinition>),
+        typeof(Dictionary<string, ValueMapDefinition>),
+        typeof(ValueMapDefinition),
+        typeof(ValueMapEntry),
     ];
 
     [Theory]
@@ -48,6 +52,31 @@ public sealed class ProviderJsonContextTests
         Assert.Equal(2, restored.Count);
         Assert.Equal("one", restored[1L]);
         Assert.Equal("big", restored[0x100000000L]);
+    }
+
+    [Fact]
+    public void RoundTrip_IReadOnlyDictionaryStringValueMapDefinition_PreservesData()
+    {
+        IReadOnlyDictionary<string, ValueMapDefinition> original = new Dictionary<string, ValueMapDefinition>
+        {
+            ["BusType"] = new(isBitMap: false, [new ValueMapEntry(10, "SAS"), new ValueMapEntry(11, "SATA")]),
+            ["Flags"] = new(isBitMap: true, [new ValueMapEntry(1, "Compressed"), new ValueMapEntry(2, "Encrypted")])
+        };
+
+        var bytes = CompressedJsonValueConverter<IReadOnlyDictionary<string, ValueMapDefinition>>.ConvertToCompressedJson(original);
+        var restored = CompressedJsonValueConverter<IReadOnlyDictionary<string, ValueMapDefinition>>.ConvertFromCompressedJson(bytes);
+
+        Assert.NotNull(restored);
+        Assert.Equal(2, restored.Count);
+
+        Assert.False(restored["BusType"].IsBitMap);
+        Assert.Equal(2, restored["BusType"].Entries.Count);
+        Assert.Equal(10u, restored["BusType"].Entries[0].Value);
+        Assert.Equal("SAS", restored["BusType"].Entries[0].Name);
+
+        Assert.True(restored["Flags"].IsBitMap);
+        Assert.Equal(2u, restored["Flags"].Entries[1].Value);
+        Assert.Equal("Encrypted", restored["Flags"].Entries[1].Name);
     }
 
     [Fact]

@@ -67,6 +67,9 @@ internal static class ProviderDetailsMerger
         return setA.SetEquals(setB);
     }
 
+    private static bool MapsAreEquivalent(ValueMapDefinition a, ValueMapDefinition b) =>
+        a.IsBitMap == b.IsBitMap && a.Entries.SequenceEqual(b.Entries);
+
     private static IReadOnlyList<EventModel> MergeEvents(
         IEnumerable<EventModel> events,
         string canonicalProviderName,
@@ -102,9 +105,24 @@ internal static class ProviderDetailsMerger
     {
         var canonicalName = group[0].ProviderName;
 
+        var distinctVersionKeys = group
+            .Select(row => row.VersionKey)
+            .Where(versionKey => !string.IsNullOrEmpty(versionKey))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (distinctVersionKeys.Count > 1)
+        {
+            throw new DatabaseUpgradeException(
+                databasePath,
+                $"Provider '{canonicalName}' has rows with distinct VersionKeys ({string.Join(", ", distinctVersionKeys)}). " +
+                "Merging by provider name alone would discard distinct provider versions; a tuple-keyed merge is required.");
+        }
+
         return new ProviderDetails
         {
             ProviderName = canonicalName,
+            VersionKey = group[0].VersionKey,
             Messages = MergeMessages(group.SelectMany(r => r.Messages), canonicalName, databasePath),
             Parameters = MergeMessages(group.SelectMany(r => r.Parameters), canonicalName, databasePath),
             Events = MergeEvents(group.SelectMany(r => r.Events), canonicalName, databasePath),
@@ -126,11 +144,43 @@ internal static class ProviderDetailsMerger
                 databasePath,
                 "Tasks",
                 key => key.ToString()),
+            Maps = MergeMaps(group.Select(r => r.Maps), canonicalName, databasePath),
             ResolvedFromOwningPublisher = MergeResolvedFromOwningPublisher(
                 group.Select(r => r.ResolvedFromOwningPublisher),
                 canonicalName,
                 databasePath)
         };
+    }
+
+    private static IReadOnlyDictionary<string, ValueMapDefinition> MergeMaps(
+        IEnumerable<IReadOnlyDictionary<string, ValueMapDefinition>> maps,
+        string canonicalProviderName,
+        string databasePath)
+    {
+        var merged = new Dictionary<string, ValueMapDefinition>(StringComparer.Ordinal);
+
+        foreach (var map in maps)
+        {
+            foreach (var (name, definition) in map)
+            {
+                if (!merged.TryGetValue(name, out var existing))
+                {
+                    merged[name] = definition;
+
+                    continue;
+                }
+
+                if (!MapsAreEquivalent(existing, definition))
+                {
+                    throw new DatabaseUpgradeException(
+                        databasePath,
+                        $"Provider '{canonicalProviderName}' has conflicting Map entries for '{name}'. " +
+                        $"Cannot merge case-insensitive duplicates with different value-map definitions.");
+                }
+            }
+        }
+
+        return merged;
     }
 
     private static IReadOnlyList<MessageModel> MergeMessages(

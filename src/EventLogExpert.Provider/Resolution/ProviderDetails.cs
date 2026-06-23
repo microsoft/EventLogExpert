@@ -71,6 +71,13 @@ public sealed class ProviderDetails
 
     public IDictionary<int, string> Tasks { get; set; } = new Dictionary<int, string>();
 
+    /// <summary>
+    ///     Content version of this provider - a hash of the rendering payload, stamped at db-create, so identical
+    ///     providers collapse to one row and genuinely different versions coexist. Empty for single-version / legacy
+    ///     databases.
+    /// </summary>
+    public string VersionKey { get; set; } = string.Empty;
+
     /// <summary>Gets events matching the given Id using a pre-built lookup dictionary.</summary>
     public IReadOnlyList<EventModel> GetEventsById(long id)
     {
