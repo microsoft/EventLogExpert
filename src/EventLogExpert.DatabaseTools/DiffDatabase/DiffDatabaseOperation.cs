@@ -42,14 +42,13 @@ internal sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Opera
             return DatabaseToolsOutcome.Failed;
         }
 
-        var firstProviderNames = new HashSet<string>(
-            await ProviderSource.LoadProviderNamesAsync(request.FirstSourcePath, logger, cancellationToken: cancellationToken),
-            StringComparer.OrdinalIgnoreCase);
+        var firstIdentities = (await ProviderSource.LoadProviderIdentitiesAsync(
+            request.FirstSourcePath, logger, cancellationToken: cancellationToken)).ToHashSet();
 
         var providersCopied = new List<ProviderDetails>();
 
         logger.Information(
-            $"Skipping up to {firstProviderNames.Count} provider name(s) from the second source that also appear in the first source.");
+            $"Skipping up to {firstIdentities.Count} provider version(s) from the second source that also appear in the first source.");
 
         ProviderDbContext? newDbContext = null;
 
@@ -58,7 +57,7 @@ internal sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Opera
             await foreach (var details in ProviderSource.LoadProvidersAsync(request.SecondSourcePath,
                 logger,
                 regex: null,
-                skipProviderNames: firstProviderNames,
+                skipIdentities: firstIdentities,
                 cancellationToken: cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();

@@ -31,6 +31,19 @@ public sealed class ProviderIdentityTests
     }
 
     [Fact]
+    public void Equals_NameDiffersByNonAsciiCase_AreNotEqual()
+    {
+        // SQLite NOCASE (the ProviderName primary-key collation) folds only ASCII, so names differing solely by
+        // non-ASCII case (U+00C4 vs U+00E4) are DISTINCT rows; the identity must keep them distinct to stay consistent
+        // with the database, or version-aware dedup/skip/delete would collide with the composite key.
+        var upper = new ProviderIdentity("Provider-\u00c4", "");
+        var lower = new ProviderIdentity("Provider-\u00e4", "");
+
+        Assert.NotEqual(upper, lower);
+        Assert.True(upper != lower);
+    }
+
+    [Fact]
     public void Equals_NameDiffersOnlyByCase_AreEqual()
     {
         var upper = new ProviderIdentity("Foo", "");

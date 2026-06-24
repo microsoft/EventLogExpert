@@ -37,16 +37,20 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
             return DatabaseToolsOutcome.Failed;
         }
 
-        var sourceNames = new HashSet<string>(
-            await ProviderSource.LoadProviderNamesAsync(request.SourcePath, logger, cancellationToken: cancellationToken),
-            StringComparer.OrdinalIgnoreCase);
+        var sourceIdentities = (await ProviderSource.LoadProviderIdentitiesAsync(
+            request.SourcePath, logger, cancellationToken: cancellationToken)).ToHashSet();
 
-        if (sourceNames.Count == 0)
+        if (sourceIdentities.Count == 0)
         {
             logger.Warning($"No providers were discovered in the source.");
 
             return DatabaseToolsOutcome.Succeeded;
         }
+
+        var sourceNames = sourceIdentities
+            .Select(identity => identity.ProviderName)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
 
         DatabaseSchemaState targetState;
 
@@ -80,72 +84,80 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
         {
             await using var targetContext = new ProviderDbContext(request.TargetDatabasePath, false, logger);
 
-            var sourceNamesList = sourceNames.ToList();
-            var targetMatchingNames = new List<string>();
+            // Find which of the source's identities already exist in the target. Query target rows by NAME (SQLite
+            // cannot translate a composite-tuple IN), project KEYS only (no blob columns), then narrow to the exact
+            // (name, version) identities the source carries. Versions of a matched name that the source does NOT carry
+            // are intentionally left untouched.
+            var identitiesAlreadyInTarget = new HashSet<ProviderIdentity>();
 
-            for (var offset = 0; offset < sourceNamesList.Count; offset += ProviderSource.MaxInClauseParameters)
+            for (var offset = 0; offset < sourceNames.Count; offset += ProviderSource.MaxInClauseParameters)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var chunk = sourceNamesList
+                var chunk = sourceNames
                     .Skip(offset)
                     .Take(ProviderSource.MaxInClauseParameters)
                     .ToList();
 
-                targetMatchingNames.AddRange(
-                    await targetContext.ProviderDetails
-                        .AsNoTracking()
-                        .Where(p => chunk.Contains(p.ProviderName))
-                        .Select(p => p.ProviderName)
-                        .ToListAsync(cancellationToken));
-            }
+                var targetKeys = await targetContext.ProviderDetails
+                    .AsNoTracking()
+                    .Where(p => chunk.Contains(p.ProviderName))
+                    .Select(p => new { p.ProviderName, p.VersionKey })
+                    .ToListAsync(cancellationToken);
 
-            var providerNamesInTarget = new HashSet<string>(targetMatchingNames, StringComparer.OrdinalIgnoreCase);
+                foreach (var key in targetKeys)
+                {
+                    var identity = new ProviderIdentity(key.ProviderName, key.VersionKey);
+
+                    if (sourceIdentities.Contains(identity)) { identitiesAlreadyInTarget.Add(identity); }
+                }
+            }
 
             // Wrap the destructive phase (overwrite delete + provider copy) in a transaction so a cancel mid-flight
             // does not leave the target with permanently-missing providers. The non-overwrite path is also wrapped
             // so partial copies don't persist on failure - re-running merge produces the intended end state regardless.
             await using var transaction = await targetContext.Database.BeginTransactionAsync(cancellationToken);
 
-            if (targetMatchingNames.Count > 0)
+            if (identitiesAlreadyInTarget.Count > 0)
             {
-                logger.Information($"The target database contains {targetMatchingNames.Count} provider row(s) matching {providerNamesInTarget.Count} provider name(s) in the source.");
+                logger.Information($"The target database already contains {identitiesAlreadyInTarget.Count} of the source's provider version(s).");
 
                 if (request.Overwrite)
                 {
-                    logger.Information($"Removing these providers from the target database...");
+                    logger.Information($"Removing these provider version(s) from the target database...");
 
-                    var removed = 0;
-
-                    for (var offset = 0; offset < targetMatchingNames.Count; offset += ProviderSource.MaxInClauseParameters)
+                    // Delete only the colliding (name, version) identities by composite primary key via stub entities,
+                    // so the copy below re-inserts them from the source while any OTHER versions of those names already
+                    // in the target survive. Stub deletion deletes by key without materializing the (large) blob rows.
+                    foreach (var identity in identitiesAlreadyInTarget)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        var chunk = targetMatchingNames
-                            .Skip(offset)
-                            .Take(ProviderSource.MaxInClauseParameters)
-                            .ToList();
-
-                        removed += await targetContext.ProviderDetails
-                            .Where(p => chunk.Contains(p.ProviderName))
-                            .ExecuteDeleteAsync(cancellationToken);
+                        targetContext.Entry(new ProviderDetails { ProviderName = identity.ProviderName, VersionKey = identity.VersionKey })
+                            .State = EntityState.Deleted;
                     }
 
-                    logger.Information($"Removal of {removed} provider row(s) completed.");
+                    await targetContext.SaveChangesAsync(cancellationToken);
+                    targetContext.ChangeTracker.Clear();
+
+                    logger.Information($"Removal of {identitiesAlreadyInTarget.Count} provider version(s) completed.");
                 }
                 else
                 {
-                    logger.Information($"These providers will not be copied from the source.");
+                    logger.Information($"These provider version(s) will not be copied from the source.");
                 }
             }
 
             logger.Information($"Copying providers from the source...");
 
-            var skipForLoad = request.Overwrite ? null : providerNamesInTarget;
+            var skipForLoad = request.Overwrite ? null : identitiesAlreadyInTarget;
 
-            var expectedCopiedNames = skipForLoad is null
-                ? sourceNames.ToList()
-                : sourceNames.Where(n => !skipForLoad.Contains(n)).ToList();
+            var expectedCopiedIdentities = skipForLoad is null
+                ? sourceIdentities
+                : sourceIdentities.Where(identity => !skipForLoad.Contains(identity)).ToHashSet();
+
+            var expectedCopiedNames = expectedCopiedIdentities
+                .Select(identity => identity.ProviderName)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
 
             logger.Information($"");
             LogProviderDetailHeader(logger, expectedCopiedNames);
@@ -157,8 +169,8 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
                 request.SourcePath,
                 logger,
                 regex: null,
-                skipProviderNames: skipForLoad,
-                preDiscoveredProviderNames: sourceNamesList,
+                skipIdentities: skipForLoad,
+                preDiscoveredProviderNames: sourceNames,
                 cancellationToken: cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -166,7 +178,7 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
                 targetContext.ProviderDetails.Add(provider);
                 pendingBatch.Add(provider);
 
-                progress?.Report(new DatabaseToolsProgress(copiedCount + pendingBatch.Count, expectedCopiedNames.Count, provider.ProviderName));
+                progress?.Report(new DatabaseToolsProgress(copiedCount + pendingBatch.Count, expectedCopiedIdentities.Count, provider.ProviderName));
 
                 if (pendingBatch.Count < BatchSize) { continue; }
 

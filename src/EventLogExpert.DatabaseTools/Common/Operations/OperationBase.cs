@@ -83,13 +83,14 @@ internal abstract class OperationBase
     }
 
     /// <summary>
-    ///     Yields <see cref="ProviderDetails" /> for each local provider, applying the optional regex filter and skip set
-    ///     before metadata is resolved.
+    ///     Yields <see cref="ProviderDetails" /> for each local provider, applying the optional regex filter and
+    ///     name-level <paramref name="excludeProviderNames" /> exclude set before metadata is resolved. Local providers are
+    ///     live, so their identity is always <c>(name, "")</c>; a name-level exclude is therefore exact here.
     /// </summary>
     protected static async IAsyncEnumerable<ProviderDetails> LoadLocalProvidersAsync(
         ITraceLogger logger,
         Regex? regex,
-        IReadOnlySet<string>? skipProviderNames = null,
+        IReadOnlySet<string>? excludeProviderNames = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         // Local-provider resolution is synchronous (registry/metadata reads). This wrapper exposes it as an
@@ -101,7 +102,7 @@ internal abstract class OperationBase
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (skipProviderNames is not null && skipProviderNames.Contains(providerName)) { continue; }
+            if (excludeProviderNames is not null && excludeProviderNames.Contains(providerName)) { continue; }
 
             yield return new EventMessageProvider(providerName, logger: logger).LoadProviderDetails();
         }
