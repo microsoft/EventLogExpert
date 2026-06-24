@@ -16,6 +16,40 @@ public sealed class DiffDatabaseCommandTests : IDisposable
     private readonly List<string> _tempPaths = [];
 
     [Fact]
+    public async Task DiffDatabase_CopiesNewVersionOfNameAlsoPresentInFirstSource()
+    {
+        var first = CreateTempDb();
+        var second = CreateTempDb();
+        var output = CreateTempDb();
+
+        var firstV1 = DatabaseTestUtils.BuildProviderDetails(Constants.SharedProviderName);
+        firstV1.VersionKey = "vk1";
+        DatabaseTestUtils.CreateV4Database(first, firstV1);
+
+        var secondV1 = DatabaseTestUtils.BuildProviderDetails(Constants.SharedProviderName);
+        secondV1.VersionKey = "vk1";
+        var secondV2 = DatabaseTestUtils.BuildProviderDetails(Constants.SharedProviderName);
+        secondV2.VersionKey = "vk2";
+        DatabaseTestUtils.CreateV4Database(second, secondV1, secondV2);
+
+        File.Delete(output);
+
+        var logger = Substitute.For<ITraceLogger>();
+
+        // The diff skips by identity, so the second source's new vk2 version of a name also in the first source (only
+        // as vk1) is still treated as "missing from first" and copied. A name-level skip would drop it entirely.
+        await new DiffDatabaseOperation(new DiffDatabaseRequest(first, second, output)).ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.True(File.Exists(output), "Diff should have created the output database.");
+
+        await using var verify = new ProviderDbContext(output, readOnly: true, ensureCreated: false);
+        var rows = verify.ProviderDetails.ToList();
+        var copied = Assert.Single(rows);
+        Assert.Equal(Constants.SharedProviderName, copied.ProviderName);
+        Assert.Equal("vk2", copied.VersionKey);
+    }
+
+    [Fact]
     public async Task DiffDatabase_PreservesResolvedFromOwningPublisher()
     {
         // Arrange — first source has Shared, second source has Shared and Second.

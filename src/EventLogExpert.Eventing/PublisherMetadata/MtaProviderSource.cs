@@ -83,10 +83,11 @@ public static class MtaProviderSource
         string evtxPath,
         ITraceLogger logger,
         Regex? regex = null,
-        IReadOnlySet<string>? skipProviderNames = null,
+        IReadOnlySet<string>? excludeProviderNames = null,
+        IReadOnlySet<ProviderIdentity>? skipIdentities = null,
         HashSet<ProviderIdentity>? seen = null,
         IReadOnlyList<string>? preDiscoveredProviderNames = null) =>
-        LoadProvidersCore(evtxPath, logger, regex, skipProviderNames, seen, preDiscoveredProviderNames);
+        LoadProvidersCore(evtxPath, logger, regex, excludeProviderNames, skipIdentities, seen, preDiscoveredProviderNames);
 
     private static IReadOnlyList<string> DiscoverProviderNamesCore(
         string evtxPath,
@@ -156,7 +157,8 @@ public static class MtaProviderSource
         string evtxPath,
         ITraceLogger logger,
         Regex? regex,
-        IReadOnlySet<string>? skipProviderNames,
+        IReadOnlySet<string>? excludeProviderNames,
+        IReadOnlySet<ProviderIdentity>? skipIdentities,
         HashSet<ProviderIdentity>? seen,
         IReadOnlyList<string>? preDiscoveredProviderNames = null)
     {
@@ -181,7 +183,9 @@ public static class MtaProviderSource
             // provider, distinct from an offline content-hashed version (a later phase).
             var identity = new ProviderIdentity(providerName, string.Empty);
 
-            if (skipProviderNames is not null && skipProviderNames.Contains(providerName)) { continue; }
+            if (excludeProviderNames is not null && excludeProviderNames.Contains(providerName)) { continue; }
+
+            if (skipIdentities is not null && skipIdentities.Contains(identity)) { continue; }
 
             if (seen is not null && seen.Contains(identity)) { continue; }
 

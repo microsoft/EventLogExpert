@@ -43,7 +43,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             return DatabaseToolsOutcome.Failed;
         }
 
-        HashSet<string> skipProviderNames = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> excludeProviderNames = new(StringComparer.OrdinalIgnoreCase);
 
         if (!string.IsNullOrWhiteSpace(request.SkipProvidersInFile))
         {
@@ -54,10 +54,10 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
             foreach (var name in await ProviderSource.LoadProviderNamesAsync(request.SkipProvidersInFile, logger, cancellationToken: cancellationToken))
             {
-                skipProviderNames.Add(name);
+                excludeProviderNames.Add(name);
             }
 
-            logger.Information($"Found {skipProviderNames.Count} providers in {request.SkipProvidersInFile}. These will not be included in the new database.");
+            logger.Information($"Found {excludeProviderNames.Count} providers in {request.SkipProvidersInFile}. These will not be included in the new database.");
         }
 
         // Defensive recompile if input has Regex.InfiniteMatchTimeout (otherwise catch below is dead).
@@ -75,8 +75,8 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         try
         {
             IAsyncEnumerable<ProviderDetails> providersToAdd = request.SourcePath is null
-                ? LoadLocalProvidersAsync(logger, filterRegex, skipProviderNames, cancellationToken)
-                : ProviderSource.LoadProvidersAsync(request.SourcePath, logger, filterRegex, skipProviderNames, cancellationToken: cancellationToken);
+                ? LoadLocalProvidersAsync(logger, filterRegex, excludeProviderNames, cancellationToken)
+                : ProviderSource.LoadProvidersAsync(request.SourcePath, logger, filterRegex, excludeProviderNames, cancellationToken: cancellationToken);
 
             await foreach (var details in providersToAdd.WithCancellation(cancellationToken))
             {

@@ -32,6 +32,36 @@ internal static class ProviderSource
     private const string EvtxExtension = ".evtx";
 
     /// <summary>
+    ///     Returns the distinct provider identities (name + content <see cref="ProviderDetails.VersionKey" />) available
+    ///     from <paramref name="path" />, applying an optional <paramref name="regex" /> to filter by name. Live providers
+    ///     discovered from an .evtx source contribute <c>(name, "")</c> because event records expose only the name. Does not
+    ///     load full provider details.
+    /// </summary>
+    public static async Task<IReadOnlyList<ProviderIdentity>> LoadProviderIdentitiesAsync(
+        string path,
+        ITraceLogger logger,
+        Regex? regex = null,
+        CancellationToken cancellationToken = default)
+    {
+        var identities = new HashSet<ProviderIdentity>();
+
+        foreach (var file in EnumerateSourceFiles(path, logger))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            foreach (var identity in await LoadIdentitiesFromFileAsync(file, logger, cancellationToken))
+            {
+                if (regex is null || regex.IsMatch(identity.ProviderName)) { identities.Add(identity); }
+            }
+        }
+
+        return identities
+            .OrderBy(identity => identity.ProviderName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(identity => identity.VersionKey, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <summary>
     ///     Returns the distinct provider names available from <paramref name="path" />, applying an optional
     ///     <paramref name="regex" /> to filter names. Case sensitivity follows the caller's <see cref="RegexOptions" />. Does
     ///     not load full provider details.
@@ -57,14 +87,21 @@ internal static class ProviderSource
         return regex is null ? names.ToList() : names.Where(n => regex.IsMatch(n)).ToList();
     }
 
+    /// <summary>
+    ///     Streams full <see cref="ProviderDetails" /> from <paramref name="path" />, skipping providers two ways:
+    ///     <paramref name="excludeProviderNames" /> drops EVERY version of a named provider (a user / name-level exclude),
+    ///     while <paramref name="skipIdentities" /> drops only specific <c>(name, version)</c> identities (e.g. versions
+    ///     already present in a merge/diff target). A provider is skipped if either set matches.
+    /// </summary>
     public static IAsyncEnumerable<ProviderDetails> LoadProvidersAsync(
         string path,
         ITraceLogger logger,
         Regex? regex = null,
-        IReadOnlySet<string>? skipProviderNames = null,
+        IReadOnlySet<string>? excludeProviderNames = null,
+        IReadOnlySet<ProviderIdentity>? skipIdentities = null,
         IReadOnlyList<string>? preDiscoveredProviderNames = null,
         CancellationToken cancellationToken = default) =>
-        LoadProvidersIteratorAsync(path, logger, regex, skipProviderNames, preDiscoveredProviderNames, cancellationToken);
+        LoadProvidersIteratorAsync(path, logger, regex, excludeProviderNames, skipIdentities, preDiscoveredProviderNames, cancellationToken);
 
     /// <summary>Validates that <paramref name="path" /> exists and has a recognized form.</summary>
     public static bool TryValidate(string path, ITraceLogger logger)
@@ -207,7 +244,8 @@ internal static class ProviderSource
         string file,
         ITraceLogger logger,
         Regex? regex,
-        IReadOnlySet<string>? skipProviderNames,
+        IReadOnlySet<string>? excludeProviderNames,
+        IReadOnlySet<ProviderIdentity>? skipIdentities,
         HashSet<ProviderIdentity> seen,
         CancellationToken cancellationToken)
     {
@@ -235,7 +273,9 @@ internal static class ProviderSource
 
                     if (regex is not null && !regex.IsMatch(identity.ProviderName)) { return false; }
 
-                    return skipProviderNames is null || !skipProviderNames.Contains(identity.ProviderName);
+                    if (excludeProviderNames is not null && excludeProviderNames.Contains(identity.ProviderName)) { return false; }
+
+                    return skipIdentities is null || !skipIdentities.Contains(identity);
                 })
                 .ToList();
 
@@ -271,6 +311,7 @@ internal static class ProviderSource
                 var rows = await context.ProviderDetails
                     .Where(p => chunk.Contains(p.ProviderName))
                     .OrderBy(p => p.ProviderName)
+                    .ThenBy(p => p.VersionKey)
                     .ToListAsync(cancellationToken);
 
                 loaded.AddRange(rows.Where(row => wantedIdentities.Contains(ProviderIdentity.Of(row))));
@@ -288,6 +329,49 @@ internal static class ProviderSource
 
             return [];
         }
+    }
+
+    private static async Task<IReadOnlyList<ProviderIdentity>> LoadIdentitiesFromFileAsync(
+        string file,
+        ITraceLogger logger,
+        CancellationToken cancellationToken)
+    {
+        var ext = Path.GetExtension(file);
+
+        if (string.Equals(ext, DbExtension, StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                await using var providerContext = new ProviderDbContext(file, true, false, logger);
+
+                if (!IsSourceSchemaCurrent(providerContext, file, logger)) { return []; }
+
+                var pairs = await providerContext.ProviderDetails
+                    .AsNoTracking()
+                    .Select(p => new { p.ProviderName, p.VersionKey })
+                    .ToListAsync(cancellationToken);
+
+                return pairs.Select(p => new ProviderIdentity(p.ProviderName, p.VersionKey)).ToList();
+            }
+            catch (DbException ex)
+            {
+                logger.Warning($"Skipping invalid database file '{file}': {ex.Message}");
+
+                return [];
+            }
+        }
+
+        if (string.Equals(ext, EvtxExtension, StringComparison.OrdinalIgnoreCase))
+        {
+            // Live providers from an exported log expose only a name (no content version), so their identity is (name, empty).
+            return MtaProviderSource.DiscoverProviderNames(file, logger)
+                .Select(name => new ProviderIdentity(name, string.Empty))
+                .ToList();
+        }
+
+        logger.Warning($"Skipping unsupported source file: {file}");
+
+        return [];
     }
 
     private static async Task<IReadOnlyList<string>> LoadNamesFromFileAsync(string file, ITraceLogger logger, CancellationToken cancellationToken)
@@ -325,7 +409,8 @@ internal static class ProviderSource
         string path,
         ITraceLogger logger,
         Regex? regex,
-        IReadOnlySet<string>? skipProviderNames,
+        IReadOnlySet<string>? excludeProviderNames,
+        IReadOnlySet<ProviderIdentity>? skipIdentities,
         IReadOnlyList<string>? preDiscoveredProviderNames,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -349,7 +434,7 @@ internal static class ProviderSource
             {
                 // Materialize the full per-file result before yielding so a mid-read DbException yields nothing for
                 // this file and does not corrupt the cross-file `seen` set. C# also forbids `yield` inside try/catch.
-                var loaded = await LoadDbDetailsAsync(file, logger, regex, skipProviderNames, seen, cancellationToken);
+                var loaded = await LoadDbDetailsAsync(file, logger, regex, excludeProviderNames, skipIdentities, seen, cancellationToken);
 
                 foreach (var details in loaded) { yield return details; }
             }
@@ -357,7 +442,7 @@ internal static class ProviderSource
             {
                 var hint = canUsePreDiscovered ? preDiscoveredProviderNames : null;
 
-                foreach (var details in MtaProviderSource.LoadProviders(file, logger, regex, skipProviderNames, seen, hint))
+                foreach (var details in MtaProviderSource.LoadProviders(file, logger, regex, excludeProviderNames, skipIdentities, seen, hint))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
