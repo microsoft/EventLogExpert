@@ -229,6 +229,23 @@ public sealed class EventResolverDatabaseTests
     }
 
     [Fact]
+    public void Dispose_ThenResolveEvent_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        var dbCollection = Substitute.For<IActiveDatabases>();
+        dbCollection.Paths.Returns([]);
+        var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
+
+        var eventRecord = EventUtils.CreateBasicEvent();
+
+        // Act
+        resolver.Dispose();
+
+        // Assert
+        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
+    }
+
+    [Fact]
     public void Dispose_ThenResolveEventViaBaseReference_ShouldThrowObjectDisposedException()
     {
         // Arrange
@@ -246,23 +263,6 @@ public sealed class EventResolverDatabaseTests
 
         // Assert - This should throw because ResolveEvent is overridden, not hidden with 'new'
         Assert.Throws<ObjectDisposedException>(() => baseResolver.ResolveEvent(eventRecord));
-    }
-
-    [Fact]
-    public void Dispose_ThenResolveEvent_ShouldThrowObjectDisposedException()
-    {
-        // Arrange
-        var dbCollection = Substitute.For<IActiveDatabases>();
-        dbCollection.Paths.Returns([]);
-        var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
-
-        var eventRecord = EventUtils.CreateBasicEvent();
-
-        // Act
-        resolver.Dispose();
-
-        // Assert
-        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
     }
 
     [Fact]
@@ -412,6 +412,72 @@ public sealed class EventResolverDatabaseTests
     }
 
     [Fact]
+    public void LoadProviderDetails_WhenProviderInMultipleDatabases_ShouldSelectMostCompleteVersion()
+    {
+        // Arrange
+        // "Exchange 2019" sorts before "Windows 2019", so the less-complete version is loaded FIRST. Selection must be
+        // by completeness, not load order / file name, so the more-complete Windows version must still win.
+        string lessCompletePath = Path.Combine(Path.GetTempPath(), $"Exchange 2019_{Guid.NewGuid()}.db");
+        string moreCompletePath = Path.Combine(Path.GetTempPath(), $"Windows 2019_{Guid.NewGuid()}.db");
+
+        const string winningDescription = "Selected from the more complete database";
+
+        try
+        {
+            // Less-complete version: this event's description is an empty capture gap.
+            using (var lessComplete = new ProviderDbContext(lessCompletePath, false))
+            {
+                lessComplete.ProviderDetails.Add(EventUtils.CreateProvider(
+                    Constants.TestProviderName,
+                    events: [EventUtils.CreateEventModel(1000, "", version: 0, logName: Constants.ApplicationLogName, template: "")]));
+
+                lessComplete.SaveChanges();
+            }
+
+            // More-complete version: the same event carries a real description.
+            using (var moreComplete = new ProviderDbContext(moreCompletePath, false))
+            {
+                moreComplete.ProviderDetails.Add(EventUtils.CreateProvider(
+                    Constants.TestProviderName,
+                    events: [EventUtils.CreateEventModel(1000, winningDescription, version: 0, logName: Constants.ApplicationLogName, template: "")]));
+
+                moreComplete.SaveChanges();
+            }
+
+            var dbCollection = Substitute.For<IActiveDatabases>();
+            dbCollection.Paths.Returns(ImmutableList.Create(lessCompletePath, moreCompletePath));
+            var logger = Substitute.For<ITraceLogger>();
+
+            using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
+
+            var eventRecord = new EventRecord
+            {
+                ProviderName = Constants.TestProviderName,
+                Id = 1000,
+                Version = 0,
+                LogName = Constants.ApplicationLogName
+            };
+
+            // Act
+            var resolved = resolver.ResolveEvent(eventRecord);
+
+            // Assert
+            // Resolution gathered both versions across all active databases and selected the most-complete one (no
+            // file-name "first database wins" pick), so the populated description wins over the other database's empty.
+            Assert.Contains(winningDescription, resolved.Description);
+            logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h =>
+                h.ToString().Contains("Resolved") &&
+                h.ToString().Contains(Constants.TestProviderName) &&
+                h.ToString().Contains("2 database version(s)")));
+        }
+        finally
+        {
+            DeleteDatabaseFile(lessCompletePath);
+            DeleteDatabaseFile(moreCompletePath);
+        }
+    }
+
+    [Fact]
     public void LoadProviderDetails_WithCaseInsensitiveProviderName_ShouldResolve()
     {
         // Arrange
@@ -448,58 +514,6 @@ public sealed class EventResolverDatabaseTests
         finally
         {
             DeleteDatabaseFile(dbPath);
-        }
-    }
-
-    [Fact]
-    public void LoadProviderDetails_WithFirstDatabaseContainingProvider_ShouldUseFirstDatabase()
-    {
-        // Arrange
-        string dbPath1 = Path.Combine(Path.GetTempPath(), $"Exchange 2019_{Guid.NewGuid()}.db");
-        string dbPath2 = Path.Combine(Path.GetTempPath(), $"Windows 2019_{Guid.NewGuid()}.db");
-
-        try
-        {
-            using (var context1 = new ProviderDbContext(dbPath1, false))
-            {
-                context1.ProviderDetails.Add(EventUtils.CreateProvider(Constants.TestProviderName));
-
-                context1.SaveChanges();
-            }
-
-            using (var context2 = new ProviderDbContext(dbPath2, false))
-            {
-                context2.ProviderDetails.Add(EventUtils.CreateProvider(Constants.TestProviderName));
-
-                context2.SaveChanges();
-            }
-
-            var dbCollection = Substitute.For<IActiveDatabases>();
-            dbCollection.Paths.Returns(ImmutableList.Create(dbPath1, dbPath2));
-            var logger = Substitute.For<ITraceLogger>();
-
-            using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
-
-            var eventRecord = new EventRecord
-            {
-                ProviderName = Constants.TestProviderName,
-                Id = 1000
-            };
-
-            // Act
-            resolver.LoadProviderDetails(eventRecord);
-
-            // Assert
-            // Should use Exchange database (first in sorted order)
-            logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h =>
-                h.ToString().Contains("Resolved") &&
-                h.ToString().Contains(Constants.TestProviderName) &&
-                h.ToString().Contains("Exchange")));
-        }
-        finally
-        {
-            DeleteDatabaseFile(dbPath1);
-            DeleteDatabaseFile(dbPath2);
         }
     }
 

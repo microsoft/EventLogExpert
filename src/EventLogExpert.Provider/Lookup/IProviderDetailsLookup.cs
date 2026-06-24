@@ -10,6 +10,8 @@ public interface IProviderDetailsLookup : IDisposable
 {
     string Name { get; }
 
+    IReadOnlyList<ProviderDetails> FindAllProviderVersions(string providerName);
+
     ProviderDetails? FindProvider(string providerName);
 
     DatabaseSchemaState IsUpgradeNeeded();
