@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.Eventing.PublisherMetadata;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.ProviderDatabase.Context;
@@ -84,6 +85,8 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 ? LoadLocalProvidersAsync(logger, filterRegex, excludeProviderNames, cancellationToken)
                 : ProviderSource.LoadProvidersAsync(request.SourcePath, logger, filterRegex, excludeProviderNames, cancellationToken: cancellationToken);
 
+            var hostOsProvenance = request.SourcePath is null ? HostOsProvenance.Read(logger) : null;
+
             await foreach (var details in providersToAdd.WithCancellation(cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -94,6 +97,14 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 details.VersionKey = VersionKeyCalculator.Compute(details);
 
                 if (!stampedIdentities.Add(ProviderIdentity.Of(details))) { continue; }
+
+                if (hostOsProvenance is not null)
+                {
+                    details.SourceOsBuild = hostOsProvenance.Build;
+                    details.SourceOsRevision = hostOsProvenance.Revision;
+                    details.SourceOsEdition = hostOsProvenance.Edition;
+                    details.SourceOsDisplayVersion = hostOsProvenance.DisplayVersion;
+                }
 
                 if (!headerLogged)
                 {

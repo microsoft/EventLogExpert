@@ -69,6 +69,16 @@ public sealed class ProviderDetails
 
     public string? ResolvedFromOwningPublisher { get; set; }
 
+    public int? SourceOsBuild { get; set; }
+
+    public int? SourceOsRevision { get; set; }
+
+    public string? SourceOsEdition { get; set; }
+
+    public string? SourceOsDisplayVersion { get; set; }
+
+    public string? MessageFileVersion { get; set; }
+
     public IDictionary<int, string> Tasks { get; set; } = new Dictionary<int, string>();
 
     /// <summary>
@@ -78,7 +88,6 @@ public sealed class ProviderDetails
     /// </summary>
     public string VersionKey { get; set; } = string.Empty;
 
-    /// <summary>Gets events matching the given Id using a pre-built lookup dictionary.</summary>
     public IReadOnlyList<EventModel> GetEventsById(long id)
     {
         _eventsByIdLookup ??= BuildEventsByIdLookup();
@@ -86,17 +95,9 @@ public sealed class ProviderDetails
         return _eventsByIdLookup.TryGetValue(id, out var list) ? list : [];
     }
 
-    /// <summary>
-    ///     Gets messages matching the given ShortId (compared as unsigned, matching the implicit ushort-to-int promotion
-    ///     used by callers). Materialized on demand from the compact store and cached.
-    /// </summary>
     public IReadOnlyList<MessageModel> GetMessagesByShortId(int shortId) =>
         _messageStore?.GetByShortId(shortId) ?? [];
 
-    /// <summary>
-    ///     Gets the first parameter message with the given RawId, or null when none matches. Duplicate RawIds resolve
-    ///     first-wins. Materialized on demand from the compact store and cached.
-    /// </summary>
     public MessageModel? GetParameterByRawId(long rawId) => _parameterStore?.GetByRawIdFirst(rawId);
 
     public void SetLazyMessageSource(ILazyMessageSource source)

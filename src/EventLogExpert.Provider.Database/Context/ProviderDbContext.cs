@@ -81,7 +81,7 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
                 userVersion = Convert.ToInt32(versionCommand.ExecuteScalar());
             }
 
-            if (userVersion == DatabaseSchemaVersion.Current)
+            if (userVersion == DatabaseSchemaVersion.Current && IsCanonicalShape(connection))
             {
                 // Stamped canonical database - current shape, no rebuild. Skip the structural probe.
                 return LogResult(new DatabaseSchemaState(DatabaseSchemaVersion.Current));
@@ -340,8 +340,9 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
     private static bool IsType(string? actual, string expected) =>
         string.Equals(actual?.Trim(), expected, StringComparison.OrdinalIgnoreCase);
 
-    private static ProviderDetails ReadCompressedRow(IDataReader reader, string providerName) =>
-        new()
+    private static ProviderDetails ReadCompressedRow(IDataReader reader, string providerName)
+    {
+        var details = new ProviderDetails
         {
             ProviderName = providerName,
             Messages = CompressedJsonValueConverter<List<MessageModel>>.ConvertFromCompressedJson((byte[])reader["Messages"]),
@@ -354,6 +355,38 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
             VersionKey = TryReadVersionKey(reader),
             ResolvedFromOwningPublisher = TryReadResolvedFromOwningPublisher(reader, providerName)
         };
+
+        ReadProvenanceInto(reader, details);
+
+        return details;
+    }
+
+    private static void ReadProvenanceInto(IDataReader reader, ProviderDetails details)
+    {
+        for (var i = 0; i < reader.FieldCount; i++)
+        {
+            if (reader.IsDBNull(i)) { continue; }
+
+            switch (reader.GetName(i))
+            {
+                case nameof(Provider.Resolution.ProviderDetails.SourceOsBuild):
+                    details.SourceOsBuild = Convert.ToInt32(reader.GetValue(i));
+                    break;
+                case nameof(Provider.Resolution.ProviderDetails.SourceOsRevision):
+                    details.SourceOsRevision = Convert.ToInt32(reader.GetValue(i));
+                    break;
+                case nameof(Provider.Resolution.ProviderDetails.SourceOsEdition):
+                    details.SourceOsEdition = reader.GetString(i);
+                    break;
+                case nameof(Provider.Resolution.ProviderDetails.SourceOsDisplayVersion):
+                    details.SourceOsDisplayVersion = reader.GetString(i);
+                    break;
+                case nameof(Provider.Resolution.ProviderDetails.MessageFileVersion):
+                    details.MessageFileVersion = reader.GetString(i);
+                    break;
+            }
+        }
+    }
 
     private static bool TryDetectPrimaryKeyNoCaseCollation(DbConnection connection)
     {
@@ -462,6 +495,54 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
         }
 
         return string.Empty;
+    }
+
+#if DEBUG
+    private bool ActualColumnsMatchModel(DbConnection connection)
+    {
+        var actualColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info(\"ProviderDetails\")";
+
+            using var reader = command.ExecuteReader();
+
+            while (reader.Read())
+            {
+                var columnName = reader["name"]?.ToString();
+
+                if (!string.IsNullOrEmpty(columnName)) { actualColumns.Add(columnName); }
+            }
+        }
+
+        var entityType = Model.FindEntityType(typeof(ProviderDetails));
+
+        if (entityType is null) { return true; }
+
+        var modelColumns = entityType.GetProperties().Select(property => property.GetColumnName());
+
+        return actualColumns.SetEquals(modelColumns);
+    }
+#endif
+
+    // In RELEASE this compiles to `return true`, so detection is byte-identical to a plain user_version==Current
+    // short-circuit - no behavior change for shipped builds, no per-event cost (it runs only when a database opens).
+    // In DEBUG it additionally verifies the physical column set still matches the current EF model, so a developer
+    // database stamped with the current version but built from an earlier model shape rebuilds itself in place
+    // instead of requiring a manual delete. The expected set is derived from the model, so this self-heals EVERY
+    // future within-stamp column add/rename, not just the provenance columns. Type-only changes still require a
+    // DatabaseSchemaVersion bump (the must-bump invariant) - name-set equivalence deliberately ignores affinity to
+    // avoid SQLite type-string false positives.
+    private bool IsCanonicalShape(DbConnection connection)
+    {
+#if DEBUG
+        return ActualColumnsMatchModel(connection);
+#else
+        _ = connection;
+
+        return true;
+#endif
     }
 
     private void StampCanonicalUserVersion()

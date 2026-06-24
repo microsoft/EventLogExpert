@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Resolution;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.PublisherMetadata;
@@ -230,11 +231,20 @@ public sealed class EventMessageProvider(
 
         var legacyProviderFiles = _registryProvider.GetMessageFilesForLegacyProvider(_providerName);
 
-        if (!TrySetLazyMessages(provider, legacyProviderFiles))
+        var messageFilePaths = new List<string>();
+
+        if (TrySetLazyMessages(provider, legacyProviderFiles))
         {
-            if (!string.IsNullOrEmpty(providerMetadata?.MessageFilePath) &&
-                TrySetLazyMessages(provider, [providerMetadata.MessageFilePath]))
+            messageFilePaths.AddRange(legacyProviderFiles);
+        }
+        else
+        {
+            var modernMessageFilePath = providerMetadata?.MessageFilePath;
+
+            if (!string.IsNullOrEmpty(modernMessageFilePath) &&
+                TrySetLazyMessages(provider, [modernMessageFilePath]))
             {
+                messageFilePaths.Add(modernMessageFilePath);
                 _logger?.Debug(
                     $"No legacy messages loaded for provider {_providerName}. Using message file from modern provider.");
             }
@@ -250,6 +260,10 @@ public sealed class EventMessageProvider(
         {
             _logger?.Debug($"Parameter file for provider {_providerName} produced no messages.");
         }
+
+        // Record the newest message-DLL file version as the per-provider recency signal (captured at db-create).
+        // FileVersionInfo I/O runs once per provider here, never per event.
+        SetMessageFileVersion(provider, messageFilePaths);
 
         if (provider.IsEmpty)
         {
@@ -331,6 +345,24 @@ public sealed class EventMessageProvider(
         }
 
         return entries.Count > 0 ? new ValueMapDefinition(rawMap.IsBitMap, entries) : null;
+    }
+
+    // Stamps the provider with the newest 4-part numeric file version across its resolved message DLLs - the
+    // per-provider recency signal. Uses FileVersionInfo NUMERIC parts, not the FileVersion string: inbox DLLs carry
+    // a trailing " (WinBuild.160101.0800)" that Version.Parse rejects, which would null the ordinal for nearly every
+    // OS provider. Leaves MessageFileVersion null when no candidate file yields a version.
+    private void SetMessageFileVersion(ProviderDetails provider, IReadOnlyList<string> messageFilePaths)
+    {
+        Version? newest = null;
+
+        foreach (var path in messageFilePaths)
+        {
+            var version = TryReadFileVersion(path);
+
+            if (version is not null && (newest is null || version > newest)) { newest = version; }
+        }
+
+        if (newest is not null) { provider.MessageFileVersion = newest.ToString(); }
     }
 
     private void TryFallbackToOwningPublisher(ProviderDetails target, HashSet<string>? visited)
@@ -478,6 +510,24 @@ public sealed class EventMessageProvider(
             {
                 Marshal.FreeHGlobal(buffer);
             }
+        }
+    }
+
+    private Version? TryReadFileVersion(string path)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) { return null; }
+
+            var info = FileVersionInfo.GetVersionInfo(path);
+
+            return new Version(info.FileMajorPart, info.FileMinorPart, info.FileBuildPart, info.FilePrivatePart);
+        }
+        catch (Exception ex)
+        {
+            _logger?.Debug($"Failed to read file version for {path} (provider {_providerName}). Exception:\n{ex}");
+
+            return null;
         }
     }
 

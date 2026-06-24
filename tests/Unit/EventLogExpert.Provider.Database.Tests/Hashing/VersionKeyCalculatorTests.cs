@@ -28,6 +28,29 @@ public sealed class VersionKeyCalculatorTests
     }
 
     [Fact]
+    public void Compute_DifferentProvenance_DoesNotChangeKey()
+    {
+        // Provenance is source metadata, not rendering content: two byte-identical providers from different OS
+        // sources must keep the SAME VersionKey so they collapse to one row on a future merge.
+        var first = EventUtils.CreateProvider("P", events: [EventUtils.CreateEventModel(1, description: "same")]);
+        var second = EventUtils.CreateProvider("P", events: [EventUtils.CreateEventModel(1, description: "same")]);
+
+        first.SourceOsBuild = 19041;
+        first.SourceOsRevision = 1;
+        first.SourceOsEdition = "ServerStandard";
+        first.SourceOsDisplayVersion = "1809";
+        first.MessageFileVersion = "10.0.19041.1";
+
+        second.SourceOsBuild = 22621;
+        second.SourceOsRevision = 999;
+        second.SourceOsEdition = "ServerDatacenter";
+        second.SourceOsDisplayVersion = "23H2";
+        second.MessageFileVersion = "10.0.22621.900";
+
+        Assert.Equal(VersionKeyCalculator.Compute(first), VersionKeyCalculator.Compute(second));
+    }
+
+    [Fact]
     public void Compute_DifferentResolvedFromOwningPublisher_ChangesKey()
     {
         var first = EventUtils.CreateProvider("P", resolvedFromOwningPublisher: "Owner-A");

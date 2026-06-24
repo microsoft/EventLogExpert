@@ -118,7 +118,13 @@ internal static class ProviderDetailsMerger
                 (winner, value) => throw new DatabaseUpgradeException(
                     databasePath,
                     $"Provider '{canonicalName}' has conflicting ResolvedFromOwningPublisher values: " +
-                    $"'{winner}' vs '{value}'."))
+                    $"'{winner}' vs '{value}'.")),
+
+            SourceOsBuild = group.Select(static row => row.SourceOsBuild).FirstOrDefault(static value => value.HasValue),
+            SourceOsRevision = group.Select(static row => row.SourceOsRevision).FirstOrDefault(static value => value.HasValue),
+            SourceOsEdition = group.Select(static row => row.SourceOsEdition).FirstOrDefault(static value => !string.IsNullOrEmpty(value)),
+            SourceOsDisplayVersion = group.Select(static row => row.SourceOsDisplayVersion).FirstOrDefault(static value => !string.IsNullOrEmpty(value)),
+            MessageFileVersion = group.Select(static row => row.MessageFileVersion).FirstOrDefault(static value => !string.IsNullOrEmpty(value))
         };
     }
 }

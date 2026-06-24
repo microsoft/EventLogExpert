@@ -53,6 +53,64 @@ public sealed class ProviderVersionSelectorTests
     }
 
     [Fact]
+    public void SelectMostComplete_RecencyIsBelowCompleteness_MoreCompleteOlderSourceWins()
+    {
+        // A newer source that captured fewer descriptions must NOT beat an older, more-complete one.
+        var newerButSparse = TiedProvider(build: 22621);
+        var olderButComplete = ProviderWith((1, "one"), (2, "two"));
+        olderButComplete.SourceOsBuild = 19041;
+
+        var result = ProviderVersionSelector.SelectMostComplete([newerButSparse, olderButComplete]);
+
+        Assert.Same(olderButComplete, result);
+    }
+
+    [Fact]
+    public void SelectMostComplete_WhenBuildAndRevisionTie_PrefersNewerMessageFileVersion()
+    {
+        var olderFile = TiedProvider(build: 22621, revision: 1000, messageFileVersion: "10.0.22621.1");
+        var newerFile = TiedProvider(build: 22621, revision: 1000, messageFileVersion: "10.0.22621.900");
+
+        var result = ProviderVersionSelector.SelectMostComplete([olderFile, newerFile]);
+
+        Assert.Same(newerFile, result);
+    }
+
+    [Fact]
+    public void SelectMostComplete_WhenBuildTies_PrefersNewerRevision()
+    {
+        var olderRevision = TiedProvider(build: 22621, revision: 1000);
+        var newerRevision = TiedProvider(build: 22621, revision: 2000);
+
+        var result = ProviderVersionSelector.SelectMostComplete([olderRevision, newerRevision]);
+
+        Assert.Same(newerRevision, result);
+    }
+
+    [Fact]
+    public void SelectMostComplete_WhenCompletenessTies_PrefersNewerOsBuild()
+    {
+        // Older loads first; recency must override the load-order-keeps-first tiebreak and pick the newer build.
+        var olderBuild = TiedProvider(build: 19041);
+        var newerBuild = TiedProvider(build: 22621);
+
+        var result = ProviderVersionSelector.SelectMostComplete([olderBuild, newerBuild]);
+
+        Assert.Same(newerBuild, result);
+    }
+
+    [Fact]
+    public void SelectMostComplete_WhenCompletenessTies_PresentProvenanceOutranksNull()
+    {
+        var noProvenance = TiedProvider();
+        var withProvenance = TiedProvider(build: 19041);
+
+        var result = ProviderVersionSelector.SelectMostComplete([noProvenance, withProvenance]);
+
+        Assert.Same(withProvenance, result);
+    }
+
+    [Fact]
     public void SelectMostComplete_WhenDescriptionsTie_PrefersMoreLegacyMessages()
     {
         var fewerMessages = EventUtils.CreateProvider(Provider, [new MessageModel { ShortId = 1, RawId = 1, Text = "a" }]);
@@ -63,6 +121,17 @@ public sealed class ProviderVersionSelectorTests
         var result = ProviderVersionSelector.SelectMostComplete([fewerMessages, moreMessages]);
 
         Assert.Same(moreMessages, result);
+    }
+
+    [Fact]
+    public void SelectMostComplete_WhenMessageFileVersionUnparseable_DoesNotThrowAndKeepsLoadOrder()
+    {
+        var first = TiedProvider(build: 22621, revision: 1000, messageFileVersion: "not-a-version");
+        var second = TiedProvider(build: 22621, revision: 1000, messageFileVersion: "also-bad");
+
+        var result = ProviderVersionSelector.SelectMostComplete([first, second]);
+
+        Assert.Same(first, result);
     }
 
     [Fact]
@@ -81,6 +150,17 @@ public sealed class ProviderVersionSelectorTests
     }
 
     [Fact]
+    public void SelectMostComplete_WhenProvenanceAbsentOnAllCandidates_FallsBackToLoadOrder()
+    {
+        var first = TiedProvider();
+        var second = TiedProvider();
+
+        var result = ProviderVersionSelector.SelectMostComplete([first, second]);
+
+        Assert.Same(first, result);
+    }
+
+    [Fact]
     public void SelectMostComplete_WhenSingleCandidate_ReturnsSameReference()
     {
         var only = ProviderWith((1, "desc"));
@@ -92,4 +172,17 @@ public sealed class ProviderVersionSelectorTests
         EventUtils.CreateProvider(
             Provider,
             events: [.. events.Select(e => EventUtils.CreateEventModel(e.Id, e.Description, logName: LogName))]);
+
+    private static ProviderDetails TiedProvider(int? build = null, int? revision = null, string? messageFileVersion = null)
+    {
+        var provider = EventUtils.CreateProvider(
+            Provider,
+            events: [EventUtils.CreateEventModel(1, "same", logName: LogName)]);
+
+        provider.SourceOsBuild = build;
+        provider.SourceOsRevision = revision;
+        provider.MessageFileVersion = messageFileVersion;
+
+        return provider;
+    }
 }
