@@ -279,21 +279,28 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
         {
             ObjectDisposedException.ThrowIf(IsDisposed, this);
 
+            List<ProviderDetails>? candidates = null;
+
             foreach (var lookup in lookups)
             {
-                var details = lookup.FindProvider(providerName);
-
-                if (details is null) { continue; }
-
-                Logger?.Debug($"Resolved {providerName} from database {lookup.Name}.");
-                ProviderDetails.TryAdd(providerName, details);
-                _providerFromNonLocal.TryAdd(providerName, true);
-
-                return true;
+                foreach (var details in lookup.FindAllProviderVersions(providerName))
+                {
+                    (candidates ??= []).Add(details);
+                }
             }
-        }
 
-        return false;
+            if (candidates is null) { return false; }
+
+            var resolved = ProviderVersionSelector.SelectMostComplete(candidates);
+
+            if (resolved is null) { return false; }
+
+            Logger?.Debug($"Resolved {providerName} from {candidates.Count} database version(s).");
+            ProviderDetails.TryAdd(providerName, resolved);
+            _providerFromNonLocal.TryAdd(providerName, true);
+
+            return true;
+        }
     }
 
     private bool TryResolveFromMta(string providerName, ImmutableArray<string> metadataPaths)

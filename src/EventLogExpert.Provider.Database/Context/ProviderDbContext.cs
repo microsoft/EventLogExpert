@@ -55,6 +55,14 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
 
     private string Path { get; }
 
+    // Ordered by VersionKey so the consolidated winner's true ties (same description length) break deterministically on
+    // a stable per-database order rather than SQLite's unspecified row order.
+    public IReadOnlyList<ProviderDetails> FindAllProviderVersions(string providerName) =>
+        ProviderDetails
+            .Where(p => p.ProviderName == providerName)
+            .OrderBy(p => p.VersionKey)
+            .ToList();
+
     public ProviderDetails? FindProvider(string providerName) =>
         ProviderDetails.FirstOrDefault(p => p.ProviderName == providerName);
 
