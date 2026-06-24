@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
+using EventLogExpert.Provider.Resolution;
 using NSubstitute;
 
 namespace EventLogExpert.DatabaseTools.IntegrationTests.Sources;
@@ -26,6 +27,69 @@ public sealed class ProviderSourceTests : IDisposable
         {
             DatabaseTestUtils.DeleteDirectoryRecursive(dir);
         }
+    }
+
+    [Fact]
+    public async Task LoadProviders_NonAsciiCaseVariantNamesInOneDatabase_LoadsBoth()
+    {
+        // Arrange - SQLite's NOCASE primary-key collation folds only ASCII, so provider names differing solely by
+        // non-ASCII case (here U+00E9 vs U+00C9) are DISTINCT rows that coexist in one database. The reload-by-name
+        // path must de-duplicate names ordinally; folding them via OrdinalIgnoreCase or the identity HashSet (both of
+        // which fold all of Unicode) would collapse the two names to one and silently drop a row.
+        var dbPath = CreateTempDb();
+        var lower = DatabaseTestUtils.BuildProviderDetails("Provider-\u00e9");
+        var upper = DatabaseTestUtils.BuildProviderDetails("Provider-\u00c9");
+        DatabaseTestUtils.CreateV4Database(dbPath, lower, upper);
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        var loaded = new List<ProviderDetails>();
+
+        await foreach (var provider in ProviderSource.LoadProvidersAsync(
+            dbPath, logger, cancellationToken: TestContext.Current.CancellationToken))
+        {
+            loaded.Add(provider);
+        }
+
+        // Assert - both case variants load; neither is collapsed away.
+        Assert.Equal(2, loaded.Count);
+        Assert.Contains(loaded, provider => provider.ProviderName == "Provider-\u00e9");
+        Assert.Contains(loaded, provider => provider.ProviderName == "Provider-\u00c9");
+    }
+
+    [Fact]
+    public async Task LoadProviders_SameNameDistinctVersionsAcrossFiles_LoadsBothVersions()
+    {
+        // Arrange - two source files carry the same provider name but distinct VersionKeys, i.e. different provider
+        // versions. The cross-file `seen` dedup is keyed by identity (name, version), not name alone, so both must
+        // load rather than the second file's version being dropped as a name-duplicate. VersionKey is empty in
+        // production today; this guards the behavior once content hashing makes versions coexist.
+        var dir = CreateTempDir();
+        var first = Path.Combine(dir, "first.db");
+        var second = Path.Combine(dir, "second.db");
+
+        var firstVersion = DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName);
+        firstVersion.VersionKey = "vk1";
+        var secondVersion = DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName);
+        secondVersion.VersionKey = "vk2";
+
+        DatabaseTestUtils.CreateV4Database(first, firstVersion);
+        DatabaseTestUtils.CreateV4Database(second, secondVersion);
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        var loaded = new List<ProviderDetails>();
+
+        await foreach (var provider in ProviderSource.LoadProvidersAsync(
+            dir, logger, cancellationToken: TestContext.Current.CancellationToken))
+        {
+            loaded.Add(provider);
+        }
+
+        // Assert
+        Assert.Equal(2, loaded.Count);
+        Assert.Equal(["vk1", "vk2"], loaded.Select(p => p.VersionKey).OrderBy(v => v, StringComparer.Ordinal).ToArray());
+        Assert.All(loaded, provider => Assert.Equal(Constants.FirstProviderName, provider.ProviderName));
     }
 
     [Fact]

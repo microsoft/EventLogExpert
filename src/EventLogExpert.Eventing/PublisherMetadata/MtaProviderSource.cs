@@ -84,7 +84,7 @@ public static class MtaProviderSource
         ITraceLogger logger,
         Regex? regex = null,
         IReadOnlySet<string>? skipProviderNames = null,
-        HashSet<string>? seen = null,
+        HashSet<ProviderIdentity>? seen = null,
         IReadOnlyList<string>? preDiscoveredProviderNames = null) =>
         LoadProvidersCore(evtxPath, logger, regex, skipProviderNames, seen, preDiscoveredProviderNames);
 
@@ -157,7 +157,7 @@ public static class MtaProviderSource
         ITraceLogger logger,
         Regex? regex,
         IReadOnlySet<string>? skipProviderNames,
-        HashSet<string>? seen,
+        HashSet<ProviderIdentity>? seen,
         IReadOnlyList<string>? preDiscoveredProviderNames = null)
     {
         // Honor the pre-discovered hint when supplied; otherwise re-scan the evtx file. The hint must already
@@ -176,9 +176,14 @@ public static class MtaProviderSource
 
         foreach (var providerName in providerNames)
         {
+            // Live providers expose only a name (events carry no content version), so their identity is always
+            // (name, empty). The empty VersionKey is meaningful rather than a placeholder: it marks a live/online
+            // provider, distinct from an offline content-hashed version (a later phase).
+            var identity = new ProviderIdentity(providerName, string.Empty);
+
             if (skipProviderNames is not null && skipProviderNames.Contains(providerName)) { continue; }
 
-            if (seen is not null && seen.Contains(providerName)) { continue; }
+            if (seen is not null && seen.Contains(identity)) { continue; }
 
             var details = new EventMessageProvider(providerName, mtaFiles, logger).LoadProviderDetails();
 
@@ -191,7 +196,7 @@ public static class MtaProviderSource
 
             // Mark as seen only after confirming the provider has data, so that an empty/missing
             // provider from one .evtx does not block loading it from a later source file.
-            seen?.Add(providerName);
+            seen?.Add(identity);
 
             yield return details;
         }
