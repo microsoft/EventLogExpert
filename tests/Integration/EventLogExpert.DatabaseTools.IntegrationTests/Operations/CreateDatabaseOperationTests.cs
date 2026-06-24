@@ -7,6 +7,7 @@ using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.ProviderDatabase.Context;
+using EventLogExpert.ProviderDatabase.Hashing;
 using NSubstitute;
 using System.Text.RegularExpressions;
 
@@ -16,6 +17,58 @@ public sealed class CreateDatabaseCommandTests : IDisposable
 {
     private readonly List<string> _tempDirs = [];
     private readonly List<string> _tempPaths = [];
+
+    [Fact]
+    public async Task CreateDatabase_FolderSourceWithSameContentUnderDifferentKeys_CollapsesInsteadOfColliding()
+    {
+        // Two source files hold the SAME provider with byte-identical content but different stored VersionKeys (one
+        // unstamped legacy row, one already hashed). The cross-file dedup keys on the source key, so both survive
+        // load, then both re-hash to the same key. Without a post-stamp guard they would collide on the composite
+        // primary key and abort the create; they must instead collapse to one row.
+        var dir = CreateTempDir();
+
+        var unstamped = DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName);
+        var stamped = DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName);
+        stamped.VersionKey = VersionKeyCalculator.Compute(stamped);
+
+        DatabaseTestUtils.CreateV4Database(Path.Combine(dir, "a.db"), unstamped);
+        DatabaseTestUtils.CreateV4Database(Path.Combine(dir, "b.db"), stamped);
+
+        var path = CreateTempPath();
+        var logger = Substitute.For<ITraceLogger>();
+
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(path, dir, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.True(File.Exists(path), "Create should have produced a database (collapsed, not aborted).");
+
+        using var verify = new ProviderDbContext(path, readOnly: true, ensureCreated: false);
+        var single = Assert.Single(verify.ProviderDetails.ToList());
+        Assert.Equal(Constants.FirstProviderName, single.ProviderName);
+        Assert.StartsWith("vk1:", single.VersionKey);
+        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
+    }
+
+    [Fact]
+    public async Task CreateDatabase_StampsContentHashVersionKey()
+    {
+        // A source provider with an empty (unstamped) VersionKey must come out of create with its content hash
+        // stamped, so the composite (name, version) primary key can hold genuinely different versions of a provider
+        // and identical providers collapse to one row.
+        var source = CreateTempPath();
+        DatabaseTestUtils.CreateV4Database(source, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
+
+        var path = CreateTempPath();
+        var logger = Substitute.For<ITraceLogger>();
+
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
+
+        await using var context = new ProviderDbContext(path, readOnly: true, ensureCreated: false);
+        var created = context.ProviderDetails.Single();
+
+        Assert.Equal(Constants.FirstProviderName, created.ProviderName);
+        Assert.StartsWith("vk1:", created.VersionKey);
+        Assert.Equal(VersionKeyCalculator.Compute(created), created.VersionKey);
+    }
 
     [Fact]
     public async Task CreateDatabase_WhenExtensionNotDb_LogsErrorAndDoesNotCreateFile()
@@ -255,6 +308,14 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         {
             DatabaseTestUtils.DeleteDirectoryRecursive(dir);
         }
+    }
+
+    private string CreateTempDir()
+    {
+        var dir = DatabaseTestUtils.CreateTempDirectory();
+        _tempDirs.Add(dir);
+
+        return dir;
     }
 
     private string CreateTempPath()
