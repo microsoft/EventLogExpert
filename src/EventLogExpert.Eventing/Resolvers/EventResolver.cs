@@ -295,7 +295,13 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
 
             if (resolved is null) { return false; }
 
-            Logger?.Debug($"Resolved {providerName} from {candidates.Count} database version(s).");
+            // Recency picks the newest AVAILABLE source, not the source OS of the event being resolved: an EVTX
+            // record carries no OS/build signal, so this is a global preference, not a per-event match.
+            Logger?.Debug(
+                $"Resolved {providerName} from {candidates.Count} database version(s); winning source build " +
+                $"{resolved.SourceOsBuild?.ToString() ?? "?"}.{resolved.SourceOsRevision?.ToString() ?? "?"} " +
+                $"{resolved.SourceOsEdition ?? "?"} {resolved.SourceOsDisplayVersion ?? "?"}, message file version " +
+                $"{resolved.MessageFileVersion ?? "?"}.");
             ProviderDetails.TryAdd(providerName, resolved);
             _providerFromNonLocal.TryAdd(providerName, true);
 

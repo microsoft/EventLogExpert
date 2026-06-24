@@ -172,6 +172,46 @@ public sealed class ProviderDbContextTests : IDisposable
         Assert.All(results, count => Assert.Equal(10, count));
     }
 
+#if DEBUG
+    [Fact]
+    public void Detection_DevMode_StampedCurrentButStaleShape_RebuildsInPlace()
+    {
+        // Arrange - a database stamped with the current version whose physical shape was built from an earlier model
+        // (a provenance column dropped). Only the DEBUG model-vs-actual self-heal catches this.
+        var dbPath = CreateTempDatabasePath();
+
+        using (var context = new ProviderDbContext(dbPath, false))
+        {
+            context.ProviderDetails.Add(EventUtils.CreateProvider("Dev-Prov"));
+            context.SaveChanges();
+        }
+
+        Assert.Equal(DatabaseSchemaVersion.Current, ReadUserVersion(dbPath));
+
+        DropColumn(dbPath, nameof(ProviderDetails.MessageFileVersion));
+        Assert.False(TableHasColumn(dbPath, nameof(ProviderDetails.MessageFileVersion)));
+
+        // Assert - despite the current stamp, the model mismatch flags a rebuild.
+        using (var readContext = new ProviderDbContext(dbPath, true))
+        {
+            Assert.True(readContext.IsUpgradeNeeded().NeedsUpgrade);
+        }
+
+        // Act - the in-place rebuild restores the model shape and re-stamps.
+        using (var upgrade = new ProviderDbContext(dbPath, false))
+        {
+            upgrade.PerformUpgradeIfNeeded();
+        }
+
+        // Assert - column restored, stamped current, row survived.
+        Assert.True(TableHasColumn(dbPath, nameof(ProviderDetails.MessageFileVersion)));
+
+        using var verify = new ProviderDbContext(dbPath, true);
+        Assert.False(verify.IsUpgradeNeeded().NeedsUpgrade);
+        Assert.NotNull(verify.FindProvider("Dev-Prov"));
+    }
+#endif
+
     [Fact]
     public void Detection_FreshDatabase_ReportsV4()
     {
@@ -628,6 +668,36 @@ public sealed class ProviderDbContextTests : IDisposable
     }
 
     [Fact]
+    public void Provenance_RoundTripsThroughDatabase()
+    {
+        // Arrange
+        var dbPath = CreateTempDatabasePath();
+
+        var provider = EventUtils.CreateProvider("ProvenanceRoundTrip");
+        provider.SourceOsBuild = 22621;
+        provider.SourceOsRevision = 2861;
+        provider.SourceOsEdition = "ServerDatacenter";
+        provider.SourceOsDisplayVersion = "23H2";
+        provider.MessageFileVersion = "10.0.22621.2861";
+
+        // Act
+        using (var context = new ProviderDbContext(dbPath, false))
+        {
+            context.ProviderDetails.Add(provider);
+            context.SaveChanges();
+        }
+
+        // Assert
+        using var verify = new ProviderDbContext(dbPath, true);
+        var retrieved = verify.ProviderDetails.Single(p => p.ProviderName == "ProvenanceRoundTrip");
+        Assert.Equal(22621, retrieved.SourceOsBuild);
+        Assert.Equal(2861, retrieved.SourceOsRevision);
+        Assert.Equal("ServerDatacenter", retrieved.SourceOsEdition);
+        Assert.Equal("23H2", retrieved.SourceOsDisplayVersion);
+        Assert.Equal("10.0.22621.2861", retrieved.MessageFileVersion);
+    }
+
+    [Fact]
     public void ProviderDetails_Delete_ShouldRemoveRecord()
     {
         // Arrange
@@ -1007,6 +1077,74 @@ public sealed class ProviderDbContextTests : IDisposable
     }
 
     [Fact]
+    public void Upgrade_RebuildPreservesProvenance()
+    {
+        // Arrange - a current-shape database carrying provenance whose stamp was reset to 0 (an interrupted stamp):
+        // the rebuild must carry the provenance forward, not drop it.
+        var dbPath = CreateTempDatabasePath();
+
+        var provider = EventUtils.CreateProvider("Provenanced");
+        provider.SourceOsBuild = 19041;
+        provider.SourceOsRevision = 3636;
+        provider.SourceOsEdition = "ServerStandard";
+        provider.SourceOsDisplayVersion = "2009";
+        provider.MessageFileVersion = "10.0.19041.3636";
+
+        using (var context = new ProviderDbContext(dbPath, false))
+        {
+            context.ProviderDetails.Add(provider);
+            context.SaveChanges();
+        }
+
+        SetUserVersion(dbPath, 0);
+
+        // Act
+        using (var upgrade = new ProviderDbContext(dbPath, false))
+        {
+            upgrade.PerformUpgradeIfNeeded();
+        }
+
+        // Assert - provenance survives the destructive rebuild.
+        using var verify = new ProviderDbContext(dbPath, true);
+        var row = verify.FindProvider("Provenanced");
+        Assert.NotNull(row);
+        Assert.Equal(19041, row.SourceOsBuild);
+        Assert.Equal(3636, row.SourceOsRevision);
+        Assert.Equal("ServerStandard", row.SourceOsEdition);
+        Assert.Equal("2009", row.SourceOsDisplayVersion);
+        Assert.Equal("10.0.19041.3636", row.MessageFileVersion);
+    }
+
+    [Fact]
+    public void Upgrade_V3_To_V4_AddsProvenanceColumnsWithNullValues()
+    {
+        // Arrange - a true v3 database with no provenance columns.
+        var dbPath = CreateTempDatabasePath();
+        SeedV3Schema(dbPath);
+        InsertV3Row(dbPath, EventUtils.CreateProvider("V3-Prov", [EventUtils.CreateMessageModel("V3-Prov", 1, "msg")]));
+
+        // Act
+        using (var context = new ProviderDbContext(dbPath, false))
+        {
+            context.PerformUpgradeIfNeeded();
+        }
+
+        // Assert - the rebuild adds the provenance columns; the legacy row carries null provenance (the intended
+        // degrade; re-captured on a live recreate).
+        Assert.True(TableHasColumn(dbPath, nameof(ProviderDetails.SourceOsBuild)));
+        Assert.True(TableHasColumn(dbPath, nameof(ProviderDetails.MessageFileVersion)));
+
+        using var verify = new ProviderDbContext(dbPath, true);
+        var row = verify.FindProvider("V3-Prov");
+        Assert.NotNull(row);
+        Assert.Null(row.SourceOsBuild);
+        Assert.Null(row.SourceOsRevision);
+        Assert.Null(row.SourceOsEdition);
+        Assert.Null(row.SourceOsDisplayVersion);
+        Assert.Null(row.MessageFileVersion);
+    }
+
+    [Fact]
     public void Upgrade_V3_To_V4_HappyPath()
     {
         // Arrange
@@ -1226,6 +1364,16 @@ public sealed class ProviderDbContextTests : IDisposable
 
     private static void DeleteDatabaseFile(string path) => SqliteTestDb.Delete(path);
 
+    private static void DropColumn(string dbPath, string columnName)
+    {
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = $"ALTER TABLE \"ProviderDetails\" DROP COLUMN \"{columnName}\"";
+        command.ExecuteNonQuery();
+    }
+
     private static void InsertLegacyRow(
         string dbPath,
         string providerName,
@@ -1437,6 +1585,24 @@ public sealed class ProviderDbContextTests : IDisposable
         using var command = connection.CreateCommand();
         command.CommandText = $"PRAGMA user_version = {value}";
         command.ExecuteNonQuery();
+    }
+
+    private static bool TableHasColumn(string dbPath, string columnName)
+    {
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info(\"ProviderDetails\")";
+
+        using var reader = command.ExecuteReader();
+
+        while (reader.Read())
+        {
+            if (string.Equals(reader["name"]?.ToString(), columnName, StringComparison.Ordinal)) { return true; }
+        }
+
+        return false;
     }
 
     private string CreateTempDatabasePath()
