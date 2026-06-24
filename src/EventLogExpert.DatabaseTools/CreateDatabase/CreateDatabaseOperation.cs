@@ -5,6 +5,7 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.ProviderDatabase.Context;
+using EventLogExpert.ProviderDatabase.Hashing;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.DatabaseTools.CreateDatabase;
@@ -67,6 +68,11 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         var headerLogged = false;
         var pendingForHeader = new List<ProviderDetails>(BatchSize);
 
+        // Collapse identical content arriving under different source keys (e.g. an unstamped legacy row plus an
+        // already-hashed row in a multi-file source): both re-hash to the same VersionKey, so the second would
+        // otherwise collide on the composite primary key. Track stamped identities and skip duplicates first-wins.
+        var stampedIdentities = new HashSet<ProviderIdentity>();
+
         // Defer creating the DbContext (and therefore the .db file on disk) until we have
         // at least one provider to persist. This prevents leaving an empty database behind
         // when no provider details could be resolved.
@@ -81,6 +87,13 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             await foreach (var details in providersToAdd.WithCancellation(cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                // Stamp the content hash so distinct versions of a provider name coexist under the composite key and
+                // identical providers (across machines / OS builds) collapse to one row. Idempotent for an
+                // already-hashed source; computes the key for freshly-resolved (live) providers.
+                details.VersionKey = VersionKeyCalculator.Compute(details);
+
+                if (!stampedIdentities.Add(ProviderIdentity.Of(details))) { continue; }
 
                 if (!headerLogged)
                 {
