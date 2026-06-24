@@ -13,13 +13,13 @@ internal static class ProviderDetailsMerger
         string databasePath)
     {
         var merged = new List<ProviderDetails>(rows.Count);
-        var firstIndexByGroup = new Dictionary<(string ProviderName, string VersionKey), int>(ProviderIdentityComparer.Instance);
-        var groupedRows = new Dictionary<(string ProviderName, string VersionKey), List<ProviderDetails>>(ProviderIdentityComparer.Instance);
+        var firstIndexByGroup = new Dictionary<ProviderIdentity, int>();
+        var groupedRows = new Dictionary<ProviderIdentity, List<ProviderDetails>>();
 
         for (var i = 0; i < rows.Count; i++)
         {
             var row = rows[i];
-            var key = (row.ProviderName, row.VersionKey);
+            var key = ProviderIdentity.Of(row);
 
             if (firstIndexByGroup.TryAdd(key, i))
             {
@@ -34,7 +34,7 @@ internal static class ProviderDetailsMerger
         foreach (var (_, firstIndex) in firstIndexByGroup.OrderBy(kvp => kvp.Value))
         {
             var first = rows[firstIndex];
-            var group = groupedRows[(first.ProviderName, first.VersionKey)];
+            var group = groupedRows[ProviderIdentity.Of(first)];
 
             if (group.Count == 1)
             {
@@ -267,20 +267,6 @@ internal static class ProviderDetailsMerger
     private static bool MessagesAreEquivalent(MessageModel a, MessageModel b) =>
         string.Equals(a.Text, b.Text, StringComparison.Ordinal) &&
         string.Equals(a.Template, b.Template, StringComparison.Ordinal);
-
-    private sealed class ProviderIdentityComparer : IEqualityComparer<(string ProviderName, string VersionKey)>
-    {
-        public static readonly ProviderIdentityComparer Instance = new();
-
-        public bool Equals((string ProviderName, string VersionKey) x, (string ProviderName, string VersionKey) y) =>
-            string.Equals(x.ProviderName, y.ProviderName, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(x.VersionKey, y.VersionKey, StringComparison.Ordinal);
-
-        public int GetHashCode((string ProviderName, string VersionKey) obj) =>
-            HashCode.Combine(
-                StringComparer.OrdinalIgnoreCase.GetHashCode(obj.ProviderName),
-                StringComparer.Ordinal.GetHashCode(obj.VersionKey));
-    }
 
     private readonly record struct MessageIdentity(short ShortId, long RawId, string? LogLink, string? Tag);
 

@@ -208,7 +208,7 @@ internal static class ProviderSource
         ITraceLogger logger,
         Regex? regex,
         IReadOnlySet<string>? skipProviderNames,
-        HashSet<string> seen,
+        HashSet<ProviderIdentity> seen,
         CancellationToken cancellationToken)
     {
         try
@@ -219,25 +219,45 @@ internal static class ProviderSource
 
             context.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
 
-            // Filter by name without mutating `seen` so that a subsequent catch does not
-            // permanently mark these names as loaded when they were never successfully read.
-            var allNames = await context.ProviderDetails.Select(p => p.ProviderName).ToListAsync(cancellationToken);
-            var namesToLoad = allNames
-                .Where(name =>
+            // Project (name, version) identities and filter without mutating `seen`, so a subsequent catch does not
+            // permanently mark these identities as loaded when they were never successfully read. Dedup is
+            // version-aware: an identity already loaded from an earlier source file is skipped, but a different
+            // version of the same provider name is not.
+            var allIdentities = await context.ProviderDetails
+                .Select(p => new { p.ProviderName, p.VersionKey })
+                .ToListAsync(cancellationToken);
+
+            var identitiesToLoad = allIdentities
+                .Select(p => new ProviderIdentity(p.ProviderName, p.VersionKey))
+                .Where(identity =>
                 {
-                    if (seen.Contains(name)) { return false; }
+                    if (seen.Contains(identity)) { return false; }
 
-                    if (regex is not null && !regex.IsMatch(name)) { return false; }
+                    if (regex is not null && !regex.IsMatch(identity.ProviderName)) { return false; }
 
-                    return skipProviderNames is null || !skipProviderNames.Contains(name);
+                    return skipProviderNames is null || !skipProviderNames.Contains(identity.ProviderName);
                 })
-                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            if (namesToLoad.Count == 0) { return []; }
+            if (identitiesToLoad.Count == 0) { return []; }
 
-            // Chunk the IN-clause to stay below SQLite's parameter limit (default 999).
-            var loaded = new List<ProviderDetails>(namesToLoad.Count);
+            var wantedIdentities = identitiesToLoad.ToHashSet();
+
+            // Reload full rows by NAME (SQLite cannot translate a composite-tuple IN clause), chunking to stay below
+            // SQLite's parameter limit (default 999). Derive the names from the identity LIST (not the HashSet) and
+            // de-duplicate them ORDINALLY: ProviderIdentity equality and SQLite's NOCASE collation differ on non-ASCII
+            // case (NOCASE folds only ASCII, OrdinalIgnoreCase folds all of Unicode), so two names differing solely by
+            // non-ASCII case are distinct rows that must both reach the IN clause - collapsing them via the HashSet or
+            // an OrdinalIgnoreCase Distinct would drop one. The reload by name can pull versions we did not ask for, so
+            // post-filter the materialized rows back down to the wanted identities. Today VersionKey is always empty,
+            // making the post-filter a no-op; it becomes load-bearing once content hashing lets versions coexist.
+            var namesToLoad = identitiesToLoad
+                .Select(identity => identity.ProviderName)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var loaded = new List<ProviderDetails>(identitiesToLoad.Count);
 
             for (var offset = 0; offset < namesToLoad.Count; offset += MaxInClauseParameters)
             {
@@ -248,15 +268,17 @@ internal static class ProviderSource
                     .Take(MaxInClauseParameters)
                     .ToList();
 
-                loaded.AddRange(await context.ProviderDetails
+                var rows = await context.ProviderDetails
                     .Where(p => chunk.Contains(p.ProviderName))
                     .OrderBy(p => p.ProviderName)
-                    .ToListAsync(cancellationToken));
+                    .ToListAsync(cancellationToken);
+
+                loaded.AddRange(rows.Where(row => wantedIdentities.Contains(ProviderIdentity.Of(row))));
             }
 
             // Mark as seen only after a successful load so a catch for a corrupt file does
-            // not prevent the same provider names from being loaded from a later source file.
-            foreach (var name in namesToLoad) { seen.Add(name); }
+            // not prevent the same identities from being loaded from a later source file.
+            foreach (var identity in identitiesToLoad) { seen.Add(identity); }
 
             return loaded;
         }
@@ -307,7 +329,7 @@ internal static class ProviderSource
         IReadOnlyList<string>? preDiscoveredProviderNames,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<ProviderIdentity>();
         var files = EnumerateSourceFiles(path, logger).ToList();
 
         // preDiscoveredProviderNames optimization only applies for single-file .evtx sources. For folders and .db
