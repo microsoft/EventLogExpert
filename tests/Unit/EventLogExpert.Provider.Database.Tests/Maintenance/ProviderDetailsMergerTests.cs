@@ -12,6 +12,43 @@ public sealed class ProviderDetailsMergerTests
 {
     private const string TestDatabasePath = @"C:\test\fake.db";
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MergeCaseInsensitiveDuplicates_CarriesNewestSourceProvenanceAsCoherentUnit_RegardlessOfOrder(bool newerFirst)
+    {
+        // Same identity (case-folded name + shared VersionKey) from two OS sources. The merged row must take the
+        // NEWEST source's provenance as one coherent unit, deterministically, not whichever row SELECT returned first.
+        var older = EventUtils.CreateProvider("Same-Provider");
+        older.VersionKey = "vk1:shared";
+        older.SourceOsBuild = 17763;
+        older.SourceOsRevision = 100;
+        older.SourceOsEdition = "ServerStandard";
+        older.SourceOsDisplayVersion = "1809";
+        older.MessageFileVersion = "10.0.17763.100";
+
+        var newer = EventUtils.CreateProvider("same-provider");
+        newer.VersionKey = "vk1:shared";
+        newer.SourceOsBuild = 20348;
+        newer.SourceOsRevision = 2000;
+        newer.SourceOsEdition = "ServerDatacenter";
+        newer.SourceOsDisplayVersion = "21H2";
+        newer.MessageFileVersion = "10.0.20348.2000";
+
+        var rows = newerFirst
+            ? new List<ProviderDetails> { newer, older }
+            : new List<ProviderDetails> { older, newer };
+
+        var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(rows, TestDatabasePath);
+
+        var row = Assert.Single(merged);
+        Assert.Equal(20348, row.SourceOsBuild);
+        Assert.Equal(2000, row.SourceOsRevision);
+        Assert.Equal("ServerDatacenter", row.SourceOsEdition);
+        Assert.Equal("21H2", row.SourceOsDisplayVersion);
+        Assert.Equal("10.0.20348.2000", row.MessageFileVersion);
+    }
+
     [Fact]
     public void MergeCaseInsensitiveDuplicates_CarriesSharedVersionKeyThroughMerge()
     {
@@ -436,5 +473,36 @@ public sealed class ProviderDetailsMergerTests
 
         Assert.Single(merged);
         Assert.Equal("MICROSOFT-Foo", merged[0].ProviderName);
+    }
+
+    [Fact]
+    public void MergeCaseInsensitiveDuplicates_WhenRecencyTies_PicksProvenanceDeterministicallyAcrossRowOrder()
+    {
+        // Same recency key (build, revision, file version) but different edition: the merge must still pick the same
+        // winner regardless of source row order, since SELECT * has no defined order.
+        static ProviderDetails WithEdition(string nameCase, string edition)
+        {
+            var provider = EventUtils.CreateProvider(nameCase);
+            provider.VersionKey = "vk1:shared";
+            provider.SourceOsBuild = 20348;
+            provider.SourceOsRevision = 2000;
+            provider.SourceOsEdition = edition;
+            provider.SourceOsDisplayVersion = "21H2";
+            provider.MessageFileVersion = "10.0.20348.2000";
+
+            return provider;
+        }
+
+        var forward = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(
+            [WithEdition("Same-Provider", "ServerStandard"), WithEdition("same-provider", "ServerDatacenter")],
+            TestDatabasePath);
+
+        var reverse = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(
+            [WithEdition("Same-Provider", "ServerDatacenter"), WithEdition("same-provider", "ServerStandard")],
+            TestDatabasePath);
+
+        // "ServerStandard" sorts after "ServerDatacenter" ordinally, so it is the deterministic winner either way.
+        Assert.Equal("ServerStandard", Assert.Single(forward).SourceOsEdition);
+        Assert.Equal("ServerStandard", Assert.Single(reverse).SourceOsEdition);
     }
 }
