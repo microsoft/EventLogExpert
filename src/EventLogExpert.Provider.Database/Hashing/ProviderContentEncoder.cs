@@ -22,20 +22,16 @@ namespace EventLogExpert.ProviderDatabase.Hashing;
 ///     order is unspecified); event keyword lists are sorted AND de-duplicated (the merger compares them as a set); event,
 ///     message, and parameter entries are encoded to self-delimiting blobs that are sorted ordinally with exact duplicates
 ///     dropped (manifest list order is not a stability contract); ValueMap entries keep their ORIGINAL order (bitmap
-///     decoding is order-dependent, so order is content). Strings are preserved EXACTLY - no Unicode or whitespace
-///     normalization - so the hash stays injective over the persisted bytes; the database's fail-hard rule requires that
-///     identical hashes imply identical content.
+///     decoding is order-dependent, so order is content). Strings are preserved EXACTLY, except an event's Template, which
+///     is encoded by <see cref="TemplateSignature" /> as render-relevant field tuples so templates that render identically
+///     collapse across live and offline builds.
 /// </remarks>
-internal static class ProviderContentCanonicalizer
+internal static class ProviderContentEncoder
 {
-    /// <summary>
-    ///     Bumping this re-keys every provider on purpose (e.g. after a canonicalization fix). Pair it with the
-    ///     <c>vk1:</c> tag in <see cref="VersionKeyCalculator" /> so providers hashed under different schemes never silently
-    ///     share a key.
-    /// </summary>
+    // Bump to deliberately re-key every provider after a canonicalization change.
     private const byte SchemeVersion = 1;
 
-    public static byte[] Canonicalize(ProviderDetails provider)
+    internal static byte[] Encode(ProviderDetails provider)
     {
         var buffer = new ArrayBufferWriter<byte>();
 
@@ -72,7 +68,7 @@ internal static class ProviderContentCanonicalizer
 
         foreach (var keyword in keywords) { WriteInt64(buffer, keyword); }
 
-        WriteString(buffer, model.Template);
+        TemplateSignature.AppendTo(buffer, model.Template.AsSpan());
         WriteString(buffer, model.Description);
         WriteString(buffer, model.LogName);
 
