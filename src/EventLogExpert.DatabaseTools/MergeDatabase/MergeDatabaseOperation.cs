@@ -25,7 +25,8 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken)
     {
-        if (!ProviderSource.TryValidate(request.SourcePath, logger))
+        if (!ProviderSource.TryValidate(request.SourcePath, logger) ||
+            !await ProviderSource.ValidateSourceSchemasAsync(request.SourcePath, logger, cancellationToken))
         {
             return DatabaseToolsOutcome.Failed;
         }

@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.MergeDatabase;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Eventing.TestUtils.Constants;
@@ -57,6 +58,26 @@ public sealed class MergeDatabaseCommandTests : IDisposable
 
         logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
             handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(target)));
+    }
+
+    [Fact]
+    public async Task MergeDatabase_WithSourceNeedingUpgrade_FailsInsteadOfReportingSuccess()
+    {
+        var source = CreateTempDb();
+        var target = CreateTempDb();
+
+        // A pre-stamp (v3) source is classified as needing an upgrade. Merge must FAIL with a clear error rather than
+        // silently reporting success while copying nothing (mirrors the diff operation's source-schema validation).
+        DatabaseTestUtils.CreateV3Database(source);
+        DatabaseTestUtils.CreateV4Database(target, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
+
+        var logger = Substitute.For<ITraceLogger>();
+
+        var outcome = await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false))
+            .ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.Equal(DatabaseToolsOutcome.Failed, outcome);
+        logger.Received().Error(Arg.Is<ErrorLogHandler>(handler => handler.ToString().Contains(source)));
     }
 
     [Fact]
