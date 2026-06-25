@@ -365,6 +365,88 @@ internal sealed class ProviderMetadata
     internal string FormatMessageById(uint messageId) =>
         NativeMethods.FormatMessage(_publisherMetadataHandle, messageId);
 
+    internal RawProviderContent ToRawContent(string providerName, ITraceLogger? logger)
+    {
+        List<RawNamedValue> keywords;
+
+        try
+        {
+            keywords = ReadNamedValues(
+                EvtPublisherMetadataPropertyId.Keywords,
+                EvtPublisherMetadataPropertyId.KeywordName,
+                EvtPublisherMetadataPropertyId.KeywordValue,
+                EvtPublisherMetadataPropertyId.KeywordMessageID,
+                static value => (ulong)value);
+        }
+        catch (Exception ex)
+        {
+            logger?.Debug($"Failed to read Keywords for provider {providerName}. Exception:\n{ex}");
+            keywords = [];
+        }
+
+        List<RawNamedValue> opcodes;
+
+        try
+        {
+            opcodes = ReadNamedValues(
+                EvtPublisherMetadataPropertyId.Opcodes,
+                EvtPublisherMetadataPropertyId.OpcodeName,
+                EvtPublisherMetadataPropertyId.OpcodeValue,
+                EvtPublisherMetadataPropertyId.OpcodeMessageID,
+                static value => (uint)value);
+        }
+        catch (Exception ex)
+        {
+            logger?.Debug($"Failed to read Opcodes for provider {providerName}. Exception:\n{ex}");
+            opcodes = [];
+        }
+
+        List<RawNamedValue> tasks;
+
+        try
+        {
+            tasks = ReadNamedValues(
+                EvtPublisherMetadataPropertyId.Tasks,
+                EvtPublisherMetadataPropertyId.TaskName,
+                EvtPublisherMetadataPropertyId.TaskValue,
+                EvtPublisherMetadataPropertyId.TaskMessageID,
+                static value => (uint)value);
+        }
+        catch (Exception ex)
+        {
+            logger?.Debug($"Failed to read Tasks for provider {providerName}. Exception:\n{ex}");
+            tasks = [];
+        }
+
+        IReadOnlyDictionary<uint, string> channels;
+        IReadOnlyList<RawProviderEvent> events;
+
+        try
+        {
+            channels = ReadChannelsRaw();
+            events = ReadEventsRaw();
+        }
+        catch (Exception ex)
+        {
+            logger?.Debug($"Failed to read Events for provider {providerName}. Exception:\n{ex}");
+            channels = ReadOnlyDictionary<uint, string>.Empty;
+            events = [];
+        }
+
+        return new RawProviderContent
+        {
+            ProviderName = providerName,
+            PublisherGuid = PublisherGuid,
+            ResourceFilePath = ResourceFilePath,
+            ResolveMessage = FormatMessageById,
+            Channels = channels,
+            Events = events,
+            Keywords = keywords,
+            Opcodes = opcodes,
+            Tasks = tasks
+        };
+    }
+
     private static object GetEventMetadataProperty(EvtHandle metadataHandle, EvtEventMetadataPropertyId propertyId)
     {
         IntPtr buffer = IntPtr.Zero;
@@ -559,5 +641,87 @@ internal sealed class ProviderMetadata
         {
             Marshal.FreeHGlobal(buffer);
         }
+    }
+
+    private Dictionary<uint, string> ReadChannelsRaw()
+    {
+        using EvtHandle channelRefHandle =
+            GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId.ChannelReferences);
+
+        int size = NativeMethods.GetObjectArraySize(channelRefHandle);
+
+        Dictionary<uint, string> channels = new(size);
+
+        for (int i = 0; i < size; i++)
+        {
+            uint channelId = (uint)NativeMethods.GetObjectArrayProperty(
+                channelRefHandle,
+                i,
+                EvtPublisherMetadataPropertyId.ChannelReferenceID);
+
+            string channelName = (string)NativeMethods.GetObjectArrayProperty(
+                channelRefHandle,
+                i,
+                EvtPublisherMetadataPropertyId.ChannelReferencePath);
+
+            channels.TryAdd(channelId, channelName);
+        }
+
+        return channels;
+    }
+
+    private List<RawProviderEvent> ReadEventsRaw()
+    {
+        List<RawProviderEvent> events = [];
+
+        using EvtHandle handle = NativeMethods.EvtOpenEventMetadataEnum(_publisherMetadataHandle, 0);
+
+        if (handle.IsInvalid) { return events; }
+
+        while (true)
+        {
+            using EvtHandle? metadataHandle = NextEventMetadata(handle, 0);
+
+            if (metadataHandle is null) { break; }
+
+            uint id = (uint)GetEventMetadataProperty(metadataHandle, EvtEventMetadataPropertyId.ID);
+            byte version = (byte)(uint)GetEventMetadataProperty(metadataHandle, EvtEventMetadataPropertyId.Version);
+            byte channelId = (byte)(uint)GetEventMetadataProperty(metadataHandle, EvtEventMetadataPropertyId.Channel);
+            byte level = (byte)(uint)GetEventMetadataProperty(metadataHandle, EvtEventMetadataPropertyId.Level);
+            byte opcode = (byte)(uint)GetEventMetadataProperty(metadataHandle, EvtEventMetadataPropertyId.Opcode);
+            short task = (short)(uint)GetEventMetadataProperty(metadataHandle, EvtEventMetadataPropertyId.Task);
+            ulong keywords = (ulong)GetEventMetadataProperty(metadataHandle, EvtEventMetadataPropertyId.Keyword);
+            string template = (string)GetEventMetadataProperty(metadataHandle, EvtEventMetadataPropertyId.Template);
+            uint messageId = (uint)GetEventMetadataProperty(metadataHandle, EvtEventMetadataPropertyId.MessageID);
+
+            events.Add(new RawProviderEvent(id, version, channelId, level, opcode, task, keywords, template, messageId));
+        }
+
+        return events;
+    }
+
+    private List<RawNamedValue> ReadNamedValues(
+        EvtPublisherMetadataPropertyId tableId,
+        EvtPublisherMetadataPropertyId nameId,
+        EvtPublisherMetadataPropertyId valueId,
+        EvtPublisherMetadataPropertyId messageIdId,
+        Func<object, ulong> unboxValue)
+    {
+        using EvtHandle handle = GetPublisherMetadataPropertyHandle(tableId);
+
+        int size = NativeMethods.GetObjectArraySize(handle);
+
+        List<RawNamedValue> entries = new(size);
+
+        for (int i = 0; i < size; i++)
+        {
+            string name = (string)NativeMethods.GetObjectArrayProperty(handle, i, nameId);
+            ulong value = unboxValue(NativeMethods.GetObjectArrayProperty(handle, i, valueId));
+            uint messageId = (uint)NativeMethods.GetObjectArrayProperty(handle, i, messageIdId);
+
+            entries.Add(new RawNamedValue(value, messageId, name));
+        }
+
+        return entries;
     }
 }
