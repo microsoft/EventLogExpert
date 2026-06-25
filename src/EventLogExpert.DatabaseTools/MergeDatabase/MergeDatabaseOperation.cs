@@ -146,7 +146,7 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
                 }
             }
 
-            logger.Information($"Copying providers from the source...");
+            logger.Information($"Copying provider versions from the source...");
 
             var skipForLoad = request.Overwrite ? null : identitiesAlreadyInTarget;
 
@@ -195,7 +195,7 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
             await transaction.CommitAsync(cancellationToken);
 
             logger.Information($"");
-            logger.Information($"Copied {copiedCount} provider(s).");
+            logger.Information($"Copied {copiedCount} provider version(s).");
 
             return DatabaseToolsOutcome.Succeeded;
         }

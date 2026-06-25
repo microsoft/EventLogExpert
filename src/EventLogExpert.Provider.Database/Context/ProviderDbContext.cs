@@ -298,9 +298,13 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // INVARIANT: any change to the persisted ProviderDetails model (columns, key, or converters) MUST bump
-        // DatabaseSchemaVersion.Current. Detection trusts the stored user_version stamp over the column shape, so a model
-        // change without a version bump would let a stamped-but-old-shape database read as canonical and crash EF.
+        // INVARIANT: once a build that stamps the canonical user_version has shipped, any change to the persisted
+        // ProviderDetails model (columns, key, or converters) MUST bump DatabaseSchemaVersion.Current - detection
+        // trusts the stored stamp over the column shape, so a model change without a bump would let a stamped
+        // old-shape database read as canonical and crash EF. During the prerelease window (no stamped build has
+        // shipped yet) the v4 shape is still being finalized in place WITHOUT bumping: every real database is
+        // unstamped (user_version=0) and rebuilds through the upgrade path, and the dev-only (DEBUG) shape self-heal
+        // (see IsCanonicalShape) rebuilds stamped developer databases whose columns no longer match the model.
         modelBuilder.Entity<ProviderDetails>()
             .HasKey(e => new { e.ProviderName, e.VersionKey });
 
