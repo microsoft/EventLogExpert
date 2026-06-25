@@ -30,6 +30,26 @@ public sealed class ProviderSourceTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadProviderIdentities_NonAsciiCaseVariantNames_ReturnsDeterministicOrder()
+    {
+        // Two names differing only by non-ASCII case (U+00C9 vs U+00E9) are distinct identities but tie under the
+        // OrdinalIgnoreCase primary sort; the ordinal tiebreak must order them deterministically (U+00C9 < U+00E9)
+        // regardless of the source HashSet's iteration order.
+        var dbPath = CreateTempDb();
+        DatabaseTestUtils.CreateV4Database(dbPath,
+            DatabaseTestUtils.BuildProviderDetails("Provider-\u00e9"),
+            DatabaseTestUtils.BuildProviderDetails("Provider-\u00c9"));
+        var logger = Substitute.For<ITraceLogger>();
+
+        var identities = await ProviderSource.LoadProviderIdentitiesAsync(
+            dbPath, logger, cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            ["Provider-\u00c9", "Provider-\u00e9"],
+            identities.Select(identity => identity.ProviderName).ToList());
+    }
+
+    [Fact]
     public async Task LoadProviders_NonAsciiCaseVariantNamesInOneDatabase_LoadsBoth()
     {
         // Arrange - SQLite's NOCASE primary-key collation folds only ASCII, so provider names differing solely by

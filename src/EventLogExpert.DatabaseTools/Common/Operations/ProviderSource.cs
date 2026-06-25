@@ -57,6 +57,7 @@ internal static class ProviderSource
 
         return identities
             .OrderBy(identity => identity.ProviderName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(identity => identity.ProviderName, StringComparer.Ordinal)
             .ThenBy(identity => identity.VersionKey, StringComparer.Ordinal)
             .ToList();
     }
