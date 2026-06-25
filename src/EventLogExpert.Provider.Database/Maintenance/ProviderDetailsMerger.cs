@@ -49,6 +49,35 @@ internal static class ProviderDetailsMerger
         return merged;
     }
 
+    private static int CompareOrdinalNullLowest(string? candidate, string? current)
+    {
+        if (candidate is null && current is null) { return 0; }
+
+        if (candidate is null) { return -1; }
+
+        return current is null ? 1 : string.CompareOrdinal(candidate, current);
+    }
+
+    // A total order over provenance for a deterministic merge pick: recency first (the shared order), then the
+    // non-ordinal fields by ordinal string comparison (null lowest), so two rows that tie on recency but differ on
+    // edition / display version / raw file-version string still resolve to the same winner regardless of row order.
+    private static int CompareProvenanceForMerge(ProviderDetails candidate, ProviderDetails current)
+    {
+        var byRecency = ProviderSourceRecency.Compare(candidate, current);
+
+        if (byRecency != 0) { return byRecency; }
+
+        var byEdition = CompareOrdinalNullLowest(candidate.SourceOsEdition, current.SourceOsEdition);
+
+        if (byEdition != 0) { return byEdition; }
+
+        var byDisplayVersion = CompareOrdinalNullLowest(candidate.SourceOsDisplayVersion, current.SourceOsDisplayVersion);
+
+        return byDisplayVersion != 0 ?
+            byDisplayVersion :
+            CompareOrdinalNullLowest(candidate.MessageFileVersion, current.MessageFileVersion);
+    }
+
     // Rows in a group share the same (ProviderName, VersionKey) identity (the grouping key), so the merged row carries
     // that VersionKey forward; only name case-folding differences and duplicate content are collapsed. The identity keys
     // and equivalence rules come from ProviderContentMerge so the database-merge path and the resolve-time multi-version
@@ -57,6 +86,8 @@ internal static class ProviderDetailsMerger
     private static ProviderDetails MergeGroup(List<ProviderDetails> group, string databasePath)
     {
         var canonicalName = group[0].ProviderName;
+
+        var newestProvenance = SelectNewestProvenanceRow(group);
 
         return new ProviderDetails
         {
@@ -120,11 +151,23 @@ internal static class ProviderDetailsMerger
                     $"Provider '{canonicalName}' has conflicting ResolvedFromOwningPublisher values: " +
                     $"'{winner}' vs '{value}'.")),
 
-            SourceOsBuild = group.Select(static row => row.SourceOsBuild).FirstOrDefault(static value => value.HasValue),
-            SourceOsRevision = group.Select(static row => row.SourceOsRevision).FirstOrDefault(static value => value.HasValue),
-            SourceOsEdition = group.Select(static row => row.SourceOsEdition).FirstOrDefault(static value => !string.IsNullOrEmpty(value)),
-            SourceOsDisplayVersion = group.Select(static row => row.SourceOsDisplayVersion).FirstOrDefault(static value => !string.IsNullOrEmpty(value)),
-            MessageFileVersion = group.Select(static row => row.MessageFileVersion).FirstOrDefault(static value => !string.IsNullOrEmpty(value))
+            SourceOsBuild = newestProvenance.SourceOsBuild,
+            SourceOsRevision = newestProvenance.SourceOsRevision,
+            SourceOsEdition = newestProvenance.SourceOsEdition,
+            SourceOsDisplayVersion = newestProvenance.SourceOsDisplayVersion,
+            MessageFileVersion = newestProvenance.MessageFileVersion
         };
+    }
+
+    private static ProviderDetails SelectNewestProvenanceRow(List<ProviderDetails> group)
+    {
+        var newest = group[0];
+
+        for (var index = 1; index < group.Count; index++)
+        {
+            if (CompareProvenanceForMerge(group[index], newest) > 0) { newest = group[index]; }
+        }
+
+        return newest;
     }
 }

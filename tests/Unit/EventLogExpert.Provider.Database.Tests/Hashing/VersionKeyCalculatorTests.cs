@@ -191,7 +191,7 @@ public sealed class VersionKeyCalculatorTests
     public void EventModelProperties_AreAllAccountedForInTheHash()
     {
         // Drift guard: adding or removing an EventModel property fails this. When it does, update EncodeEvent in
-        // ProviderContentCanonicalizer AND ProviderDetailsMerger.EventsAreEquivalent in lockstep, then this set.
+        // ProviderContentCanonicalizer AND ProviderContentMerge.EventsAreEquivalent in lockstep, then this set.
         var properties = typeof(EventModel).GetProperties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal);
 
         Assert.Equal(

@@ -28,7 +28,7 @@ public static class ProviderVersionSelector
             // Completeness is primary; recency (newest source) breaks completeness ties so a newer-but-empty capture
             // never beats an older-but-populated one. A full tie keeps the current best, so the newest-first load
             // order remains the final deterministic tiebreak.
-            if (comparison == 0) { comparison = CompareRecency(candidate, best); }
+            if (comparison == 0) { comparison = ProviderSourceRecency.Compare(candidate, best); }
 
             if (comparison > 0)
             {
@@ -38,43 +38,6 @@ public static class ProviderVersionSelector
         }
 
         return best;
-    }
-
-    private static int CompareFileVersion(string? candidate, string? current)
-    {
-        var candidateVersion = TryParseVersion(candidate);
-        var currentVersion = TryParseVersion(current);
-
-        if (candidateVersion is not null && currentVersion is not null)
-        {
-            return candidateVersion.CompareTo(currentVersion);
-        }
-
-        if (candidateVersion is not null) { return 1; }
-
-        return currentVersion is not null ? -1 : 0;
-    }
-
-    private static int CompareNullableInt(int? candidate, int? current)
-    {
-        if (candidate.HasValue && current.HasValue) { return candidate.Value.CompareTo(current.Value); }
-
-        if (candidate.HasValue) { return 1; }
-
-        return current.HasValue ? -1 : 0;
-    }
-
-    private static int CompareRecency(ProviderDetails candidate, ProviderDetails current)
-    {
-        var byBuild = CompareNullableInt(candidate.SourceOsBuild, current.SourceOsBuild);
-
-        if (byBuild != 0) { return byBuild; }
-
-        var byRevision = CompareNullableInt(candidate.SourceOsRevision, current.SourceOsRevision);
-
-        return byRevision != 0 ?
-            byRevision :
-            CompareFileVersion(candidate.MessageFileVersion, current.MessageFileVersion);
     }
 
     private static CompletenessScore ScoreOf(ProviderDetails provider)
@@ -94,8 +57,6 @@ public static class ProviderVersionSelector
 
         return new CompletenessScore(nonEmptyDescriptions, totalDescriptionLength, provider.MessageSource?.Count ?? 0);
     }
-
-    private static Version? TryParseVersion(string? value) => Version.TryParse(value, out var version) ? version : null;
 
     private readonly record struct CompletenessScore(int NonEmptyDescriptions, long TotalDescriptionLength, int MessageCount)
         : IComparable<CompletenessScore>

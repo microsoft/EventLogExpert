@@ -11,9 +11,9 @@ namespace EventLogExpert.ProviderDatabase.Hashing;
 ///     Computes a provider's content <see cref="ProviderDetails.VersionKey" />: a hash of its canonical rendering
 ///     payload (<see cref="ProviderContentCanonicalizer" />). Two providers with identical payloads - across machines or
 ///     OS builds - get the same key and collapse to one database row; genuinely different payloads get different keys and
-///     coexist as separate versions of the same provider name. Stamped at build ingress (<c>CreateDatabaseOperation</c> /
-///     <c>MergeDatabaseOperation</c> / <c>DiffDatabaseOperation</c>) before the row is persisted, so the composite
-///     <c>(ProviderName, VersionKey)</c> primary key can hold distinct versions of one name.
+///     coexist as separate versions of the same provider name. Stamped when a provider is first ingested from a live scan
+///     (<c>CreateDatabaseOperation</c>); the merge and diff operations copy already-stamped rows unchanged. The composite
+///     <c>(ProviderName, VersionKey)</c> primary key can therefore hold distinct versions of one name.
 /// </summary>
 public static class VersionKeyCalculator
 {
@@ -39,7 +39,7 @@ public static class VersionKeyCalculator
     /// </summary>
     private static string ToBase32Lower(ReadOnlySpan<byte> data)
     {
-        const string alphabet = "abcdefghijklmnopqrstuvwxyz234567";
+        const string Alphabet = "abcdefghijklmnopqrstuvwxyz234567";
 
         var output = new StringBuilder((data.Length * 8 + 4) / 5);
         var accumulator = 0;
@@ -53,7 +53,7 @@ public static class VersionKeyCalculator
             while (bitsBuffered >= 5)
             {
                 bitsBuffered -= 5;
-                output.Append(alphabet[(accumulator >> bitsBuffered) & 0x1F]);
+                output.Append(Alphabet[(accumulator >> bitsBuffered) & 0x1F]);
             }
 
             accumulator &= (1 << bitsBuffered) - 1;
@@ -61,7 +61,7 @@ public static class VersionKeyCalculator
 
         if (bitsBuffered > 0)
         {
-            output.Append(alphabet[(accumulator << (5 - bitsBuffered)) & 0x1F]);
+            output.Append(Alphabet[(accumulator << (5 - bitsBuffered)) & 0x1F]);
         }
 
         return output.ToString();
