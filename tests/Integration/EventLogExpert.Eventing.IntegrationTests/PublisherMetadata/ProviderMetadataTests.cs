@@ -6,53 +6,11 @@ using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using NSubstitute;
-using System.Collections.ObjectModel;
 
 namespace EventLogExpert.Eventing.IntegrationTests.PublisherMetadata;
 
 public sealed class ProviderMetadataTests
 {
-    [Fact]
-    public async Task Channels_WhenAccessedConcurrently_ShouldReturnValidData()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var tasks = new[]
-        {
-            Task.Run(() => metadata?.Channels),
-            Task.Run(() => metadata?.Channels),
-            Task.Run(() => metadata?.Channels)
-        };
-
-        await Task.WhenAll(tasks);
-
-        // Assert
-        var results = tasks.Select(t => t.Result).ToList();
-        Assert.All(results, r =>
-        {
-            Assert.NotNull(r);
-            Assert.NotEmpty(r);
-        });
-    }
-
-    [Fact]
-    public void Channels_WhenCalledMultipleTimes_ShouldReturnSameInstance()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var channels1 = metadata?.Channels;
-        var channels2 = metadata?.Channels;
-
-        // Assert
-        Assert.NotNull(channels1);
-        Assert.NotNull(channels2);
-        Assert.Same(channels1, channels2);
-    }
-
     [Fact]
     public void Channels_WhenProviderHasChannels_ShouldHaveValidKeys()
     {
@@ -60,7 +18,7 @@ public sealed class ProviderMetadataTests
         var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
-        var channels = metadata?.Channels;
+        var channels = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Channels;
 
         // Assert
         Assert.NotNull(channels);
@@ -74,46 +32,17 @@ public sealed class ProviderMetadataTests
     }
 
     [Fact]
-    public void Channels_WhenProviderHasNoDuplicateChannelIds_ShouldNotLoseData()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var channels = metadata?.Channels;
-
-        // Assert
-        Assert.NotNull(channels);
-        var uniqueIds = channels.Keys.Distinct().Count();
-        Assert.Equal(channels.Count, uniqueIds);
-    }
-
-    [Fact]
     public void Channels_WhenValidProvider_ShouldContainData()
     {
         // Arrange
         var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
-        var channels = metadata?.Channels;
+        var channels = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Channels;
 
         // Assert
         Assert.NotNull(channels);
         Assert.NotEmpty(channels);
-    }
-
-    [Fact]
-    public void Channels_WhenValidProvider_ShouldReturnReadOnlyDictionary()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var channels = metadata?.Channels;
-
-        // Assert
-        Assert.NotNull(channels);
-        Assert.IsAssignableFrom<ReadOnlyDictionary<uint, string>>(channels);
     }
 
     [Theory]
@@ -258,16 +187,15 @@ public sealed class ProviderMetadataTests
         var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
-        var events = metadata?.Events?.ToList();
+        var events = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Events;
 
         // Assert
         Assert.NotNull(events);
 
         if (events.Count == 0) { return; }
 
-        var firstEvent = events.First();
-        Assert.True(firstEvent.Id >= 0);
-        Assert.True(firstEvent.Version >= 0);
+        var firstEvent = events[0];
+        Assert.True(firstEvent.Id > 0);
     }
 
     [Fact]
@@ -277,7 +205,7 @@ public sealed class ProviderMetadataTests
         var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
-        var events = metadata?.Events?.ToList();
+        var events = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Events;
 
         // Assert
         Assert.NotNull(events);
@@ -285,10 +213,10 @@ public sealed class ProviderMetadataTests
         if (events.Count == 0) { return; }
 
         Assert.All(events,
-            e =>
+            providerEvent =>
             {
-                Assert.NotNull(e);
-                Assert.True(e.Id > 0);
+                Assert.NotNull(providerEvent);
+                Assert.True(providerEvent.Id > 0);
             });
     }
 
@@ -299,51 +227,11 @@ public sealed class ProviderMetadataTests
         var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
-        var events = metadata?.Events?.ToList();
+        var events = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Events;
 
         // Assert
         Assert.NotNull(events);
         Assert.NotEmpty(events);
-    }
-
-    [Fact]
-    public async Task Keywords_WhenAccessedConcurrently_ShouldReturnValidData()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.PowerShellLogName);
-
-        // Act
-        var tasks = new[]
-        {
-            Task.Run(() => metadata?.Keywords),
-            Task.Run(() => metadata?.Keywords),
-            Task.Run(() => metadata?.Keywords)
-        };
-
-        await Task.WhenAll(tasks);
-
-        // Assert
-        var results = tasks.Select(t => t.Result).ToList();
-        Assert.All(results, r => Assert.NotNull(r));
-        // Verify all results have the same count (cached properly)
-        var firstCount = results[0]?.Count ?? 0;
-        Assert.All(results, r => Assert.Equal(firstCount, r?.Count ?? 0));
-    }
-
-    [Fact]
-    public void Keywords_WhenCalledMultipleTimes_ShouldReturnSameInstance()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var keywords1 = metadata?.Keywords;
-        var keywords2 = metadata?.Keywords;
-
-        // Assert
-        Assert.NotNull(keywords1);
-        Assert.NotNull(keywords2);
-        Assert.Same(keywords1, keywords2);
     }
 
     [Fact]
@@ -353,7 +241,7 @@ public sealed class ProviderMetadataTests
         var metadata = ProviderMetadata.Create(Constants.PowerShellLogName);
 
         // Act
-        var keywords = metadata?.Keywords;
+        var keywords = metadata?.ToRawContent(Constants.PowerShellLogName, null).Keywords;
 
         // Assert
         Assert.NotNull(keywords);
@@ -372,45 +260,17 @@ public sealed class ProviderMetadataTests
         var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
-        var keywords = metadata?.Keywords;
+        var keywords = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Keywords;
 
         // Assert
         Assert.NotNull(keywords);
 
+        // Each raw entry carries a name source: an inline name, or a message id to resolve.
         Assert.All(keywords,
             keyword =>
             {
-                Assert.False(string.IsNullOrEmpty(keyword.Value));
+                Assert.True(keyword.MessageId != uint.MaxValue || !string.IsNullOrEmpty(keyword.InlineName));
             });
-    }
-
-    [Fact]
-    public void Keywords_WhenProviderHasNoDuplicateKeywordValues_ShouldNotLoseData()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var keywords = metadata?.Keywords;
-
-        // Assert
-        Assert.NotNull(keywords);
-        var uniqueValues = keywords.Keys.Distinct().Count();
-        Assert.Equal(keywords.Count, uniqueValues);
-    }
-
-    [Fact]
-    public void Keywords_WhenValidProvider_ShouldReturnReadOnlyDictionary()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var keywords = metadata?.Keywords;
-
-        // Assert
-        Assert.NotNull(keywords);
-        Assert.IsAssignableFrom<ReadOnlyDictionary<long, string>>(keywords);
     }
 
     [Fact]
@@ -489,77 +349,22 @@ public sealed class ProviderMetadataTests
     }
 
     [Fact]
-    public async Task Opcodes_WhenAccessedConcurrently_ShouldReturnValidData()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var tasks = new[]
-        {
-            Task.Run(() => metadata?.Opcodes),
-            Task.Run(() => metadata?.Opcodes),
-            Task.Run(() => metadata?.Opcodes)
-        };
-
-        await Task.WhenAll(tasks);
-
-        // Assert
-        var results = tasks.Select(t => t.Result).ToList();
-        Assert.All(results, r =>
-        {
-            Assert.NotNull(r);
-            Assert.NotEmpty(r);
-        });
-    }
-
-    [Fact]
-    public void Opcodes_WhenCalledMultipleTimes_ShouldReturnSameInstance()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var opcodes1 = metadata?.Opcodes;
-        var opcodes2 = metadata?.Opcodes;
-
-        // Assert
-        Assert.NotNull(opcodes1);
-        Assert.NotNull(opcodes2);
-        Assert.Same(opcodes1, opcodes2);
-    }
-
-    [Fact]
-    public void Opcodes_WhenProviderHasNoDuplicateOpcodeValues_ShouldNotLoseData()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var opcodes = metadata?.Opcodes;
-
-        // Assert
-        Assert.NotNull(opcodes);
-        var uniqueValues = opcodes.Keys.Distinct().Count();
-        Assert.Equal(opcodes.Count, uniqueValues);
-    }
-
-    [Fact]
     public void Opcodes_WhenProviderHasOpcodes_ShouldHaveValidValues()
     {
         // Arrange
         var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
-        var opcodes = metadata?.Opcodes;
+        var opcodes = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Opcodes;
 
         // Assert
         Assert.NotNull(opcodes);
 
+        // Each raw entry carries a name source: an inline name, or a message id to resolve.
         Assert.All(opcodes,
             opcode =>
             {
-                Assert.False(string.IsNullOrEmpty(opcode.Value));
+                Assert.True(opcode.MessageId != uint.MaxValue || !string.IsNullOrEmpty(opcode.InlineName));
             });
     }
 
@@ -570,25 +375,11 @@ public sealed class ProviderMetadataTests
         var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
-        var opcodes = metadata?.Opcodes;
+        var opcodes = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Opcodes;
 
         // Assert
         Assert.NotNull(opcodes);
         Assert.NotEmpty(opcodes);
-    }
-
-    [Fact]
-    public void Opcodes_WhenValidProvider_ShouldReturnReadOnlyDictionary()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var opcodes = metadata?.Opcodes;
-
-        // Assert
-        Assert.NotNull(opcodes);
-        Assert.IsAssignableFrom<ReadOnlyDictionary<int, string>>(opcodes);
     }
 
     [Fact]
@@ -639,77 +430,22 @@ public sealed class ProviderMetadataTests
     }
 
     [Fact]
-    public async Task Tasks_WhenAccessedConcurrently_ShouldReturnValidData()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var tasks = new[]
-        {
-            Task.Run(() => metadata?.Tasks),
-            Task.Run(() => metadata?.Tasks),
-            Task.Run(() => metadata?.Tasks)
-        };
-
-        await Task.WhenAll(tasks);
-
-        // Assert
-        var results = tasks.Select(t => t.Result).ToList();
-        Assert.All(results, r =>
-        {
-            Assert.NotNull(r);
-            Assert.NotEmpty(r);
-        });
-    }
-
-    [Fact]
-    public void Tasks_WhenCalledMultipleTimes_ShouldReturnSameInstance()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var tasks1 = metadata?.Tasks;
-        var tasks2 = metadata?.Tasks;
-
-        // Assert
-        Assert.NotNull(tasks1);
-        Assert.NotNull(tasks2);
-        Assert.Same(tasks1, tasks2);
-    }
-
-    [Fact]
-    public void Tasks_WhenProviderHasNoDuplicateTaskValues_ShouldNotLoseData()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var tasks = metadata?.Tasks;
-
-        // Assert
-        Assert.NotNull(tasks);
-        var uniqueValues = tasks.Keys.Distinct().Count();
-        Assert.Equal(tasks.Count, uniqueValues);
-    }
-
-    [Fact]
     public void Tasks_WhenProviderHasTasks_ShouldHaveValidValues()
     {
         // Arrange
         var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
-        var tasks = metadata?.Tasks;
+        var tasks = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Tasks;
 
         // Assert
         Assert.NotNull(tasks);
 
+        // Each raw entry carries a name source: an inline name, or a message id to resolve.
         Assert.All(tasks,
             task =>
             {
-                Assert.False(string.IsNullOrEmpty(task.Value));
+                Assert.True(task.MessageId != uint.MaxValue || !string.IsNullOrEmpty(task.InlineName));
             });
     }
 
@@ -720,24 +456,10 @@ public sealed class ProviderMetadataTests
         var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
-        var tasks = metadata?.Tasks;
+        var tasks = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Tasks;
 
         // Assert
         Assert.NotNull(tasks);
         Assert.NotEmpty(tasks);
-    }
-
-    [Fact]
-    public void Tasks_WhenValidProvider_ShouldReturnReadOnlyDictionary()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var tasks = metadata?.Tasks;
-
-        // Assert
-        Assert.NotNull(tasks);
-        Assert.IsAssignableFrom<ReadOnlyDictionary<int, string>>(tasks);
     }
 }

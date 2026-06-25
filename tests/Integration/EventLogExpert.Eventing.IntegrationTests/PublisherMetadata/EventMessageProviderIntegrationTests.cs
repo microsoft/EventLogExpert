@@ -70,22 +70,6 @@ public sealed class EventMessageProviderIntegrationTests
     }
 
     [Fact]
-    public void LoadProviderDetails_WhenCalledMultipleTimes_ShouldReturnConsistentResults()
-    {
-        // Arrange
-        EventMessageProvider provider = new(Constants.TestProviderName);
-
-        // Act
-        var details1 = provider.LoadProviderDetails();
-        var details2 = provider.LoadProviderDetails();
-
-        // Assert
-        Assert.NotNull(details1);
-        Assert.NotNull(details2);
-        Assert.Equal(details1.ProviderName, details2.ProviderName);
-    }
-
-    [Fact]
     public void LoadProviderDetails_WhenCalled_ShouldHaveNonNullCollections()
     {
         // Arrange
@@ -116,6 +100,22 @@ public sealed class EventMessageProviderIntegrationTests
         // Assert
         Assert.NotNull(details);
         Assert.Equal(Constants.TestProviderName, details.ProviderName);
+    }
+
+    [Fact]
+    public void LoadProviderDetails_WhenCalledMultipleTimes_ShouldReturnConsistentResults()
+    {
+        // Arrange
+        EventMessageProvider provider = new(Constants.TestProviderName);
+
+        // Act
+        var details1 = provider.LoadProviderDetails();
+        var details2 = provider.LoadProviderDetails();
+
+        // Assert
+        Assert.NotNull(details1);
+        Assert.NotNull(details2);
+        Assert.Equal(details1.ProviderName, details2.ProviderName);
     }
 
     [Fact]
@@ -201,6 +201,25 @@ public sealed class EventMessageProviderIntegrationTests
         // Assert
         Assert.NotNull(details);
         Assert.Equal(Constants.TestProviderName, details.ProviderName);
+    }
+
+    [Fact]
+    public void LoadProviderDetails_WhenStableProvider_ShouldResolveNamedValues()
+    {
+        // End-to-end: the modern path (ToRawContent -> ProviderDetailsAssembler) must resolve the raw keyword/opcode/task
+        // message ids into non-empty display names for a real provider, not merely read the raw rows.
+        EventMessageProvider provider = new(Constants.SecurityAuditingLogName);
+
+        var details = provider.LoadProviderDetails();
+
+        Assert.NotNull(details);
+        Assert.SkipUnless(!details.IsEmpty, "Test requires the Microsoft-Windows-Security-Auditing provider on the host.");
+
+        var resolvedNames = details.Keywords.Values
+            .Concat(details.Opcodes.Values)
+            .Concat(details.Tasks.Values);
+
+        Assert.Contains(resolvedNames, name => !string.IsNullOrEmpty(name));
     }
 
     private static bool TryFindChannelWithDistinctOwningPublisher(out string? channelName, out string? owningPublisher)
