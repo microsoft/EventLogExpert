@@ -5,14 +5,14 @@ using EventLogExpert.Eventing.PublisherMetadata;
 
 namespace EventLogExpert.Eventing.Tests.PublisherMetadata;
 
-public sealed class EventMessageProviderTests
+public sealed class ProviderDetailsAssemblerTests
 {
     [Fact]
     public void InjectMapAttribute_DataSourcePrefix_InjectsIntoTheRealDataElement()
     {
         string template = "<template><dataSource name=\"BusType\"/><data name=\"BusType\"/></template>";
 
-        string result = EventMessageProvider.InjectMapAttribute(template, "BusType", "BusTypeMap");
+        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "BusType", "BusTypeMap");
 
         Assert.Equal(
             "<template><dataSource name=\"BusType\"/><data name=\"BusType\" map=\"BusTypeMap\"/></template>",
@@ -24,7 +24,7 @@ public sealed class EventMessageProviderTests
     {
         string template = "<template><dataSource name=\"BusType\"/><data name=\"Volume\"/></template>";
 
-        string result = EventMessageProvider.InjectMapAttribute(template, "BusType", "BusTypeMap");
+        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "BusType", "BusTypeMap");
 
         Assert.Equal(template, result);
         Assert.DoesNotContain("map=", result);
@@ -35,7 +35,7 @@ public sealed class EventMessageProviderTests
     {
         string template = "<template><data name=\"Other\" inType=\"win:UInt32\"/></template>";
 
-        string result = EventMessageProvider.InjectMapAttribute(template, "BusType", "BusTypeMap");
+        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "BusType", "BusTypeMap");
 
         Assert.Equal(template, result);
     }
@@ -45,7 +45,7 @@ public sealed class EventMessageProviderTests
     {
         string template = "<template><data name=\"BusType\" inType=\"win:UInt32\"/></template>";
 
-        string result = EventMessageProvider.InjectMapAttribute(template, "BusType", "BusTypeMap");
+        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "BusType", "BusTypeMap");
 
         Assert.Equal(
             "<template><data name=\"BusType\" map=\"BusTypeMap\" inType=\"win:UInt32\"/></template>",
@@ -57,7 +57,7 @@ public sealed class EventMessageProviderTests
     {
         string template = "<template><data name=\"BusType\"/></template>";
 
-        string result = EventMessageProvider.InjectMapAttribute(template, "Bus", "BusMap");
+        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "Bus", "BusMap");
 
         Assert.Equal(template, result);
     }
@@ -67,7 +67,7 @@ public sealed class EventMessageProviderTests
     {
         string template = "<template><data name=\"Bus\"/><data name=\"BusType\"/></template>";
 
-        string result = EventMessageProvider.InjectMapAttribute(template, "BusType", "BusTypeMap");
+        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "BusType", "BusTypeMap");
 
         Assert.Equal(
             "<template><data name=\"Bus\"/><data name=\"BusType\" map=\"BusTypeMap\"/></template>",
@@ -79,7 +79,7 @@ public sealed class EventMessageProviderTests
     {
         string template = "<template><struct name=\"BusType\"/></template>";
 
-        string result = EventMessageProvider.InjectMapAttribute(template, "BusType", "BusTypeMap");
+        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "BusType", "BusTypeMap");
 
         Assert.Equal(template, result);
     }

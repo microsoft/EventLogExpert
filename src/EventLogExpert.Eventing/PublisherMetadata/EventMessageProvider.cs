@@ -29,43 +29,6 @@ public sealed class EventMessageProvider(
 
     public ProviderDetails LoadProviderDetails() => LoadProviderDetailsCore(null);
 
-    internal static string InjectMapAttribute(string template, string fieldName, string mapName)
-    {
-        string nameAttribute = $"name=\"{fieldName}\"";
-        int searchStart = 0;
-
-        while (true)
-        {
-            int dataIndex = template.IndexOf("<data", searchStart, StringComparison.OrdinalIgnoreCase);
-
-            if (dataIndex < 0) { return template; }
-
-            int afterTag = dataIndex + "<data".Length;
-            char delimiter = afterTag < template.Length ? template[afterTag] : '\0';
-
-            // "<data" prefixes "<dataSource"; only an element whose tag ends here is a real <data> node.
-            if (delimiter is not (' ' or '\t' or '\r' or '\n' or '>' or '/'))
-            {
-                searchStart = afterTag;
-
-                continue;
-            }
-
-            int elementEnd = template.IndexOf('>', afterTag);
-
-            if (elementEnd < 0) { return template; }
-
-            int nameIndex = template.IndexOf(nameAttribute, dataIndex, StringComparison.OrdinalIgnoreCase);
-
-            if (nameIndex >= 0 && nameIndex < elementEnd)
-            {
-                return template.Insert(nameIndex + nameAttribute.Length, $" map=\"{mapName}\"");
-            }
-
-            searchStart = elementEnd + 1;
-        }
-    }
-
     internal static List<MessageModel> LoadMessagesFromFiles(
         IEnumerable<string> legacyProviderFiles,
         string providerName,
@@ -84,38 +47,6 @@ public sealed class EventMessageProvider(
         }
 
         return messages;
-    }
-
-    private static void InjectMapAttributes(
-        IReadOnlyList<EventModel> events,
-        IReadOnlyDictionary<WevtEventKey, IReadOnlyDictionary<string, string>> eventFieldMaps,
-        IReadOnlyDictionary<string, ValueMapDefinition> decodedMaps)
-    {
-        if (eventFieldMaps.Count == 0) { return; }
-
-        foreach (EventModel model in events)
-        {
-            if (string.IsNullOrEmpty(model.Template)) { continue; }
-
-            if (!eventFieldMaps.TryGetValue(
-                    new WevtEventKey((uint)model.Id, model.Version),
-                    out IReadOnlyDictionary<string, string>? fieldMaps))
-            {
-                continue;
-            }
-
-            string template = model.Template;
-
-            foreach ((string fieldName, string mapName) in fieldMaps)
-            {
-                if (decodedMaps.ContainsKey(mapName))
-                {
-                    template = InjectMapAttribute(template, fieldName, mapName);
-                }
-            }
-
-            model.Template = template;
-        }
     }
 
     private LegacyMessageFileSource? BuildLazySource(IReadOnlyList<string> files)
@@ -149,63 +80,15 @@ public sealed class EventMessageProvider(
     {
         _logger?.Debug($"{nameof(LoadMessagesFromModernProvider)} called for provider {_providerName}");
 
-        var provider = new ProviderDetails { ProviderName = _providerName };
-
         if (!providerMetadata.IsLocaleMetadata && !s_allProviderNames.Contains(_providerName))
         {
             _logger?.Debug($"{_providerName} modern provider is not present. Returning empty provider.");
 
-            return provider;
+            return new ProviderDetails { ProviderName = _providerName };
         }
 
-        try
-        {
-            provider.Events = providerMetadata.Events.Select(e => new EventModel
-            {
-                Description = e.Description,
-                Id = e.Id,
-                Keywords = e.Keywords.ToArray(),
-                Level = e.Level,
-                LogName = e.LogName,
-                Opcode = e.Opcode,
-                Task = e.Task,
-                Template = e.Template,
-                Version = e.Version
-            }).ToArray();
-        }
-        catch (Exception ex)
-        {
-            _logger?.Debug($"Failed to load Events for modern provider: {_providerName}. Exception:\n{ex}");
-        }
-
-        try
-        {
-            provider.Keywords = providerMetadata.Keywords;
-        }
-        catch (Exception ex)
-        {
-            _logger?.Debug($"Failed to load Keywords for modern provider: {_providerName}. Exception:\n{ex}");
-        }
-
-        try
-        {
-            provider.Opcodes = providerMetadata.Opcodes;
-        }
-        catch (Exception ex)
-        {
-            _logger?.Debug($"Failed to load Opcodes for modern provider: {_providerName}. Exception:\n{ex}");
-        }
-
-        try
-        {
-            provider.Tasks = providerMetadata.Tasks;
-        }
-        catch (Exception ex)
-        {
-            _logger?.Debug($"Failed to load Tasks for modern provider: {_providerName}. Exception:\n{ex}");
-        }
-
-        PopulateValueMaps(provider, providerMetadata);
+        ProviderDetails provider =
+            ProviderDetailsAssembler.Assemble(providerMetadata.ToRawContent(_providerName, _logger), _logger);
 
         _logger?.Debug($"Returning {provider.Events.Count} events for provider {_providerName}");
 
@@ -271,80 +154,6 @@ public sealed class EventMessageProvider(
         }
 
         return provider;
-    }
-
-    private void PopulateValueMaps(ProviderDetails provider, ProviderMetadata providerMetadata)
-    {
-        try
-        {
-            Guid publisherGuid = providerMetadata.PublisherGuid;
-
-            if (publisherGuid == Guid.Empty) { return; }
-
-            string resourceFilePath = providerMetadata.ResourceFilePath;
-
-            if (string.IsNullOrEmpty(resourceFilePath)) { return; }
-
-            WevtTemplateData? templateData = WevtTemplateReader.TryRead(resourceFilePath, publisherGuid, _logger);
-
-            if (templateData is null || templateData.Maps.Count == 0) { return; }
-
-            Dictionary<string, ValueMapDefinition> decodedMaps = new(StringComparer.Ordinal);
-
-            foreach ((string mapName, WevtRawMap rawMap) in templateData.Maps)
-            {
-                ValueMapDefinition? definition = ResolveMap(rawMap, providerMetadata);
-
-                if (definition is not null)
-                {
-                    decodedMaps[mapName] = definition;
-                }
-            }
-
-            if (decodedMaps.Count == 0) { return; }
-
-            provider.Maps = decodedMaps;
-
-            InjectMapAttributes(provider.Events, templateData.EventFieldMaps, decodedMaps);
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException
-                                       and not StackOverflowException
-                                       and not AccessViolationException)
-        {
-            _logger?.Debug($"Failed to populate value maps for modern provider: {_providerName}. Exception:\n{ex}");
-        }
-    }
-
-    private ValueMapDefinition? ResolveMap(WevtRawMap rawMap, ProviderMetadata providerMetadata)
-    {
-        List<ValueMapEntry> entries = new(rawMap.Entries.Count);
-
-        foreach (WevtRawMapEntry entry in rawMap.Entries)
-        {
-            if (entry.MessageId == uint.MaxValue) { continue; }
-
-            string name;
-
-            try
-            {
-                name = providerMetadata.FormatMessageById(entry.MessageId);
-            }
-            catch (Exception ex) when (ex is not OutOfMemoryException
-                                           and not StackOverflowException
-                                           and not AccessViolationException)
-            {
-                _logger?.Debug(
-                    $"Failed to resolve map message {entry.MessageId} for provider {_providerName}: {ex.Message}");
-
-                continue;
-            }
-
-            if (string.IsNullOrEmpty(name)) { continue; }
-
-            entries.Add(new ValueMapEntry(entry.Value, name.TrimEnd('\0', '\r', '\n', '\t', ' ')));
-        }
-
-        return entries.Count > 0 ? new ValueMapDefinition(rawMap.IsBitMap, entries) : null;
     }
 
     // Stamps the provider with the newest 4-part numeric file version across its resolved message DLLs - the
