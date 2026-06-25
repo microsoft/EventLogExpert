@@ -93,6 +93,39 @@ public sealed class VersionKeyCalculatorTests
     }
 
     [Fact]
+    public void Compute_EventTemplateDifferentOutType_ChangesKey()
+    {
+        var first = EventUtils.CreateProvider("P",
+            events: [EventUtils.CreateEventModel(1, template: "<template><data name=\"V\" outType=\"xs:string\"/></template>")]);
+        var second = EventUtils.CreateProvider("P",
+            events: [EventUtils.CreateEventModel(1, template: "<template><data name=\"V\" outType=\"win:HexInt32\"/></template>")]);
+
+        Assert.NotEqual(VersionKeyCalculator.Compute(first), VersionKeyCalculator.Compute(second));
+    }
+
+    [Fact]
+    public void Compute_EventTemplateNullVersusEmpty_DoesNotChangeKey()
+    {
+        // A null template and an empty template both mean "no fields" and render identically, so they share a key.
+        var nullTemplate = EventUtils.CreateProvider("P", events: [EventUtils.CreateEventModel(1, template: null)]);
+        var emptyTemplate = EventUtils.CreateProvider("P", events: [EventUtils.CreateEventModel(1, template: "")]);
+
+        Assert.Equal(VersionKeyCalculator.Compute(nullTemplate), VersionKeyCalculator.Compute(emptyTemplate));
+    }
+
+    [Fact]
+    public void Compute_EventTemplateWhitespaceAndAttributeOrderOnly_DoesNotChangeKey()
+    {
+        // Live and offline producers serialize templates differently; identical render fields must collapse to one key.
+        var first = EventUtils.CreateProvider("P",
+            events: [EventUtils.CreateEventModel(1, template: "<template><data name=\"User\" outType=\"xs:string\"/></template>")]);
+        var second = EventUtils.CreateProvider("P",
+            events: [EventUtils.CreateEventModel(1, template: "<template>\r\n  <data  outType=\"xs:string\"   name=\"User\" />\r\n</template>")]);
+
+        Assert.Equal(VersionKeyCalculator.Compute(first), VersionKeyCalculator.Compute(second));
+    }
+
+    [Fact]
     public void Compute_ExcludesTopLevelAndMessageProviderName()
     {
         // Neither the top-level provider name (the identity key) nor the per-message ProviderName (which mirrors it)
@@ -191,7 +224,7 @@ public sealed class VersionKeyCalculatorTests
     public void EventModelProperties_AreAllAccountedForInTheHash()
     {
         // Drift guard: adding or removing an EventModel property fails this. When it does, update EncodeEvent in
-        // ProviderContentCanonicalizer AND ProviderContentMerge.EventsAreEquivalent in lockstep, then this set.
+        // ProviderContentEncoder AND ProviderContentMerge.EventsAreEquivalent in lockstep, then this set.
         var properties = typeof(EventModel).GetProperties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal);
 
         Assert.Equal(

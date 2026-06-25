@@ -397,6 +397,42 @@ public sealed class ProviderDetailsMergerTests
     }
 
     [Fact]
+    public void MergeCaseInsensitiveDuplicates_SameEventIdentityDifferentTemplateFields_Throws()
+    {
+        var rows = new List<ProviderDetails>
+        {
+            EventUtils.CreateProvider("Same-Provider",
+                events: [EventUtils.CreateEventModel(100, logName: "App", template: "<template><data name=\"User\" outType=\"xs:string\"/></template>")]),
+            EventUtils.CreateProvider("same-provider",
+                events: [EventUtils.CreateEventModel(100, logName: "App", template: "<template><data name=\"User\" outType=\"win:HexInt32\"/></template>")])
+        };
+
+        var ex = Assert.Throws<DatabaseUpgradeException>(() =>
+            ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(rows, TestDatabasePath));
+
+        Assert.Contains("Event", ex.Reason);
+    }
+
+    [Fact]
+    public void MergeCaseInsensitiveDuplicates_TemplatesDifferByteWiseButRenderIdentically_MergesWithoutThrowing()
+    {
+        // A live capture and an offline rebuild serialize the same event template differently. The merge compares
+        // templates by render-equivalence, so the rows collapse instead of being rejected as a conflict.
+        var rows = new List<ProviderDetails>
+        {
+            EventUtils.CreateProvider("Same-Provider",
+                events: [EventUtils.CreateEventModel(100, logName: "App", template: "<template><data name=\"User\" outType=\"xs:string\"/></template>")]),
+            EventUtils.CreateProvider("same-provider",
+                events: [EventUtils.CreateEventModel(100, logName: "App", template: "<template>\r\n  <data name=\"User\" outType=\"xs:string\" />\r\n</template>")])
+        };
+
+        var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(rows, TestDatabasePath);
+
+        var row = Assert.Single(merged);
+        Assert.Single(row.Events);
+    }
+
+    [Fact]
     public void MergeCaseInsensitiveDuplicates_TreatsEventsWithSameKeywordsInDifferentOrderAsEqual()
     {
         var rows = new List<ProviderDetails>

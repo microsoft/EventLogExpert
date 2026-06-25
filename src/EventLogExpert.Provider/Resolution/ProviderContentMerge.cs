@@ -63,7 +63,7 @@ public static class ProviderContentMerge
         left.Opcode == right.Opcode &&
         left.Task == right.Task &&
         KeywordsEqual(left.Keywords, right.Keywords) &&
-        string.Equals(left.Template, right.Template, StringComparison.Ordinal) &&
+        TemplateSignature.Equal(left.Template.AsSpan(), right.Template.AsSpan()) &&
         string.Equals(left.Description, right.Description, StringComparison.Ordinal);
 
     /// <summary>Extracts the <see cref="MessageIdentity" /> of a message row.</summary>

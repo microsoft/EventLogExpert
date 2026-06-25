@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Provider.Resolution;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
@@ -180,81 +181,30 @@ internal sealed class TemplateAnalyzer
         return new TemplateMetadata(visibleCount, allOutTypes, visibleOutTypes, allMaps, visibleMaps);
     }
 
-    private static string? ExtractAttribute(ReadOnlySpan<char> element, ReadOnlySpan<char> attributePrefix)
-    {
-        int index = element.IndexOf(attributePrefix, StringComparison.Ordinal);
-
-        if (index == -1) { return null; }
-
-        index += attributePrefix.Length;
-        int endIndex = element[index..].IndexOf('"');
-
-        return endIndex != -1 ? new string(element.Slice(index, endIndex)) : null;
-    }
-
     private static TemplateMetadata Parse(ReadOnlySpan<char> template)
     {
         List<(string name, string outType, string map)> elements = [];
         HashSet<string> lengthProviderNames = new(StringComparer.OrdinalIgnoreCase);
 
-        ReadOnlySpan<char> dataTag = "<data";
-        ReadOnlySpan<char> nameAttr = "name=\"";
-        ReadOnlySpan<char> outTypeAttr = "outType=\"";
-        ReadOnlySpan<char> lengthAttr = "length=\"";
-        ReadOnlySpan<char> mapAttr = "map=\"";
-
-        int searchStart = 0;
-
-        while (searchStart < template.Length)
+        foreach (TemplateField field in new TemplateFieldReader(template))
         {
-            int dataIndex = template[searchStart..].IndexOf(dataTag, StringComparison.OrdinalIgnoreCase);
-
-            if (dataIndex == -1) { break; }
-
-            dataIndex += searchStart;
-
-            // Verify the character after "<data" is whitespace, '/', or '>'
-            // to avoid matching tags like "<dataSource"
-            int nextCharIndex = dataIndex + dataTag.Length;
-
-            if (nextCharIndex < template.Length)
+            if (field.IsRaw)
             {
-                char next = template[nextCharIndex];
+                // A non-canonical element contributes a visible node with no outType/map (matching the prior scanner).
+                elements.Add((string.Empty, string.Empty, string.Empty));
 
-                if (next != ' ' && next != '\t' && next != '\r' && next != '\n' && next != '/' && next != '>')
-                {
-                    searchStart = nextCharIndex;
-
-                    continue;
-                }
+                continue;
             }
 
-            int elementEnd = template[dataIndex..].IndexOf("/>");
+            elements.Add((
+                field.Name.IsEmpty ? string.Empty : new string(field.Name),
+                field.OutType.IsEmpty ? string.Empty : new string(field.OutType),
+                field.Map.IsEmpty ? string.Empty : new string(field.Map)));
 
-            if (elementEnd == -1)
+            if (!field.Length.IsEmpty)
             {
-                elementEnd = template[dataIndex..].IndexOf('>');
+                lengthProviderNames.Add(new string(field.Length));
             }
-
-            if (elementEnd == -1) { break; }
-
-            elementEnd += dataIndex;
-
-            ReadOnlySpan<char> element = template[dataIndex..elementEnd];
-
-            string name = ExtractAttribute(element, nameAttr) ?? string.Empty;
-            string outType = ExtractAttribute(element, outTypeAttr) ?? string.Empty;
-            string map = ExtractAttribute(element, mapAttr) ?? string.Empty;
-            elements.Add((name, outType, map));
-
-            string? lengthRef = ExtractAttribute(element, lengthAttr);
-
-            if (lengthRef is not null)
-            {
-                lengthProviderNames.Add(lengthRef);
-            }
-
-            searchStart = elementEnd + 1;
         }
 
         return BuildMetadata(elements, lengthProviderNames);

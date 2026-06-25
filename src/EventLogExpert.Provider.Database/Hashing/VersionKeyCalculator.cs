@@ -9,8 +9,8 @@ namespace EventLogExpert.ProviderDatabase.Hashing;
 
 /// <summary>
 ///     Computes a provider's content <see cref="ProviderDetails.VersionKey" />: a hash of its canonical rendering
-///     payload (<see cref="ProviderContentCanonicalizer" />). Two providers with identical payloads - across machines or
-///     OS builds - get the same key and collapse to one database row; genuinely different payloads get different keys and
+///     payload (<see cref="ProviderContentEncoder" />). Two providers with identical payloads - across machines or OS
+///     builds - get the same key and collapse to one database row; genuinely different payloads get different keys and
 ///     coexist as separate versions of the same provider name. Stamped when a provider is first ingested from a live scan
 ///     (<c>CreateDatabaseOperation</c>); the merge and diff operations copy already-stamped rows unchanged. The composite
 ///     <c>(ProviderName, VersionKey)</c> primary key can therefore hold distinct versions of one name.
@@ -27,7 +27,7 @@ public static class VersionKeyCalculator
 
     public static string Compute(ProviderDetails provider)
     {
-        var canonical = ProviderContentCanonicalizer.Canonicalize(provider);
+        var canonical = ProviderContentEncoder.Encode(provider);
         var hash = SHA256.HashData(canonical);
 
         return SchemePrefix + ToBase32Lower(hash);

@@ -73,6 +73,11 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         // already-hashed row in a multi-file source): both re-hash to the same VersionKey, so the second would
         // otherwise collide on the composite primary key. Track stamped identities and skip duplicates first-wins.
         var stampedIdentities = new HashSet<ProviderIdentity>();
+#if DEBUG
+        // CI-only tripwire: fail the build if a (Name, VersionKey) collision's rows are not content-equivalent (hash and
+        // merge drift). No release retention.
+        var firstByIdentity = new Dictionary<ProviderIdentity, ProviderDetails>();
+#endif
 
         // Defer creating the DbContext (and therefore the .db file on disk) until we have
         // at least one provider to persist. This prevents leaving an empty database behind
@@ -96,7 +101,20 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 // already-hashed source; computes the key for freshly-resolved (live) providers.
                 details.VersionKey = VersionKeyCalculator.Compute(details);
 
-                if (!stampedIdentities.Add(ProviderIdentity.Of(details))) { continue; }
+                var identity = ProviderIdentity.Of(details);
+
+                if (!stampedIdentities.Add(identity))
+                {
+#if DEBUG
+                    AssertContentEquivalent(firstByIdentity[identity], details);
+#endif
+
+                    continue;
+                }
+
+#if DEBUG
+                firstByIdentity[identity] = details;
+#endif
 
                 if (hostOsProvenance is not null)
                 {
@@ -206,4 +224,91 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         dbContext.ChangeTracker.Clear();
         buffer.Clear();
     }
+
+#if DEBUG
+    private static void AssertContentEquivalent(ProviderDetails first, ProviderDetails duplicate)
+    {
+        if (ContentEquivalent(first, duplicate)) { return; }
+
+        throw new InvalidOperationException(
+            $"Provider '{duplicate.ProviderName}' produced two rows sharing VersionKey '{duplicate.VersionKey}' that " +
+            $"are not content-equivalent. The content hash and {nameof(ProviderContentMerge)} have drifted - a field " +
+            $"is hashed for identity but not compared for equivalence (or vice versa).");
+    }
+
+    private static bool ContentEquivalent(ProviderDetails first, ProviderDetails duplicate) =>
+        ModelsEquivalent(first.Events, duplicate.Events, static model => ProviderContentMerge.IdentityOf(model), ProviderContentMerge.EventsAreEquivalent) &&
+        ModelsEquivalent(first.Messages, duplicate.Messages, static model => ProviderContentMerge.IdentityOf(model), ProviderContentMerge.MessagesAreEquivalent) &&
+        ModelsEquivalent(first.Parameters, duplicate.Parameters, static model => ProviderContentMerge.IdentityOf(model), ProviderContentMerge.MessagesAreEquivalent) &&
+        MapsEquivalent(first.Maps, duplicate.Maps) &&
+        DictionaryEqual(first.Keywords, duplicate.Keywords) &&
+        DictionaryEqual(first.Opcodes, duplicate.Opcodes) &&
+        DictionaryEqual(first.Tasks, duplicate.Tasks) &&
+        string.Equals(
+            first.ResolvedFromOwningPublisher ?? string.Empty,
+            duplicate.ResolvedFromOwningPublisher ?? string.Empty,
+            StringComparison.Ordinal);
+
+    private static bool DictionaryEqual<TKey>(IDictionary<TKey, string> first, IDictionary<TKey, string> second)
+        where TKey : notnull
+    {
+        if (first.Count != second.Count) { return false; }
+
+        foreach ((TKey key, string value) in first)
+        {
+            if (!second.TryGetValue(key, out string? other) || !string.Equals(value, other, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool MapsEquivalent(
+        IReadOnlyDictionary<string, ValueMapDefinition> first,
+        IReadOnlyDictionary<string, ValueMapDefinition> second)
+    {
+        if (first.Count != second.Count) { return false; }
+
+        foreach ((string key, ValueMapDefinition map) in first)
+        {
+            if (!second.TryGetValue(key, out ValueMapDefinition? other) || !ProviderContentMerge.MapsAreEquivalent(map, other))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ModelsEquivalent<TModel, TIdentity>(
+        IReadOnlyList<TModel> first,
+        IReadOnlyList<TModel> second,
+        Func<TModel, TIdentity> identityOf,
+        Func<TModel, TModel, bool> areEquivalent)
+        where TIdentity : notnull
+    {
+        // Compare DISTINCT identities both ways (the hash drops exact-duplicate rows, so raw counts can differ).
+        var firstByIdentity = new Dictionary<TIdentity, TModel>(first.Count);
+
+        foreach (TModel model in first) { firstByIdentity[identityOf(model)] = model; }
+
+        var secondByIdentity = new Dictionary<TIdentity, TModel>(second.Count);
+
+        foreach (TModel model in second) { secondByIdentity[identityOf(model)] = model; }
+
+        if (firstByIdentity.Count != secondByIdentity.Count) { return false; }
+
+        foreach ((TIdentity identity, TModel model) in firstByIdentity)
+        {
+            if (!secondByIdentity.TryGetValue(identity, out TModel? other) || !areEquivalent(model, other))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+#endif
 }
