@@ -12,22 +12,24 @@ namespace EventLogExpert.Eventing.PublisherMetadata.Wevt;
 ///     name / inType / outType / length / count; the <c>map</c> attribute is injected separately by
 ///     <see cref="ProviderDetailsFactory.InjectMapAttribute" /> so a map is never written twice. The whole template fails
 ///     closed (a null return) when any field is unrepresentable - an unknown inType or outType byte, a length that is
-///     neither the pinned field-name reference nor a fixed binary length, or a count reference that is out of range or
-///     points at a struct - so the reader never emits a guessed or partial template.
+///     neither the pinned field-name reference nor a fixed length on a variable-length type, or a count reference that is
+///     out of range or points at a struct - so the reader never emits a guessed or partial template.
 /// </summary>
 internal static class WevtTemplateWriter
 {
+    private const byte AnsiStringInType = 0x02;
+
+    private const byte BinaryInType = 0x0e;
+
     private const uint FixedCountArrayFlag = 0x8;
 
-    private const byte FixedLengthBinaryInType = 0x0e;
-
     private const uint FixedLengthFlag = 0x2;
-
-    private const byte FixedLengthHexBinaryOutType = 0x0f;
 
     private const uint LengthFieldReferenceFlag = 0x4;
 
     private const string TemplateNamespace = "http://schemas.microsoft.com/win/2004/08/events";
+
+    private const byte UnicodeStringInType = 0x01;
 
     private const uint VariableCountArrayFlag = 0x10;
 
@@ -54,6 +56,9 @@ internal static class WevtTemplateWriter
 
         return builder.ToString();
     }
+
+    private static bool IsFixedLengthBearingInType(byte inType) =>
+        inType is UnicodeStringInType or AnsiStringInType or BinaryInType;
 
     private static bool TryAppendLeaf(
         StringBuilder builder,
@@ -178,7 +183,6 @@ internal static class WevtTemplateWriter
         countValue = (arrayCount == 0 ? 1 : arrayCount).ToString(CultureInfo.InvariantCulture);
 
         return true;
-
     }
 
     private static bool TryResolveLength(
@@ -206,8 +210,7 @@ internal static class WevtTemplateWriter
 
         if ((leaf.Flags & FixedLengthFlag) == 0) { return true; }
 
-        // Native emits a fixed numeric length only for win:Binary / xs:hexBinary; any other type fails closed.
-        if (leaf.InType != FixedLengthBinaryInType || leaf.OutType != FixedLengthHexBinaryOutType || leaf.Length == 0)
+        if (leaf.Length == 0 || !IsFixedLengthBearingInType(leaf.InType))
         {
             return false;
         }
@@ -215,6 +218,5 @@ internal static class WevtTemplateWriter
         lengthValue = leaf.Length.ToString(CultureInfo.InvariantCulture);
 
         return true;
-
     }
 }
