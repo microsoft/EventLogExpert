@@ -1,11 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.PublisherMetadata;
+using EventLogExpert.Eventing.PublisherMetadata.Wevt;
 using System.Buffers.Binary;
 using System.Text;
 
-namespace EventLogExpert.Eventing.Tests.PublisherMetadata;
+namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Wevt;
 
 public sealed class WevtTemplateReaderTests
 {

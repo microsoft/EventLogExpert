@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.PublisherMetadata.Wevt;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Resolution;
 
@@ -15,7 +16,13 @@ namespace EventLogExpert.Eventing.PublisherMetadata;
 /// </summary>
 internal static class ProviderDetailsAssembler
 {
-    internal static ProviderDetails Assemble(RawProviderContent content, ITraceLogger? logger)
+    internal static ProviderDetails Assemble(RawProviderContent content, ITraceLogger? logger) =>
+        Assemble(content, preParsedTemplates: null, logger);
+
+    internal static ProviderDetails Assemble(
+        RawProviderContent content,
+        WevtTemplateData? preParsedTemplates,
+        ITraceLogger? logger)
     {
         var provider = new ProviderDetails { ProviderName = content.ProviderName };
 
@@ -55,14 +62,16 @@ internal static class ProviderDetailsAssembler
             logger?.Debug($"Failed to load Tasks for modern provider: {content.ProviderName}. Exception:\n{ex}");
         }
 
-        PopulateValueMaps(provider, content, logger);
+        PopulateValueMaps(provider, content, preParsedTemplates, logger);
 
         return provider;
     }
 
     internal static string InjectMapAttribute(string template, string fieldName, string mapName)
     {
-        string nameAttribute = $"name=\"{fieldName}\"";
+        // The field name is escaped the same way the template writer escaped it, so a name containing '&' or '<' still
+        // matches the emitted name= attribute instead of silently missing.
+        string nameAttribute = $"name=\"{WevtTemplateSynthesizer.EscapeXmlAttribute(fieldName)}\"";
         int searchStart = 0;
 
         while (true)
@@ -135,13 +144,14 @@ internal static class ProviderDetailsAssembler
         foreach (RawNamedValue entry in entries)
         {
             // Message-id wins over the inline name when a real id exists (mirrors the native getters); the resolver
-            // coalesce only guards the offline message-table resolver, which can return null - native never does. The
-            // inline name is preserved as-is (the native getters TryAdd the raw name, which may be null/empty).
-            string? name = entry.MessageId == uint.MaxValue
+            // coalesce only guards the offline message-table resolver, which can return null - native never does.
+            string? resolvedName = entry.MessageId == uint.MaxValue
                 ? entry.InlineName
                 : resolveMessage(entry.MessageId) ?? string.Empty;
 
-            dictionary.TryAdd(keyProjector(entry.Value), name!);
+            // Trailing control characters are trimmed so the two sources collapse to the same VersionKey: native
+            // FormatMessage names carry a trailing '\0', offline message-table names carry a trailing '\r\n'.
+            dictionary.TryAdd(keyProjector(entry.Value), (resolvedName?.TrimEnd('\0', '\r', '\n', '\t', ' '))!);
         }
 
         return dictionary;
@@ -199,15 +209,17 @@ internal static class ProviderDetailsAssembler
         }
     }
 
-    private static void PopulateValueMaps(ProviderDetails provider, RawProviderContent content, ITraceLogger? logger)
+    private static void PopulateValueMaps(
+        ProviderDetails provider,
+        RawProviderContent content,
+        WevtTemplateData? preParsed,
+        ITraceLogger? logger)
     {
         try
         {
-            if (content.PublisherGuid == Guid.Empty) { return; }
-
-            if (string.IsNullOrEmpty(content.ResourceFilePath)) { return; }
-
-            WevtTemplateData? templateData = WevtTemplateReader.TryRead(content.ResourceFilePath, content.PublisherGuid, logger);
+            // The offline path supplies the already-parsed maps (single load); the native path reads them on demand.
+            // Both then run the same ResolveMap + InjectMapAttributes below.
+            WevtTemplateData? templateData = preParsed ?? TryReadTemplateData(content, logger);
 
             if (templateData is null || templateData.Maps.Count == 0) { return; }
 
@@ -270,5 +282,14 @@ internal static class ProviderDetailsAssembler
         }
 
         return entries.Count > 0 ? new ValueMapDefinition(rawMap.IsBitMap, entries) : null;
+    }
+
+    private static WevtTemplateData? TryReadTemplateData(RawProviderContent content, ITraceLogger? logger)
+    {
+        if (content.PublisherGuid == Guid.Empty) { return null; }
+
+        if (string.IsNullOrEmpty(content.ResourceFilePath)) { return null; }
+
+        return WevtTemplateReader.TryRead(content.ResourceFilePath, content.PublisherGuid, logger);
     }
 }

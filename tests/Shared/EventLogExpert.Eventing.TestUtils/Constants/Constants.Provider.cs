@@ -12,6 +12,8 @@ public sealed partial class Constants
 
     public const string KernelGeneralLogName = "Microsoft-Windows-Kernel-General";
 
+    public const string KernelPowerLogName = "Microsoft-Windows-Kernel-Power";
+
     public const string LocalComputer = "LocalComputer";
 
     public const string Localhost = "localhost";
