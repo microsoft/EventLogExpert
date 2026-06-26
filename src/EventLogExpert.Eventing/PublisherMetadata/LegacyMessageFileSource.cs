@@ -42,6 +42,33 @@ internal sealed class LegacyMessageFileSource : ILazyMessageSource
 
     public IReadOnlyList<MessageModel> MaterializeAll() => _all.Value;
 
+    internal static LegacyMessageFileSource? TryCreate(IReadOnlyList<string> files, string providerName, ITraceLogger? logger)
+    {
+        if (files.Count == 0) { return null; }
+
+        var walkable = new List<string>();
+        int total = 0;
+
+        foreach (var file in files)
+        {
+            if (!MessageTableReader.TryOpen(file, logger, out var handle, out nint memTable, out uint size)) { continue; }
+
+            try
+            {
+                int count = MessageTableReader.CountEntries(memTable, size);
+
+                if (count > 0)
+                {
+                    walkable.Add(file);
+                    total += count;
+                }
+            }
+            finally { handle.Dispose(); }
+        }
+
+        return total > 0 ? new LegacyMessageFileSource(walkable, providerName, total, logger) : null;
+    }
+
     private MessageModel? ExtractByRawId(long rawId)
     {
         foreach (var file in _files)

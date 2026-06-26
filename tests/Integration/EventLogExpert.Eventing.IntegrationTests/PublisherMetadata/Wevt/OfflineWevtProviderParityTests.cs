@@ -5,22 +5,13 @@ using EventLogExpert.Eventing.PublisherMetadata;
 using EventLogExpert.Eventing.PublisherMetadata.Wevt;
 using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Provider.Resolution;
+using EventLogExpert.ProviderDatabase.Hashing;
 using System.Buffers;
 using System.Xml;
 using System.Xml.Linq;
 
 namespace EventLogExpert.Eventing.IntegrationTests.PublisherMetadata.Wevt;
 
-/// <summary>
-///     Asserts that the offline WEVT parser produces the same resolved provider content as the native
-///     publisher-metadata path for real providers: Security-Auditing supplies the rich event and template corpus,
-///     Kernel-Power supplies the length-reference and FILETIME templates that exercise length / outType synthesis, and
-///     PowerShell supplies the non-empty keyword, value-map, opcode, and task tables. Parity is checked by key and value
-///     (not by count): the native enumeration may carry extra standard entries, so every offline entry must reproduce its
-///     native counterpart exactly, while a partial decode regression is caught by comparing each offline table size to the
-///     parsed post-dedup table count. Messages and parameters are excluded because they are resolved lazily, not by this
-///     path; descriptions are compared, resolved eagerly through the shared assembler for both sources.
-/// </summary>
 public sealed class OfflineWevtProviderParityTests(
     OfflineWevtProviderParityTests.SecurityAuditingParityFixture securityAuditing,
     OfflineWevtProviderParityTests.PowerShellParityFixture powerShell,
@@ -240,6 +231,16 @@ public sealed class OfflineWevtProviderParityTests(
     }
 
     [Fact]
+    public void Messages_OfflineEntries_MatchNative()
+    {
+        Assert.SkipUnless(securityAuditing.Available, SkipReasonFor(securityAuditing));
+
+        Assert.NotEmpty(securityAuditing.Native!.Messages);
+
+        AssertMessagesEqual(securityAuditing.Native!.Messages, securityAuditing.Offline!.Messages);
+    }
+
+    [Fact]
     public void Opcodes_OfflineEntries_MatchNativeByKeyAndValue()
     {
         Assert.SkipUnless(powerShell.Available, SkipReasonFor(powerShell));
@@ -263,6 +264,31 @@ public sealed class OfflineWevtProviderParityTests(
         Assert.Equal(powerShell.RawTaskKeyCount, powerShell.Offline!.Tasks.Count);
 
         AssertOfflineMatchesNative(powerShell.Native!.Tasks, powerShell.Offline!.Tasks);
+    }
+
+    [Fact]
+    public void VersionKey_OfflineProvider_EqualsNative()
+    {
+        Assert.SkipUnless(securityAuditing.Available, SkipReasonFor(securityAuditing));
+
+        Assert.Null(securityAuditing.Native!.ResolvedFromOwningPublisher);
+
+        Assert.Equal(
+            VersionKeyCalculator.Compute(securityAuditing.Native!),
+            VersionKeyCalculator.Compute(securityAuditing.Offline!));
+    }
+
+    private static void AssertMessagesEqual(IReadOnlyList<MessageModel> native, IReadOnlyList<MessageModel> offline)
+    {
+        static MessageKey ToKey(MessageModel message) =>
+            new(message.ShortId, message.RawId, message.LogLink, message.Tag, message.Template, message.Text);
+
+        HashSet<MessageKey> nativeSet = native.Select(ToKey).ToHashSet();
+        HashSet<MessageKey> offlineSet = offline.Select(ToKey).ToHashSet();
+
+        Assert.True(
+            nativeSet.SetEquals(offlineSet),
+            $"Offline messages diverge from native: native {nativeSet.Count} distinct, offline {offlineSet.Count} distinct.");
     }
 
     private static void AssertOfflineMatchesNative<TKey>(IDictionary<TKey, string> native, IDictionary<TKey, string> offline)
@@ -351,8 +377,7 @@ public sealed class OfflineWevtProviderParityTests(
 
             if (metadata is null) { return; }
 
-            Native = ProviderDetailsAssembler.Assemble(
-                metadata.ToRawContent(providerName, logger: null), logger: null);
+            Native = new EventMessageProvider(providerName, logger: null).LoadProviderDetails();
 
             string resourceFilePath = metadata.ResourceFilePath;
 
@@ -361,6 +386,7 @@ public sealed class OfflineWevtProviderParityTests(
             Offline = OfflineWevtProviderReader.TryBuildProviderDetails(
                 resourceFilePath,
                 [metadata.MessageFilePath],
+                metadata.ParameterFilePath,
                 metadata.PublisherGuid,
                 providerName,
                 logger: null);
@@ -412,6 +438,8 @@ public sealed class OfflineWevtProviderParityTests(
     }
 
     public sealed class SecurityAuditingParityFixture() : ProviderParityFixture(Constants.SecurityAuditingLogName);
+
+    private readonly record struct MessageKey(short ShortId, long RawId, string? LogLink, string? Tag, string? Template, string Text);
 
     private readonly record struct TemplateDataNode(string Name, string InType, string OutType, string Length, string Count);
 }

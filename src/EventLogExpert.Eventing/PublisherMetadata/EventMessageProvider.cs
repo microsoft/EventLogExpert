@@ -49,33 +49,6 @@ public sealed class EventMessageProvider(
         return messages;
     }
 
-    private LegacyMessageFileSource? BuildLazySource(IReadOnlyList<string> files)
-    {
-        if (files.Count == 0) { return null; }
-
-        var walkable = new List<string>();
-        int total = 0;
-
-        foreach (var file in files)
-        {
-            if (!MessageTableReader.TryOpen(file, _logger, out var handle, out nint memTable, out uint size)) { continue; }
-
-            try
-            {
-                int count = MessageTableReader.CountEntries(memTable, size);
-
-                if (count > 0)
-                {
-                    walkable.Add(file);
-                    total += count;
-                }
-            }
-            finally { handle.Dispose(); }
-        }
-
-        return total > 0 ? new LegacyMessageFileSource(walkable, _providerName, total, _logger) : null;
-    }
-
     private ProviderDetails LoadMessagesFromModernProvider(ProviderMetadata providerMetadata)
     {
         _logger?.Debug($"{nameof(LoadMessagesFromModernProvider)} called for provider {_providerName}");
@@ -342,7 +315,7 @@ public sealed class EventMessageProvider(
 
     private bool TrySetLazyMessages(ProviderDetails provider, IReadOnlyList<string> files)
     {
-        var source = BuildLazySource(files);
+        var source = LegacyMessageFileSource.TryCreate(files, _providerName, _logger);
 
         if (source is null) { return false; }
 
@@ -353,7 +326,7 @@ public sealed class EventMessageProvider(
 
     private bool TrySetLazyParameters(ProviderDetails provider, IReadOnlyList<string> files)
     {
-        var source = BuildLazySource(files);
+        var source = LegacyMessageFileSource.TryCreate(files, _providerName, _logger);
 
         if (source is null) { return false; }
 
