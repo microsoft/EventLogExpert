@@ -7,19 +7,12 @@ using EventLogExpert.Provider.Resolution;
 
 namespace EventLogExpert.Eventing.PublisherMetadata;
 
-/// <summary>
-///     Builds a <see cref="ProviderDetails" /> from source-agnostic <see cref="RawProviderContent" />. The native
-///     publisher-metadata path feeds this today; the offline WEVT parser feeds the same assembler later, so a single
-///     resolution + projection path serves both and the two cannot drift. Each section is assembled under its own
-///     try/catch so a resolution failure empties only that section, matching the per-section behavior of the original
-///     inline load path.
-/// </summary>
-internal static class ProviderDetailsAssembler
+internal static class ProviderDetailsFactory
 {
-    internal static ProviderDetails Assemble(RawProviderContent content, ITraceLogger? logger) =>
-        Assemble(content, preParsedTemplates: null, logger);
+    internal static ProviderDetails Create(RawProviderContent content, ITraceLogger? logger) =>
+        Create(content, preParsedTemplates: null, logger);
 
-    internal static ProviderDetails Assemble(
+    internal static ProviderDetails Create(
         RawProviderContent content,
         WevtTemplateData? preParsedTemplates,
         ITraceLogger? logger)
@@ -71,7 +64,7 @@ internal static class ProviderDetailsAssembler
     {
         // The field name is escaped the same way the template writer escaped it, so a name containing '&' or '<' still
         // matches the emitted name= attribute instead of silently missing.
-        string nameAttribute = $"name=\"{WevtTemplateSynthesizer.EscapeXmlAttribute(fieldName)}\"";
+        string nameAttribute = $"name=\"{WevtTemplateWriter.EscapeXmlAttribute(fieldName)}\"";
         int searchStart = 0;
 
         while (true)

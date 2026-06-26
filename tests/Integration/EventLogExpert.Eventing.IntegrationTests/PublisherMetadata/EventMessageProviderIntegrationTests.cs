@@ -206,7 +206,7 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadProviderDetails_WhenStableProvider_ShouldResolveNamedValues()
     {
-        // End-to-end: the modern path (ToRawContent -> ProviderDetailsAssembler) must resolve the raw keyword/opcode/task
+        // End-to-end: the modern path (ToRawContent -> ProviderDetailsFactory) must resolve the raw keyword/opcode/task
         // message ids into non-empty display names for a real provider, not merely read the raw rows.
         EventMessageProvider provider = new(Constants.SecurityAuditingLogName);
 

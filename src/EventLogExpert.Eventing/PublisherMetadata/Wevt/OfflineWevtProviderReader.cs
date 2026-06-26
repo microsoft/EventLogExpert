@@ -10,7 +10,7 @@ namespace EventLogExpert.Eventing.PublisherMetadata.Wevt;
 /// <summary>
 ///     Builds a <see cref="ProviderDetails" /> purely from a provider's WEVT_TEMPLATE and RT_MESSAGETABLE resources,
 ///     with no EvtOpenPublisherMetadata call. The parsed tables are mapped to <see cref="RawProviderContent" /> in the
-///     same representation the native path produces, so the shared <see cref="ProviderDetailsAssembler" /> resolves both
+///     same representation the native path produces, so the shared <see cref="ProviderDetailsFactory" /> resolves both
 ///     sources identically.
 /// </summary>
 internal static class OfflineWevtProviderReader
@@ -73,8 +73,6 @@ internal static class OfflineWevtProviderReader
 
             List<string> candidateFiles = [.. messageFilePaths, resourceFilePath];
 
-            // The session holds native message-table handles and backs RawProviderContent.ResolveMessage; the closure is
-            // only invoked synchronously during Assemble, so the session is disposed immediately after it returns.
             using MessageTableSession session = MessageTableSession.Open(providerName, candidateFiles, logger);
 
             RawProviderContent content = MapToRawContent(
@@ -84,7 +82,7 @@ internal static class OfflineWevtProviderReader
                 resourceFilePath,
                 messageId => session.Resolve(messageId) is { } raw ? WevtMessageFormatter.Format(raw) : null);
 
-            ProviderDetails details = ProviderDetailsAssembler.Assemble(content, data.Templates, logger);
+            ProviderDetails details = ProviderDetailsFactory.Create(content, data.Templates, logger);
 
             PopulateLegacyTables(details, messageFilePaths, parameterFilePath, providerName, logger);
 
@@ -121,11 +119,11 @@ internal static class OfflineWevtProviderReader
         {
             WevtProviderEvent source = events[index];
 
-            // Struct-bearing templates fail closed (no flat synthesis), as do templates the synthesizer rejects as
-            // unrepresentable (unknown inType/outType byte or a non-field-reference length); both yield an empty string.
-            string template = source.Template is null || source.Template.IsStruct
+            // An unrepresentable template (an unknown inType/outType byte, a non-reference length, or a malformed struct
+            // member range) makes the writer return null, which yields an empty string.
+            string template = source.Template is null
                 ? string.Empty
-                : WevtTemplateSynthesizer.Synthesize(source.Template.Items) ?? string.Empty;
+                : WevtTemplateWriter.Write(source.Template.Nodes, source.Template.Descriptors) ?? string.Empty;
 
             result[index] = new RawProviderEvent(
                 source.Id,
@@ -164,9 +162,6 @@ internal static class OfflineWevtProviderReader
         {
             WevtIdentifiedEntry opcode = opcodes[index];
 
-            // The OPCO table stores each opcode value already shifted into the high word (opcode << 16) - the exact layout
-            // native EvtPublisherMetadataOpcodeValue returns and the assembler projects via (int)((uint)Value >> 16). Pass
-            // the raw id through unchanged so the offline and native opcode keys match.
             result[index] = new RawNamedValue(opcode.Id, opcode.MessageId, opcode.InlineName);
         }
 

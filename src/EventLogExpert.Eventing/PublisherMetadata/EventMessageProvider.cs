@@ -61,7 +61,7 @@ public sealed class EventMessageProvider(
         }
 
         ProviderDetails provider =
-            ProviderDetailsAssembler.Assemble(providerMetadata.ToRawContent(_providerName, _logger), _logger);
+            ProviderDetailsFactory.Create(providerMetadata.ToRawContent(_providerName, _logger), _logger);
 
         _logger?.Debug($"Returning {provider.Events.Count} events for provider {_providerName}");
 
