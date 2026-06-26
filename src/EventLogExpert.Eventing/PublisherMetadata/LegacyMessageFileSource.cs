@@ -49,38 +49,40 @@ internal sealed class LegacyMessageFileSource : ILazyMessageSource
         var walkable = new List<string>();
         int total = 0;
 
-        foreach (var file in files)
+        foreach (var (file, memTable, size) in OpenMessageTables(files, logger))
         {
-            if (!MessageTableReader.TryOpen(file, logger, out var handle, out nint memTable, out uint size)) { continue; }
+            int count = MessageTableReader.CountEntries(memTable, size);
 
-            try
+            if (count > 0)
             {
-                int count = MessageTableReader.CountEntries(memTable, size);
-
-                if (count > 0)
-                {
-                    walkable.Add(file);
-                    total += count;
-                }
+                walkable.Add(file);
+                total += count;
             }
-            finally { handle.Dispose(); }
         }
 
         return total > 0 ? new LegacyMessageFileSource(walkable, providerName, total, logger) : null;
     }
 
+    private static IEnumerable<(string File, nint MemTable, uint Size)> OpenMessageTables(
+        IReadOnlyList<string> files,
+        ITraceLogger? logger)
+    {
+        foreach (var file in files)
+        {
+            if (!MessageTableReader.TryOpen(file, logger, out var handle, out var memTable, out uint size)) { continue; }
+
+            try { yield return (file, memTable, size); }
+            finally { handle.Dispose(); }
+        }
+    }
+
     private MessageModel? ExtractByRawId(long rawId)
     {
-        foreach (var file in _files)
+        foreach (var (_, memTable, size) in OpenMessageTables(_files, _logger))
         {
-            if (!MessageTableReader.TryOpen(file, _logger, out var handle, out var memTable, out uint size)) { continue; }
+            var match = MessageTableReader.FindFirstByRawId(memTable, size, rawId, _providerName);
 
-            try
-            {
-                var match = MessageTableReader.FindFirstByRawId(memTable, size, rawId, _providerName);
-                if (match is not null) { return match; }
-            }
-            finally { handle.Dispose(); }
+            if (match is not null) { return match; }
         }
 
         return null;
@@ -90,12 +92,9 @@ internal sealed class LegacyMessageFileSource : ILazyMessageSource
     {
         var result = new List<MessageModel>();
 
-        foreach (var file in _files)
+        foreach (var (_, memTable, size) in OpenMessageTables(_files, _logger))
         {
-            if (!MessageTableReader.TryOpen(file, _logger, out var handle, out var memTable, out uint size)) { continue; }
-
-            try { MessageTableReader.AppendMatches(memTable, size, _providerName, shortId, result); }
-            finally { handle.Dispose(); }
+            MessageTableReader.AppendMatches(memTable, size, _providerName, shortId, result);
         }
 
         return result.Count == 0 ? s_empty : result;
@@ -105,12 +104,9 @@ internal sealed class LegacyMessageFileSource : ILazyMessageSource
     {
         var result = new List<MessageModel>(_count);
 
-        foreach (var file in _files)
+        foreach (var (_, memTable, size) in OpenMessageTables(_files, _logger))
         {
-            if (!MessageTableReader.TryOpen(file, _logger, out var handle, out var memTable, out uint size)) { continue; }
-
-            try { MessageTableReader.AppendMatches(memTable, size, _providerName, -1, result); }
-            finally { handle.Dispose(); }
+            MessageTableReader.AppendMatches(memTable, size, _providerName, -1, result);
         }
 
         return result;
