@@ -73,6 +73,20 @@ public sealed class ProviderDetailsAssemblerTests
     }
 
     [Fact]
+    public void Assemble_InlineNameWithTrailingNull_IsTrimmed()
+    {
+        // Native FormatMessage names arrive with a trailing '\0'; trimming lets the native and offline sources collapse
+        // to the same dictionary value.
+        var content = CreateContent(
+            resolveMessage: _ => null,
+            opcodes: [new RawNamedValue(0x00030000, uint.MaxValue, "OpcodeName\0")]);
+
+        var details = ProviderDetailsAssembler.Assemble(content, null);
+
+        Assert.Equal("OpcodeName", details.Opcodes[3]);
+    }
+
+    [Fact]
     public void Assemble_MessageIdResolvesToNull_NameIsEmptyString()
     {
         // The offline resolver may return null; the assembler coalesces that to string.Empty (never null), so the
@@ -112,6 +126,20 @@ public sealed class ProviderDetailsAssemblerTests
     }
 
     [Fact]
+    public void Assemble_ResolvedNameWithTrailingCrlf_IsTrimmed()
+    {
+        // Offline message-table names arrive with a trailing '\r\n'; trimming lets the native and offline sources
+        // collapse to the same dictionary value.
+        var content = CreateContent(
+            resolveMessage: id => id == 77 ? "KeywordName\r\n" : null,
+            keywords: [new RawNamedValue(0x4, 77, null)]);
+
+        var details = ProviderDetailsAssembler.Assemble(content, null);
+
+        Assert.Equal("KeywordName", details.Keywords[4L]);
+    }
+
+    [Fact]
     public void Assemble_TaskValue_UsesValueAsKey()
     {
         var content = CreateContent(
@@ -144,6 +172,20 @@ public sealed class ProviderDetailsAssemblerTests
 
         Assert.Equal(template, result);
         Assert.DoesNotContain("map=", result);
+    }
+
+    [Fact]
+    public void InjectMapAttribute_EscapedFieldName_MatchesEscapedTemplate()
+    {
+        // The template carries the field name XML-escaped; passing the raw name must still match because the search term
+        // is escaped the same way the template writer escaped it.
+        string template = "<template><data name=\"a&amp;b\" inType=\"win:UInt32\"/></template>";
+
+        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "a&b", "MyMap");
+
+        Assert.Equal(
+            "<template><data name=\"a&amp;b\" map=\"MyMap\" inType=\"win:UInt32\"/></template>",
+            result);
     }
 
     [Fact]
