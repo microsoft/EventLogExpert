@@ -45,6 +45,7 @@ internal static class OfflineWevtProviderReader
     internal static ProviderDetails? TryBuildProviderDetails(
         string resourceFilePath,
         IReadOnlyList<string> messageFilePaths,
+        string? parameterFilePath,
         Guid publisherGuid,
         string providerName,
         ITraceLogger? logger)
@@ -83,7 +84,11 @@ internal static class OfflineWevtProviderReader
                 resourceFilePath,
                 messageId => session.Resolve(messageId) is { } raw ? WevtMessageFormatter.Format(raw) : null);
 
-            return ProviderDetailsAssembler.Assemble(content, data.Templates, logger);
+            ProviderDetails details = ProviderDetailsAssembler.Assemble(content, data.Templates, logger);
+
+            PopulateLegacyTables(details, messageFilePaths, parameterFilePath, providerName, logger);
+
+            return details;
         }
         finally
         {
@@ -180,5 +185,27 @@ internal static class OfflineWevtProviderReader
         }
 
         return result;
+    }
+
+    private static void PopulateLegacyTables(
+        ProviderDetails details,
+        IReadOnlyList<string> modernMessageFilePaths,
+        string? parameterFilePath,
+        string providerName,
+        ITraceLogger? logger)
+    {
+        RegistryProvider registryProvider = new(logger);
+        IReadOnlyList<string> legacyFiles = registryProvider.GetMessageFilesForLegacyProvider(providerName);
+
+        LegacyMessageFileSource? messages = LegacyMessageFileSource.TryCreate(legacyFiles, providerName, logger)
+            ?? LegacyMessageFileSource.TryCreate(modernMessageFilePaths, providerName, logger);
+
+        if (messages is not null) { details.SetLazyMessageSource(messages); }
+
+        if (string.IsNullOrEmpty(parameterFilePath)) { return; }
+
+        LegacyMessageFileSource? parameters = LegacyMessageFileSource.TryCreate([parameterFilePath], providerName, logger);
+
+        if (parameters is not null) { details.SetLazyParameterSource(parameters); }
     }
 }
