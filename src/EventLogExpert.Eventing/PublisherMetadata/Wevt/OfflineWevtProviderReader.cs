@@ -81,7 +81,7 @@ internal static class OfflineWevtProviderReader
                 publisherGuid,
                 providerName,
                 resourceFilePath,
-                session.Resolve);
+                messageId => session.Resolve(messageId) is { } raw ? WevtMessageFormatter.Format(raw) : null);
 
             return ProviderDetailsAssembler.Assemble(content, data.Templates, logger);
         }

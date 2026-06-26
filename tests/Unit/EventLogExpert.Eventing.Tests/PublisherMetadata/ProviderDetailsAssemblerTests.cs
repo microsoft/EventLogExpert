@@ -60,6 +60,30 @@ public sealed class ProviderDetailsAssemblerTests
     }
 
     [Fact]
+    public void Assemble_EventDescriptionResolvesToNull_DescriptionIsEmptyString()
+    {
+        var content = CreateContent(
+            resolveMessage: _ => null,
+            events: [new RawProviderEvent(1, 0, 0, 0, 0, 0, 0, "<t/>", 50)]);
+
+        var details = ProviderDetailsAssembler.Assemble(content, null);
+
+        Assert.Equal(string.Empty, Assert.Single(details.Events).Description);
+    }
+
+    [Fact]
+    public void Assemble_EventDescriptionWithTrailingControlChars_IsTrimmed()
+    {
+        var content = CreateContent(
+            resolveMessage: id => id == 50 ? "Event description\r\n\0\t " : null,
+            events: [new RawProviderEvent(1, 0, 0, 0, 0, 0, 0, "<t/>", 50)]);
+
+        var details = ProviderDetailsAssembler.Assemble(content, null);
+
+        Assert.Equal("Event description", Assert.Single(details.Events).Description);
+    }
+
+    [Fact]
     public void Assemble_EventWithoutMessageId_DescriptionIsEmptyString()
     {
         var content = CreateContent(
@@ -123,6 +147,18 @@ public sealed class ProviderDetailsAssemblerTests
         var details = ProviderDetailsAssembler.Assemble(content, null);
 
         Assert.Equal("InlineOpcode", details.Opcodes[1]);
+    }
+
+    [Fact]
+    public void Assemble_NamedValueWithoutMessageIdOrInlineName_NameIsEmptyString()
+    {
+        var content = CreateContent(
+            resolveMessage: _ => null,
+            tasks: [new RawNamedValue(5, uint.MaxValue, null)]);
+
+        var details = ProviderDetailsAssembler.Assemble(content, null);
+
+        Assert.Equal(string.Empty, details.Tasks[5]);
     }
 
     [Fact]
