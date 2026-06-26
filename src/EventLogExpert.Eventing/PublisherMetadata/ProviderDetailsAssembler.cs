@@ -118,7 +118,9 @@ internal static class ProviderDetailsAssembler
             {
                 // No-message events resolve to string.Empty (not null) to match the native path; the encoder hashes
                 // null and empty differently.
-                Description = raw.MessageId == uint.MaxValue ? string.Empty : content.ResolveMessage(raw.MessageId) ?? string.Empty,
+                Description = raw.MessageId == uint.MaxValue
+                    ? string.Empty
+                    : content.ResolveMessage(raw.MessageId)?.TrimEnd('\0', '\r', '\n', '\t', ' ') ?? string.Empty,
                 Id = raw.Id,
                 Keywords = ExpandKeywords(raw.KeywordsMask),
                 Level = raw.Level,
@@ -151,7 +153,7 @@ internal static class ProviderDetailsAssembler
 
             // Trailing control characters are trimmed so the two sources collapse to the same VersionKey: native
             // FormatMessage names carry a trailing '\0', offline message-table names carry a trailing '\r\n'.
-            dictionary.TryAdd(keyProjector(entry.Value), (resolvedName?.TrimEnd('\0', '\r', '\n', '\t', ' '))!);
+            dictionary.TryAdd(keyProjector(entry.Value), resolvedName?.TrimEnd('\0', '\r', '\n', '\t', ' ') ?? string.Empty);
         }
 
         return dictionary;

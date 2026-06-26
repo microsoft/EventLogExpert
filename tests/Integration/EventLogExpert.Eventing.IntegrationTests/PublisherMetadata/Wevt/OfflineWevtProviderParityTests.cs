@@ -18,8 +18,8 @@ namespace EventLogExpert.Eventing.IntegrationTests.PublisherMetadata.Wevt;
 ///     PowerShell supplies the non-empty keyword, value-map, opcode, and task tables. Parity is checked by key and value
 ///     (not by count): the native enumeration may carry extra standard entries, so every offline entry must reproduce its
 ///     native counterpart exactly, while a partial decode regression is caught by comparing each offline table size to the
-///     parsed post-dedup table count. Messages / parameters / descriptions are excluded because they are resolved lazily,
-///     not by this path.
+///     parsed post-dedup table count. Messages and parameters are excluded because they are resolved lazily, not by this
+///     path; descriptions are compared, resolved eagerly through the shared assembler for both sources.
 /// </summary>
 public sealed class OfflineWevtProviderParityTests(
     OfflineWevtProviderParityTests.SecurityAuditingParityFixture securityAuditing,
@@ -29,6 +29,29 @@ public sealed class OfflineWevtProviderParityTests(
         IClassFixture<OfflineWevtProviderParityTests.PowerShellParityFixture>,
         IClassFixture<OfflineWevtProviderParityTests.KernelPowerParityFixture>
 {
+    [Fact]
+    public void Descriptions_SharedByIdAndVersion_AreByteIdenticalToNative()
+    {
+        Assert.SkipUnless(securityAuditing.Available, SkipReasonFor(securityAuditing));
+
+        Dictionary<(long Id, byte Version), EventModel> nativeByKey = BuildEventLookup(securityAuditing.Native!);
+        int comparedCount = 0;
+
+        foreach (EventModel offlineEvent in securityAuditing.Offline!.Events)
+        {
+            if (!nativeByKey.TryGetValue((offlineEvent.Id, offlineEvent.Version), out EventModel? nativeEvent) ||
+                string.IsNullOrEmpty(nativeEvent.Description))
+            {
+                continue;
+            }
+
+            Assert.Equal(nativeEvent.Description, offlineEvent.Description);
+            comparedCount++;
+        }
+
+        Assert.True(comparedCount > 0, "Expected at least one shared event with a non-empty native description to compare.");
+    }
+
     [Fact]
     public void Events_KernelPowerTemplates_HaveLengthOutTypeAndArrayCountParity()
     {
