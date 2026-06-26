@@ -7,6 +7,14 @@ public sealed partial class Constants
 {
     public const string ApplicationLogName = "Application";
 
+    public const string BitsClientLogName = "Microsoft-Windows-Bits-Client";
+
+    public const string Direct3D11LogName = "Microsoft-Windows-Direct3D11";
+
+    public const string DotNetRuntimeLogName = "Microsoft-Windows-DotNETRuntime";
+
+    public const string DwmCoreLogName = "Microsoft-Windows-Dwm-Core";
+
     public const string ExchangeFormattedDescription =
         "Database redundancy health check passed.\r\nDatabase copy: SERVER1\r\nRedundancy count: 4\r\nIsSuppressed: False\r\n\r\nErrors:\r\nLots of copy status text";
 

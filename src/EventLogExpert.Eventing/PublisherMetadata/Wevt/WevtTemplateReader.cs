@@ -23,28 +23,21 @@ internal sealed class WevtTemplateData
     public required IReadOnlyDictionary<string, WevtRawMap> Maps { get; init; }
 }
 
-/// <summary>
-///     A single flat template field descriptor used to synthesize the manifest template XML. <see cref="Flags" /> is
-///     the descriptor's flags@0 word (carries the length-reference bit); <see cref="LengthRefIndex" /> is the length@14
-///     field, the 0-based index of the length-providing item when the length-reference bit is set.
-/// </summary>
-internal readonly record struct WevtTemplateItem(
-    string Name,
-    byte InType,
-    byte OutType,
-    ushort Count,
-    uint Flags,
-    ushort LengthRefIndex);
+internal abstract record WevtTemplateNode(string Name, uint Flags, ushort ArrayCount);
 
-/// <summary>
-///     A parsed event template. <see cref="IsStruct" /> is set when the template carries nested struct data (more
-///     name entries than descriptor items); such templates fail closed (no flat synthesis) until P2d adds struct support.
-/// </summary>
+internal sealed record WevtLeafNode(string Name, byte InType, byte OutType, uint Flags, ushort ArrayCount, ushort Length)
+    : WevtTemplateNode(Name, Flags, ArrayCount);
+
+internal sealed record WevtStructNode(string Name, uint Flags, ushort ArrayCount, IReadOnlyList<WevtLeafNode> Members)
+    : WevtTemplateNode(Name, Flags, ArrayCount);
+
+internal readonly record struct WevtRawDescriptor(string Name, bool IsStruct);
+
 internal sealed class WevtParsedTemplate
 {
-    public required bool IsStruct { get; init; }
+    public required IReadOnlyList<WevtRawDescriptor> Descriptors { get; init; }
 
-    public required IReadOnlyList<WevtTemplateItem> Items { get; init; }
+    public required IReadOnlyList<WevtTemplateNode> Nodes { get; init; }
 }
 
 /// <summary>A provider event read in full from the EVNT table, before any name/keyword resolution.</summary>
@@ -158,6 +151,7 @@ internal static class WevtTemplateReader
     private const int TemplateItemInTypeOffset = 4;
     private const int TemplateItemLengthOffset = 14;
     private const int TemplateItemMapOffset = 8;
+    private const int TemplateItemMemberCountOffset = 6;
     private const int TemplateItemNameOffset = 16;
     private const int TemplateItemOutTypeOffset = 5;
     private const int TemplateItemSize = 20;
@@ -537,38 +531,85 @@ internal static class WevtTemplateReader
         if (!TryReadUInt32(data, (int)templateOffset + TemplateItemCountOffset, out uint itemCount) ||
             !TryReadUInt32(data, (int)templateOffset + TemplateNameCountOffset, out uint nameCount) ||
             !TryReadUInt32(data, (int)templateOffset + TemplateItemsPointerOffset, out uint itemsOffset) ||
-            itemCount > MaxTemplateItemCount)
+            itemCount > MaxTemplateItemCount ||
+            nameCount > MaxTemplateItemCount ||
+            nameCount < itemCount)
         {
             return null;
         }
 
-        // A struct-bearing template has more name entries than descriptor items (numNames > numDesc). Nested struct
-        // synthesis is out of scope for P2a, so the template fails closed and the offline reader emits no template XML.
-        bool isStruct = nameCount > itemCount;
+        RawTemplateDescriptor[] raw = new RawTemplateDescriptor[nameCount];
+        WevtRawDescriptor[] descriptors = new WevtRawDescriptor[nameCount];
 
-        List<WevtTemplateItem> items = new((int)itemCount);
-
-        for (uint itemIndex = 0; itemIndex < itemCount; itemIndex++)
+        for (uint index = 0; index < nameCount; index++)
         {
-            int itemOffset = (int)itemsOffset + (int)(itemIndex * TemplateItemSize);
+            int itemOffset = (int)itemsOffset + (int)(index * TemplateItemSize);
 
             if (!TryReadUInt32(data, itemOffset + TemplateItemFlagsOffset, out uint flags) ||
                 !TryReadByte(data, itemOffset + TemplateItemInTypeOffset, out byte inType) ||
                 !TryReadByte(data, itemOffset + TemplateItemOutTypeOffset, out byte outType) ||
-                !TryReadUInt16(data, itemOffset + TemplateItemArrayCountOffset, out ushort count) ||
-                !TryReadUInt16(data, itemOffset + TemplateItemLengthOffset, out ushort lengthRefIndex) ||
+                !TryReadUInt16(data, itemOffset + TemplateItemMemberCountOffset, out ushort memberCount) ||
+                !TryReadUInt16(data, itemOffset + TemplateItemInTypeOffset, out ushort memberStart) ||
+                !TryReadUInt16(data, itemOffset + TemplateItemArrayCountOffset, out ushort arrayCount) ||
+                !TryReadUInt16(data, itemOffset + TemplateItemLengthOffset, out ushort length) ||
                 !TryReadUInt32(data, itemOffset + TemplateItemNameOffset, out uint nameOffset) ||
                 !TryReadName(data, nameOffset, out string name))
             {
-                // A truncated or malformed item descriptor or name makes the whole template unrepresentable, so it fails
-                // closed (the offline reader emits no template XML) rather than synthesizing a partial / empty-name template.
                 return null;
             }
 
-            items.Add(new WevtTemplateItem(name, inType, outType, count, flags, lengthRefIndex));
+            raw[index] = new RawTemplateDescriptor(name, inType, outType, memberCount, memberStart, flags, arrayCount, length);
+            descriptors[index] = new WevtRawDescriptor(name, memberCount > 0);
         }
 
-        return new WevtParsedTemplate { IsStruct = isStruct, Items = items };
+        List<WevtTemplateNode> nodes = new((int)itemCount);
+        bool[] memberConsumed = new bool[nameCount];
+
+        for (uint index = 0; index < itemCount; index++)
+        {
+            RawTemplateDescriptor descriptor = raw[index];
+
+            if (descriptor.MemberCount == 0)
+            {
+                nodes.Add(ToLeafNode(descriptor));
+
+                continue;
+            }
+
+            long memberEnd = (long)descriptor.MemberStart + descriptor.MemberCount;
+
+            if (descriptor.MemberStart < itemCount || memberEnd > nameCount)
+            {
+                return null;
+            }
+
+            List<WevtLeafNode> members = new(descriptor.MemberCount);
+
+            for (int member = descriptor.MemberStart; member < memberEnd; member++)
+            {
+                // A member that is itself a struct (nested) or already claimed by another struct is unrepresentable.
+                if (raw[member].MemberCount != 0 || memberConsumed[member])
+                {
+                    return null;
+                }
+
+                memberConsumed[member] = true;
+                members.Add(ToLeafNode(raw[member]));
+            }
+
+            nodes.Add(new WevtStructNode(descriptor.Name, descriptor.Flags, descriptor.ArrayCount, members));
+        }
+
+        for (int index = (int)itemCount; index < nameCount; index++)
+        {
+            // Every appended member descriptor must be claimed by exactly one struct, or the template is malformed.
+            if (!memberConsumed[index])
+            {
+                return null;
+            }
+        }
+
+        return new WevtParsedTemplate { Nodes = nodes, Descriptors = descriptors };
     }
 
     private static string? ReadInlineName(ReadOnlySpan<byte> data, uint nameDataOffset)
@@ -605,6 +646,9 @@ internal static class WevtTemplateReader
 
         return mapName;
     }
+
+    private static WevtLeafNode ToLeafNode(RawTemplateDescriptor descriptor) =>
+        new(descriptor.Name, descriptor.InType, descriptor.OutType, descriptor.Flags, descriptor.ArrayCount, descriptor.Length);
 
     private static byte[]? TryCopyWevtResource(
         string resourceFilePath,
@@ -864,4 +908,14 @@ internal static class WevtTemplateReader
 
         return true;
     }
+
+    private readonly record struct RawTemplateDescriptor(
+        string Name,
+        byte InType,
+        byte OutType,
+        ushort MemberCount,
+        ushort MemberStart,
+        uint Flags,
+        ushort ArrayCount,
+        ushort Length);
 }

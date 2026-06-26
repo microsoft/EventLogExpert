@@ -5,10 +5,10 @@ using EventLogExpert.Eventing.PublisherMetadata;
 
 namespace EventLogExpert.Eventing.Tests.PublisherMetadata;
 
-public sealed class ProviderDetailsAssemblerTests
+public sealed class ProviderDetailsFactoryTests
 {
     [Fact]
-    public void Assemble_DuplicateProjectedOpcodeKey_KeepsFirstAndPreservesDistinctKeys()
+    public void Create_DuplicateProjectedOpcodeKey_KeepsFirstAndPreservesDistinctKeys()
     {
         // Opcode keys are the value shifted right 16 bits: 0x00010000 and 0x0001FFFF both project to 1; 0x00020000 to 2.
         // First write wins for the colliding key, and the distinct key survives (the dedup the native getters used to do).
@@ -21,7 +21,7 @@ public sealed class ProviderDetailsAssemblerTests
                 new RawNamedValue(0x00020000, uint.MaxValue, "Third")
             ]);
 
-        var details = ProviderDetailsAssembler.Assemble(content, null);
+        var details = ProviderDetailsFactory.Create(content, null);
 
         Assert.Equal(2, details.Opcodes.Count);
         Assert.Equal("First", details.Opcodes[1]);
@@ -29,7 +29,7 @@ public sealed class ProviderDetailsAssemblerTests
     }
 
     [Fact]
-    public void Assemble_Event_ExpandsKeywordMaskAndResolvesDescriptionAndLogName()
+    public void Create_Event_ExpandsKeywordMaskAndResolvesDescriptionAndLogName()
     {
         var content = CreateContent(
             resolveMessage: id => id == 50 ? "Event description" : null,
@@ -48,7 +48,7 @@ public sealed class ProviderDetailsAssemblerTests
                     MessageId: 50)
             ]);
 
-        var details = ProviderDetailsAssembler.Assemble(content, null);
+        var details = ProviderDetailsFactory.Create(content, null);
 
         var model = Assert.Single(details.Events);
         Assert.Equal(4624L, model.Id);
@@ -60,44 +60,44 @@ public sealed class ProviderDetailsAssemblerTests
     }
 
     [Fact]
-    public void Assemble_EventDescriptionResolvesToNull_DescriptionIsEmptyString()
+    public void Create_EventDescriptionResolvesToNull_DescriptionIsEmptyString()
     {
         var content = CreateContent(
             resolveMessage: _ => null,
             events: [new RawProviderEvent(1, 0, 0, 0, 0, 0, 0, "<t/>", 50)]);
 
-        var details = ProviderDetailsAssembler.Assemble(content, null);
+        var details = ProviderDetailsFactory.Create(content, null);
 
         Assert.Equal(string.Empty, Assert.Single(details.Events).Description);
     }
 
     [Fact]
-    public void Assemble_EventDescriptionWithTrailingControlChars_IsTrimmed()
+    public void Create_EventDescriptionWithTrailingControlChars_IsTrimmed()
     {
         var content = CreateContent(
             resolveMessage: id => id == 50 ? "Event description\r\n\0\t " : null,
             events: [new RawProviderEvent(1, 0, 0, 0, 0, 0, 0, "<t/>", 50)]);
 
-        var details = ProviderDetailsAssembler.Assemble(content, null);
+        var details = ProviderDetailsFactory.Create(content, null);
 
         Assert.Equal("Event description", Assert.Single(details.Events).Description);
     }
 
     [Fact]
-    public void Assemble_EventWithoutMessageId_DescriptionIsEmptyString()
+    public void Create_EventWithoutMessageId_DescriptionIsEmptyString()
     {
         var content = CreateContent(
             resolveMessage: _ => "ShouldNotBeUsed",
             events: [new RawProviderEvent(1, 0, 0, 0, 0, 0, 0, "<t/>", uint.MaxValue)]);
 
-        var details = ProviderDetailsAssembler.Assemble(content, null);
+        var details = ProviderDetailsFactory.Create(content, null);
 
         var model = Assert.Single(details.Events);
         Assert.Equal(string.Empty, model.Description);
     }
 
     [Fact]
-    public void Assemble_InlineNameWithTrailingNull_IsTrimmed()
+    public void Create_InlineNameWithTrailingNull_IsTrimmed()
     {
         // Native FormatMessage names arrive with a trailing '\0'; trimming lets the native and offline sources collapse
         // to the same dictionary value.
@@ -105,64 +105,64 @@ public sealed class ProviderDetailsAssemblerTests
             resolveMessage: _ => null,
             opcodes: [new RawNamedValue(0x00030000, uint.MaxValue, "OpcodeName\0")]);
 
-        var details = ProviderDetailsAssembler.Assemble(content, null);
+        var details = ProviderDetailsFactory.Create(content, null);
 
         Assert.Equal("OpcodeName", details.Opcodes[3]);
     }
 
     [Fact]
-    public void Assemble_MessageIdResolvesToNull_NameIsEmptyString()
+    public void Create_MessageIdResolvesToNull_NameIsEmptyString()
     {
-        // The offline resolver may return null; the assembler coalesces that to string.Empty (never null), so the
+        // The offline resolver may return null; the factory coalesces that to string.Empty (never null), so the
         // encoder hashes it the same as the native path.
         var content = CreateContent(
             resolveMessage: _ => null,
             keywords: [new RawNamedValue(0x0000000000000002, 99, null)]);
 
-        var details = ProviderDetailsAssembler.Assemble(content, null);
+        var details = ProviderDetailsFactory.Create(content, null);
 
         Assert.Equal(string.Empty, details.Keywords[2L]);
     }
 
     [Fact]
-    public void Assemble_NamedValueWithMessageId_ResolvesNameThroughResolver()
+    public void Create_NamedValueWithMessageId_ResolvesNameThroughResolver()
     {
         var content = CreateContent(
             resolveMessage: id => id == 42 ? "ResolvedKeyword" : null,
             keywords: [new RawNamedValue(0x0000000000000001, 42, "ShouldNotBeUsed")]);
 
-        var details = ProviderDetailsAssembler.Assemble(content, null);
+        var details = ProviderDetailsFactory.Create(content, null);
 
         // The message id wins over the inline name when a real id exists.
         Assert.Equal("ResolvedKeyword", details.Keywords[1L]);
     }
 
     [Fact]
-    public void Assemble_NamedValueWithoutMessageId_FallsBackToInlineName()
+    public void Create_NamedValueWithoutMessageId_FallsBackToInlineName()
     {
         var content = CreateContent(
             resolveMessage: _ => "ShouldNotBeUsed",
             opcodes: [new RawNamedValue(0x00010000, uint.MaxValue, "InlineOpcode")]);
 
-        var details = ProviderDetailsAssembler.Assemble(content, null);
+        var details = ProviderDetailsFactory.Create(content, null);
 
         Assert.Equal("InlineOpcode", details.Opcodes[1]);
     }
 
     [Fact]
-    public void Assemble_NamedValueWithoutMessageIdOrInlineName_NameIsEmptyString()
+    public void Create_NamedValueWithoutMessageIdOrInlineName_NameIsEmptyString()
     {
         var content = CreateContent(
             resolveMessage: _ => null,
             tasks: [new RawNamedValue(5, uint.MaxValue, null)]);
 
-        var details = ProviderDetailsAssembler.Assemble(content, null);
+        var details = ProviderDetailsFactory.Create(content, null);
 
         Assert.Equal(string.Empty, details.Tasks[5]);
     }
 
     [Fact]
-    public void Assemble_ResolvedNameWithTrailingCrlf_IsTrimmed()
+    public void Create_ResolvedNameWithTrailingCrlf_IsTrimmed()
     {
         // Offline message-table names arrive with a trailing '\r\n'; trimming lets the native and offline sources
         // collapse to the same dictionary value.
@@ -170,19 +170,19 @@ public sealed class ProviderDetailsAssemblerTests
             resolveMessage: id => id == 77 ? "KeywordName\r\n" : null,
             keywords: [new RawNamedValue(0x4, 77, null)]);
 
-        var details = ProviderDetailsAssembler.Assemble(content, null);
+        var details = ProviderDetailsFactory.Create(content, null);
 
         Assert.Equal("KeywordName", details.Keywords[4L]);
     }
 
     [Fact]
-    public void Assemble_TaskValue_UsesValueAsKey()
+    public void Create_TaskValue_UsesValueAsKey()
     {
         var content = CreateContent(
             resolveMessage: _ => null,
             tasks: [new RawNamedValue(7, uint.MaxValue, "InlineTask")]);
 
-        var details = ProviderDetailsAssembler.Assemble(content, null);
+        var details = ProviderDetailsFactory.Create(content, null);
 
         Assert.Equal("InlineTask", details.Tasks[7]);
     }
@@ -192,7 +192,7 @@ public sealed class ProviderDetailsAssemblerTests
     {
         string template = "<template><dataSource name=\"BusType\"/><data name=\"BusType\"/></template>";
 
-        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "BusType", "BusTypeMap");
+        string result = ProviderDetailsFactory.InjectMapAttribute(template, "BusType", "BusTypeMap");
 
         Assert.Equal(
             "<template><dataSource name=\"BusType\"/><data name=\"BusType\" map=\"BusTypeMap\"/></template>",
@@ -204,7 +204,7 @@ public sealed class ProviderDetailsAssemblerTests
     {
         string template = "<template><dataSource name=\"BusType\"/><data name=\"Volume\"/></template>";
 
-        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "BusType", "BusTypeMap");
+        string result = ProviderDetailsFactory.InjectMapAttribute(template, "BusType", "BusTypeMap");
 
         Assert.Equal(template, result);
         Assert.DoesNotContain("map=", result);
@@ -217,7 +217,7 @@ public sealed class ProviderDetailsAssemblerTests
         // is escaped the same way the template writer escaped it.
         string template = "<template><data name=\"a&amp;b\" inType=\"win:UInt32\"/></template>";
 
-        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "a&b", "MyMap");
+        string result = ProviderDetailsFactory.InjectMapAttribute(template, "a&b", "MyMap");
 
         Assert.Equal(
             "<template><data name=\"a&amp;b\" map=\"MyMap\" inType=\"win:UInt32\"/></template>",
@@ -229,7 +229,7 @@ public sealed class ProviderDetailsAssemblerTests
     {
         string template = "<template><data name=\"Other\" inType=\"win:UInt32\"/></template>";
 
-        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "BusType", "BusTypeMap");
+        string result = ProviderDetailsFactory.InjectMapAttribute(template, "BusType", "BusTypeMap");
 
         Assert.Equal(template, result);
     }
@@ -239,7 +239,7 @@ public sealed class ProviderDetailsAssemblerTests
     {
         string template = "<template><data name=\"BusType\" inType=\"win:UInt32\"/></template>";
 
-        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "BusType", "BusTypeMap");
+        string result = ProviderDetailsFactory.InjectMapAttribute(template, "BusType", "BusTypeMap");
 
         Assert.Equal(
             "<template><data name=\"BusType\" map=\"BusTypeMap\" inType=\"win:UInt32\"/></template>",
@@ -251,7 +251,7 @@ public sealed class ProviderDetailsAssemblerTests
     {
         string template = "<template><data name=\"BusType\"/></template>";
 
-        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "Bus", "BusMap");
+        string result = ProviderDetailsFactory.InjectMapAttribute(template, "Bus", "BusMap");
 
         Assert.Equal(template, result);
     }
@@ -261,7 +261,7 @@ public sealed class ProviderDetailsAssemblerTests
     {
         string template = "<template><data name=\"Bus\"/><data name=\"BusType\"/></template>";
 
-        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "BusType", "BusTypeMap");
+        string result = ProviderDetailsFactory.InjectMapAttribute(template, "BusType", "BusTypeMap");
 
         Assert.Equal(
             "<template><data name=\"Bus\"/><data name=\"BusType\" map=\"BusTypeMap\"/></template>",
@@ -273,7 +273,7 @@ public sealed class ProviderDetailsAssemblerTests
     {
         string template = "<template><struct name=\"BusType\"/></template>";
 
-        string result = ProviderDetailsAssembler.InjectMapAttribute(template, "BusType", "BusTypeMap");
+        string result = ProviderDetailsFactory.InjectMapAttribute(template, "BusType", "BusTypeMap");
 
         Assert.Equal(template, result);
     }
@@ -287,7 +287,7 @@ public sealed class ProviderDetailsAssemblerTests
         IReadOnlyList<RawNamedValue>? tasks = null) =>
         new()
         {
-            // Guid.Empty short-circuits value-map population, so the assembler never touches the native WEVT reader.
+            // Guid.Empty short-circuits value-map population, so the factory never touches the native WEVT reader.
             ProviderName = "TestProvider",
             PublisherGuid = Guid.Empty,
             ResourceFilePath = string.Empty,

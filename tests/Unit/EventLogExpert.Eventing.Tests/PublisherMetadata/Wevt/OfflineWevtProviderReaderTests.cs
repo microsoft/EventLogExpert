@@ -64,7 +64,7 @@ public sealed class OfflineWevtProviderReaderTests
     }
 
     [Fact]
-    public void MapToRawContent_FileTimeFlatTemplate_IsNotStructAndSynthesizesFileTime()
+    public void MapToRawContent_FileTimeFlatTemplate_IsNotStructAndWritesFileTime()
     {
         // A multi-field flat template (FILETIME + UInt32) has numNames == numDesc, so it must NOT be treated as a struct.
         byte[] resource = BuildProviderResource(
@@ -104,14 +104,31 @@ public sealed class OfflineWevtProviderReaderTests
     }
 
     [Fact]
-    public void MapToRawContent_FixedNumericLength_FailsClosedToEmptyTemplate()
+    public void MapToRawContent_FixedNumericLengthBinary_EmitsLength()
     {
-        // flags@0 carries the fixed-length bit (0x2) without the field-reference bit (0x4): length@14 is a numeric byte
-        // count, which is outside the pinned field-name form, so the whole template fails closed.
+        // flags@0 carries the fixed-length bit (0x2) without the field-reference bit (0x4): for win:Binary (inType 0x0e /
+        // outType 0x0f) length@14 is the literal byte count, emitted as length="<n>".
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
                 Items: [new TemplateItemSpec(InType: 0x0e, OutType: 0x0f, Count: 0, Name: "Address", Flags: 0x2, LengthRefIndex: 6)],
+                NameCount: 1));
+
+        string template = Assert.Single(MapResource(resource).Events).Template;
+
+        Assert.Contains("name=\"Address\"", template);
+        Assert.Contains("length=\"6\"", template);
+    }
+
+    [Fact]
+    public void MapToRawContent_FixedNumericLengthNonBinary_FailsClosedToEmptyTemplate()
+    {
+        // A fixed numeric length (flags 0x2) on a type other than win:Binary / xs:hexBinary is not an observed native
+        // combination, so the whole template fails closed.
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
+            template: new TemplateSpec(
+                Items: [new TemplateItemSpec(InType: 0x08, OutType: 0x08, Count: 0, Name: "Value", Flags: 0x2, LengthRefIndex: 6)],
                 NameCount: 1));
 
         RawProviderContent content = MapResource(resource);
@@ -123,7 +140,7 @@ public sealed class OfflineWevtProviderReaderTests
     public void MapToRawContent_LengthFieldReference_EmitsReferencedFieldName()
     {
         // The second field's flags@0 carries the field-reference bit (0x4) and length@14 indexes field 0, so the
-        // synthesized template emits length="<field 0's name>" rather than a numeric length.
+        // written template emits length="<field 0's name>" rather than a numeric length.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -157,10 +174,32 @@ public sealed class OfflineWevtProviderReaderTests
     }
 
     [Fact]
-    public void MapToRawContent_OpcodeValue_PassesHighWordThroughForAssemblerProjection()
+    public void MapToRawContent_NestedStructMember_FailsClosedToEmptyTemplate()
+    {
+        // A struct member that is itself a struct (memberCount@6 > 0) is a nested struct, which the corpus never contains;
+        // the parser rejects the whole template rather than emitting a partial or guessed shape.
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 7, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: 0, ReferencesTemplate: true)],
+            template: new TemplateSpec(
+                Items:
+                [
+                    new TemplateItemSpec(InType: 0x00, OutType: 0x00, Count: 0, Name: "Outer", MemberCount: 2, MemberStart: 1),
+                    new TemplateItemSpec(InType: 0x00, OutType: 0x00, Count: 0, Name: "Inner", MemberCount: 1, MemberStart: 2),
+                    new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "Leaf")
+                ],
+                NameCount: 3,
+                ItemCount: 1));
+
+        RawProviderContent content = MapResource(resource);
+
+        Assert.Equal(string.Empty, Assert.Single(content.Events).Template);
+    }
+
+    [Fact]
+    public void MapToRawContent_OpcodeValue_PassesHighWordThroughForFactoryProjection()
     {
         // The OPCO table stores each opcode value already shifted into the high word (opcode << 16), exactly as native
-        // EvtPublisherMetadataOpcodeValue reports it. The reader passes the raw id through unchanged so the assembler's
+        // EvtPublisherMetadataOpcodeValue reports it. The reader passes the raw id through unchanged so the factory's
         // (int)((uint)Value >> 16) projection recovers the same opcode key the native path produces.
         byte[] resource = BuildProviderResource(opcodes:
         [
@@ -180,7 +219,7 @@ public sealed class OfflineWevtProviderReaderTests
         Assert.Equal(10UL << 16, content.Opcodes[2].Value);
         Assert.Equal((ulong)ushort.MaxValue << 16, content.Opcodes[3].Value);
 
-        ProviderDetails details = ProviderDetailsAssembler.Assemble(content, data.Templates, logger: null);
+        ProviderDetails details = ProviderDetailsFactory.Create(content, data.Templates, logger: null);
 
         Assert.Equal(4, details.Opcodes.Count);
         Assert.Equal("Op0", details.Opcodes[0]);
@@ -192,7 +231,7 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_RenderingCriticalOutTypeBytes_EmitExactLiveCasing()
     {
-        // The synthesized outType spelling must match the live API exactly: a casing drift (win:HResult vs the live
+        // The written outType spelling must match the live API exactly: a casing drift (win:HResult vs the live
         // win:Hresult, or win:NTSTATUS vs the live win:NTStatus) diverges the template structurally on every field of
         // that type. These two bytes are the casing-sensitive ones, so their exact spelling is pinned here.
         byte[] resource = BuildProviderResource(
@@ -214,24 +253,32 @@ public sealed class OfflineWevtProviderReaderTests
     }
 
     [Fact]
-    public void MapToRawContent_StructTemplate_FailsClosedToEmptyTemplate()
+    public void MapToRawContent_StructTemplate_EmitsNestedDataInsideStruct()
     {
-        // numNames (2) > numDesc (1) marks a struct-bearing template; the offline reader fails closed and emits no XML.
+        // itemCount=1 top-level struct whose memberCount@6=2 claims the two appended member descriptors at [1..3); the
+        // members render as nested <data> inside <struct name="Header"> (no count flag, so the struct carries no count).
         byte[] resource = BuildProviderResource(
-            events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
+            events: [new EventSpec(Id: 5, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: 0, ReferencesTemplate: true)],
             template: new TemplateSpec(
-                Items: [new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "Field1")],
-                NameCount: 2));
-
-        WevtProviderData data = ParseResource(resource);
-
-        WevtProviderEvent parsed = Assert.Single(data.Events);
-        Assert.NotNull(parsed.Template);
-        Assert.True(parsed.Template!.IsStruct);
+                Items:
+                [
+                    new TemplateItemSpec(InType: 0x00, OutType: 0x00, Count: 0, Name: "Header", MemberCount: 2, MemberStart: 1),
+                    new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "Version"),
+                    new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "Size")
+                ],
+                NameCount: 3,
+                ItemCount: 1));
 
         RawProviderContent content = MapResource(resource);
         RawProviderEvent mapped = Assert.Single(content.Events);
-        Assert.Equal(string.Empty, mapped.Template);
+
+        Assert.Equal(
+            "<template xmlns=\"http://schemas.microsoft.com/win/2004/08/events\">" +
+            "<struct name=\"Header\">" +
+            "<data name=\"Version\" inType=\"win:UInt32\" outType=\"xs:unsignedInt\"/>" +
+            "<data name=\"Size\" inType=\"win:UInt32\" outType=\"xs:unsignedInt\"/>" +
+            "</struct></template>",
+            mapped.Template);
     }
 
     [Fact]
@@ -253,7 +300,7 @@ public sealed class OfflineWevtProviderReaderTests
         Assert.Equal(7UL, Assert.Single(content.Tasks).Value);
         Assert.Equal([0x8000000000000000, 0x0000000000000002], content.Keywords.Select(static keyword => keyword.Value));
 
-        ProviderDetails details = ProviderDetailsAssembler.Assemble(content, data.Templates, logger: null);
+        ProviderDetails details = ProviderDetailsFactory.Create(content, data.Templates, logger: null);
 
         Assert.Equal("Task7", details.Tasks[7]);
         Assert.Equal("KeywordHigh", details.Keywords[unchecked((long)0x8000000000000000)]);
@@ -270,13 +317,30 @@ public sealed class OfflineWevtProviderReaderTests
                 NameCount: 1));
 
         // Point the first item's name-offset (the item descriptor's name@16 field) past the end of the resource. A name
-        // that cannot be read makes the whole template unrepresentable, so it fails closed rather than synthesizing a
+        // that cannot be read makes the whole template unrepresentable, so it fails closed rather than writing a
         // partial or empty-name field.
         WriteUInt32(resource, TemplateOffset + 20 + 16, BufferSize + 0x100);
 
         RawProviderContent content = MapResource(resource);
 
         Assert.Equal(string.Empty, Assert.Single(content.Events).Template);
+    }
+
+    [Fact]
+    public void MapToRawContent_TemplateWithUnclaimedAppendedDescriptor_FailsClosedToEmptyTemplate()
+    {
+        // numNames (2) > numDesc (1), but the single top-level descriptor is a leaf, so no struct claims the appended
+        // descriptor; the exact-partition check rejects the template and the offline reader emits no XML.
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
+            template: new TemplateSpec(
+                Items: [new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "Field1")],
+                NameCount: 2));
+
+        RawProviderContent content = MapResource(resource);
+        RawProviderEvent mapped = Assert.Single(content.Events);
+
+        Assert.Equal(string.Empty, mapped.Template);
     }
 
     [Fact]
@@ -290,12 +354,47 @@ public sealed class OfflineWevtProviderReaderTests
 
         // Cut the resource part-way through the single item descriptor: the template header and item pointer survive, but
         // the descriptor's trailing fields are gone. A truncated descriptor fails the whole template closed instead of
-        // synthesizing from partially-read bytes.
+        // writing from partially-read bytes.
         byte[] truncated = resource[..(TemplateOffset + 20 + 4)];
 
         RawProviderContent content = MapResource(truncated);
 
         Assert.Equal(string.Empty, Assert.Single(content.Events).Template);
+    }
+
+    [Fact]
+    public void MapToRawContent_TwoSiblingStructs_EmitEachWithItsOwnMembers()
+    {
+        // Two top-level structs (itemCount=2) directly index disjoint member ranges - First claims [2..4), Second claims
+        // [4..6) - proving members are addressed by each struct's own start index, not a shared running cursor.
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 6, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: 0, ReferencesTemplate: true)],
+            template: new TemplateSpec(
+                Items:
+                [
+                    new TemplateItemSpec(InType: 0x00, OutType: 0x00, Count: 0, Name: "First", MemberCount: 2, MemberStart: 2),
+                    new TemplateItemSpec(InType: 0x00, OutType: 0x00, Count: 0, Name: "Second", MemberCount: 2, MemberStart: 4),
+                    new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "A"),
+                    new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "B"),
+                    new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "C"),
+                    new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "D")
+                ],
+                NameCount: 6,
+                ItemCount: 2));
+
+        RawProviderContent content = MapResource(resource);
+
+        Assert.Equal(
+            "<template xmlns=\"http://schemas.microsoft.com/win/2004/08/events\">" +
+            "<struct name=\"First\">" +
+            "<data name=\"A\" inType=\"win:UInt32\" outType=\"xs:unsignedInt\"/>" +
+            "<data name=\"B\" inType=\"win:UInt32\" outType=\"xs:unsignedInt\"/>" +
+            "</struct>" +
+            "<struct name=\"Second\">" +
+            "<data name=\"C\" inType=\"win:UInt32\" outType=\"xs:unsignedInt\"/>" +
+            "<data name=\"D\" inType=\"win:UInt32\" outType=\"xs:unsignedInt\"/>" +
+            "</struct></template>",
+            Assert.Single(content.Events).Template);
     }
 
     [Fact]
@@ -334,7 +433,7 @@ public sealed class OfflineWevtProviderReaderTests
     public void MapToRawContent_VariableCountArray_EmitsReferencedFieldName()
     {
         // The second field's flags@0 carries the variable-count-array bit (0x10) and count@12 indexes field 0, so the
-        // synthesized template emits count="<field 0's name>" rather than a numeric count.
+        // written template emits count="<field 0's name>" rather than a numeric count.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -368,10 +467,33 @@ public sealed class OfflineWevtProviderReaderTests
     }
 
     [Fact]
+    public void MapToRawContent_VariableCountReferenceToStruct_FailsClosedToEmptyTemplate()
+    {
+        // A variable-count field (flags 0x10) whose count@12 references a struct descriptor (index 0) is unresolvable - a
+        // count must name a leaf numeric field, never a struct - so the whole template fails closed.
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 8, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: 0, ReferencesTemplate: true)],
+            template: new TemplateSpec(
+                Items:
+                [
+                    new TemplateItemSpec(InType: 0x00, OutType: 0x00, Count: 0, Name: "Block", MemberCount: 2, MemberStart: 2),
+                    new TemplateItemSpec(InType: 0x08, OutType: 0x08, Count: 0, Name: "Items", Flags: 0x10),
+                    new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "M1"),
+                    new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "M2")
+                ],
+                NameCount: 4,
+                ItemCount: 2));
+
+        RawProviderContent content = MapResource(resource);
+
+        Assert.Equal(string.Empty, Assert.Single(content.Events).Template);
+    }
+
+    [Fact]
     public void MapToRawContent_ZeroOutTypeByte_EmitsInTypeDefaultOutType()
     {
         // A zero outType byte means "use the inType's winmeta default outType". The live API always emits an outType, so
-        // the synthesizer emits win:UInt32's default (xs:unsignedInt) rather than omitting the attribute.
+        // the writer emits win:UInt32's default (xs:unsignedInt) rather than omitting the attribute.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -382,35 +504,6 @@ public sealed class OfflineWevtProviderReaderTests
 
         Assert.Contains("inType=\"win:UInt32\"", template);
         Assert.Contains("outType=\"xs:unsignedInt\"", template);
-    }
-
-    [Fact]
-    public void Synthesize_XmlEscapedFieldName_StillMatchesMapInjection()
-    {
-        // The field name contains '&'; the synthesized template escapes it to "a&amp;b" while the map association is keyed
-        // by the raw "a&b". Map injection must escape identically, otherwise the map attribute is silently dropped.
-        byte[] resource = BuildProviderResource(
-            events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
-            template: new TemplateSpec(
-                Items: [new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "a&b", HasMap: true)],
-                NameCount: 1,
-                Map: new MapSpec(Name: "MyMap", IsBitMap: false, Entries: [(Value: 1, MessageId: 0x5000)])));
-
-        WevtProviderData data = ParseResource(resource);
-
-        Assert.True(data.Templates.EventFieldMaps.TryGetValue(
-            new WevtEventKey(10, 0), out IReadOnlyDictionary<string, string>? fieldMaps));
-        Assert.Equal("MyMap", fieldMaps!["a&b"]);
-
-        RawProviderContent content = OfflineWevtProviderReader.MapToRawContent(
-            data, s_publisherGuid, "TestProvider", string.Empty, static id => id == 0x5000 ? "DecodedOne" : null);
-
-        Assert.Contains("name=\"a&amp;b\"", Assert.Single(content.Events).Template);
-
-        ProviderDetails details = ProviderDetailsAssembler.Assemble(content, data.Templates, logger: null);
-
-        Assert.True(details.Maps.ContainsKey("MyMap"));
-        Assert.Contains("map=\"MyMap\"", Assert.Single(details.Events).Template);
     }
 
     [Fact]
@@ -477,6 +570,35 @@ public sealed class OfflineWevtProviderReaderTests
 
         Assert.Empty(data.Keywords);
         Assert.Single(data.Opcodes);
+    }
+
+    [Fact]
+    public void Write_XmlEscapedFieldName_StillMatchesMapInjection()
+    {
+        // The field name contains '&'; the written template escapes it to "a&amp;b" while the map association is keyed
+        // by the raw "a&b". Map injection must escape identically, otherwise the map attribute is silently dropped.
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
+            template: new TemplateSpec(
+                Items: [new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "a&b", HasMap: true)],
+                NameCount: 1,
+                Map: new MapSpec(Name: "MyMap", IsBitMap: false, Entries: [(Value: 1, MessageId: 0x5000)])));
+
+        WevtProviderData data = ParseResource(resource);
+
+        Assert.True(data.Templates.EventFieldMaps.TryGetValue(
+            new WevtEventKey(10, 0), out IReadOnlyDictionary<string, string>? fieldMaps));
+        Assert.Equal("MyMap", fieldMaps!["a&b"]);
+
+        RawProviderContent content = OfflineWevtProviderReader.MapToRawContent(
+            data, s_publisherGuid, "TestProvider", string.Empty, static id => id == 0x5000 ? "DecodedOne" : null);
+
+        Assert.Contains("name=\"a&amp;b\"", Assert.Single(content.Events).Template);
+
+        ProviderDetails details = ProviderDetailsFactory.Create(content, data.Templates, logger: null);
+
+        Assert.True(details.Maps.ContainsKey("MyMap"));
+        Assert.Contains("map=\"MyMap\"", Assert.Single(details.Events).Template);
     }
 
     private static byte[] BuildProviderResource(
@@ -596,7 +718,7 @@ public sealed class OfflineWevtProviderReaderTests
         if (template is not null)
         {
             WriteAscii(buffer, TemplateOffset, "TEMP");
-            WriteUInt32(buffer, TemplateOffset + 8, (uint)template.Items.Length);
+            WriteUInt32(buffer, TemplateOffset + 8, (uint)(template.ItemCount ?? template.Items.Length));
             WriteUInt32(buffer, TemplateOffset + 12, (uint)template.NameCount);
             WriteUInt32(buffer, TemplateOffset + 16, TemplateOffset + 20);
 
@@ -605,8 +727,19 @@ public sealed class OfflineWevtProviderReaderTests
                 TemplateItemSpec item = template.Items[index];
                 int itemOffset = TemplateOffset + 20 + (index * 20);
                 WriteUInt32(buffer, itemOffset, item.Flags);
-                buffer[itemOffset + 4] = item.InType;
-                buffer[itemOffset + 5] = item.OutType;
+
+                if (item.MemberCount > 0)
+                {
+                    // A struct descriptor carries no inType: @4 is the member-start index (u16) and @6 the member count.
+                    WriteUInt16(buffer, itemOffset + 4, item.MemberStart);
+                    WriteUInt16(buffer, itemOffset + 6, item.MemberCount);
+                }
+                else
+                {
+                    buffer[itemOffset + 4] = item.InType;
+                    buffer[itemOffset + 5] = item.OutType;
+                }
+
                 WriteUInt16(buffer, itemOffset + 12, item.Count);
                 WriteUInt16(buffer, itemOffset + 14, item.LengthRefIndex);
                 WriteUInt32(buffer, itemOffset + 16, (uint)Alloc(item.Name));
@@ -685,7 +818,9 @@ public sealed class OfflineWevtProviderReaderTests
         string Name,
         bool HasMap = false,
         uint Flags = 0,
-        ushort LengthRefIndex = 0);
+        ushort LengthRefIndex = 0,
+        ushort MemberCount = 0,
+        ushort MemberStart = 0);
 
-    private sealed record TemplateSpec(TemplateItemSpec[] Items, int NameCount, MapSpec? Map = null);
+    private sealed record TemplateSpec(TemplateItemSpec[] Items, int NameCount, MapSpec? Map = null, int? ItemCount = null);
 }
