@@ -104,6 +104,21 @@ public sealed class OfflineWevtProviderReaderTests
     }
 
     [Fact]
+    public void MapToRawContent_FixedNumericLengthAnsiString_EmitsLength()
+    {
+        // win:AnsiString (0x02) is length-bearing: a fixed length@14=4 emits length="4".
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
+            template: new TemplateSpec(
+                Items: [new TemplateItemSpec(InType: 0x02, OutType: 0x00, Count: 0, Name: "Tag", Flags: 0x2, Length: 4)],
+                NameCount: 1));
+
+        string template = Assert.Single(MapResource(resource).Events).Template;
+
+        Assert.Contains("inType=\"win:AnsiString\" outType=\"xs:string\" length=\"4\"", template);
+    }
+
+    [Fact]
     public void MapToRawContent_FixedNumericLengthBinary_EmitsLength()
     {
         // flags@0 carries the fixed-length bit (0x2) without the field-reference bit (0x4): for win:Binary (inType 0x0e /
@@ -111,7 +126,7 @@ public sealed class OfflineWevtProviderReaderTests
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
-                Items: [new TemplateItemSpec(InType: 0x0e, OutType: 0x0f, Count: 0, Name: "Address", Flags: 0x2, LengthRefIndex: 6)],
+                Items: [new TemplateItemSpec(InType: 0x0e, OutType: 0x0f, Count: 0, Name: "Address", Flags: 0x2, Length: 6)],
                 NameCount: 1));
 
         string template = Assert.Single(MapResource(resource).Events).Template;
@@ -121,19 +136,50 @@ public sealed class OfflineWevtProviderReaderTests
     }
 
     [Fact]
-    public void MapToRawContent_FixedNumericLengthNonBinary_FailsClosedToEmptyTemplate()
+    public void MapToRawContent_FixedNumericLengthBinaryNonHexBinary_EmitsLength()
     {
-        // A fixed numeric length (flags 0x2) on a type other than win:Binary / xs:hexBinary is not an observed native
-        // combination, so the whole template fails closed.
+        // The fixed-length bit (0x2) is valid on win:Binary regardless of outType: win:Binary (0x0e) + win:IPv6 (0x18)
+        // with length@14=16 emits length="16" (a 16-byte IPv6 address), exactly as native renders it.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
-                Items: [new TemplateItemSpec(InType: 0x08, OutType: 0x08, Count: 0, Name: "Value", Flags: 0x2, LengthRefIndex: 6)],
+                Items: [new TemplateItemSpec(InType: 0x0e, OutType: 0x18, Count: 0, Name: "Address", Flags: 0x2, Length: 16)],
+                NameCount: 1));
+
+        string template = Assert.Single(MapResource(resource).Events).Template;
+
+        Assert.Contains("inType=\"win:Binary\" outType=\"win:IPv6\" length=\"16\"", template);
+    }
+
+    [Fact]
+    public void MapToRawContent_FixedNumericLengthNonBinary_FailsClosedToEmptyTemplate()
+    {
+        // A fixed numeric length (flags 0x2) on a non-length-bearing inType (here win:UInt32; only win:UnicodeString /
+        // win:AnsiString / win:Binary carry one) fails the whole template closed.
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
+            template: new TemplateSpec(
+                Items: [new TemplateItemSpec(InType: 0x08, OutType: 0x08, Count: 0, Name: "Value", Flags: 0x2, Length: 6)],
                 NameCount: 1));
 
         RawProviderContent content = MapResource(resource);
 
         Assert.Equal(string.Empty, Assert.Single(content.Events).Template);
+    }
+
+    [Fact]
+    public void MapToRawContent_FixedNumericLengthUnicodeString_EmitsLength()
+    {
+        // win:UnicodeString (0x01) is length-bearing: a fixed length@14=32 emits length="32".
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
+            template: new TemplateSpec(
+                Items: [new TemplateItemSpec(InType: 0x01, OutType: 0x00, Count: 0, Name: "Hash", Flags: 0x2, Length: 32)],
+                NameCount: 1));
+
+        string template = Assert.Single(MapResource(resource).Events).Template;
+
+        Assert.Contains("inType=\"win:UnicodeString\" outType=\"xs:string\" length=\"32\"", template);
     }
 
     [Fact]
@@ -147,7 +193,7 @@ public sealed class OfflineWevtProviderReaderTests
                 Items:
                 [
                     new TemplateItemSpec(InType: 0x08, OutType: 0x08, Count: 0, Name: "Size"),
-                    new TemplateItemSpec(InType: 0x0e, OutType: 0x0f, Count: 0, Name: "Payload", Flags: 0x4, LengthRefIndex: 0)
+                    new TemplateItemSpec(InType: 0x0e, OutType: 0x0f, Count: 0, Name: "Payload", Flags: 0x4, Length: 0)
                 ],
                 NameCount: 2));
 
@@ -165,7 +211,7 @@ public sealed class OfflineWevtProviderReaderTests
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
-                Items: [new TemplateItemSpec(InType: 0x0e, OutType: 0x0f, Count: 0, Name: "Payload", Flags: 0x4, LengthRefIndex: 5)],
+                Items: [new TemplateItemSpec(InType: 0x0e, OutType: 0x0f, Count: 0, Name: "Payload", Flags: 0x4, Length: 5)],
                 NameCount: 1));
 
         RawProviderContent content = MapResource(resource);
@@ -741,7 +787,7 @@ public sealed class OfflineWevtProviderReaderTests
                 }
 
                 WriteUInt16(buffer, itemOffset + 12, item.Count);
-                WriteUInt16(buffer, itemOffset + 14, item.LengthRefIndex);
+                WriteUInt16(buffer, itemOffset + 14, item.Length);
                 WriteUInt32(buffer, itemOffset + 16, (uint)Alloc(item.Name));
 
                 if (item.HasMap)
@@ -818,7 +864,7 @@ public sealed class OfflineWevtProviderReaderTests
         string Name,
         bool HasMap = false,
         uint Flags = 0,
-        ushort LengthRefIndex = 0,
+        ushort Length = 0,
         ushort MemberCount = 0,
         ushort MemberStart = 0);
 
