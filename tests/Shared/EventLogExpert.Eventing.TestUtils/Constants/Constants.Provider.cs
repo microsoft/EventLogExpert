@@ -30,6 +30,7 @@ public sealed partial class Constants
     public const string NonExistentDll = "NonExistent.dll";
     public const string NonExistentDllFullPath = @"C:\Windows\System32\NonExistent.dll";
     public const string NonExistentProviderName = "NonExistentProvider";
+    public const string PerfOsLogName = "Microsoft-Windows-PerfOS";
     public const string PowerShellLogName = "Microsoft-Windows-PowerShell";
     public const string RemoteComputer = "RemoteComputer";
     public const string SecurityAuditingLogName = "Microsoft-Windows-Security-Auditing";

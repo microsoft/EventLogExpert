@@ -16,10 +16,12 @@ namespace EventLogExpert.Eventing.IntegrationTests.PublisherMetadata.Wevt;
 public sealed class OfflineWevtProviderParityTests(
     OfflineWevtProviderParityTests.SecurityAuditingParityFixture securityAuditing,
     OfflineWevtProviderParityTests.PowerShellParityFixture powerShell,
-    OfflineWevtProviderParityTests.KernelPowerParityFixture kernelPower)
+    OfflineWevtProviderParityTests.KernelPowerParityFixture kernelPower,
+    OfflineWevtProviderParityTests.PerfOsParityFixture perfOs)
     : IClassFixture<OfflineWevtProviderParityTests.SecurityAuditingParityFixture>,
         IClassFixture<OfflineWevtProviderParityTests.PowerShellParityFixture>,
-        IClassFixture<OfflineWevtProviderParityTests.KernelPowerParityFixture>
+        IClassFixture<OfflineWevtProviderParityTests.KernelPowerParityFixture>,
+        IClassFixture<OfflineWevtProviderParityTests.PerfOsParityFixture>
 {
     [Fact]
     public void Descriptions_SharedByIdAndVersion_AreByteIdenticalToNative()
@@ -346,6 +348,20 @@ public sealed class OfflineWevtProviderParityTests(
             VersionKeyCalculator.Compute(securityAuditing.Offline!));
     }
 
+    [Fact]
+    public void VersionKey_PerfOsClassicParameterReferenceProvider_EqualsNative()
+    {
+        Assert.SkipUnless(perfOs.Available, SkipReasonFor(perfOs));
+
+        Assert.Null(perfOs.Native!.ResolvedFromOwningPublisher);
+
+        Assert.NotEmpty(perfOs.Offline!.Events);
+
+        Assert.Equal(
+            VersionKeyCalculator.Compute(perfOs.Native!),
+            VersionKeyCalculator.Compute(perfOs.Offline!));
+    }
+
     private static void AppendCanonicalElements(StringBuilder builder, IEnumerable<XElement> elements)
     {
         foreach (XElement element in elements)
@@ -502,6 +518,8 @@ public sealed class OfflineWevtProviderParityTests(
     }
 
     public sealed class KernelPowerParityFixture() : ProviderParityFixture(Constants.KernelPowerLogName);
+
+    public sealed class PerfOsParityFixture() : ProviderParityFixture(Constants.PerfOsLogName);
 
     public sealed class PowerShellParityFixture() : ProviderParityFixture(Constants.PowerShellLogName);
 
