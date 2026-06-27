@@ -69,6 +69,7 @@ internal static partial class OfflineWevtProviderReader
         string? parameterFilePath,
         Guid publisherGuid,
         string providerName,
+        ILegacyMessageFileResolver legacyResolver,
         ITraceLogger? logger)
     {
         byte[]? rented = WevtTemplateReader.TryRentWevtResource(resourceFilePath, logger, out int resourceSize);
@@ -105,7 +106,7 @@ internal static partial class OfflineWevtProviderReader
 
             ProviderDetails details = ProviderDetailsFactory.Create(content, data.Templates, logger);
 
-            PopulateLegacyTables(details, messageFilePaths, parameterFilePath, providerName, logger);
+            PopulateLegacyTables(details, messageFilePaths, parameterFilePath, providerName, legacyResolver, logger);
 
             ResolveParameterReferences(details);
 
@@ -213,10 +214,10 @@ internal static partial class OfflineWevtProviderReader
         IReadOnlyList<string> modernMessageFilePaths,
         string? parameterFilePath,
         string providerName,
+        ILegacyMessageFileResolver legacyResolver,
         ITraceLogger? logger)
     {
-        RegistryProvider registryProvider = new(logger);
-        IReadOnlyList<string> legacyFiles = registryProvider.GetMessageFilesForLegacyProvider(providerName);
+        IReadOnlyList<string> legacyFiles = legacyResolver.GetMessageFilesForLegacyProvider(providerName);
 
         LegacyMessageFileSource? messages = LegacyMessageFileSource.TryCreate(legacyFiles, providerName, logger)
             ?? LegacyMessageFileSource.TryCreate(modernMessageFilePaths, providerName, logger);

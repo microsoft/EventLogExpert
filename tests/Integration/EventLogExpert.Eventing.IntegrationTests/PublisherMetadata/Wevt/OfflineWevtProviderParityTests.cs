@@ -512,6 +512,7 @@ public sealed class OfflineWevtProviderParityTests(
             metadata.ParameterFilePath,
             metadata.PublisherGuid,
             providerName,
+            new RegistryProvider(logger: null),
             logger: null);
 
         return offline is not null;
@@ -545,6 +546,7 @@ public sealed class OfflineWevtProviderParityTests(
                 metadata.ParameterFilePath,
                 metadata.PublisherGuid,
                 providerName,
+                new RegistryProvider(logger: null),
                 logger: null);
 
             CaptureRawTableCounts(resourceFilePath, metadata.PublisherGuid);
