@@ -97,10 +97,9 @@ internal static class WevtMessageFormatter
                     case >= '1' and <= '9':
                         // A numbered FormatMessage insert (%1-%99): emit the %N placeholder unchanged (IGNORE_INSERTS
                         // semantics) for the runtime DescriptionFormatter to substitute. Native EvtFormatMessage strips the
-                        // printf format spec (the !...! after %N) from the FIRST numbered insert ONLY and keeps it on the
-                        // rest - an empirically-observed native quirk replicated here so offline-resolved messages collapse to the same
-                        // VersionKey as native (followon-fix-formatspec-strip). This is the single site to revisit if it
-                        // ever causes an issue.
+                        // !S! / !s! string spec from the FIRST numbered insert ONLY, keeping numeric specs (!d!, !I64x!, ...)
+                        // and every later insert's spec - an empirically-observed quirk replicated so offline-resolved
+                        // messages collapse to the same VersionKey as native.
                         buffer[length++] = '%';
                         buffer[length++] = escape;
                         index++;
@@ -116,12 +115,12 @@ internal static class WevtMessageFormatter
                         {
                             firstNumberedInsertSeen = true;
 
-                            // Strip the first insert's !...! spec. An unterminated '!' (no closing '!') is left literal.
                             if (index + 1 < raw.Length && raw[index + 1] == '!')
                             {
                                 int specClose = raw.IndexOf('!', index + 2);
+                                bool singleCharStringSpec = specClose == index + 3 && raw[index + 2] is 'S' or 's';
 
-                                if (specClose >= 0) { index = specClose; }
+                                if (singleCharStringSpec) { index = specClose; }
                             }
                         }
 
