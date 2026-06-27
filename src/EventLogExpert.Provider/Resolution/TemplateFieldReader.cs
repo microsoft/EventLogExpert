@@ -95,11 +95,11 @@ public ref struct TemplateFieldReader(ReadOnlySpan<char> template)
     }
 
     private static bool IsSignatureAttribute(ReadOnlySpan<char> attributeName) =>
-        attributeName.SequenceEqual("name") ||
-        attributeName.SequenceEqual("inType") ||
-        attributeName.SequenceEqual("outType") ||
-        attributeName.SequenceEqual("length") ||
-        attributeName.SequenceEqual("map");
+        attributeName.Equals("name", StringComparison.OrdinalIgnoreCase) ||
+        attributeName.Equals("inType", StringComparison.OrdinalIgnoreCase) ||
+        attributeName.Equals("outType", StringComparison.OrdinalIgnoreCase) ||
+        attributeName.Equals("length", StringComparison.OrdinalIgnoreCase) ||
+        attributeName.Equals("map", StringComparison.OrdinalIgnoreCase);
 
     private static TemplateField ParseElement(ReadOnlySpan<char> element)
     {
@@ -163,11 +163,11 @@ public ref struct TemplateFieldReader(ReadOnlySpan<char> template)
 
             if (!signature) { continue; }
 
-            if (attributeName.SequenceEqual("name")) { name = value; }
-            else if (attributeName.SequenceEqual("inType")) { inType = value; }
-            else if (attributeName.SequenceEqual("outType")) { outType = value; }
-            else if (attributeName.SequenceEqual("length")) { length = value; }
-            else if (attributeName.SequenceEqual("map")) { map = value; }
+            if (attributeName.Equals("name", StringComparison.OrdinalIgnoreCase)) { name = value; }
+            else if (attributeName.Equals("inType", StringComparison.OrdinalIgnoreCase)) { inType = value; }
+            else if (attributeName.Equals("outType", StringComparison.OrdinalIgnoreCase)) { outType = value; }
+            else if (attributeName.Equals("length", StringComparison.OrdinalIgnoreCase)) { length = value; }
+            else if (attributeName.Equals("map", StringComparison.OrdinalIgnoreCase)) { map = value; }
         }
 
         return TemplateField.Parsed(name, inType, outType, length, map);

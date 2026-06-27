@@ -92,7 +92,7 @@ internal static class ProviderDetailsFactory
 
             if (nameIndex >= 0 && nameIndex < elementEnd)
             {
-                return template.Insert(nameIndex + nameAttribute.Length, $" map=\"{mapName}\"");
+                return template.Insert(nameIndex + nameAttribute.Length, $" map=\"{WevtTemplateWriter.EscapeXmlAttribute(mapName)}\"");
             }
 
             searchStart = elementEnd + 1;

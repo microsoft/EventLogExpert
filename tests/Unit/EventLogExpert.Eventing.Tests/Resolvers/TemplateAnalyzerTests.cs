@@ -7,6 +7,24 @@ namespace EventLogExpert.Eventing.Tests.Resolvers;
 
 public sealed class TemplateAnalyzerTests
 {
+    [Theory]
+    [InlineData("M&amp;N", "M&N")]
+    [InlineData("M&lt;N&gt;", "M<N>")]
+    [InlineData("M&quot;N&apos;P", "M\"N'P")]
+    [InlineData("M&amp;lt;N", "M&lt;N")]
+    public void Analyze_EscapedMapName_IsXmlUnescapedToRawKey(string escapedMap, string expectedMap)
+    {
+        var analyzer = new TemplateAnalyzer();
+
+        // A map name carrying XML-special characters is injected escaped into the template; the analyzer must decode it
+        // back so the render-time lookup matches the raw key the map was stored under. The last case proves the &amp;
+        // pass runs last - an already-escaped entity body must not be decoded a second time.
+        TemplateMetadata metadata = analyzer.Analyze(
+            $"<template><data name=\"Field\" map=\"{escapedMap}\"/></template>");
+
+        Assert.Equal([expectedMap], metadata.AllMaps);
+    }
+
     [Fact]
     public void Analyze_ExtractsMapAttribute_InDocumentOrder()
     {

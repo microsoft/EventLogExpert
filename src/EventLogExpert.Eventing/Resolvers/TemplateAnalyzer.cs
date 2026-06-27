@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.PublisherMetadata.Wevt;
 using EventLogExpert.Provider.Resolution;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
@@ -197,13 +198,13 @@ internal sealed class TemplateAnalyzer
             }
 
             elements.Add((
-                field.Name.IsEmpty ? string.Empty : new string(field.Name),
-                field.OutType.IsEmpty ? string.Empty : new string(field.OutType),
-                field.Map.IsEmpty ? string.Empty : new string(field.Map)));
+                field.Name.IsEmpty ? string.Empty : WevtTemplateWriter.UnescapeXmlAttribute(field.Name),
+                field.OutType.IsEmpty ? string.Empty : WevtTemplateWriter.UnescapeXmlAttribute(field.OutType),
+                field.Map.IsEmpty ? string.Empty : WevtTemplateWriter.UnescapeXmlAttribute(field.Map)));
 
             if (!field.Length.IsEmpty)
             {
-                lengthProviderNames.Add(new string(field.Length));
+                lengthProviderNames.Add(WevtTemplateWriter.UnescapeXmlAttribute(field.Length));
             }
         }
 

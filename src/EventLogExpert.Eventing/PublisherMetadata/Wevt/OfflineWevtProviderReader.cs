@@ -54,7 +54,7 @@ internal static partial class OfflineWevtProviderReader
                 return token;
             }
 
-            string? parameterText = resolveParameterText((int)parameterId);
+            string? parameterText = resolveParameterText(unchecked((int)parameterId));
 
             // An unresolved reference stays the literal %%NNNN so the render-time DescriptionFormatter can still resolve
             // it (including its system-message-table fallback, which the offline db-create path must not bake in here).
@@ -154,7 +154,7 @@ internal static partial class OfflineWevtProviderReader
                 source.Channel,
                 source.Level,
                 source.Opcode,
-                (short)source.Task,
+                unchecked((short)source.Task),
                 source.Keywords,
                 template,
                 source.MessageId);

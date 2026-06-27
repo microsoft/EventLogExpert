@@ -40,6 +40,24 @@ internal static class WevtTemplateWriter
     internal static string EscapeXmlAttribute(string value) =>
         value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&apos;");
 
+    /// <summary>
+    ///     Decodes an attribute value produced by <see cref="EscapeXmlAttribute" /> back to its literal text, so a render
+    ///     consumer can match a parsed map / field name against the unescaped keys it was stored under. The exact inverse of
+    ///     <see cref="EscapeXmlAttribute" />: the <c>&amp;amp;</c> pass runs last so the body of an already-decoded entity is
+    ///     not re-decoded a second time.
+    /// </summary>
+    internal static string UnescapeXmlAttribute(ReadOnlySpan<char> value)
+    {
+        if (value.IndexOf('&') < 0) { return new string(value); }
+
+        return new string(value)
+            .Replace("&lt;", "<")
+            .Replace("&gt;", ">")
+            .Replace("&quot;", "\"")
+            .Replace("&apos;", "'")
+            .Replace("&amp;", "&");
+    }
+
     internal static string? Write(
         IReadOnlyList<WevtTemplateNode> nodes,
         IReadOnlyList<WevtRawDescriptor> descriptors)

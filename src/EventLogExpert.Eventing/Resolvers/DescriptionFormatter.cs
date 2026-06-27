@@ -511,7 +511,7 @@ internal sealed partial class DescriptionFormatter(
                         // Some parameters exceed int size and need to be cast from long to int
                         // because they are actually negative numbers
                         ReadOnlySpan<char> parameterMessage =
-                            parameterSource?.GetParameterByRawId((int)parameterId)?.Text ?? string.Empty;
+                            parameterSource?.GetParameterByRawId(unchecked((int)parameterId))?.Text ?? string.Empty;
 
                         // Fallback to the cached system message table when the provider's parameter table has no
                         // entry. Caching hits AND misses keeps foreign/uninstalled providers (whose codes never
