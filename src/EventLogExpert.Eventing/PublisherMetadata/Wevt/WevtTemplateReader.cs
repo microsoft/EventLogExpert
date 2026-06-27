@@ -839,7 +839,7 @@ internal static class WevtTemplateReader
 
     private static bool TryReadGuid(ReadOnlySpan<byte> data, int offset, out Guid value)
     {
-        if (offset < 0 || offset + 16 > data.Length)
+        if (offset < 0 || offset > data.Length - 16)
         {
             value = Guid.Empty;
 
@@ -865,7 +865,7 @@ internal static class WevtTemplateReader
         int stringByteLength = (int)totalByteSize - 4;
         int stringStart = (int)nameOffset + 4;
 
-        if (stringStart < 0 || stringStart + stringByteLength > data.Length)
+        if (stringStart < 0 || stringStart > data.Length - stringByteLength)
         {
             return false;
         }
@@ -877,7 +877,7 @@ internal static class WevtTemplateReader
 
     private static bool TryReadSignature(ReadOnlySpan<byte> data, int offset, out string signature)
     {
-        if (offset < 0 || offset + 4 > data.Length)
+        if (offset < 0 || offset > data.Length - 4)
         {
             signature = string.Empty;
 
@@ -891,7 +891,7 @@ internal static class WevtTemplateReader
 
     private static bool TryReadUInt16(ReadOnlySpan<byte> data, int offset, out ushort value)
     {
-        if (offset < 0 || offset + 2 > data.Length)
+        if (offset < 0 || offset > data.Length - 2)
         {
             value = 0;
 
@@ -905,7 +905,7 @@ internal static class WevtTemplateReader
 
     private static bool TryReadUInt32(ReadOnlySpan<byte> data, int offset, out uint value)
     {
-        if (offset < 0 || offset + 4 > data.Length)
+        if (offset < 0 || offset > data.Length - 4)
         {
             value = 0;
 
@@ -919,7 +919,7 @@ internal static class WevtTemplateReader
 
     private static bool TryReadUInt64(ReadOnlySpan<byte> data, int offset, out ulong value)
     {
-        if (offset < 0 || offset + 8 > data.Length)
+        if (offset < 0 || offset > data.Length - 8)
         {
             value = 0;
 
