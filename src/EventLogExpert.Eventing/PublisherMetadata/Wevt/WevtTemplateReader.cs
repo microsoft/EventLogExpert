@@ -102,11 +102,13 @@ internal static class WevtTemplateReader
     private const int ChannelMessageIdOffset = 12;
     private const int ChannelNameDataOffset = 4;
     private const string ChanSignature = "CHAN";
+    private const uint ClassicEventIdCustomerBit = 0x20000000;
     private const int CrimProviderCountOffset = 12;
     private const int CrimProviderDescriptorArrayOffset = 16;
     private const int CrimProviderDescriptorSize = 20;
     private const string CrimSignature = "CRIM";
     private const int EventChannelOffset = 3;
+    private const int EventClassicTrailingFieldOffset = 44;
     private const int EventDefinitionSize = 48;
     private const int EventDefinitionTemplateOffset = 20;
     private const int EventDefinitionVersionOffset = 2;
@@ -114,6 +116,7 @@ internal static class WevtTemplateReader
     private const int EventLevelOffset = 4;
     private const int EventMessageIdOffset = 16;
     private const int EventOpcodeOffset = 5;
+    private const int EventOpcodeTableReferenceOffset = 24;
     private const int EventTableArrayOffset = 16;
     private const int EventTableCountOffset = 8;
     private const int EventTaskOffset = 6;
@@ -357,6 +360,28 @@ internal static class WevtTemplateReader
                 continue;
             }
 
+            bool isClassicEvent =
+                TryReadUInt32(data,
+                    eventDefinitionOffset + EventOpcodeTableReferenceOffset,
+                    out uint opcodeTableReference) &&
+                opcodeTableReference == 0 &&
+                TryReadUInt32(data,
+                    eventDefinitionOffset + EventClassicTrailingFieldOffset,
+                    out uint classicTrailingField) &&
+                classicTrailingField == 0 &&
+                (messageId & ClassicEventIdCustomerBit) == 0;
+
+            uint nativeId = eventId;
+            byte nativeVersion = version;
+            byte nativeOpcode = opcode;
+
+            if (isClassicEvent)
+            {
+                nativeId = ((uint)opcode << 24) | ((uint)version << 16) | eventId;
+                nativeVersion = 0;
+                nativeOpcode = 0;
+            }
+
             WevtParsedTemplate? template = null;
 
             if (templateOffset != 0)
@@ -369,7 +394,7 @@ internal static class WevtTemplateReader
 
                 if (fieldMaps is { Count: > 0 })
                 {
-                    eventFieldMaps[new WevtEventKey(eventId, version)] = fieldMaps;
+                    eventFieldMaps[new WevtEventKey(nativeId, nativeVersion)] = fieldMaps;
                 }
 
                 if (!templatesByOffset.TryGetValue(templateOffset, out template))
@@ -379,7 +404,7 @@ internal static class WevtTemplateReader
                 }
             }
 
-            events.Add(new WevtProviderEvent(eventId, version, channel, level, opcode, task, keywords, messageId, template));
+            events.Add(new WevtProviderEvent(nativeId, nativeVersion, channel, level, nativeOpcode, task, keywords, messageId, template));
         }
 
         return events;
@@ -387,7 +412,6 @@ internal static class WevtTemplateReader
 
     private static List<WevtIdentifiedEntry> ParseIdentifiedTable(ReadOnlySpan<byte> data, uint tableOffset, int entrySize)
     {
-        // LEVL / OPCO share the 12-byte layout: id@0, messageId@4, nameDataOffset@8.
         List<WevtIdentifiedEntry> entries = [];
 
         if (!TryReadUInt32(data, (int)tableOffset + TableEntryCountOffset, out uint count) || count > MaxTableEntryCount)
@@ -414,7 +438,6 @@ internal static class WevtTemplateReader
 
     private static List<WevtKeywordEntry> ParseKeywords(ReadOnlySpan<byte> data, uint tableOffset)
     {
-        // KEYW entry is 16 bytes: bit mask(u64)@0, messageId@8, nameDataOffset@12.
         List<WevtKeywordEntry> keywords = [];
 
         if (!TryReadUInt32(data, (int)tableOffset + TableEntryCountOffset, out uint count) || count > MaxTableEntryCount)
@@ -441,7 +464,6 @@ internal static class WevtTemplateReader
 
     private static List<WevtIdentifiedEntry> ParseTasks(ReadOnlySpan<byte> data, uint tableOffset)
     {
-        // TASK entry is 28 bytes: id@0, messageId@4, mui-guid@8[16], nameDataOffset@24.
         List<WevtIdentifiedEntry> tasks = [];
 
         if (!TryReadUInt32(data, (int)tableOffset + TableEntryCountOffset, out uint count) || count > MaxTableEntryCount)

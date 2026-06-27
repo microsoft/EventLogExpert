@@ -570,10 +570,73 @@ public sealed class OfflineWevtProviderReaderTests
     }
 
     [Fact]
+    public void TryParseProvider_ClassicAndModernShareSixteenBitId_ProduceDistinctIds()
+    {
+        // Two rows share the 16-bit code 4: one classic (projected to the qualified id) and one modern (kept bare).
+        byte[] resource = BuildProviderResource(
+            events:
+            [
+                new EventSpec(Id: 4, Version: 90, Channel: 0, Level: 0, Opcode: 0x42, Task: 0, Keywords: 0, MessageId: 0x425A0004),
+                new EventSpec(Id: 4, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, OpcodeTableReference: 0x40)
+            ]);
+
+        WevtProviderData data = ParseResource(resource);
+
+        Assert.Equal(2, data.Events.Count);
+        Assert.Contains(data.Events, e => e.Id == 0x425A0004u);
+        Assert.Contains(data.Events, e => e is { Id: 4u, Version: 0 });
+    }
+
+    [Fact]
+    public void TryParseProvider_ClassicEvent_ProjectsToQualifiedIdWithZeroedVersionAndOpcode()
+    {
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 4, Version: 90, Channel: 0, Level: 0, Opcode: 0x42, Task: 0, Keywords: 0, MessageId: 0x425A0004)]);
+
+        WevtProviderEvent parsed = Assert.Single(ParseResource(resource).Events);
+
+        Assert.Equal(0x425A0004u, parsed.Id);
+        Assert.Equal((byte)0, parsed.Version);
+        Assert.Equal((byte)0, parsed.Opcode);
+        Assert.Equal(0x425A0004u, parsed.MessageId);
+    }
+
+    [Fact]
+    public void TryParseProvider_ClassicEventHighOpcodeByte_ComposesQualifiedIdWithoutSignExtension()
+    {
+        // An opcode byte >= 0x80 must shift in the uint domain; an int-domain shift would sign-extend into the high dword.
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 1, Version: 6, Channel: 0, Level: 0, Opcode: 0xC0, Task: 0, Keywords: 0, MessageId: 0xC0060001)]);
+
+        WevtProviderEvent parsed = Assert.Single(ParseResource(resource).Events);
+
+        Assert.Equal(0xC0060001u, parsed.Id);
+    }
+
+    [Fact]
+    public void TryParseProvider_ClassicEventWithValueMap_KeysFieldMapByQualifiedId()
+    {
+        // No shipping provider has a classic event that also carries a value-map, but the field-map key must still follow
+        // the projected identity: ProviderDetailsFactory injects maps by the final (Id, Version), so the offline key must
+        // be the qualified id with a zeroed version, not the bare 16-bit code.
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 4, Version: 90, Channel: 0, Level: 0, Opcode: 0x42, Task: 0, Keywords: 0, MessageId: 0x425A0004, ReferencesTemplate: true)],
+            template: new TemplateSpec(
+                Items: [new TemplateItemSpec(InType: 0x08, OutType: 0x00, Count: 0, Name: "field", HasMap: true)],
+                NameCount: 1,
+                Map: new MapSpec(Name: "MyMap", IsBitMap: false, Entries: [(Value: 1, MessageId: 0x5000)])));
+
+        WevtProviderData data = ParseResource(resource);
+
+        Assert.True(data.Templates.EventFieldMaps.ContainsKey(new WevtEventKey(0x425A0004, 0)));
+        Assert.False(data.Templates.EventFieldMaps.ContainsKey(new WevtEventKey(4, 90)));
+    }
+
+    [Fact]
     public void TryParseProvider_FullTables_ReadEveryFieldAtItsOffset()
     {
         byte[] resource = BuildProviderResource(
-            events: [new EventSpec(Id: 0x1234, Version: 5, Channel: 0x10, Level: 0x04, Opcode: 0x09, Task: 0x0203, Keywords: 0x0102030405060708, MessageId: 0x0A0B0C0D)],
+            events: [new EventSpec(Id: 0x1234, Version: 5, Channel: 0x10, Level: 0x04, Opcode: 0x09, Task: 0x0203, Keywords: 0x0102030405060708, MessageId: 0x0A0B0C0D, OpcodeTableReference: 0x40)],
             channels: [new ChannelSpec(Id: 1, ReferenceId: 200, MessageId: uint.MaxValue, Name: "ChannelName")],
             opcodes: [new IdentifiedSpec(Id: 300, MessageId: uint.MaxValue, Name: "OpcodeName")],
             tasks: [new IdentifiedSpec(Id: 400, MessageId: uint.MaxValue, Name: "TaskName")],
@@ -616,6 +679,48 @@ public sealed class OfflineWevtProviderReaderTests
 
         Assert.Empty(data.Keywords);
         Assert.Single(data.Opcodes);
+    }
+
+    [Fact]
+    public void TryParseProvider_MessageIdCustomerBitSet_LeavesEventUnprojected()
+    {
+        // A modern manifest message id sets the customer bit (0x20000000); such an event is not a classic row.
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 4, Version: 90, Channel: 0, Level: 0, Opcode: 0x42, Task: 0, Keywords: 0, MessageId: 0x625A0004)]);
+
+        WevtProviderEvent parsed = Assert.Single(ParseResource(resource).Events);
+
+        Assert.Equal(4u, parsed.Id);
+        Assert.Equal((byte)90, parsed.Version);
+        Assert.Equal((byte)0x42, parsed.Opcode);
+    }
+
+    [Fact]
+    public void TryParseProvider_OpcodeTableReferenceNonZero_LeavesEventUnprojected()
+    {
+        // A non-zero opcode-table reference marks a modern event; it keeps its bare id, version, and opcode even though
+        // the trailing field is zero and the message id customer bit is clear.
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 4, Version: 90, Channel: 0, Level: 0, Opcode: 0x42, Task: 0, Keywords: 0, MessageId: 0x425A0004, OpcodeTableReference: 0x40)]);
+
+        WevtProviderEvent parsed = Assert.Single(ParseResource(resource).Events);
+
+        Assert.Equal(4u, parsed.Id);
+        Assert.Equal((byte)90, parsed.Version);
+        Assert.Equal((byte)0x42, parsed.Opcode);
+    }
+
+    [Fact]
+    public void TryParseProvider_TrailingFieldNonZero_LeavesEventUnprojected()
+    {
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 4, Version: 90, Channel: 0, Level: 0, Opcode: 0x42, Task: 0, Keywords: 0, MessageId: 0x425A0004, TrailingField: 1)]);
+
+        WevtProviderEvent parsed = Assert.Single(ParseResource(resource).Events);
+
+        Assert.Equal(4u, parsed.Id);
+        Assert.Equal((byte)90, parsed.Version);
+        Assert.Equal((byte)0x42, parsed.Opcode);
     }
 
     [Fact]
@@ -707,6 +812,8 @@ public sealed class OfflineWevtProviderReaderTests
             WriteUInt64(buffer, entry + 8, spec.Keywords);
             WriteUInt32(buffer, entry + 16, spec.MessageId);
             WriteUInt32(buffer, entry + 20, spec.ReferencesTemplate ? (uint)TemplateOffset : 0);
+            WriteUInt32(buffer, entry + 24, spec.OpcodeTableReference);
+            WriteUInt32(buffer, entry + 44, spec.TrailingField);
         }
 
         WriteAscii(buffer, ChannelTableOffset, "CHAN");
@@ -849,7 +956,9 @@ public sealed class OfflineWevtProviderReaderTests
         ushort Task,
         ulong Keywords,
         uint MessageId,
-        bool ReferencesTemplate = false);
+        bool ReferencesTemplate = false,
+        uint OpcodeTableReference = 0,
+        uint TrailingField = 0);
 
     private sealed record IdentifiedSpec(uint Id, uint MessageId, string? Name);
 
