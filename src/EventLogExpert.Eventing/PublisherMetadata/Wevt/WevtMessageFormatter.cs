@@ -25,6 +25,7 @@ internal static class WevtMessageFormatter
         try
         {
             int length = 0;
+            bool firstNumberedInsertSeen = false;
 
             for (int index = 0; index < raw.Length; index++)
             {
@@ -93,6 +94,38 @@ internal static class WevtMessageFormatter
                         break;
                     case '0':
                         return new string(buffer[..length]);
+                    case >= '1' and <= '9':
+                        // A numbered FormatMessage insert (%1-%99): emit the %N placeholder unchanged (IGNORE_INSERTS
+                        // semantics) for the runtime DescriptionFormatter to substitute. Native EvtFormatMessage strips the
+                        // printf format spec (the !...! after %N) from the FIRST numbered insert ONLY and keeps it on the
+                        // rest - an empirically-observed native quirk replicated here so offline-resolved messages collapse to the same
+                        // VersionKey as native (followon-fix-formatspec-strip). This is the single site to revisit if it
+                        // ever causes an issue.
+                        buffer[length++] = '%';
+                        buffer[length++] = escape;
+                        index++;
+
+                        // Consume an optional second digit (%10-%99) before testing for the spec.
+                        if (index + 1 < raw.Length && raw[index + 1] is >= '0' and <= '9')
+                        {
+                            buffer[length++] = raw[index + 1];
+                            index++;
+                        }
+
+                        if (!firstNumberedInsertSeen)
+                        {
+                            firstNumberedInsertSeen = true;
+
+                            // Strip the first insert's !...! spec. An unterminated '!' (no closing '!') is left literal.
+                            if (index + 1 < raw.Length && raw[index + 1] == '!')
+                            {
+                                int specClose = raw.IndexOf('!', index + 2);
+
+                                if (specClose >= 0) { index = specClose; }
+                            }
+                        }
+
+                        break;
                     default:
                         buffer[length++] = '%';
                         break;
