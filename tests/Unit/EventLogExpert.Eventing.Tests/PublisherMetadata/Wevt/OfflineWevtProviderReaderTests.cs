@@ -384,6 +384,25 @@ public sealed class OfflineWevtProviderReaderTests
         Assert.Equal(string.Empty, Assert.Single(content.Events).Template);
     }
 
+    [Theory]
+    [InlineData(0x7FFFFFF0u)]
+    [InlineData(0xFFFFFFF0u)]
+    [InlineData(0x7FFFFFFFu)]
+    public void MapToRawContent_TemplateItemsPointerOverflow_FailsClosedWithoutThrowing(uint itemsOffset)
+    {
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
+            template: new TemplateSpec(
+                Items: [new TemplateItemSpec(InType: 0x08, OutType: 0x08, Count: 0, Name: "Field")],
+                NameCount: 1));
+
+        WriteUInt32(resource, TemplateOffset + 16, itemsOffset);
+
+        RawProviderContent content = MapResource(resource);
+
+        Assert.Equal(string.Empty, Assert.Single(content.Events).Template);
+    }
+
     [Fact]
     public void MapToRawContent_TemplateWithUnclaimedAppendedDescriptor_FailsClosedToEmptyTemplate()
     {
