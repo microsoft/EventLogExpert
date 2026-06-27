@@ -7,7 +7,7 @@ using Microsoft.Win32;
 
 namespace EventLogExpert.Eventing.PublisherMetadata;
 
-internal sealed class RegistryProvider(ITraceLogger? logger = null)
+internal sealed class RegistryProvider(ITraceLogger? logger = null) : ILegacyMessageFileResolver
 {
     private readonly ITraceLogger? _logger = logger;
 
