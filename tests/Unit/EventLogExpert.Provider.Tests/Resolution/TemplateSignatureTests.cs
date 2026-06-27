@@ -18,6 +18,30 @@ public sealed class TemplateSignatureTests
     }
 
     [Fact]
+    public void Equal_DataElementsWithNoSignatureAttributes_FailClosedAndDoNotCollapse()
+    {
+        // A <data> element whose attributes are all non-signature (no name/inType/outType/length/map) is non-canonical;
+        // it must fall back to its raw substring so two such elements stay distinct instead of collapsing to one
+        // all-empty parsed signature.
+        const string Foo = "<template><data foo=\"1\"/></template>";
+        const string Bar = "<template><data bar=\"2\"/></template>";
+
+        Assert.False(TemplateSignature.Equal(Foo, Bar));
+    }
+
+    [Fact]
+    public void Equal_DataElementsWithOnlyEmptySignatureValues_FailClosedAndDoNotCollapse()
+    {
+        // Signature attributes present but all empty-valued carry no render-relevant content; two distinct such elements
+        // (a different attribute present, both empty) must still fail closed to raw rather than collapse to one all-empty
+        // parsed signature.
+        const string EmptyName = "<template><data name=\"\"/></template>";
+        const string EmptyInType = "<template><data inType=\"\"/></template>";
+
+        Assert.False(TemplateSignature.Equal(EmptyName, EmptyInType));
+    }
+
+    [Fact]
     public void Equal_DifferentFieldOrder_AreNotEqual()
     {
         const string Ab = "<template><data name=\"A\"/><data name=\"B\"/></template>";
