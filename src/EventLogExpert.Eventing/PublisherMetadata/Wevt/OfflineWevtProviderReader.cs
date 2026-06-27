@@ -4,6 +4,7 @@
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Resolution;
 using System.Buffers;
+using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Wevt;
 
@@ -13,7 +14,7 @@ namespace EventLogExpert.Eventing.PublisherMetadata.Wevt;
 ///     same representation the native path produces, so the shared <see cref="ProviderDetailsFactory" /> resolves both
 ///     sources identically.
 /// </summary>
-internal static class OfflineWevtProviderReader
+internal static partial class OfflineWevtProviderReader
 {
     /// <summary>
     ///     Maps the parsed provider tables to <see cref="RawProviderContent" />. Pure and host-independent: the unit
@@ -41,6 +42,26 @@ internal static class OfflineWevtProviderReader
             Tasks = BuildTasks(data.Tasks)
         };
     }
+
+    internal static string ResolveParameterReferences(string description, Func<int, string?> resolveParameterText) =>
+        ParameterReferenceRegex().Replace(description, match =>
+        {
+            string token = match.Value;
+
+            if (!token.StartsWith("%%", StringComparison.Ordinal) ||
+                !long.TryParse(token.AsSpan(2), out long parameterId))
+            {
+                return token;
+            }
+
+            string? parameterText = resolveParameterText((int)parameterId);
+
+            // An unresolved reference stays the literal %%NNNN so the render-time DescriptionFormatter can still resolve
+            // it (including its system-message-table fallback, which the offline db-create path must not bake in here).
+            if (string.IsNullOrEmpty(parameterText)) { return token; }
+
+            return parameterText.EndsWith("%0", StringComparison.Ordinal) ? parameterText[..^2] : parameterText;
+        }).TrimEnd('\0', '\r', '\n', '\t', ' ');
 
     internal static ProviderDetails? TryBuildProviderDetails(
         string resourceFilePath,
@@ -85,6 +106,8 @@ internal static class OfflineWevtProviderReader
             ProviderDetails details = ProviderDetailsFactory.Create(content, data.Templates, logger);
 
             PopulateLegacyTables(details, messageFilePaths, parameterFilePath, providerName, logger);
+
+            ResolveParameterReferences(details);
 
             return details;
         }
@@ -182,6 +205,9 @@ internal static class OfflineWevtProviderReader
         return result;
     }
 
+    [GeneratedRegex("%+[0-9]+")]
+    private static partial Regex ParameterReferenceRegex();
+
     private static void PopulateLegacyTables(
         ProviderDetails details,
         IReadOnlyList<string> modernMessageFilePaths,
@@ -202,5 +228,20 @@ internal static class OfflineWevtProviderReader
         LegacyMessageFileSource? parameters = LegacyMessageFileSource.TryCreate([parameterFilePath], providerName, logger);
 
         if (parameters is not null) { details.SetLazyParameterSource(parameters); }
+    }
+
+    private static void ResolveParameterReferences(ProviderDetails details)
+    {
+        foreach (EventModel model in details.Events)
+        {
+            string? description = model.Description;
+
+            if (string.IsNullOrEmpty(description) || !description.Contains("%%", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            model.Description = ResolveParameterReferences(description, rawId => details.GetParameterByRawId(rawId)?.Text);
+        }
     }
 }

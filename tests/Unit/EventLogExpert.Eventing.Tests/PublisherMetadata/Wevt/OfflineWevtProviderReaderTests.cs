@@ -564,6 +564,19 @@ public sealed class OfflineWevtProviderReaderTests
         Assert.Contains("outType=\"xs:unsignedInt\"", template);
     }
 
+    [Theory]
+    [InlineData("%%1000", "Allocate buffer.")]
+    [InlineData("X %%1001 Y", "X Second Y")]
+    [InlineData("%%1001 %%1001", "Second Second")]
+    [InlineData("%%2", "WithTerminator")]
+    [InlineData("%1 %%1001", "%1 Second")]
+    [InlineData("%%9999", "%%9999")]
+    [InlineData("%%%1001", "%%%1001")]
+    [InlineData("no markers here", "no markers here")]
+    [InlineData("%%4294967295", "NegativeCast")]
+    public void ResolveParameterReferences_ResolvesAndTrimsParameterTokens(string raw, string expected) =>
+        Assert.Equal(expected, OfflineWevtProviderReader.ResolveParameterReferences(raw, FakeParameterText));
+
     [Fact]
     public void TryParse_MapLessProvider_ReturnsNullWhileFullParseReturnsEventsAndTables()
     {
@@ -932,6 +945,15 @@ public sealed class OfflineWevtProviderReaderTests
 
         return buffer;
     }
+
+    private static string? FakeParameterText(int rawId) => rawId switch
+    {
+        1000 => "Allocate buffer.\r\n",
+        1001 => "Second",
+        2 => "WithTerminator%0",
+        -1 => "NegativeCast",
+        _ => null
+    };
 
     private static RawProviderContent MapResource(byte[] resource) =>
         OfflineWevtProviderReader.MapToRawContent(
