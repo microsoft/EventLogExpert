@@ -170,6 +170,14 @@ public ref struct TemplateFieldReader(ReadOnlySpan<char> template)
             else if (attributeName.Equals("map", StringComparison.OrdinalIgnoreCase)) { map = value; }
         }
 
+        // An element with no non-empty signature value (name/inType/outType/length/map all absent or empty) is
+        // non-canonical; fail closed to a raw node so two such elements stay distinct instead of collapsing to one
+        // all-empty parsed signature.
+        if (name.IsEmpty && inType.IsEmpty && outType.IsEmpty && length.IsEmpty && map.IsEmpty)
+        {
+            return TemplateField.RawElement(element);
+        }
+
         return TemplateField.Parsed(name, inType, outType, length, map);
     }
 
