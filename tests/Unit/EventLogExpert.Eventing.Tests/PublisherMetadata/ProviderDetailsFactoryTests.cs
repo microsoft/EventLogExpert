@@ -188,6 +188,18 @@ public sealed class ProviderDetailsFactoryTests
     }
 
     [Fact]
+    public void InjectMapAttribute_ApostropheFieldName_MatchesEscapedTemplate()
+    {
+        string template = "<template><data name=\"a&apos;b\" inType=\"win:UInt32\"/></template>";
+
+        string result = ProviderDetailsFactory.InjectMapAttribute(template, "a'b", "MyMap");
+
+        Assert.Equal(
+            "<template><data name=\"a&apos;b\" map=\"MyMap\" inType=\"win:UInt32\"/></template>",
+            result);
+    }
+
+    [Fact]
     public void InjectMapAttribute_DataSourcePrefix_InjectsIntoTheRealDataElement()
     {
         string template = "<template><dataSource name=\"BusType\"/><data name=\"BusType\"/></template>";

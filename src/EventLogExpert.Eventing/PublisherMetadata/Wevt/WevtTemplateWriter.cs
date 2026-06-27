@@ -38,7 +38,7 @@ internal static class WevtTemplateWriter
     ///     injection searches for the same escaped name it emitted (otherwise injection silently misses).
     /// </summary>
     internal static string EscapeXmlAttribute(string value) =>
-        value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
+        value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&apos;");
 
     internal static string? Write(
         IReadOnlyList<WevtTemplateNode> nodes,

@@ -63,6 +63,18 @@ public sealed class OfflineWevtProviderReaderTests
         Assert.Empty(content.Channels);
     }
 
+    [Theory]
+    [InlineData("plain", "plain")]
+    [InlineData("a&b", "a&amp;b")]
+    [InlineData("a<b", "a&lt;b")]
+    [InlineData("a>b", "a&gt;b")]
+    [InlineData("a\"b", "a&quot;b")]
+    [InlineData("a'b", "a&apos;b")]
+    [InlineData("L'UNKNOWN'", "L&apos;UNKNOWN&apos;")]
+    [InlineData("a'&b", "a&apos;&amp;b")]
+    public void EscapeXmlAttribute_EscapesEveryXmlSpecialChar(string raw, string expected) =>
+        Assert.Equal(expected, WevtTemplateWriter.EscapeXmlAttribute(raw));
+
     [Fact]
     public void MapToRawContent_FileTimeFlatTemplate_IsNotStructAndWritesFileTime()
     {
