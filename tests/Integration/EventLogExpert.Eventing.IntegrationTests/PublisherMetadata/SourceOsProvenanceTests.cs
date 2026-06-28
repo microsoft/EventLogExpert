@@ -6,12 +6,12 @@ using Microsoft.Win32;
 
 namespace EventLogExpert.Eventing.IntegrationTests.PublisherMetadata;
 
-public sealed class HostOsProvenanceTests
+public sealed class SourceOsProvenanceTests
 {
     [Fact]
     public void Empty_HasAllNullFields()
     {
-        var empty = HostOsProvenance.Empty;
+        var empty = SourceOsProvenance.Empty;
 
         Assert.Null(empty.Build);
         Assert.Null(empty.Revision);
@@ -33,7 +33,7 @@ public sealed class HostOsProvenanceTests
         // UBR is present on every supported build; the read must surface it as the recency secondary.
         var expectedRevision = currentVersion.GetValue("UBR") is int ubr ? ubr : (int?)null;
 
-        var provenance = HostOsProvenance.Read();
+        var provenance = SourceOsProvenance.Read();
 
         Assert.Equal(expectedEdition, provenance.Edition);
         Assert.Equal(expectedRevision, provenance.Revision);
@@ -54,7 +54,7 @@ public sealed class HostOsProvenanceTests
             ? build
             : (int?)null;
 
-        var provenance = HostOsProvenance.Read();
+        var provenance = SourceOsProvenance.Read();
 
         Assert.Equal(expectedBuild, provenance.Build);
         Assert.NotNull(provenance.Build);

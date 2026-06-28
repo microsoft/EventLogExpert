@@ -90,7 +90,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 ? LoadLocalProvidersAsync(logger, filterRegex, excludeProviderNames, cancellationToken)
                 : ProviderSource.LoadProvidersAsync(request.SourcePath, logger, filterRegex, excludeProviderNames, cancellationToken: cancellationToken);
 
-            var hostOsProvenance = request.SourcePath is null ? HostOsProvenance.Read(logger) : null;
+            var sourceOsProvenance = request.SourcePath is null ? SourceOsProvenance.Read(logger) : null;
 
             await foreach (var details in providersToAdd.WithCancellation(cancellationToken))
             {
@@ -116,12 +116,12 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 firstByIdentity[identity] = details;
 #endif
 
-                if (hostOsProvenance is not null)
+                if (sourceOsProvenance is not null)
                 {
-                    details.SourceOsBuild = hostOsProvenance.Build;
-                    details.SourceOsRevision = hostOsProvenance.Revision;
-                    details.SourceOsEdition = hostOsProvenance.Edition;
-                    details.SourceOsDisplayVersion = hostOsProvenance.DisplayVersion;
+                    details.SourceOsBuild = sourceOsProvenance.Build;
+                    details.SourceOsRevision = sourceOsProvenance.Revision;
+                    details.SourceOsEdition = sourceOsProvenance.Edition;
+                    details.SourceOsDisplayVersion = sourceOsProvenance.DisplayVersion;
                 }
 
                 if (!headerLogged)

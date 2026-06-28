@@ -17,7 +17,7 @@ namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 ///     stays host-free. It exposes the publisher catalog together with per-provider builders for the modern and legacy
 ///     paths.
 /// </summary>
-internal sealed class OfflineImageProviderExtractor : IDisposable
+internal sealed class OfflineImageProviderExtractor : IOfflineImageProviderExtractor
 {
     private readonly OfflinePublisherCatalog _catalog;
     private readonly OfflineLegacyProviderBuilder _legacyBuilder;
@@ -85,6 +85,9 @@ internal sealed class OfflineImageProviderExtractor : IDisposable
 
     /// <summary>Distinct legacy provider names registered under the image's <c>SYSTEM</c> hive.</summary>
     public IReadOnlyList<string> EnumerateLegacyProviderNames() => _legacyResolver.EnumerateProviderNames();
+
+    /// <summary>Reads the image's OS provenance from its <c>SOFTWARE</c> hive (never the host registry).</summary>
+    public SourceOsProvenance ReadImageProvenance() => SourceOsProvenance.ReadFromSoftwareHive(_softwareHive.Root, _logger);
 
     /// <summary>The modern (manifest) publisher registrations declared in the image's <c>SOFTWARE</c> hive.</summary>
     public IReadOnlyList<OfflinePublisherRegistration> ReadModernRegistrations() => _catalog.ReadRegistrations(_softwareHive.Root);
