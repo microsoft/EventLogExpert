@@ -26,7 +26,7 @@ namespace EventLogExpert.DatabaseTools.CreateDatabase;
 /// <param name="ImageKind">
 ///     How <paramref name="OfflineImagePath" /> is accessed: a mounted volume/extracted folder (
 ///     <see cref="OfflineImageKind.Directory" />) or a <c>.wim</c>/<c>.esd</c> file (<see cref="OfflineImageKind.Wim" />,
-///     which extracts <paramref name="WimIndex" /> first).
+///     which extracts <paramref name="WimIndex" /> first). Null = auto-detect from the path (directory vs .wim/.esd/.iso).
 /// </param>
 /// <param name="WimIndex">
 ///     The 1-based image index to extract from a <c>.wim</c>/<c>.esd</c>, for
@@ -38,5 +38,5 @@ public sealed record CreateDatabaseRequest(
     Regex? FilterRegex,
     string? SkipProvidersInFile,
     string? OfflineImagePath = null,
-    OfflineImageKind ImageKind = OfflineImageKind.Directory,
+    OfflineImageKind? ImageKind = null,
     int? WimIndex = null);

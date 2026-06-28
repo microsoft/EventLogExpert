@@ -104,7 +104,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             // like a mounted volume. A failed extraction surfaces a specific, actionable error and leaves no .db behind.
             string? effectiveOfflineImagePath = request.OfflineImagePath;
 
-            if (mode == CreateDatabaseMode.OfflineImage && request.ImageKind == OfflineImageKind.Wim)
+            if (mode == CreateDatabaseMode.OfflineImage && ResolveImageKind(request) == OfflineImageKind.Wim)
             {
                 OfflineWimExtractResult extraction = await OfflineWimImage.TryExtractAsync(
                     request.OfflineImagePath!, request.WimIndex!.Value, Path.GetTempPath(), logger, cancellationToken);
@@ -273,6 +273,23 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
     }
 
+    // The effective kind is the explicit --image-kind when given, otherwise inferred from the path: an existing directory
+    // is a mounted volume / extracted folder; a .wim/.esd is a WIM; a .iso is an ISO. Null = neither given nor inferable.
+    internal static OfflineImageKind? ResolveImageKind(CreateDatabaseRequest request)
+    {
+        if (request.ImageKind is { } explicitKind) { return explicitKind; }
+
+        if (string.IsNullOrWhiteSpace(request.OfflineImagePath)) { return null; }
+
+        if (Directory.Exists(request.OfflineImagePath)) { return OfflineImageKind.Directory; }
+
+        string extension = Path.GetExtension(request.OfflineImagePath.TrimEnd('.', ' '));
+
+        return extension.Equals(".wim", StringComparison.OrdinalIgnoreCase) || extension.Equals(".esd", StringComparison.OrdinalIgnoreCase)
+            ? OfflineImageKind.Wim
+            : extension.Equals(".iso", StringComparison.OrdinalIgnoreCase) ? OfflineImageKind.Iso : null;
+    }
+
     /// <summary>
     ///     Picks the provider source for the request. An offline image (a non-whitespace <c>OfflineImagePath</c>) wins;
     ///     otherwise a null <c>SourcePath</c> means local providers and a non-null one means a file source. Pure so the mode
@@ -288,8 +305,8 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         if (string.IsNullOrWhiteSpace(request.OfflineImagePath))
         {
             // No offline image: reject orphan WIM options so they are never silently ignored (which would build from the
-            // wrong source). The kind defaults to Directory, so only a non-default kind or a stray index is an error here.
-            if (request.ImageKind != OfflineImageKind.Directory)
+            // wrong source). Kind is auto-detected, so an EXPLICIT kind or a stray index without an image is the error.
+            if (request.ImageKind is not null)
             {
                 logger.Error($"--image-kind requires an offline image (--offline-image).");
 
@@ -313,7 +330,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             return false;
         }
 
-        switch (request.ImageKind)
+        switch (ResolveImageKind(request))
         {
             case OfflineImageKind.Directory:
                 if (request.WimIndex is not null)
@@ -323,14 +340,18 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                     return false;
                 }
 
-                if (!Directory.Exists(request.OfflineImagePath))
+                if (Directory.Exists(request.OfflineImagePath)) { return true; }
+
+                if (File.Exists(request.OfflineImagePath))
+                {
+                    logger.Error($"Offline image path is a file, not a directory: {request.OfflineImagePath}. For a .wim/.esd file, add --image-kind wim --wim-index N.");
+                }
+                else
                 {
                     logger.Error($"Offline image directory not found: {request.OfflineImagePath}");
-
-                    return false;
                 }
 
-                return true;
+                return false;
 
             case OfflineImageKind.Wim:
                 if (!File.Exists(request.OfflineImagePath))
@@ -360,10 +381,17 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
                 return true;
 
+            case null:
+                logger.Error(
+                    $"Could not determine the offline image kind for '{request.OfflineImagePath}'. Pass --image-kind " +
+                    $"directory or wim (.wim/.esd), or point at a mounted volume / extracted image folder.");
+
+                return false;
+
             default:
                 logger.Error(
-                    $"Offline {request.ImageKind} images are not yet supported; use a mounted volume or extracted image " +
-                    $"folder (--image-kind directory) or a .wim/.esd file (--image-kind wim).");
+                    $"Offline ISO images are not yet supported; use a mounted volume or extracted image folder " +
+                    $"(--image-kind directory) or a .wim/.esd file (--image-kind wim).");
 
                 return false;
         }

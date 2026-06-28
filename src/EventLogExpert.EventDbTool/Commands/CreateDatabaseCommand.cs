@@ -50,15 +50,15 @@ public sealed class CreateDatabaseCommand
             Description =
                 "Build the database from a Windows image, fully offline (no host registry or host files are " +
                 "read): a mounted volume root (e.g. an attached VHDX), an extracted image folder, or a .wim/.esd " +
-                "file (with --image-kind wim --wim-index N). The image's own providers are read in place. Mutually " +
-                "exclusive with the source argument."
+                "file (use --wim-index N to pick the image). The kind is auto-detected from the path; override with " +
+                "--image-kind. Mutually exclusive with the source argument."
         };
 
         Option<string> imageKindOption = new("--image-kind")
         {
             Description =
-                "How --offline-image is read: 'directory' (a mounted volume or extracted folder, the default) or " +
-                "'wim' (a .wim/.esd file - combine with --wim-index)."
+                "Override how --offline-image is read: 'directory' (a mounted volume or extracted folder) or 'wim' " +
+                "(a .wim/.esd file). Omit to auto-detect from the path (a directory, or a .wim/.esd file)."
         };
 
         Option<int?> wimIndexOption = new("--wim-index")
@@ -97,14 +97,18 @@ public sealed class CreateDatabaseCommand
             }
 
             var imageKindValue = result.GetValue(imageKindOption);
-            var imageKind = OfflineImageKind.Directory;
+            OfflineImageKind? imageKind = null;
 
-            if (!string.IsNullOrWhiteSpace(imageKindValue)
-                && (!Enum.TryParse(imageKindValue, ignoreCase: true, out imageKind) || !Enum.IsDefined(imageKind)))
+            if (!string.IsNullOrWhiteSpace(imageKindValue))
             {
-                logger.Error($"Invalid --image-kind '{imageKindValue}'. Valid values: directory, wim.");
+                if (!Enum.TryParse(imageKindValue, ignoreCase: true, out OfflineImageKind parsed) || !Enum.IsDefined(parsed))
+                {
+                    logger.Error($"Invalid --image-kind '{imageKindValue}'. Valid values: directory, wim.");
 
-                return;
+                    return;
+                }
+
+                imageKind = parsed;
             }
 
             var request = new CreateDatabaseRequest(
