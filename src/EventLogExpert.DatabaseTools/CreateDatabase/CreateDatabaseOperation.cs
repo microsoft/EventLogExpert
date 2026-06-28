@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Eventing.PublisherMetadata;
+using EventLogExpert.Eventing.PublisherMetadata.Offline;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.ProviderDatabase.Context;
@@ -91,9 +92,31 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         // when no provider details could be resolved.
         ProviderDbContext? dbContext = null;
 
+        // A WIM image is extracted to a temp folder up front; the OfflineWimImage owns that ~GB-scale temp and is disposed
+        // in the finally (AFTER the final SaveChangesAsync, which materializes lazy DLL reads from the extracted tree).
+        OfflineWimImage? wimImage = null;
+
         try
         {
             var mode = SelectMode(request);
+
+            // For a WIM image, extract the requested index to a temp folder, then read providers from that folder exactly
+            // like a mounted volume. A failed extraction surfaces a specific, actionable error and leaves no .db behind.
+            string? effectiveOfflineImagePath = request.OfflineImagePath;
+
+            if (mode == CreateDatabaseMode.OfflineImage && request.ImageKind == OfflineImageKind.Wim)
+            {
+                OfflineWimExtractResult extraction = await OfflineWimImage.TryExtractAsync(
+                    request.OfflineImagePath!, request.WimIndex!.Value, Path.GetTempPath(), logger, cancellationToken);
+
+                if (extraction.Status != OfflineWimExtractStatus.Extracted)
+                {
+                    return HandleWimExtractionFailure(extraction.Status, request.OfflineImagePath!, request.WimIndex!.Value, logger);
+                }
+
+                wimImage = extraction.Image;
+                effectiveOfflineImagePath = wimImage!.ExtractedRoot;
+            }
 
             // ONE switch picks BOTH the provider stream AND the provenance so the two cannot desync: an offline image
             // build must NOT read host provenance (the facade already stamped each row with the IMAGE's OS, and a host
@@ -105,17 +128,29 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             switch (mode)
             {
                 case CreateDatabaseMode.OfflineImage:
-                    providersToAdd = LoadOfflineImageProvidersAsync(request.OfflineImagePath!, logger, filterRegex, excludeProviderNames, cancellationToken);
+                    providersToAdd = LoadOfflineImageProvidersAsync(effectiveOfflineImagePath!,
+                        logger,
+                        filterRegex,
+                        excludeProviderNames,
+                        cancellationToken);
+
                     sourceOsProvenance = null;
 
                     break;
                 case CreateDatabaseMode.Local:
-                    providersToAdd = LoadLocalProvidersAsync(logger, filterRegex, excludeProviderNames, cancellationToken);
+                    providersToAdd =
+                        LoadLocalProvidersAsync(logger, filterRegex, excludeProviderNames, cancellationToken);
+
                     sourceOsProvenance = SourceOsProvenance.Read(logger);
 
                     break;
                 default:
-                    providersToAdd = ProviderSource.LoadProvidersAsync(request.SourcePath!, logger, filterRegex, excludeProviderNames, cancellationToken: cancellationToken);
+                    providersToAdd = ProviderSource.LoadProvidersAsync(request.SourcePath!,
+                        logger,
+                        filterRegex,
+                        excludeProviderNames,
+                        cancellationToken: cancellationToken);
+
                     sourceOsProvenance = null;
 
                     break;
@@ -232,6 +267,9 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         finally
         {
             if (dbContext is not null) { await dbContext.DisposeAsync(); }
+
+            // Delete the extracted WIM temp AFTER persistence completes (the final SaveChangesAsync reads from it).
+            wimImage?.Dispose();
         }
     }
 
@@ -245,9 +283,28 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         : request.SourcePath is null ? CreateDatabaseMode.Local
         : CreateDatabaseMode.FileSource;
 
-    private static bool ValidateOfflineImageRequest(CreateDatabaseRequest request, ITraceLogger logger)
+    internal static bool ValidateOfflineImageRequest(CreateDatabaseRequest request, ITraceLogger logger)
     {
-        if (string.IsNullOrWhiteSpace(request.OfflineImagePath)) { return true; }
+        if (string.IsNullOrWhiteSpace(request.OfflineImagePath))
+        {
+            // No offline image: reject orphan WIM options so they are never silently ignored (which would build from the
+            // wrong source). The kind defaults to Directory, so only a non-default kind or a stray index is an error here.
+            if (request.ImageKind != OfflineImageKind.Directory)
+            {
+                logger.Error($"--image-kind requires an offline image (--offline-image).");
+
+                return false;
+            }
+
+            if (request.WimIndex is not null)
+            {
+                logger.Error($"--wim-index requires an offline image (--offline-image) and --image-kind wim.");
+
+                return false;
+            }
+
+            return true;
+        }
 
         if (request.SourcePath is not null)
         {
@@ -256,30 +313,119 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             return false;
         }
 
-        if (request.ImageKind != OfflineImageKind.Directory)
+        switch (request.ImageKind)
         {
-            logger.Error(
-                $"Offline {request.ImageKind} images are not yet supported; today only a mounted volume or extracted " +
-                $"image folder (Directory) can be read.");
+            case OfflineImageKind.Directory:
+                if (request.WimIndex is not null)
+                {
+                    logger.Error($"--wim-index applies only to --image-kind wim.");
 
-            return false;
+                    return false;
+                }
+
+                if (!Directory.Exists(request.OfflineImagePath))
+                {
+                    logger.Error($"Offline image directory not found: {request.OfflineImagePath}");
+
+                    return false;
+                }
+
+                return true;
+
+            case OfflineImageKind.Wim:
+                if (!File.Exists(request.OfflineImagePath))
+                {
+                    logger.Error($"WIM image file not found: {request.OfflineImagePath}");
+
+                    return false;
+                }
+
+                if (!IsWimImageFile(request.OfflineImagePath))
+                {
+                    logger.Error($"--image-kind wim expects a .wim or .esd file: {request.OfflineImagePath}");
+
+                    return false;
+                }
+
+                // The index range and elevation are validated by the extraction itself (so the messages list the actual
+                // images and the elevation prompt comes only when an apply is really needed). A MISSING index, though, is
+                // a request-shape error - list the choices so the user can pick one.
+                if (request.WimIndex is null)
+                {
+                    logger.Error($"--wim-index is required for --image-kind wim. Choose an image:");
+                    LogAvailableWimIndices(request.OfflineImagePath, logger);
+
+                    return false;
+                }
+
+                return true;
+
+            default:
+                logger.Error(
+                    $"Offline {request.ImageKind} images are not yet supported; use a mounted volume or extracted image " +
+                    $"folder (--image-kind directory) or a .wim/.esd file (--image-kind wim).");
+
+                return false;
+        }
+    }
+
+    /// <summary>
+    ///     Maps a non-success <see cref="OfflineWimExtractStatus" /> to an actionable error and the operation outcome.
+    ///     The extraction already cleaned up any partial temp, so there is nothing to dispose here.
+    /// </summary>
+    private static DatabaseToolsOutcome HandleWimExtractionFailure(
+        OfflineWimExtractStatus status, string wimPath, int wimIndex, ITraceLogger logger)
+    {
+        string wimName = Path.GetFileName(wimPath);
+
+        switch (status)
+        {
+            case OfflineWimExtractStatus.Cancelled:
+                return DatabaseToolsOutcome.Cancelled;
+            case OfflineWimExtractStatus.NeedsElevation:
+                logger.Error($"Extracting an image from {wimName} requires administrator privileges. Re-run elevated.");
+
+                break;
+            case OfflineWimExtractStatus.IndexOutOfRange:
+                logger.Error($"Image index {wimIndex} is not in {wimName}.");
+                LogAvailableWimIndices(wimPath, logger);
+
+                break;
+            case OfflineWimExtractStatus.InsufficientSpace:
+                logger.Error($"Not enough free disk space to extract image {wimIndex} from {wimName}.");
+
+                break;
+            case OfflineWimExtractStatus.NotAWim:
+                logger.Error($"{wimPath} is not a readable WIM or ESD image.");
+
+                break;
+            default:
+                logger.Error($"Could not extract image {wimIndex} from {wimName}.");
+
+                break;
         }
 
-        if (request.WimIndex is not null)
+        return DatabaseToolsOutcome.Failed;
+    }
+
+    private static bool IsWimImageFile(string path)
+    {
+        string extension = Path.GetExtension(path);
+
+        return string.Equals(extension, ".wim", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".esd", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void LogAvailableWimIndices(string wimPath, ITraceLogger logger)
+    {
+        WimImageList imageList = OfflineWimImage.ReadIndexList(wimPath, logger);
+
+        if (imageList.Status != WimImageListStatus.Ok || imageList.Images.Count == 0) { return; }
+
+        foreach (WimImageEntry image in imageList.Images)
         {
-            logger.Error($"WimIndex applies only to WIM images, which are not yet supported.");
-
-            return false;
+            logger.Information($"  --wim-index {image.Index}  {image.Name} ({image.Edition})");
         }
-
-        if (!Directory.Exists(request.OfflineImagePath))
-        {
-            logger.Error($"Offline image directory not found: {request.OfflineImagePath}");
-
-            return false;
-        }
-
-        return true;
     }
 
     private async Task FlushHeaderAndBufferAsync(
