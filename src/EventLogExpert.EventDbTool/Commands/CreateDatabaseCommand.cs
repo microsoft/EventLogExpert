@@ -45,6 +45,14 @@ public sealed class CreateDatabaseCommand
                 "would be saved in the new database."
         };
 
+        Option<string> offlineImageOption = new("--offline-image")
+        {
+            Description =
+                "Build the database from a Windows image, fully offline (no host registry or host files are " +
+                "read): a mounted volume root (e.g. an attached VHDX) or an extracted image folder. The image's own " +
+                "providers are read in place. Mutually exclusive with the source argument."
+        };
+
         Option<bool> verboseOption = new("--verbose")
         {
             Description = "Enable verbose logging. May be useful for troubleshooting."
@@ -54,6 +62,7 @@ public sealed class CreateDatabaseCommand
         createDatabaseCommand.Arguments.Add(sourceArgument);
         createDatabaseCommand.Options.Add(filterOption);
         createDatabaseCommand.Options.Add(skipProvidersInFileOption);
+        createDatabaseCommand.Options.Add(offlineImageOption);
         createDatabaseCommand.Options.Add(verboseOption);
 
         createDatabaseCommand.SetAction(async result =>
@@ -74,7 +83,8 @@ public sealed class CreateDatabaseCommand
                 result.GetRequiredValue(fileArgument),
                 result.GetValue(sourceArgument),
                 regex,
-                result.GetValue(skipProvidersInFileOption));
+                result.GetValue(skipProvidersInFileOption),
+                OfflineImagePath: result.GetValue(offlineImageOption));
 
             var factory = sp.GetRequiredService<IDatabaseToolsOperationFactory>();
 

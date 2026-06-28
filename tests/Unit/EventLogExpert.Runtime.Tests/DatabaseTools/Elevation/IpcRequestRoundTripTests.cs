@@ -14,6 +14,30 @@ namespace EventLogExpert.Runtime.Tests.DatabaseTools.Elevation;
 
 public sealed class IpcRequestRoundTripTests
 {
+    [Fact]
+    public void CreateDatabaseIpcRequest_RoundTrips_PreservesOfflineImageFields()
+    {
+        // The offline-image fields ride the same whole-record IPC payload to the elevated helper; the source-gen
+        // serializer must carry the nullable path, the enum (serialized numerically in Metadata mode), and the
+        // nullable index intact so a future elevated offline build sees exactly what the caller requested.
+        var domain = new CreateDatabaseRequest(
+            TargetPath: @"C:\out\target.db",
+            SourcePath: null,
+            FilterRegex: null,
+            SkipProvidersInFile: null,
+            OfflineImagePath: @"X:\",
+            ImageKind: OfflineImageKind.Wim,
+            WimIndex: 2);
+        var original = new CreateDatabaseIpcRequest(domain, Verbose: false);
+
+        var roundTripped = SerializeDeserialize(original, out _);
+
+        var create = Assert.IsType<CreateDatabaseIpcRequest>(roundTripped);
+        Assert.Equal(@"X:\", create.Request.OfflineImagePath);
+        Assert.Equal(OfflineImageKind.Wim, create.Request.ImageKind);
+        Assert.Equal(2, create.Request.WimIndex);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
