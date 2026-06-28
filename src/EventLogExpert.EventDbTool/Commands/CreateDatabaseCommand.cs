@@ -101,7 +101,9 @@ public sealed class CreateDatabaseCommand
 
             if (!string.IsNullOrWhiteSpace(imageKindValue))
             {
-                if (!Enum.TryParse(imageKindValue, ignoreCase: true, out OfflineImageKind parsed) || !Enum.IsDefined(parsed))
+                if (!Enum.TryParse(imageKindValue, ignoreCase: true, out OfflineImageKind parsed) ||
+                    !Enum.IsDefined(parsed) ||
+                    parsed == OfflineImageKind.Iso)
                 {
                     logger.Error($"Invalid --image-kind '{imageKindValue}'. Valid values: directory, wim.");
 
