@@ -44,23 +44,24 @@ internal sealed class OfflineImageProviderExtractor : IOfflineImageProviderExtra
 
     /// <summary>
     ///     Loads the image's hives and wires the offline readers, or returns <see langword="null" /> when either hive
-    ///     cannot be loaded. The caller owns the returned extractor and must dispose it (which unloads both hives). Throws
+    ///     cannot be loaded (logging the specific reason - not a hive, recovery failed, or recovery needs administrator). The
+    ///     caller owns the returned extractor and must dispose it (which unloads both hives). Throws
     ///     <see cref="OfflineRootGuardViolationException" /> if the image's hive paths escape the image root (a malformed
     ///     image whose <c>config</c> directory is a junction out of the image).
     /// </summary>
     public static OfflineImageProviderExtractor? TryCreate(OfflineImageRoot imageRoot, ITraceLogger? logger)
     {
         // Jail-check the hive paths BEFORE loading them: if Windows\System32\config is a junction that leaves the image,
-        // staging and RegLoadAppKey'ing the hive would read out-of-image (possibly host) registry data. Fail closed.
+        // staging and loading the hive would read out-of-image (possibly host) registry data. Fail closed.
         var guard = new OfflineRootGuard(imageRoot, logger);
         guard.Assert(imageRoot.SoftwareHivePath, "SOFTWARE hive");
         guard.Assert(imageRoot.SystemHivePath, "SYSTEM hive");
 
-        OfflineRegistryHive? softwareHive = OfflineRegistryHive.TryLoad(imageRoot.SoftwareHivePath, logger);
+        OfflineRegistryHive? softwareHive = LoadHive(imageRoot.SoftwareHivePath, "SOFTWARE", logger);
 
         if (softwareHive is null) { return null; }
 
-        OfflineRegistryHive? systemHive = OfflineRegistryHive.TryLoad(imageRoot.SystemHivePath, logger);
+        OfflineRegistryHive? systemHive = LoadHive(imageRoot.SystemHivePath, "SYSTEM", logger);
 
         if (systemHive is null)
         {
@@ -116,5 +117,30 @@ internal sealed class OfflineImageProviderExtractor : IOfflineImageProviderExtra
             registration.ProviderName,
             _legacyResolver,
             _logger);
+    }
+
+    // Loads one hive, logging the specific failure reason at Error so a non-elevated user reading a real (dirty) image
+    // sees the actionable "re-run as administrator" message rather than a silent generic failure.
+    private static OfflineRegistryHive? LoadHive(string hivePath, string hiveName, ITraceLogger? logger)
+    {
+        OfflineHiveLoadResult result = OfflineRegistryHive.TryLoad(hivePath, logger);
+
+        switch (result.Status)
+        {
+            case OfflineHiveLoadStatus.Loaded:
+                return result.Hive;
+            case OfflineHiveLoadStatus.NeedsElevation:
+                logger?.Error($"The image's {hiveName} hive needs registry recovery, which requires running as administrator. Re-run elevated.");
+
+                return null;
+            case OfflineHiveLoadStatus.RecoveryFailed:
+                logger?.Error($"The image's {hiveName} hive could not be recovered; it may be corrupt or missing its transaction logs.");
+
+                return null;
+            default:
+                logger?.Error($"The image's {hiveName} hive is missing or is not a registry hive.");
+
+                return null;
+        }
     }
 }

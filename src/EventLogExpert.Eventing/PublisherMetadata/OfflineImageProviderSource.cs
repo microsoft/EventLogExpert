@@ -121,7 +121,9 @@ public static class OfflineImageProviderSource
 
             if (extractor is null)
             {
-                logger.Error($"Could not load the SOFTWARE/SYSTEM hives from '{imageRootPath}'.");
+                // OfflineImageProviderExtractor.TryCreate already logged the specific reason (not a hive / recovery
+                // failed / needs administrator) at Error; this is just the diagnostic trail.
+                logger.Debug($"Could not load the SOFTWARE/SYSTEM hives from '{imageRootPath}'.");
             }
 
             return extractor;
