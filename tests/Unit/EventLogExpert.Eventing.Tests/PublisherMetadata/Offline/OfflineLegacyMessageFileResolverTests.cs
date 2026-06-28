@@ -75,8 +75,8 @@ public sealed class OfflineLegacyMessageFileResolverTests
         Assert.Equal(Path.Combine(image.RootDirectory, "Windows", "System32", "cat.dll"), files[0], ignoreCase: true);
         Assert.Equal(Path.Combine(image.RootDirectory, "Windows", "System32", "evt.dll"), files[1], ignoreCase: true);
 
-        // The parameter message file is read by the live reader but never returned; the offline reader mirrors the
-        // discard so offline databases stay comparable with native-built ones.
+        // The parameter message file is excluded from the message list; it is surfaced separately by
+        // GetParameterFilesForLegacyProvider so offline databases stay comparable with native-built ones.
         Assert.DoesNotContain(files, file => file.EndsWith("param.dll", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -103,6 +103,31 @@ public sealed class OfflineLegacyMessageFileResolverTests
         using OfflineRegistryHive hive = LoadSystemHive(image);
 
         Assert.Empty(ResolverFor(image, hive).GetMessageFilesForLegacyProvider("NoSuchProvider"));
+    }
+
+    [Fact]
+    public void GetParameterFiles_ProviderWithoutParameterFile_ReturnsEmpty()
+    {
+        using OfflineTestImage image = OfflineTestImage.Create(seedSystem: system =>
+        {
+            SetCurrentControlSet(system, 1);
+            using RegistryKey provider = system.CreateSubKey(@"ControlSet001\Services\EventLog\Application\NoParamProvider");
+            provider.SetValue("EventMessageFile", @"C:\Windows\System32\evt.dll", RegistryValueKind.ExpandString);
+        });
+        using OfflineRegistryHive hive = LoadSystemHive(image);
+
+        Assert.Empty(ResolverFor(image, hive).GetParameterFilesForLegacyProvider("NoParamProvider"));
+    }
+
+    [Fact]
+    public void GetParameterFiles_ReturnsReRootedParameterFile()
+    {
+        using OfflineTestImage image = OfflineTestImage.Create(seedSystem: SeedApplicationProvider);
+        using OfflineRegistryHive hive = LoadSystemHive(image);
+
+        IReadOnlyList<string> files = ResolverFor(image, hive).GetParameterFilesForLegacyProvider("TestLegacyProvider");
+
+        Assert.Equal(Path.Combine(image.RootDirectory, "Windows", "System32", "param.dll"), Assert.Single(files), ignoreCase: true);
     }
 
     private static OfflineRegistryHive LoadSystemHive(OfflineTestImage image)
