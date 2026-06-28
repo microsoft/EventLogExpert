@@ -13,11 +13,28 @@ public sealed class OfflineRegistryHiveTests
     private const int KEY_ALL_ACCESS = 0xF003F;
 
     [Fact]
-    public void TryLoad_NonexistentFile_ReturnsNull()
+    public void TryLoad_FileWithoutHiveSignature_ReturnsNotAHiveWithoutAttemptingRecovery()
+    {
+        string notAHive = Path.Combine(Path.GetTempPath(), "elx_notahive_" + Guid.NewGuid().ToString("N") + ".dat");
+        File.WriteAllBytes(notAHive, "this is not a registry hive"u8.ToArray());
+
+        try
+        {
+            // No "regf" signature -> rejected before any load/recovery path runs.
+            Assert.Equal(OfflineHiveLoadStatus.NotAHive, OfflineRegistryHive.TryLoad(notAHive, logger: null).Status);
+        }
+        finally
+        {
+            File.Delete(notAHive);
+        }
+    }
+
+    [Fact]
+    public void TryLoad_NonexistentFile_ReturnsNotAHive()
     {
         string missing = Path.Combine(Path.GetTempPath(), "elx_missing_" + Guid.NewGuid().ToString("N") + ".dat");
 
-        Assert.Null(OfflineRegistryHive.TryLoad(missing, logger: null));
+        Assert.Equal(OfflineHiveLoadStatus.NotAHive, OfflineRegistryHive.TryLoad(missing, logger: null).Status);
     }
 
     [Fact]
@@ -29,8 +46,11 @@ public sealed class OfflineRegistryHiveTests
         {
             SeedHive(hivePath);
 
-            using OfflineRegistryHive? hive = OfflineRegistryHive.TryLoad(hivePath, logger: null);
+            OfflineHiveLoadResult result = OfflineRegistryHive.TryLoad(hivePath, logger: null);
 
+            Assert.Equal(OfflineHiveLoadStatus.Loaded, result.Status);
+
+            using OfflineRegistryHive? hive = result.Hive;
             Assert.NotNull(hive);
 
             using RegistryKey? publisher = hive!.Root.OpenSubKey(

@@ -107,7 +107,7 @@ public sealed class OfflineLegacyMessageFileResolverTests
 
     private static OfflineRegistryHive LoadSystemHive(OfflineTestImage image)
     {
-        OfflineRegistryHive? hive = OfflineRegistryHive.TryLoad(image.ImageRoot.SystemHivePath, logger: null);
+        OfflineRegistryHive? hive = OfflineRegistryHive.TryLoad(image.ImageRoot.SystemHivePath, logger: null).Hive;
         Assert.NotNull(hive);
 
         return hive!;
