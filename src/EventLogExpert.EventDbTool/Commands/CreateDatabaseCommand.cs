@@ -49,8 +49,23 @@ public sealed class CreateDatabaseCommand
         {
             Description =
                 "Build the database from a Windows image, fully offline (no host registry or host files are " +
-                "read): a mounted volume root (e.g. an attached VHDX) or an extracted image folder. The image's own " +
-                "providers are read in place. Mutually exclusive with the source argument."
+                "read): a mounted volume root (e.g. an attached VHDX), an extracted image folder, or a .wim/.esd " +
+                "file (with --image-kind wim --wim-index N). The image's own providers are read in place. Mutually " +
+                "exclusive with the source argument."
+        };
+
+        Option<string> imageKindOption = new("--image-kind")
+        {
+            Description =
+                "How --offline-image is read: 'directory' (a mounted volume or extracted folder, the default) or " +
+                "'wim' (a .wim/.esd file - combine with --wim-index)."
+        };
+
+        Option<int?> wimIndexOption = new("--wim-index")
+        {
+            Description =
+                "The 1-based image index to extract from a .wim/.esd, for --image-kind wim. Omit to list the " +
+                "available images."
         };
 
         Option<bool> verboseOption = new("--verbose")
@@ -63,6 +78,8 @@ public sealed class CreateDatabaseCommand
         createDatabaseCommand.Options.Add(filterOption);
         createDatabaseCommand.Options.Add(skipProvidersInFileOption);
         createDatabaseCommand.Options.Add(offlineImageOption);
+        createDatabaseCommand.Options.Add(imageKindOption);
+        createDatabaseCommand.Options.Add(wimIndexOption);
         createDatabaseCommand.Options.Add(verboseOption);
 
         createDatabaseCommand.SetAction(async result =>
@@ -79,12 +96,25 @@ public sealed class CreateDatabaseCommand
                 return;
             }
 
+            var imageKindValue = result.GetValue(imageKindOption);
+            var imageKind = OfflineImageKind.Directory;
+
+            if (!string.IsNullOrWhiteSpace(imageKindValue)
+                && (!Enum.TryParse(imageKindValue, ignoreCase: true, out imageKind) || !Enum.IsDefined(imageKind)))
+            {
+                logger.Error($"Invalid --image-kind '{imageKindValue}'. Valid values: directory, wim, iso.");
+
+                return;
+            }
+
             var request = new CreateDatabaseRequest(
                 result.GetRequiredValue(fileArgument),
                 result.GetValue(sourceArgument),
                 regex,
                 result.GetValue(skipProvidersInFileOption),
-                OfflineImagePath: result.GetValue(offlineImageOption));
+                OfflineImagePath: result.GetValue(offlineImageOption),
+                ImageKind: imageKind,
+                WimIndex: result.GetValue(wimIndexOption));
 
             var factory = sp.GetRequiredService<IDatabaseToolsOperationFactory>();
 

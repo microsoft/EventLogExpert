@@ -130,21 +130,6 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateDatabase_WhenOfflineImageKindIsWim_LogsNotSupportedErrorAndDoesNotCreateFile()
-    {
-        // WIM extraction is a later phase; v1 supports only a directory (mounted volume / extracted folder).
-        var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
-
-        await new CreateDatabaseOperation(new CreateDatabaseRequest(
-            path, SourcePath: null, FilterRegex: null, SkipProvidersInFile: null, OfflineImagePath: @"X:\",
-            ImageKind: OfflineImageKind.Wim)).ExecuteAsync(logger, null, CancellationToken.None);
-
-        Assert.False(File.Exists(path), "WIM offline extraction is not yet supported; no file should be written.");
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("not yet supported")));
-    }
-
-    [Fact]
     public async Task CreateDatabase_WhenProviderCountCrossesBatchSize_PersistsEveryProviderWithoutErrors()
     {
         // Arrange — exercises the mid-stream FlushHeaderAndBuffer path: at 100 providers the buffer
@@ -329,6 +314,22 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateDatabase_WhenWimImageFileMissing_LogsErrorAndDoesNotCreateFile()
+    {
+        // WIM extraction is supported, but a .wim path that does not exist is rejected up front (before any extraction
+        // or elevation prompt), so no .db is written.
+        var path = CreateTempPath();
+        var logger = Substitute.For<ITraceLogger>();
+
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(
+            path, SourcePath: null, FilterRegex: null, SkipProvidersInFile: null, OfflineImagePath: @"X:\missing.wim",
+            ImageKind: OfflineImageKind.Wim, WimIndex: 1)).ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.False(File.Exists(path), "A missing WIM file is rejected; no file should be written.");
+        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("WIM image file not found")));
+    }
+
+    [Fact]
     public async Task CreateDatabase_WhenWimIndexGivenForDirectoryImage_LogsErrorAndDoesNotCreateFile()
     {
         // WimIndex only means anything for a WIM image; supplying it for a directory image is rejected rather than
@@ -341,7 +342,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
             WimIndex: 1)).ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.False(File.Exists(path), "WimIndex applies only to WIM images; no file should be written.");
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("WimIndex applies only to WIM")));
+        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("--wim-index applies only to")));
     }
 
     public void Dispose()
