@@ -315,7 +315,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
             if (request.WimIndex is not null)
             {
-                logger.Error($"--wim-index requires an offline image (--offline-image) and --image-kind wim.");
+                logger.Error($"--wim-index requires an offline image (--offline-image) pointing at a .wim/.esd file.");
 
                 return false;
             }
