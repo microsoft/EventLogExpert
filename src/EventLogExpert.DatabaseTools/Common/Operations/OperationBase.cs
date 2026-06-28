@@ -109,6 +109,30 @@ internal abstract class OperationBase
     }
 
     /// <summary>
+    ///     Streams providers extracted from a mounted or extracted foreign Windows image, fully offline. Mirrors
+    ///     <see cref="LoadLocalProvidersAsync" />: offline extraction is synchronous (registry-hive + DLL reads), so this
+    ///     wrapper exposes it as an <see cref="IAsyncEnumerable{T}" /> for the shared <c>await foreach</c> consume loop; the
+    ///     await keeps it a valid async iterator without scheduling an extra continuation. The facade applies the name filter
+    ///     and exclude set itself (so this does not re-filter) and stamps each provider with the IMAGE's OS provenance.
+    /// </summary>
+    protected static async IAsyncEnumerable<ProviderDetails> LoadOfflineImageProvidersAsync(
+        string offlineImagePath,
+        ITraceLogger logger,
+        Regex? regex,
+        IReadOnlySet<string>? excludeProviderNames = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await Task.CompletedTask;
+
+        foreach (var details in OfflineImageProviderSource.LoadProviders(offlineImagePath, logger, regex, excludeProviderNames))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            yield return details;
+        }
+    }
+
+    /// <summary>
     ///     Emits the provider-details column header sized to the longest provider name. Updates the instance format
     ///     string so subsequent <see cref="LogProviderDetails" /> calls align to the same width.
     /// </summary>
