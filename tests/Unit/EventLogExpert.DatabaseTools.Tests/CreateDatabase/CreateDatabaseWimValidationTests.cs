@@ -17,6 +17,51 @@ namespace EventLogExpert.DatabaseTools.Tests.CreateDatabase;
 public sealed class CreateDatabaseWimValidationTests
 {
     [Fact]
+    public void Validate_AutoDetectsDirectory_WhenNoKindGiven_Accepts()
+    {
+        using var workspace = new TempFiles();
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: workspace.Directory, kind: null);
+
+        Assert.True(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+    }
+
+    [Fact]
+    public void Validate_AutoDetectsWim_FromExtension_WithIndex_Accepts()
+    {
+        using var workspace = new TempFiles();
+        string wim = workspace.CreateFile("image.wim");
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: wim, kind: null, wimIndex: 1);
+
+        Assert.True(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+    }
+
+    [Fact]
+    public void Validate_AutoDetectsWim_FromExtension_WithoutIndex_Rejects()
+    {
+        using var workspace = new TempFiles();
+        string wim = workspace.CreateFile("image.esd");
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: wim, kind: null);
+
+        Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+        Assert.Contains(logger.Errors, error => error.Contains("--wim-index", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_AutoDetectUnknownExtension_Rejects()
+    {
+        using var workspace = new TempFiles();
+        string unknown = workspace.CreateFile("image.dat");
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: unknown, kind: null);
+
+        Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+        Assert.Contains(logger.Errors, error => error.Contains("determine", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void Validate_WhenDirectoryExists_Accepts()
     {
         using var workspace = new TempFiles();
@@ -24,6 +69,21 @@ public sealed class CreateDatabaseWimValidationTests
         var request = Request(offlineImagePath: workspace.Directory, kind: OfflineImageKind.Directory);
 
         Assert.True(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+    }
+
+    [Fact]
+    public void Validate_WhenDirectoryKindGivenAFile_RejectsWithActionableMessage()
+    {
+        using var workspace = new TempFiles();
+        string wim = workspace.CreateFile("image.wim");
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: wim, kind: OfflineImageKind.Directory);
+
+        // A .wim passed without --image-kind wim must not say "directory not found" (the file exists); the error should
+        // identify it as a file and point at --image-kind wim.
+        Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+        Assert.Contains(logger.Errors, error =>
+            error.Contains("file", StringComparison.OrdinalIgnoreCase) && error.Contains("--image-kind wim", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -73,7 +133,7 @@ public sealed class CreateDatabaseWimValidationTests
     public void Validate_WhenNoImageAndNoWimOptions_Accepts()
     {
         var logger = new CapturingTraceLogger();
-        var request = Request(offlineImagePath: null, kind: OfflineImageKind.Directory);
+        var request = Request(offlineImagePath: null, kind: null);
 
         Assert.True(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
     }
@@ -92,7 +152,7 @@ public sealed class CreateDatabaseWimValidationTests
     public void Validate_WhenNoImageButWimIndexSet_Rejects()
     {
         var logger = new CapturingTraceLogger();
-        var request = Request(offlineImagePath: null, kind: OfflineImageKind.Directory, wimIndex: 1);
+        var request = Request(offlineImagePath: null, kind: null, wimIndex: 1);
 
         Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
         Assert.Contains(logger.Errors, error => error.Contains("--wim-index", StringComparison.Ordinal));
@@ -150,7 +210,7 @@ public sealed class CreateDatabaseWimValidationTests
     private static CreateDatabaseRequest Request(
         string? offlineImagePath,
         string? source = null,
-        OfflineImageKind kind = OfflineImageKind.Directory,
+        OfflineImageKind? kind = null,
         int? wimIndex = null) =>
         new(@"C:\out.db", source, FilterRegex: null, SkipProvidersInFile: null, offlineImagePath, kind, wimIndex);
 
