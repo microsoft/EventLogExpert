@@ -54,14 +54,15 @@ public sealed class OfflinePublisherCatalogTests
     [Fact]
     public void ReadRegistrations_RegExpandSzValue_IsReadLiterallyNotHostExpanded()
     {
-        // If the catalog let .NET host-expand the REG_EXPAND_SZ value, %ProgramData% would become C:\ProgramData\… and
-        // map to a non-null image path. Reading it literally (DoNotExpandEnvironmentNames) leaves the unsupported token
-        // intact, so the mapper drops it - which is what proves the host environment is never consulted.
+        // If the catalog let .NET host-expand the REG_EXPAND_SZ value, %APPDATA% would become a real host path (e.g.
+        // C:\Users\<user>\AppData\Roaming\…) that the mapper re-roots to a non-null image path. Reading it literally
+        // (DoNotExpandEnvironmentNames) leaves the per-user token intact, and the mapper does not map per-user tokens,
+        // so it drops the value - which is what proves the host environment is never consulted.
         using OfflineTestImage image = OfflineTestImage.Create(seedSoftware: software =>
         {
             using RegistryKey publisher = software.CreateSubKey($@"{PublishersKeyPath}\{TestGuid}");
             publisher.SetValue(null, "Test-Provider");
-            publisher.SetValue("ResourceFileName", @"%ProgramData%\Vendor\foo.dll", RegistryValueKind.ExpandString);
+            publisher.SetValue("ResourceFileName", @"%APPDATA%\Vendor\foo.dll", RegistryValueKind.ExpandString);
         });
 
         OfflinePublisherRegistration registration = Assert.Single(ReadRegistrations(image));
