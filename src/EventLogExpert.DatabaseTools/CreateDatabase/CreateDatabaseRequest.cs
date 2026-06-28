@@ -24,12 +24,13 @@ namespace EventLogExpert.DatabaseTools.CreateDatabase;
 ///     registry or host files). Null = not an offline build. Mutually exclusive with <paramref name="SourcePath" />.
 /// </param>
 /// <param name="ImageKind">
-///     How <paramref name="OfflineImagePath" /> is accessed. Only
-///     <see cref="OfflineImageKind.Directory" /> is supported today.
+///     How <paramref name="OfflineImagePath" /> is accessed: a mounted volume/extracted folder (
+///     <see cref="OfflineImageKind.Directory" />) or a <c>.wim</c>/<c>.esd</c> file (<see cref="OfflineImageKind.Wim" />,
+///     which extracts <paramref name="WimIndex" /> first).
 /// </param>
 /// <param name="WimIndex">
-///     The image index within a .wim, for <see cref="OfflineImageKind.Wim" /> (a later phase). Null
-///     otherwise.
+///     The 1-based image index to extract from a <c>.wim</c>/<c>.esd</c>, for
+///     <see cref="OfflineImageKind.Wim" />. Null otherwise.
 /// </param>
 public sealed record CreateDatabaseRequest(
     string TargetPath,
