@@ -2,8 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.PublisherMetadata.Offline.Containment;
-using System.ComponentModel;
-using System.Diagnostics;
 
 namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline.Containment;
 
@@ -33,7 +31,7 @@ public sealed class OfflineRootGuardTests
         {
             string junctionPath = Path.Combine(image.ImageRoot.System32Directory, "linkdir");
 
-            Assert.SkipUnless(TryCreateJunction(junctionPath, outsideTarget), "Could not create an NTFS junction for the reparse-point test.");
+            Assert.SkipUnless(OfflineTestImage.TryCreateJunction(junctionPath, outsideTarget), "Could not create an NTFS junction for the reparse-point test.");
 
             var guard = new OfflineRootGuard(image.ImageRoot, logger: null);
             string throughJunction = Path.Combine(junctionPath, "evil.dll");
@@ -57,30 +55,5 @@ public sealed class OfflineRootGuardTests
         string inside = Path.Combine(image.ImageRoot.System32Directory, "foo.dll");
 
         guard.Assert(inside, "resource");
-    }
-
-    private static bool TryCreateJunction(string junctionPath, string targetPath)
-    {
-        try
-        {
-            // Directory junctions (mklink /J) do not require elevation, unlike symbolic links.
-            using var process = Process.Start(new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{junctionPath}\" \"{targetPath}\"")
-            {
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            });
-
-            if (process is null) { return false; }
-
-            process.WaitForExit(10_000);
-
-            return process.HasExited && process.ExitCode == 0 && Directory.Exists(junctionPath);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception)
-        {
-            return false;
-        }
     }
 }

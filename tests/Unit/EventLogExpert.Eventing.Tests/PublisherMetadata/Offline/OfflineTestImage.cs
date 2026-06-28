@@ -5,6 +5,8 @@ using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.PublisherMetadata.Offline.Containment;
 using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
+using System.ComponentModel;
+using System.Diagnostics;
 
 namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
 
@@ -47,6 +49,34 @@ internal sealed class OfflineTestImage : IDisposable
             ?? throw new InvalidOperationException($"Failed to create OfflineImageRoot for scaffold {rootDirectory}.");
 
         return new OfflineTestImage(rootDirectory, imageRoot);
+    }
+
+    /// <summary>
+    ///     Creates an NTFS directory junction (which, unlike symbolic links, does not require elevation) for
+    ///     reparse-point tests; returns false when the platform refuses so callers can <c>Assert.SkipUnless</c>.
+    /// </summary>
+    public static bool TryCreateJunction(string junctionPath, string targetPath)
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{junctionPath}\" \"{targetPath}\"")
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            });
+
+            if (process is null) { return false; }
+
+            process.WaitForExit(10_000);
+
+            return process.HasExited && process.ExitCode == 0 && Directory.Exists(junctionPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception)
+        {
+            return false;
+        }
     }
 
     public void Dispose()

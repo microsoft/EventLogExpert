@@ -78,6 +78,32 @@ public sealed class OfflineImageRootTests
         Assert.Equal(windowsDirectory, root.WindowsDirectory);
     }
 
+    [Fact]
+    public void TryCreate_ImageRootReachedViaJunction_FilesUnderItPassTheGuard()
+    {
+        using OfflineTestImage image = OfflineTestImage.Create();
+        string rootLink = Path.Combine(Path.GetTempPath(), "elx_rootlink_" + Guid.NewGuid().ToString("N"));
+
+        Assert.SkipUnless(OfflineTestImage.TryCreateJunction(rootLink, image.RootDirectory), "Could not create an NTFS junction for the reparse-point test.");
+
+        try
+        {
+            // The image root is reached through a junction; TryCreate canonicalizes the boundary so a file under it is not
+            // falsely rejected by the (reparse-resolving) guard - without that, every resolved file path would mismatch.
+            OfflineImageRoot? viaJunction = OfflineImageRoot.TryCreate(rootLink, logger: null);
+
+            Assert.NotNull(viaJunction);
+
+            var guard = new OfflineRootGuard(viaJunction!, logger: null);
+
+            guard.Assert(Path.Combine(viaJunction!.System32Directory, "foo.dll"), "resource");
+        }
+        finally
+        {
+            if (Directory.Exists(rootLink)) { Directory.Delete(rootLink); }
+        }
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -85,6 +111,15 @@ public sealed class OfflineImageRootTests
     public void TryCreate_NullOrEmpty_ReturnsNull(string? input)
     {
         Assert.Null(OfflineImageRoot.TryCreate(input!, logger: null));
+    }
+
+    [Fact]
+    public void TryCreate_WhenPathHasInvalidCharacters_ReturnsNullWithoutThrowing()
+    {
+        // A NUL character makes Path.GetFullPath throw ArgumentException; the offline source promises a fail-closed
+        // skip (logged null) for a hostile or malformed image path, never an exception bubbling out of the public
+        // enumeration. The Assert.Null both asserts the contract and proves no exception was thrown.
+        Assert.Null(OfflineImageRoot.TryCreate("foo\0bar", logger: null));
     }
 
     [Fact]
