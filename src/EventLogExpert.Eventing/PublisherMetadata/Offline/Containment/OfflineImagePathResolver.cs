@@ -11,9 +11,10 @@ namespace EventLogExpert.Eventing.PublisherMetadata.Offline.Containment;
 internal sealed class OfflineImagePathResolver(OfflineImagePathMapper mapper, OfflineRootGuard guard)
 {
     /// <summary>
-    ///     Maps a single registry value onto the image, or <see langword="null" /> when it cannot be mapped safely.
-    ///     Throws <see cref="OfflineRootGuardViolationException" /> if a mapped path escapes the image (a contamination bug,
-    ///     not a recoverable condition).
+    ///     Maps a single registry value onto the image, or <see langword="null" /> when it cannot be mapped safely - both
+    ///     lexically unsafe values (dropped by the mapper) and values that escape the image only through a reparse point (a
+    ///     junction in a hostile or corrupt image, caught by the guard) return <see langword="null" />, so one bad value is
+    ///     skipped rather than throwing out of the offline enumeration.
     /// </summary>
     public string? Resolve(string? registryValue, string what)
     {
@@ -21,7 +22,17 @@ internal sealed class OfflineImagePathResolver(OfflineImagePathMapper mapper, Of
 
         if (reRooted is null) { return null; }
 
-        guard.Assert(reRooted, what);
+        try
+        {
+            guard.Assert(reRooted, what);
+        }
+        catch (OfflineRootGuardViolationException)
+        {
+            // The mapper already drops lexical escapes, so a guard violation here is a reparse point leaving the image -
+            // hostile/corrupt image content, not our re-rooting bug. Drop it (the guard already logged the violation) so the
+            // public LoadProviders enumeration honours its "never throws for a bad or hostile image" contract.
+            return null;
+        }
 
         return reRooted;
     }

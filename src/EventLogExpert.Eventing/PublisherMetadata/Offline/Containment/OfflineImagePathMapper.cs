@@ -45,15 +45,27 @@ internal sealed class OfflineImagePathMapper(OfflineImageRoot imageRoot, ITraceL
             return Drop(registryPath, "unsupported path form");
         }
 
-        // A residual '%' means an unsupported variable (e.g. %ProgramFiles%) we will not guess at; a ':' in the
-        // remainder is a stray drive letter or an alternate-data-stream (foo.dll:stream) - both fail closed.
+        // A residual '%' means an unsupported variable (e.g. a per-user/volatile token like %APPDATA%) we will not guess
+        // at; a ':' in the remainder is a stray drive letter or an alternate-data-stream (foo.dll:stream) - both fail
+        // closed.
         if (relativeToImageRoot.Contains('%', StringComparison.Ordinal) ||
             relativeToImageRoot.Contains(':', StringComparison.Ordinal))
         {
             return Drop(registryPath, "residual environment token or stream/drive separator");
         }
 
-        string mappedPath = Path.GetFullPath(Path.Combine(imageRoot.ImageRoot, relativeToImageRoot));
+        string mappedPath;
+
+        try
+        {
+            mappedPath = Path.GetFullPath(Path.Combine(imageRoot.ImageRoot, relativeToImageRoot));
+        }
+        catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException)
+        {
+            // A hostile or corrupt hive can yield a value with an embedded NUL (or other invalid path syntax): Path.Combine
+            // tolerates it but Path.GetFullPath throws. Drop fail-closed rather than let it abort the whole catalog read.
+            return Drop(registryPath, $"invalid path syntax ({ex.GetType().Name})");
+        }
 
         // A '..' segment can normalize above the image root. Drop it here rather than emit an escaping path: the guard
         // would otherwise reject it by THROWING (aborting the whole catalog read for one bad value), whereas an unsafe
@@ -82,6 +94,34 @@ internal sealed class OfflineImagePathMapper(OfflineImageRoot imageRoot, ITraceL
             return remainder;
         }
 
+        // Machine-scoped program-directory tokens map to their well-known image-relative locations, defaulting to the
+        // standard folder names (a relocated ProgramFiles is rare and not honored). Per-user / volatile tokens
+        // (%APPDATA%, %TEMP%, %USERPROFILE%, ...) are deliberately NOT mapped - they have no stable image-relative home.
+        if (TryStripTokenPrefix(value, "%ProgramFiles(x86)%", out remainder))
+        {
+            return Path.Combine("Program Files (x86)", remainder);
+        }
+
+        if (TryStripTokenPrefix(value, "%ProgramFiles%", out remainder))
+        {
+            return Path.Combine("Program Files", remainder);
+        }
+
+        if (TryStripTokenPrefix(value, "%CommonProgramFiles(x86)%", out remainder))
+        {
+            return Path.Combine("Program Files (x86)", "Common Files", remainder);
+        }
+
+        if (TryStripTokenPrefix(value, "%CommonProgramFiles%", out remainder))
+        {
+            return Path.Combine("Program Files", "Common Files", remainder);
+        }
+
+        if (TryStripTokenPrefix(value, "%ProgramData%", out remainder))
+        {
+            return Path.Combine("ProgramData", remainder);
+        }
+
         if (IsDriveAbsolute(value))
         {
             return value[3..];
@@ -103,7 +143,11 @@ internal sealed class OfflineImagePathMapper(OfflineImageRoot imageRoot, ITraceL
     // remainder relative. Returns false (and remainder = "") when value does not start with the token.
     private static bool TryStripTokenPrefix(string value, string token, out string remainder)
     {
-        if (value.StartsWith(token, StringComparison.OrdinalIgnoreCase))
+        // Require the token to sit on a path boundary: end-of-string or a separator. Otherwise "%ProgramFiles%evil" would
+        // strip to "evil" and re-root under Program Files, while live expansion produces "Program Filesevil" (a different
+        // directory). Anything past the boundary falls through to the residual-'%' drop instead of being silently re-rooted.
+        if (value.StartsWith(token, StringComparison.OrdinalIgnoreCase) &&
+            (value.Length == token.Length || value[token.Length] is '\\' or '/'))
         {
             remainder = value[token.Length..].TrimStart('\\', '/');
 
