@@ -71,6 +71,22 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateDatabase_WhenBothSourceAndOfflineImageGiven_LogsErrorAndDoesNotCreateFile()
+    {
+        // Source and offline image are mutually exclusive. The mutual-exclusivity check must fire BEFORE source
+        // validation, so the user gets the clear "one or the other" message rather than a confusing "source not found".
+        var path = CreateTempPath();
+        var logger = Substitute.For<ITraceLogger>();
+
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(
+            path, SourcePath: @"C:\src.db", FilterRegex: null, SkipProvidersInFile: null, OfflineImagePath: @"X:\"))
+            .ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.False(File.Exists(path), "No file should be written when a source and an offline image are both given.");
+        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("source OR an offline image")));
+    }
+
+    [Fact]
     public async Task CreateDatabase_WhenExtensionNotDb_LogsErrorAndDoesNotCreateFile()
     {
         // Arrange
@@ -111,6 +127,21 @@ public sealed class CreateDatabaseCommandTests : IDisposable
             h.ToString().Contains("Database was not created")));
         // No errors should have been logged on this path; an extra error here would be a UX regression.
         logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
+    }
+
+    [Fact]
+    public async Task CreateDatabase_WhenOfflineImageKindIsWim_LogsNotSupportedErrorAndDoesNotCreateFile()
+    {
+        // WIM extraction is a later phase; v1 supports only a directory (mounted volume / extracted folder).
+        var path = CreateTempPath();
+        var logger = Substitute.For<ITraceLogger>();
+
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(
+            path, SourcePath: null, FilterRegex: null, SkipProvidersInFile: null, OfflineImagePath: @"X:\",
+            ImageKind: OfflineImageKind.Wim)).ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.False(File.Exists(path), "WIM offline extraction is not yet supported; no file should be written.");
+        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("not yet supported")));
     }
 
     [Fact]
@@ -295,6 +326,22 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         Assert.Equal(sentinel, File.ReadAllBytes(path));
         logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
             h.ToString().Contains("file already exists") && h.ToString().Contains(path)));
+    }
+
+    [Fact]
+    public async Task CreateDatabase_WhenWimIndexGivenForDirectoryImage_LogsErrorAndDoesNotCreateFile()
+    {
+        // WimIndex only means anything for a WIM image; supplying it for a directory image is rejected rather than
+        // silently ignored, so the request can't quietly do something other than what the caller asked.
+        var path = CreateTempPath();
+        var logger = Substitute.For<ITraceLogger>();
+
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(
+            path, SourcePath: null, FilterRegex: null, SkipProvidersInFile: null, OfflineImagePath: @"X:\",
+            WimIndex: 1)).ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.False(File.Exists(path), "WimIndex applies only to WIM images; no file should be written.");
+        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("WimIndex applies only to WIM")));
     }
 
     public void Dispose()

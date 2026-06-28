@@ -21,6 +21,8 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 {
     private const int BatchSize = 100;
 
+    internal enum CreateDatabaseMode { Local, FileSource, OfflineImage }
+
     public async Task<DatabaseToolsOutcome> ExecuteAsync(
         ITraceLogger logger,
         IProgress<DatabaseToolsProgress>? progress,
@@ -37,6 +39,11 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         {
             logger.Error($"File extension must be .db.");
 
+            return DatabaseToolsOutcome.Failed;
+        }
+
+        if (!ValidateOfflineImageRequest(request, logger))
+        {
             return DatabaseToolsOutcome.Failed;
         }
 
@@ -86,11 +93,33 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
         try
         {
-            IAsyncEnumerable<ProviderDetails> providersToAdd = request.SourcePath is null
-                ? LoadLocalProvidersAsync(logger, filterRegex, excludeProviderNames, cancellationToken)
-                : ProviderSource.LoadProvidersAsync(request.SourcePath, logger, filterRegex, excludeProviderNames, cancellationToken: cancellationToken);
+            var mode = SelectMode(request);
 
-            var sourceOsProvenance = request.SourcePath is null ? SourceOsProvenance.Read(logger) : null;
+            // ONE switch picks BOTH the provider stream AND the provenance so the two cannot desync: an offline image
+            // build must NOT read host provenance (the facade already stamped each row with the IMAGE's OS, and a host
+            // read here would overwrite it); host provenance is read ONLY for a local build. The bounded filterRegex
+            // (not request.FilterRegex) reaches every source so the RegexMatchTimeoutException catch stays reachable.
+            IAsyncEnumerable<ProviderDetails> providersToAdd;
+            SourceOsProvenance? sourceOsProvenance;
+
+            switch (mode)
+            {
+                case CreateDatabaseMode.OfflineImage:
+                    providersToAdd = LoadOfflineImageProvidersAsync(request.OfflineImagePath!, logger, filterRegex, excludeProviderNames, cancellationToken);
+                    sourceOsProvenance = null;
+
+                    break;
+                case CreateDatabaseMode.Local:
+                    providersToAdd = LoadLocalProvidersAsync(logger, filterRegex, excludeProviderNames, cancellationToken);
+                    sourceOsProvenance = SourceOsProvenance.Read(logger);
+
+                    break;
+                default:
+                    providersToAdd = ProviderSource.LoadProvidersAsync(request.SourcePath!, logger, filterRegex, excludeProviderNames, cancellationToken: cancellationToken);
+                    sourceOsProvenance = null;
+
+                    break;
+            }
 
             await foreach (var details in providersToAdd.WithCancellation(cancellationToken))
             {
@@ -204,6 +233,53 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         {
             if (dbContext is not null) { await dbContext.DisposeAsync(); }
         }
+    }
+
+    /// <summary>
+    ///     Picks the provider source for the request. An offline image (a non-whitespace <c>OfflineImagePath</c>) wins;
+    ///     otherwise a null <c>SourcePath</c> means local providers and a non-null one means a file source. Pure so the mode
+    ///     selection (and the host-provenance suppression keyed on it) can be unit-tested without a real image.
+    /// </summary>
+    internal static CreateDatabaseMode SelectMode(CreateDatabaseRequest request) =>
+        !string.IsNullOrWhiteSpace(request.OfflineImagePath) ? CreateDatabaseMode.OfflineImage
+        : request.SourcePath is null ? CreateDatabaseMode.Local
+        : CreateDatabaseMode.FileSource;
+
+    private static bool ValidateOfflineImageRequest(CreateDatabaseRequest request, ITraceLogger logger)
+    {
+        if (string.IsNullOrWhiteSpace(request.OfflineImagePath)) { return true; }
+
+        if (request.SourcePath is not null)
+        {
+            logger.Error($"Specify a source OR an offline image, not both.");
+
+            return false;
+        }
+
+        if (request.ImageKind != OfflineImageKind.Directory)
+        {
+            logger.Error(
+                $"Offline {request.ImageKind} images are not yet supported; today only a mounted volume or extracted " +
+                $"image folder (Directory) can be read.");
+
+            return false;
+        }
+
+        if (request.WimIndex is not null)
+        {
+            logger.Error($"WimIndex applies only to WIM images, which are not yet supported.");
+
+            return false;
+        }
+
+        if (!Directory.Exists(request.OfflineImagePath))
+        {
+            logger.Error($"Offline image directory not found: {request.OfflineImagePath}");
+
+            return false;
+        }
+
+        return true;
     }
 
     private async Task FlushHeaderAndBufferAsync(
