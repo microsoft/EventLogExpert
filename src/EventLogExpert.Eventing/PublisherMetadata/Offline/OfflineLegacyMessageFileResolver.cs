@@ -8,12 +8,14 @@ using Microsoft.Win32;
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
 /// <summary>
-///     Offline counterpart of <see cref="RegistryProvider" />: resolves a legacy provider's message/category files
-///     from a foreign image's <c>SYSTEM</c> hive instead of the host <c>HKLM\SYSTEM</c>. A statically loaded hive has no
-///     <c>CurrentControlSet</c> symlink, so the active control set is resolved via <c>Select\Current</c> -&gt;
-///     <c>ControlSet{NNN}</c>. The extension filter, category-first ordering, and the <c>ParameterMessageFile</c> discard
-///     mirror <see cref="RegistryProvider" /> for parity with native-built databases; values are read without host
-///     environment expansion and re-rooted onto the image. Unlike the live reader it does NOT skip the Security/State
+///     Offline counterpart of <see cref="RegistryProvider" />: resolves a legacy provider's
+///     message/category/parameter files from a foreign image's <c>SYSTEM</c> hive instead of the host <c>HKLM\SYSTEM</c>.
+///     A statically loaded hive has no <c>CurrentControlSet</c> symlink, so the active control set is resolved via
+///     <c>Select\Current</c> -&gt; <c>ControlSet{NNN}</c>. The extension filter and category-first ordering mirror
+///     <see cref="RegistryProvider" /> for parity with native-built databases; the <c>ParameterMessageFile</c> is resolved
+///     separately via <see cref="GetParameterFilesForLegacyProvider" /> so the offline parameter table matches those same
+///     native-built databases (the live <see cref="RegistryProvider" /> reads it only to discard). Values are read without
+///     host environment expansion and re-rooted onto the image. Unlike the live reader it does NOT skip the Security/State
 ///     admin channels - reading a hive file needs no elevation, so offline is intentionally more complete there.
 /// </summary>
 internal sealed class OfflineLegacyMessageFileResolver(
@@ -58,29 +60,17 @@ internal sealed class OfflineLegacyMessageFileResolver(
         return names;
     }
 
-    public IReadOnlyList<string> GetMessageFilesForLegacyProvider(string providerName)
-    {
-        using RegistryKey? eventLogKey = OpenEventLogKey();
+    public IReadOnlyList<string> GetMessageFilesForLegacyProvider(string providerName) =>
+        ResolveFromRegisteringChannel(
+            providerName,
+            (providerKey, eventMessageFile) => ResolveProviderFiles(eventMessageFile, ReadString(providerKey, "CategoryMessageFile")));
 
-        if (eventLogKey is null) { return []; }
-
-        foreach (string channelName in eventLogKey.GetSubKeyNames())
-        {
-            using RegistryKey? channelKey = eventLogKey.OpenSubKey(channelName);
-            using RegistryKey? providerKey = channelKey?.OpenSubKey(providerName);
-
-            if (providerKey is null) { continue; }
-
-            // Mirror RegistryProvider exactly (for parity with native-built databases): the first channel carrying an
-            // EventMessageFile wins, even if extension filtering later empties it. ParameterMessageFile is deliberately
-            // not read - the live reader reads but discards it.
-            if (ReadString(providerKey, "EventMessageFile") is not { } eventMessageFile) { continue; }
-
-            return ResolveProviderFiles(eventMessageFile, ReadString(providerKey, "CategoryMessageFile"));
-        }
-
-        return [];
-    }
+    public IReadOnlyList<string> GetParameterFilesForLegacyProvider(string providerName) =>
+        ResolveFromRegisteringChannel(
+            providerName,
+            (providerKey, _) => ReadString(providerKey, "ParameterMessageFile") is { } parameterMessageFile
+                ? ResolveProviderFiles(parameterMessageFile, categoryMessageFile: null)
+                : []);
 
     // Read without host expansion so REG_EXPAND_SZ tokens reach the mapper as literal %tokens (no effect on REG_SZ).
     private static string? ReadString(RegistryKey key, string name) =>
@@ -114,6 +104,31 @@ internal sealed class OfflineLegacyMessageFileResolver(
 
             return eventLogKey;
         }
+    }
+
+    private IReadOnlyList<string> ResolveFromRegisteringChannel(
+        string providerName,
+        Func<RegistryKey, string, IReadOnlyList<string>> resolveFromProviderKey)
+    {
+        using RegistryKey? eventLogKey = OpenEventLogKey();
+
+        if (eventLogKey is null) { return []; }
+
+        foreach (string channelName in eventLogKey.GetSubKeyNames())
+        {
+            using RegistryKey? channelKey = eventLogKey.OpenSubKey(channelName);
+            using RegistryKey? providerKey = channelKey?.OpenSubKey(providerName);
+
+            if (providerKey is null) { continue; }
+
+            // Mirror RegistryProvider exactly (for parity with native-built databases): the first channel carrying an
+            // EventMessageFile wins, even if extension filtering later empties it.
+            if (ReadString(providerKey, "EventMessageFile") is not { } eventMessageFile) { continue; }
+
+            return resolveFromProviderKey(providerKey, eventMessageFile);
+        }
+
+        return [];
     }
 
     private IReadOnlyList<string> ResolveProviderFiles(string eventMessageFile, string? categoryMessageFile)
