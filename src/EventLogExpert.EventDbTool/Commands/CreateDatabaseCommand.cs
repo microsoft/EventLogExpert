@@ -102,7 +102,7 @@ public sealed class CreateDatabaseCommand
             if (!string.IsNullOrWhiteSpace(imageKindValue)
                 && (!Enum.TryParse(imageKindValue, ignoreCase: true, out imageKind) || !Enum.IsDefined(imageKind)))
             {
-                logger.Error($"Invalid --image-kind '{imageKindValue}'. Valid values: directory, wim, iso.");
+                logger.Error($"Invalid --image-kind '{imageKindValue}'. Valid values: directory, wim.");
 
                 return;
             }
