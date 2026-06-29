@@ -91,27 +91,40 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         // at least one provider to persist. This prevents leaving an empty database behind
         // when no provider details could be resolved.
         ProviderDbContext? dbContext = null;
-
-        // A WIM image is extracted to a temp folder up front; the OfflineWimImage owns that ~GB-scale temp and is disposed
-        // in the finally (AFTER the final SaveChangesAsync, which materializes lazy DLL reads from the extracted tree).
         OfflineWimImage? wimImage = null;
+        OfflineIsoImage? isoImage = null;
 
         try
         {
             var mode = SelectMode(request);
 
-            // For a WIM image, extract the requested index to a temp folder, then read providers from that folder exactly
-            // like a mounted volume. A failed extraction surfaces a specific, actionable error and leaves no .db behind.
+            // A WIM/ISO image is extracted to a temp folder, then read like a mounted volume. ISO just resolves the inner
+            // install.wim first. A failed mount/extraction surfaces a specific, actionable error and leaves no .db behind.
             string? effectiveOfflineImagePath = request.OfflineImagePath;
+            OfflineImageKind? kind = mode == CreateDatabaseMode.OfflineImage ? ResolveImageKind(request) : null;
 
-            if (mode == CreateDatabaseMode.OfflineImage && ResolveImageKind(request) == OfflineImageKind.Wim)
+            if (kind is OfflineImageKind.Iso)
             {
+                OfflineIsoMountResult mount = OfflineIsoImage.TryMount(request.OfflineImagePath!, logger);
+
+                if (mount.Status != OfflineIsoMountStatus.Mounted)
+                {
+                    return HandleIsoMountFailure(mount.Status, request.OfflineImagePath!, logger);
+                }
+
+                isoImage = mount.Image;
+            }
+
+            if (kind is OfflineImageKind.Wim or OfflineImageKind.Iso)
+            {
+                string wimSourcePath = isoImage?.InstallImagePath ?? request.OfflineImagePath!;
+
                 OfflineWimExtractResult extraction = await OfflineWimImage.TryExtractAsync(
-                    request.OfflineImagePath!, request.WimIndex!.Value, Path.GetTempPath(), logger, cancellationToken);
+                    wimSourcePath, request.WimIndex!.Value, Path.GetTempPath(), logger, cancellationToken);
 
                 if (extraction.Status != OfflineWimExtractStatus.Extracted)
                 {
-                    return HandleWimExtractionFailure(extraction.Status, request.OfflineImagePath!, request.WimIndex!.Value, logger);
+                    return HandleWimExtractionFailure(extraction.Status, wimSourcePath, request.WimIndex!.Value, logger);
                 }
 
                 wimImage = extraction.Image;
@@ -268,8 +281,10 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         {
             if (dbContext is not null) { await dbContext.DisposeAsync(); }
 
-            // Delete the extracted WIM temp AFTER persistence completes (the final SaveChangesAsync reads from it).
+            // Delete the extracted WIM temp AFTER persistence completes (the final SaveChangesAsync reads from it), then
+            // detach the ISO (extraction copied install.wim to temp, so the mount is no longer needed).
             wimImage?.Dispose();
+            isoImage?.Dispose();
         }
     }
 
@@ -335,7 +350,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             case OfflineImageKind.Directory:
                 if (request.WimIndex is not null)
                 {
-                    logger.Error($"--wim-index applies only to --image-kind wim.");
+                    logger.Error($"--wim-index applies only to --image-kind wim or iso.");
 
                     return false;
                 }
@@ -381,20 +396,69 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
                 return true;
 
+            case OfflineImageKind.Iso:
+                if (!File.Exists(request.OfflineImagePath))
+                {
+                    logger.Error($"ISO image file not found: {request.OfflineImagePath}");
+
+                    return false;
+                }
+
+                if (!IsIsoFile(request.OfflineImagePath))
+                {
+                    logger.Error($"--image-kind iso expects a .iso file: {request.OfflineImagePath}");
+
+                    return false;
+                }
+
+                // An ISO's install.wim is multi-edition, so an index is required - but its choices cannot be listed without
+                // mounting, which the validator must not do. The extraction (after mount) reports a bad index with choices.
+                if (request.WimIndex is null)
+                {
+                    logger.Error(
+                        $"--wim-index is required for --image-kind iso (sources\\install.wim is a multi-edition image). " +
+                        $"Pass --wim-index 1 for the default edition, or extract sources\\install.wim and run --image-kind wim to list editions.");
+
+                    return false;
+                }
+
+                return true;
+
             case null:
                 logger.Error(
                     $"Could not determine the offline image kind for '{request.OfflineImagePath}'. Pass --image-kind " +
-                    $"directory or wim (.wim/.esd), or point at a mounted volume / extracted image folder.");
+                    $"directory or wim (.wim/.esd) or iso (.iso), or point at a mounted volume / extracted image folder.");
 
                 return false;
 
             default:
-                logger.Error(
-                    $"Offline ISO images are not yet supported; use a mounted volume or extracted image folder " +
-                    $"(--image-kind directory) or a .wim/.esd file (--image-kind wim).");
+                logger.Error($"Offline image kind {ResolveImageKind(request)} is not supported.");
 
                 return false;
         }
+    }
+
+    private static DatabaseToolsOutcome HandleIsoMountFailure(OfflineIsoMountStatus status, string isoPath, ITraceLogger logger)
+    {
+        string isoName = Path.GetFileName(isoPath);
+
+        switch (status)
+        {
+            case OfflineIsoMountStatus.NotAnIso:
+                logger.Error($"{isoPath} is not a readable ISO image.");
+
+                break;
+            case OfflineIsoMountStatus.NoInstallImage:
+                logger.Error($"{isoName} has no sources\\install.wim or install.esd; only a Windows install ISO is supported.");
+
+                break;
+            default:
+                logger.Error($"Could not mount {isoName} (if this is an access-denied error, re-run elevated).");
+
+                break;
+        }
+
+        return DatabaseToolsOutcome.Failed;
     }
 
     /// <summary>
@@ -435,6 +499,9 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
         return DatabaseToolsOutcome.Failed;
     }
+
+    private static bool IsIsoFile(string path) =>
+        string.Equals(Path.GetExtension(path), ".iso", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsWimImageFile(string path)
     {

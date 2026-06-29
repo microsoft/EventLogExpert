@@ -10,9 +10,9 @@ namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 ///     read/validate/ extract/cancel state machine can be unit-tested with a fake that returns crafted image lists and
 ///     Win32 results - the real <c>WIMApplyImage</c> path needs administrator privileges and a real multi-GB image. The
 ///     seam is COARSE on purpose: no native handle ever crosses it, so the fake needs no real <c>wimgapi</c> handle, and
-///     the handle + message-callback lifetime stays entirely inside <see cref="WimNativeApi" />.
+///     the handle + message-callback lifetime stays entirely inside <see cref="WimOperations" />.
 /// </summary>
-internal interface IWimNativeApi
+internal interface IWimOperations
 {
     /// <summary>
     ///     Applies (extracts) the 1-based <paramref name="imageIndex" /> of <paramref name="wimPath" /> into

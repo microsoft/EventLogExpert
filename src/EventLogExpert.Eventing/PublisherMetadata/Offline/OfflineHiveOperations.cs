@@ -8,10 +8,10 @@ using Microsoft.Win32.SafeHandles;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
-/// <summary>The production <see cref="IOfflineHiveNativeApi" />, calling the real Win32 registry APIs.</summary>
-internal sealed class OfflineHiveNativeApi : IOfflineHiveNativeApi
+/// <summary>The production <see cref="IOfflineHiveOperations" />, calling the real Win32 registry APIs.</summary>
+internal sealed class OfflineHiveOperations : IOfflineHiveOperations
 {
-    internal static OfflineHiveNativeApi Instance { get; } = new();
+    internal static OfflineHiveOperations Instance { get; } = new();
 
     public IReadOnlyList<string> EnumerateHklmSubKeyNames()
     {

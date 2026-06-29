@@ -11,10 +11,10 @@ using System.Xml.Linq;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
-/// <summary>The production <see cref="IWimNativeApi" />, calling the real <c>wimgapi.dll</c> exports.</summary>
-internal sealed class WimNativeApi : IWimNativeApi
+/// <summary>The production <see cref="IWimOperations" />, calling the real <c>wimgapi.dll</c> exports.</summary>
+internal sealed class WimOperations : IWimOperations
 {
-    internal static WimNativeApi Instance { get; } = new();
+    internal static WimOperations Instance { get; } = new();
 
     public int ApplyImage(
         string wimPath,
@@ -49,7 +49,7 @@ internal sealed class WimNativeApi : IWimNativeApi
 
             if (registeredCallback == NativeMethods.WIM_INVALID_CALLBACK_VALUE)
             {
-                logger?.Debug($"{nameof(WimNativeApi)}: WIMRegisterMessageCallback failed (error {Marshal.GetLastWin32Error()}); apply will not be cancellable.");
+                logger?.Debug($"{nameof(WimOperations)}: WIMRegisterMessageCallback failed (error {Marshal.GetLastWin32Error()}); apply will not be cancellable.");
             }
         }
 
@@ -88,14 +88,14 @@ internal sealed class WimNativeApi : IWimNativeApi
 
             if (wim.IsInvalid)
             {
-                logger?.Debug($"{nameof(WimNativeApi)}: WIMCreateFile failed for {wimPath} (error {Marshal.GetLastWin32Error()}).");
+                logger?.Debug($"{nameof(WimOperations)}: WIMCreateFile failed for {wimPath} (error {Marshal.GetLastWin32Error()}).");
 
                 return WimImageList.NotAWim;
             }
 
             if (!NativeMethods.WIMGetImageInformation(wim, out IntPtr imageInfo, out uint imageInfoBytes) || imageInfo == IntPtr.Zero)
             {
-                logger?.Debug($"{nameof(WimNativeApi)}: WIMGetImageInformation failed for {wimPath} (error {Marshal.GetLastWin32Error()}).");
+                logger?.Debug($"{nameof(WimOperations)}: WIMGetImageInformation failed for {wimPath} (error {Marshal.GetLastWin32Error()}).");
 
                 return WimImageList.NotAWim;
             }
@@ -113,7 +113,7 @@ internal sealed class WimNativeApi : IWimNativeApi
         }
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
-            logger?.Debug($"{nameof(WimNativeApi)}: reading WIM image list for {wimPath} failed: {ex.Message}");
+            logger?.Debug($"{nameof(WimOperations)}: reading WIM image list for {wimPath} failed: {ex.Message}");
 
             return WimImageList.NotAWim;
         }

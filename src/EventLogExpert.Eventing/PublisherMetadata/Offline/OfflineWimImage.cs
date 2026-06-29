@@ -45,7 +45,7 @@ public sealed class OfflineWimImage : IDisposable
     ///     <c>--wim-index</c>. Needs no elevation and never throws for a bad image.
     /// </summary>
     public static WimImageList ReadIndexList(string wimPath, ITraceLogger? logger) =>
-        ReadIndexList(wimPath, WimNativeApi.Instance, logger);
+        ReadIndexList(wimPath, WimOperations.Instance, logger);
 
     /// <summary>
     ///     Extracts the 1-based <paramref name="imageIndex" /> of <paramref name="wimPath" /> into a fresh folder under
@@ -54,7 +54,7 @@ public sealed class OfflineWimImage : IDisposable
     /// </summary>
     public static Task<OfflineWimExtractResult> TryExtractAsync(
         string wimPath, int imageIndex, string tempParent, ITraceLogger? logger, CancellationToken cancellationToken) =>
-        TryExtractAsync(wimPath, imageIndex, tempParent, WimNativeApi.Instance, logger, cancellationToken);
+        TryExtractAsync(wimPath, imageIndex, tempParent, WimOperations.Instance, logger, cancellationToken);
 
     public void Dispose()
     {
@@ -65,7 +65,7 @@ public sealed class OfflineWimImage : IDisposable
         TryDeleteExtraction(ExtractedRoot, _logger);
     }
 
-    internal static WimImageList ReadIndexList(string wimPath, IWimNativeApi nativeApi, ITraceLogger? logger)
+    internal static WimImageList ReadIndexList(string wimPath, IWimOperations nativeApi, ITraceLogger? logger)
     {
         if (File.Exists(wimPath))
         {
@@ -82,7 +82,7 @@ public sealed class OfflineWimImage : IDisposable
         string wimPath,
         int imageIndex,
         string tempParent,
-        IWimNativeApi nativeApi,
+        IWimOperations nativeApi,
         ITraceLogger? logger,
         CancellationToken cancellationToken)
     {

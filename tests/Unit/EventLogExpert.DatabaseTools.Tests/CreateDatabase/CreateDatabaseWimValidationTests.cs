@@ -27,6 +27,17 @@ public sealed class CreateDatabaseWimValidationTests
     }
 
     [Fact]
+    public void Validate_AutoDetectsIso_FromExtension_WithIndex_Accepts()
+    {
+        using var workspace = new TempFiles();
+        string iso = workspace.CreateFile("image.iso");
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: iso, kind: null, wimIndex: 1);
+
+        Assert.True(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+    }
+
+    [Fact]
     public void Validate_AutoDetectsWim_FromExtension_WithIndex_Accepts()
     {
         using var workspace = new TempFiles();
@@ -118,7 +129,29 @@ public sealed class CreateDatabaseWimValidationTests
     }
 
     [Fact]
-    public void Validate_WhenIsoKind_Rejects()
+    public void Validate_WhenIsoFileMissing_Rejects()
+    {
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: @"C:\missing.iso", kind: OfflineImageKind.Iso, wimIndex: 1);
+
+        Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+        Assert.Contains(logger.Errors, error => error.Contains("not found", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Validate_WhenIsoKindOnNonIsoFile_Rejects()
+    {
+        using var workspace = new TempFiles();
+        string notIso = workspace.CreateFile("image.dat");
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: notIso, kind: OfflineImageKind.Iso, wimIndex: 1);
+
+        Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+        Assert.Contains(logger.Errors, error => error.Contains(".iso", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Validate_WhenIsoWithoutIndex_Rejects()
     {
         using var workspace = new TempFiles();
         string iso = workspace.CreateFile("image.iso");
@@ -126,7 +159,7 @@ public sealed class CreateDatabaseWimValidationTests
         var request = Request(offlineImagePath: iso, kind: OfflineImageKind.Iso);
 
         Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
-        Assert.Contains(logger.Errors, error => error.Contains("not yet supported", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(logger.Errors, error => error.Contains("--wim-index", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

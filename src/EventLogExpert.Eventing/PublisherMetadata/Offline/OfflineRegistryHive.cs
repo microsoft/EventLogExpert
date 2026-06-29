@@ -32,7 +32,7 @@ internal sealed class OfflineRegistryHive : IDisposable
 
     private readonly ITraceLogger? _logger;
     private readonly string? _mountSubKey;
-    private readonly IOfflineHiveNativeApi _nativeApi;
+    private readonly IOfflineHiveOperations _nativeApi;
     private readonly Mutex? _ownershipMutex;
     private readonly string _stagingDirectory;
 
@@ -43,7 +43,7 @@ internal sealed class OfflineRegistryHive : IDisposable
         string stagingDirectory,
         string? mountSubKey,
         Mutex? ownershipMutex,
-        IOfflineHiveNativeApi nativeApi,
+        IOfflineHiveOperations nativeApi,
         ITraceLogger? logger)
     {
         Root = root;
@@ -57,9 +57,9 @@ internal sealed class OfflineRegistryHive : IDisposable
     /// <summary>Root key of the loaded hive; navigate with <see cref="RegistryKey.OpenSubKey(string)" />.</summary>
     public RegistryKey Root { get; }
 
-    public static OfflineHiveLoadResult TryLoad(string hiveFilePath, ITraceLogger? logger, IOfflineHiveNativeApi? nativeApi = null)
+    public static OfflineHiveLoadResult TryLoad(string hiveFilePath, ITraceLogger? logger, IOfflineHiveOperations? nativeApi = null)
     {
-        nativeApi ??= OfflineHiveNativeApi.Instance;
+        nativeApi ??= OfflineHiveOperations.Instance;
 
         if (!File.Exists(hiveFilePath))
         {
@@ -176,7 +176,7 @@ internal sealed class OfflineRegistryHive : IDisposable
         string stagedHive,
         string stagingDirectory,
         string mountSubKey,
-        IOfflineHiveNativeApi nativeApi,
+        IOfflineHiveOperations nativeApi,
         ITraceLogger? logger,
         int appKeyResult)
     {
@@ -278,7 +278,7 @@ internal sealed class OfflineRegistryHive : IDisposable
     // Reclaims HKLM mounts left by a crashed prior run: a mount is orphaned when its Global ownership mutex no longer
     // exists (the owner died and the OS released the handle). A live owner's mutex still opens, so a recycled PID or a
     // concurrent sibling app (CLI vs UI) is never reclaimed out from under a live process.
-    private static void SweepOrphanedMountsOnce(IOfflineHiveNativeApi nativeApi, ITraceLogger? logger)
+    private static void SweepOrphanedMountsOnce(IOfflineHiveOperations nativeApi, ITraceLogger? logger)
     {
         lock (s_sweepGate)
         {
@@ -343,7 +343,7 @@ internal sealed class OfflineRegistryHive : IDisposable
     ///     Used by <see cref="Dispose" />, the recovery partial-failure path, and the orphan sweep, so every unmount is
     ///     privileged and bounded.
     /// </summary>
-    private static void UnloadMountedHive(IOfflineHiveNativeApi nativeApi, string mountSubKey, ITraceLogger? logger)
+    private static void UnloadMountedHive(IOfflineHiveOperations nativeApi, string mountSubKey, ITraceLogger? logger)
     {
         using IDisposable? privilege = nativeApi.TryEnterRecoveryPrivilege(logger);
 
