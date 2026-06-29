@@ -89,14 +89,14 @@ internal sealed class VirtualDiskOperations : IVirtualDiskOperations
         }
     }
 
-    private static string? FindVolumeOnDisk(uint diskNumber, bool requireInstallImage)
+    private static string? FindCdromVolume(uint deviceNumber, bool requireInstallImage)
     {
         char[] volumeName = new char[64];
         IntPtr find = NativeMethods.FindFirstVolumeW(volumeName, (uint)volumeName.Length);
 
         if (find == IntPtr.Zero || find == new IntPtr(-1)) { return null; }
 
-        string? firstOnDisk = null;
+        string? firstOnDevice = null;
 
         try
         {
@@ -104,9 +104,11 @@ internal sealed class VirtualDiskOperations : IVirtualDiskOperations
             {
                 string volume = new string(volumeName).TrimEnd('\0');
 
-                if (!VolumeIsOnDisk(volume.TrimEnd('\\'), diskNumber)) { continue; }
+                if (NativeMethods.GetDriveTypeW(volume) != NativeMethods.DRIVE_CDROM) { continue; }
 
-                firstOnDisk ??= volume;
+                if (VolumeDeviceNumber(volume.TrimEnd('\\')) != deviceNumber) { continue; }
+
+                firstOnDevice ??= volume;
 
                 if (File.Exists(Path.Join(volume, "sources", "install.wim")) ||
                     File.Exists(Path.Join(volume, "sources", "install.esd")))
@@ -116,7 +118,7 @@ internal sealed class VirtualDiskOperations : IVirtualDiskOperations
             }
             while (NativeMethods.FindNextVolumeW(find, volumeName, (uint)volumeName.Length));
 
-            return requireInstallImage ? null : firstOnDisk;
+            return requireInstallImage ? null : firstOnDevice;
         }
         finally
         {
@@ -124,32 +126,7 @@ internal sealed class VirtualDiskOperations : IVirtualDiskOperations
         }
     }
 
-    // The volume that appears for a freshly attached ISO can lag the attach, so retry the whole resolve briefly. Prefer a
-    // disk-matching volume that holds an install image; fall back to any volume on the disk so an image-less but valid ISO
-    // still resolves and OfflineIsoImage can report NoInstallImage rather than a generic mount failure.
-    private static string? ResolveMountedVolume(VirtualDiskSafeHandle handle, ITraceLogger? logger)
-    {
-        for (int attempt = 0; attempt < 20; attempt++)
-        {
-            uint diskNumber = ResolvePhysicalDiskNumber(handle);
-
-            if (diskNumber != uint.MaxValue && FindVolumeOnDisk(diskNumber, requireInstallImage: true) is { } withImage) { return withImage; }
-
-            Thread.Sleep(100);
-        }
-
-        // The window elapsed without an install image appearing; fall back to any volume on the disk so a valid but
-        // image-less ISO resolves and OfflineIsoImage reports NoInstallImage rather than a generic mount failure.
-        uint disk = ResolvePhysicalDiskNumber(handle);
-
-        if (disk != uint.MaxValue && FindVolumeOnDisk(disk, requireInstallImage: false) is { } any) { return any; }
-
-        logger?.Debug($"{nameof(VirtualDiskOperations)}: mounted volume did not resolve in time.");
-
-        return null;
-    }
-
-    private static uint ResolvePhysicalDiskNumber(VirtualDiskSafeHandle handle)
+    private static uint ResolveDeviceNumber(VirtualDiskSafeHandle handle)
     {
         uint sizeBytes = 0;
         NativeMethods.GetVirtualDiskPhysicalPath(handle, ref sizeBytes, null);
@@ -161,56 +138,51 @@ internal sealed class VirtualDiskOperations : IVirtualDiskOperations
         if (NativeMethods.GetVirtualDiskPhysicalPath(handle, ref sizeBytes, buffer) != Win32ErrorCodes.ERROR_SUCCESS) { return uint.MaxValue; }
 
         string path = new string(buffer).TrimEnd('\0');
-        int digit = path.LastIndexOf("PhysicalDrive", StringComparison.OrdinalIgnoreCase);
+        int marker = path.LastIndexOf("CDROM", StringComparison.OrdinalIgnoreCase);
 
-        return digit >= 0 && uint.TryParse(path[(digit + "PhysicalDrive".Length)..], out uint diskNumber) ? diskNumber : uint.MaxValue;
+        return marker >= 0 && uint.TryParse(path[(marker + "CDROM".Length)..], out uint number) ? number : uint.MaxValue;
     }
 
-    private static bool VolumeIsOnDisk(string volumeDevice, uint diskNumber)
+    // A mounted ISO appears as a CD-ROM device (GetVirtualDiskPhysicalPath returns \\.\CDROMn). The mount can lag the
+    // attach, so retry; match ONLY the volume whose storage device number equals THIS disk's, so a pre-existing mounted ISO
+    // or inserted DVD is never picked. Prefer the install-bearing volume, else any volume on this disk (image-less ISO ->
+    // NoInstallImage downstream).
+    private static string? ResolveMountedVolume(VirtualDiskSafeHandle handle, ITraceLogger? logger)
+    {
+        for (int attempt = 0; attempt < 20; attempt++)
+        {
+            uint deviceNumber = ResolveDeviceNumber(handle);
+
+            if (deviceNumber != uint.MaxValue)
+            {
+                if (FindCdromVolume(deviceNumber, requireInstallImage: true) is { } withImage) { return withImage; }
+
+                if (FindCdromVolume(deviceNumber, requireInstallImage: false) is { } any) { return any; }
+            }
+
+            Thread.Sleep(100);
+        }
+
+        logger?.Debug($"{nameof(VirtualDiskOperations)}: mounted volume did not resolve in time.");
+
+        return null;
+    }
+
+    private static uint VolumeDeviceNumber(string volumeDevice)
     {
         using SafeFileHandle device = NativeMethods.CreateFileW(
-            volumeDevice,
-            NativeMethods.GENERIC_READ,
-            NativeMethods.FILE_SHARE_READ_WRITE,
-            IntPtr.Zero,
-            NativeMethods.OPEN_EXISTING,
-            0,
-            IntPtr.Zero);
+            volumeDevice, 0, NativeMethods.FILE_SHARE_READ_WRITE, IntPtr.Zero, NativeMethods.OPEN_EXISTING, 0, IntPtr.Zero);
 
-        if (device.IsInvalid) { return false; }
+        if (device.IsInvalid) { return uint.MaxValue; }
 
-        int extentSize = Marshal.SizeOf<NativeMethods.DISK_EXTENT>();
-
-        // VOLUME_DISK_EXTENTS is { uint NumberOfDiskExtents; DISK_EXTENT[] }; DISK_EXTENT's 8-byte-aligned long pushes the
-        // array to offset 8 (4-byte count + 4 pad), not 4 - reading at 4 would parse DiskNumber from the padding.
-        const int extentsOffset = 8;
-        int bufferSize = extentsOffset + (extentSize * 16);
-        IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+        int size = Marshal.SizeOf<NativeMethods.STORAGE_DEVICE_NUMBER>();
+        IntPtr buffer = Marshal.AllocHGlobal(size);
 
         try
         {
-            if (!NativeMethods.DeviceIoControl(device,
-                NativeMethods.IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,
-                IntPtr.Zero,
-                0,
-                buffer,
-                (uint)bufferSize,
-                out _,
-                IntPtr.Zero))
-            {
-                return false;
-            }
-
-            int count = Marshal.ReadInt32(buffer);
-
-            for (int i = 0; i < count; i++)
-            {
-                var extent = Marshal.PtrToStructure<NativeMethods.DISK_EXTENT>(buffer + extentsOffset + (i * extentSize));
-
-                if (extent.DiskNumber == diskNumber) { return true; }
-            }
-
-            return false;
+            return NativeMethods.DeviceIoControl(device, NativeMethods.IOCTL_STORAGE_GET_DEVICE_NUMBER, IntPtr.Zero, 0, buffer, (uint)size, out _, IntPtr.Zero)
+                ? Marshal.PtrToStructure<NativeMethods.STORAGE_DEVICE_NUMBER>(buffer).DeviceNumber
+                : uint.MaxValue;
         }
         finally
         {
