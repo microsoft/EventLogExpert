@@ -196,6 +196,8 @@ public sealed class OfflineWimImage : IDisposable
     {
         try
         {
+            if (requiredBytes < 0) { return false; }
+
             string root = Path.GetPathRoot(Path.GetFullPath(tempParent)) ?? tempParent;
             long available = new DriveInfo(root).AvailableFreeSpace;
 
