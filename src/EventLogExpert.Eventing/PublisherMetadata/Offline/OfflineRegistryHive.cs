@@ -291,6 +291,10 @@ internal sealed class OfflineRegistryHive : IDisposable
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             logger?.Debug($"{nameof(OfflineRegistryHive)}: orphan-mount sweep failed: {ex.Message}");
+
+            // Re-arm so a later load in this process can retry: a transient failure should not leak orphaned mounts
+            // until the next process run.
+            lock (s_sweepGate) { s_sweptOrphanedMounts = false; }
         }
     }
 

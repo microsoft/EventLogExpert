@@ -218,6 +218,21 @@ public sealed class OfflineWimImage : IDisposable
         }
     }
 
+    // Mirrors DeleteDirectoryTree: never recurse into reparse points - a junction in an extracted Windows tree would
+    // otherwise loop, leave the root, or throw access-denied - so the leaked-size estimate stays best-effort and bounded.
+    private static long SumFilesSkippingReparsePoints(DirectoryInfo directory)
+    {
+        if ((directory.Attributes & FileAttributes.ReparsePoint) != 0) { return 0; }
+
+        long total = 0;
+
+        foreach (FileInfo file in directory.GetFiles()) { total += file.Length; }
+
+        foreach (DirectoryInfo subDirectory in directory.GetDirectories()) { total += SumFilesSkippingReparsePoints(subDirectory); }
+
+        return total;
+    }
+
     // Recursively deletes an extracted image, logging a Warning naming the leaked path + size on failure so a multi-GB
     // temp is visible rather than silently abandoned.
     private static void TryDeleteExtraction(string extractRoot, ITraceLogger? logger)
@@ -238,14 +253,7 @@ public sealed class OfflineWimImage : IDisposable
     {
         try
         {
-            long total = 0;
-
-            foreach (string file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
-            {
-                total += new FileInfo(file).Length;
-            }
-
-            return total;
+            return SumFilesSkippingReparsePoints(new DirectoryInfo(directory));
         }
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
