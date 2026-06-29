@@ -339,7 +339,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(
             path, SourcePath: null, FilterRegex: null, SkipProvidersInFile: null, OfflineImagePath: @"X:\",
-            WimIndex: 1)).ExecuteAsync(logger, null, CancellationToken.None);
+            ImageKind: OfflineImageKind.Directory, WimIndex: 1)).ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.False(File.Exists(path), "WimIndex applies only to WIM images; no file should be written.");
         logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("--wim-index applies only to")));
