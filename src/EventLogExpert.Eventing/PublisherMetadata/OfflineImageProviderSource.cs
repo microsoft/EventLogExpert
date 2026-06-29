@@ -61,7 +61,7 @@ public static class OfflineImageProviderSource
 
         foreach (OfflinePublisherRegistration registration in extractor.ReadModernRegistrations())
         {
-            if (IsFilteredOut(registration.ProviderName, regex, excludeProviderNames)) { continue; }
+            if (seen.Contains(registration.ProviderName) || IsFilteredOut(registration.ProviderName, regex, excludeProviderNames)) { continue; }
 
             if (extractor.TryBuildModernProvider(registration) is not { IsEmpty: false } details) { continue; }
 
