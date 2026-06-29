@@ -190,6 +190,16 @@ internal sealed class OfflineRegistryHive : IDisposable
         // hard crash auto-releases it and the next run's sweep reclaims this mount.
         Mutex? ownershipMutex = TryCreateOwnershipBeacon(mountSubKey, logger);
 
+        if (ownershipMutex is null)
+        {
+            // Fail closed: without a beacon a concurrent sibling sweep would judge this mount ownerless and could unload
+            // it mid-use, so abort recovery rather than create an unprotected mount.
+            logger?.Error($"{nameof(OfflineRegistryHive)}: cannot publish the ownership beacon for {mountSubKey}; aborting recovery to avoid a concurrent sweep unloading a live mount.");
+            TryDeleteDirectory(stagingDirectory);
+
+            return OfflineHiveLoadResult.Failed(OfflineHiveLoadStatus.RecoveryFailed);
+        }
+
         using (IDisposable? privilege = nativeApi.TryEnterRecoveryPrivilege(logger))
         {
             if (privilege is null)
@@ -299,8 +309,8 @@ internal sealed class OfflineRegistryHive : IDisposable
     }
 
     // A machine-global ownership beacon (an open, unowned named mutex) so the next run's sweep can tell this mount has a
-    // live owner. Best-effort: if it cannot be created the mount still works, it is merely not crash-reclaimable, so a
-    // failure here (e.g. SeCreateGlobalPrivilege unavailable) is logged and the load proceeds.
+    // live owner. Returns null if it cannot be created; recovery then fails closed (an unprotected mount could be unloaded
+    // mid-use by a concurrent sweep) rather than proceeding without crash-reclaim protection.
     private static Mutex? TryCreateOwnershipBeacon(string mountSubKey, ITraceLogger? logger)
     {
         try
