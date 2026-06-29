@@ -13,7 +13,7 @@ namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 ///     dirty-hive recovery path cannot be exercised by the synthetic clean hives the other tests use (clean hives never
 ///     return the recovery-needed error), and it requires administrator privileges.
 /// </summary>
-internal interface IOfflineHiveNativeApi
+internal interface IOfflineHiveOperations
 {
     /// <summary>
     ///     Enumerates the immediate subkey names under <c>HKLM</c>, used by the orphan sweep to find <c>ELX_</c> recovery
