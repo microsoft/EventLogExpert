@@ -315,7 +315,7 @@ internal sealed class OfflineRegistryHive : IDisposable
     {
         try
         {
-            return new Mutex(initiallyOwned: false, $"Global\\{mountSubKey}");
+            return new Mutex(initiallyOwned: false, name: $"Global\\{mountSubKey}");
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {
