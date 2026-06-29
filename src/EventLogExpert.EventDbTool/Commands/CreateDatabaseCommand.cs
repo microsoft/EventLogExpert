@@ -49,23 +49,23 @@ public sealed class CreateDatabaseCommand
         {
             Description =
                 "Build the database from a Windows image, fully offline (no host registry or host files are " +
-                "read): a mounted volume root (e.g. an attached VHDX), an extracted image folder, or a .wim/.esd " +
-                "file (use --wim-index N to pick the image). The kind is auto-detected from the path; override with " +
-                "--image-kind. Mutually exclusive with the source argument."
+                "read): a mounted volume root (e.g. an attached VHDX), an extracted image folder, a .wim/.esd " +
+                "file, or a .iso file (use --wim-index N to pick the image). The kind is auto-detected from the " +
+                "path; override with --image-kind. Mutually exclusive with the source argument."
         };
 
         Option<string> imageKindOption = new("--image-kind")
         {
             Description =
-                "Override how --offline-image is read: 'directory' (a mounted volume or extracted folder) or 'wim' " +
-                "(a .wim/.esd file). Omit to auto-detect from the path (a directory, or a .wim/.esd file)."
+                "Override how --offline-image is read: 'directory' (a mounted volume or extracted folder), 'wim' " +
+                "(a .wim/.esd file), or 'iso' (a Windows install ISO). Omit to auto-detect from the path."
         };
 
         Option<int?> wimIndexOption = new("--wim-index")
         {
             Description =
-                "The 1-based image index to extract from a .wim/.esd, for --image-kind wim. Omit to list the " +
-                "available images."
+                "The 1-based image index to extract from a .wim/.esd (or an ISO's install.wim), for --image-kind " +
+                "wim or iso. Omit to list the available images."
         };
 
         Option<bool> verboseOption = new("--verbose")
@@ -102,10 +102,9 @@ public sealed class CreateDatabaseCommand
             if (!string.IsNullOrWhiteSpace(imageKindValue))
             {
                 if (!Enum.TryParse(imageKindValue, ignoreCase: true, out OfflineImageKind parsed) ||
-                    !Enum.IsDefined(parsed) ||
-                    parsed == OfflineImageKind.Iso)
+                    !Enum.IsDefined(parsed))
                 {
-                    logger.Error($"Invalid --image-kind '{imageKindValue}'. Valid values: directory, wim.");
+                    logger.Error($"Invalid --image-kind '{imageKindValue}'. Valid values: directory, wim, iso.");
 
                     return;
                 }

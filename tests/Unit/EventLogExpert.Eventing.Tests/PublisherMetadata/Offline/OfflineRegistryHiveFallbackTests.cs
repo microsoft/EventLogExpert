@@ -11,7 +11,7 @@ namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
 
 /// <summary>
 ///     Drives the dirty-hive recovery state machine deterministically through a fake
-///     <see cref="IOfflineHiveNativeApi" />. The synthetic clean hives the other tests use are born clean, so
+///     <see cref="IOfflineHiveOperations" />. The synthetic clean hives the other tests use are born clean, so
 ///     <c>RegLoadAppKey</c> always succeeds on them and the recovery fallback is never exercised - the exact blind spot
 ///     that let the real-image bug ship. These tests seed a real <c>regf</c> hive (so staging + signature checks run for
 ///     real) but make the fake app-key load FAIL, then assert each recovery branch.
@@ -22,7 +22,7 @@ public sealed class OfflineRegistryHiveFallbackTests
     public void TryLoad_WhenAppHiveLoadFailsAndPrivilegeUnavailable_ReturnsNeedsElevation()
     {
         using var hive = TempHive.Seeded();
-        var nativeApi = new FakeHiveNativeApi
+        var nativeApi = new FakeHiveOperations
         {
             AppHiveLoadResult = Win32ErrorCodes.ERROR_BADDB,
             RecoveryPrivilegeAvailable = false
@@ -39,7 +39,7 @@ public sealed class OfflineRegistryHiveFallbackTests
     public void TryLoad_WhenAppHiveLoadFailsAndRecoveryLoadFails_ReturnsRecoveryFailedWithoutLeakingAMount()
     {
         using var hive = TempHive.Seeded();
-        var nativeApi = new FakeHiveNativeApi
+        var nativeApi = new FakeHiveOperations
         {
             AppHiveLoadResult = Win32ErrorCodes.ERROR_BADDB,
             RecoveryPrivilegeAvailable = true,
@@ -58,7 +58,7 @@ public sealed class OfflineRegistryHiveFallbackTests
     public void TryLoad_WhenAppHiveLoadSucceeds_DoesNotEnterRecovery()
     {
         using var hive = TempHive.Seeded();
-        var nativeApi = new FakeHiveNativeApi
+        var nativeApi = new FakeHiveOperations
         {
             // A real handle so RegistryKey.FromHandle works; the fake just reports success and never recovers.
             AppHiveLoadResult = Win32ErrorCodes.ERROR_SUCCESS,
@@ -78,7 +78,7 @@ public sealed class OfflineRegistryHiveFallbackTests
     public void TryLoad_WhenRecoveryLoadSucceedsButRootCannotOpen_ReturnsRecoveryFailedAndUnloadsTheMount()
     {
         using var hive = TempHive.Seeded();
-        var nativeApi = new FakeHiveNativeApi
+        var nativeApi = new FakeHiveOperations
         {
             AppHiveLoadResult = Win32ErrorCodes.ERROR_BADDB,
             RecoveryPrivilegeAvailable = true,
@@ -102,7 +102,7 @@ public sealed class OfflineRegistryHiveFallbackTests
         return new SafeRegistryHandle(handle, ownsHandle: true);
     }
 
-    private sealed class FakeHiveNativeApi : IOfflineHiveNativeApi
+    private sealed class FakeHiveOperations : IOfflineHiveOperations
     {
         public Func<SafeRegistryHandle>? AppHiveHandleFactory { get; init; }
 

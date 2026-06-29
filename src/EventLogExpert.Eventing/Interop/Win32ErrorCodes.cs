@@ -12,6 +12,8 @@ internal static class Win32ErrorCodes
     internal const int ERROR_CANCELLED = 1223;
     /// <summary>The destination drive ran out of space (e.g. during <c>WIMApplyImage</c>).</summary>
     internal const int ERROR_DISK_FULL = 112;
+    /// <summary>The file is not a recognized virtual-disk image (a corrupt or non-ISO file passed to OpenVirtualDisk).</summary>
+    internal const int ERROR_FILE_CORRUPT = 1392;
     internal const int ERROR_FILE_NOT_FOUND = 2;
     internal const int ERROR_INSUFFICIENT_BUFFER = 122;
     internal const int ERROR_INVALID_DATA = 13;
@@ -20,6 +22,7 @@ internal static class Win32ErrorCodes
     internal const int ERROR_NO_MORE_ITEMS = 259;
     /// <summary>A token privilege requested by <c>AdjustTokenPrivileges</c> is not held by the token.</summary>
     internal const int ERROR_NOT_ALL_ASSIGNED = 1300;
+    internal const int ERROR_NOT_SUPPORTED = 50;
     internal const int ERROR_PATH_NOT_FOUND = 3;
     /// <summary>A required privilege (e.g. <c>SeRestorePrivilege</c>) is not held by the caller.</summary>
     internal const int ERROR_PRIVILEGE_NOT_HELD = 1314;

@@ -9,7 +9,7 @@ namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
 
 /// <summary>
 ///     Drives the WIM read/validate/extract/cancel state machine deterministically through a fake
-///     <see cref="IWimNativeApi" />. The real <c>WIMApplyImage</c> path needs administrator privileges and a multi-GB
+///     <see cref="IWimOperations" />. The real <c>WIMApplyImage</c> path needs administrator privileges and a multi-GB
 ///     image, so these tests assert the orchestration (index validation, elevation gate, disk precheck, failure-safe temp
 ///     cleanup, status mapping) while a fake stands in for the native calls and creates/deletes a REAL temp directory so
 ///     the cleanup assertions are real, not mocked. The actual native apply is covered by the manual real-WIM E2E.
@@ -17,10 +17,10 @@ namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
 public sealed class OfflineWimImageTests
 {
     [Fact]
-    public void ReadIndexList_WhenFileExists_ForwardsToNativeApi()
+    public void ReadIndexList_WhenFileExists_ForwardsToOperations()
     {
         using var workspace = new TempWorkspace();
-        var nativeApi = new FakeWimNativeApi
+        var nativeApi = new FakeWimOperations
         {
             Images = [new WimImageEntry(1, "Image", "Edition", 123)]
         };
@@ -35,7 +35,7 @@ public sealed class OfflineWimImageTests
     [Fact]
     public void ReadIndexList_WhenFileMissing_ReturnsNotAWimWithoutCallingNative()
     {
-        var nativeApi = new FakeWimNativeApi();
+        var nativeApi = new FakeWimOperations();
 
         WimImageList result = OfflineWimImage.ReadIndexList(
             Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".wim"), nativeApi, logger: null);
@@ -48,7 +48,7 @@ public sealed class OfflineWimImageTests
     public async Task TryExtractAsync_DisposeIsIdempotent()
     {
         using var workspace = new TempWorkspace();
-        var nativeApi = new FakeWimNativeApi { OnApply = WriteAPartialFile };
+        var nativeApi = new FakeWimOperations { OnApply = WriteAPartialFile };
 
         OfflineWimExtractResult result = await OfflineWimImage.TryExtractAsync(
             workspace.WimPath, 1, workspace.TempParent, nativeApi, logger: null, CancellationToken.None);
@@ -63,7 +63,7 @@ public sealed class OfflineWimImageTests
     public async Task TryExtractAsync_WhenAlreadyCancelled_ReturnsCancelledWithoutApplying()
     {
         using var workspace = new TempWorkspace();
-        var nativeApi = new FakeWimNativeApi();
+        var nativeApi = new FakeWimOperations();
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
@@ -78,7 +78,7 @@ public sealed class OfflineWimImageTests
     public async Task TryExtractAsync_WhenApplyAborts_ReturnsCancelledAndDeletesTheTemp()
     {
         using var workspace = new TempWorkspace();
-        var nativeApi = new FakeWimNativeApi
+        var nativeApi = new FakeWimOperations
         {
             ApplyResult = Win32ErrorCodes.ERROR_REQUEST_ABORTED,
             OnApply = WriteAPartialFile
@@ -95,7 +95,7 @@ public sealed class OfflineWimImageTests
     public async Task TryExtractAsync_WhenApplyFails_ReturnsApplyFailedAndDeletesTheTemp()
     {
         using var workspace = new TempWorkspace();
-        var nativeApi = new FakeWimNativeApi
+        var nativeApi = new FakeWimOperations
         {
             ApplyResult = Win32ErrorCodes.ERROR_INVALID_DATA,
             OnApply = WriteAPartialFile
@@ -114,7 +114,7 @@ public sealed class OfflineWimImageTests
     public async Task TryExtractAsync_WhenApplySucceeds_ReturnsExtractedRootThatDisposeDeletes()
     {
         using var workspace = new TempWorkspace();
-        var nativeApi = new FakeWimNativeApi { OnApply = WriteAPartialFile };
+        var nativeApi = new FakeWimOperations { OnApply = WriteAPartialFile };
 
         OfflineWimExtractResult result = await OfflineWimImage.TryExtractAsync(
             workspace.WimPath, 1, workspace.TempParent, nativeApi, logger: null, CancellationToken.None);
@@ -133,7 +133,7 @@ public sealed class OfflineWimImageTests
     public async Task TryExtractAsync_WhenExtractionContainsReadOnlyFiles_StillDeletesTheTemp()
     {
         using var workspace = new TempWorkspace();
-        var nativeApi = new FakeWimNativeApi
+        var nativeApi = new FakeWimOperations
         {
             ApplyResult = Win32ErrorCodes.ERROR_INVALID_DATA,
             OnApply = WriteAReadOnlyFile
@@ -151,7 +151,7 @@ public sealed class OfflineWimImageTests
     public async Task TryExtractAsync_WhenImageLargerThanFreeSpace_ReturnsInsufficientSpaceWithoutApplying()
     {
         using var workspace = new TempWorkspace();
-        var nativeApi = new FakeWimNativeApi
+        var nativeApi = new FakeWimOperations
         {
             Images = [new WimImageEntry(1, "Huge", "Edition", long.MaxValue)]
         };
@@ -167,7 +167,7 @@ public sealed class OfflineWimImageTests
     public async Task TryExtractAsync_WhenIndexNotInImage_ReturnsIndexOutOfRangeWithoutApplying()
     {
         using var workspace = new TempWorkspace();
-        var nativeApi = new FakeWimNativeApi
+        var nativeApi = new FakeWimOperations
         {
             Images = [new WimImageEntry(1, "Only image", "Edition", null)]
         };
@@ -183,7 +183,7 @@ public sealed class OfflineWimImageTests
     public async Task TryExtractAsync_WhenNotAWim_ReturnsNotAWimWithoutApplying()
     {
         using var workspace = new TempWorkspace();
-        var nativeApi = new FakeWimNativeApi { ImageListStatus = WimImageListStatus.NotAWim };
+        var nativeApi = new FakeWimOperations { ImageListStatus = WimImageListStatus.NotAWim };
 
         OfflineWimExtractResult result = await OfflineWimImage.TryExtractAsync(
             workspace.WimPath, 1, workspace.TempParent, nativeApi, logger: null, CancellationToken.None);
@@ -196,7 +196,7 @@ public sealed class OfflineWimImageTests
     public async Task TryExtractAsync_WhenNotElevated_ReturnsNeedsElevationWithoutApplying()
     {
         using var workspace = new TempWorkspace();
-        var nativeApi = new FakeWimNativeApi { Elevated = false };
+        var nativeApi = new FakeWimOperations { Elevated = false };
 
         OfflineWimExtractResult result = await OfflineWimImage.TryExtractAsync(
             workspace.WimPath, 1, workspace.TempParent, nativeApi, logger: null, CancellationToken.None);
@@ -217,7 +217,7 @@ public sealed class OfflineWimImageTests
         File.SetAttributes(path, FileAttributes.ReadOnly);
     }
 
-    private sealed class FakeWimNativeApi : IWimNativeApi
+    private sealed class FakeWimOperations : IWimOperations
     {
         public int ApplyCallCount { get; private set; }
 
