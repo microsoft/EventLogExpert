@@ -23,7 +23,7 @@ public sealed class OfflineLegacyMessageFileResolverTests
             using RegistryKey security = system.CreateSubKey(@"ControlSet001\Services\EventLog\Security\SecProvider");
             security.SetValue("EventMessageFile", @"C:\Windows\System32\sec.dll", RegistryValueKind.ExpandString);
         });
-        using OfflineRegistryHive hive = LoadSystemHive(image);
+        using OfflineHiveFile hive = LoadSystemHive(image);
 
         IReadOnlyList<string> names = ResolverFor(image, hive).EnumerateProviderNames();
 
@@ -40,7 +40,7 @@ public sealed class OfflineLegacyMessageFileResolverTests
             using RegistryKey provider = system.CreateSubKey(@"ControlSet001\Services\EventLog\Application\DriverProvider");
             provider.SetValue("EventMessageFile", @"C:\Windows\System32\drivers\flt.sys;C:\Windows\System32\evt.dll", RegistryValueKind.ExpandString);
         });
-        using OfflineRegistryHive hive = LoadSystemHive(image);
+        using OfflineHiveFile hive = LoadSystemHive(image);
 
         IReadOnlyList<string> files = ResolverFor(image, hive).GetMessageFilesForLegacyProvider("DriverProvider");
 
@@ -56,7 +56,7 @@ public sealed class OfflineLegacyMessageFileResolverTests
             using RegistryKey provider = system.CreateSubKey(@"ControlSet002\Services\EventLog\Application\OnSetTwo");
             provider.SetValue("EventMessageFile", @"C:\Windows\System32\two.dll", RegistryValueKind.ExpandString);
         });
-        using OfflineRegistryHive hive = LoadSystemHive(image);
+        using OfflineHiveFile hive = LoadSystemHive(image);
 
         IReadOnlyList<string> files = ResolverFor(image, hive).GetMessageFilesForLegacyProvider("OnSetTwo");
 
@@ -67,7 +67,7 @@ public sealed class OfflineLegacyMessageFileResolverTests
     public void GetMessageFiles_OrdersCategoryFirstAndDiscardsParameterFile()
     {
         using OfflineTestImage image = OfflineTestImage.Create(seedSystem: SeedApplicationProvider);
-        using OfflineRegistryHive hive = LoadSystemHive(image);
+        using OfflineHiveFile hive = LoadSystemHive(image);
 
         IReadOnlyList<string> files = ResolverFor(image, hive).GetMessageFilesForLegacyProvider("TestLegacyProvider");
 
@@ -89,7 +89,7 @@ public sealed class OfflineLegacyMessageFileResolverTests
             using RegistryKey provider = system.CreateSubKey(@"ControlSet001\Services\EventLog\Security\SecAuditProvider");
             provider.SetValue("EventMessageFile", @"C:\Windows\System32\sec.dll", RegistryValueKind.ExpandString);
         });
-        using OfflineRegistryHive hive = LoadSystemHive(image);
+        using OfflineHiveFile hive = LoadSystemHive(image);
 
         IReadOnlyList<string> files = ResolverFor(image, hive).GetMessageFilesForLegacyProvider("SecAuditProvider");
 
@@ -100,7 +100,7 @@ public sealed class OfflineLegacyMessageFileResolverTests
     public void GetMessageFiles_UnknownProvider_ReturnsEmpty()
     {
         using OfflineTestImage image = OfflineTestImage.Create(seedSystem: SeedApplicationProvider);
-        using OfflineRegistryHive hive = LoadSystemHive(image);
+        using OfflineHiveFile hive = LoadSystemHive(image);
 
         Assert.Empty(ResolverFor(image, hive).GetMessageFilesForLegacyProvider("NoSuchProvider"));
     }
@@ -114,7 +114,7 @@ public sealed class OfflineLegacyMessageFileResolverTests
             using RegistryKey provider = system.CreateSubKey(@"ControlSet001\Services\EventLog\Application\NoParamProvider");
             provider.SetValue("EventMessageFile", @"C:\Windows\System32\evt.dll", RegistryValueKind.ExpandString);
         });
-        using OfflineRegistryHive hive = LoadSystemHive(image);
+        using OfflineHiveFile hive = LoadSystemHive(image);
 
         Assert.Empty(ResolverFor(image, hive).GetParameterFilesForLegacyProvider("NoParamProvider"));
     }
@@ -123,28 +123,28 @@ public sealed class OfflineLegacyMessageFileResolverTests
     public void GetParameterFiles_ReturnsReRootedParameterFile()
     {
         using OfflineTestImage image = OfflineTestImage.Create(seedSystem: SeedApplicationProvider);
-        using OfflineRegistryHive hive = LoadSystemHive(image);
+        using OfflineHiveFile hive = LoadSystemHive(image);
 
         IReadOnlyList<string> files = ResolverFor(image, hive).GetParameterFilesForLegacyProvider("TestLegacyProvider");
 
         Assert.Equal(Path.Combine(image.RootDirectory, "Windows", "System32", "param.dll"), Assert.Single(files), ignoreCase: true);
     }
 
-    private static OfflineRegistryHive LoadSystemHive(OfflineTestImage image)
+    private static OfflineHiveFile LoadSystemHive(OfflineTestImage image)
     {
-        OfflineRegistryHive? hive = OfflineRegistryHive.TryLoad(image.ImageRoot.SystemHivePath, logger: null).Hive;
+        OfflineHiveFile? hive = OfflineHiveFile.TryOpen(image.ImageRoot.SystemHivePath, logger: null);
         Assert.NotNull(hive);
 
         return hive!;
     }
 
-    private static OfflineLegacyMessageFileResolver ResolverFor(OfflineTestImage image, OfflineRegistryHive hive)
+    private static OfflineLegacyMessageFileResolver ResolverFor(OfflineTestImage image, OfflineHiveFile hive)
     {
         var pathResolver = new OfflineImagePathResolver(
             new OfflineImagePathMapper(image.ImageRoot, logger: null),
             new OfflineRootGuard(image.ImageRoot, logger: null));
 
-        return new OfflineLegacyMessageFileResolver(hive.Root, pathResolver, logger: null);
+        return new OfflineLegacyMessageFileResolver(hive, pathResolver, logger: null);
     }
 
     private static void SeedApplicationProvider(RegistryKey system)

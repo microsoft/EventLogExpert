@@ -47,9 +47,10 @@ internal static class ProgramEntry
     // callback, so without this the operation would hang forever and the elevated child cannot be killed by the host.
     private static readonly TimeSpan s_selfTerminateWatchdog = TimeSpan.FromSeconds(8);
 
-    // Upper bound the main flow waits for best-effort startup reconciliation before dispatching. A wedged native
-    // RegUnLoadKey on an orphaned hive must never block startup before the control reader can process a CancelMessage and
-    // self-terminate; past this bound the reconcile keeps running in the background, it just stops gating the operation.
+    // Upper bound the main flow waits for best-effort startup reconciliation before dispatching. A wedged filesystem
+    // delete of an orphaned extraction folder must never block startup before the control reader can process a
+    // CancelMessage and self-terminate; past this bound the reconcile keeps running in the background, it just stops
+    // gating the operation.
     private static readonly TimeSpan s_startupReconcileTimeout = TimeSpan.FromSeconds(30);
 
     public static async Task<int> MainAsync(string[] args)
@@ -164,10 +165,9 @@ internal static class ProgramEntry
             }
         });
 
-        // 3a) Reclaim scratch resources (orphaned hive mounts / WIM extraction folders) a crashed or self-terminated
-        //     prior run left behind. MUST run elevated (the medium-IL host cannot unload an HKLM hive). Deliberately
-        //     started AFTER the control reader/watchdog are armed and run OFF the main flow: a wedged native RegUnLoadKey
-        //     on a dead orphan must not block startup before a CancelMessage can be processed (that would reintroduce the
+        // 3a) Reclaim orphaned WIM extraction folders a crashed or self-terminated prior run left behind. Deliberately
+        //     started AFTER the control reader/watchdog are armed and run OFF the main flow: a wedged filesystem delete of a
+        //     dead orphan must not block startup before a CancelMessage can be processed (that would reintroduce the
         //     unkillable hang this helper exists to prevent). Best-effort and self-swallowing; the main flow waits only up
         //     to s_startupReconcileTimeout, then dispatches while any slow reconcile finishes in the background.
         var reconcileTask = Task.Run(() =>
@@ -177,7 +177,7 @@ internal static class ProgramEntry
         });
 
         try { await reconcileTask.WaitAsync(s_startupReconcileTimeout, operationCts.Token); }
-        catch (TimeoutException) { /* a wedged unload keeps running in the background; proceed so the operation can run */ }
+        catch (TimeoutException) { /* a wedged delete keeps running in the background; proceed so the operation can run */ }
         catch (OperationCanceledException) { /* cancel arrived mid-reconcile; the armed watchdog handles self-terminate */ }
 
         // 4) Dispatch the operation.
