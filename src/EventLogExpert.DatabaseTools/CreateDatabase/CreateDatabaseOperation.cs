@@ -13,28 +13,16 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.DatabaseTools.CreateDatabase;
 
-/// <summary>
-///     Creates a new provider database (.db). When the request's SourcePath is null/empty, local providers on this
-///     machine are used. When supplied, ONLY the source is used (no fallback to local providers). Streams provider details
-///     into the DbContext in batches; defers DbContext creation until at least one provider is resolved so a failed scan
-///     does not leave an empty .db on disk.
-/// </summary>
 internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : OperationBase, IDatabaseToolsOperation
 {
     private const int BatchSize = 100;
 
-    // The three on-disk files an at-rest SQLite database can occupy: the main file plus its WAL/SHM sidecars. The
-    // overwrite backup/restore moves and cleans all three so a restored database is never paired with the aborted
-    // rebuild's stale WAL (which would corrupt it). At-rest, cleanly-closed databases normally have only "".
+    // SQLite at rest may include main, WAL, and SHM files; overwrite backup/restore must move all three together.
     private static readonly string[] s_databaseFileSuffixes = ["", "-wal", "-shm"];
 
-    // Set only AFTER TakeOverwriteBackup() moves ALL of the old database's files aside. Gates the restore's leftover
-    // deletion: if the backup tore midway the new build never started, so the files still at the target paths are
-    // unmoved originals and must NOT be deleted (deleting an original -wal/-shm would strip uncheckpointed data).
+    // Set only after every sidecar backup moves; restore must not delete unmoved originals after a torn backup.
     private bool _overwriteBackupCompleted;
 
-    // Set the first time the old database is moved aside to ".bak" (overwrite of an existing target, at the first
-    // ProviderDbContext creation). Drives the post-run finalize: delete the backup on success, restore it otherwise.
     private bool _overwriteBackupTaken;
 
     internal enum CreateDatabaseMode { Local, FileSource, OfflineImage }
@@ -51,10 +39,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             return DatabaseToolsOutcome.Failed;
         }
 
-        // Unconditional stale-backup preflight (mirrors DestructiveRecovery.WrapUpgradeAsync). An interrupted prior
-        // overwrite can leave a ".bak" snapshot behind - possibly with the target itself already gone. Proceeding would
-        // let a later success delete that snapshot (the sole surviving copy) or break the next overwrite's File.Move.
-        // Fire whenever ANY backup file (main or WAL/SHM sidecar) exists, regardless of whether the target exists.
+        // Any stale .bak sidecar may be the sole surviving copy after an interrupted overwrite and must block retry.
         foreach (var suffix in s_databaseFileSuffixes)
         {
             var backupPath = request.TargetPath + suffix + ".bak";
@@ -80,8 +65,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             return DatabaseToolsOutcome.Failed;
         }
 
-        // Pre-flight the chosen .db destination so a Controlled Folder Access / ACL denial fails fast with an actionable
-        // message instead of surfacing later as an opaque write error after a long scan/extract.
+        // Fail fast on destination ACL/CFA denial before expensive scan or extraction work begins.
         string targetDirectory = Path.GetDirectoryName(Path.GetFullPath(request.TargetPath)) ?? request.TargetPath;
         string? targetBlocked = OfflineScratch.ProbeWritable(targetDirectory);
 
@@ -110,14 +94,10 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             logger.Information($"Found {excludeProviderNames.Count} providers in {request.SkipProvidersInFile}. These will not be included in the new database.");
         }
 
-        // Defensive recompile if input has Regex.InfiniteMatchTimeout (otherwise catch below is dead).
         var filterRegex = EnsureBoundedTimeout(request.FilterRegex, TimeSpan.FromSeconds(5));
 
         var outcome = await CreateCoreAsync();
 
-        // Overwrite finalize: the old database was moved aside to ".bak" only if a new database was actually started
-        // (first ProviderDbContext creation, in GetOrCreateContext). Keep the new one and drop the snapshot on success;
-        // otherwise restore the snapshot so a failed/cancelled rebuild never destroys the prior database.
         if (!_overwriteBackupTaken) { return outcome; }
 
         if (outcome is DatabaseToolsOutcome.Succeeded) { DeleteOverwriteBackups(logger); }
@@ -131,19 +111,12 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         var headerLogged = false;
         var pendingForHeader = new List<ProviderDetails>(BatchSize);
 
-        // Collapse identical content arriving under different source keys (e.g. an unstamped legacy row plus an
-        // already-hashed row in a multi-file source): both re-hash to the same VersionKey, so the second would
-        // otherwise collide on the composite primary key. Track stamped identities and skip duplicates first-wins.
         var stampedIdentities = new HashSet<ProviderIdentity>();
 #if DEBUG
-        // CI-only tripwire: fail the build if a (Name, VersionKey) collision's rows are not content-equivalent (hash and
-        // merge drift). No release retention.
         var firstByIdentity = new Dictionary<ProviderIdentity, ProviderDetails>();
 #endif
 
-        // Defer creating the DbContext (and therefore the .db file on disk) until we have
-        // at least one provider to persist. This prevents leaving an empty database behind
-        // when no provider details could be resolved.
+        // Create DbContext only after the first provider so failed scans leave no empty database.
         ProviderDbContext? dbContext = null;
         OfflineWimImage? wimImage = null;
         OfflineIsoImage? isoImage = null;
@@ -153,13 +126,10 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         {
             var mode = SelectMode(request);
 
-            // A WIM/ISO image is extracted to a temp folder, then read like a mounted volume. ISO just resolves the inner
-            // install.wim first. A failed mount/extraction surfaces a specific, actionable error and leaves no .db behind.
             string? effectiveOfflineImagePath = request.OfflineImagePath;
             OfflineImageKind? kind = mode == CreateDatabaseMode.OfflineImage ? ResolveImageKind(request) : null;
 
-            // A WIM/ISO build extracts into the scratch root via a long native WIMApplyImage that ignores the cooperative
-            // cancel; pre-flight the scratch root so a CFA/ACL denial fails fast here instead of wedging the apply.
+            // WIM apply ignores cooperative cancellation on denied writes, so probe scratch ACLs before native extraction.
             if (kind is OfflineImageKind.Wim or OfflineImageKind.Iso)
             {
                 string? scratchBlocked = OfflineScratch.ProbeWritable(OfflineScratch.Root);
@@ -185,8 +155,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 isoImage = mount.Image;
             }
 
-            // A VHD/VHDX is attached read-only, its Windows partition resolved, then read like a mounted volume - no WIM
-            // extraction and no image index. A failed mount surfaces a specific, actionable error and leaves no .db behind.
             if (kind is OfflineImageKind.Vhdx)
             {
                 OfflineVhdxMountResult mount = OfflineVhdxImage.TryMount(request.OfflineImagePath!, logger);
@@ -216,10 +184,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 effectiveOfflineImagePath = wimImage!.ExtractedRoot;
             }
 
-            // ONE switch picks BOTH the provider stream AND the provenance so the two cannot desync: an offline image
-            // build must NOT read host provenance (the facade already stamped each row with the IMAGE's OS, and a host
-            // read here would overwrite it); host provenance is read ONLY for a local build. The bounded filterRegex
-            // (not request.FilterRegex) reaches every source so the RegexMatchTimeoutException catch stays reachable.
+            // Offline providers already carry image provenance; only local builds read host provenance.
             IAsyncEnumerable<ProviderDetails> providersToAdd;
             SourceOsProvenance? sourceOsProvenance;
 
@@ -258,9 +223,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // Stamp the content hash so distinct versions of a provider name coexist under the composite key and
-                // identical providers (across machines / OS builds) collapse to one row. Idempotent for an
-                // already-hashed source; computes the key for freshly-resolved (live) providers.
                 details.VersionKey = VersionKeyCalculator.Compute(details);
 
                 var identity = ProviderIdentity.Of(details);
@@ -356,7 +318,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
         catch (Exception ex)
         {
-            // Any non-cancellation, non-regex-timeout failure (e.g., EF/SQLite errors mid-save) - no stub .db.
             logger.Error($"Unexpected error creating database: {ex.Message}");
             await CleanupPartialUnlessUnmovedOriginalAsync();
             dbContext = null;
@@ -367,17 +328,13 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         {
             if (dbContext is not null) { await dbContext.DisposeAsync(); }
 
-            // Delete the extracted WIM temp AFTER persistence completes (the final SaveChangesAsync reads from it), then
-            // detach the ISO/VHDX (the mounts are no longer needed once providers are persisted).
+            // Dispose extracted WIM after SaveChanges because persisted rows may still read from it.
             wimImage?.Dispose();
             isoImage?.Dispose();
             vhdxImage?.Dispose();
         }
 
-        // Generic partial-cleanup deletes the target path as a disposable stub. That is correct for a non-overwrite run
-        // or once the overwrite backup has fully completed (the target is then a partial NEW build). But if the backup
-        // started and tore before completing, the file still at the target is the UNMOVED ORIGINAL - deleting it would
-        // destroy the prior database. In that case skip the delete and let RestoreOverwriteBackups move any ".bak" back.
+        // Never delete target files after a torn overwrite backup; they may be unmoved originals.
         async Task CleanupPartialUnlessUnmovedOriginalAsync()
         {
             if (_overwriteBackupTaken && !_overwriteBackupCompleted) { return; }
@@ -386,16 +343,12 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
         }
 
-        // First ProviderDbContext creation is where the new database file appears on disk. If this is an overwrite of an
-        // existing target, move the old database (and any WAL/SHM sidecars) aside to ".bak" exactly once, BEFORE
-        // constructing the writable context (which calls Database.EnsureCreated() and would otherwise open/overwrite the
-        // live file). ALL three creation sites route through here so the header-flush path cannot bypass the backup.
+        // Back up the old database before the writable context opens or creates target files.
         ProviderDbContext GetOrCreateContext()
         {
             if (request.Overwrite && !_overwriteBackupTaken && File.Exists(request.TargetPath))
             {
-                // Set the flag BEFORE the move so a partially-completed backup still triggers the restore path, which
-                // heals a torn move by restoring whichever ".bak" files were created.
+                // Set before moving so a torn backup still enters restore.
                 _overwriteBackupTaken = true;
                 TakeOverwriteBackup();
                 _overwriteBackupCompleted = true;
@@ -405,17 +358,9 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
     }
 
-    // The effective kind is the explicit --image-kind when given, otherwise inferred from the path: an existing directory
-    // is a mounted volume / extracted folder; a .wim/.esd is a WIM; a .iso is an ISO. Null = neither given nor inferable.
-    // Path-based resolution is shared with the elevation helper via OfflineImageKindResolver.
     internal static OfflineImageKind? ResolveImageKind(CreateDatabaseRequest request) =>
         OfflineImageKindResolver.ResolveFromPath(request.OfflineImagePath, request.ImageKind);
 
-    /// <summary>
-    ///     Picks the provider source for the request. An offline image (a non-whitespace <c>OfflineImagePath</c>) wins;
-    ///     otherwise a null <c>SourcePath</c> means local providers and a non-null one means a file source. Pure so the mode
-    ///     selection (and the host-provenance suppression keyed on it) can be unit-tested without a real image.
-    /// </summary>
     internal static CreateDatabaseMode SelectMode(CreateDatabaseRequest request) =>
         !string.IsNullOrWhiteSpace(request.OfflineImagePath) ? CreateDatabaseMode.OfflineImage
         : request.SourcePath is null ? CreateDatabaseMode.Local
@@ -423,10 +368,9 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
     internal static bool ValidateOfflineImageRequest(CreateDatabaseRequest request, ITraceLogger logger)
     {
+        // Reject orphan WIM options so the command cannot silently fall back to local providers.
         if (string.IsNullOrWhiteSpace(request.OfflineImagePath))
         {
-            // No offline image: reject orphan WIM options so they are never silently ignored (which would build from the
-            // wrong source). Kind is auto-detected, so an EXPLICIT kind or a stray index without an image is the error.
             if (request.ImageKind is not null)
             {
                 logger.Error($"--image-kind requires an offline image (--offline-image).");
@@ -489,9 +433,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                     return false;
                 }
 
-                // The index range and elevation are validated by the extraction itself (so the messages list the actual
-                // images and the elevation prompt comes only when an apply is really needed). A MISSING index, though, is
-                // a request-shape error - list the choices so the user can pick one.
                 if (request.WimIndex is null)
                 {
                     logger.Error($"--wim-index is required for --image-kind wim. Choose an image:");
@@ -517,8 +458,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                     return false;
                 }
 
-                // An ISO's install.wim is multi-edition, so an index is required - but its choices cannot be listed without
-                // mounting, which the validator must not do. The extraction (after mount) reports a bad index with choices.
+                // Validator cannot mount ISO just to list choices; extraction reports bad indices after mount.
                 if (request.WimIndex is null)
                 {
                     logger.Error(
@@ -545,8 +485,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                     return false;
                 }
 
-                // A VHD/VHDX is read directly from its Windows partition; an image index does not apply, so a stray one is
-                // a request-shape error rather than something to silently ignore.
                 if (request.WimIndex is not null)
                 {
                     logger.Error($"--wim-index applies only to --image-kind wim or iso, not vhdx.");
@@ -620,8 +558,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         return DatabaseToolsOutcome.Failed;
     }
 
-    /// The extraction already cleaned up any partial temp, so there is nothing to dispose here.
-    /// </summary>
     private static DatabaseToolsOutcome HandleWimExtractionFailure(
         OfflineWimExtractStatus status, string wimPath, int wimIndex, ITraceLogger logger)
     {
@@ -688,8 +624,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
     }
 
-    // Drops the ".bak" snapshot (and any sidecar snapshots) after a successful overwrite. Best-effort: a leftover backup
-    // is harmless (the new database is intact) but would block the next overwrite, so warn if it cannot be removed.
     private void DeleteOverwriteBackups(ITraceLogger logger)
     {
         foreach (var suffix in s_databaseFileSuffixes)
@@ -725,10 +659,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         buffer.Clear();
     }
 
-    // Restores the ".bak" snapshot after a failed/cancelled overwrite. First clears the connection pool and removes any
-    // new-build leftovers (the partial main file plus its orphaned WAL/SHM sidecars, which CleanupPartialDatabaseAsync
-    // does NOT delete) so the restored database is never paired with the aborted build's stale WAL, then moves each
-    // ".bak" back. Best-effort: on failure the ".bak" is left in place with an actionable log line for manual recovery.
+    // Clear pools and remove aborted-build sidecars before restoring backups.
     private void RestoreOverwriteBackups(ITraceLogger logger)
     {
         var mainBackup = request.TargetPath + ".bak";
@@ -737,8 +668,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         {
             SqliteConnection.ClearAllPools();
 
-            // Only delete files if the backup fully completed (meaning the new database was started). If it tore midway,
-            // the new database never started, so any files present are unmoved originals and must NOT be deleted.
+            // Only delete files after a complete backup; otherwise they may be unmoved originals.
             if (_overwriteBackupCompleted)
             {
                 foreach (var suffix in s_databaseFileSuffixes)
@@ -767,9 +697,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
     }
 
-    // Moves the existing database and any WAL/SHM sidecars to their ".bak" names. The stale-backup preflight already
-    // guaranteed no ".bak" exists, so each File.Move targets a free path. Throws on failure (e.g., a locked file); the
-    // caller's surrounding try/catch then cleans up and the overwrite finalize restores whatever was moved.
+    // Stale-backup preflight guarantees every .bak move targets a free path.
     private void TakeOverwriteBackup()
     {
         foreach (var suffix in s_databaseFileSuffixes)
@@ -853,7 +781,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         Func<TModel, TModel, bool> areEquivalent)
         where TIdentity : notnull
     {
-        // Compare DISTINCT identities both ways (the hash drops exact-duplicate rows, so raw counts can differ).
+        // Compare distinct identities both ways because the hash drops exact duplicate rows.
         var firstByIdentity = new Dictionary<TIdentity, TModel>(first.Count);
 
         foreach (TModel model in first) { firstByIdentity[identityOf(model)] = model; }

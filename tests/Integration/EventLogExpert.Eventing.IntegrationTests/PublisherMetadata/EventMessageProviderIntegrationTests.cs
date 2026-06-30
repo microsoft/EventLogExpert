@@ -18,7 +18,7 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadMessagesFromFiles_WhenBinaryUsesMuiSatellite_ShouldLoadMessagesFromMuiFile()
     {
-        // wevtsvc.dll keeps its message table in the .mui satellite — the loader must follow MUI fallback.
+        // wevtsvc.dll keeps messages in the .mui satellite; the loader must follow MUI fallback.
         var systemDirectory = Environment.SystemDirectory;
         var muiBinary = Path.Combine(systemDirectory, "wevtsvc.dll");
 
@@ -26,10 +26,8 @@ public sealed class EventMessageProviderIntegrationTests
             File.Exists(muiBinary) && TryFindMuiSatellite(systemDirectory, "wevtsvc.dll", out _),
             "Test requires wevtsvc.dll and a matching .mui satellite in the loader's MUI fallback chain (current UI culture or en-US).");
 
-        // Act
         var messages = EventMessageProvider.LoadMessagesFromFiles([muiBinary], Constants.TestProviderName);
 
-        // Assert
         Assert.NotNull(messages);
         Assert.NotEmpty(messages);
         Assert.All(messages, m => Assert.Equal(Constants.TestProviderName, m.ProviderName));
@@ -38,7 +36,7 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadMessagesFromFiles_WhenFilePathContainsEnvironmentVariable_ShouldHandleCorrectly()
     {
-        // LoadLibraryEx does not expand env vars; provider must expand %SystemRoot% before loading.
+        // LoadLibraryEx does not expand env vars; provider paths must expand %SystemRoot% first.
         var systemDirectory = Environment.SystemDirectory;
         var muiBinary = Path.Combine(systemDirectory, "wevtsvc.dll");
 
@@ -58,27 +56,21 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadProviderDetails_ShouldLogProviderLoadingAttempt()
     {
-        // Arrange
         var mockLogger = Substitute.For<ITraceLogger>();
         EventMessageProvider provider = new(Constants.TestProviderName, logger: mockLogger);
 
-        // Act
         provider.LoadProviderDetails();
 
-        // Assert
         mockLogger.Received().Debug(Arg.Any<DebugLogHandler>());
     }
 
     [Fact]
     public void LoadProviderDetails_WhenCalled_ShouldHaveNonNullCollections()
     {
-        // Arrange
         EventMessageProvider provider = new(Constants.TestProviderName);
 
-        // Act
         var details = provider.LoadProviderDetails();
 
-        // Assert
         Assert.NotNull(details);
         Assert.NotNull(details.Events);
         Assert.NotNull(details.Keywords);
@@ -91,13 +83,10 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadProviderDetails_WhenCalled_ShouldReturnProviderDetails()
     {
-        // Arrange
         EventMessageProvider provider = new(Constants.TestProviderName);
 
-        // Act
         var details = provider.LoadProviderDetails();
 
-        // Assert
         Assert.NotNull(details);
         Assert.Equal(Constants.TestProviderName, details.ProviderName);
     }
@@ -105,14 +94,11 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadProviderDetails_WhenCalledMultipleTimes_ShouldReturnConsistentResults()
     {
-        // Arrange
         EventMessageProvider provider = new(Constants.TestProviderName);
 
-        // Act
         var details1 = provider.LoadProviderDetails();
         var details2 = provider.LoadProviderDetails();
 
-        // Assert
         Assert.NotNull(details1);
         Assert.NotNull(details2);
         Assert.Equal(details1.ProviderName, details2.ProviderName);
@@ -121,7 +107,6 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadProviderDetails_WhenChannelOwningPublisherUnknown_ShouldReturnEmptyDetailsWithoutFallback()
     {
-        // Arrange — name is neither a registered publisher nor a channel.
         const string MadeUpName = "NonExistent-Publisher-And-Channel/Bogus";
 
         EventMessageProvider provider = new(MadeUpName);
@@ -158,13 +143,10 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadProviderDetails_WhenProviderHasNoData_ShouldReturnEmptyCollections()
     {
-        // Arrange
         EventMessageProvider provider = new(Constants.TestProviderName);
 
-        // Act
         var details = provider.LoadProviderDetails();
 
-        // Assert
         Assert.NotNull(details);
         Assert.Empty(details.Messages);
         Assert.Empty(details.Parameters);
@@ -173,7 +155,7 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadProviderDetails_WhenProviderNameIsActuallyAChannelPath_ShouldFallBackToOwningPublisher()
     {
-        // Channel paths in the ProviderName slot must resolve via EvtChannelConfigOwningPublisher.
+        // Channel paths in ProviderName must resolve through EvtChannelConfigOwningPublisher.
         Assert.SkipUnless(
             TryFindChannelWithDistinctOwningPublisher(out var channelName, out var owningPublisher),
             "Test requires a registered channel whose owning publisher differs from the channel path itself.");
@@ -192,13 +174,10 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadProviderDetails_WhenProviderNotFound_ShouldReturnDetailsWithProviderName()
     {
-        // Arrange
         EventMessageProvider provider = new(Constants.TestProviderName);
 
-        // Act
         var details = provider.LoadProviderDetails();
 
-        // Assert
         Assert.NotNull(details);
         Assert.Equal(Constants.TestProviderName, details.ProviderName);
     }
@@ -206,8 +185,7 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadProviderDetails_WhenStableProvider_ShouldResolveNamedValues()
     {
-        // End-to-end: the modern path (ToRawContent -> ProviderDetailsFactory) must resolve the raw keyword/opcode/task
-        // message ids into non-empty display names for a real provider, not merely read the raw rows.
+        // Modern metadata must resolve raw keyword/opcode/task message IDs into display names.
         EventMessageProvider provider = new(Constants.SecurityAuditingLogName);
 
         var details = provider.LoadProviderDetails();
@@ -226,7 +204,7 @@ public sealed class EventMessageProviderIntegrationTests
     {
         foreach (var candidate in EventLogSession.GlobalSession.GetLogNames())
         {
-            // Only modern channels carry an OwningPublisher distinct from the channel path itself.
+            // Only modern channels carry an OwningPublisher distinct from the channel path.
             if (!candidate.Contains('/'))
             {
                 continue;
@@ -268,7 +246,7 @@ public sealed class EventMessageProviderIntegrationTests
     {
         var muiFileName = binaryName + ".mui";
 
-        // Probe only locales the Win32 MUI loader actually consults: current UI culture chain + en-US fallback.
+        // Probe only the Win32 MUI loader order: current UI culture chain, then en-US.
         var probeOrder = new List<string>();
 
         for (var culture = CultureInfo.CurrentUICulture; !string.IsNullOrEmpty(culture.Name); culture = culture.Parent)
@@ -313,8 +291,7 @@ public sealed class EventMessageProviderIntegrationTests
                 continue;
             }
 
-            // Probe: confirm the legacy load actually produces zero messages.
-            // Common when registry points to %SystemRoot%\System32\foo.dll for software that's been uninstalled.
+            // Legacy registry paths can survive uninstall but load zero messages.
             var legacyMessages = EventMessageProvider.LoadMessagesFromFiles(legacyFiles, candidate);
 
             if (legacyMessages.Count > 0)
@@ -338,7 +315,7 @@ public sealed class EventMessageProviderIntegrationTests
                 continue;
             }
 
-            // Probe: confirm the modern path actually loads messages — otherwise the SUT's fallback would also be empty.
+            // Require modern metadata to load messages; otherwise the fallback would also be empty.
             var modernMessages = EventMessageProvider.LoadMessagesFromFiles([metadata.MessageFilePath], candidate);
 
             if (modernMessages.Count == 0)

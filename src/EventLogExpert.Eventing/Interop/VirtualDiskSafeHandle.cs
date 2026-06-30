@@ -5,10 +5,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace EventLogExpert.Eventing.Interop;
 
-/// <summary>
-///     An open virtual-disk handle from <see cref="NativeMethods.OpenVirtualDisk" />. Closing it auto-detaches the
-///     ISO because the attach is non-permanent, so a crashed run never leaves the image mounted.
-/// </summary>
+// Closing a non-permanent virtual disk handle auto-detaches the ISO.
 internal sealed class VirtualDiskSafeHandle() : SafeHandleZeroOrMinusOneIsInvalid(true)
 {
     // Must be public for the source-generated P/Invoke marshaller to construct the handle for a return value.

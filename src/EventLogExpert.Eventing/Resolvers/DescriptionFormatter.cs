@@ -13,32 +13,7 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.Resolvers;
 
-/// <summary>
-///     Resolves and formats the human-readable description for an event record from provider metadata, handling %N
-///     positional substitution, %%N parameter resolution, %%-escape cleanup, and the no-metadata fallback path.
-/// </summary>
-/// <remarks>
-///     <para>
-///         Construction injects the unified <see cref="TemplateAnalyzer" /> (for outType extraction), the optional
-///         <see cref="IEventResolverCache" /> for description / value interning, the optional <see cref="ITraceLogger" />
-///         for diagnostics, and a <see cref="Func{T, TResult}" /> delegate that exposes the owning
-///         <see cref="EventResolverBase" />'s protected virtual <c>TryGetSupplementalDetails</c> hook for the lazy-load
-///         fallback inside <c>PickParameterSourceForDescription</c>. Legacy-message disambiguation invokes the static
-///         <see cref="ModernEventMatcher.DisambiguateLegacyMessage" /> directly (no instance reference held).
-///     </para>
-///     <para>
-///         The delegate-injection pattern captures the virtual-method slot at base-ctor time via <c>ldvirtftn</c>. When
-///         derived ctors run (e.g., <see cref="EventResolver" /> override), the delegate dispatches to the override.
-///         Invocation only happens during <see cref="Resolve" /> after the derived ctor body has completed, so
-///         override-side fields are fully initialized.
-///     </para>
-///     <para>
-///         Note: the <c>supplementalProvider</c> may return non-null even when the <c>supplemental</c> parameter passed
-///         to <see cref="Resolve" /> is null at entry. This is the lazy backstop for the modernEvent-decisive path where
-///         <c>EventResolverBase.ResolveEvent</c> short-circuits supplemental loading. Implementers must NOT assume
-///         entry-supplemental-null means no supplemental exists.
-///     </para>
-/// </remarks>
+// supplementalProvider can lazy-load even when entry supplemental is null; do not treat null as final.
 internal sealed partial class DescriptionFormatter(
     TemplateAnalyzer templates,
     IEventResolverCache? cache,
@@ -63,7 +38,6 @@ internal sealed partial class DescriptionFormatter(
     private readonly Func<EventRecord, ProviderDetails?> _supplementalProvider = supplementalProvider;
     private readonly TemplateAnalyzer _templates = templates;
 
-    /// <summary>Resolve event descriptions from an event record.</summary>
     public string Resolve(
         EventRecord eventRecord,
         ProviderDetails? primaryDetails,
@@ -91,7 +65,6 @@ internal sealed partial class DescriptionFormatter(
                 PickParameterSourceForDescription(modernEvent.Description, primaryDetails, descriptionFromSupplemental, ref supplemental, eventRecord));
         }
 
-        // Legacy provider message lookup
         var legacyMessages = descriptionDetails.GetMessagesByShortId(eventRecord.Id);
 
         if (legacyMessages.Count == 1)
@@ -116,9 +89,7 @@ internal sealed partial class DescriptionFormatter(
 
             _logger?.Debug($"{nameof(Resolve)}: Multiple legacy messages found, could not disambiguate - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, MessageCount={legacyMessages.Count}");
 
-            // Last-resort: ambiguous primary may be resolvable via supplemental. ResolveEvent
-            // pre-loads supplemental and its modern event for count > 1, so both are already
-            // set here when supplemental is available.
+            // Ambiguous primary messages may resolve through preloaded supplemental metadata.
             if (supplemental is not null && !ReferenceEquals(supplemental, descriptionDetails))
             {
                 if (!string.IsNullOrEmpty(supplementalModernEvent?.Description))
@@ -127,8 +98,7 @@ internal sealed partial class DescriptionFormatter(
 
                     var supplementalProperties = GetFormattedProperties(supplementalModernEvent!.Template, eventRecord.Properties, supplemental.Maps);
 
-                    // Description came from supplemental, so resolve %%n parameter substitutions
-                    // against supplemental's parameter table first.
+                    // Supplemental descriptions resolve %%n against supplemental parameters first.
                     return FormatDescription(supplementalProperties, supplementalModernEvent.Description,
                         PickParameterSourceForDescription(supplementalModernEvent.Description, primaryDetails, true, ref supplemental, eventRecord));
                 }
@@ -146,9 +116,7 @@ internal sealed partial class DescriptionFormatter(
             }
         }
 
-        // Some events store the entire description in a single property when no template exists.
-        // Only the single-property case is meaningful here; multi-property events without a template
-        // cannot be rendered into a description and would just emit a misleading constant.
+        // Single-property template-less events can carry the full description; multi-property fallback would mislead.
         if (properties.Count == 1)
         {
             _logger?.Debug($"{nameof(Resolve)}: Using single-property description fallback - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
@@ -357,7 +325,7 @@ internal sealed partial class DescriptionFormatter(
     {
         byte[] bytes => Convert.ToHexString(bytes),
         SecurityIdentifier sid => sid.Value,
-        // Match Windows EvtFormatMessage, which renders GUID properties wrapped in braces.
+        // Windows EvtFormatMessage renders GUID properties wrapped in braces.
         Guid guidValue => guidValue.ToString("B"),
         _ => reference?.ToString() ?? string.Empty
     };
@@ -382,18 +350,14 @@ internal sealed partial class DescriptionFormatter(
 
         if (isClassic && eventRecord.Id == 0)
         {
-            // EventId 0 with the Classic keyword bit is what mmc renders as the Win32
-            // ERROR_SUCCESS text ("The operation completed successfully."). The Win32
-            // ERROR_SUCCESS code happens to be 0 too, but we are deliberately requesting
-            // the ERROR_SUCCESS message - not treating the EventId as a Win32 error code.
+            // Classic EventId 0 maps to the Win32 ERROR_SUCCESS message, not arbitrary Win32 error translation.
             const uint Win32ErrorSuccess = 0;
             systemMessage = NativeMethods.FormatSystemMessage(Win32ErrorSuccess);
         }
 
         string? propertyTail = BuildEventDataTail(properties);
 
-        // The propertyTail varies per event (timestamps, paths, IDs, etc.) - caching it
-        // would grow the description cache unboundedly.
+        // Do not cache property tails; per-event values would make the description cache unbounded.
         if (propertyTail is not null)
         {
             return string.IsNullOrWhiteSpace(systemMessage)
@@ -418,17 +382,12 @@ internal sealed partial class DescriptionFormatter(
 
         if (string.IsNullOrWhiteSpace(descriptionTemplate))
         {
-            // If there is only one property then this is what certain EventRecords look like
-            // when the entire description is a string literal, and there is no provider DLL needed.
-            // Found a few providers that have their properties wrapped with \r\n for some reason.
-            // Multi-property fall-through is a defensive backstop (e.g. a legacy message row with
-            // empty Text); DefaultFailedDescription is reserved for actual formatting exceptions.
+            // Single-property empty-template events can be literal descriptions; multi-property cases are not renderable.
             return properties.Count == 1
                 ? properties[0].TrimEnd('\0', '\r', '\n')
                 : DefaultNoMatchingDescription;
         }
 
-        // Guard against stack overflow from very large templates
         const int MaxStackAllocChars = 4096;
         int cleanupBufferSize = descriptionTemplate.Length * 2;
         char[]? cleanupRented = null;
@@ -474,7 +433,7 @@ internal sealed partial class DescriptionFormatter(
 
                 if (!propString.StartsWith("%%") && int.TryParse(propString.Trim(['{', '}', '%']), out var propIndex))
                 {
-                    // %0 is a Windows Event Log message terminator - skip it entirely
+                    // %0 is a Windows Event Log message terminator.
                     if (propIndex == 0)
                     {
                         lastIndex = match.Index + match.Length;
@@ -486,10 +445,7 @@ internal sealed partial class DescriptionFormatter(
                     {
                         _logger?.Debug($"{nameof(FormatDescription)}: Property index out of range - RequestedIndex={propIndex}, PropertyCount={properties.Count}, Template={descriptionTemplate}");
 
-                        // Substitute with empty string rather than failing the entire description.
-                        // This commonly occurs when a manifest template references more properties
-                        // than the event actually supplies (e.g., version mismatch or optional data).
-                        // The available properties are still correctly positional.
+                        // Missing optional/versioned properties substitute empty text so remaining positions stay aligned.
                         propString = ReadOnlySpan<char>.Empty;
                     }
                     else
@@ -508,15 +464,11 @@ internal sealed partial class DescriptionFormatter(
 
                     if (long.TryParse(parameterIdString, out long parameterId))
                     {
-                        // Some parameters exceed int size and need to be cast from long to int
-                        // because they are actually negative numbers
+                        // Large parameter ids may be negative signed values encoded in an unsigned token.
                         ReadOnlySpan<char> parameterMessage =
                             parameterSource?.GetParameterByRawId(unchecked((int)parameterId))?.Text ?? string.Empty;
 
-                        // Fallback to the cached system message table when the provider's parameter table has no
-                        // entry. Caching hits AND misses keeps foreign/uninstalled providers (whose codes never
-                        // resolve) from re-invoking Win32 FormatMessage on every event; an empty result still
-                        // leaves the %%N token unsubstituted, matching the prior behavior.
+                        // Cache system-message hits and misses so unresolved foreign-provider parameters do not call Win32 per event.
                         if (parameterMessage.IsEmpty && parameterId is > 0 and <= uint.MaxValue)
                         {
                             parameterMessage = NativeErrorResolver.GetSystemMessageCached((uint)parameterId);
@@ -524,7 +476,7 @@ internal sealed partial class DescriptionFormatter(
 
                         if (!parameterMessage.IsEmpty)
                         {
-                            // Remove only an exact trailing "%0" terminator, not individual chars
+                            // Remove only the exact trailing "%0" terminator.
                             parameterMessage = parameterMessage.EndsWith("%0")
                                 ? parameterMessage[..^2]
                                 : parameterMessage;
@@ -561,16 +513,13 @@ internal sealed partial class DescriptionFormatter(
 
             returnDescription = new string(updatedDescription[..currentLength]);
 
-            // Intern the formatted description so the many events sharing an identical description (recurring event
-            // types) reference one string instance. Mirrors the no-properties (~line 343) and exception (~line 466)
-            // paths which already cache; the cache is bounded so high-cardinality logs cannot grow it without limit.
+            // Intern repeated formatted descriptions; the bounded cache prevents high-cardinality growth.
             return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
         catch (InvalidOperationException ex)
         {
             _logger?.Warning($"{nameof(FormatDescription)}: InvalidOperationException - PropertyCount={properties.Count}, Template={descriptionTemplate}, Exception={ex.Message}");
 
-            // If the regex fails to match, then we just return the original description.
             returnDescription = description.ToString();
 
             return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
@@ -600,9 +549,7 @@ internal sealed partial class DescriptionFormatter(
 
         if (!template.IsEmpty)
         {
-            // EvtRender may or may not include hidden length-provider fields in its output.
-            // Choose the outType array whose length matches the actual property count.
-            // If neither matches, skip outType formatting to avoid misalignment.
+            // Match outTypes to actual property count because EvtRender may omit hidden length-provider fields.
             var meta = _templates.Analyze(template);
 
             if (meta.VisibleOutTypes.Length == properties.Count)
@@ -631,13 +578,7 @@ internal sealed partial class DescriptionFormatter(
         return formattedValues;
     }
 
-    /// <summary>
-    ///     Picks the parameter source for %%n substitutions, biased toward whichever provider supplied the description
-    ///     text. When <paramref name="descriptionFromSupplemental" /> is true, prefer supplemental's parameters and fall back
-    ///     to primary; otherwise prefer primary and fall back to supplemental (lazily loading it when not yet available).
-    ///     Short-circuits to <c>null</c> when the description has no %% tokens, avoiding the eager supplemental load on hot
-    ///     paths where the lookup would never fire.
-    /// </summary>
+    // Bias %%n lookup toward the provider that supplied the description, lazy-loading supplemental only when needed.
     private ProviderDetails? PickParameterSourceForDescription(
         string? descriptionTemplate,
         ProviderDetails? primary,

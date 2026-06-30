@@ -7,14 +7,7 @@ using System.Text.Json.Serialization;
 
 namespace EventLogExpert.DatabaseTools.Common.Ipc;
 
-/// <summary>
-///     Source-generated <see cref="JsonSerializerContext" /> for message + request types that flow over the
-///     elevation-helper IPC channel. Source-gen mode is <see cref="JsonSourceGenerationMode.Metadata" /> (NOT
-///     <c>Serialization</c>) so the runtime can still apply <see cref="RegexJsonConverter" /> via the per-context
-///     <see cref="JsonSerializerOptions.Converters" /> collection - the fast-path serialization mode skips runtime
-///     converter lookup. Every concrete derived message/request type is listed explicitly so polymorphic deserialization
-///     through the base type can locate its metadata.
-/// </summary>
+// Metadata mode is required so RegexJsonConverter is discovered at runtime; fast-path serialization skips converter lookup.
 [JsonSourceGenerationOptions(GenerationMode = JsonSourceGenerationMode.Metadata)]
 [JsonSerializable(typeof(DatabaseToolsIpcMessage))]
 [JsonSerializable(typeof(HelloMessage))]

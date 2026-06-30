@@ -18,8 +18,7 @@ namespace EventLogExpert.UI.Database;
 
 public sealed partial class DatabaseEntryRow : ComponentBase
 {
-    // Distinct OS versions shown before collapsing to "N+". DatabaseClassificationService reads one MORE than this (the
-    // cap + 1), so a meaningful count exceeding the cap means "more than cap distinct versions", rendered as "cap+".
+    // Classification reads one extra stamp so "9+" means more than nine distinct versions.
     private const int OsStampDisplayCap = 9;
 
     private static readonly IReadOnlyDictionary<string, object> s_ariaHiddenTrueAttributes =
@@ -84,8 +83,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private bool IsRestoreBlocked => IsUpgradeBlocked || IsUpgrading || UpgradeProgress is not null;
 
-    // The distinct OS stamps worth displaying. A legacy/unstamped row - all fields null, or whose only numeric signal is a
-    // non-positive build (0 is never a real build) or a bare revision - carries no real provenance and is dropped.
+    // Bare revisions and non-positive builds carry no provenance without edition/display version.
     private IReadOnlyList<ProviderDatabaseOsStamp> MeaningfulOsStamps =>
         Entry.OsStamps.Where(HasAnyField).ToList();
 
@@ -93,10 +91,9 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private string OsStampAriaLabel => $"Source OS: {OsStampDetail}";
 
-    // Full list (the hover title AND the accessible label) so the OS info is never hover-only.
+    // Keep full detail in both title and accessible label so OS info is not hover-only.
     private string OsStampDetail => string.Join("; ", MeaningfulOsStamps.Select(FormatStamp));
 
-    // Compact visible indicator: one stamp formatted, or "Mixed (N OS versions)" for a merged database.
     private string OsStampSummary
     {
         get
@@ -162,8 +159,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private static string? FormatBuildRevision(int? build, int? revision)
     {
-        // A build of 0 / negative is never a real Windows build, and a revision (UBR) is not meaningful without its build,
-        // so render the segment only for a valid (> 0) build. A revision of 0 IS valid for a real build (e.g. an RTM UBR).
+        // UBR is meaningful only with a real build; revision 0 is valid for RTM builds.
         if (build is not > 0) { return null; }
 
         return revision is not null
@@ -171,7 +167,6 @@ public sealed partial class DatabaseEntryRow : ComponentBase
             : build.Value.ToString(CultureInfo.InvariantCulture);
     }
 
-    // "Edition · DisplayVersion · Build.Revision" with null segments omitted; raw values, no marketing-name mapping.
     private static string FormatStamp(ProviderDatabaseOsStamp stamp)
     {
         var parts = new List<string>(3);
@@ -200,7 +195,6 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private void HandleContextMenu(MouseEventArgs args)
     {
-        // Suppressed in selection mode - bulk strip is the action surface.
         if (IsSelectionModeActive) { return; }
 
         var items = new List<MenuItem>

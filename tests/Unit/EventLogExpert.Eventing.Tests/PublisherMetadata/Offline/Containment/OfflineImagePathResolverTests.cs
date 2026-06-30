@@ -23,8 +23,7 @@ public sealed class OfflineImagePathResolverTests
                 new OfflineImagePathMapper(image.ImageRoot, logger: null),
                 new OfflineRootGuard(image.ImageRoot, logger: null));
 
-            // Lexically under the image, but the junction redirects outside it: the guard throws, yet the resolver must
-            // drop the value (return null) so a hostile image cannot abort the whole offline enumeration.
+            // Escaping junctions must be dropped so a hostile image cannot abort offline enumeration.
             Assert.Null(resolver.Resolve(@"C:\Windows\System32\linkdir\evil.dll", "resource"));
         }
         finally

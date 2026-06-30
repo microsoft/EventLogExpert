@@ -9,12 +9,6 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.PublisherMetadata;
 
-/// <summary>Provides metadata about an event log provider.</summary>
-/// <remarks>
-///     This class does not implement <see cref="IDisposable" />. The underlying <see cref="EvtHandle" /> is a
-///     <see cref="SafeHandle" /> that cleans itself up via its own finalizer. Instances are short-lived: each one is
-///     created for a single provider load, consumed once through <see cref="ToRawContent" />, and then discarded.
-/// </remarks>
 internal sealed class ProviderMetadata
 {
     private readonly EvtHandle _publisherMetadataHandle;

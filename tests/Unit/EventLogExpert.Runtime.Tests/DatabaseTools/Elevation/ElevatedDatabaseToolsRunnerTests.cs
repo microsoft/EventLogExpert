@@ -483,7 +483,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null),
             logSink, progress: null, cts.Token);
 
-        // Cancel before Hello arrives - give the runner a beat to enter the Hello wait, then cancel.
+        // Let the runner enter the Hello wait before cancelling.
         await Task.Delay(50, ct);
         cts.Cancel();
 
@@ -515,7 +515,6 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null),
             logSink, progress: null, cts.Token);
 
-        // Send a non-Hello message first to trigger the wrong-first-envelope early return.
         await WriteMessageAsync(clientWriter, new LogMessage(DateTime.UtcNow, LogLevel.Information, "early log"), ct);
 
         var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
@@ -528,9 +527,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
     [Fact]
     public async Task RunAsync_WhenHelloTimeoutAndHelperUnkillable_CentralizedFinallyCleansUpWithinBoundedTime()
     {
-        // Early-return path: helper spawns but never sends Hello, then proves unkillable. The centralized
-        // finally must: cancel reader, await pipeReader task (bounded), dispose pipe (graceful), bounded wait,
-        // fallback Kill (returns false), exit. Must not hang.
+        // No-Hello plus unkillable helper must still bound every cleanup wait.
         var ct = TestContext.Current.CancellationToken;
         await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
         var fakeProcess = new FakeElevatedHelperProcess(server, processId: 4242)
@@ -548,8 +545,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null),
             logSink, progress: null, cts.Token);
 
-        // Don't send Hello — let _helloTimeout (500ms) fire to trigger the early-return path. Centralized
-        // finally must clean up without hanging. Ceiling: hello-timeout + 2*exit-grace ≈ 1.5s. 10s slack.
+        // No Hello forces the 500 ms timeout; 10 s only bounds regression hangs.
         var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
@@ -560,8 +556,6 @@ public sealed class ElevatedDatabaseToolsRunnerTests
     [Fact]
     public async Task RunAsync_WhenHelperKillSucceedsAfterCancel_ReportsForceKilled()
     {
-        // Companion to the unkillable test: when Kill returns true (succeeds), Disposition=Succeeded and
-        // TranslateOutcome emits the existing "force-killed" message (NOT the orphan message).
         var ct = TestContext.Current.CancellationToken;
         await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
         var fakeProcess = new FakeElevatedHelperProcess(server, processId: 4242)
@@ -607,10 +601,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
     [Fact]
     public async Task RunAsync_WhenHelperUnkillableAfterCancel_DoesNotHangAndReportsOrphan()
     {
-        // Original bug: a helper that ignores CancelMessage AND can't be force-killed (medium-IL runner trying
-        // to kill a high-IL helper). Before the fix, the runner deadlocked on the unbounded WaitForExitAsync.
-        // After the fix, the kill-timer detects Kill returned false, disposes the pipe to unblock the drain
-        // loop, marks Disposition=Failed, and TranslateOutcome reports the orphan helper to the caller.
+        // Unkillable post-cancel helpers must dispose the pipe to unblock the drain instead of hanging on exit.
         var ct = TestContext.Current.CancellationToken;
         await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
         var fakeProcess = new FakeElevatedHelperProcess(server, processId: 4242)
@@ -638,7 +629,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         cts.Cancel();
 
-        // Ceiling: cancellation-grace (~500ms) + exit-grace (~500ms) for post-IPC bounded wait. 10s gives generous slack.
+        // 10 s bounds regressions around the cancellation-grace and exit-grace waits.
         var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
 
         Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
@@ -666,7 +657,6 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null),
             logSink, progress: null, cts.Token);
 
-        // Close the helper-side pipe immediately to trigger the pipe-closed-before-Hello path.
         await Task.Delay(50, ct);
         await client.DisposeAsync();
 
@@ -699,7 +689,6 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null),
             logSink, progress: null, cts.Token);
 
-        // Send a Hello with mismatched protocol version to trigger the protocol-mismatch early return.
         await WriteMessageAsync(clientWriter, new HelloMessage(4242, ProtocolVersion: 99), ct);
 
         var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);

@@ -12,18 +12,6 @@ using System.Diagnostics;
 
 namespace EventLogExpert.ElevationHelper.Operations;
 
-/// <summary>
-///     Helper-side handler for <see cref="ListImageEditionsIpcRequest" />: a read-only enumeration of an offline
-///     image's editions. A <c>.wim</c>/<c>.esd</c> is read directly; a <c>.iso</c> is mounted to read its inner
-///     <c>install.wim</c> and detached in the <c>finally</c>. On a readable image the editions are streamed back as an
-///     <see cref="ImageEditionsMessage" /> BEFORE the terminal success result, so the runner always pairs a success with a
-///     payload; an unreadable file or a failed mount surfaces as <see cref="DatabaseToolsOutcome.Failed" /> instead.
-/// </summary>
-/// <remarks>
-///     This runs OUTSIDE <see cref="DestructiveRecovery" /> because it neither writes a database nor renames anything
-///     - it only mounts (ISO) and reads. The ISO mount lifetime is bound to <see cref="OfflineIsoImage" />'s handle, so a
-///     crash before <c>Dispose</c> still detaches when the handle is reclaimed (orphan-mount-safe).
-/// </remarks>
 internal static class ListImageEditionsHandler
 {
     public static async Task<DatabaseToolsResult> HandleAsync(

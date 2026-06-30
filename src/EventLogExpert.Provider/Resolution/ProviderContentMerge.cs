@@ -3,23 +3,10 @@
 
 namespace EventLogExpert.Provider.Resolution;
 
-/// <summary>
-///     Shared deduplication primitives for collapsing the content of two or more provider rows that describe the same
-///     logical provider. Two callers consume these: the database upgrade/merge path (which treats a non-equivalent
-///     collision as corruption and throws) and, later, the resolve-time multi-version union (which treats a non-equivalent
-///     collision as legitimate version divergence and records it). Keeping the identity keys and equivalence rules in one
-///     place stops the two paths from drifting - a field one path collapses on but the other does not would desynchronize
-///     merge from union and silently change which row wins.
-/// </summary>
+// Merge and resolve-time union share identity/equivalence rules so row selection cannot drift.
 public static class ProviderContentMerge
 {
-    /// <summary>
-    ///     Deduplicates <paramref name="items" /> by identity, keeping the first occurrence of each identity in
-    ///     first-seen order (matching the prior <c>Dictionary.Values</c> enumeration with no removals). When a later item
-    ///     shares an earlier item's identity but is not equivalent to it, <paramref name="onConflict" /> is invoked
-    ///     synchronously with (existing, duplicate) - so a throwing callback short-circuits the merge exactly as before - and
-    ///     the existing winner is otherwise retained.
-    /// </summary>
+    // Keeps first identity in first-seen order; conflicts invoke the callback before retaining the winner.
     public static List<TModel> Deduplicate<TIdentity, TModel>(
         IEnumerable<TModel> items,
         Func<TModel, TIdentity> identitySelector,
@@ -66,22 +53,15 @@ public static class ProviderContentMerge
         TemplateSignature.Equal(left.Template.AsSpan(), right.Template.AsSpan()) &&
         string.Equals(left.Description, right.Description, StringComparison.Ordinal);
 
-    /// <summary>Extracts the <see cref="MessageIdentity" /> of a message row.</summary>
     public static MessageIdentity IdentityOf(MessageModel message) =>
         new(message.ShortId, message.RawId, message.LogLink, message.Tag);
 
-    /// <summary>Extracts the <see cref="EventIdentity" /> of an event row.</summary>
     public static EventIdentity IdentityOf(EventModel @event) =>
         new(@event.Id, @event.Version, @event.LogName);
 
     public static bool MapsAreEquivalent(ValueMapDefinition left, ValueMapDefinition right) =>
         left.IsBitMap == right.IsBitMap && left.Entries.SequenceEqual(right.Entries);
 
-    /// <summary>
-    ///     Merges value-map dictionaries (ordinal key comparison), keeping the first definition seen for each name. When
-    ///     a later dictionary maps a known name to a non-equivalent definition, <paramref name="onConflict" /> is invoked with
-    ///     (name, existing, duplicate).
-    /// </summary>
     public static Dictionary<string, ValueMapDefinition> MergeMaps(
         IEnumerable<IReadOnlyDictionary<string, ValueMapDefinition>> maps,
         Action<string, ValueMapDefinition, ValueMapDefinition> onConflict)
@@ -109,10 +89,6 @@ public static class ProviderContentMerge
         return merged;
     }
 
-    /// <summary>
-    ///     Picks the first non-empty value, invoking <paramref name="onConflict" /> with (winner, duplicate) when a later
-    ///     non-empty value disagrees with the winner. Returns null when every value is null or empty.
-    /// </summary>
     public static string? MergeScalarFirstNonEmpty(IEnumerable<string?> values, Action<string, string> onConflict)
     {
         string? winner = null;
@@ -137,11 +113,6 @@ public static class ProviderContentMerge
         return winner;
     }
 
-    /// <summary>
-    ///     Merges string-valued dictionaries, keeping the first value seen for each key (default
-    ///     <typeparamref name="TKey" /> equality). When a later dictionary maps a known key to a different value,
-    ///     <paramref name="onConflict" /> is invoked with (key, existing, duplicate).
-    /// </summary>
     public static Dictionary<TKey, string> MergeStringDictionary<TKey>(
         IEnumerable<IDictionary<TKey, string>> dictionaries,
         Action<TKey, string, string> onConflict)
@@ -181,9 +152,7 @@ public static class ProviderContentMerge
         return new HashSet<long>(left).SetEquals(right);
     }
 
-    /// <summary>Identity of a message-table row, matching the database merge key exactly.</summary>
     public readonly record struct MessageIdentity(short ShortId, long RawId, string? LogLink, string? Tag);
 
-    /// <summary>Identity of a modern event row, matching the database merge key exactly.</summary>
     public readonly record struct EventIdentity(long Id, byte Version, string? LogName);
 }

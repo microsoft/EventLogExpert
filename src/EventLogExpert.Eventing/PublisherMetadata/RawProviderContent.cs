@@ -20,7 +20,7 @@ internal sealed record RawNamedValue(ulong Value, uint MessageId, string? Inline
 
 internal sealed class RawProviderContent
 {
-    /// <summary>Channel reference id to log name; the per-event channel byte is looked up here for the event's log name.</summary>
+    // Channel keys are native channel reference ids used by each event's channel byte.
     public IReadOnlyDictionary<uint, string> Channels { get; init; } = ReadOnlyDictionary<uint, string>.Empty;
 
     public IReadOnlyList<RawProviderEvent> Events { get; init; } = [];
@@ -33,7 +33,6 @@ internal sealed class RawProviderContent
 
     public required Guid PublisherGuid { get; init; }
 
-    /// <summary>Resolves a message id to its text, or null when unresolved (native FormatMessage never returns null).</summary>
     public required Func<uint, string?> ResolveMessage { get; init; }
 
     public required string ResourceFilePath { get; init; }

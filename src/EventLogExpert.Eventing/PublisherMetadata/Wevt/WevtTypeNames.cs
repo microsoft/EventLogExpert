@@ -5,23 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Wevt;
 
-/// <summary>
-///     Maps a WEVT_TEMPLATE item's inType / outType byte to its manifest attribute string. inType values are the
-///     winmeta in-types; the non-zero outType values are validated against live templates. A zero outType byte means "use
-///     the inType's winmeta default outType": the live API always emits an outType attribute, even when it equals the
-///     default, so a zero byte resolves through the default table rather than being omitted.
-/// </summary>
-/// <remarks>
-///     Entries 0x0e-0x11 of the non-zero outType table were corrected from positional alignment against live
-///     templates (common guesses were wrong): 0x0e=xs:GUID, 0x0f=xs:hexBinary, 0x10=win:HexInt8, 0x11=win:HexInt16. 0x10
-///     is rendering-critical: the wrong guess (win:Pointer) is in the description formatter's display-as-hex set, so it
-///     rendered HexInt8 fields as 0x.. instead of decimal. 0x1f matches live casing exactly ("win:NTStatus", not
-///     "win:NTSTATUS"). The inType -> default outType table is the canonical winmeta default for each in-type,
-///     cross-checked against the explicit outType every real provider field carries: no real provider field stores a zero
-///     outType byte, so that table is defensive and exercised only by crafted input. An inType or non-zero outType byte
-///     absent from these tables is unrepresentable, and the caller fails the whole template closed rather than emit a
-///     guessed token.
-/// </remarks>
+// OutType 0 uses winmeta defaults; live-validated non-zero outTypes include corrected 0x0e-0x11 and NTStatus casing.
 internal static class WevtTypeNames
 {
     internal const byte ArrayFlag = 0x80;

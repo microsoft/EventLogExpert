@@ -5,18 +5,11 @@ using EventLogExpert.Logging.Abstractions;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
-/// <summary>The result of <see cref="OfflineIsoImage.TryMount(string, ITraceLogger?)" />: the outcome plus the mount.</summary>
 public readonly record struct OfflineIsoMountResult(OfflineIsoMountStatus Status, OfflineIsoImage? Image)
 {
     internal static OfflineIsoMountResult Failed(OfflineIsoMountStatus status) => new(status, null);
 }
 
-/// <summary>
-///     Mounts a Windows <c>.iso</c> read-only and exposes its <c>sources\install.wim</c> (else <c>install.esd</c>) so
-///     the existing WIM extractor can read it; an ISO is just a front-end producing a WIM. The mount detaches on
-///     <see cref="Dispose" />. The entry point NEVER throws for a bad / non-Windows / non-ISO file - it returns a typed
-///     <see cref="OfflineIsoMountStatus" />.
-/// </summary>
 public sealed class OfflineIsoImage : IDisposable
 {
     private readonly IDisposable _lease;
@@ -30,10 +23,6 @@ public sealed class OfflineIsoImage : IDisposable
         _logger = logger;
     }
 
-    /// <summary>
-    ///     Path to the install image inside the mounted ISO; pass to the WIM extractor. Valid until
-    ///     <see cref="Dispose" />.
-    /// </summary>
     public string InstallImagePath { get; }
 
     public static OfflineIsoMountResult TryMount(string isoPath, ITraceLogger? logger) =>
@@ -67,8 +56,7 @@ public sealed class OfflineIsoImage : IDisposable
                 attach.Status == IsoAttachStatus.NotAnIso ? OfflineIsoMountStatus.NotAnIso : OfflineIsoMountStatus.MountFailed);
         }
 
-        // install.wim first, then install.esd. The path is built from exact segments under the resolved volume - never a
-        // scan - so a crafted ISO cannot redirect the lookup outside the mount.
+        // Build exact install-image paths under the mounted volume; never scan or follow image-provided redirects.
         string? installImagePath = ResolveInstallImage(attach.VolumeRoot);
 
         if (installImagePath is null)

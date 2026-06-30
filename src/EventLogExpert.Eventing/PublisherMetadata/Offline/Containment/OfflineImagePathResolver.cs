@@ -3,19 +3,9 @@
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline.Containment;
 
-/// <summary>
-///     The single seam every offline registry reader uses to turn a stored path into one that is safe to open: map it
-///     onto the image (<see cref="OfflineImagePathMapper" />), then assert it stays inside the image (
-///     <see cref="OfflineRootGuard" />). Keeping the map-then-guard contract here means callers never see an unsafe path.
-/// </summary>
+// Map first, then guard, so offline registry paths never reach host filesystem unchecked.
 internal sealed class OfflineImagePathResolver(OfflineImagePathMapper mapper, OfflineRootGuard guard)
 {
-    /// <summary>
-    ///     Maps a single registry value onto the image, or <see langword="null" /> when it cannot be mapped safely - both
-    ///     lexically unsafe values (dropped by the mapper) and values that escape the image only through a reparse point (a
-    ///     junction in a hostile or corrupt image, caught by the guard) return <see langword="null" />, so one bad value is
-    ///     skipped rather than throwing out of the offline enumeration.
-    /// </summary>
     public string? Resolve(string? registryValue, string what)
     {
         string? reRooted = mapper.Map(registryValue);
@@ -28,19 +18,13 @@ internal sealed class OfflineImagePathResolver(OfflineImagePathMapper mapper, Of
         }
         catch (OfflineRootGuardViolationException)
         {
-            // The mapper already drops lexical escapes, so a guard violation here is a reparse point leaving the image -
-            // hostile/corrupt image content, not our re-rooting bug. Drop it (the guard already logged the violation) so the
-            // public LoadProviders enumeration honours its "never throws for a bad or hostile image" contract.
+            // Reparse-point escapes are hostile image content; drop them so one bad value cannot abort enumeration.
             return null;
         }
 
         return reRooted;
     }
 
-    /// <summary>
-    ///     Resolves each segment of a multi-valued (<c>;</c>-separated) registry path string, preserving order and
-    ///     dropping any that cannot be mapped safely.
-    /// </summary>
     public IReadOnlyList<string> ResolveMany(string? multiValue, string what)
     {
         if (string.IsNullOrWhiteSpace(multiValue)) { return []; }

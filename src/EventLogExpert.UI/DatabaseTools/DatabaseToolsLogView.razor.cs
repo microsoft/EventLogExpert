@@ -14,11 +14,6 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.DatabaseTools;
 
-/// <summary>
-///     Severity-colored, monospace log surface used by each DatabaseTools tab. Auto-scrolls to bottom on new entries
-///     ONLY when the user is already at the bottom; pauses auto-scroll and surfaces a "Jump to latest" pill when the user
-///     has scrolled up to inspect earlier output.
-/// </summary>
 public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 {
     private readonly DotNetObjectReference<DatabaseToolsLogView> _selfRef;
@@ -36,16 +31,8 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 
     [Parameter] public string FileNamePrefix { get; set; } = "database-tools";
 
-    /// <summary>
-    ///     Final outcome of the most recent operation. When non-null, the log toolbar shows a colored chip with the
-    ///     outcome between the entries count and Copy / Export.
-    /// </summary>
     [Parameter] public DatabaseToolsResult? Outcome { get; set; }
 
-    /// <summary>
-    ///     Content slot rendered on the LEFT side of the log toolbar (before the entries count). Tabs use this for their
-    ///     Run / Cancel button so the action lives in the same toolbar as Copy / Export.
-    /// </summary>
     [Parameter] public RenderFragment? ToolbarLeadingContent { get; set; }
 
     [Parameter] public RenderFragment? ToolbarTrailingContent { get; set; }
@@ -138,7 +125,7 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
         }
         catch (ObjectDisposedException)
         {
-            // Disposed between _disposed check and dispatch; ignore.
+            // Disposed between check and dispatch; ignore.
         }
     }
 
@@ -148,7 +135,6 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
         {
             if (_disposed) { return; }
 
-            // Inline JS module: scroll + pin tracker. Loaded lazily.
             try
             {
                 _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -166,17 +152,12 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 
         if (Entries.Count != _lastRenderedCount)
         {
-            // Track shrink (new run resets Entries to empty) and grow uniformly so auto-scroll
-            // re-arms on the next batch of entries after a reset.
             var grew = Entries.Count > _lastRenderedCount;
             _lastRenderedCount = Entries.Count;
 
             if (!grew)
             {
-                // Shrink → new run reset. Re-arm pinned state so the next batch auto-scrolls
-                // regardless of prior-run scroll position; JS pin tracker will re-compute on
-                // the user's next scroll event. StateHasChanged because the render that just
-                // committed drew the pill from the prior-run state.
+                // Re-arm after reset; this render used the prior pinned state.
                 _isAutoScrollPinned = true;
                 _showJumpToLatest = false;
                 StateHasChanged();

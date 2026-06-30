@@ -5,9 +5,6 @@ using System.Buffers;
 using System.Runtime.InteropServices;
 
 // ReSharper disable InconsistentNaming
-// We are defining some win32 types in this file, so we
-// are not following the usual C# naming conventions.
-
 namespace EventLogExpert.Eventing.Interop;
 
 internal static partial class NativeMethods
@@ -20,11 +17,7 @@ internal static partial class NativeMethods
 
     private const string Kernel32Api = "kernel32.dll";
 
-    /// <summary>
-    ///     Detects unresolved FormatMessage insert placeholders in the result. Catches positional inserts (%1 through
-    ///     %99, including forms like %1!s!) and common printf-style specifiers (%s, %d, %p, etc.) that appear in some message
-    ///     tables. Skips escaped percent signs (%%). Does not detect compound printf forms like %lu or %I64u.
-    /// </summary>
+    // Detects unresolved FormatMessage placeholders; compound printf forms are left as text.
     internal static bool ContainsFormatInsert(ReadOnlySpan<char> text)
     {
         for (int i = 0; i < text.Length - 1; i++)
@@ -33,7 +26,6 @@ internal static partial class NativeMethods
 
             char next = text[i + 1];
 
-            // %% is an escaped percent literal - skip it
             if (next == '%')
             {
                 i++;
@@ -41,13 +33,11 @@ internal static partial class NativeMethods
                 continue;
             }
 
-            // %1-%9 (and %10-%99) are FormatMessage positional inserts
             if (next is >= '1' and <= '9')
             {
                 return true;
             }
 
-            // Common printf-style format specifiers found in some message tables
             if (next is 's' or 'S' or 'd' or 'i' or 'u' or 'o'
                 or 'x' or 'X' or 'c' or 'C' or 'p'
                 or 'e' or 'E' or 'f' or 'F' or 'g' or 'G')
@@ -63,9 +53,7 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool CloseHandle(IntPtr handle);
 
-    // Returns an HRSRC, which is a non-owning pointer into the loaded module's resource section.
-    // It must NOT be released with FreeLibrary, so we deliberately marshal it as an IntPtr and
-    // not as a LibraryHandle (whose ReleaseHandle calls FreeLibrary).
+    // HRSRC is a non-owning module-resource pointer; do not wrap it in LibraryHandle.
     [LibraryImport(Kernel32Api, SetLastError = true)]
     internal static partial IntPtr FindResourceExA(
         LibraryHandle hModule,
@@ -73,8 +61,7 @@ internal static partial class NativeMethods
         int lpName,
         ushort wLanguage = 0);
 
-    // String-typed resource lookup (FindResourceExA only handles integer-typed resources). Used to locate the
-    // "WEVT_TEMPLATE" resource by name. Returns an HRSRC, a non-owning pointer; see FindResourceExA above.
+    // String resource lookup also returns a non-owning HRSRC.
     [LibraryImport(Kernel32Api, StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
     internal static partial IntPtr FindResourceW(
         LibraryHandle hModule,
@@ -91,7 +78,6 @@ internal static partial class NativeMethods
         int nSize,
         IntPtr arguments);
 
-    /// <summary>Formats an NTSTATUS code to a human-readable string using ntdll.dll's message table only.</summary>
     internal static string? FormatNtStatusMessage(uint ntStatus)
     {
         IntPtr ntdllHandle = GetModuleHandleW("ntdll.dll");
@@ -101,7 +87,6 @@ internal static partial class NativeMethods
         return FormatMessageFromModule(ntdllHandle, ntStatus);
     }
 
-    /// <summary>Formats an error code to a human-readable string using the system message table.</summary>
     internal static string? FormatSystemMessage(uint errorCode) =>
         FormatMessageWithRetry(
             FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -146,7 +131,6 @@ internal static partial class NativeMethods
 
         if (Marshal.GetLastWin32Error() != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER) { return null; }
 
-        // Retry with progressively larger pooled buffers
         ReadOnlySpan<int> retrySizes = [2048, 8192, 32768];
 
         foreach (int size in retrySizes)
@@ -179,11 +163,7 @@ internal static partial class NativeMethods
 
         if (result.Length == 0) { return null; }
 
-        // Reject messages that contain unresolved FormatMessage insert placeholders
-        // (e.g., "%1", "%1!s!", "%s", "%p"). These occur when FORMAT_MESSAGE_IGNORE_INSERTS is
-        // used with messages that expect parameters, producing misleading template text.
-        if (ContainsFormatInsert(result)) { return null; }
-
-        return new string(result);
+        // Ignore unresolved FormatMessage templates so placeholders are not returned as final text.
+        return ContainsFormatInsert(result) ? null : new string(result);
     }
 }

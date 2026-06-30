@@ -11,7 +11,6 @@ using System.Xml.Linq;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
-/// <summary>The production <see cref="IWimOperations" />, calling the real <c>wimgapi.dll</c> exports.</summary>
 internal sealed class WimOperations : IWimOperations
 {
     internal static WimOperations Instance { get; } = new();
@@ -33,17 +32,14 @@ internal sealed class WimOperations : IWimOperations
 
         if (image.IsInvalid) { return Marshal.GetLastWin32Error(); }
 
-        // The message callback serves two purposes: aborting on cancellation, and surfacing extraction progress so the
-        // multi-minute apply does not leave the log silent. Register it when EITHER is wanted. While registered the delegate
-        // MUST stay rooted for the whole apply (it fires per-message for minutes); a collected/moved delegate would be an
-        // intermittent AccessViolationException - the GC.KeepAlive in the finally pins it.
+        // Keep the WIM callback delegate rooted until after unregister; native callbacks may fire for minutes.
         NativeMethods.WimMessageCallback? messageCallback = null;
         IntPtr callbackPointer = IntPtr.Zero;
         uint registeredCallback = NativeMethods.WIM_INVALID_CALLBACK_VALUE;
 
         if (cancellationToken.CanBeCanceled || logger is not null)
         {
-            int lastReportedDecile = 0; // start past the 0% band so the first line is "10% complete", not "0% complete".
+            int lastReportedDecile = 0;
 
             messageCallback = (messageId, wParam, _, _) =>
             {
@@ -54,9 +50,8 @@ internal sealed class WimOperations : IWimOperations
                     return NativeMethods.WIM_MSG_SUCCESS;
                 }
 
-                int percent = (int)wParam; // WIM_MSG_PROGRESS: wParam is the percent complete (0-100).
+                int percent = (int)wParam; // WIM_MSG_PROGRESS: wParam is percent complete (0-100).
 
-                // One Information line per 10% crossed: enough to show the long apply is alive without flooding the log.
                 if (TryAdvanceProgressDecile(percent, ref lastReportedDecile))
                 {
                     logger.Information($"Extracting image: {percent}% complete...");
@@ -88,14 +83,11 @@ internal sealed class WimOperations : IWimOperations
                 NativeMethods.WIMUnregisterMessageCallback(wim, callbackPointer);
             }
 
-            // Root the delegate across the entire apply + unregister; only now may it be collected.
+            // Native callback lifetime ends only after unregister returns.
             GC.KeepAlive(messageCallback);
         }
     }
 
-    // Returns true the first time `percent` enters a higher 10% band than `lastReportedDecile` (which it advances), so a
-    // per-message progress callback emits at most one line per 10% crossed. Percents outside 0-100 are ignored. Internal
-    // for testing the throttling without driving the real native apply.
     internal static bool TryAdvanceProgressDecile(int percent, ref int lastReportedDecile)
     {
         if (percent is < 0 or > 100) { return false; }
@@ -158,7 +150,7 @@ internal sealed class WimOperations : IWimOperations
 
     private static IReadOnlyList<WimImageEntry> ParseImageEntries(string xml)
     {
-        // The buffer is UTF-16 and may carry a BOM; XDocument rejects a leading BOM character.
+        // WIM XML may include a BOM; XDocument rejects it as a leading character.
         string trimmed = xml.TrimStart('\uFEFF', '\u200B').Trim();
 
         if (trimmed.Length == 0) { return []; }

@@ -8,18 +8,8 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Wevt;
 
-/// <summary>
-///     Builds a <see cref="ProviderDetails" /> purely from a provider's WEVT_TEMPLATE and RT_MESSAGETABLE resources,
-///     with no EvtOpenPublisherMetadata call. The parsed tables are mapped to <see cref="RawProviderContent" /> in the
-///     same representation the native path produces, so the shared <see cref="ProviderDetailsFactory" /> resolves both
-///     sources identically.
-/// </summary>
 internal static partial class OfflineWevtProviderReader
 {
-    /// <summary>
-    ///     Maps the parsed provider tables to <see cref="RawProviderContent" />. Pure and host-independent: the unit
-    ///     tests drive it directly from crafted bytes plus a fake <paramref name="resolveMessage" />.
-    /// </summary>
     internal static RawProviderContent MapToRawContent(
         WevtProviderData data,
         Guid publisherGuid,
@@ -27,8 +17,7 @@ internal static partial class OfflineWevtProviderReader
         string resourceFilePath,
         Func<uint, string?> resolveMessage)
     {
-        // Levels are parsed for fidelity but intentionally not mapped: the native RawProviderContent carries no level
-        // table (event Level is the raw byte on each event), so omitting them keeps parity with the native path.
+        // Level table stays unmapped to preserve native RawProviderContent parity.
         return new RawProviderContent
         {
             ProviderName = providerName,
@@ -56,8 +45,7 @@ internal static partial class OfflineWevtProviderReader
 
             string? parameterText = resolveParameterText(unchecked((int)parameterId));
 
-            // An unresolved reference stays the literal %%NNNN so the render-time DescriptionFormatter can still resolve
-            // it (including its system-message-table fallback, which the offline db-create path must not bake in here).
+            // Keep unresolved %%NNNN literal so render-time formatting can still use provider/system fallback tables.
             if (string.IsNullOrEmpty(parameterText)) { return token; }
 
             return parameterText.EndsWith("%0", StringComparison.Ordinal) ? parameterText[..^2] : parameterText;
@@ -124,8 +112,7 @@ internal static partial class OfflineWevtProviderReader
 
         foreach (WevtChannelEntry channel in channels)
         {
-            // Inline-only, keyed by the channel reference id, first row wins - matching the native channel dictionary,
-            // which uses the inline ChannelReferencePath with no message resolution.
+            // Native channel dictionaries use first inline ChannelReferencePath by reference id, with no message lookup.
             if (channel.InlineName is { Length: > 0 } name)
             {
                 result.TryAdd(channel.ReferenceId, name);
@@ -143,8 +130,7 @@ internal static partial class OfflineWevtProviderReader
         {
             WevtProviderEvent source = events[index];
 
-            // An unrepresentable template (an unknown inType/outType byte, a non-reference length, or a malformed struct
-            // member range) makes the writer return null, which yields an empty string.
+            // Unrepresentable template bytes fail closed to an empty template instead of emitting guessed XML.
             string template = source.Template is null
                 ? string.Empty
                 : WevtTemplateWriter.Write(source.Template.Nodes, source.Template.Descriptors) ?? string.Empty;

@@ -10,8 +10,7 @@ public sealed class ProviderDetailsFactoryTests
     [Fact]
     public void Create_DuplicateProjectedOpcodeKey_KeepsFirstAndPreservesDistinctKeys()
     {
-        // Opcode keys are the value shifted right 16 bits: 0x00010000 and 0x0001FFFF both project to 1; 0x00020000 to 2.
-        // First write wins for the colliding key, and the distinct key survives (the dedup the native getters used to do).
+        // Opcode keys project from the high word; colliding projected keys keep the first native-style entry.
         var content = CreateContent(
             resolveMessage: _ => null,
             opcodes:
@@ -99,8 +98,7 @@ public sealed class ProviderDetailsFactoryTests
     [Fact]
     public void Create_InlineNameWithTrailingNull_IsTrimmed()
     {
-        // Native FormatMessage names arrive with a trailing '\0'; trimming lets the native and offline sources collapse
-        // to the same dictionary value.
+        // Native FormatMessage names can include a trailing null, so trimming preserves native/offline dedup parity.
         var content = CreateContent(
             resolveMessage: _ => null,
             opcodes: [new RawNamedValue(0x00030000, uint.MaxValue, "OpcodeName\0")]);
@@ -113,8 +111,7 @@ public sealed class ProviderDetailsFactoryTests
     [Fact]
     public void Create_MessageIdResolvesToNull_NameIsEmptyString()
     {
-        // The offline resolver may return null; the factory coalesces that to string.Empty (never null), so the
-        // encoder hashes it the same as the native path.
+        // Null offline descriptions coalesce to string.Empty so encoder hashes match the native path.
         var content = CreateContent(
             resolveMessage: _ => null,
             keywords: [new RawNamedValue(0x0000000000000002, 99, null)]);
@@ -133,7 +130,6 @@ public sealed class ProviderDetailsFactoryTests
 
         var details = ProviderDetailsFactory.Create(content, null);
 
-        // The message id wins over the inline name when a real id exists.
         Assert.Equal("ResolvedKeyword", details.Keywords[1L]);
     }
 
@@ -164,8 +160,7 @@ public sealed class ProviderDetailsFactoryTests
     [Fact]
     public void Create_ResolvedNameWithTrailingCrlf_IsTrimmed()
     {
-        // Offline message-table names arrive with a trailing '\r\n'; trimming lets the native and offline sources
-        // collapse to the same dictionary value.
+        // Offline message-table names can include trailing CRLF, so trimming preserves native/offline dedup parity.
         var content = CreateContent(
             resolveMessage: id => id == 77 ? "KeywordName\r\n" : null,
             keywords: [new RawNamedValue(0x4, 77, null)]);
@@ -225,8 +220,7 @@ public sealed class ProviderDetailsFactoryTests
     [Fact]
     public void InjectMapAttribute_EscapedFieldName_MatchesEscapedTemplate()
     {
-        // The template carries the field name XML-escaped; passing the raw name must still match because the search term
-        // is escaped the same way the template writer escaped it.
+        // Raw field names must match XML-escaped template names because map injection escapes the search term.
         string template = "<template><data name=\"a&amp;b\" inType=\"win:UInt32\"/></template>";
 
         string result = ProviderDetailsFactory.InjectMapAttribute(template, "a&b", "MyMap");

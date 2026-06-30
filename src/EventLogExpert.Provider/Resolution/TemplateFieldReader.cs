@@ -3,11 +3,7 @@
 
 namespace EventLogExpert.Provider.Resolution;
 
-/// <summary>
-///     Allocation-free enumerator over a template's &lt;data&gt; nodes - the shared decomposition used by the hash,
-///     the merge, and the resolver. Non-canonical elements fail closed to a raw node; <c>count</c> and &lt;struct&gt; are
-///     excluded as render-dead.
-/// </summary>
+// Non-canonical data nodes fail closed to raw spans; count and struct are render-dead.
 public ref struct TemplateFieldReader(ReadOnlySpan<char> template)
 {
     private const string DataTag = "<data";
@@ -32,7 +28,7 @@ public ref struct TemplateFieldReader(ReadOnlySpan<char> template)
             int dataIndex = searchStart + relative;
             int afterTag = dataIndex + DataTag.Length;
 
-            // Reject "<dataSource" and similar: the tag must be terminated by whitespace, '/', or '>'.
+            // Reject "<dataSource" and similar; the tag must be delimited.
             if (afterTag < span.Length)
             {
                 char next = span[afterTag];
@@ -50,7 +46,7 @@ public ref struct TemplateFieldReader(ReadOnlySpan<char> template)
 
             if (closeIndex == -1)
             {
-                // Unterminated element: fail closed to a raw node rather than dropping the remainder.
+                // Unterminated elements fail closed to raw spans rather than dropping content.
                 Current = TemplateField.RawElement(fromData);
                 _remaining = default;
 
@@ -109,7 +105,6 @@ public ref struct TemplateFieldReader(ReadOnlySpan<char> template)
         ReadOnlySpan<char> length = default;
         ReadOnlySpan<char> map = default;
 
-        // Single forward pass over the element's attributes.
         int pos = DataTag.Length;
 
         while (pos < element.Length)
@@ -132,7 +127,7 @@ public ref struct TemplateFieldReader(ReadOnlySpan<char> template)
 
             if (pos >= element.Length || element[pos] != '=')
             {
-                // A signature attribute with no value is non-canonical - fail closed.
+                // Signature attributes without values fail closed to preserve distinct raw elements.
                 if (signature) { return TemplateField.RawElement(element); }
 
                 continue;
@@ -144,7 +139,7 @@ public ref struct TemplateFieldReader(ReadOnlySpan<char> template)
 
             if (pos >= element.Length || element[pos] != '"')
             {
-                // Single-quoted / unquoted / missing value: fail closed for a signature attribute, otherwise skip it.
+                // Signature attributes require double-quoted values; otherwise fail closed.
                 if (signature) { return TemplateField.RawElement(element); }
 
                 pos = SkipValue(element, pos);
@@ -170,9 +165,7 @@ public ref struct TemplateFieldReader(ReadOnlySpan<char> template)
             else if (attributeName.Equals("map", StringComparison.OrdinalIgnoreCase)) { map = value; }
         }
 
-        // An element with no non-empty signature value (name/inType/outType/length/map all absent or empty) is
-        // non-canonical; fail closed to a raw node so two such elements stay distinct instead of collapsing to one
-        // all-empty parsed signature.
+        // All-empty signatures fail closed so distinct raw elements do not collapse together.
         if (name.IsEmpty && inType.IsEmpty && outType.IsEmpty && length.IsEmpty && map.IsEmpty)
         {
             return TemplateField.RawElement(element);

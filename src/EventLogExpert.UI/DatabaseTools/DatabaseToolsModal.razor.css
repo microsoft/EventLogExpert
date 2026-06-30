@@ -1,10 +1,4 @@
-/*
- * The .db-tabs-container wrapper is owned by DatabaseToolsModal so DBTools-scope CSS isolation
- * can target descendants of the tabs subtree (which is otherwise rendered by SidebarTabs<TTab>
- * with a different CSS-isolation scope). The `::deep` pseudo-element preserves DBTools's outer
- * scope on `.db-tabs-container` but disables scoping after it so these rules can reach into
- * elements rendered by SidebarTabs and the per-tab child components.
- */
+/* ::deep lets modal-scoped CSS reach SidebarTabs and child tab markup rendered under different isolation scopes. */
 
 .db-tabs-container {
     display: flex;
@@ -58,7 +52,7 @@
     min-width: 0;
 }
 
-/* Path / filter inputs need left-aligned content (global .input centers — appropriate for short values, awkward for paths). */
+/* Global .input centers short values; paths and filters need left alignment. */
 .db-tabs-container ::deep .db-tab-form .input {
     text-align: left;
 }
@@ -79,11 +73,7 @@
     white-space: nowrap;
 }
 
-/* ValueSelect renders its <input> inside a .dropdown-input wrapper (inline-block by default, so it shrinks to its
-   content). In the DBTools form, let the wrapper fill its grid column / flex slot like the plain .input fields, and let
-   the inner input fill the wrapper, so long values (a full image-edition label, or the existing-providers mode text)
-   are shown in full instead of being clipped to a narrow fixed width. The wrapper keeps its scoped .5rem horizontal
-   margin so its content left-aligns with (and gets the same right gutter as) the other rows' inputs. */
+/* ValueSelect wraps inputs in inline-block .dropdown-input; DBTools forms need it to fill the row. */
 .db-tabs-container ::deep .db-tab-form .dropdown-input {
     display: block;
     min-width: 0;
@@ -103,7 +93,6 @@
 
 .db-tabs-container ::deep .db-tab-form .filter-error {
     grid-column: 2;
-    /* Match the input's .5rem horizontal margin so the error text aligns with input content. */
     margin: 0 .5rem;
     color: var(--clr-red);
     min-height: 0;
@@ -111,7 +100,6 @@
 
 .db-tabs-container ::deep .db-tab-form .checkbox-label {
     grid-column: 2;
-    /* Match the input's .5rem horizontal margin so the checkbox lines up with the input content in adjacent rows. */
     margin: 0 .5rem;
     display: inline-flex;
     align-items: center;
@@ -120,7 +108,6 @@
 
 .db-tabs-container ::deep .db-tab-form .direction-row {
     grid-column: 2;
-    /* Match the input's .5rem horizontal margin so the italic text aligns with input content above. */
     margin: 0 .5rem;
     color: var(--text-secondary);
     font-style: italic;

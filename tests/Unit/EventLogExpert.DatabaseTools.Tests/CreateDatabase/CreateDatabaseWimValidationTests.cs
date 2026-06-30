@@ -8,12 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.DatabaseTools.Tests.CreateDatabase;
 
-/// <summary>
-///     Locks the kind-aware request validation for offline images. These combinations are pure (no <c>wimgapi</c>):
-///     they guard against a WIM option being silently ignored (which would build from the wrong source) and against
-///     opening a directory as a WIM or vice versa. The actual WIM extraction outcomes are covered by the seam-driven
-///     <c>OfflineWimImageTests</c> in the Eventing test project and the manual real-WIM E2E.
-/// </summary>
 public sealed class CreateDatabaseWimValidationTests
 {
     [Fact]
@@ -56,7 +50,6 @@ public sealed class CreateDatabaseWimValidationTests
         var logger = new CapturingTraceLogger();
         var request = Request(offlineImagePath: vhdx, kind: null);
 
-        // A .vhdx is read directly from its Windows partition, so no index is required.
         Assert.True(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
     }
 
@@ -113,8 +106,7 @@ public sealed class CreateDatabaseWimValidationTests
         var logger = new CapturingTraceLogger();
         var request = Request(offlineImagePath: wim, kind: OfflineImageKind.Directory);
 
-        // A .wim passed without --image-kind wim must not say "directory not found" (the file exists); the error should
-        // identify it as a file and point at --image-kind wim.
+        // A .wim without --image-kind wim must identify the wrong kind, not claim the existing file is missing.
         Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
         Assert.Contains(logger.Errors, error =>
             error.Contains("file", StringComparison.OrdinalIgnoreCase) && error.Contains("--image-kind wim", StringComparison.Ordinal));
@@ -281,7 +273,7 @@ public sealed class CreateDatabaseWimValidationTests
         var logger = new CapturingTraceLogger();
         var request = Request(offlineImagePath: wim, kind: OfflineImageKind.Wim, wimIndex: 1);
 
-        // Validation passes on the request shape; the index range, elevation, and extraction are checked by the apply.
+        // Apply owns index range, elevation, and extraction checks after request-shape validation.
         Assert.True(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
     }
 
@@ -349,7 +341,6 @@ public sealed class CreateDatabaseWimValidationTests
             }
             catch (IOException)
             {
-                // Best-effort cleanup.
             }
         }
     }

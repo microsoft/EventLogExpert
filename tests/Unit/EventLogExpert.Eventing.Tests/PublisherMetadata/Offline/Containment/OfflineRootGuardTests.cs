@@ -10,8 +10,7 @@ public sealed class OfflineRootGuardTests
     [Fact]
     public void Assert_HostPathOutsideImage_ThrowsEvenOnSameDrive()
     {
-        // The scaffold lives on the host drive, so the host's own C:\Windows is NOT under the image root - the guard must
-        // reject it, which a Path.GetPathRoot-based guard (treating C:\ as the root) would wrongly allow.
+        // Same-drive host paths catch Path.GetPathRoot-based containment bugs.
         using OfflineTestImage image = OfflineTestImage.Create();
         var guard = new OfflineRootGuard(image.ImageRoot, logger: null);
 
@@ -36,8 +35,7 @@ public sealed class OfflineRootGuardTests
             var guard = new OfflineRootGuard(image.ImageRoot, logger: null);
             string throughJunction = Path.Combine(junctionPath, "evil.dll");
 
-            // Lexically the path is under the image root, but the junction redirects outside it - the guard must resolve
-            // the reparse point and fail closed.
+            // Escaping junctions must resolve outside the image and fail closed.
             Assert.Throws<OfflineRootGuardViolationException>(() => guard.Assert(throughJunction, "resource"));
         }
         finally

@@ -6,13 +6,7 @@ using EventLogExpert.Runtime.Database.Upgrade;
 
 namespace EventLogExpert.UI.Tests.DatabaseTools.Tabs;
 
-/// <summary>
-///     Test-only fake of <see cref="IDatabaseService" /> that exposes real CLR field-like events and their
-///     invocation-list counts via <see cref="EntriesChangedHandlerCount" /> /
-///     <see cref="UpgradeBatchCompletedHandlerCount" />. NSubstitute proxies do not surface <c>GetInvocationList()</c> on
-///     intercepted events, so a hand-rolled fake is the cleanest way to assert unsubscribe coverage from the
-///     disposal-regression test.
-/// </summary>
+// Hand-rolled fake exposes event invocation lists because NSubstitute proxies hide them.
 internal sealed class FakeDatabaseService : IDatabaseService
 {
     public event EventHandler? EntriesChanged;

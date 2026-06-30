@@ -46,8 +46,7 @@ internal sealed class ProviderDatabaseMaintenance(ITraceLogger? logger = null) :
     {
         var stamps = new List<ProviderDatabaseOsStamp>();
 
-        // Read-only + pooling disabled so the file handle is released on dispose (no lingering pooled connection that
-        // could block a later delete/move). A raw DISTINCT query avoids EF Core evaluating Distinct() client-side.
+        // Pooling stays off so the disposed read-only connection cannot pin the file during later file operations.
         using var connection = new SqliteConnection($"Data Source={databasePath};Mode=ReadOnly;Pooling=False");
         connection.Open();
 

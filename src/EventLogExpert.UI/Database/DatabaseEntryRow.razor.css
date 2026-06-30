@@ -63,8 +63,6 @@
     flex: 1 1 auto;
     min-width: 0;
 
-    /* Reset the <button> chrome so the name reads as plain text on the row,
-       only the cursor and focus outline reveal that it's interactive. */
     margin: 0;
     padding: 0;
     border: 0;

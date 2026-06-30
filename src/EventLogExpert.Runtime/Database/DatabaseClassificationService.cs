@@ -10,8 +10,7 @@ namespace EventLogExpert.Runtime.Database;
 
 internal sealed class DatabaseClassificationService
 {
-    // Distinct OS stamps surfaced per database. The read fetches ONE MORE than this visible cap (cap + 1) so the row UI
-    // can distinguish "exactly cap" from "more than cap" and render a "cap+" indicator. Mirrors OsStampDisplayCap.
+    // Read cap + 1 to distinguish exactly cap from cap-plus in the row UI.
     private const int OsStampVisibleCap = 9;
 
     private readonly DatabaseRegistry _entryStore;
@@ -72,7 +71,7 @@ internal sealed class DatabaseClassificationService
         }
         catch (InvalidOperationException)
         {
-            // Entry was removed between SnapshotEntries() and MarkStatus(). Stale UI; nothing to retry.
+            // Stale UI: the entry disappeared, so there is nothing to retry.
             return;
         }
 
@@ -128,9 +127,7 @@ internal sealed class DatabaseClassificationService
             return new DatabaseClassificationResult(DatabaseStatus.ClassificationFailed, false, []);
         }
 
-        // Read OS stamps ONLY for a current-schema (Ready) database and in its OWN try: an obsolete schema may lack the
-        // stamp columns, and a stamp-read failure must never demote an otherwise-classified database to
-        // ClassificationFailed.
+        // Stamp reads are Ready-only and isolated so obsolete/malformed stamps cannot demote classification.
         var osStamps = status == DatabaseStatus.Ready ? ReadOsStamps(entry) : [];
 
         return new DatabaseClassificationResult(status, backupExists, osStamps);

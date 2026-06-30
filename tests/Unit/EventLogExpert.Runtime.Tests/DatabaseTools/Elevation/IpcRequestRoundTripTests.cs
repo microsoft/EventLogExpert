@@ -17,9 +17,7 @@ public sealed class IpcRequestRoundTripTests
     [Fact]
     public void CreateDatabaseIpcRequest_RoundTrips_PreservesOfflineImageFields()
     {
-        // The offline-image fields ride the same whole-record IPC payload to the elevated helper; the source-gen
-        // serializer must carry the nullable path, the enum (serialized numerically in Metadata mode), and the
-        // nullable index intact so a future elevated offline build sees exactly what the caller requested.
+        // Offline-image fields ride the same source-generated IPC payload the elevated helper consumes.
         var domain = new CreateDatabaseRequest(
             TargetPath: @"C:\out\target.db",
             SourcePath: null,
@@ -100,9 +98,7 @@ public sealed class IpcRequestRoundTripTests
     [Fact]
     public void ListImageEditionsIpcRequest_RoundTrips_PreservesImagePathAndVerbose()
     {
-        // The read-only list-editions request rides the same polymorphic IPC payload as the five operations; the
-        // source-gen serializer must carry its $type discriminator and the inner image path intact so the elevated
-        // helper enumerates the editions for exactly the image the caller selected.
+        // List-editions shares the polymorphic IPC payload, so its discriminator and image path must survive.
         var domain = new ListOfflineImageEditionsRequest(@"C:\images\windows.iso");
         var original = new ListImageEditionsIpcRequest(domain, Verbose: true);
 

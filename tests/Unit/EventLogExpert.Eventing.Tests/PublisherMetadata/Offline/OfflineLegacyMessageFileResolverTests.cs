@@ -75,8 +75,7 @@ public sealed class OfflineLegacyMessageFileResolverTests
         Assert.Equal(Path.Combine(image.RootDirectory, "Windows", "System32", "cat.dll"), files[0], ignoreCase: true);
         Assert.Equal(Path.Combine(image.RootDirectory, "Windows", "System32", "evt.dll"), files[1], ignoreCase: true);
 
-        // The parameter message file is excluded from the message list; it is surfaced separately by
-        // GetParameterFilesForLegacyProvider so offline databases stay comparable with native-built ones.
+        // Parameter files stay out of the message list because GetParameterFilesForLegacyProvider surfaces them separately.
         Assert.DoesNotContain(files, file => file.EndsWith("param.dll", StringComparison.OrdinalIgnoreCase));
     }
 

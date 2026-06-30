@@ -11,11 +11,6 @@ using System.Data.Common;
 
 namespace EventLogExpert.DatabaseTools.MergeDatabase;
 
-/// <summary>
-///     Merges providers from a source into a target database. Providers already in the target are skipped by default;
-///     when <see cref="MergeDatabaseRequest.Overwrite" /> is true, existing target rows for those providers are removed
-///     before re-inserting from the source.
-/// </summary>
 internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : OperationBase, IDatabaseToolsOperation
 {
     private const int BatchSize = 100;
@@ -86,10 +81,7 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
         {
             await using var targetContext = new ProviderDbContext(request.TargetDatabasePath, false, logger);
 
-            // Find which of the source's identities already exist in the target. Query target rows by NAME (SQLite
-            // cannot translate a composite-tuple IN), project KEYS only (no blob columns), then narrow to the exact
-            // (name, version) identities the source carries. Versions of a matched name that the source does NOT carry
-            // are intentionally left untouched.
+            // SQLite cannot translate composite IN, so query by name and narrow exact identities in memory.
             var identitiesAlreadyInTarget = new HashSet<ProviderIdentity>();
 
             for (var offset = 0; offset < sourceNames.Count; offset += ProviderSource.MaxInClauseParameters)
@@ -115,9 +107,7 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
                 }
             }
 
-            // Wrap the destructive phase (overwrite delete + provider copy) in a transaction so a cancel mid-flight
-            // does not leave the target with permanently-missing providers. The non-overwrite path is also wrapped
-            // so partial copies don't persist on failure - re-running merge produces the intended end state regardless.
+            // Wrap deletes and inserts so cancellation or failure cannot leave providers permanently missing.
             await using var transaction = await targetContext.Database.BeginTransactionAsync(cancellationToken);
 
             if (identitiesAlreadyInTarget.Count > 0)
@@ -128,9 +118,7 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
                 {
                     logger.Information($"Removing these provider version(s) from the target database...");
 
-                    // Delete only the colliding (name, version) identities by composite primary key via stub entities,
-                    // so the copy below re-inserts them from the source while any OTHER versions of those names already
-                    // in the target survive. Stub deletion deletes by key without materializing the (large) blob rows.
+                    // Delete only colliding identities so unrelated versions of the same provider survive.
                     foreach (var identity in identitiesAlreadyInTarget)
                     {
                         targetContext.Entry(new ProviderDetails { ProviderName = identity.ProviderName, VersionKey = identity.VersionKey })
@@ -192,8 +180,6 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
                 copiedCount += await FlushBatchAsync(logger, targetContext, pendingBatch, cancellationToken);
             }
 
-            // Commit only after every delete + insert succeeded. Disposing the transaction without committing
-            // (e.g., on OperationCanceledException or a thrown exception) rolls back the destructive phase.
             await transaction.CommitAsync(cancellationToken);
 
             logger.Information($"");

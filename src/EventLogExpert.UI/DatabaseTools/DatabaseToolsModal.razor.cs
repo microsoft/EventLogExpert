@@ -36,7 +36,6 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
 
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
-    /// <summary>True when any tab is mid-Run (so the modal close path must confirm cancel first).</summary>
     private bool AnyTabIsRunning =>
         (_showTab?.IsRunning ?? false) ||
         (_createTab?.IsRunning ?? false) ||
@@ -65,8 +64,6 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
     {
         await _autoImportCts.CancelAsync();
 
-        // CancelIfRunning is a no-op when not running; safe to call from all close paths.
-        // Manage tab is not a DatabaseToolsTabBase<TRequest> and has no Run/Cancel surface.
         _showTab?.CancelIfRunning();
         _createTab?.CancelIfRunning();
         _mergeTab?.CancelIfRunning();
@@ -83,17 +80,14 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
 
     protected override async Task<bool> OnRequestCloseAsync(ModalCloseRequest request)
     {
-        // 0. Manage tab in selection mode consumes the close request.
         if (_activeTab == DatabaseToolsTab.Manage && _manageTab is { IsInSelectionMode: true } manageTab)
         {
             await manageTab.ExitSelectionModeWithFocusAsync();
             return false;
         }
 
-        // 1. Hard-block while Manage-tab-initiated upgrade is in flight.
         if (_manageTab is { IsUpgradeInFlight: true }) { return false; }
 
-        // 2. Pending toggles → save prompt OR discard prompt.
         if (_manageTab is { HasPendingChanges: true })
         {
             var savePrompt = await ShowInlineAlertAsync(
@@ -126,11 +120,10 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
                 if (!closeAnyway.Accepted) { return false; }
             }
 
-            // Re-check after the async prompt round-trip.
+            // Async prompts can race Manage-tab upgrades; re-check before closing.
             if (_manageTab is { IsUpgradeInFlight: true }) { return false; }
         }
 
-        // 3. Existing AnyTabIsRunning prompt - preserves current behavior.
         if (AnyTabIsRunning)
         {
             var confirm = await ShowInlineAlertAsync(
@@ -146,7 +139,7 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
             if (!confirm.Accepted) { return false; }
         }
 
-        // 4. Final upgrade re-check covers upgrades started during the AnyTabIsRunning prompt.
+        // Covers upgrades started during the running-operation prompt.
         if (_manageTab is { IsUpgradeInFlight: true }) { return false; }
 
         return true;

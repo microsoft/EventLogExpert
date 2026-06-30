@@ -34,11 +34,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
     [Parameter] public bool Disabled { get; set; }
 
-    /// <summary>
-    ///     Text shown by a multi-select <see cref="ValueSelect{T}" /> when no values are selected. Defaults to "Empty";
-    ///     consumers should override with a domain-appropriate label such as "All" when an empty selection means "no filter
-    ///     applied".
-    /// </summary>
+    // Multi-select empty text should be domain-specific when empty means "All".
     [Parameter]
     public string EmptyText { get; set; } = "Empty";
 
@@ -72,9 +68,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
             if (!IsMultiSelect)
             {
-                // While an editable input is focused, show the raw value so the user can type/edit it directly. A display
-                // converter that expands the value to richer text (e.g. an image index to its full edition label) would
-                // otherwise overwrite each keystroke and break multi-character entry; the converted form is shown on blur.
+                // Editable inputs show raw text while focused so display converters cannot overwrite keystrokes.
                 if (IsInput && _inputFocused) { return $"{Value}"; }
 
                 return converter is null ? $"{Value}" : converter.Set(Value);
@@ -296,10 +290,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
             return;
         }
 
-        // The typed text is not convertible to T (e.g. a non-numeric entry in an editable numeric combobox). Surface
-        // that as "no value" instead of silently keeping the last valid one, so a consumer cannot submit a stale value
-        // that no longer matches what the input shows. (For T = string the conversion never fails, so this is a no-op
-        // for text inputs.)
+        // Conversion failure clears the value so consumers cannot submit stale data that no longer matches the input.
         Value = default!;
         await ValueChanged.InvokeAsync(Value);
     }
@@ -308,8 +299,6 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
     {
         if (!IsInput) { return; }
 
-        // Switch the editable input to its raw value for editing (see DisplayString). Re-render so the converted display
-        // form is replaced immediately on focus rather than only after the first keystroke.
         _inputFocused = true;
         StateHasChanged();
     }
