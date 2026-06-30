@@ -65,23 +65,13 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 
     private string OutcomeChipRole => Outcome?.Outcome == DatabaseToolsOutcome.Failed ? "alert" : "status";
 
-    private string OutcomeChipText
+    private string OutcomeChipText => Outcome?.Outcome switch
     {
-        get
-        {
-            if (Outcome is null) { return string.Empty; }
-
-            var seconds = Outcome.Duration.TotalSeconds;
-
-            return Outcome.Outcome switch
-            {
-                DatabaseToolsOutcome.Succeeded => $"Succeeded in {seconds:F1}s",
-                DatabaseToolsOutcome.Cancelled => $"Cancelled after {seconds:F1}s",
-                DatabaseToolsOutcome.Failed => $"Failed: {Outcome.FailureSummary ?? "see debug log"}",
-                _ => string.Empty
-            };
-        }
-    }
+        DatabaseToolsOutcome.Succeeded => "Succeeded",
+        DatabaseToolsOutcome.Cancelled => "Cancelled",
+        DatabaseToolsOutcome.Failed => "Failed",
+        _ => string.Empty
+    };
 
     public async ValueTask DisposeAsync()
     {
