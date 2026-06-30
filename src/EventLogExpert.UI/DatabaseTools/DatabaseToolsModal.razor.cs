@@ -3,6 +3,8 @@
 
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.DatabaseTools.Tabs;
@@ -21,6 +23,7 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
         (DatabaseToolsTab.Diff, "Diff Databases"),
         (DatabaseToolsTab.Upgrade, "Upgrade Database")
     ];
+    private readonly CancellationTokenSource _autoImportCts = new();
 
     private DatabaseToolsTab _activeTab = DatabaseToolsTab.Manage;
     private CreateDatabaseTab? _createTab;
@@ -31,6 +34,8 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
     private UpgradeDatabaseTab? _upgradeTab;
     private bool _verboseLogging;
 
+    [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
+
     /// <summary>True when any tab is mid-Run (so the modal close path must confirm cancel first).</summary>
     private bool AnyTabIsRunning =>
         (_showTab?.IsRunning ?? false) ||
@@ -39,12 +44,27 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
         (_diffTab?.IsRunning ?? false) ||
         (_upgradeTab?.IsRunning ?? false);
 
+    [Inject] private IDatabaseOperationCoordinator DatabaseOperationCoordinator { get; init; } = null!;
+
     [Inject] private ILogReloadCoordinator LogReloadCoordinator { get; init; } = null!;
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
+    protected override async ValueTask DisposeAsyncCore(bool disposing)
+    {
+        if (disposing)
+        {
+            await _autoImportCts.CancelAsync();
+            _autoImportCts.Dispose();
+        }
+
+        await base.DisposeAsyncCore(disposing);
+    }
+
     protected override async Task OnClosingAsync()
     {
+        await _autoImportCts.CancelAsync();
+
         // CancelIfRunning is a no-op when not running; safe to call from all close paths.
         // Manage tab is not a DatabaseToolsTabBase<TRequest> and has no Run/Cancel surface.
         _showTab?.CancelIfRunning();
@@ -132,6 +152,61 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
         return true;
     }
 
+    private async Task<bool> AskOverwriteAsync(string fileName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await ShowInlineAlertAsync(
+                new InlineAlertRequest(
+                    Title: "Database already exists",
+                    Message: $"{fileName} already exists. Overwrite?",
+                    AcceptLabel: "Overwrite",
+                    CancelLabel: "Skip",
+                    IsPrompt: false,
+                    PromptInitialValue: null),
+                cancellationToken);
+
+            return result.Accepted;
+        }
+        catch (ObjectDisposedException) { return false; }
+    }
+
+    private async Task HandleAutoImportAsync(string producedPath, bool enable)
+    {
+        try
+        {
+            var outcome = await DatabaseOperationCoordinator.ImportPathsAsync(
+                [producedPath],
+                enableOnImport: enable,
+                askOverwriteAsync: AskOverwriteAsync,
+                cancellationToken: _autoImportCts.Token);
+
+            if (!outcome.DatabaseStateChanged || outcome.Failures.Count > 0 || outcome.UpgradeFailures.Count > 0)
+            {
+                throw new InvalidOperationException("The database import did not complete.");
+            }
+
+            AnnouncementService.Announce(enable ? "Database imported and enabled" : "Database imported");
+
+            if (enable)
+            {
+                _activeTab = DatabaseToolsTab.Manage;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            await ShowAutoImportErrorAsync(Path.GetFileName(producedPath));
+            throw;
+        }
+        catch (Exception ex)
+        {
+            TraceLogger.Warning($"{nameof(DatabaseToolsModal)}.{nameof(HandleAutoImportAsync)} failed: {ex}");
+            await ShowAutoImportErrorAsync(Path.GetFileName(producedPath));
+            throw;
+        }
+    }
+
     private async Task PromptAndReloadOpenLogs()
     {
         if (!LogReloadCoordinator.HasActiveLogs) { return; }
@@ -166,5 +241,22 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
                     $"{nameof(DatabaseToolsModal)}.{nameof(PromptAndReloadOpenLogs)}: reload did not complete within timeout: {ex}");
             }
         }
+    }
+
+    private async Task ShowAutoImportErrorAsync(string fileName)
+    {
+        try
+        {
+            await ShowInlineAlertAsync(
+                new InlineAlertRequest(
+                    Title: "Import Failed",
+                    Message: $"The database was created, but '{fileName}' was not imported.",
+                    AcceptLabel: "OK",
+                    CancelLabel: "OK",
+                    IsPrompt: false,
+                    PromptInitialValue: null),
+                CancellationToken.None);
+        }
+        catch (ObjectDisposedException) { }
     }
 }

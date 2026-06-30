@@ -34,6 +34,14 @@ public interface IProviderDatabaseMaintenance
     void PrepareForFileDeletion();
 
     /// <summary>
+    ///     Reads up to <paramref name="limit" /> DISTINCT source-OS stamps from the <c>ProviderDetails</c> rows of the
+    ///     database at <paramref name="databasePath" />. Caller MUST only invoke this for a current-schema (Ready) database -
+    ///     an obsolete schema may lack the stamp columns and the read would throw. May throw on a malformed database; the
+    ///     caller is expected to treat any failure as "no stamps" without affecting the database's classification.
+    /// </summary>
+    IReadOnlyList<ProviderDatabaseOsStamp> ReadDistinctSourceOsStamps(string databasePath, int limit);
+
+    /// <summary>
     ///     Executes <c>PRAGMA wal_checkpoint(TRUNCATE)</c> on the database, then flushes all SQLite connection pools.
     ///     Both operations are performed together so that the temporary connection opened for the checkpoint does not remain
     ///     pooled.

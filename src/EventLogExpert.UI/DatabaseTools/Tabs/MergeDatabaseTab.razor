@@ -43,16 +43,30 @@
                 @bind-Value="_overwrite"
                 CssClass="input filter-dropdown overwrite-mode-select"
                 T="bool"
-                ToStringFunc="@(v => v ? "Overwrite" : "Keep")">
-                <ValueSelectItem T="bool" Value="false">Keep - skip providers already in target</ValueSelectItem>
-                <ValueSelectItem T="bool" Value="true">Overwrite - replace providers already in target</ValueSelectItem>
+                ToStringFunc="FormatOverwriteMode">
+                <ValueSelectItem T="bool" Value="false">@KeepModeLabel</ValueSelectItem>
+                <ValueSelectItem T="bool" Value="true">@OverwriteModeLabel</ValueSelectItem>
+            </ValueSelect>
+        </div>
+
+        <div class="form-row">
+            <label for="merge-auto-import" id="merge-auto-import-label">When finished</label>
+            <ValueSelect AriaLabelledBy="merge-auto-import-label"
+                @bind-Value="AutoImportMode"
+                CssClass="input"
+                Id="merge-auto-import"
+                T="AutoImportMode"
+                ToStringFunc="FormatAutoImportMode">
+                <ValueSelectItem T="AutoImportMode" Value="AutoImportMode.Off">Don't import</ValueSelectItem>
+                <ValueSelectItem T="AutoImportMode" Value="AutoImportMode.Import">Import database</ValueSelectItem>
+                <ValueSelectItem T="AutoImportMode" Value="AutoImportMode.ImportAndEnable">Import and enable</ValueSelectItem>
             </ValueSelect>
         </div>
     </div>
 
     <DatabaseToolsLogView Entries="@LogEntries" FileNamePrefix="merge-database" Outcome="@Outcome">
         <ToolbarLeadingContent>
-            @if (IsRunning)
+            @if (IsRunning && !IsImportInProgress)
             {
                 @if (IsCancelling)
                 {
@@ -65,8 +79,16 @@
             }
             else
             {
-                <PrimaryButton Disabled="@(!CanRun)" IconClass="bi bi-play-fill" OnClick="RunAsync">Run</PrimaryButton>
+                <PrimaryButton Disabled="@(!CanRun || IsRunning || IsImportInProgress || IsConfirming)" IconClass="bi bi-play-fill" OnClick="RunAsync">Run</PrimaryButton>
             }
         </ToolbarLeadingContent>
+        <ToolbarTrailingContent>
+            @if (ShouldShowImportDatabaseButton)
+            {
+                <Button Disabled="@IsImportDatabaseButtonDisabled" IconClass="bi bi-database-add" OnClick="ImportProducedDatabaseAsync">
+                    @ImportDatabaseButtonText
+                </Button>
+            }
+        </ToolbarTrailingContent>
     </DatabaseToolsLogView>
 </div>

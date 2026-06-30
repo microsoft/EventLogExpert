@@ -17,6 +17,11 @@
         }
 
         <div class="toolbar-trailing">
+            @if (ToolbarTrailingContent is not null)
+            {
+                @ToolbarTrailingContent
+            }
+
             <Button Disabled="@(Entries.Count == 0)" IconClass="bi bi-clipboard" OnClick="CopyAllAsync">
                 Copy
             </Button>

@@ -10,6 +10,9 @@ namespace EventLogExpert.UI.DatabaseTools.Tabs;
 
 public sealed partial class MergeDatabaseTab : DatabaseToolsTabBase<MergeDatabaseRequest>
 {
+    private const string KeepModeLabel = "Keep - skip providers already in target";
+    private const string OverwriteModeLabel = "Overwrite - replace providers already in target";
+
     private static readonly IReadOnlyList<string> s_dbExtensions = [".db"];
     private static readonly IReadOnlyList<string> s_sourceExtensions = [".db", ".evtx"];
 
@@ -20,6 +23,8 @@ public sealed partial class MergeDatabaseTab : DatabaseToolsTabBase<MergeDatabas
     protected override bool CanRun =>
         !string.IsNullOrWhiteSpace(_sourcePath) && !string.IsNullOrWhiteSpace(_targetPath);
 
+    protected override string? ProducedDatabasePathCandidate => _targetPath.Trim();
+
     protected override MergeDatabaseRequest BuildRequest() =>
         new(_sourcePath.Trim(), _targetPath.Trim(), _overwrite);
 
@@ -28,6 +33,9 @@ public sealed partial class MergeDatabaseTab : DatabaseToolsTabBase<MergeDatabas
         IProgress<LogRecord> logSink,
         CancellationToken cancellationToken) =>
         DatabaseToolsService.MergeAsync(request, logSink, progress: null, cancellationToken, VerboseLogging);
+
+    /// <summary>Full label for the selected existing-providers mode, shown in the collapsed select (matches the items).</summary>
+    private static string FormatOverwriteMode(bool overwrite) => overwrite ? OverwriteModeLabel : KeepModeLabel;
 
     private void OnSourcePathInput(ChangeEventArgs e) => _sourcePath = e.Value?.ToString() ?? string.Empty;
 

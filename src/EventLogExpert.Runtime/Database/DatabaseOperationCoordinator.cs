@@ -83,14 +83,27 @@ internal sealed class DatabaseOperationCoordinator(
 
                 if (sourcePaths.Count == 0) { return ImportOutcome.None; }
 
-                var skip = await ResolveImportConflictsAsync(sourcePaths, askOverwriteAsync, cancellationToken);
-                var result = await _databases.ImportAsync(sourcePaths, skip, cancellationToken);
-                var (title, message, severity) = BuildImportSummary(result);
-
-                ReportPostOperationResult(title, message, severity);
-
-                return new ImportOutcome(result.Imported, result.Failures, result.UpgradeFailures);
+                return await ImportPathsCoreAsync(sourcePaths, enableOnImport: false, askOverwriteAsync, cancellationToken);
             });
+    }
+
+    public async Task<ImportOutcome> ImportPathsAsync(
+        IReadOnlyList<string> sourcePaths,
+        bool enableOnImport,
+        Func<string, CancellationToken, Task<bool>>? askOverwriteAsync = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(sourcePaths);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (sourcePaths.Count == 0) { return ImportOutcome.None; }
+
+        return await RunOperationAsync(
+            operationName: "import",
+            failureTitle: "Import Failed",
+            operationNoun: "importing provider databases",
+            fallbackOutcome: ImportOutcome.None,
+            body: () => ImportPathsCoreAsync(sourcePaths, enableOnImport, askOverwriteAsync, cancellationToken));
     }
 
     public bool IsUpgradeInFlight(string fileName)
@@ -318,6 +331,57 @@ internal sealed class DatabaseOperationCoordinator(
         foreach (var entry in upgradeFailures) { parts.Add($"{entry.FileName} upgrade ({entry.Reason})"); }
 
         return $"failed: {string.Join(", ", parts)}";
+    }
+
+    private async Task EnableFreshlyImportedReadyDatabasesAsync(
+        ImportResult result,
+        CancellationToken cancellationToken)
+    {
+        if (result.Imported <= 0 || result.ImportedNames.Count == 0) { return; }
+
+        var importedNames = result.ImportedNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var readyDisabledNames = _databases.Entries
+            .Where(entry => importedNames.Contains(entry.FileName) && entry is { IsEnabled: false, Status: DatabaseStatus.Ready })
+            .Select(entry => entry.FileName)
+            .ToList();
+
+        if (readyDisabledNames.Count == 0) { return; }
+
+        await ApplyPendingTogglesAsync(readyDisabledNames, cancellationToken);
+
+        if (_logReload.HasActiveLogs)
+        {
+            await _logReload.ReloadAllActiveLogsAsync(cancellationToken);
+        }
+    }
+
+    private async Task<ImportOutcome> ImportPathsCoreAsync(
+        IReadOnlyList<string> sourcePaths,
+        bool enableOnImport,
+        Func<string, CancellationToken, Task<bool>>? askOverwriteAsync,
+        CancellationToken cancellationToken)
+    {
+        var skip = await ResolveImportConflictsAsync(sourcePaths, askOverwriteAsync, cancellationToken);
+        var result = await _databases.ImportAsync(sourcePaths, skip, cancellationToken);
+        var (title, message, severity) = BuildImportSummary(result);
+
+        ReportPostOperationResult(title, message, severity);
+
+        if (enableOnImport)
+        {
+            // The import already committed to disk; an enable/reload failure (incl. a reload timeout or cancel) must not
+            // turn a successful import into a reported failure. Isolate it: log and continue with the real import outcome.
+            try
+            {
+                await EnableFreshlyImportedReadyDatabasesAsync(result, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.Warning($"{nameof(ImportPathsCoreAsync)}: import succeeded but enable/reload did not complete: {ex}");
+            }
+        }
+
+        return new ImportOutcome(result.Imported, result.Failures, result.UpgradeFailures);
     }
 
     private void RaiseUpgradeStateChangedSafely()

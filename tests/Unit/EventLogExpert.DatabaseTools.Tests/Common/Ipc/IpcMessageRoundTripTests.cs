@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common.Ipc;
 using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.Eventing.PublisherMetadata.Offline;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
@@ -45,6 +46,40 @@ public sealed class IpcMessageRoundTripTests
         var hello = Assert.IsType<HelloMessage>(roundTripped);
         Assert.Equal(12345, hello.HelperProcessId);
         Assert.Equal(1, hello.ProtocolVersion);
+    }
+
+    [Fact]
+    public void ImageEditionsMessage_RoundTrips_PreservesStatusAndImages()
+    {
+        // The streamed editions payload carries the nested WimImageList status plus each WimImageEntry; the source-gen
+        // context must serialize the whole graph so the runner reconstructs the exact edition list the helper read.
+        var original = new ImageEditionsMessage(
+            WimImageListStatus.Ok,
+            [
+                new WimImageEntry(Index: 1, Name: "Windows 11 Pro", Edition: "Professional", TotalBytes: 15_000_000_000),
+                new WimImageEntry(Index: 2, Name: "Windows 11 Home", Edition: "Core", TotalBytes: null)
+            ]);
+
+        var roundTripped = SerializeDeserialize(original, out var json);
+
+        AssertDiscriminator(json, "image-editions");
+        var editions = Assert.IsType<ImageEditionsMessage>(roundTripped);
+        Assert.Equal(WimImageListStatus.Ok, editions.Status);
+        Assert.Equal(2, editions.Images.Count);
+        Assert.Equal(new WimImageEntry(1, "Windows 11 Pro", "Professional", 15_000_000_000), editions.Images[0]);
+        Assert.Equal(new WimImageEntry(2, "Windows 11 Home", "Core", null), editions.Images[1]);
+    }
+
+    [Fact]
+    public void ImageEditionsMessage_RoundTrips_WithEmptyImageList()
+    {
+        var original = new ImageEditionsMessage(WimImageListStatus.NotAWim, []);
+
+        var roundTripped = SerializeDeserialize(original, out _);
+
+        var editions = Assert.IsType<ImageEditionsMessage>(roundTripped);
+        Assert.Equal(WimImageListStatus.NotAWim, editions.Status);
+        Assert.Empty(editions.Images);
     }
 
     [Fact]

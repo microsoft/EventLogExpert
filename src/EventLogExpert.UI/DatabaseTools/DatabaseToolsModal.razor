@@ -16,42 +16,44 @@
     <ChildContent>
         <CascadingValue Name="VerboseLogging" Value="_verboseLogging">
             <CascadingValue IsFixed="true" Value="(IInlineAlertSurface)this">
-                <div class="db-tabs-container">
-                    <SidebarTabs @bind-ActiveTab="_activeTab"
-                        TablistAriaLabel="Database tools"
-                        Tabs="s_tabs"
-                        TTab="DatabaseToolsTab">
-                        <TabContent Context="tab">
-                            @switch (tab)
-                            {
-                                case DatabaseToolsTab.Show:
-                                    <ShowProvidersTab @ref="_showTab" />
+                <CascadingValue Name="RequestAutoImport" Value="HandleAutoImportAsync">
+                    <div class="db-tabs-container">
+                        <SidebarTabs @bind-ActiveTab="_activeTab"
+                            TablistAriaLabel="Database tools"
+                            Tabs="s_tabs"
+                            TTab="DatabaseToolsTab">
+                            <TabContent Context="tab">
+                                @switch (tab)
+                                {
+                                    case DatabaseToolsTab.Show:
+                                        <ShowProvidersTab @ref="_showTab" />
 
-                                    break;
-                                case DatabaseToolsTab.Create:
-                                    <CreateDatabaseTab @ref="_createTab" />
+                                        break;
+                                    case DatabaseToolsTab.Create:
+                                        <CreateDatabaseTab @ref="_createTab" />
 
-                                    break;
-                                case DatabaseToolsTab.Merge:
-                                    <MergeDatabaseTab @ref="_mergeTab" />
+                                        break;
+                                    case DatabaseToolsTab.Merge:
+                                        <MergeDatabaseTab @ref="_mergeTab" />
 
-                                    break;
-                                case DatabaseToolsTab.Diff:
-                                    <DiffDatabasesTab @ref="_diffTab" />
+                                        break;
+                                    case DatabaseToolsTab.Diff:
+                                        <DiffDatabasesTab @ref="_diffTab" />
 
-                                    break;
-                                case DatabaseToolsTab.Upgrade:
-                                    <UpgradeDatabaseTab @ref="_upgradeTab" />
+                                        break;
+                                    case DatabaseToolsTab.Upgrade:
+                                        <UpgradeDatabaseTab @ref="_upgradeTab" />
 
-                                    break;
-                                case DatabaseToolsTab.Manage:
-                                    <ManageDatabasesTab @ref="_manageTab" />
+                                        break;
+                                    case DatabaseToolsTab.Manage:
+                                        <ManageDatabasesTab @ref="_manageTab" />
 
-                                    break;
-                            }
-                        </TabContent>
-                    </SidebarTabs>
-                </div>
+                                        break;
+                                }
+                            </TabContent>
+                        </SidebarTabs>
+                    </div>
+                </CascadingValue>
             </CascadingValue>
         </CascadingValue>
     </ChildContent>

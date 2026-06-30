@@ -10,6 +10,10 @@ namespace EventLogExpert.Runtime.Database;
 
 internal sealed class DatabaseClassificationService
 {
+    // Distinct OS stamps surfaced per database. The read fetches ONE MORE than this visible cap (cap + 1) so the row UI
+    // can distinguish "exactly cap" from "more than cap" and render a "cap+" indicator. Mirrors OsStampDisplayCap.
+    private const int OsStampVisibleCap = 9;
+
     private readonly DatabaseRegistry _entryStore;
     private readonly FileLocationOptions _fileLocationOptions;
     private readonly IProviderDatabaseMaintenance _maintenance;
@@ -39,9 +43,7 @@ internal sealed class DatabaseClassificationService
         var statuses = await Task.Run(
                 () =>
                 {
-                    var perFile =
-                        new Dictionary<string, (DatabaseStatus Status, bool BackupExists)>(StringComparer
-                            .OrdinalIgnoreCase);
+                    var perFile = new Dictionary<string, DatabaseClassificationResult>(StringComparer.OrdinalIgnoreCase);
 
                     foreach (var entry in snapshot)
                     {
@@ -80,7 +82,7 @@ internal sealed class DatabaseClassificationService
             .ConfigureAwait(false);
 
         _entryStore.ApplyClassificationResults(
-            new Dictionary<string, (DatabaseStatus Status, bool BackupExists)>(StringComparer.OrdinalIgnoreCase)
+            new Dictionary<string, DatabaseClassificationResult>(StringComparer.OrdinalIgnoreCase)
             {
                 [fileName] = result
             });
@@ -98,32 +100,40 @@ internal sealed class DatabaseClassificationService
         };
     }
 
-    private (DatabaseStatus Status, bool BackupExists) ClassifyEntry(
+    private DatabaseClassificationResult ClassifyEntry(
         DatabaseEntry entry,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        DatabaseStatus status;
+        bool backupExists;
+
         try
         {
             if (!File.Exists(entry.FullPath) || new FileInfo(entry.FullPath).Length == 0)
             {
-                return (DatabaseStatus.UnrecognizedSchema, false);
+                return new DatabaseClassificationResult(DatabaseStatus.UnrecognizedSchema, false, []);
             }
 
             var state = _maintenance.CheckSchemaState(entry.FullPath);
-            var status = MapSchemaStateToStatus(state);
-            var backupExists = ProbeOrCleanupBackup(entry, status);
-
-            return (status, backupExists);
+            status = MapSchemaStateToStatus(state);
+            backupExists = ProbeOrCleanupBackup(entry, status);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseClassificationService)}.{nameof(ClassifyEntry)} failed to classify '{entry.FileName}': {ex}"));
 
-            return (DatabaseStatus.ClassificationFailed, false);
+            return new DatabaseClassificationResult(DatabaseStatus.ClassificationFailed, false, []);
         }
+
+        // Read OS stamps ONLY for a current-schema (Ready) database and in its OWN try: an obsolete schema may lack the
+        // stamp columns, and a stamp-read failure must never demote an otherwise-classified database to
+        // ClassificationFailed.
+        var osStamps = status == DatabaseStatus.Ready ? ReadOsStamps(entry) : [];
+
+        return new DatabaseClassificationResult(status, backupExists, osStamps);
     }
 
     private bool ProbeOrCleanupBackup(DatabaseEntry entry, DatabaseStatus status)
@@ -159,6 +169,21 @@ internal sealed class DatabaseClassificationService
         }
 
         return false;
+    }
+
+    private IReadOnlyList<ProviderDatabaseOsStamp> ReadOsStamps(DatabaseEntry entry)
+    {
+        try
+        {
+            return _maintenance.ReadDistinctSourceOsStamps(entry.FullPath, OsStampVisibleCap + 1);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
+                $"{nameof(DatabaseClassificationService)}.{nameof(ReadOsStamps)} failed for '{entry.FileName}': {ex.Message}"));
+
+            return [];
+        }
     }
 
     private async Task StartInitialClassificationAsync()

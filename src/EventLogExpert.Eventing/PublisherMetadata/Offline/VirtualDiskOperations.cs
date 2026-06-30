@@ -18,6 +18,11 @@ internal sealed class VirtualDiskOperations : IVirtualDiskOperations
 {
     internal static readonly VirtualDiskOperations Instance = new();
 
+    // PhysicalDrive checked before CDROM so a VHD/VHDX (\\.\PhysicalDriveN) is parsed correctly; both are disk numbers.
+    private static readonly string[] s_physicalPathMarkers = ["PHYSICALDRIVE", "CDROM"];
+
+    private enum WindowsVolumeResolution { Found, None, Multiple }
+
     public IsoAttachResult Attach(string isoPath, ITraceLogger? logger)
     {
         NativeMethods.VIRTUAL_STORAGE_TYPE storageType = new()
@@ -63,7 +68,7 @@ internal sealed class VirtualDiskOperations : IVirtualDiskOperations
         }
 
         // Disposing the handle (the lease) auto-detaches the ISO from here on; route every failure through it.
-        var lease = new IsoAttachLease(handle);
+        var lease = new VirtualDiskLease(handle);
 
         try
         {
@@ -86,6 +91,83 @@ internal sealed class VirtualDiskOperations : IVirtualDiskOperations
             lease.Dispose();
 
             return IsoAttachResult.Failed(IsoAttachStatus.Failed);
+        }
+    }
+
+    public VhdxAttachResult AttachVhdx(string vhdxPath, ITraceLogger? logger)
+    {
+        // DEVICE_UNKNOWN + the empty vendor GUID let Windows auto-detect .vhd vs .vhdx (no per-extension device id).
+        NativeMethods.VIRTUAL_STORAGE_TYPE storageType = new()
+        {
+            DeviceId = NativeMethods.VIRTUAL_STORAGE_TYPE_DEVICE_UNKNOWN,
+            VendorId = NativeMethods.VIRTUAL_STORAGE_TYPE_VENDOR_UNKNOWN
+        };
+
+        int openResult = NativeMethods.OpenVirtualDisk(
+            ref storageType,
+            vhdxPath,
+            NativeMethods.VIRTUAL_DISK_ACCESS_ATTACH_RO | NativeMethods.VIRTUAL_DISK_ACCESS_GET_INFO | NativeMethods.VIRTUAL_DISK_ACCESS_DETACH,
+            NativeMethods.OPEN_VIRTUAL_DISK_FLAG_NONE,
+            IntPtr.Zero,
+            out VirtualDiskSafeHandle handle);
+
+        if (openResult != Win32ErrorCodes.ERROR_SUCCESS)
+        {
+            handle.Dispose();
+            logger?.Debug($"{nameof(VirtualDiskOperations)}: OpenVirtualDisk failed for {vhdxPath} (error {openResult}).");
+
+            // A corrupt/unrecognized file is NotAVhdx; everything else (e.g. the host file is in use) is an environment
+            // failure surfaced as a generic mount failure.
+            bool badImage = openResult is Win32ErrorCodes.ERROR_FILE_CORRUPT or Win32ErrorCodes.ERROR_INVALID_PARAMETER or Win32ErrorCodes.ERROR_NOT_SUPPORTED;
+
+            return VhdxAttachResult.Failed(badImage ? VhdxAttachStatus.NotAVhdx : VhdxAttachStatus.Failed);
+        }
+
+        int attachResult = NativeMethods.AttachVirtualDisk(
+            handle,
+            IntPtr.Zero,
+            NativeMethods.ATTACH_VIRTUAL_DISK_FLAG_READ_ONLY | NativeMethods.ATTACH_VIRTUAL_DISK_FLAG_NO_DRIVE_LETTER,
+            0,
+            IntPtr.Zero,
+            IntPtr.Zero);
+
+        if (attachResult != Win32ErrorCodes.ERROR_SUCCESS)
+        {
+            // Open succeeded but attach failed: close the handle so the opened-but-unattached disk is not leaked.
+            handle.Dispose();
+            logger?.Debug($"{nameof(VirtualDiskOperations)}: AttachVirtualDisk failed for {vhdxPath} (error {attachResult}).");
+
+            return VhdxAttachResult.Failed(VhdxAttachStatus.Failed);
+        }
+
+        // Disposing the handle (the lease) auto-detaches the disk from here on; route every later failure through it so
+        // a partially-resolved mount is never left attached.
+        var lease = new VirtualDiskLease(handle);
+
+        try
+        {
+            (WindowsVolumeResolution resolution, string? volumeRoot) = ResolveWindowsVolume(handle, logger);
+
+            switch (resolution)
+            {
+                case WindowsVolumeResolution.Found:
+                    return new VhdxAttachResult(VhdxAttachStatus.Attached, volumeRoot, lease);
+                case WindowsVolumeResolution.Multiple:
+                    lease.Dispose();
+
+                    return VhdxAttachResult.Failed(VhdxAttachStatus.MultipleWindowsVolumes);
+                default:
+                    lease.Dispose();
+
+                    return VhdxAttachResult.Failed(VhdxAttachStatus.NoWindowsVolume);
+            }
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        {
+            logger?.Debug($"{nameof(VirtualDiskOperations)}: resolving the Windows volume for {vhdxPath} failed: {ex.Message}");
+            lease.Dispose();
+
+            return VhdxAttachResult.Failed(VhdxAttachStatus.Failed);
         }
     }
 
@@ -126,6 +208,61 @@ internal sealed class VirtualDiskOperations : IVirtualDiskOperations
         }
     }
 
+    private static List<string> FindWindowsVolumesOnDisk(uint diskNumber, ITraceLogger? logger)
+    {
+        var matches = new List<string>();
+        char[] volumeName = new char[64];
+        IntPtr find = NativeMethods.FindFirstVolumeW(volumeName, (uint)volumeName.Length);
+
+        if (find == IntPtr.Zero || find == new IntPtr(-1)) { return matches; }
+
+        try
+        {
+            do
+            {
+                string volume = new string(volumeName).TrimEnd('\0');
+
+                // A VHD/VHDX partition mounts as a fixed disk; skip CD-ROM/removable/network volumes outright.
+                if (NativeMethods.GetDriveTypeW(volume) != NativeMethods.DRIVE_FIXED) { continue; }
+
+                if (VolumeDeviceNumber(volume.TrimEnd('\\')) != diskNumber) { continue; }
+
+                // The volume GUID already ends with a single backslash, so Path.Join yields \\?\Volume{GUID}\Windows\System32
+                // with no double separator. BitLocker-locked / raw / non-NTFS partitions throw here; swallow and skip so a
+                // sibling readable Windows volume can still win.
+                try
+                {
+                    if (Directory.Exists(Path.Join(volume, "Windows", "System32"))) { matches.Add(volume); }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    logger?.Debug($"{nameof(VirtualDiskOperations)}: skipping unreadable volume {volume}: {ex.Message}");
+                }
+            }
+            while (NativeMethods.FindNextVolumeW(find, volumeName, (uint)volumeName.Length));
+        }
+        finally
+        {
+            NativeMethods.FindVolumeClose(find);
+        }
+
+        return matches;
+    }
+
+    // GetVirtualDiskPhysicalPath returns \\.\CDROMn for an attached ISO and \\.\PhysicalDriveN for an attached VHD/VHDX;
+    // both encode the disk number that STORAGE_DEVICE_NUMBER reports for the mounted volume. Unknown forms -> MaxValue.
+    private static uint ParsePhysicalPathNumber(string physicalPath)
+    {
+        foreach (string marker in s_physicalPathMarkers)
+        {
+            int index = physicalPath.LastIndexOf(marker, StringComparison.OrdinalIgnoreCase);
+
+            if (index >= 0 && uint.TryParse(physicalPath[(index + marker.Length)..], out uint number)) { return number; }
+        }
+
+        return uint.MaxValue;
+    }
+
     private static uint ResolveDeviceNumber(VirtualDiskSafeHandle handle)
     {
         uint sizeBytes = 0;
@@ -138,9 +275,8 @@ internal sealed class VirtualDiskOperations : IVirtualDiskOperations
         if (NativeMethods.GetVirtualDiskPhysicalPath(handle, ref sizeBytes, buffer) != Win32ErrorCodes.ERROR_SUCCESS) { return uint.MaxValue; }
 
         string path = new string(buffer).TrimEnd('\0');
-        int marker = path.LastIndexOf("CDROM", StringComparison.OrdinalIgnoreCase);
 
-        return marker >= 0 && uint.TryParse(path[(marker + "CDROM".Length)..], out uint number) ? number : uint.MaxValue;
+        return ParsePhysicalPathNumber(path);
     }
 
     // A mounted ISO appears as a CD-ROM device (GetVirtualDiskPhysicalPath returns \\.\CDROMn). The mount can lag the
@@ -168,6 +304,57 @@ internal sealed class VirtualDiskOperations : IVirtualDiskOperations
         return null;
     }
 
+    // A mounted VHD/VHDX appears as a fixed disk (GetVirtualDiskPhysicalPath returns \\.\PhysicalDriveN), and the
+    // filesystem can take longer to surface than an ISO, so retry the full enumerate->match->probe for ~10s. Match ONLY
+    // volumes on THIS disk so a sibling fixed disk is never picked. More than one Windows volume is a deliberate ambiguity
+    // error (never a silent guess); none after the window is reported distinctly so an encrypted / data-only disk gets an
+    // actionable message. A SINGLE match must repeat on a consecutive pass before it wins, so a second Windows partition
+    // whose filesystem surfaces a beat later still trips the ambiguity guard instead of being silently skipped.
+    private static (WindowsVolumeResolution Resolution, string? VolumeRoot) ResolveWindowsVolume(VirtualDiskSafeHandle handle, ITraceLogger? logger)
+    {
+        string? pendingSingle = null;
+
+        for (int attempt = 0; attempt < 50; attempt++)
+        {
+            uint diskNumber = ResolveDeviceNumber(handle);
+
+            List<string> candidates = diskNumber != uint.MaxValue
+                ? FindWindowsVolumesOnDisk(diskNumber, logger)
+                : [];
+
+            if (candidates.Count > 1)
+            {
+                logger?.Debug(
+                    $"{nameof(VirtualDiskOperations)}: multiple Windows volumes on disk {diskNumber}: {string.Join(", ", candidates)}.");
+
+                return (WindowsVolumeResolution.Multiple, null);
+            }
+
+            if (candidates.Count == 1)
+            {
+                // Accept only after the same single volume is seen on two consecutive passes; the intervening sleep gives
+                // a sibling Windows partition time to surface (which would flip the result to Multiple above).
+                if (pendingSingle == candidates[0]) { return (WindowsVolumeResolution.Found, candidates[0]); }
+
+                pendingSingle = candidates[0];
+            }
+            else
+            {
+                pendingSingle = null;
+            }
+
+            Thread.Sleep(200);
+        }
+
+        // A single volume that only surfaced on the final pass never got a confirming pass; accept it rather than fail a
+        // valid single-Windows disk (a sibling appearing later than the whole ~10s window is implausible).
+        if (pendingSingle is not null) { return (WindowsVolumeResolution.Found, pendingSingle); }
+
+        logger?.Debug($"{nameof(VirtualDiskOperations)}: no readable Windows volume resolved in time.");
+
+        return (WindowsVolumeResolution.None, null);
+    }
+
     private static uint VolumeDeviceNumber(string volumeDevice)
     {
         using SafeFileHandle device = NativeMethods.CreateFileW(
@@ -190,7 +377,7 @@ internal sealed class VirtualDiskOperations : IVirtualDiskOperations
         }
     }
 
-    private sealed class IsoAttachLease(VirtualDiskSafeHandle handle) : IDisposable
+    private sealed class VirtualDiskLease(VirtualDiskSafeHandle handle) : IDisposable
     {
         public void Dispose() => handle.Dispose();
     }

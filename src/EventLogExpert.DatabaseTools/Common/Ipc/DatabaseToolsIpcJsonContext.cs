@@ -1,6 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.CreateDatabase;
+using EventLogExpert.Eventing.PublisherMetadata.Offline;
 using System.Text.Json.Serialization;
 
 namespace EventLogExpert.DatabaseTools.Common.Ipc;
@@ -22,10 +24,15 @@ namespace EventLogExpert.DatabaseTools.Common.Ipc;
 [JsonSerializable(typeof(ResultMessage))]
 [JsonSerializable(typeof(FatalMessage))]
 [JsonSerializable(typeof(CancelMessage))]
+[JsonSerializable(typeof(ImageEditionsMessage))]
 [JsonSerializable(typeof(DatabaseToolsIpcRequest))]
 [JsonSerializable(typeof(ShowProvidersIpcRequest))]
 [JsonSerializable(typeof(CreateDatabaseIpcRequest))]
 [JsonSerializable(typeof(MergeDatabaseIpcRequest))]
 [JsonSerializable(typeof(DiffDatabaseIpcRequest))]
 [JsonSerializable(typeof(UpgradeDatabaseIpcRequest))]
+[JsonSerializable(typeof(ListImageEditionsIpcRequest))]
+[JsonSerializable(typeof(ListOfflineImageEditionsRequest))]
+[JsonSerializable(typeof(WimImageEntry))]
+[JsonSerializable(typeof(WimImageList))]
 internal partial class DatabaseToolsIpcJsonContext : JsonSerializerContext;

@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.Eventing.PublisherMetadata.Offline;
 using Microsoft.Extensions.Logging;
 using System.Text.Json.Serialization;
 
@@ -10,8 +11,8 @@ namespace EventLogExpert.DatabaseTools.Common.Ipc;
 /// <summary>
 ///     Polymorphic base for messages that flow over the elevation-helper IPC channel. The discriminator <c>$type</c>
 ///     selects the concrete message at deserialization time; callers always serialize through this base so the
-///     discriminator is emitted. Derived message records live in this same file so the polymorphic schema stays
-///     reviewable in one place.
+///     discriminator is emitted. Derived message records live in this same file so the polymorphic schema stays reviewable
+///     in one place.
 /// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
 [JsonDerivedType(typeof(HelloMessage), "hello")]
@@ -21,6 +22,7 @@ namespace EventLogExpert.DatabaseTools.Common.Ipc;
 [JsonDerivedType(typeof(ResultMessage), "result")]
 [JsonDerivedType(typeof(FatalMessage), "fatal")]
 [JsonDerivedType(typeof(CancelMessage), "cancel")]
+[JsonDerivedType(typeof(ImageEditionsMessage), "image-editions")]
 public abstract record DatabaseToolsIpcMessage;
 
 /// <summary>
@@ -32,7 +34,7 @@ public abstract record DatabaseToolsIpcMessage;
 /// <param name="ProtocolVersion">Schema version of the message contract; bump on breaking changes.</param>
 public sealed record HelloMessage(int HelperProcessId, int ProtocolVersion) : DatabaseToolsIpcMessage
 {
-    public const int CurrentProtocolVersion = 1;
+    public const int CurrentProtocolVersion = 2;
 }
 
 /// <summary>
@@ -86,8 +88,8 @@ public sealed record ResultMessage(DatabaseToolsOutcome Outcome, string? Failure
 
 /// <summary>
 ///     Emitted by the helper when an unhandled exception escapes the operation dispatcher. Distinguishes "helper
-///     crashed unexpectedly" from "operation completed with Failed outcome" - the latter uses
-///     <see cref="ResultMessage" />.
+///     crashed unexpectedly" from "operation completed with Failed outcome" - the latter uses <see cref="ResultMessage" />
+///     .
 /// </summary>
 /// <param name="ExceptionType">Fully-qualified type name of the unhandled exception.</param>
 /// <param name="Message">Exception message.</param>
@@ -97,7 +99,16 @@ public sealed record FatalMessage(string ExceptionType, string Message, string S
 /// <summary>
 ///     Control message written runner -> helper to request cooperative cancellation of the in-flight operation.
 ///     Helper-side dedicated control reader cancels the operation's linked <c>CancellationTokenSource</c>; the operation
-///     then completes via the normal <see cref="ResultMessage" /> path with
-///     <see cref="DatabaseToolsOutcome.Cancelled" />.
+///     then completes via the normal <see cref="ResultMessage" /> path with <see cref="DatabaseToolsOutcome.Cancelled" />.
 /// </summary>
 public sealed record CancelMessage : DatabaseToolsIpcMessage;
+
+/// <summary>
+///     Streamed payload from the helper's read-only list-editions operation, emitted BEFORE the terminal
+///     <see cref="ResultMessage" />. Carries the enumerated offline-image editions (the <c>--wim-index</c> choices) so the
+///     UI can populate its image-index picker. Kept distinct from <see cref="ResultMessage" /> (which is terminal and
+///     carries only the outcome) so a streaming payload is never conflated with completion.
+/// </summary>
+/// <param name="Status">Whether the image's edition metadata could be read.</param>
+/// <param name="Images">The enumerated editions; empty when <paramref name="Status" /> is not <c>Ok</c>.</param>
+public sealed record ImageEditionsMessage(WimImageListStatus Status, IReadOnlyList<WimImageEntry> Images) : DatabaseToolsIpcMessage;

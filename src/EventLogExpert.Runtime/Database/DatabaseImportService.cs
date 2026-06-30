@@ -130,7 +130,10 @@ internal sealed class DatabaseImportService(
 
                     using (_registry.ReserveFileOperation(fileName, nameof(ImportAsync)))
                     {
-                        File.Copy(sourceFilePath, destinationPath, true);
+                        if (!PathsEqual(sourceFilePath, destinationPath))
+                        {
+                            File.Copy(sourceFilePath, destinationPath, true);
+                        }
                     }
 
                     importedCount++;
@@ -150,7 +153,7 @@ internal sealed class DatabaseImportService(
 
         if (importedCount <= 0)
         {
-            return new ImportResult(importedCount, failures, []);
+            return new ImportResult(importedCount, importedNames, failures, []);
         }
 
         _registry.MarkFreshlyImportedDisabled(freshlyImportedNames);
@@ -178,7 +181,7 @@ internal sealed class DatabaseImportService(
 
         if (upgradeNeeded.Count <= 0)
         {
-            return new ImportResult(importedCount, failures, upgradeFailures);
+            return new ImportResult(importedCount, importedNames, failures, upgradeFailures);
         }
 
         var batchResult = await _upgradeService.UpgradeBatchAsync(
@@ -191,8 +194,11 @@ internal sealed class DatabaseImportService(
             .Select(failure => new ImportFailure(failure.FileName, failure.Message))
             .ToList();
 
-        return new ImportResult(importedCount, failures, upgradeFailures);
+        return new ImportResult(importedCount, importedNames, failures, upgradeFailures);
     }
+
+    private static bool PathsEqual(string left, string right) =>
+        string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), StringComparison.OrdinalIgnoreCase);
 
     private async Task<(int Imported, IReadOnlyList<ImportFailure> Failures, IReadOnlyList<string> ImportedNames)>
         ImportZipAsync(

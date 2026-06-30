@@ -37,6 +37,13 @@ internal static class OperationDispatcher
         var logSink = new IpcLogSink(writer);
         var progressSink = new IpcProgressSink(writer);
 
+        // The list-editions request is read-only (it mounts/reads an image and streams the editions back); it never
+        // writes or renames a database, so it bypasses the destructive-recovery wrapper the five operations go through.
+        if (request is ListImageEditionsIpcRequest listEditions)
+        {
+            return await ListImageEditionsHandler.HandleAsync(listEditions.Request, writer, listEditions.Verbose, cancellationToken);
+        }
+
         return await DestructiveRecovery.WrapAsync(
             request,
             (req, ct) => RawDispatchAsync(service, req, logSink, progressSink, ct),
