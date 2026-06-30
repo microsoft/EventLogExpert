@@ -22,6 +22,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
     private bool _inputFocused;
     private bool _isOpen;
     private bool _preventDefault;
+    private string? _rawInput;
     private ElementReference _selectComponent;
     private DotNetObjectReference<ValueSelect<T>>? _selfRef;
 
@@ -68,8 +69,8 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
             if (!IsMultiSelect)
             {
-                // Editable inputs show raw text while focused so display converters cannot overwrite keystrokes.
-                if (IsInput && _inputFocused) { return $"{Value}"; }
+                // While focused, echo the user's raw keystrokes so a parse failure does not wipe in-progress text.
+                if (IsInput && _inputFocused) { return _rawInput ?? $"{Value}"; }
 
                 return converter is null ? $"{Value}" : converter.Set(Value);
             }
@@ -186,6 +187,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
             }
 
             Value = item;
+            _rawInput = item is null ? null : $"{item}";
             await ValueChanged.InvokeAsync(Value);
         }
     }
@@ -277,11 +279,14 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         if (!IsInput || !_inputFocused) { return; }
 
         _inputFocused = false;
+        _rawInput = null;
         StateHasChanged();
     }
 
     private async Task OnInputChange(ChangeEventArgs args)
     {
+        _rawInput = $"{args.Value}";
+
         if (BindConverter.TryConvertTo<T>($"{args.Value}", null, out var result))
         {
             Value = result;
@@ -300,6 +305,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         if (!IsInput) { return; }
 
         _inputFocused = true;
+        _rawInput = $"{Value}";
         StateHasChanged();
     }
 

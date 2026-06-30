@@ -3,6 +3,7 @@
 
 using Bunit;
 using EventLogExpert.UI.Inputs;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace EventLogExpert.UI.Tests.Inputs;
 
@@ -11,6 +12,24 @@ public sealed class ValueSelectTests : BunitContext
     public ValueSelectTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
+    }
+
+    [Fact]
+    public void Input_WhenFocusedAndTypedTextDoesNotParse_KeepsTypedTextSoItCanBeCorrected()
+    {
+        int? bound = 7;
+        var component = Render<ValueSelect<int?>>(parameters => parameters
+            .Add(p => p.IsInput, true)
+            .Add(p => p.Value, bound)
+            .Add(p => p.ValueChanged, value => bound = value));
+
+        var input = component.Find("input[role='combobox']");
+        input.TriggerEvent("onfocus", new FocusEventArgs());
+        input.Input("12x");
+
+        // The value clears so consumers cannot submit invalid input, but the input keeps the typed text to be corrected.
+        Assert.Null(bound);
+        Assert.Equal("12x", component.Find("input[role='combobox']").GetAttribute("value"));
     }
 
     [Fact]
