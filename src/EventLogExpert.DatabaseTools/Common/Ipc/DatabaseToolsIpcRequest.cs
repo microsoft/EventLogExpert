@@ -22,6 +22,7 @@ namespace EventLogExpert.DatabaseTools.Common.Ipc;
 [JsonDerivedType(typeof(MergeDatabaseIpcRequest), "merge")]
 [JsonDerivedType(typeof(DiffDatabaseIpcRequest), "diff")]
 [JsonDerivedType(typeof(UpgradeDatabaseIpcRequest), "upgrade")]
+[JsonDerivedType(typeof(ListImageEditionsIpcRequest), "list-editions")]
 public abstract record DatabaseToolsIpcRequest(bool Verbose);
 
 /// <param name="Request">The matching domain request record.</param>
@@ -43,3 +44,12 @@ public sealed record DiffDatabaseIpcRequest(DiffDatabaseRequest Request, bool Ve
 /// <param name="Request">The matching domain request record.</param>
 /// <param name="Verbose">Lowers the helper's streaming-trace-logger threshold to Trace when true.</param>
 public sealed record UpgradeDatabaseIpcRequest(UpgradeDatabaseRequest Request, bool Verbose) : DatabaseToolsIpcRequest(Verbose);
+
+/// <summary>
+///     Read-only request to enumerate an offline image's editions (the <c>--wim-index</c> choices). Unlike the five
+///     operation requests it returns its payload through a streamed <see cref="ImageEditionsMessage" /> before the
+///     terminal result, rather than persisting anything.
+/// </summary>
+/// <param name="Request">The matching domain request record.</param>
+/// <param name="Verbose">Lowers the helper's streaming-trace-logger threshold to Trace when true.</param>
+public sealed record ListImageEditionsIpcRequest(ListOfflineImageEditionsRequest Request, bool Verbose) : DatabaseToolsIpcRequest(Verbose);

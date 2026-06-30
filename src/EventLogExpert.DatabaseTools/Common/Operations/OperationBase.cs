@@ -23,6 +23,13 @@ internal abstract class OperationBase
     private string _providerDetailFormat = "{0, -14} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8} {6, 8}";
 
     /// <summary>
+    ///     A user-actionable failure reason worth surfacing in the result chip (see
+    ///     <see cref="IDatabaseToolsOperation.FailureSummary" />). Operations set this via <see cref="SetFailureSummary" />
+    ///     when they fail-fast on a destination/scratch write denial so the actionable remedy is not buried in the log.
+    /// </summary>
+    public string? FailureSummary { get; private set; }
+
+    /// <summary>
     ///     Cleans up a partially-created .db file after an operation aborts (cancellation, fatal exception). EF Core's
     ///     SqliteConnection pool keeps the file handle alive across <c>DbContext.Dispose</c>, so a naive <c>File.Delete</c>
     ///     hits a sharing violation on Windows. Mirrors the codebase pattern at
@@ -166,4 +173,7 @@ internal abstract class OperationBase
 
         logger.Information($"{line}");
     }
+
+    /// <summary>Records a user-actionable <see cref="FailureSummary" /> for a fail-fast outcome.</summary>
+    protected void SetFailureSummary(string summary) => FailureSummary = summary;
 }

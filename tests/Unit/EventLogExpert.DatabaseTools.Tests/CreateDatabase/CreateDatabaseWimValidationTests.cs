@@ -38,6 +38,29 @@ public sealed class CreateDatabaseWimValidationTests
     }
 
     [Fact]
+    public void Validate_AutoDetectsVhd_FromExtension_WithoutIndex_Accepts()
+    {
+        using var workspace = new TempFiles();
+        string vhd = workspace.CreateFile("disk.vhd");
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: vhd, kind: null);
+
+        Assert.True(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+    }
+
+    [Fact]
+    public void Validate_AutoDetectsVhdx_FromExtension_WithoutIndex_Accepts()
+    {
+        using var workspace = new TempFiles();
+        string vhdx = workspace.CreateFile("disk.vhdx");
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: vhdx, kind: null);
+
+        // A .vhdx is read directly from its Windows partition, so no index is required.
+        Assert.True(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+    }
+
+    [Fact]
     public void Validate_AutoDetectsWim_FromExtension_WithIndex_Accepts()
     {
         using var workspace = new TempFiles();
@@ -186,6 +209,40 @@ public sealed class CreateDatabaseWimValidationTests
     {
         var logger = new CapturingTraceLogger();
         var request = Request(offlineImagePath: null, kind: null, wimIndex: 1);
+
+        Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+        Assert.Contains(logger.Errors, error => error.Contains("--wim-index", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_WhenVhdxFileMissing_Rejects()
+    {
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: @"C:\missing.vhdx", kind: OfflineImageKind.Vhdx);
+
+        Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+        Assert.Contains(logger.Errors, error => error.Contains("not found", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Validate_WhenVhdxKindOnNonVhdxFile_Rejects()
+    {
+        using var workspace = new TempFiles();
+        string notVhdx = workspace.CreateFile("image.dat");
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: notVhdx, kind: OfflineImageKind.Vhdx);
+
+        Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+        Assert.Contains(logger.Errors, error => error.Contains(".vhdx", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Validate_WhenVhdxWithWimIndex_Rejects()
+    {
+        using var workspace = new TempFiles();
+        string vhdx = workspace.CreateFile("disk.vhdx");
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: vhdx, kind: OfflineImageKind.Vhdx, wimIndex: 1);
 
         Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
         Assert.Contains(logger.Errors, error => error.Contains("--wim-index", StringComparison.Ordinal));

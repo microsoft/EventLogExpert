@@ -15,6 +15,7 @@ internal static partial class NativeMethods
     internal const uint ATTACH_VIRTUAL_DISK_FLAG_NO_DRIVE_LETTER = 0x00000001;
     internal const uint ATTACH_VIRTUAL_DISK_FLAG_READ_ONLY = 0x00000002;
     internal const uint DRIVE_CDROM = 5;
+    internal const uint DRIVE_FIXED = 3;
     internal const uint FILE_SHARE_READ_WRITE = 0x00000003;
     internal const uint IOCTL_STORAGE_GET_DEVICE_NUMBER = 0x002D1080;
     internal const uint OPEN_EXISTING = 3;
@@ -24,10 +25,13 @@ internal static partial class NativeMethods
     internal const uint VIRTUAL_DISK_ACCESS_GET_INFO = 0x00080000;
     // The ISO storage type uses the Microsoft vendor GUID; the device id selects the .iso interpretation.
     internal const uint VIRTUAL_STORAGE_TYPE_DEVICE_ISO = 1;
+    // DEVICE_UNKNOWN paired with the empty vendor GUID lets Windows auto-detect the format (.vhd vs .vhdx).
+    internal const uint VIRTUAL_STORAGE_TYPE_DEVICE_UNKNOWN = 0;
 
     private const string VirtDiskApi = "virtdisk.dll";
 
     internal static readonly Guid VIRTUAL_STORAGE_TYPE_VENDOR_MICROSOFT = new("EC984AEC-A0F9-47e9-901F-71415A66345B");
+    internal static readonly Guid VIRTUAL_STORAGE_TYPE_VENDOR_UNKNOWN = Guid.Empty;
 
     /// <summary>
     ///     Attaches (mounts) an open virtual disk. For an ISO, <c>READ_ONLY</c> is mandatory; <c>NO_DRIVE_LETTER</c>

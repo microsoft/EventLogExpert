@@ -47,7 +47,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null),
             logSink, progress: null, cts.Token);
 
-        await WriteMessageAsync(clientWriter, new HelloMessage(4242, 1), ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(4242, HelloMessage.CurrentProtocolVersion), ct);
 
         var request = await ReadRequestAsync(clientReader, ct);
         Assert.IsType<ShowProvidersIpcRequest>(request);
@@ -91,7 +91,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
                 new ShowProvidersRequest(null, null),
                 logSink, progress: null, cts.Token);
 
-            await WriteMessageAsync(clientWriter, new HelloMessage(5252, 1), ct);
+            await WriteMessageAsync(clientWriter, new HelloMessage(5252, HelloMessage.CurrentProtocolVersion), ct);
 
             var request = await ReadRequestAsync(clientReader, ct);
             Assert.IsType<ShowProvidersIpcRequest>(request);
@@ -165,7 +165,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runTask = runner.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progressSink, ct);
 
-        await WriteMessageAsync(clientWriter, new HelloMessage(9999, 1), ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(9999, HelloMessage.CurrentProtocolVersion), ct);
         await ReadRequestAsync(clientReader, ct);
 
         var ts1 = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -290,7 +290,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             var runTask = runner.ShowAsync(
                 new ShowProvidersRequest(null, null), logSink, progress: null, ct);
 
-            await WriteMessageAsync(clientWriter, new HelloMessage(8484, 1), ct);
+            await WriteMessageAsync(clientWriter, new HelloMessage(8484, HelloMessage.CurrentProtocolVersion), ct);
             await ReadRequestAsync(clientReader, ct);
 
             client.Dispose();
@@ -373,7 +373,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runTask = runner.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progress: null, ct);
 
-        await WriteMessageAsync(clientWriter, new HelloMessage(1111, 1), ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(1111, HelloMessage.CurrentProtocolVersion), ct);
         await ReadRequestAsync(clientReader, ct);
 
         await clientWriter.WriteLineAsync("{not valid json");
@@ -406,7 +406,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runTask = runner.ShowAsync(
             new ShowProvidersRequest(null, null), logSink, progressSink, ct);
 
-        await WriteMessageAsync(clientWriter, new HelloMessage(2222, 1), ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(2222, HelloMessage.CurrentProtocolVersion), ct);
         await ReadRequestAsync(clientReader, ct);
 
         for (var i = 0; i < 20; i++)
@@ -461,6 +461,68 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
         Assert.Equal("Cancelled before helper spawn completed.", result.FailureSummary);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenCancelledBeforeHandshakeAndHelperUnkillable_CentralizedFinallyCleansUpWithinBoundedTime()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
+        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 4242)
+        {
+            SimulateUnkillable = true
+        };
+        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
+        var logger = new LoggerUtils.RecordingTraceLogger();
+        var runner = CreateRunner(host, logger);
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var logSink = new ListProgress<LogRecord>();
+
+        var runTask = runner.ShowAsync(
+            new ShowProvidersRequest(null, null),
+            logSink, progress: null, cts.Token);
+
+        // Cancel before Hello arrives - give the runner a beat to enter the Hello wait, then cancel.
+        await Task.Delay(50, ct);
+        cts.Cancel();
+
+        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
+
+        Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
+        Assert.True(fakeProcess.WasKilled);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenFirstEnvelopeIsNotHelloAndHelperUnkillable_CentralizedFinallyCleansUpWithinBoundedTime()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
+        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 4242)
+        {
+            SimulateUnkillable = true
+        };
+        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
+        var logger = new LoggerUtils.RecordingTraceLogger();
+        var runner = CreateRunner(host, logger);
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var logSink = new ListProgress<LogRecord>();
+
+        await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
+
+        var runTask = runner.ShowAsync(
+            new ShowProvidersRequest(null, null),
+            logSink, progress: null, cts.Token);
+
+        // Send a non-Hello message first to trigger the wrong-first-envelope early return.
+        await WriteMessageAsync(clientWriter, new LogMessage(DateTime.UtcNow, LogLevel.Information, "early log"), ct);
+
+        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
+
+        Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
+        Assert.Contains("HelloMessage", result.FailureSummary);
+        Assert.True(fakeProcess.WasKilled);
     }
 
     [Fact]
@@ -522,7 +584,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
                 new ShowProvidersRequest(null, null),
                 logSink, progress: null, cts.Token);
 
-            await WriteMessageAsync(clientWriter, new HelloMessage(4242, 1), ct);
+            await WriteMessageAsync(clientWriter, new HelloMessage(4242, HelloMessage.CurrentProtocolVersion), ct);
 
             var request = await ReadRequestAsync(clientReader, ct);
             Assert.IsType<ShowProvidersIpcRequest>(request);
@@ -569,7 +631,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null),
             logSink, progress: null, cts.Token);
 
-        await WriteMessageAsync(clientWriter, new HelloMessage(4242, 1), ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(4242, HelloMessage.CurrentProtocolVersion), ct);
 
         var request = await ReadRequestAsync(clientReader, ct);
         Assert.IsType<ShowProvidersIpcRequest>(request);
@@ -581,6 +643,69 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
         Assert.Contains("could not be terminated", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.True(fakeProcess.WasKilled);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenPipeClosedBeforeHelloAndHelperUnkillable_CentralizedFinallyCleansUpWithinBoundedTime()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
+        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 4242)
+        {
+            SimulateUnkillable = true
+        };
+        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
+        var logger = new LoggerUtils.RecordingTraceLogger();
+        var runner = CreateRunner(host, logger);
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var logSink = new ListProgress<LogRecord>();
+
+        var runTask = runner.ShowAsync(
+            new ShowProvidersRequest(null, null),
+            logSink, progress: null, cts.Token);
+
+        // Close the helper-side pipe immediately to trigger the pipe-closed-before-Hello path.
+        await Task.Delay(50, ct);
+        await client.DisposeAsync();
+
+        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
+
+        Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
+        Assert.Contains("Pipe closed", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.True(fakeProcess.WasKilled);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenProtocolMismatchAndHelperUnkillable_CentralizedFinallyCleansUpWithinBoundedTime()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
+        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 4242)
+        {
+            SimulateUnkillable = true
+        };
+        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
+        var logger = new LoggerUtils.RecordingTraceLogger();
+        var runner = CreateRunner(host, logger);
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var logSink = new ListProgress<LogRecord>();
+
+        await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
+
+        var runTask = runner.ShowAsync(
+            new ShowProvidersRequest(null, null),
+            logSink, progress: null, cts.Token);
+
+        // Send a Hello with mismatched protocol version to trigger the protocol-mismatch early return.
+        await WriteMessageAsync(clientWriter, new HelloMessage(4242, ProtocolVersion: 99), ct);
+
+        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
+
+        Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
+        Assert.Contains("protocol version", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
         Assert.True(fakeProcess.WasKilled);
     }
 
@@ -601,7 +726,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runTask = runner.ShowAsync(
             new ShowProvidersRequest(null, null), throwingSink, progress: null, ct);
 
-        await WriteMessageAsync(clientWriter, new HelloMessage(3333, 1), ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(3333, HelloMessage.CurrentProtocolVersion), ct);
         await ReadRequestAsync(clientReader, ct);
 
         await WriteMessageAsync(clientWriter,
@@ -651,7 +776,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new CreateDatabaseRequest(@"C:\out.db", null, null, null),
             logSink, progress: null, ct, verbose: true);
 
-        await WriteMessageAsync(clientWriter, new HelloMessage(4444, 1), ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(4444, HelloMessage.CurrentProtocolVersion), ct);
 
         var request = await ReadRequestAsync(clientReader, ct);
         var create = Assert.IsType<CreateDatabaseIpcRequest>(request);
@@ -683,7 +808,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         var runTask = invoke(runner, logSink, ct);
 
-        await WriteMessageAsync(clientWriter, new HelloMessage(1234, 1), ct);
+        await WriteMessageAsync(clientWriter, new HelloMessage(1234, HelloMessage.CurrentProtocolVersion), ct);
 
         var request = await ReadRequestAsync(clientReader, ct);
         Assert.IsType(expectedRequestType, request);
@@ -695,131 +820,6 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var result = await runTask;
         Assert.Equal(DatabaseToolsOutcome.Succeeded, result.Outcome);
         Assert.Null(result.FailureSummary);
-    }
-
-    [Fact]
-    public async Task RunAsync_WhenProtocolMismatchAndHelperUnkillable_CentralizedFinallyCleansUpWithinBoundedTime()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
-        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 4242)
-        {
-            SimulateUnkillable = true
-        };
-        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
-        var logger = new LoggerUtils.RecordingTraceLogger();
-        var runner = CreateRunner(host, logger);
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var logSink = new ListProgress<LogRecord>();
-
-        await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
-
-        var runTask = runner.ShowAsync(
-            new ShowProvidersRequest(null, null),
-            logSink, progress: null, cts.Token);
-
-        // Send a Hello with mismatched protocol version to trigger the protocol-mismatch early return.
-        await WriteMessageAsync(clientWriter, new HelloMessage(4242, ProtocolVersion: 99), ct);
-
-        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
-
-        Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.Contains("protocol version", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
-        Assert.True(fakeProcess.WasKilled);
-    }
-
-    [Fact]
-    public async Task RunAsync_WhenFirstEnvelopeIsNotHelloAndHelperUnkillable_CentralizedFinallyCleansUpWithinBoundedTime()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
-        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 4242)
-        {
-            SimulateUnkillable = true
-        };
-        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
-        var logger = new LoggerUtils.RecordingTraceLogger();
-        var runner = CreateRunner(host, logger);
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var logSink = new ListProgress<LogRecord>();
-
-        await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
-
-        var runTask = runner.ShowAsync(
-            new ShowProvidersRequest(null, null),
-            logSink, progress: null, cts.Token);
-
-        // Send a non-Hello message first to trigger the wrong-first-envelope early return.
-        await WriteMessageAsync(clientWriter, new LogMessage(DateTime.UtcNow, LogLevel.Information, "early log"), ct);
-
-        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
-
-        Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.Contains("HelloMessage", result.FailureSummary);
-        Assert.True(fakeProcess.WasKilled);
-    }
-
-    [Fact]
-    public async Task RunAsync_WhenCancelledBeforeHandshakeAndHelperUnkillable_CentralizedFinallyCleansUpWithinBoundedTime()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
-        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 4242)
-        {
-            SimulateUnkillable = true
-        };
-        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
-        var logger = new LoggerUtils.RecordingTraceLogger();
-        var runner = CreateRunner(host, logger);
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var logSink = new ListProgress<LogRecord>();
-
-        var runTask = runner.ShowAsync(
-            new ShowProvidersRequest(null, null),
-            logSink, progress: null, cts.Token);
-
-        // Cancel before Hello arrives — give the runner a beat to enter the Hello wait, then cancel.
-        await Task.Delay(50, ct);
-        cts.Cancel();
-
-        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
-
-        Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
-        Assert.True(fakeProcess.WasKilled);
-    }
-
-    [Fact]
-    public async Task RunAsync_WhenPipeClosedBeforeHelloAndHelperUnkillable_CentralizedFinallyCleansUpWithinBoundedTime()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
-        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 4242)
-        {
-            SimulateUnkillable = true
-        };
-        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
-        var logger = new LoggerUtils.RecordingTraceLogger();
-        var runner = CreateRunner(host, logger);
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var logSink = new ListProgress<LogRecord>();
-
-        var runTask = runner.ShowAsync(
-            new ShowProvidersRequest(null, null),
-            logSink, progress: null, cts.Token);
-
-        // Close the helper-side pipe immediately to trigger the pipe-closed-before-Hello path.
-        await Task.Delay(50, ct);
-        await client.DisposeAsync();
-
-        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
-
-        Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.Contains("Pipe closed", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
-        Assert.True(fakeProcess.WasKilled);
     }
 
     private static ElevatedDatabaseToolsRunner CreateRunner(IElevatedHelperProcessHost host, ITraceLogger logger) =>

@@ -29,11 +29,14 @@ public sealed class OfflineWimImage : IDisposable
     private const FileAttributes UndeletableAttributes = FileAttributes.ReadOnly | FileAttributes.System | FileAttributes.Hidden;
 
     private readonly ITraceLogger? _logger;
+    private readonly Mutex? _ownershipBeacon;
+
     private bool _disposed;
 
-    private OfflineWimImage(string extractedRoot, ITraceLogger? logger)
+    private OfflineWimImage(string extractedRoot, Mutex? ownershipBeacon, ITraceLogger? logger)
     {
         ExtractedRoot = extractedRoot;
+        _ownershipBeacon = ownershipBeacon;
         _logger = logger;
     }
 
@@ -46,6 +49,14 @@ public sealed class OfflineWimImage : IDisposable
     /// </summary>
     public static WimImageList ReadIndexList(string wimPath, ITraceLogger? logger) =>
         ReadIndexList(wimPath, WimOperations.Instance, logger);
+
+    /// <summary>
+    ///     Deletes WIM extraction folders in the scratch root left by a crashed or self-terminated prior run, identified
+    ///     by a dead ownership beacon so a live sibling's in-progress extraction is never removed. Helper-side startup
+    ///     maintenance paired with <see cref="OfflineRegistryHive" />'s orphaned-mount sweep.
+    /// </summary>
+    public static void ReconcileOrphanedExtractions(ITraceLogger? logger) =>
+        ReconcileOrphanedExtractions(OfflineScratch.Root, logger);
 
     /// <summary>
     ///     Extracts the 1-based <paramref name="imageIndex" /> of <paramref name="wimPath" /> into a fresh folder under
@@ -63,6 +74,10 @@ public sealed class OfflineWimImage : IDisposable
         _disposed = true;
 
         TryDeleteExtraction(ExtractedRoot, _logger);
+
+        // Release the liveness beacon only AFTER the folder is gone, so a concurrent sweep never sees a dead beacon while
+        // the folder still exists (which would be a redundant but harmless re-delete attempt).
+        _ownershipBeacon?.Dispose();
     }
 
     internal static WimImageList ReadIndexList(string wimPath, IWimOperations nativeApi, ITraceLogger? logger)
@@ -76,6 +91,28 @@ public sealed class OfflineWimImage : IDisposable
 
         return WimImageList.NotAWim;
 
+    }
+
+    internal static void ReconcileOrphanedExtractions(string scratchRoot, ITraceLogger? logger)
+    {
+        if (!Directory.Exists(scratchRoot)) { return; }
+
+        try
+        {
+            foreach (string directory in Directory.EnumerateDirectories(scratchRoot, "ELX_WIM_*"))
+            {
+                string name = Path.GetFileName(directory);
+
+                if (OwnershipBeacon.IsAlive(name)) { continue; }
+
+                logger?.Debug($"{nameof(OfflineWimImage)}: reclaiming orphaned extraction {directory}.");
+                TryDeleteExtraction(directory, logger);
+            }
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        {
+            logger?.Debug($"{nameof(OfflineWimImage)}: orphaned-extraction sweep failed: {ex.Message}");
+        }
     }
 
     internal static async Task<OfflineWimExtractResult> TryExtractAsync(
@@ -120,11 +157,28 @@ public sealed class OfflineWimImage : IDisposable
         }
 
         // A SHORT root keeps the deep WinSxS tree under MAX_PATH; the GUID makes it unique across concurrent runs.
-        string extractRoot = Path.Combine(tempParent, $"ELX_WIM_{Guid.NewGuid():N}");
+        string extractDirName = $"ELX_WIM_{Guid.NewGuid():N}";
+        string extractRoot = Path.Combine(tempParent, extractDirName);
+
+        // Publish a liveness beacon BEFORE the long apply so a concurrent run's reconciliation sweep never deletes this
+        // extraction mid-flight; on a hard self-terminate the OS releases it and the next run's sweep reclaims the folder.
+        Mutex? ownershipBeacon = OwnershipBeacon.TryCreate(extractDirName, logger);
+
+        if (ownershipBeacon is null)
+        {
+            // Fail closed (mirrors OfflineRegistryHive's dirty-hive path): without a liveness beacon a concurrent
+            // reconciliation sweep would see no live owner for this ELX_WIM_* folder and could delete it mid-apply. Refuse
+            // to create the folder or start the apply; nothing to clean up because the directory was never created.
+            logger?.Error($"{nameof(OfflineWimImage)}: could not acquire an ownership beacon for {extractDirName}; refusing to extract without sweep protection against concurrent reconciliation.");
+
+            return OfflineWimExtractResult.Failed(OfflineWimExtractStatus.ApplyFailed);
+        }
 
         try
         {
             Directory.CreateDirectory(extractRoot);
+
+            logger?.Information($"Extracting image index {imageIndex} from {wimPath} (this can take several minutes)...");
 
             // The apply is a long blocking native call; run it off the current thread. Cancellation is honored INSIDE the
             // apply via the message-callback abort (mapped to ERROR_REQUEST_ABORTED), so Task.Run itself is not cancelled.
@@ -135,19 +189,22 @@ public sealed class OfflineWimImage : IDisposable
             switch (applyResult)
             {
                 case Win32ErrorCodes.ERROR_SUCCESS:
+                    logger?.Information($"Extracted image index {imageIndex} to {extractRoot}.");
+
+                    // The returned image now owns the beacon + folder; both are released on its Dispose.
                     return new OfflineWimExtractResult(
-                        OfflineWimExtractStatus.Extracted, new OfflineWimImage(extractRoot, logger));
+                        OfflineWimExtractStatus.Extracted, new OfflineWimImage(extractRoot, ownershipBeacon, logger));
                 case Win32ErrorCodes.ERROR_REQUEST_ABORTED:
-                    TryDeleteExtraction(extractRoot, logger);
+                    CleanupFailedExtraction(extractRoot, ownershipBeacon, logger);
 
                     return OfflineWimExtractResult.Failed(OfflineWimExtractStatus.Cancelled);
                 case Win32ErrorCodes.ERROR_DISK_FULL:
-                    TryDeleteExtraction(extractRoot, logger);
+                    CleanupFailedExtraction(extractRoot, ownershipBeacon, logger);
 
                     return OfflineWimExtractResult.Failed(OfflineWimExtractStatus.InsufficientSpace);
                 default:
                     logger?.Debug($"{nameof(OfflineWimImage)}: WIMApplyImage failed for index {imageIndex} of {wimPath} (error {applyResult}).");
-                    TryDeleteExtraction(extractRoot, logger);
+                    CleanupFailedExtraction(extractRoot, ownershipBeacon, logger);
 
                     return OfflineWimExtractResult.Failed(OfflineWimExtractStatus.ApplyFailed);
             }
@@ -155,10 +212,17 @@ public sealed class OfflineWimImage : IDisposable
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             logger?.Debug($"{nameof(OfflineWimImage)}: extracting index {imageIndex} of {wimPath} failed: {ex.Message}");
-            TryDeleteExtraction(extractRoot, logger);
+            CleanupFailedExtraction(extractRoot, ownershipBeacon, logger);
 
             return OfflineWimExtractResult.Failed(OfflineWimExtractStatus.ApplyFailed);
         }
+    }
+
+    // Releases the resources of a failed extraction: the partial folder first, then the beacon (mirrors Dispose ordering).
+    private static void CleanupFailedExtraction(string extractRoot, Mutex? ownershipBeacon, ITraceLogger? logger)
+    {
+        TryDeleteExtraction(extractRoot, logger);
+        ownershipBeacon?.Dispose();
     }
 
     // An extracted Windows tree contains JUNCTIONS (e.g. the legacy "Users\All Users" -> ProgramData with deny-list

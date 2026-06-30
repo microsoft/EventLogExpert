@@ -8,6 +8,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.ProviderDatabase.Context;
 using EventLogExpert.ProviderDatabase.Hashing;
+using Microsoft.Data.Sqlite;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.DatabaseTools.CreateDatabase;
@@ -22,6 +23,20 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 {
     private const int BatchSize = 100;
 
+    // The three on-disk files an at-rest SQLite database can occupy: the main file plus its WAL/SHM sidecars. The
+    // overwrite backup/restore moves and cleans all three so a restored database is never paired with the aborted
+    // rebuild's stale WAL (which would corrupt it). At-rest, cleanly-closed databases normally have only "".
+    private static readonly string[] s_databaseFileSuffixes = ["", "-wal", "-shm"];
+
+    // Set only AFTER TakeOverwriteBackup() moves ALL of the old database's files aside. Gates the restore's leftover
+    // deletion: if the backup tore midway the new build never started, so the files still at the target paths are
+    // unmoved originals and must NOT be deleted (deleting an original -wal/-shm would strip uncheckpointed data).
+    private bool _overwriteBackupCompleted;
+
+    // Set the first time the old database is moved aside to ".bak" (overwrite of an existing target, at the first
+    // ProviderDbContext creation). Drives the post-run finalize: delete the backup on success, restore it otherwise.
+    private bool _overwriteBackupTaken;
+
     internal enum CreateDatabaseMode { Local, FileSource, OfflineImage }
 
     public async Task<DatabaseToolsOutcome> ExecuteAsync(
@@ -29,13 +44,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken)
     {
-        if (File.Exists(request.TargetPath))
-        {
-            logger.Error($"Cannot create database because file already exists: {request.TargetPath}");
-
-            return DatabaseToolsOutcome.Failed;
-        }
-
         if (!string.Equals(Path.GetExtension(request.TargetPath), ".db", StringComparison.OrdinalIgnoreCase))
         {
             logger.Error($"File extension must be .db.");
@@ -43,13 +51,45 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             return DatabaseToolsOutcome.Failed;
         }
 
-        if (!ValidateOfflineImageRequest(request, logger))
+        // Unconditional stale-backup preflight (mirrors DestructiveRecovery.WrapUpgradeAsync). An interrupted prior
+        // overwrite can leave a ".bak" snapshot behind - possibly with the target itself already gone. Proceeding would
+        // let a later success delete that snapshot (the sole surviving copy) or break the next overwrite's File.Move.
+        // Fire whenever ANY backup file (main or WAL/SHM sidecar) exists, regardless of whether the target exists.
+        foreach (var suffix in s_databaseFileSuffixes)
+        {
+            var backupPath = request.TargetPath + suffix + ".bak";
+
+            if (File.Exists(backupPath))
+            {
+                logger.Error($"A recovery backup from an interrupted overwrite already exists at {backupPath}. Inspect, rename, or delete it before retrying so the snapshot is not overwritten.");
+
+                return DatabaseToolsOutcome.Failed;
+            }
+        }
+
+        if (File.Exists(request.TargetPath) && !request.Overwrite)
+        {
+            logger.Error($"Cannot create database because file already exists: {request.TargetPath}");
+
+            return DatabaseToolsOutcome.Failed;
+        }
+
+        if (!ValidateOfflineImageRequest(request, logger) ||
+            (request.SourcePath is not null && !ProviderSource.TryValidate(request.SourcePath, logger)))
         {
             return DatabaseToolsOutcome.Failed;
         }
 
-        if (request.SourcePath is not null && !ProviderSource.TryValidate(request.SourcePath, logger))
+        // Pre-flight the chosen .db destination so a Controlled Folder Access / ACL denial fails fast with an actionable
+        // message instead of surfacing later as an opaque write error after a long scan/extract.
+        string targetDirectory = Path.GetDirectoryName(Path.GetFullPath(request.TargetPath)) ?? request.TargetPath;
+        string? targetBlocked = OfflineScratch.ProbeWritable(targetDirectory);
+
+        if (targetBlocked is not null)
         {
+            logger.Error($"{targetBlocked}");
+            SetFailureSummary(targetBlocked);
+
             return DatabaseToolsOutcome.Failed;
         }
 
@@ -73,6 +113,20 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         // Defensive recompile if input has Regex.InfiniteMatchTimeout (otherwise catch below is dead).
         var filterRegex = EnsureBoundedTimeout(request.FilterRegex, TimeSpan.FromSeconds(5));
 
+        var outcome = await CreateCoreAsync();
+
+        // Overwrite finalize: the old database was moved aside to ".bak" only if a new database was actually started
+        // (first ProviderDbContext creation, in GetOrCreateContext). Keep the new one and drop the snapshot on success;
+        // otherwise restore the snapshot so a failed/cancelled rebuild never destroys the prior database.
+        if (!_overwriteBackupTaken) { return outcome; }
+
+        if (outcome is DatabaseToolsOutcome.Succeeded) { DeleteOverwriteBackups(logger); }
+        else { RestoreOverwriteBackups(logger); }
+
+        return outcome;
+
+        async Task<DatabaseToolsOutcome> CreateCoreAsync()
+        {
         var count = 0;
         var headerLogged = false;
         var pendingForHeader = new List<ProviderDetails>(BatchSize);
@@ -93,6 +147,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         ProviderDbContext? dbContext = null;
         OfflineWimImage? wimImage = null;
         OfflineIsoImage? isoImage = null;
+        OfflineVhdxImage? vhdxImage = null;
 
         try
         {
@@ -102,6 +157,21 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             // install.wim first. A failed mount/extraction surfaces a specific, actionable error and leaves no .db behind.
             string? effectiveOfflineImagePath = request.OfflineImagePath;
             OfflineImageKind? kind = mode == CreateDatabaseMode.OfflineImage ? ResolveImageKind(request) : null;
+
+            // A WIM/ISO build extracts into the scratch root via a long native WIMApplyImage that ignores the cooperative
+            // cancel; pre-flight the scratch root so a CFA/ACL denial fails fast here instead of wedging the apply.
+            if (kind is OfflineImageKind.Wim or OfflineImageKind.Iso)
+            {
+                string? scratchBlocked = OfflineScratch.ProbeWritable(OfflineScratch.Root);
+
+                if (scratchBlocked is not null)
+                {
+                    logger.Error($"{scratchBlocked}");
+                    SetFailureSummary(scratchBlocked);
+
+                    return DatabaseToolsOutcome.Failed;
+                }
+            }
 
             if (kind is OfflineImageKind.Iso)
             {
@@ -115,12 +185,27 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 isoImage = mount.Image;
             }
 
+            // A VHD/VHDX is attached read-only, its Windows partition resolved, then read like a mounted volume - no WIM
+            // extraction and no image index. A failed mount surfaces a specific, actionable error and leaves no .db behind.
+            if (kind is OfflineImageKind.Vhdx)
+            {
+                OfflineVhdxMountResult mount = OfflineVhdxImage.TryMount(request.OfflineImagePath!, logger);
+
+                if (mount.Status != OfflineVhdxMountStatus.Mounted)
+                {
+                    return HandleVhdxMountFailure(mount.Status, request.OfflineImagePath!, logger);
+                }
+
+                vhdxImage = mount.Image;
+                effectiveOfflineImagePath = vhdxImage!.VolumeRoot;
+            }
+
             if (kind is OfflineImageKind.Wim or OfflineImageKind.Iso)
             {
                 string wimSourcePath = isoImage?.InstallImagePath ?? request.OfflineImagePath!;
 
                 OfflineWimExtractResult extraction = await OfflineWimImage.TryExtractAsync(
-                    wimSourcePath, request.WimIndex!.Value, Path.GetTempPath(), logger, cancellationToken);
+                    wimSourcePath, request.WimIndex!.Value, OfflineScratch.Root, logger, cancellationToken);
 
                 if (extraction.Status != OfflineWimExtractStatus.Extracted)
                 {
@@ -207,7 +292,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
                     if (pendingForHeader.Count < BatchSize) { continue; }
 
-                    dbContext ??= new ProviderDbContext(request.TargetPath, false, logger);
+                    dbContext ??= GetOrCreateContext();
                     count += pendingForHeader.Count;
                     await FlushHeaderAndBufferAsync(logger, dbContext, pendingForHeader, cancellationToken);
                     headerLogged = true;
@@ -216,7 +301,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                     continue;
                 }
 
-                dbContext ??= new ProviderDbContext(request.TargetPath, false, logger);
+                dbContext ??= GetOrCreateContext();
                 dbContext.ProviderDetails.Add(details);
                 LogProviderDetails(logger, details);
                 count++;
@@ -230,7 +315,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
             if (!headerLogged && pendingForHeader.Count > 0)
             {
-                dbContext ??= new ProviderDbContext(request.TargetPath, false, logger);
+                dbContext ??= GetOrCreateContext();
                 var lastName = pendingForHeader[^1].ProviderName;
                 count += pendingForHeader.Count;
                 await FlushHeaderAndBufferAsync(logger, dbContext, pendingForHeader, cancellationToken);
@@ -240,8 +325,9 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             if (dbContext is null)
             {
                 logger.Warning($"No provider details could be resolved from the source. Database was not created.");
+                SetFailureSummary("No providers could be resolved from the source, so no database was created.");
 
-                return DatabaseToolsOutcome.Succeeded;
+                return DatabaseToolsOutcome.Failed;
             }
 
             logger.Information($"");
@@ -255,7 +341,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
         catch (OperationCanceledException)
         {
-            await CleanupPartialDatabaseAsync(logger, dbContext, request.TargetPath);
+            await CleanupPartialUnlessUnmovedOriginalAsync();
             dbContext = null;
 
             return DatabaseToolsOutcome.Cancelled;
@@ -263,7 +349,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         catch (RegexMatchTimeoutException)
         {
             logger.Error($"The provider-name regex timed out. The pattern may cause catastrophic backtracking.");
-            await CleanupPartialDatabaseAsync(logger, dbContext, request.TargetPath);
+            await CleanupPartialUnlessUnmovedOriginalAsync();
             dbContext = null;
 
             return DatabaseToolsOutcome.Failed;
@@ -272,7 +358,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         {
             // Any non-cancellation, non-regex-timeout failure (e.g., EF/SQLite errors mid-save) - no stub .db.
             logger.Error($"Unexpected error creating database: {ex.Message}");
-            await CleanupPartialDatabaseAsync(logger, dbContext, request.TargetPath);
+            await CleanupPartialUnlessUnmovedOriginalAsync();
             dbContext = null;
 
             return DatabaseToolsOutcome.Failed;
@@ -282,28 +368,48 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             if (dbContext is not null) { await dbContext.DisposeAsync(); }
 
             // Delete the extracted WIM temp AFTER persistence completes (the final SaveChangesAsync reads from it), then
-            // detach the ISO (extraction copied install.wim to temp, so the mount is no longer needed).
+            // detach the ISO/VHDX (the mounts are no longer needed once providers are persisted).
             wimImage?.Dispose();
             isoImage?.Dispose();
+            vhdxImage?.Dispose();
+        }
+
+        // Generic partial-cleanup deletes the target path as a disposable stub. That is correct for a non-overwrite run
+        // or once the overwrite backup has fully completed (the target is then a partial NEW build). But if the backup
+        // started and tore before completing, the file still at the target is the UNMOVED ORIGINAL - deleting it would
+        // destroy the prior database. In that case skip the delete and let RestoreOverwriteBackups move any ".bak" back.
+        async Task CleanupPartialUnlessUnmovedOriginalAsync()
+        {
+            if (_overwriteBackupTaken && !_overwriteBackupCompleted) { return; }
+
+            await CleanupPartialDatabaseAsync(logger, dbContext, request.TargetPath);
+        }
+        }
+
+        // First ProviderDbContext creation is where the new database file appears on disk. If this is an overwrite of an
+        // existing target, move the old database (and any WAL/SHM sidecars) aside to ".bak" exactly once, BEFORE
+        // constructing the writable context (which calls Database.EnsureCreated() and would otherwise open/overwrite the
+        // live file). ALL three creation sites route through here so the header-flush path cannot bypass the backup.
+        ProviderDbContext GetOrCreateContext()
+        {
+            if (request.Overwrite && !_overwriteBackupTaken && File.Exists(request.TargetPath))
+            {
+                // Set the flag BEFORE the move so a partially-completed backup still triggers the restore path, which
+                // heals a torn move by restoring whichever ".bak" files were created.
+                _overwriteBackupTaken = true;
+                TakeOverwriteBackup();
+                _overwriteBackupCompleted = true;
+            }
+
+            return new ProviderDbContext(request.TargetPath, false, logger);
         }
     }
 
     // The effective kind is the explicit --image-kind when given, otherwise inferred from the path: an existing directory
     // is a mounted volume / extracted folder; a .wim/.esd is a WIM; a .iso is an ISO. Null = neither given nor inferable.
-    internal static OfflineImageKind? ResolveImageKind(CreateDatabaseRequest request)
-    {
-        if (request.ImageKind is { } explicitKind) { return explicitKind; }
-
-        if (string.IsNullOrWhiteSpace(request.OfflineImagePath)) { return null; }
-
-        if (Directory.Exists(request.OfflineImagePath)) { return OfflineImageKind.Directory; }
-
-        string extension = Path.GetExtension(request.OfflineImagePath.TrimEnd('.', ' '));
-
-        return extension.Equals(".wim", StringComparison.OrdinalIgnoreCase) || extension.Equals(".esd", StringComparison.OrdinalIgnoreCase)
-            ? OfflineImageKind.Wim
-            : extension.Equals(".iso", StringComparison.OrdinalIgnoreCase) ? OfflineImageKind.Iso : null;
-    }
+    // Path-based resolution is shared with the elevation helper via OfflineImageKindResolver.
+    internal static OfflineImageKind? ResolveImageKind(CreateDatabaseRequest request) =>
+        OfflineImageKindResolver.ResolveFromPath(request.OfflineImagePath, request.ImageKind);
 
     /// <summary>
     ///     Picks the provider source for the request. An offline image (a non-whitespace <c>OfflineImagePath</c>) wins;
@@ -424,10 +530,36 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
                 return true;
 
+            case OfflineImageKind.Vhdx:
+                if (!File.Exists(request.OfflineImagePath))
+                {
+                    logger.Error($"VHD/VHDX image file not found: {request.OfflineImagePath}");
+
+                    return false;
+                }
+
+                if (!IsVhdxFile(request.OfflineImagePath))
+                {
+                    logger.Error($"--image-kind vhdx expects a .vhdx or .vhd file: {request.OfflineImagePath}");
+
+                    return false;
+                }
+
+                // A VHD/VHDX is read directly from its Windows partition; an image index does not apply, so a stray one is
+                // a request-shape error rather than something to silently ignore.
+                if (request.WimIndex is not null)
+                {
+                    logger.Error($"--wim-index applies only to --image-kind wim or iso, not vhdx.");
+
+                    return false;
+                }
+
+                return true;
+
             case null:
                 logger.Error(
                     $"Could not determine the offline image kind for '{request.OfflineImagePath}'. Pass --image-kind " +
-                    $"directory or wim (.wim/.esd) or iso (.iso), or point at a mounted volume / extracted image folder.");
+                    $"directory or wim (.wim/.esd) or iso (.iso) or vhdx (.vhdx/.vhd), or point at a mounted volume / extracted image folder.");
 
                 return false;
 
@@ -461,9 +593,34 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         return DatabaseToolsOutcome.Failed;
     }
 
-    /// <summary>
-    ///     Maps a non-success <see cref="OfflineWimExtractStatus" /> to an actionable error and the operation outcome.
-    ///     The extraction already cleaned up any partial temp, so there is nothing to dispose here.
+    private static DatabaseToolsOutcome HandleVhdxMountFailure(OfflineVhdxMountStatus status, string vhdxPath, ITraceLogger logger)
+    {
+        string vhdxName = Path.GetFileName(vhdxPath);
+
+        switch (status)
+        {
+            case OfflineVhdxMountStatus.NotAVhdx:
+                logger.Error($"{vhdxPath} is not a readable VHD/VHDX image.");
+
+                break;
+            case OfflineVhdxMountStatus.NoWindowsVolume:
+                logger.Error($"{vhdxName} has no readable Windows volume (\\Windows\\System32); the disk may be data-only or BitLocker-encrypted.");
+
+                break;
+            case OfflineVhdxMountStatus.MultipleWindowsVolumes:
+                logger.Error($"{vhdxName} contains more than one Windows volume; selecting one is ambiguous, so no database was created.");
+
+                break;
+            default:
+                logger.Error($"Could not mount {vhdxName} (if this is an access-denied error, re-run elevated).");
+
+                break;
+        }
+
+        return DatabaseToolsOutcome.Failed;
+    }
+
+    /// The extraction already cleaned up any partial temp, so there is nothing to dispose here.
     /// </summary>
     private static DatabaseToolsOutcome HandleWimExtractionFailure(
         OfflineWimExtractStatus status, string wimPath, int wimIndex, ITraceLogger logger)
@@ -503,6 +660,14 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
     private static bool IsIsoFile(string path) =>
         string.Equals(Path.GetExtension(path), ".iso", StringComparison.OrdinalIgnoreCase);
 
+    private static bool IsVhdxFile(string path)
+    {
+        string extension = Path.GetExtension(path);
+
+        return string.Equals(extension, ".vhdx", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".vhd", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool IsWimImageFile(string path)
     {
         string extension = Path.GetExtension(path);
@@ -520,6 +685,24 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         foreach (WimImageEntry image in imageList.Images)
         {
             logger.Information($"  --wim-index {image.Index}  {image.Name} ({image.Edition})");
+        }
+    }
+
+    // Drops the ".bak" snapshot (and any sidecar snapshots) after a successful overwrite. Best-effort: a leftover backup
+    // is harmless (the new database is intact) but would block the next overwrite, so warn if it cannot be removed.
+    private void DeleteOverwriteBackups(ITraceLogger logger)
+    {
+        foreach (var suffix in s_databaseFileSuffixes)
+        {
+            var backup = request.TargetPath + suffix + ".bak";
+
+            if (!File.Exists(backup)) { continue; }
+
+            try { File.Delete(backup); }
+            catch (Exception ex)
+            {
+                logger.Warning($"Could not delete the overwrite backup at {backup}: {ex.Message}. Delete it manually before the next overwrite of {request.TargetPath}.");
+            }
         }
     }
 
@@ -542,6 +725,61 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         buffer.Clear();
     }
 
+    // Restores the ".bak" snapshot after a failed/cancelled overwrite. First clears the connection pool and removes any
+    // new-build leftovers (the partial main file plus its orphaned WAL/SHM sidecars, which CleanupPartialDatabaseAsync
+    // does NOT delete) so the restored database is never paired with the aborted build's stale WAL, then moves each
+    // ".bak" back. Best-effort: on failure the ".bak" is left in place with an actionable log line for manual recovery.
+    private void RestoreOverwriteBackups(ITraceLogger logger)
+    {
+        var mainBackup = request.TargetPath + ".bak";
+
+        try
+        {
+            SqliteConnection.ClearAllPools();
+
+            // Only delete files if the backup fully completed (meaning the new database was started). If it tore midway,
+            // the new database never started, so any files present are unmoved originals and must NOT be deleted.
+            if (_overwriteBackupCompleted)
+            {
+                foreach (var suffix in s_databaseFileSuffixes)
+                {
+                    var newFile = request.TargetPath + suffix;
+
+                    // Never delete the main file unless its snapshot exists to take its place.
+                    if (suffix.Length == 0 && !File.Exists(mainBackup)) { continue; }
+
+                    if (File.Exists(newFile)) { File.Delete(newFile); }
+                }
+            }
+
+            foreach (var suffix in s_databaseFileSuffixes)
+            {
+                var backup = request.TargetPath + suffix + ".bak";
+
+                if (File.Exists(backup)) { File.Move(backup, request.TargetPath + suffix); }
+            }
+
+            logger.Information($"Existing database was preserved: restored from backup after the rebuild did not complete.");
+        }
+        catch (Exception ex)
+        {
+            logger.Error($"Could not restore the original database from backup ({ex.GetType().Name}: {ex.Message}). The backup remains at {mainBackup}; rename it back to {request.TargetPath} to recover.");
+        }
+    }
+
+    // Moves the existing database and any WAL/SHM sidecars to their ".bak" names. The stale-backup preflight already
+    // guaranteed no ".bak" exists, so each File.Move targets a free path. Throws on failure (e.g., a locked file); the
+    // caller's surrounding try/catch then cleans up and the overwrite finalize restores whatever was moved.
+    private void TakeOverwriteBackup()
+    {
+        foreach (var suffix in s_databaseFileSuffixes)
+        {
+            var source = request.TargetPath + suffix;
+
+            if (File.Exists(source)) { File.Move(source, source + ".bak"); }
+        }
+    }
+
 #if DEBUG
     private static void AssertContentEquivalent(ProviderDetails first, ProviderDetails duplicate)
     {
@@ -554,9 +792,18 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
     }
 
     private static bool ContentEquivalent(ProviderDetails first, ProviderDetails duplicate) =>
-        ModelsEquivalent(first.Events, duplicate.Events, static model => ProviderContentMerge.IdentityOf(model), ProviderContentMerge.EventsAreEquivalent) &&
-        ModelsEquivalent(first.Messages, duplicate.Messages, static model => ProviderContentMerge.IdentityOf(model), ProviderContentMerge.MessagesAreEquivalent) &&
-        ModelsEquivalent(first.Parameters, duplicate.Parameters, static model => ProviderContentMerge.IdentityOf(model), ProviderContentMerge.MessagesAreEquivalent) &&
+        ModelsEquivalent(first.Events,
+            duplicate.Events,
+            static model => ProviderContentMerge.IdentityOf(model),
+            ProviderContentMerge.EventsAreEquivalent) &&
+        ModelsEquivalent(first.Messages,
+            duplicate.Messages,
+            static model => ProviderContentMerge.IdentityOf(model),
+            ProviderContentMerge.MessagesAreEquivalent) &&
+        ModelsEquivalent(first.Parameters,
+            duplicate.Parameters,
+            static model => ProviderContentMerge.IdentityOf(model),
+            ProviderContentMerge.MessagesAreEquivalent) &&
         MapsEquivalent(first.Maps, duplicate.Maps) &&
         DictionaryEqual(first.Keywords, duplicate.Keywords) &&
         DictionaryEqual(first.Opcodes, duplicate.Opcodes) &&

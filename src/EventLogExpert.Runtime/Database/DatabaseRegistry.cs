@@ -32,7 +32,7 @@ internal sealed class DatabaseRegistry(
     public IReadOnlyList<DatabaseEntry> Entries => _entries;
 
     public void ApplyClassificationResults(
-        IReadOnlyDictionary<string, (DatabaseStatus Status, bool BackupExists)> statuses)
+        IReadOnlyDictionary<string, DatabaseClassificationResult> statuses)
     {
         if (statuses.Count == 0) { return; }
 
@@ -48,9 +48,19 @@ internal sealed class DatabaseRegistry(
 
                 if (!statuses.TryGetValue(entry.FileName, out var newState)) { continue; }
 
-                if (entry.Status == newState.Status && entry.BackupExists == newState.BackupExists) { continue; }
+                if (entry.Status == newState.Status
+                    && entry.BackupExists == newState.BackupExists
+                    && entry.OsStamps.SequenceEqual(newState.OsStamps))
+                {
+                    continue;
+                }
 
-                builder[i] = entry with { Status = newState.Status, BackupExists = newState.BackupExists };
+                builder[i] = entry with
+                {
+                    Status = newState.Status,
+                    BackupExists = newState.BackupExists,
+                    OsStamps = newState.OsStamps,
+                };
 
                 changed = true;
             }

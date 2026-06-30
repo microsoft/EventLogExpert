@@ -23,19 +23,85 @@
             <label for="create-source-path">Source path</label>
             <div class="path-input-group">
                 <span class="visually-hidden" id="create-source-path-help">
-                    Optional. Leave empty to use local providers. Accepts a .db or .evtx path; paste a folder path to use a directory.
+                    Optional. Leave empty to use local providers. Accepts a .db or .evtx path, a folder, or an offline image (.wim, .esd, .iso, or .vhdx/.vhd). When an image is given, providers are read from it, fully offline.
                 </span>
                 <input aria-describedby="create-source-path-help"
                     class="input source-path"
                     disabled="@IsRunning"
                     id="create-source-path"
                     @oninput="OnSourcePathInput"
-                    placeholder="Leave empty for local providers, or pick / paste a path"
+                    placeholder="Leave empty for local providers, or pick / paste a .db, .evtx, folder, .wim/.esd/.iso, or a .vhdx/.vhd disk"
                     type="text"
                     value="@_sourcePath" />
                 <Button Disabled="@IsRunning" OnClick="PickSourceAsync">Browse…</Button>
             </div>
         </div>
+
+        @if (ShowProtectedProvidersOption)
+        {
+            <div class="form-row">
+                <label class="checkbox-label" for="create-include-protected">
+                    <input checked="@_includeProtectedProviders"
+                        disabled="@IsRunning"
+                        id="create-include-protected"
+                        @onchange="OnIncludeProtectedProvidersInput"
+                        type="checkbox" />
+                    Include protected providers such as Security (requires elevation)
+                </label>
+            </div>
+        }
+
+        @if (Directory.Exists(_sourcePath.Trim()))
+        {
+            <div class="form-row">
+                <label class="checkbox-label" for="create-folder-as-image">
+                    <input checked="@_treatFolderAsImage"
+                        disabled="@IsRunning"
+                        id="create-folder-as-image"
+                        @onchange="OnTreatFolderAsImageInput"
+                        type="checkbox" />
+                    Folder is an offline Windows image (mounted volume or extracted image), not a folder of .db/.evtx files
+                </label>
+            </div>
+        }
+
+        @if (IsWimIndexApplicable)
+        {
+            <div class="form-row">
+                <label for="create-wim-index" id="create-wim-index-label">Image index</label>
+                <div class="path-input-group">
+                    <span class="visually-hidden" id="create-wim-index-help">Optional. 1-based image index. Type an index, or load the image's editions to pick one from the list. An ISO requires an index.</span>
+                    <ValueSelect AriaDescribedBy="@(_editionsError is null ? "create-wim-index-help" : "create-wim-index-help create-wim-index-error")"
+                        AriaInvalid="@(_editionsError is null ? "false" : "true")"
+                        AriaLabelledBy="create-wim-index-label"
+                        @bind-Value="_wimIndex"
+                        CssClass="input wim-index"
+                        Disabled="@IsRunning"
+                        Id="create-wim-index"
+                        IsInput="true"
+                        T="int?"
+                        ToStringFunc="FormatSelectedImageIndex">
+                        @foreach (var edition in _imageEditions)
+                        {
+                            <ValueSelectItem T="int?" Value="edition.Index">@FormatEditionLabel(edition)</ValueSelectItem>
+                        }
+                    </ValueSelect>
+                    <Button Disabled="@(IsRunning || _isLoadingEditions)"
+                        OnClick="LoadEditionsAsync"
+                        title="List the image's editions (always elevated) and fill the index list.">
+                        @(_isLoadingEditions ? "Loading…" : "Load editions")
+                    </Button>
+                </div>
+
+                @if (_editionsError is not null)
+                {
+                    <span class="filter-error" id="create-wim-index-error" role="alert">
+                        <i aria-hidden="true" class="bi bi-exclamation-triangle"></i>
+                        <span>@_editionsError</span>
+                    </span>
+                }
+            </div>
+        }
 
         <div class="form-row">
             <label for="create-filter">Filter (regex)</label>
@@ -77,25 +143,25 @@
             </div>
         </div>
 
-        @if (ShowElevationWarning)
-        {
-            <div class="elevation-warning-slot">
-                <div class="elevation-warning" role="alert">
-                    <i aria-hidden="true" class="bi bi-shield-exclamation"></i>
-                    <span>Running without elevation - some local providers (Security, etc.) will be skipped or return incomplete metadata.</span>
-                    <Button Disabled="@IsRunning"
-                        OnClick="RunElevatedAsync"
-                        title="Run this operation in an elevated helper process; main app stays running.">
-                        Run Elevated
-                    </Button>
-                </div>
-            </div>
-        }
+        <div class="form-row">
+            <label for="create-auto-import" id="create-auto-import-label">When finished</label>
+            <ValueSelect AriaLabelledBy="create-auto-import-label"
+                @bind-Value="AutoImportMode"
+                CssClass="input"
+                Disabled="@IsRunning"
+                Id="create-auto-import"
+                T="AutoImportMode"
+                ToStringFunc="FormatAutoImportMode">
+                <ValueSelectItem T="AutoImportMode" Value="AutoImportMode.Off">Don't import</ValueSelectItem>
+                <ValueSelectItem T="AutoImportMode" Value="AutoImportMode.Import">Import database</ValueSelectItem>
+                <ValueSelectItem T="AutoImportMode" Value="AutoImportMode.ImportAndEnable">Import and enable</ValueSelectItem>
+            </ValueSelect>
+        </div>
     </div>
 
     <DatabaseToolsLogView Entries="@LogEntries" FileNamePrefix="create-database" Outcome="@Outcome">
         <ToolbarLeadingContent>
-            @if (IsRunning)
+            @if (IsRunning && !IsImportInProgress)
             {
                 @if (IsCancelling)
                 {
@@ -112,10 +178,27 @@
             }
             else
             {
-                <PrimaryButton Disabled="@(!CanRun)" IconClass="bi bi-play-fill" OnClick="RunAsync">
+                @if (WillElevate)
+                {
+                    <span class="visually-hidden" id="create-run-elevation-help">@RunElevationTitle</span>
+                }
+
+                <PrimaryButton aria-describedby="@(WillElevate ? "create-run-elevation-help" : null)"
+                    Disabled="@(!CanRun || IsRunning || IsImportInProgress || IsConfirming)"
+                    IconClass="@(WillElevate ? "bi bi-shield-lock" : "bi bi-play-fill")"
+                    OnClick="RunCreateAsync"
+                    title="@RunElevationTitle">
                     Run
                 </PrimaryButton>
             }
         </ToolbarLeadingContent>
+        <ToolbarTrailingContent>
+            @if (ShouldShowImportDatabaseButton)
+            {
+                <Button Disabled="@IsImportDatabaseButtonDisabled" IconClass="bi bi-database-add" OnClick="ImportProducedDatabaseAsync">
+                    @ImportDatabaseButtonText
+                </Button>
+            }
+        </ToolbarTrailingContent>
     </DatabaseToolsLogView>
 </div>

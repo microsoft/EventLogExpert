@@ -41,7 +41,7 @@ public class ShowCommand
         showCommand.Options.Add(filterOption);
         showCommand.Options.Add(verboseOption);
 
-        showCommand.SetAction(async action =>
+        showCommand.SetAction(async (action, cancellationToken) =>
         {
             await using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
             var logger = sp.GetRequiredService<ITraceLogger>();
@@ -52,14 +52,16 @@ public class ShowCommand
             {
                 logger.Error($"Invalid --filter regex '{filterValue}': {error}");
 
-                return;
+                return 1;
             }
 
             var request = new ShowProvidersRequest(action.GetValue(sourceArgument), regex);
 
             var factory = sp.GetRequiredService<IDatabaseToolsOperationFactory>();
 
-            await factory.Create(request).ExecuteAsync(logger, progress: null, CancellationToken.None);
+            var outcome = await factory.Create(request).ExecuteAsync(logger, progress: null, cancellationToken);
+
+            return CommandExitCode.ToExitCode(outcome);
         });
 
         return showCommand;

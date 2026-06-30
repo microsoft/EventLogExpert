@@ -89,7 +89,7 @@ public sealed class DatabaseOperationCoordinatorTests
     public void BuildImportSummary_AllFailedZeroImported_MessageJoinsWithSemicolonNotPeriodToPreserveLowercaseFragment()
     {
         var failures = new[] { new ImportFailure("A.db", "bad") };
-        var result = new ImportResult(0, failures, []);
+        var result = new ImportResult(0, [], failures, []);
 
         var (_, message, _) = DatabaseOperationCoordinator.BuildImportSummary(result);
 
@@ -114,7 +114,7 @@ public sealed class DatabaseOperationCoordinatorTests
             .Select(i => new ImportFailure($"f{i}.db", "reason")).ToList();
         var upgradeFailures = Enumerable.Range(0, upgradeFailureCount)
             .Select(i => new ImportFailure($"u{i}.db", "reason")).ToList();
-        var result = new ImportResult(imported, failures, upgradeFailures);
+        var result = new ImportResult(imported, [], failures, upgradeFailures);
 
         var (title, _, severity) = DatabaseOperationCoordinator.BuildImportSummary(result);
 
@@ -129,7 +129,7 @@ public sealed class DatabaseOperationCoordinatorTests
             .Returns(["/path/exists.db"]);
         _databases.Entries.Returns([CreateEntry("exists.db")]);
         _databases.ImportAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
-            .Returns(new ImportResult(1, [], []));
+            .Returns(new ImportResult(1, ["A.db"], [], []));
 
         var sut = CreateSut();
         await sut.ImportAsync((_, _) => Task.FromResult(true), Ct);
@@ -147,7 +147,7 @@ public sealed class DatabaseOperationCoordinatorTests
             .Returns(["/path/exists.db"]);
         _databases.Entries.Returns([CreateEntry("exists.db")]);
         _databases.ImportAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
-            .Returns(new ImportResult(0, [], []));
+            .Returns(new ImportResult(0, [], [], []));
 
         Task<bool> ThrowingCallback(string _, CancellationToken __) =>
             Task.FromException<bool>(new InvalidOperationException("ui callback failed"));
@@ -215,7 +215,7 @@ public sealed class DatabaseOperationCoordinatorTests
         Assert.False(importTask.IsCompleted);
         _infoBanners.DidNotReceiveWithAnyArgs().ReportInfoBanner(null!, null!, default);
 
-        importTcs.SetResult(new ImportResult(1, [], []));
+        importTcs.SetResult(new ImportResult(1, ["A.db"], [], []));
         var outcome = await importTask;
 
         _infoBanners.Received(1).ReportInfoBanner(
@@ -248,7 +248,7 @@ public sealed class DatabaseOperationCoordinatorTests
             .Returns(["/path/exists.db"]);
         _databases.Entries.Returns([CreateEntry("exists.db")]);
         _databases.ImportAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
-            .Returns(new ImportResult(0, [], []));
+            .Returns(new ImportResult(0, [], [], []));
 
         var sut = CreateSut();
         await sut.ImportAsync(askOverwriteAsync: null, cancellationToken: Ct);
@@ -309,7 +309,7 @@ public sealed class DatabaseOperationCoordinatorTests
         var failures = Enumerable.Range(0, failureCount).Select(i => new ImportFailure($"f{i}.db", "x")).ToList();
         var upgradeFailures = Enumerable.Range(0, upgradeFailureCount).Select(i => new ImportFailure($"u{i}.db", "x")).ToList();
         _databases.ImportAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
-            .Returns(new ImportResult(imported, failures, upgradeFailures));
+            .Returns(new ImportResult(imported, [], failures, upgradeFailures));
 
         var sut = CreateSut();
         var outcome = await sut.ImportAsync(cancellationToken: Ct);
@@ -358,7 +358,7 @@ public sealed class DatabaseOperationCoordinatorTests
             .Returns(["/path/A.db"]);
         _databases.Entries.Returns([]);
         _databases.ImportAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
-            .Returns(new ImportResult(0, [new ImportFailure("A.db", "bad")], []));
+            .Returns(new ImportResult(0, [], [new ImportFailure("A.db", "bad")], []));
 
         var sut = CreateSut();
         var outcome = await sut.ImportAsync(cancellationToken: Ct);
@@ -367,6 +367,58 @@ public sealed class DatabaseOperationCoordinatorTests
         _infoBanners.DidNotReceiveWithAnyArgs().ReportInfoBanner(null!, null!, default);
         Assert.Equal(0, outcome.ImportedCount);
         Assert.False(outcome.DatabaseStateChanged);
+    }
+
+    [Fact]
+    public async Task ImportPathsAsync_EnableOnImportFalse_ImportsGivenPathsWithoutPickerAndLeavesImportedEntryDisabled()
+    {
+        _databases.Entries.Returns([CreateEntry("A.db", isEnabled: false)]);
+        _databases.ImportAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new ImportResult(1, ["A.db"], [], []));
+
+        var sut = CreateSut();
+        var outcome = await sut.ImportPathsAsync([@"C:\out\A.db"], enableOnImport: false, cancellationToken: Ct);
+
+        Assert.Equal(1, outcome.ImportedCount);
+        await _filePicker.DidNotReceiveWithAnyArgs().PickMultipleAsync(null!, null!);
+        await _databases.Received(1).ImportAsync(
+            Arg.Is<IEnumerable<string>>(paths => paths.SequenceEqual(new[] { @"C:\out\A.db" })),
+            Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<CancellationToken>());
+        _databases.DidNotReceiveWithAnyArgs().Toggle(null!);
+        await _logReload.DidNotReceiveWithAnyArgs().ReloadAllActiveLogsAsync(Ct);
+    }
+
+    [Fact]
+    public async Task ImportPathsAsync_EnableOnImportTrue_DoesNotEnableImportedEntryWhenNotReady()
+    {
+        _databases.Entries.Returns([CreateEntry("A.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired)]);
+        _databases.ImportAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new ImportResult(1, ["A.db"], [], []));
+        _logReload.HasActiveLogs.Returns(true);
+
+        var sut = CreateSut();
+        var outcome = await sut.ImportPathsAsync([@"C:\out\A.db"], enableOnImport: true, cancellationToken: Ct);
+
+        Assert.Equal(1, outcome.ImportedCount);
+        _databases.DidNotReceiveWithAnyArgs().Toggle(null!);
+        await _logReload.DidNotReceiveWithAnyArgs().ReloadAllActiveLogsAsync(Ct);
+    }
+
+    [Fact]
+    public async Task ImportPathsAsync_EnableOnImportTrue_EnablesFreshReadyEntriesAndReloadsOpenLogs()
+    {
+        _databases.Entries.Returns([CreateEntry("A.db", isEnabled: false)]);
+        _databases.ImportAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new ImportResult(1, ["A.db"], [], []));
+        _logReload.HasActiveLogs.Returns(true);
+
+        var sut = CreateSut();
+        var outcome = await sut.ImportPathsAsync([@"C:\out\A.db"], enableOnImport: true, cancellationToken: Ct);
+
+        Assert.Equal(1, outcome.ImportedCount);
+        _databases.Received(1).Toggle("A.db");
+        await _logReload.Received(1).ReloadAllActiveLogsAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -850,4 +902,3 @@ public sealed class DatabaseOperationCoordinatorTests
     private DatabaseOperationCoordinator CreateSut() =>
         new(_databases, _infoBanners, _errorBanners, _filePicker, _logReload, _logger);
 }
-

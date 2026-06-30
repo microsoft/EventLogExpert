@@ -79,6 +79,24 @@
     white-space: nowrap;
 }
 
+/* ValueSelect renders its <input> inside a .dropdown-input wrapper (inline-block by default, so it shrinks to its
+   content). In the DBTools form, let the wrapper fill its grid column / flex slot like the plain .input fields, and let
+   the inner input fill the wrapper, so long values (a full image-edition label, or the existing-providers mode text)
+   are shown in full instead of being clipped to a narrow fixed width. The wrapper keeps its scoped .5rem horizontal
+   margin so its content left-aligns with (and gets the same right gutter as) the other rows' inputs. */
+.db-tabs-container ::deep .db-tab-form .dropdown-input {
+    display: block;
+    min-width: 0;
+}
+
+.db-tabs-container ::deep .db-tab-form .path-input-group .dropdown-input {
+    flex: 1 1 auto;
+}
+
+.db-tabs-container ::deep .db-tab-form .dropdown-input > .input {
+    width: 100%;
+}
+
 .db-tabs-container ::deep .db-tab-form .input.invalid {
     border-color: var(--clr-red);
 }
@@ -93,6 +111,8 @@
 
 .db-tabs-container ::deep .db-tab-form .checkbox-label {
     grid-column: 2;
+    /* Match the input's .5rem horizontal margin so the checkbox lines up with the input content in adjacent rows. */
+    margin: 0 .5rem;
     display: inline-flex;
     align-items: center;
     gap: .375rem;
@@ -104,29 +124,6 @@
     margin: 0 .5rem;
     color: var(--text-secondary);
     font-style: italic;
-}
-
-.db-tabs-container ::deep .db-tab-form .elevation-warning-slot {
-    grid-column: 1 / -1;
-}
-
-.db-tabs-container ::deep .elevation-warning {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    padding: .5rem .625rem;
-    background: var(--clr-yellow);
-    color: var(--clr-on-status-fill);
-    border: none;
-    border-radius: .25rem;
-}
-
-.db-tabs-container ::deep .elevation-warning > span {
-    flex: 1 1 auto;
-}
-
-.db-tabs-container ::deep .elevation-warning .button {
-    --btn-color: var(--clr-on-status-fill);
 }
 
 .db-tabs-container ::deep .elevation-error {

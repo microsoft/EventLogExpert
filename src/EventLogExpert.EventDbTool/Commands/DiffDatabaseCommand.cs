@@ -43,7 +43,7 @@ public sealed class DiffDatabaseCommand
         diffDatabaseCommand.Arguments.Add(newDbArgument);
         diffDatabaseCommand.Options.Add(verboseOption);
 
-        diffDatabaseCommand.SetAction(async action =>
+        diffDatabaseCommand.SetAction(async (action, cancellationToken) =>
         {
             await using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
             var logger = sp.GetRequiredService<ITraceLogger>();
@@ -55,7 +55,9 @@ public sealed class DiffDatabaseCommand
 
             var factory = sp.GetRequiredService<IDatabaseToolsOperationFactory>();
 
-            await factory.Create(request).ExecuteAsync(logger, progress: null, CancellationToken.None);
+            var outcome = await factory.Create(request).ExecuteAsync(logger, progress: null, cancellationToken);
+
+            return CommandExitCode.ToExitCode(outcome);
         });
 
         return diffDatabaseCommand;

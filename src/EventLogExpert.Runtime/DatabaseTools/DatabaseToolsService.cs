@@ -86,6 +86,10 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
             outcome = await Task.Run(
                 () => operation.ExecuteAsync(logger, progress, cancellationToken),
                 cancellationToken);
+
+            // A fail-fast operation (e.g. a Controlled Folder Access-blocked destination) records an actionable summary
+            // instead of throwing; surface it on the result so the UI chip shows the remedy, not a generic "see log".
+            failureSummary = operation.FailureSummary;
         }
         catch (OperationCanceledException)
         {

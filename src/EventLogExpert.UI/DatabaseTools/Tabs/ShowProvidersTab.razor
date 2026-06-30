@@ -21,6 +21,20 @@
             </div>
         </div>
 
+        @if (ShowProtectedProvidersOption)
+        {
+            <div class="form-row">
+                <label class="checkbox-label" for="show-include-protected">
+                    <input checked="@_includeProtectedProviders"
+                        disabled="@IsRunning"
+                        id="show-include-protected"
+                        @onchange="OnIncludeProtectedProvidersInput"
+                        type="checkbox" />
+                    Include protected providers such as Security (requires elevation)
+                </label>
+            </div>
+        }
+
         <div class="form-row">
             <label for="show-filter">Filter (regex)</label>
             <span class="visually-hidden" id="show-filter-help">
@@ -44,21 +58,6 @@
                 </span>
             }
         </div>
-
-        @if (ShowElevationWarning)
-        {
-            <div class="elevation-warning-slot">
-                <div class="elevation-warning" role="alert">
-                    <i aria-hidden="true" class="bi bi-shield-exclamation"></i>
-                    <span>Running without elevation - some local providers (Security, etc.) will be skipped or return incomplete metadata.</span>
-                    <Button Disabled="@IsRunning"
-                        OnClick="RunElevatedAsync"
-                        title="Run this operation in an elevated helper process; main app stays running.">
-                        Run Elevated
-                    </Button>
-                </div>
-            </div>
-        }
     </div>
 
     <DatabaseToolsLogView Entries="@LogEntries" FileNamePrefix="show-providers" Outcome="@Outcome">
@@ -76,7 +75,18 @@
             }
             else
             {
-                <PrimaryButton Disabled="@(!CanRun)" IconClass="bi bi-play-fill" OnClick="RunAsync">Run</PrimaryButton>
+                @if (WillElevate)
+                {
+                    <span class="visually-hidden" id="show-run-elevation-help">@RunElevationTitle</span>
+                }
+
+                <PrimaryButton aria-describedby="@(WillElevate ? "show-run-elevation-help" : null)"
+                    Disabled="@(!CanRun)"
+                    IconClass="@(WillElevate ? "bi bi-shield-lock" : "bi bi-play-fill")"
+                    OnClick="RunShowAsync"
+                    title="@RunElevationTitle">
+                    Run
+                </PrimaryButton>
             }
         </ToolbarLeadingContent>
     </DatabaseToolsLogView>

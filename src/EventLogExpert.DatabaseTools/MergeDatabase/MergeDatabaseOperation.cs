@@ -44,8 +44,9 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
         if (sourceIdentities.Count == 0)
         {
             logger.Warning($"No providers were discovered in the source.");
+            SetFailureSummary("No providers were discovered in the source, so the database was not modified.");
 
-            return DatabaseToolsOutcome.Succeeded;
+            return DatabaseToolsOutcome.Failed;
         }
 
         var sourceNames = sourceIdentities
