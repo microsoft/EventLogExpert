@@ -54,7 +54,9 @@ internal sealed class ProviderDatabaseMaintenance(ITraceLogger? logger = null) :
 
         command.CommandText =
             "SELECT DISTINCT SourceOsBuild, SourceOsRevision, SourceOsEdition, SourceOsDisplayVersion " +
-            "FROM ProviderDetails LIMIT $limit;";
+            "FROM ProviderDetails " +
+            "ORDER BY SourceOsBuild DESC, SourceOsRevision DESC, SourceOsEdition, SourceOsDisplayVersion " +
+            "LIMIT $limit;";
         command.Parameters.AddWithValue("$limit", limit);
 
         using var reader = command.ExecuteReader();
