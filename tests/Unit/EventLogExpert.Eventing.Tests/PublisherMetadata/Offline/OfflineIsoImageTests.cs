@@ -33,14 +33,14 @@ public sealed class OfflineIsoImageTests
     }
 
     [Fact]
-    public void TryMount_WhenFileMissing_ReturnsNotAnIso()
+    public void TryMount_WhenFileMissing_ReturnsMountFailed()
     {
         var api = new FakeVirtualDiskOperations();
 
         OfflineIsoMountResult result = OfflineIsoImage.TryMount(
             Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".iso"), api, logger: null);
 
-        Assert.Equal(OfflineIsoMountStatus.NotAnIso, result.Status);
+        Assert.Equal(OfflineIsoMountStatus.MountFailed, result.Status);
         Assert.False(api.Attached);
     }
 

@@ -61,6 +61,15 @@ export function registerDropdown(root, dotNetRef) {
         toggle(e);
     }, { signal: controller.signal });
 
+    input.addEventListener("keydown", (e) => {
+        // Arrow keys drive dropdown navigation, so suppress the browser's caret-move/scroll default here.
+        // Blazor's @onkeydown:preventDefault can't: it reads a field captured at the prior render, so it
+        // suppressed the following keystroke instead of this one.
+        if (e.code === "ArrowUp" || e.code === "ArrowDown") {
+            e.preventDefault();
+        }
+    }, { signal: controller.signal });
+
     input.addEventListener("blur", (e) => closeDropdown(e), { signal: controller.signal });
     dropdown.addEventListener("blur", (e) => closeDropdown(e), { signal: controller.signal });
 

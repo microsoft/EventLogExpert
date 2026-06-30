@@ -45,16 +45,39 @@ internal sealed class OfflineLegacyMessageFileResolver(
     }
 
     public IReadOnlyList<string> GetMessageFilesForLegacyProvider(string providerName) =>
-        ResolveFromRegisteringChannel(
-            providerName,
-            (providerKey, eventMessageFile) => ResolveProviderFiles(eventMessageFile, ReadString(providerKey, "CategoryMessageFile")));
+        ResolveFilesForLegacyProvider(providerName).MessageFiles;
 
     public IReadOnlyList<string> GetParameterFilesForLegacyProvider(string providerName) =>
-        ResolveFromRegisteringChannel(
-            providerName,
-            (providerKey, _) => ReadString(providerKey, "ParameterMessageFile") is { } parameterMessageFile
-                ? ResolveProviderFiles(parameterMessageFile, categoryMessageFile: null)
-                : []);
+        ResolveFilesForLegacyProvider(providerName).ParameterFiles;
+
+    internal LegacyProviderFiles ResolveFilesForLegacyProvider(string providerName)
+    {
+        using IOfflineRegistryKey? eventLogKey = OpenEventLogKey();
+
+        if (eventLogKey is null) { return LegacyProviderFiles.Empty; }
+
+        foreach (string channelName in eventLogKey.GetSubKeyNames())
+        {
+            using IOfflineRegistryKey? channelKey = eventLogKey.OpenSubKey(channelName);
+            using IOfflineRegistryKey? providerKey = channelKey?.OpenSubKey(providerName);
+
+            if (providerKey is null) { continue; }
+
+            // First channel with EventMessageFile wins to match native-built database parity.
+            if (ReadString(providerKey, "EventMessageFile") is not { } eventMessageFile) { continue; }
+
+            string? categoryMessageFile = ReadString(providerKey, "CategoryMessageFile");
+            string? parameterMessageFile = ReadString(providerKey, "ParameterMessageFile");
+            IReadOnlyList<string> parameterFiles = parameterMessageFile is null
+                ? []
+                : ResolveProviderFiles(parameterMessageFile, categoryMessageFile: null);
+            IReadOnlyList<string> messageFiles = ResolveProviderFiles(eventMessageFile, categoryMessageFile);
+
+            return new LegacyProviderFiles(messageFiles, parameterFiles);
+        }
+
+        return LegacyProviderFiles.Empty;
+    }
 
     // Registry values stay unexpanded so image-local mapping never uses the host environment.
     private static string? ReadString(IOfflineRegistryKey key, string name) => key.GetValue(name) as string;
@@ -89,30 +112,6 @@ internal sealed class OfflineLegacyMessageFileResolver(
         }
     }
 
-    private IReadOnlyList<string> ResolveFromRegisteringChannel(
-        string providerName,
-        Func<IOfflineRegistryKey, string, IReadOnlyList<string>> resolveFromProviderKey)
-    {
-        using IOfflineRegistryKey? eventLogKey = OpenEventLogKey();
-
-        if (eventLogKey is null) { return []; }
-
-        foreach (string channelName in eventLogKey.GetSubKeyNames())
-        {
-            using IOfflineRegistryKey? channelKey = eventLogKey.OpenSubKey(channelName);
-            using IOfflineRegistryKey? providerKey = channelKey?.OpenSubKey(providerName);
-
-            if (providerKey is null) { continue; }
-
-            // First channel with EventMessageFile wins to match native-built database parity.
-            if (ReadString(providerKey, "EventMessageFile") is not { } eventMessageFile) { continue; }
-
-            return resolveFromProviderKey(providerKey, eventMessageFile);
-        }
-
-        return [];
-    }
-
     private IReadOnlyList<string> ResolveProviderFiles(string eventMessageFile, string? categoryMessageFile)
     {
         // Filter raw registrations to .dll/.exe because some providers register .sys drivers that must not be loaded.
@@ -142,5 +141,12 @@ internal sealed class OfflineLegacyMessageFileResolver(
         }
 
         return resolved;
+    }
+
+    internal sealed record LegacyProviderFiles(
+        IReadOnlyList<string> MessageFiles,
+        IReadOnlyList<string> ParameterFiles)
+    {
+        public static LegacyProviderFiles Empty { get; } = new([], []);
     }
 }

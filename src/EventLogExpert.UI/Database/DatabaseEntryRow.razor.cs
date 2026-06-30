@@ -27,7 +27,10 @@ public sealed partial class DatabaseEntryRow : ComponentBase
     private readonly string _nameButtonId = ComponentId.NewUnique("db-row-name").Value;
     private readonly string _pendingStatusId = ComponentId.NewUnique("db-row-pending").Value;
 
+    private IReadOnlyList<ProviderDatabaseOsStamp> _meaningfulOsStamps = [];
     private ChromelessButton? _nameButton;
+    private string _osStampDetail = string.Empty;
+    private string _osStampSummary = string.Empty;
     private bool _shouldFocusNameAfterRender;
 
     private enum ActionKind
@@ -84,31 +87,16 @@ public sealed partial class DatabaseEntryRow : ComponentBase
     private bool IsRestoreBlocked => IsUpgradeBlocked || IsUpgrading || UpgradeProgress is not null;
 
     // Bare revisions and non-positive builds carry no provenance without edition/display version.
-    private IReadOnlyList<ProviderDatabaseOsStamp> MeaningfulOsStamps =>
-        Entry.OsStamps.Where(HasAnyField).ToList();
+    private IReadOnlyList<ProviderDatabaseOsStamp> MeaningfulOsStamps => _meaningfulOsStamps;
 
     [Inject] private IMenuService MenuService { get; init; } = null!;
 
     private string OsStampAriaLabel => $"Source OS: {OsStampDetail}";
 
     // Keep full detail in both title and accessible label so OS info is not hover-only.
-    private string OsStampDetail => string.Join("; ", MeaningfulOsStamps.Select(FormatStamp));
+    private string OsStampDetail => _osStampDetail;
 
-    private string OsStampSummary
-    {
-        get
-        {
-            var stamps = MeaningfulOsStamps;
-
-            if (stamps.Count == 0) { return string.Empty; }
-
-            if (stamps.Count == 1) { return FormatStamp(stamps[0]); }
-
-            return stamps.Count > OsStampDisplayCap
-                ? $"Mixed ({OsStampDisplayCap}+ OS versions)"
-                : $"Mixed ({stamps.Count} OS versions)";
-        }
-    }
+    private string OsStampSummary => _osStampSummary;
 
     private ActionKind PrimaryAction
     {
@@ -155,6 +143,19 @@ public sealed partial class DatabaseEntryRow : ComponentBase
         _shouldFocusNameAfterRender = false;
 
         await FocusNameAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        _meaningfulOsStamps = Entry.OsStamps.Where(HasAnyField).ToList();
+        _osStampDetail = string.Join("; ", _meaningfulOsStamps.Select(FormatStamp));
+        _osStampSummary = _meaningfulOsStamps.Count switch
+        {
+            0 => string.Empty,
+            1 => FormatStamp(_meaningfulOsStamps[0]),
+            > OsStampDisplayCap => $"Mixed ({OsStampDisplayCap}+ OS versions)",
+            _ => $"Mixed ({_meaningfulOsStamps.Count} OS versions)"
+        };
     }
 
     private static string? FormatBuildRevision(int? build, int? revision)

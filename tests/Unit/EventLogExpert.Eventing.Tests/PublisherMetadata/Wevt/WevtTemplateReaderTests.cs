@@ -21,6 +21,7 @@ public sealed class WevtTemplateReaderTests
     private const int MapOffset = 448;
     private const int ProviderDataOffset = 64;
     private const int TemplateItemOffset = 320;
+    private const int TemplateItemSize = 20;
     private const int TemplateOffset = 256;
 
     private static readonly Guid s_publisherGuid = new("11112222-3333-4444-5555-666677778888");
@@ -39,6 +40,20 @@ public sealed class WevtTemplateReaderTests
     [Fact]
     public void TryParse_EmptyBuffer_ReturnsNull() =>
         Assert.Null(WevtTemplateReader.TryParse([], s_publisherGuid, logger: null));
+
+    [Fact]
+    public void TryParse_MapOnStructMember_RecoversFieldAssociation()
+    {
+        byte[] resource = BuildResource("VMAP", mapOnStructMember: true);
+
+        WevtTemplateData? result = WevtTemplateReader.TryParse(resource, s_publisherGuid, logger: null);
+
+        Assert.NotNull(result);
+        Assert.True(result!.EventFieldMaps.TryGetValue(
+            new WevtEventKey(EventId, EventVersion),
+            out IReadOnlyDictionary<string, string>? fieldMaps));
+        Assert.Equal(MapName, fieldMaps![FieldName]);
+    }
 
     [Fact]
     public void TryParse_MapValueCountExceedsCap_ReturnsNull()
@@ -92,7 +107,7 @@ public sealed class WevtTemplateReaderTests
         Assert.Null(WevtTemplateReader.TryParse(resource, s_publisherGuid, logger: null));
     }
 
-    private static byte[] BuildResource(string mapSignature)
+    private static byte[] BuildResource(string mapSignature, bool mapOnStructMember = false)
     {
         byte[] buffer = new byte[560];
 
@@ -113,10 +128,19 @@ public sealed class WevtTemplateReaderTests
 
         WriteAscii(buffer, TemplateOffset, "TEMP");
         WriteUInt32(buffer, TemplateOffset + 8, 1);
+        WriteUInt32(buffer, TemplateOffset + 12, mapOnStructMember ? 2u : 1u);
         WriteUInt32(buffer, TemplateOffset + 16, TemplateItemOffset);
 
-        WriteUInt32(buffer, TemplateItemOffset + 8, MapOffset);
-        WriteUInt32(buffer, TemplateItemOffset + 16, FieldNameOffset);
+        // Put the mapped descriptor past itemCount (a struct member) to exercise the full-nameCount scan.
+        int mappedItemOffset = mapOnStructMember ? TemplateItemOffset + TemplateItemSize : TemplateItemOffset;
+
+        if (mapOnStructMember)
+        {
+            WriteUInt32(buffer, TemplateItemOffset + 16, FieldNameOffset);
+        }
+
+        WriteUInt32(buffer, mappedItemOffset + 8, MapOffset);
+        WriteUInt32(buffer, mappedItemOffset + 16, FieldNameOffset);
         WriteName(buffer, FieldNameOffset, FieldName);
 
         WriteAscii(buffer, MapOffset, mapSignature);

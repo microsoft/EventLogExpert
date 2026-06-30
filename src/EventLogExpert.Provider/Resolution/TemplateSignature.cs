@@ -3,7 +3,6 @@
 
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Text;
 
 namespace EventLogExpert.Provider.Resolution;
 
@@ -44,7 +43,7 @@ public static class TemplateSignature
 
     public static bool Equal(ReadOnlySpan<char> left, ReadOnlySpan<char> right)
     {
-        // Streaming comparison mirrors AppendTo's framed UTF-8 encoding without allocating hot-path buffers.
+        // Streaming comparison mirrors AppendTo's framed UTF-16LE encoding without allocating hot-path buffers.
         var leftReader = new TemplateFieldReader(left);
         var rightReader = new TemplateFieldReader(right);
 
@@ -65,39 +64,13 @@ public static class TemplateSignature
     {
         if (left.IsRaw != right.IsRaw) { return false; }
 
-        if (left.IsRaw) { return Utf8Equal(left.Raw, right.Raw); }
+        if (left.IsRaw) { return left.Raw.SequenceEqual(right.Raw); }
 
-        return Utf8Equal(left.Name, right.Name) &&
-            Utf8Equal(left.InType, right.InType) &&
-            Utf8Equal(left.OutType, right.OutType) &&
-            Utf8Equal(left.Length, right.Length) &&
-            Utf8Equal(left.Map, right.Map);
-    }
-
-    // Compares spans by AppendTo's UTF-8 bytes so malformed UTF-16 matches hash semantics.
-    private static bool Utf8Equal(ReadOnlySpan<char> left, ReadOnlySpan<char> right)
-    {
-        if (left.SequenceEqual(right)) { return true; }
-
-        int byteCount = Encoding.UTF8.GetByteCount(left);
-
-        if (byteCount != Encoding.UTF8.GetByteCount(right)) { return false; }
-
-        byte[] buffer = ArrayPool<byte>.Shared.Rent(byteCount * 2);
-
-        try
-        {
-            Span<byte> leftBytes = buffer.AsSpan(0, byteCount);
-            Span<byte> rightBytes = buffer.AsSpan(byteCount, byteCount);
-            Encoding.UTF8.GetBytes(left, leftBytes);
-            Encoding.UTF8.GetBytes(right, rightBytes);
-
-            return leftBytes.SequenceEqual(rightBytes);
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
-        }
+        return left.Name.SequenceEqual(right.Name) &&
+            left.InType.SequenceEqual(right.InType) &&
+            left.OutType.SequenceEqual(right.OutType) &&
+            left.Length.SequenceEqual(right.Length) &&
+            left.Map.SequenceEqual(right.Map);
     }
 
     private static void WriteByte(IBufferWriter<byte> buffer, byte value)
@@ -115,12 +88,18 @@ public static class TemplateSignature
 
     private static void WriteString(IBufferWriter<byte> buffer, ReadOnlySpan<char> value)
     {
-        int byteCount = Encoding.UTF8.GetByteCount(value);
+        int byteCount = value.Length * sizeof(char);
         WriteInt32(buffer, byteCount);
 
         if (byteCount == 0) { return; }
 
-        Encoding.UTF8.GetBytes(value, buffer.GetSpan(byteCount));
+        Span<byte> destination = buffer.GetSpan(byteCount);
+
+        for (var index = 0; index < value.Length; index++)
+        {
+            BinaryPrimitives.WriteUInt16LittleEndian(destination[(index * sizeof(char))..], value[index]);
+        }
+
         buffer.Advance(byteCount);
     }
 }

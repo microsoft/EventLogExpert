@@ -310,22 +310,25 @@ public sealed class EventMessageProviderIntegrationTests
                 continue;
             }
 
-            if (metadata is null || string.IsNullOrEmpty(metadata.MessageFilePath))
+            using (metadata)
             {
-                continue;
+                if (metadata is null || string.IsNullOrEmpty(metadata.MessageFilePath))
+                {
+                    continue;
+                }
+
+                // Require modern metadata to load messages; otherwise the fallback would also be empty.
+                var modernMessages = EventMessageProvider.LoadMessagesFromFiles([metadata.MessageFilePath], candidate);
+
+                if (modernMessages.Count == 0)
+                {
+                    continue;
+                }
+
+                providerName = candidate;
+
+                return true;
             }
-
-            // Require modern metadata to load messages; otherwise the fallback would also be empty.
-            var modernMessages = EventMessageProvider.LoadMessagesFromFiles([metadata.MessageFilePath], candidate);
-
-            if (modernMessages.Count == 0)
-            {
-                continue;
-            }
-
-            providerName = candidate;
-
-            return true;
         }
 
         providerName = null;

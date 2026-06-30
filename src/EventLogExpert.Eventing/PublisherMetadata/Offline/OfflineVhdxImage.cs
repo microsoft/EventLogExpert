@@ -41,7 +41,8 @@ public sealed class OfflineVhdxImage : IDisposable
         {
             logger?.Debug($"{nameof(OfflineVhdxImage)}: VHD/VHDX file not found: {vhdxPath}.");
 
-            return OfflineVhdxMountResult.Failed(OfflineVhdxMountStatus.NotAVhdx);
+            // A missing file is an open/mount failure, not a format problem; NotAVhdx would surface as "not a readable VHD/VHDX".
+            return OfflineVhdxMountResult.Failed(OfflineVhdxMountStatus.MountFailed);
         }
 
         logger?.Information($"Mounting VHD/VHDX {vhdxPath}...");

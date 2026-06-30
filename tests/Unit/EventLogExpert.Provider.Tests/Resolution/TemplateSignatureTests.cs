@@ -76,13 +76,12 @@ public sealed class TemplateSignatureTests
     }
 
     [Fact]
-    public void Equal_FieldsDifferingOnlyByUtf8CollapsingSurrogate_StayInSyncWithTheHashEncoding()
+    public void Equal_FieldsDifferingOnlyByInvalidSurrogate_AreNotEqual()
     {
-        // Equal must mirror AppendTo's UTF-8 replacement-byte behavior so merge equality and hashing do not drift.
         const string FirstSurrogate = "<template><data name=\"\uD800\"/></template>";
         const string SecondSurrogate = "<template><data name=\"\uD801\"/></template>";
 
-        Assert.True(TemplateSignature.Equal(FirstSurrogate, SecondSurrogate));
+        Assert.False(TemplateSignature.Equal(FirstSurrogate, SecondSurrogate));
     }
 
     [Fact]

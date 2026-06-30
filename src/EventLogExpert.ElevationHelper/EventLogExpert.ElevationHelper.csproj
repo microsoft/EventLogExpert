@@ -29,6 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="EventLogExpert.DatabaseTools.Tests" />
     <InternalsVisibleTo Include="EventLogExpert.ElevationHelper.IntegrationTests" />
   </ItemGroup>
 

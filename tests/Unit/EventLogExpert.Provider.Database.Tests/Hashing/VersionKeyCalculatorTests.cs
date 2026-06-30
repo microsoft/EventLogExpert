@@ -59,6 +59,15 @@ public sealed class VersionKeyCalculatorTests
     }
 
     [Fact]
+    public void Compute_DistinctInvalidSurrogates_ChangesKey()
+    {
+        var first = EventUtils.CreateProvider("P", events: [EventUtils.CreateEventModel(1, description: "\uD800")]);
+        var second = EventUtils.CreateProvider("P", events: [EventUtils.CreateEventModel(1, description: "\uD801")]);
+
+        Assert.NotEqual(VersionKeyCalculator.Compute(first), VersionKeyCalculator.Compute(second));
+    }
+
+    [Fact]
     public void Compute_EmptyProvider_IsStableAndNonEmpty()
     {
         var first = EventUtils.CreateProvider("P");
@@ -66,7 +75,7 @@ public sealed class VersionKeyCalculatorTests
 
         var firstKey = VersionKeyCalculator.Compute(first);
 
-        Assert.StartsWith("vk1:", firstKey);
+        Assert.StartsWith(VersionKeyCalculator.SchemePrefix, firstKey);
         Assert.Equal(firstKey, VersionKeyCalculator.Compute(second));
     }
 
@@ -212,8 +221,8 @@ public sealed class VersionKeyCalculatorTests
     {
         var key = VersionKeyCalculator.Compute(BuildProvider());
 
-        Assert.StartsWith("vk1:", key);
-        Assert.True(key.Length > "vk1:".Length, "VersionKey must carry a non-empty hash body.");
+        Assert.StartsWith(VersionKeyCalculator.SchemePrefix, key);
+        Assert.True(key.Length > VersionKeyCalculator.SchemePrefix.Length, "VersionKey must carry a non-empty hash body.");
     }
 
     [Fact]
