@@ -31,7 +31,7 @@ internal static class WevtMessageFormatter
             {
                 char current = raw[index];
 
-                // MAX_WIDTH fold: a literal CRLF or lone CR/LF collapses to one space (a %n-emitted CRLF is not re-folded).
+                // MAX_WIDTH folds literal newlines to one space; %n-emitted CRLF is not folded again.
                 if (current == '\r')
                 {
                     if (index + 1 < raw.Length && raw[index + 1] == '\n')
@@ -87,7 +87,7 @@ internal static class WevtMessageFormatter
                         index++;
                         break;
                     case '%':
-                        // %% stays doubled (IGNORE_INSERTS) so DescriptionFormatter can later resolve %%nnnn parameter inserts.
+                        // Preserve %%nnnn for render-time parameter resolution under FORMAT_MESSAGE_IGNORE_INSERTS semantics.
                         buffer[length++] = '%';
                         buffer[length++] = '%';
                         index++;
@@ -95,16 +95,11 @@ internal static class WevtMessageFormatter
                     case '0':
                         return new string(buffer[..length]);
                     case >= '1' and <= '9':
-                        // A numbered FormatMessage insert (%1-%99): emit the %N placeholder unchanged (IGNORE_INSERTS
-                        // semantics) for the runtime DescriptionFormatter to substitute. Native EvtFormatMessage strips the
-                        // !S! / !s! string spec from the FIRST numbered insert ONLY, keeping numeric specs (!d!, !I64x!, ...)
-                        // and every later insert's spec - an empirically-observed quirk replicated so offline-resolved
-                        // messages collapse to the same VersionKey as native.
+                        // Native strips !S!/!s! only from the first numbered insert; keep all other specs for parity.
                         buffer[length++] = '%';
                         buffer[length++] = escape;
                         index++;
 
-                        // Consume an optional second digit (%10-%99) before testing for the spec.
                         if (index + 1 < raw.Length && raw[index + 1] is >= '0' and <= '9')
                         {
                             buffer[length++] = raw[index + 1];

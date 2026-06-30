@@ -15,9 +15,7 @@ public sealed class OfflineImagePathMapperTests
     [InlineData(@"\Windows\notepad.exe")]
     public void ReRoot_AnyAcceptedValue_NeverYieldsABareLeaf(string registryPath)
     {
-        // The load-bearing invariant behind deferring the MessageTableReader offline guard: a mapped path always
-        // carries directory information, so the loader's host env re-expansion and host-System32 leaf fallback are
-        // unreachable. (No mapper output may equal its own file name.)
+        // Mapped paths must keep directory information so host fallback paths stay unreachable.
         using OfflineTestImage image = OfflineTestImage.Create();
         var mapper = new OfflineImagePathMapper(image.ImageRoot, logger: null);
 
@@ -45,8 +43,7 @@ public sealed class OfflineImagePathMapperTests
         using OfflineTestImage image = OfflineTestImage.Create();
         var mapper = new OfflineImagePathMapper(image.ImageRoot, logger: null);
 
-        // Enough parent climbs to leave the image root regardless of how deep the scaffold is; without the escape guard
-        // this would normalize onto the host volume and the guard would throw, aborting the whole read.
+        // The traversal must escape any scaffold depth so the mapper proves fail-closed dropping.
         string escaping = @"C:\Windows\" + string.Concat(Enumerable.Repeat(@"..\", 40)) + "escape.dll";
 
         Assert.Null(mapper.Map(escaping));
@@ -80,7 +77,6 @@ public sealed class OfflineImagePathMapperTests
         using OfflineTestImage image = OfflineTestImage.Create();
         var mapper = new OfflineImagePathMapper(image.ImageRoot, logger: null);
 
-        // The image's own system drive may not be C: and the casing varies; the drive is replaced regardless.
         string? result = mapper.Map(@"D:\WINDOWS\System32\bar.dll");
 
         Assert.Equal(Path.Combine(image.RootDirectory, "WINDOWS", "System32", "bar.dll"), result, ignoreCase: true);
@@ -89,9 +85,7 @@ public sealed class OfflineImagePathMapperTests
     [Fact]
     public void ReRoot_PathWithEmbeddedNullCharacter_IsDroppedWithoutThrowing()
     {
-        // A hostile or corrupt hive can yield a registry value with an embedded NUL; Path.Combine tolerates it but
-        // Path.GetFullPath throws ArgumentException. The mapper must drop it fail-closed, never throw out of the public
-        // offline enumeration. The Assert.Null both asserts the contract and proves no exception escaped.
+        // Embedded NULs must be dropped fail-closed before Path.GetFullPath can throw.
         using OfflineTestImage image = OfflineTestImage.Create();
         var mapper = new OfflineImagePathMapper(image.ImageRoot, logger: null);
 
@@ -107,9 +101,6 @@ public sealed class OfflineImagePathMapperTests
     [InlineData(@"%ProgramData%\Microsoft\Windows Defender\Default\MpEngine.dll", @"ProgramData\Microsoft\Windows Defender\Default\MpEngine.dll")]
     public void ReRoot_ProgramDirectoryTokens_MapToImageRelativeLocation(string registryPath, string expectedRelative)
     {
-        // Machine-scoped program-directory tokens are re-rooted onto the image (defaulting to the standard folder
-        // names) so providers whose message files live under Program Files / ProgramData (e.g. Windows Defender)
-        // resolve offline, matching the live path that expands them against the host.
         using OfflineTestImage image = OfflineTestImage.Create();
         var mapper = new OfflineImagePathMapper(image.ImageRoot, logger: null);
 
@@ -169,16 +160,16 @@ public sealed class OfflineImagePathMapperTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    [InlineData(@"C:foo.dll")]                       // drive-relative (resolves against host current dir on C:)
-    [InlineData(@"\\server\share\foo.dll")]          // UNC
-    [InlineData(@"\\?\C:\Windows\System32\foo.dll")] // extended-length
-    [InlineData(@"\\.\C:\foo.dll")]                  // DOS device
-    [InlineData(@"\??\C:\Windows\foo.dll")]          // NT object path
-    [InlineData(@"%APPDATA%\Vendor\foo.dll")]        // unsupported per-user environment token
-    [InlineData(@"%ProgramFiles%evil\foo.dll")]      // token not on a path boundary (live -> "Program Filesevil", not "Program Files\evil")
-    [InlineData(@"%SystemRoot%System32\foo.dll")]    // token not on a path boundary
-    [InlineData(@"%SystemRoot%\%Nested%\foo.dll")]   // residual unsupported token after a supported one
-    [InlineData("foo.dll:stream")]                   // alternate data stream
+    [InlineData(@"C:foo.dll")]
+    [InlineData(@"\\server\share\foo.dll")]
+    [InlineData(@"\\?\C:\Windows\System32\foo.dll")]
+    [InlineData(@"\\.\C:\foo.dll")]
+    [InlineData(@"\??\C:\Windows\foo.dll")]
+    [InlineData(@"%APPDATA%\Vendor\foo.dll")]
+    [InlineData(@"%ProgramFiles%evil\foo.dll")]
+    [InlineData(@"%SystemRoot%System32\foo.dll")]
+    [InlineData(@"%SystemRoot%\%Nested%\foo.dll")]
+    [InlineData("foo.dll:stream")]
     public void ReRoot_UnsafeOrUnsupportedForms_AreDroppedFailClosed(string? registryPath)
     {
         using OfflineTestImage image = OfflineTestImage.Create();

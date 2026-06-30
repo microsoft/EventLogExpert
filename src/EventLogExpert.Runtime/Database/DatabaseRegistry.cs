@@ -238,9 +238,7 @@ internal sealed class DatabaseRegistry(
     {
         bool changed = false;
 
-        // Re-find by fileName under the lock — the caller's snapshot is stale by now.
-        // Only mutate the IsEnabled field on whatever entry matches; status / backup /
-        // other fields may have been updated by classification or another path.
+        // Re-find under the lock; the caller snapshot may be stale, and other fields must be preserved.
         lock (_mutationLock)
         {
             var index = FindEntryIndex(_entries, fileName);
@@ -302,10 +300,7 @@ internal sealed class DatabaseRegistry(
 
     public void Toggle(string fileName)
     {
-        // Defense-in-depth: the UI disables toggle while a remove/import/upgrade is in
-        // flight, but a stale click could still reach here. ReserveFileOperation throws
-        // if another op holds the reservation; catch + log so the UI sees a no-op rather
-        // than an unhandled exception.
+        // Stale UI clicks can race active file operations; reservation failure is a logged no-op.
         FileOperationReservation reservation;
 
         try
@@ -397,7 +392,7 @@ internal sealed class DatabaseRegistry(
     {
         try { log(); }
         catch
-        { /* Logger faults must not propagate from defensive logging sites. */
+        { /* Defensive logging must not throw. */
         }
     }
 

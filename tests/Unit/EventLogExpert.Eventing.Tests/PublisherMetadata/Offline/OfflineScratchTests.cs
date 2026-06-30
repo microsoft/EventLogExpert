@@ -5,12 +5,6 @@ using EventLogExpert.Eventing.PublisherMetadata.Offline;
 
 namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
 
-/// <summary>
-///     Covers the scratch-root write probe used as a fast pre-flight before the long native WIM apply: a writable
-///     folder passes, a non-writable target returns an actionable message, and a missing folder is created. The real
-///     Controlled Folder Access denial is environment-specific, so the "blocked" case is simulated by pointing the probe
-///     at a path that is actually a file (forcing the same failure-to-write the probe must report rather than throw).
-/// </summary>
 public sealed class OfflineScratchTests
 {
     [Fact]

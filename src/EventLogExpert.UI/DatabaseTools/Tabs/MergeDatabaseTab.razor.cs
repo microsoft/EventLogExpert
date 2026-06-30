@@ -34,7 +34,6 @@ public sealed partial class MergeDatabaseTab : DatabaseToolsTabBase<MergeDatabas
         CancellationToken cancellationToken) =>
         DatabaseToolsService.MergeAsync(request, logSink, progress: null, cancellationToken, VerboseLogging);
 
-    /// <summary>Full label for the selected existing-providers mode, shown in the collapsed select (matches the items).</summary>
     private static string FormatOverwriteMode(bool overwrite) => overwrite ? OverwriteModeLabel : KeepModeLabel;
 
     private void OnSourcePathInput(ChangeEventArgs e) => _sourcePath = e.Value?.ToString() ?? string.Empty;

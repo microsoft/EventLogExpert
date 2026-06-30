@@ -30,7 +30,7 @@ public sealed class SourceOsProvenanceTests
         var expectedEdition = currentVersion.GetValue("EditionID") as string;
         var expectedDisplayVersion = currentVersion.GetValue("DisplayVersion") as string;
 
-        // UBR is present on every supported build; the read must surface it as the recency secondary.
+        // UBR is the supported-build recency secondary.
         var expectedRevision = currentVersion.GetValue("UBR") is int ubr ? ubr : (int?)null;
 
         var provenance = SourceOsProvenance.Read();
@@ -43,8 +43,6 @@ public sealed class SourceOsProvenanceTests
     [Fact]
     public void Read_OnWindowsHost_ReturnsBuildMatchingRegistry()
     {
-        // The host always has CurrentBuildNumber under CurrentVersion, so a live read must populate the recency
-        // primary (Build). Compare against a direct registry read so the test is self-validating, not hard-coded.
         using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default);
         using var currentVersion = hklm.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
 

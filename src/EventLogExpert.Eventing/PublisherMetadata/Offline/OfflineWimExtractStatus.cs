@@ -3,7 +3,6 @@
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
-/// <summary>The outcome of extracting an image from a WIM via <see cref="OfflineWimImage" />.</summary>
 public enum OfflineWimExtractStatus
 {
     Extracted,

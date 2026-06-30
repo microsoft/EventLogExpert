@@ -6,13 +6,7 @@ using EventLogExpert.Provider.Resolution;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
-/// <summary>
-///     Builds a <see cref="ProviderDetails" /> for a provider that has only a legacy (pre-manifest) registration - no
-///     WEVT manifest - so it would otherwise be dropped (the modern reader's legacy population runs only AFTER a manifest
-///     parse succeeds). Resolution goes through <see cref="OfflineLegacyMessageFileResolver" /> and
-///     <see cref="LegacyMessageFileSource" />; it deliberately does NOT touch <see cref="EventMessageProvider" />, whose
-///     static initializer enumerates host providers.
-/// </summary>
+// Avoid EventMessageProvider here: its static initializer enumerates host providers.
 internal sealed class OfflineLegacyProviderBuilder(OfflineLegacyMessageFileResolver legacyResolver, ITraceLogger? logger)
 {
     public ProviderDetails? TryBuild(string providerName)

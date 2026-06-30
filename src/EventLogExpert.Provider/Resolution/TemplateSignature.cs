@@ -7,11 +7,7 @@ using System.Text;
 
 namespace EventLogExpert.Provider.Resolution;
 
-/// <summary>
-///     Canonical byte encoding of a template's render-relevant fields; the content hash and the merge compare
-///     templates by this same encoding (insensitive to whitespace, attribute order, and serialization) so they cannot
-///     drift.
-/// </summary>
+// Hashing and merging use this same render-relevant encoding so template equivalence cannot drift.
 public static class TemplateSignature
 {
     private const byte ParsedNode = 0;
@@ -48,10 +44,7 @@ public static class TemplateSignature
 
     public static bool Equal(ReadOnlySpan<char> left, ReadOnlySpan<char> right)
     {
-        // Streaming equivalent of comparing the two AppendTo encodings: the byte encoding writes a node count followed by
-        // each node's framed UTF-8 fields, so two templates are equal iff they yield the same nodes in order with the same
-        // per-field UTF-8 bytes. Streaming the ref-struct readers in lockstep with an equal-fields fast path avoids the two
-        // intermediate byte buffers AppendTo+SequenceEqual allocated on the merge hot path (EventsAreEquivalent).
+        // Streaming comparison mirrors AppendTo's framed UTF-8 encoding without allocating hot-path buffers.
         var leftReader = new TemplateFieldReader(left);
         var rightReader = new TemplateFieldReader(right);
 
@@ -60,7 +53,6 @@ public static class TemplateSignature
             bool leftMoved = leftReader.MoveNext();
             bool rightMoved = rightReader.MoveNext();
 
-            // A differing node count (the int32 the buffer encoding writes first) fails fast.
             if (leftMoved != rightMoved) { return false; }
 
             if (!leftMoved) { return true; }
@@ -82,10 +74,7 @@ public static class TemplateSignature
             Utf8Equal(left.Map, right.Map);
     }
 
-    // Compares two field spans by the SAME UTF-8 encoding AppendTo's WriteString uses, so merge equality stays byte-exact
-    // with the content hash and the two cannot drift - including for malformed UTF-16, which UTF-8 collapses to the
-    // replacement character. Identical UTF-16 always encodes identically (the allocation-free hot path); only differing
-    // spans of equal encoded length fall through to the byte-level check.
+    // Compares spans by AppendTo's UTF-8 bytes so malformed UTF-16 matches hash semantics.
     private static bool Utf8Equal(ReadOnlySpan<char> left, ReadOnlySpan<char> right)
     {
         if (left.SequenceEqual(right)) { return true; }

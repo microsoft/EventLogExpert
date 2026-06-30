@@ -7,11 +7,7 @@ using EventLogExpert.Provider.Resolution;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Wevt;
 
-/// <summary>
-///     Opens a provider's RT_MESSAGETABLE resources (MUI-aware) and resolves message ids to strings offline, without
-///     EvtFormatMessage. Holds native module handles for its lifetime, so it is <see cref="IDisposable" />; the resolver
-///     delegate must not be invoked after disposal.
-/// </summary>
+// Holds native message-table modules for resolver lifetime; do not call Resolve after Dispose.
 internal sealed class MessageTableSession : IDisposable
 {
     private readonly string _providerName;
@@ -57,9 +53,7 @@ internal sealed class MessageTableSession : IDisposable
             return null;
         }
 
-        // FindFirstByRawId reads block lowId/highId as signed Int32 and iterates them as long, so a message id with the
-        // high bit set (common for WEVT: 0x9xxxxxxx / 0xDxxxxxxx) must be sign-extended to match. Zero-extending a uint
-        // would compare a positive long against a negative block range and never hit.
+        // Sign-extend IDs because MESSAGE_RESOURCE block bounds are signed Int32 and WEVT high-bit IDs compare negative.
         long signExtendedId = unchecked((int)messageId);
 
         foreach ((_, nint memory, uint size) in _tables)

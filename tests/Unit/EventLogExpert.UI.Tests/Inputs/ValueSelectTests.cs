@@ -16,8 +16,7 @@ public sealed class ValueSelectTests : BunitContext
     [Fact]
     public void Input_WhenTypedTextDoesNotParse_ClearsValueInsteadOfKeepingStaleOne()
     {
-        // Regression: an unparseable entry in an editable numeric combobox must clear the bound value rather than
-        // silently retaining the last valid one, so a consumer cannot submit a stale value the input no longer shows.
+        // Invalid editable numeric text must clear the value so consumers cannot submit stale data.
         int? bound = 7;
         var component = Render<ValueSelect<int?>>(parameters => parameters
             .Add(p => p.IsInput, true)

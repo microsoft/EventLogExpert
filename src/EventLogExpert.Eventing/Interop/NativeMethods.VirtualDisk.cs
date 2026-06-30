@@ -5,9 +5,6 @@ using Microsoft.Win32.SafeHandles;
 using System.Runtime.InteropServices;
 
 // ReSharper disable InconsistentNaming
-// We are defining some win32 types in this file, so we
-// are not following the usual C# naming conventions.
-
 namespace EventLogExpert.Eventing.Interop;
 
 internal static partial class NativeMethods
@@ -33,10 +30,6 @@ internal static partial class NativeMethods
     internal static readonly Guid VIRTUAL_STORAGE_TYPE_VENDOR_MICROSOFT = new("EC984AEC-A0F9-47e9-901F-71415A66345B");
     internal static readonly Guid VIRTUAL_STORAGE_TYPE_VENDOR_UNKNOWN = Guid.Empty;
 
-    /// <summary>
-    ///     Attaches (mounts) an open virtual disk. For an ISO, <c>READ_ONLY</c> is mandatory; <c>NO_DRIVE_LETTER</c>
-    ///     keeps the mount off the drive-letter namespace so it is resolved by volume GUID. Returns a Win32 error code.
-    /// </summary>
     [LibraryImport(VirtDiskApi, EntryPoint = "AttachVirtualDisk", SetLastError = false)]
     internal static partial int AttachVirtualDisk(
         VirtualDiskSafeHandle virtualDiskHandle,
@@ -46,7 +39,6 @@ internal static partial class NativeMethods
         IntPtr parameters,
         IntPtr overlapped);
 
-    /// <summary>Opens a volume by GUID path (no access requested) so the storage device number can be queried.</summary>
     [LibraryImport(Kernel32Api,
         EntryPoint = "CreateFileW",
         StringMarshalling = StringMarshalling.Utf16,
@@ -72,7 +64,6 @@ internal static partial class NativeMethods
         out uint bytesReturned,
         IntPtr overlapped);
 
-    /// <summary>Begins enumerating mounted volumes; returns INVALID_HANDLE_VALUE on failure. Buffer gets a GUID path.</summary>
     [LibraryImport(Kernel32Api,
         EntryPoint = "FindFirstVolumeW",
         StringMarshalling = StringMarshalling.Utf16,
@@ -90,11 +81,9 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool FindVolumeClose(IntPtr findVolume);
 
-    /// <summary>Classifies a volume root; a mounted ISO surfaces as <c>DRIVE_CDROM</c>, which narrows the device search.</summary>
     [LibraryImport(Kernel32Api, EntryPoint = "GetDriveTypeW", StringMarshalling = StringMarshalling.Utf16)]
     internal static partial uint GetDriveTypeW(string rootPath);
 
-    /// <summary>Returns the attached ISO's device path (e.g. <c>\\.\CDROM2</c>) so the exact mounted volume can be matched.</summary>
     [LibraryImport(VirtDiskApi,
         EntryPoint = "GetVirtualDiskPhysicalPath",
         StringMarshalling = StringMarshalling.Utf16,
@@ -104,10 +93,6 @@ internal static partial class NativeMethods
         ref uint diskPathSizeInBytes,
         [Out] char[]? diskPath);
 
-    /// <summary>
-    ///     Opens a virtual disk file (here an ISO) for read-only attach. Returns a Win32 error code; on success the
-    ///     handle auto-detaches when closed because the attach is not permanent.
-    /// </summary>
     [LibraryImport(VirtDiskApi,
         EntryPoint = "OpenVirtualDisk",
         StringMarshalling = StringMarshalling.Utf16,

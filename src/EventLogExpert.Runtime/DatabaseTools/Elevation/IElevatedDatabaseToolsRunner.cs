@@ -11,19 +11,6 @@ using EventLogExpert.Logging.Abstractions;
 
 namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 
-/// <summary>
-///     Runner facade for executing a DatabaseTools operation in an elevated child process. Mirrors the
-///     <see cref="IDatabaseToolsService" /> shape so a tab's dispatch site can choose between in-process (medium-IL)
-///     execution and elevated (high-IL) execution by selecting one of the two facades - same request types, same outcome
-///     record, same streaming-log/progress callbacks.
-/// </summary>
-/// <remarks>
-///     Implementations spawn the packaged elevation helper EXE via <see cref="IElevatedHelperProcessHost" />, forward
-///     the request through the named-pipe IPC channel, stream incoming <c>LogMessage</c> / <c>ProgressMessage</c> records
-///     into the caller-supplied <see cref="IProgress{T}" /> sinks, await the terminal <c>ResultMessage</c>, and translate
-///     UAC-decline into <see cref="DatabaseToolsOutcome.Cancelled" />. Cancellation is cooperative - see
-///     <c>ElevatedDatabaseToolsRunner</c>'s remarks for the cancel message / 30s grace / force-kill sequence.
-/// </remarks>
 public interface IElevatedDatabaseToolsRunner
 {
     Task<DatabaseToolsResult> CreateAsync(
@@ -40,12 +27,6 @@ public interface IElevatedDatabaseToolsRunner
         CancellationToken cancellationToken,
         bool verbose = false);
 
-    /// <summary>
-    ///     Read-only enumeration of an offline image's editions (the <c>--wim-index</c> choices). Unlike the operation
-    ///     methods this returns its payload (the editions) rather than persisting anything; failures surface as a non-success
-    ///     <see cref="OfflineImageEditionsResult.Outcome" />. Takes no progress sink because the operation is a single
-    ///     read/mount with no per-item progress.
-    /// </summary>
     Task<OfflineImageEditionsResult> ListImageEditionsAsync(
         ListOfflineImageEditionsRequest request,
         IProgress<LogRecord> logSink,

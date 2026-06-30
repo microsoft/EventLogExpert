@@ -21,8 +21,7 @@ public sealed class OfflineImageProviderExtractorTests
                 using RegistryKey currentVersion = software.CreateSubKey(@"Microsoft\Windows NT\CurrentVersion");
                 currentVersion.SetValue("CurrentBuildNumber", "20348", RegistryValueKind.String);
 
-                // A foreign or malformed hive could store these as REG_EXPAND_SZ; provenance must record the literal
-                // stored value, never expand %SystemRoot% against the HOST environment.
+                // REG_EXPAND_SZ provenance must stay literal and never expand against the host environment.
                 currentVersion.SetValue("EditionID", @"%SystemRoot%Edition", RegistryValueKind.ExpandString);
                 currentVersion.SetValue("DisplayVersion", @"%SystemRoot%", RegistryValueKind.ExpandString);
             },
@@ -44,7 +43,6 @@ public sealed class OfflineImageProviderExtractorTests
 
         SourceOsProvenance provenance = extractor.ReadImageProvenance();
 
-        // Provenance comes from the IMAGE's SOFTWARE hive, never the host registry.
         Assert.Equal(20348, provenance.Build);
         Assert.Equal(2700, provenance.Revision);
         Assert.Equal("ServerDatacenter", provenance.Edition);
@@ -68,7 +66,6 @@ public sealed class OfflineImageProviderExtractorTests
 
         OfflinePublisherRegistration registration = Assert.Single(extractor.ReadModernRegistrations());
 
-        // The re-rooted resource path does not exist in the synthetic image, so the WEVT parse fails closed (no crash).
         Assert.Null(extractor.TryBuildModernProvider(registration));
     }
 

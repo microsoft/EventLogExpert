@@ -8,31 +8,16 @@ using System.Text;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
-/// <summary>
-///     Read-only managed parser for a Windows registry hive (<c>regf</c>) file, exposing the root key as an
-///     <see cref="IOfflineRegistryKey" />. Reads the hive's bytes directly (memory-mapped) instead of loading it through
-///     the Windows registry APIs, so it works regardless of MSIX package identity / registry virtualization and never
-///     mounts a hive under <c>HKLM</c>. The hive is treated as hostile, attacker-controlled image content: every offset is
-///     bounds-checked in 64-bit math against the actual file length, structure is validated, counts and recursion are
-///     capped, and any malformed structure degrades to <see langword="null" />/empty rather than throwing. Log replay of
-///     the dual <c>.LOG1</c>/<c>.LOG2</c> sidecars is intentionally NOT performed: a dirty hive (its base-block sequence
-///     numbers disagree) is read at its last-flushed state with a warning. The mapping is released on
-///     <see cref="Dispose" />.
-/// </summary>
 internal sealed class OfflineHiveFile : IOfflineRegistryKey
 {
     private const int BaseBlockSize = 0x1000;       // hive bins start here; cell offsets are relative to this.
-    // far above any real hive's total but bounding a crafted hive's work.
     private const uint InvalidOffset = 0xFFFFFFFF;  // hive sentinel for "no cell".
-    private const long MaxEntriesPerEnumeration = 100_000; // per single subkey enumeration: bounds one names list and the
-    private const long MaxHiveTraversalEntries = 16_000_000; // whole-hive ceiling on list entries EXAMINED (not just yielded),
-    // length cannot drive an unbounded (OutOfMemory) allocation.
-    private const int MaxListDepth = 16;     // ri -> li/lf/lh nesting is shallow; cap to stop a cyclic/deep list.
-    private const long MaxNameBytes = 0x400; // registry key/value names are <= 255 chars; cap at 1 KB to bound the
-    // per-name allocation a crafted nameLength could otherwise request.
-    private const long MaxValueBytes = 16 * 1024 * 1024; // a single value is realistically < 1 MB; cap hard so a crafted
-    // entries a single (possibly ri-amplified) node may examine.
-    private const long MaxValuesPerNode = 100_000;  // per single value lookup: bounds the vk offsets scanned for a name.
+    private const long MaxEntriesPerEnumeration = 100_000; // caps one subkey enumeration's list work.
+    private const long MaxHiveTraversalEntries = 16_000_000; // caps whole-hive traversal work.
+    private const int MaxListDepth = 16;     // caps cyclic/deep ri -> li/lf/lh nesting.
+    private const long MaxNameBytes = 0x400; // caps crafted name-length allocations.
+    private const long MaxValueBytes = 16 * 1024 * 1024; // caps crafted value-length allocations.
+    private const long MaxValuesPerNode = 100_000;  // caps one value lookup's vk-offset scan.
     private const ushort SigDb = 0x6264;            // "db" (big data)
     private const uint SigHbin = 0x6e696268;        // "hbin" (hive bin header)
     private const ushort SigLf = 0x666c;            // "lf"
@@ -41,7 +26,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
     private const ushort SigNk = 0x6b6e;            // "nk"
     private const ushort SigRi = 0x6972;            // "ri"
     private const ushort SigVk = 0x6b76;            // "vk"
-    private readonly long _binsEnd;                 // end of the last validated, contiguous hive bin; cells must fall below this.
+    private readonly long _binsEnd;                 // cells must fall below the validated contiguous hbin extent.
 
     private readonly IHiveBytes _bytes;
     private readonly long _length;
@@ -49,7 +34,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
     private readonly uint _rootCellOffset;
 
     private bool _disposed;
-    private long _hiveTraversalBudget;              // remaining whole-hive list-entry budget; see EnumerateSubkeyOffsets.
+    private long _hiveTraversalBudget; // remaining whole-hive list-entry budget.
 
     private OfflineHiveFile(IHiveBytes bytes, uint rootCellOffset, long binsEnd, bool isDirty, ITraceLogger? logger)
     {
@@ -62,7 +47,6 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
         _hiveTraversalBudget = MaxHiveTraversalEntries;
     }
 
-    /// <summary>Abstracts the hive's bytes so the parser runs over a memory-mapped file (production) or an array (tests).</summary>
     private interface IHiveBytes : IDisposable
     {
         long Length { get; }
@@ -76,14 +60,9 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
         uint ReadUInt32(long offset);
     }
 
-    /// <summary>The hive's base-block sequence numbers disagree: it was not cleanly flushed when captured.</summary>
+    // Dirty hive: sequence/checksum mismatch; read last-flushed state.
     public bool IsDirty { get; }
 
-    /// <summary>
-    ///     Opens <paramref name="hiveFilePath" /> as a read-only memory-mapped <c>regf</c> hive, or returns
-    ///     <see langword="null" /> (logging the reason) when the file is missing, too small to be a hive, inaccessible (e.g.
-    ///     NTFS ACLs require administrator), or not a valid hive.
-    /// </summary>
     public static OfflineHiveFile? TryOpen(string hiveFilePath, ITraceLogger? logger)
     {
         long fileLength;
@@ -108,8 +87,6 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
             return null;
         }
 
-        // A real hive is at least one base block plus one hive bin. Guard before CreateFromFile so a 0-byte file (which
-        // throws ArgumentException for an empty mapping) or a truncated stub surfaces as "not a hive", not an exception.
         if (fileLength < BaseBlockSize + 0x20)
         {
             logger?.Error($"The image's hive at {hiveFilePath} is too small to be a registry hive.");
@@ -161,7 +138,6 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
         }
     }
 
-    /// <summary>Opens an in-memory hive image (used by tests and for already-buffered hives).</summary>
     public static OfflineHiveFile? TryOpen(byte[] hiveBytes, ITraceLogger? logger)
     {
         ArgumentNullException.ThrowIfNull(hiveBytes);
@@ -223,8 +199,6 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
         }
     }
 
-    // Resolves a backslash-separated relative path from the nk at fromCellOffset, returning a lightweight key cursor (or
-    // null if any segment is absent). Case-insensitive, matching registry semantics.
     internal IOfflineRegistryKey? OpenSubKeyFrom(uint fromCellOffset, string path)
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -243,9 +217,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
         return new OfflineHiveKey(this, current);
     }
 
-    // Walks the contiguous hive bins from 0x1000, validating each "hbin" header + 4 KB-aligned size, and returns the byte
-    // just past the last valid bin. Cells are only honored below this bound, so a crafted cell offset that points into the
-    // base block, a torn bin, or padding past the bins degrades to "absent" instead of being read.
+    // Hive bins start at 0x1000; cells are valid only below the contiguous hbin extent.
     private static long ComputeBinsExtent(IHiveBytes bytes)
     {
         long offset = BaseBlockSize;
@@ -257,7 +229,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
 
             uint binSize = bytes.ReadUInt32(offset + 0x08);
 
-            if (binSize < BaseBlockSize || (binSize & 0xFFF) != 0) { break; } // bins are non-empty 4 KB-aligned blocks.
+            if (binSize < BaseBlockSize || (binSize & 0xFFF) != 0) { break; } // hbin sizes are 4 KB-aligned.
 
             long next = offset + binSize;
 
@@ -271,17 +243,15 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
 
     private static object? Decode(uint type, byte[] data) => type switch
     {
-        1 or 2 => DecodeString(data),                                            // REG_SZ / REG_EXPAND_SZ (literal)
-        4 => data.Length >= 4 ? BinaryPrimitives.ReadInt32LittleEndian(data) : 0, // REG_DWORD -> Int32 (parity)
-        5 => data.Length >= 4 ? BinaryPrimitives.ReadInt32BigEndian(data) : 0,    // REG_DWORD_BIG_ENDIAN -> Int32
+        1 or 2 => DecodeString(data), // REG_SZ / REG_EXPAND_SZ (literal)
+        4 => data.Length >= 4 ? BinaryPrimitives.ReadInt32LittleEndian(data) : 0, // REG_DWORD -> boxed Int32 parity.
+        5 => data.Length >= 4 ? BinaryPrimitives.ReadInt32BigEndian(data) : 0, // REG_DWORD_BIG_ENDIAN -> Int32
         11 => data.Length >= 8 ? BinaryPrimitives.ReadInt64LittleEndian(data) : 0L, // REG_QWORD -> Int64
-        7 => DecodeMultiString(data),                                            // REG_MULTI_SZ -> string[]
-        _ => data                                                                 // REG_NONE / REG_BINARY / other
+        7 => DecodeMultiString(data), // REG_MULTI_SZ -> string[]
+        _ => data // REG_NONE / REG_BINARY / other
     };
 
-    // REG_MULTI_SZ: NUL-delimited UTF-16 strings, double-NUL terminated. Matches Microsoft.Win32.RegistryKey.GetValue
-    // EXACTLY: split on NUL, PRESERVE interior empty elements, and drop ONLY the single final terminator segment (not the
-    // whole trailing NUL run). So `a\0\0b\0\0` -> ["a","","b"], `a\0\0\0` (["a",""]) -> ["a",""], and zero-length data -> [].
+    // REG_MULTI_SZ parity: preserve interior empties and drop only one final terminator.
     private static string[] DecodeMultiString(byte[] data)
     {
         int length = data.Length & ~1;
@@ -291,25 +261,23 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
         string decoded = Encoding.Unicode.GetString(data, 0, length);
         int end = decoded.Length;
 
-        if (decoded[end - 1] == '\0') { end--; } // drop exactly the one final terminator char, not the whole run.
+        if (decoded[end - 1] == '\0') { end--; }
 
         string[] segments = decoded[..end].Split('\0');
 
-        // A bare terminator (or trailing terminator char above) leaves a single empty final segment; remove just that one.
         return segments is [.., ""] ? segments[..^1] : segments;
     }
 
     private static string DecodeString(byte[] data)
     {
-        int length = data.Length & ~1; // whole UTF-16 code units only.
+        int length = data.Length & ~1;
 
-        if (length >= 2 && data[length - 1] == 0 && data[length - 2] == 0) { length -= 2; } // strip one trailing NUL.
+        if (length >= 2 && data[length - 1] == 0 && data[length - 2] == 0) { length -= 2; }
 
         return Encoding.Unicode.GetString(data, 0, length);
     }
 
-    // XOR of the 127 little-endian uint32s preceding the stored checksum at 0x1FC. Windows normalizes a computed 0 to 1 and
-    // 0xFFFFFFFF to 0xFFFFFFFE before storing, so accept those equivalences rather than reporting a false mismatch.
+    // Base checksum XORs the first 508 bytes; Windows maps 0/0xFFFFFFFF before storing.
     private static bool IsBaseChecksumValid(IHiveBytes bytes)
     {
         uint computed = 0;
@@ -326,7 +294,6 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
     {
         try
         {
-            // A valid hive always carries a full 0x1000-byte base block; anything smaller cannot be one.
             if (bytes.Length < BaseBlockSize)
             {
                 logger?.Debug($"{nameof(OfflineHiveFile)}: file too small ({bytes.Length} bytes) to contain a base block.");
@@ -335,8 +302,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
                 return null;
             }
 
-            // Base block: "regf" signature; primary/secondary sequence numbers + the XOR checksum classify clean vs dirty;
-            // root cell @0x24.
+            // Base block: "regf"; sequence numbers classify clean vs dirty; root cell is at 0x24.
             if (bytes.ReadUInt32(0) != 0x66676572u) // "regf"
             {
                 logger?.Debug($"{nameof(OfflineHiveFile)}: not a regf hive (bad signature).");
@@ -349,11 +315,9 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
             uint secondarySeq = bytes.ReadUInt32(0x08);
             uint rootCellOffset = bytes.ReadUInt32(0x24);
 
-            // The base-block checksum is a XOR of the first 508 bytes (stored at 0x1FC). A mismatch means a torn base, which
-            // is classified exactly like a sequence-number mismatch: read the last-flushed state with a warning, never reject.
+            // Dirty hive contract: checksum/sequence mismatch warns, then reads last-flushed state.
             bool isDirty = primarySeq != secondarySeq || !IsBaseChecksumValid(bytes);
 
-            // Root cell must land inside the hive bins.
             if (BaseBlockSize + (long)rootCellOffset + 8 > bytes.Length)
             {
                 logger?.Debug($"{nameof(OfflineHiveFile)}: root cell offset 0x{rootCellOffset:X} is out of range.");
@@ -381,9 +345,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
         }
     }
 
-    // Absolute byte offset of a cell's DATA (past the 4-byte cell size). Validates that the cell lands inside a declared hbin
-    // (below _binsEnd), is ALLOCATED (negative size), and does not overrun the bins. Returns -1 otherwise, so callers treat a
-    // sentinel/free/out-of-range cell as "absent". The per-record reads below still bounds-check their own spans.
+    // Cell offsets are relative to 0x1000; only allocated cells inside validated hbins are readable.
     private long CellData(uint cellOffset)
     {
         if (cellOffset == InvalidOffset) { return -1; }
@@ -394,11 +356,11 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
 
         int cellSize = _bytes.ReadInt32(cellStart);
 
-        if (cellSize >= 0) { return -1; } // a free (or zero-length) cell is not a valid record; only allocated cells are read.
+        if (cellSize >= 0) { return -1; }
 
         long cellLength = -(long)cellSize;
 
-        if (cellLength < 8 || cellStart + cellLength > _binsEnd) { return -1; } // the cell must fit within the validated bins.
+        if (cellLength < 8 || cellStart + cellLength > _binsEnd) { return -1; }
 
         return cellStart + 4;
     }
@@ -423,8 +385,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
 
         if (subkeyCount <= 0 || subkeyListOffset == InvalidOffset) { yield break; }
 
-        // A node cannot hold more subkeys than the file could physically describe, and never more than the per-enumeration
-        // cap; reject an absurd declared count before doing any work.
+        // Cap declared subkey counts before list walking.
         if (subkeyCount > Math.Min(MaxEntriesPerEnumeration, _length / 8))
         {
             _logger?.Debug($"{nameof(OfflineHiveFile)}: subkey count {subkeyCount} exceeds the per-enumeration cap; treating as malformed.");
@@ -436,10 +397,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
         var yieldedChildren = new HashSet<uint>();
         var budget = new TraversalBudget(this);
 
-        // An ri root-index fans out across many separately-bounded leaves, so the depth + per-list cycle guards alone cannot
-        // bound TOTAL work. The budget charges every list ENTRY examined (even ri entries that yield no child), capping both
-        // this single enumeration and the whole hive; de-duping child offsets bounds the names read - a crafted list that
-        // points every entry at the SAME large-named nk is then read once, not millions of times.
+        // Charge every list entry so ri fan-out cannot amplify work unboundedly.
         foreach (uint childOffset in WalkSubkeyList(subkeyListOffset, depth: 0, visitedLists, budget))
         {
             if (yieldedChildren.Add(childOffset)) { yield return childOffset; }
@@ -480,7 +438,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
 
             if (segment < 0) { return null; }
 
-            // Each big-data segment holds up to 16344 payload bytes; clamp to what remains.
+            // Big-data segments hold up to 16344 payload bytes.
             int chunk = (int)Math.Min(16344, totalLength - written);
 
             if (!InBounds(segment, chunk)) { return null; }
@@ -501,8 +459,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
         int valueCount = _bytes.ReadInt32(nk + 0x24);
         uint valueListOffset = _bytes.ReadUInt32(nk + 0x28);
 
-        // Reject an absurd value count before scanning: a node holds far fewer than the per-node cap, and never more vk
-        // pointers than the file could physically describe.
+        // Cap declared value counts before scanning vk offsets.
         if (valueCount <= 0 || valueListOffset == InvalidOffset || valueCount > Math.Min(MaxValuesPerNode, _length / 4)) { return null; }
 
         long valueList = CellData(valueListOffset);
@@ -519,8 +476,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
         return null;
     }
 
-    // Reads a value's raw bytes: resident (high bit of the length set => up to 4 bytes packed into the data-offset field)
-    // or referenced via a data cell, including big-data ("db") reassembly for values larger than a single cell (16344 B).
+    // Resident values pack up to 4 bytes in the data-offset field; larger values use cells or "db" big data.
     private byte[]? ReadValueData(uint dataLengthRaw, uint dataOffset)
     {
         bool resident = (dataLengthRaw & 0x80000000u) != 0;
@@ -528,9 +484,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
 
         if (length < 0 || length > _length) { return null; }
 
-        // Hard cap before any allocation: a single registry value is realistically < 1 MB, so a length larger than the cap
-        // is a crafted/corrupt value. Reject it rather than let `new byte[length]` (here or in ReadBigData) drive an
-        // OutOfMemoryException, which is intentionally NOT caught and would crash the elevated helper.
+        // Cap before allocation so crafted value lengths cannot crash the elevated helper.
         if (length > MaxValueBytes)
         {
             _logger?.Debug($"{nameof(OfflineHiveFile)}: value data length {length} exceeds the {MaxValueBytes}-byte cap; treating as malformed.");
@@ -553,8 +507,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
 
         if (data < 0) { return null; }
 
-        // Big data: a "db" indirection record (4-byte header read here, then a 4-byte segment-list offset) points at a list
-        // of segment cells, each up to 16344 bytes.
+        // Big data: "db" points at segment cells, each up to 16344 bytes.
         if (length > 16344 && InBounds(data, 8) && _bytes.ReadUInt16(data) == SigDb)
         {
             return ReadBigData(data, length);
@@ -622,9 +575,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
         return true;
     }
 
-    // Walks an lf/lh (fast/hash leaf), li (index leaf), or ri (root index of sub-lists, recursive). Depth-, cycle-, and
-    // budget-guarded: every entry examined is charged so a malformed/cyclic/amplified list cannot loop, recurse, or fan out
-    // without bound - including ri entries that recurse but yield no children.
+    // Walk lf/lh, li, or ri lists with depth, cycle, and entry-budget guards.
     private IEnumerable<uint> WalkSubkeyList(uint listOffset, int depth, HashSet<uint> visitedLists, TraversalBudget budget)
     {
         if (depth > MaxListDepth || !visitedLists.Add(listOffset)) { yield break; }
@@ -639,7 +590,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
         switch (signature)
         {
             case SigLf:
-            case SigLh: // 8 bytes per entry: 4-byte nk offset + 4-byte name hint / hash.
+            case SigLh: // 8 bytes per entry: 4-byte nk offset + 4-byte name hint/hash.
                 if (!InBounds(list + 4, (long)count * 8)) { yield break; }
 
                 for (int i = 0; i < count; i++)
@@ -661,7 +612,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
                 }
 
                 break;
-            case SigRi: // 4 bytes per entry: offset to a sub-list (recurse).
+            case SigRi: // 4 bytes per entry: sub-list offset.
                 if (!InBounds(list + 4, (long)count * 4)) { yield break; }
 
                 for (int i = 0; i < count; i++)
@@ -707,7 +658,6 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
 
         public void ReadBytes(long offset, Span<byte> destination)
         {
-            // MemoryMappedViewAccessor has no Span read; ReadArray fills a byte[] then copies into the span.
             byte[] temp = new byte[destination.Length];
             view.ReadArray(offset, temp, 0, temp.Length);
             temp.CopyTo(destination);
@@ -720,10 +670,7 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
         public uint ReadUInt32(long offset) => view.ReadUInt32(offset);
     }
 
-    // Charges each list entry examined during a SINGLE subkey enumeration against two ceilings: a per-enumeration cap (bounds
-    // one names list and a single ri-amplified node) and the whole-hive budget (bounds repeated lookups across the reader).
-    // Returns false once either is exhausted so the walk stops promptly. Charging per ENTRY (not per yielded child) is what
-    // bounds an ri fan-out whose sub-lists recurse heavily but yield few children.
+    // Per-entry charging enforces both per-enumeration and whole-hive traversal caps.
     private sealed class TraversalBudget(OfflineHiveFile hive)
     {
         private long _examinedThisEnumeration;

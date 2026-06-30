@@ -5,13 +5,6 @@ using EventLogExpert.Eventing.PublisherMetadata.Offline;
 
 namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
 
-/// <summary>
-///     Covers the helper-side startup reclamation of orphaned WIM extraction folders: a folder whose ownership beacon
-///     is dead (its owner crashed or self-terminated) is deleted, one with a live beacon is preserved, and unrelated
-///     folders are ignored. This is the WIM-extraction half of the reconciliation that prevents multi-GB scratch leaks
-///     after a watchdog self-terminate. Each test uses its own isolated scratch folder (the internal overload) so no
-///     shared global state leaks across xUnit's parallel test classes.
-/// </summary>
 public sealed class OfflineExtractionReconciliationTests
 {
     [Fact]
@@ -73,7 +66,6 @@ public sealed class OfflineExtractionReconciliationTests
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // Best-effort cleanup of the test scratch root.
             }
         }
     }

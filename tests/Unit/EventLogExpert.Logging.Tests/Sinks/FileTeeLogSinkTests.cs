@@ -58,7 +58,6 @@ public sealed class FileTeeLogSinkTests
         Assert.Equal(LogLevel.Warning, fileEntry.Level);
         Assert.Equal("no providers were discovered", fileEntry.Message);
         Assert.Equal(record, Assert.Single(captured));
-        // The persistent file write must happen before the record is handed to the inner (UI) sink.
         Assert.Equal(["file", "inner"], sequence);
     }
 
@@ -69,8 +68,6 @@ public sealed class FileTeeLogSinkTests
         var sink = new FileTeeLogSink(new RecordingProgress(captured), new ThrowingTraceLogger());
         var record = new LogRecord(DateTime.UtcNow, LogLevel.Error, "error while the file logger is broken");
 
-        // A file-logging failure must never break the operation or the UI, and the record must still reach the inner
-        // sink so it remains visible in the UI log.
         var exception = Record.Exception(() => sink.Report(record));
 
         Assert.Null(exception);

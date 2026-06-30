@@ -5,24 +5,9 @@ using EventLogExpert.Logging.Abstractions;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline.Containment;
 
-/// <summary>
-///     Maps a registry-stored DLL path (resource / message / parameter file) from a foreign Windows image onto the
-///     mounted-or-extracted image root (re-rooting it), NEVER touching the host filesystem. Real images store these paths
-///     predominantly as drive-absolute literals such as <c>C:\Windows\System32\foo.dll</c> (a host-registry sample found
-///     842 drive-absolute vs 0 <c>%SystemRoot%</c> publisher paths), so absolute re-rooting - not env-token expansion - is
-///     the load-bearing case, and the image's system drive may not be <c>C:</c>. The host
-///     <see cref="Environment.ExpandEnvironmentVariables" /> is intentionally never used. Values that cannot be re-rooted
-///     onto the image with certainty (unsupported environment tokens, UNC / DOS-device / NT / drive-relative forms,
-///     alternate-data-stream syntax) are DROPPED (return <see langword="null" />) rather than risk resolving against the
-///     host. Every non-null result is a fully literal, directory-bearing path under the image root - never a bare leaf -
-///     so the downstream loader's host env re-expansion and host-System32 leaf fallback are unreachable.
-/// </summary>
+// Re-root foreign-image paths without host expansion; drop anything not safely image-relative.
 internal sealed class OfflineImagePathMapper(OfflineImageRoot imageRoot, ITraceLogger? logger)
 {
-    /// <summary>
-    ///     Maps a single registry path value onto the image, or returns <see langword="null" /> when the value cannot be
-    ///     safely re-rooted. Callers pass each already-split segment of a multi-value (<c>;</c>-separated) registry string.
-    /// </summary>
     public string? Map(string? registryPath)
     {
         if (string.IsNullOrWhiteSpace(registryPath)) { return null; }
@@ -31,8 +16,7 @@ internal sealed class OfflineImagePathMapper(OfflineImageRoot imageRoot, ITraceL
 
         if (value.Length == 0) { return null; }
 
-        // UNC (\\server\share), DOS-device (\\.\), extended-length (\\?\, \\?\UNC\) and NT object (\??\) forms are not
-        // collapsed by Path.GetFullPath and could escape the image - reject before any further handling.
+        // Reject UNC, DOS-device, extended-length, and NT object paths before normalization because they can escape the image.
         if (value.StartsWith(@"\\", StringComparison.Ordinal) || value.StartsWith(@"\??\", StringComparison.Ordinal))
         {
             return Drop(registryPath, "UNC/DOS-device/NT path form");
@@ -45,9 +29,7 @@ internal sealed class OfflineImagePathMapper(OfflineImageRoot imageRoot, ITraceL
             return Drop(registryPath, "unsupported path form");
         }
 
-        // A residual '%' means an unsupported variable (e.g. a per-user/volatile token like %APPDATA%) we will not guess
-        // at; a ':' in the remainder is a stray drive letter or an alternate-data-stream (foo.dll:stream) - both fail
-        // closed.
+        // Unsupported variables and colon-bearing remnants fail closed instead of guessing host-specific paths or streams.
         if (relativeToImageRoot.Contains('%', StringComparison.Ordinal) ||
             relativeToImageRoot.Contains(':', StringComparison.Ordinal))
         {
@@ -62,14 +44,11 @@ internal sealed class OfflineImagePathMapper(OfflineImageRoot imageRoot, ITraceL
         }
         catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException)
         {
-            // A hostile or corrupt hive can yield a value with an embedded NUL (or other invalid path syntax): Path.Combine
-            // tolerates it but Path.GetFullPath throws. Drop fail-closed rather than let it abort the whole catalog read.
+            // Hostile hive values can break GetFullPath; drop them so one bad value does not abort catalog reading.
             return Drop(registryPath, $"invalid path syntax ({ex.GetType().Name})");
         }
 
-        // A '..' segment can normalize above the image root. Drop it here rather than emit an escaping path: the guard
-        // would otherwise reject it by THROWING (aborting the whole catalog read for one bad value), whereas an unsafe
-        // value should be skipped. This also keeps the "every non-null result is under the image root" invariant true.
+        // Normalize before containment so relative escapes are skipped instead of throwing out of enumeration.
         return !imageRoot.ContainsPath(mappedPath) ? Drop(registryPath, "path escapes the image root") : mappedPath;
     }
 
@@ -78,9 +57,7 @@ internal sealed class OfflineImagePathMapper(OfflineImageRoot imageRoot, ITraceL
 
     private static bool IsDriveLetter(char c) => c is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
 
-    // Maps a (non-UNC) registry path to the path relative to the image root that it should resolve to, or null when the
-    // form is unsafe. Env tokens are mapped to their image-relative location WITHOUT host expansion; a bare leaf is
-    // redirected under the image System32 so the result always carries directory information.
+    // Environment tokens are mapped without host expansion; bare or relative paths are anchored under image System32.
     private static string? ToImageRootRelative(string value)
     {
         if (TryStripTokenPrefix(value, "%SystemRoot%", out string remainder) ||
@@ -94,9 +71,7 @@ internal sealed class OfflineImagePathMapper(OfflineImageRoot imageRoot, ITraceL
             return remainder;
         }
 
-        // Machine-scoped program-directory tokens map to their well-known image-relative locations, defaulting to the
-        // standard folder names (a relocated ProgramFiles is rare and not honored). Per-user / volatile tokens
-        // (%APPDATA%, %TEMP%, %USERPROFILE%, ...) are deliberately NOT mapped - they have no stable image-relative home.
+        // Only machine-scoped program-directory tokens have stable image-relative defaults; per-user tokens are dropped.
         if (TryStripTokenPrefix(value, "%ProgramFiles(x86)%", out remainder))
         {
             return Path.Combine("Program Files (x86)", remainder);
@@ -127,25 +102,19 @@ internal sealed class OfflineImagePathMapper(OfflineImageRoot imageRoot, ITraceL
             return value[3..];
         }
 
-        // Drive-relative (e.g. C:foo.dll) resolves against the host's current directory on that drive - reject.
+        // Drive-relative paths resolve against the host's per-drive current directory, so reject them.
         if (value.Length >= 2 && IsDriveLetter(value[0]) && value[1] == ':')
         {
             return null;
         }
 
         return value[0] is '\\' or '/' ? value.TrimStart('\\', '/') :
-            // Bare leaf or relative subpath: anchor under the image System32 (the leaf-fallback redirect). The combined
-            // remainder still carries directory information, so the mapped output is never a bare leaf.
             Path.Combine("Windows", "System32", value);
     }
 
-    // Strips a leading environment token (case-insensitive) plus any immediately following separators, leaving the
-    // remainder relative. Returns false (and remainder = "") when value does not start with the token.
     private static bool TryStripTokenPrefix(string value, string token, out string remainder)
     {
-        // Require the token to sit on a path boundary: end-of-string or a separator. Otherwise "%ProgramFiles%evil" would
-        // strip to "evil" and re-root under Program Files, while live expansion produces "Program Filesevil" (a different
-        // directory). Anything past the boundary falls through to the residual-'%' drop instead of being silently re-rooted.
+        // Require a path boundary so "%ProgramFiles%evil" is not re-rooted under Program Files.
         if (value.StartsWith(token, StringComparison.OrdinalIgnoreCase) &&
             (value.Length == token.Length || value[token.Length] is '\\' or '/'))
         {

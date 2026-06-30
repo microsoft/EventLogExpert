@@ -3,10 +3,6 @@
 
 namespace EventLogExpert.Provider.Resolution;
 
-/// <summary>
-///     One template &lt;data&gt; node as spans: parsed attributes, or a raw element span when it cannot be
-///     canonically parsed.
-/// </summary>
 public readonly ref struct TemplateField
 {
     private TemplateField(ReadOnlySpan<char> raw)

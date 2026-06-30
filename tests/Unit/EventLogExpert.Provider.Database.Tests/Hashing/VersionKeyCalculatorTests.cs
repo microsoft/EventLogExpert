@@ -30,8 +30,7 @@ public sealed class VersionKeyCalculatorTests
     [Fact]
     public void Compute_DifferentProvenance_DoesNotChangeKey()
     {
-        // Provenance is source metadata, not rendering content: two byte-identical providers from different OS
-        // sources must keep the SAME VersionKey so they collapse to one row on a future merge.
+        // Provenance is source metadata, not rendering content, so it must not affect VersionKey.
         var first = EventUtils.CreateProvider("P", events: [EventUtils.CreateEventModel(1, description: "same")]);
         var second = EventUtils.CreateProvider("P", events: [EventUtils.CreateEventModel(1, description: "same")]);
 
@@ -74,7 +73,7 @@ public sealed class VersionKeyCalculatorTests
     [Fact]
     public void Compute_EventKeywordOrderAndDuplicates_DoNotChangeKey()
     {
-        // The merger compares keywords as a SET, so the hash must too: [1, 2, 2] and [2, 1] are the same version.
+        // The merger compares keywords as a set, so duplicates and order must not affect VersionKey.
         var ordered = EventUtils.CreateProvider("P", events: [EventUtils.CreateEventModel(1, keywords: [1L, 2L, 2L])]);
         var shuffled = EventUtils.CreateProvider("P", events: [EventUtils.CreateEventModel(1, keywords: [2L, 1L])]);
 
@@ -106,7 +105,7 @@ public sealed class VersionKeyCalculatorTests
     [Fact]
     public void Compute_EventTemplateNullVersusEmpty_DoesNotChangeKey()
     {
-        // A null template and an empty template both mean "no fields" and render identically, so they share a key.
+        // Null and empty templates both mean no fields, so they share a key.
         var nullTemplate = EventUtils.CreateProvider("P", events: [EventUtils.CreateEventModel(1, template: null)]);
         var emptyTemplate = EventUtils.CreateProvider("P", events: [EventUtils.CreateEventModel(1, template: "")]);
 
@@ -116,7 +115,7 @@ public sealed class VersionKeyCalculatorTests
     [Fact]
     public void Compute_EventTemplateWhitespaceAndAttributeOrderOnly_DoesNotChangeKey()
     {
-        // Live and offline producers serialize templates differently; identical render fields must collapse to one key.
+        // Live and offline producers serialize templates differently; identical render fields must collapse.
         var first = EventUtils.CreateProvider("P",
             events: [EventUtils.CreateEventModel(1, template: "<template><data name=\"User\" outType=\"xs:string\"/></template>")]);
         var second = EventUtils.CreateProvider("P",
@@ -128,8 +127,7 @@ public sealed class VersionKeyCalculatorTests
     [Fact]
     public void Compute_ExcludesTopLevelAndMessageProviderName()
     {
-        // Neither the top-level provider name (the identity key) nor the per-message ProviderName (which mirrors it)
-        // is content, so two recordings of the same provider under different names collapse to the same key.
+        // Provider names are identity metadata, not rendered content, so they must not affect VersionKey.
         var alpha = EventUtils.CreateProvider("Alpha",
             messages: [EventUtils.CreateMessageModel("Alpha", 100, "shared text", shortId: 100)],
             events: [EventUtils.CreateEventModel(100)]);
@@ -160,8 +158,7 @@ public sealed class VersionKeyCalculatorTests
     [Fact]
     public void Compute_MapEntryOrder_ChangesKey()
     {
-        // Bitmap decoding iterates ValueMap entries in order, so entry order is content - a reordering is a different
-        // rendering and must hash differently.
+        // Bitmap decoding iterates ValueMap entries in order, so order is rendered content.
         var first = EventUtils.CreateProvider("P");
         first.Maps = new Dictionary<string, ValueMapDefinition>
         {
@@ -180,8 +177,7 @@ public sealed class VersionKeyCalculatorTests
     [Fact]
     public void Compute_MessageProviderNameCasing_DoesNotChangeKey()
     {
-        // The merger ignores MessageModel.ProviderName and the DB key is case-insensitive, so the same provider
-        // recorded under different name casing (its messages tracking that casing) must still collapse.
+        // MessageModel.ProviderName is ignored and DB keys are case-insensitive, so casing must not affect VersionKey.
         var upper = EventUtils.CreateProvider("Provider",
             messages: [EventUtils.CreateMessageModel("Provider", 1, "text", shortId: 1)]);
         var lower = EventUtils.CreateProvider("Provider",
@@ -204,7 +200,7 @@ public sealed class VersionKeyCalculatorTests
     [Fact]
     public void Compute_ResolvedFromOwningPublisher_NullVsEmpty_AreTheSameKey()
     {
-        // The merger treats a null and an empty owning publisher as the same "no owner", so the hash must too.
+        // The merger treats null and empty owning publishers as the same no-owner value.
         var nullOwner = EventUtils.CreateProvider("P", resolvedFromOwningPublisher: null);
         var emptyOwner = EventUtils.CreateProvider("P", resolvedFromOwningPublisher: "");
 
@@ -223,8 +219,7 @@ public sealed class VersionKeyCalculatorTests
     [Fact]
     public void EventModelProperties_AreAllAccountedForInTheHash()
     {
-        // Drift guard: adding or removing an EventModel property fails this. When it does, update EncodeEvent in
-        // ProviderContentEncoder AND ProviderContentMerge.EventsAreEquivalent in lockstep, then this set.
+        // Drift guard: update ProviderContentEncoder and ProviderContentMerge.EventsAreEquivalent in lockstep.
         var properties = typeof(EventModel).GetProperties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal);
 
         Assert.Equal(
@@ -235,8 +230,7 @@ public sealed class VersionKeyCalculatorTests
     [Fact]
     public void MessageModelProperties_AreAllAccountedForInTheHash()
     {
-        // Drift guard (see EventModel test). ProviderName is intentionally NOT hashed (it mirrors the excluded
-        // provider name); every other property is content the hash must cover.
+        // Drift guard: ProviderName mirrors excluded identity metadata; every other property is hashed content.
         var properties = typeof(MessageModel).GetProperties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal);
 
         Assert.Equal(

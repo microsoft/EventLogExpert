@@ -6,17 +6,6 @@ using EventLogExpert.Logging.Abstractions;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
-/// <summary>
-///     Offline counterpart of <see cref="RegistryProvider" />: resolves a legacy provider's
-///     message/category/parameter files from a foreign image's <c>SYSTEM</c> hive instead of the host <c>HKLM\SYSTEM</c>.
-///     A statically loaded hive has no <c>CurrentControlSet</c> symlink, so the active control set is resolved via
-///     <c>Select\Current</c> -&gt; <c>ControlSet{NNN}</c>. The extension filter and category-first ordering mirror
-///     <see cref="RegistryProvider" /> for parity with native-built databases; the <c>ParameterMessageFile</c> is resolved
-///     separately via <see cref="GetParameterFilesForLegacyProvider" /> so the offline parameter table matches those same
-///     native-built databases (the live <see cref="RegistryProvider" /> reads it only to discard). Values are read without
-///     host environment expansion and re-rooted onto the image. Unlike the live reader it does NOT skip the Security/State
-///     admin channels - reading a hive file needs no elevation, so offline is intentionally more complete there.
-/// </summary>
 internal sealed class OfflineLegacyMessageFileResolver(
     IOfflineRegistryKey systemRoot,
     OfflineImagePathResolver pathResolver,
@@ -24,10 +13,6 @@ internal sealed class OfflineLegacyMessageFileResolver(
 {
     private static readonly string[] s_supportedExtensions = [".dll", ".exe"];
 
-    /// <summary>
-    ///     Distinct legacy provider names registered under any channel that carry an <c>EventMessageFile</c>. Used to
-    ///     discover legacy providers in the image.
-    /// </summary>
     public IReadOnlyList<string> EnumerateProviderNames()
     {
         using IOfflineRegistryKey? eventLogKey = OpenEventLogKey();
@@ -71,7 +56,7 @@ internal sealed class OfflineLegacyMessageFileResolver(
                 ? ResolveProviderFiles(parameterMessageFile, categoryMessageFile: null)
                 : []);
 
-    // The managed hive reader returns REG_SZ/REG_EXPAND_SZ values literally, so a stored %token reaches the mapper as-is.
+    // Registry values stay unexpanded so image-local mapping never uses the host environment.
     private static string? ReadString(IOfflineRegistryKey key, string name) => key.GetValue(name) as string;
 
     private IOfflineRegistryKey? OpenEventLogKey()
@@ -119,8 +104,7 @@ internal sealed class OfflineLegacyMessageFileResolver(
 
             if (providerKey is null) { continue; }
 
-            // Mirror RegistryProvider exactly (for parity with native-built databases): the first channel carrying an
-            // EventMessageFile wins, even if extension filtering later empties it.
+            // First channel with EventMessageFile wins to match native-built database parity.
             if (ReadString(providerKey, "EventMessageFile") is not { } eventMessageFile) { continue; }
 
             return resolveFromProviderKey(providerKey, eventMessageFile);
@@ -131,8 +115,7 @@ internal sealed class OfflineLegacyMessageFileResolver(
 
     private IReadOnlyList<string> ResolveProviderFiles(string eventMessageFile, string? categoryMessageFile)
     {
-        // Filter to .dll/.exe on the raw value, mirroring the live reader (FltMgr registers a .sys driver here that
-        // must not be loaded).
+        // Filter raw registrations to .dll/.exe because some providers register .sys drivers that must not be loaded.
         var messageFiles = eventMessageFile
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(path => s_supportedExtensions.Contains(Path.GetExtension(path).ToLowerInvariant()))
@@ -140,7 +123,7 @@ internal sealed class OfflineLegacyMessageFileResolver(
 
         var orderedRawFiles = new List<string>();
 
-        // `is not null` (not IsNullOrEmpty) mirrors the live reader's category-first ordering exactly.
+        // Use null, not empty, to mirror the live reader's category-first ordering.
         if (categoryMessageFile is not null)
         {
             orderedRawFiles.Add(categoryMessageFile);

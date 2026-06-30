@@ -10,10 +10,6 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.PublisherMetadata;
 
-/// <summary>
-///     Represents an event provider on the local machine. EventLogExpert is a local-only tool; remote-machine
-///     resolution is intentionally not supported.
-/// </summary>
 public sealed class EventMessageProvider(
     string providerName,
     IReadOnlyList<string>? metadataPaths = null,
@@ -76,8 +72,7 @@ public sealed class EventMessageProvider(
             ? LoadMessagesFromModernProvider(providerMetadata)
             : new ProviderDetails { ProviderName = _providerName };
 
-        // When metadataPaths are provided, this is an MTA-only resolution path.
-        // Skip registry and DLL lookups entirely.
+        // Metadata paths are MTA-only; never fall back to registry or DLL lookup.
         if (_metadataPaths is { Count: > 0 })
         {
             return provider;
@@ -117,8 +112,6 @@ public sealed class EventMessageProvider(
             _logger?.Debug($"Parameter file for provider {_providerName} produced no messages.");
         }
 
-        // Record the newest message-DLL file version as the per-provider recency signal (captured at db-create).
-        // FileVersionInfo I/O runs once per provider here, never per event.
         SetMessageFileVersion(provider, messageFilePaths);
 
         if (provider.IsEmpty)
@@ -129,10 +122,7 @@ public sealed class EventMessageProvider(
         return provider;
     }
 
-    // Stamps the provider with the newest 4-part numeric file version across its resolved message DLLs - the
-    // per-provider recency signal. Uses FileVersionInfo NUMERIC parts, not the FileVersion string: inbox DLLs carry
-    // a trailing " (WinBuild.160101.0800)" that Version.Parse rejects, which would null the ordinal for nearly every
-    // OS provider. Leaves MessageFileVersion null when no candidate file yields a version.
+    // Use numeric FileVersionInfo parts; inbox FileVersion strings include WinBuild suffixes that Version.Parse rejects.
     private void SetMessageFileVersion(ProviderDetails provider, IReadOnlyList<string> messageFilePaths)
     {
         Version? newest = null;
@@ -149,7 +139,7 @@ public sealed class EventMessageProvider(
 
     private void TryFallbackToOwningPublisher(ProviderDetails target, HashSet<string>? visited)
     {
-        // Bound the fallback in case channel/publisher misconfiguration creates a chain.
+        // Cap fallback chains so channel/publisher misconfiguration cannot recurse indefinitely.
         const int MaxOwningPublisherHops = 4;
 
         visited ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -177,7 +167,6 @@ public sealed class EventMessageProvider(
 
         if (string.Equals(owningPublisher, _providerName, StringComparison.OrdinalIgnoreCase))
         {
-            // Channel owns itself - nothing else to try.
             return;
         }
 

@@ -12,32 +12,13 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.DatabaseTools.Common.Operations;
 
-/// <summary>
-///     Shared base for the 5 concrete <see cref="IDatabaseToolsOperation" /> implementations. Provides static helpers
-///     for loading local providers and formatting provider-detail log lines. The logger is passed per-call (not held as
-///     state) because <see cref="IDatabaseToolsOperation.ExecuteAsync" /> receives a fresh logger per invocation (the
-///     streaming sink used by the UI).
-/// </summary>
 internal abstract class OperationBase
 {
     private string _providerDetailFormat = "{0, -14} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8} {6, 8}";
 
-    /// <summary>
-    ///     A user-actionable failure reason worth surfacing in the result chip (see
-    ///     <see cref="IDatabaseToolsOperation.FailureSummary" />). Operations set this via <see cref="SetFailureSummary" />
-    ///     when they fail-fast on a destination/scratch write denial so the actionable remedy is not buried in the log.
-    /// </summary>
     public string? FailureSummary { get; private set; }
 
-    /// <summary>
-    ///     Cleans up a partially-created .db file after an operation aborts (cancellation, fatal exception). EF Core's
-    ///     SqliteConnection pool keeps the file handle alive across <c>DbContext.Dispose</c>, so a naive <c>File.Delete</c>
-    ///     hits a sharing violation on Windows. Mirrors the codebase pattern at
-    ///     <c>ProviderDatabaseMaintenance.PrepareForFileDeletion()</c>: dispose context, clear pool, best-effort delete.
-    ///     Callers pass the context by value and null their own local afterward so the surrounding <c>finally</c> does not
-    ///     dispose twice. Best-effort: catches <see cref="IOException" /> and <see cref="UnauthorizedAccessException" /> with
-    ///     a logger.Warning so the user has signal if the partial file persists.
-    /// </summary>
+    // Clearing SQLite pools releases Windows file handles before deleting the partial database.
     protected static async Task CleanupPartialDatabaseAsync(
         ITraceLogger logger,
         ProviderDbContext? dbContext,
@@ -60,15 +41,7 @@ internal abstract class OperationBase
         }
     }
 
-    /// <summary>
-    ///     Returns a <see cref="Regex" /> with a bounded <see cref="Regex.MatchTimeout" />, so a pathological pattern
-    ///     (e.g., catastrophic backtracking) cannot hang the operation. If <paramref name="regex" /> already has a finite
-    ///     timeout, it is returned as-is. If it has the default <c>Regex.InfiniteMatchTimeout</c>, a fresh
-    ///     <see cref="Regex" /> is compiled from the same pattern/options with <paramref name="defaultTimeout" />. Returns
-    ///     <c>null</c> when input is <c>null</c>. Operations should call this at entry to guarantee any
-    ///     <see cref="RegexMatchTimeoutException" /> catch block is actually reachable, regardless of how the caller
-    ///     constructed the regex.
-    /// </summary>
+    // Recompile infinite-timeout regexes so hostile patterns cannot hang the operation.
     protected static Regex? EnsureBoundedTimeout(Regex? regex, TimeSpan defaultTimeout)
     {
         if (regex is null) { return null; }
@@ -78,10 +51,6 @@ internal abstract class OperationBase
             : regex;
     }
 
-    /// <summary>
-    ///     Returns the distinct local provider names installed on this machine, optionally filtered by a
-    ///     <paramref name="regex" /> whose case sensitivity follows the caller's <see cref="RegexOptions" />.
-    /// </summary>
     protected static List<string> GetLocalProviderNames(Regex? regex)
     {
         var providers = new List<string>(EventLogSession.GlobalSession.GetProviderNames().Distinct().OrderBy(name => name));
@@ -89,20 +58,13 @@ internal abstract class OperationBase
         return regex is null ? providers : providers.Where(p => regex.IsMatch(p)).ToList();
     }
 
-    /// <summary>
-    ///     Yields <see cref="ProviderDetails" /> for each local provider, applying the optional regex filter and
-    ///     name-level <paramref name="excludeProviderNames" /> exclude set before metadata is resolved. Local providers are
-    ///     live, so their identity is always <c>(name, "")</c>; a name-level exclude is therefore exact here.
-    /// </summary>
     protected static async IAsyncEnumerable<ProviderDetails> LoadLocalProvidersAsync(
         ITraceLogger logger,
         Regex? regex,
         IReadOnlySet<string>? excludeProviderNames = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        // Local-provider resolution is synchronous (registry/metadata reads). This wrapper exposes it as an
-        // IAsyncEnumerable so callers can stream local and file-source providers through one await foreach; the
-        // await keeps it a valid async iterator without scheduling an extra continuation.
+        // Async iterator bridge: synchronous provider reads share an IAsyncEnumerable consumer path.
         await Task.CompletedTask;
 
         foreach (var providerName in GetLocalProviderNames(regex))
@@ -115,13 +77,6 @@ internal abstract class OperationBase
         }
     }
 
-    /// <summary>
-    ///     Streams providers extracted from a mounted or extracted foreign Windows image, fully offline. Mirrors
-    ///     <see cref="LoadLocalProvidersAsync" />: offline extraction is synchronous (registry-hive + DLL reads), so this
-    ///     wrapper exposes it as an <see cref="IAsyncEnumerable{T}" /> for the shared <c>await foreach</c> consume loop; the
-    ///     await keeps it a valid async iterator without scheduling an extra continuation. The facade applies the name filter
-    ///     and exclude set itself (so this does not re-filter) and stamps each provider with the IMAGE's OS provenance.
-    /// </summary>
     protected static async IAsyncEnumerable<ProviderDetails> LoadOfflineImageProvidersAsync(
         string offlineImagePath,
         ITraceLogger logger,
@@ -139,10 +94,6 @@ internal abstract class OperationBase
         }
     }
 
-    /// <summary>
-    ///     Emits the provider-details column header sized to the longest provider name. Updates the instance format
-    ///     string so subsequent <see cref="LogProviderDetails" /> calls align to the same width.
-    /// </summary>
     protected void LogProviderDetailHeader(ITraceLogger logger, IEnumerable<string> providerNames)
     {
         var maxNameLength = providerNames.Any() ? providerNames.Max(p => p.Length) : 14;
@@ -158,7 +109,6 @@ internal abstract class OperationBase
         logger.Information($"{header}");
     }
 
-    /// <summary>Emits one formatted line for the given <see cref="ProviderDetails" />.</summary>
     protected void LogProviderDetails(ITraceLogger logger, ProviderDetails details)
     {
         var line = string.Format(
@@ -174,6 +124,5 @@ internal abstract class OperationBase
         logger.Information($"{line}");
     }
 
-    /// <summary>Records a user-actionable <see cref="FailureSummary" /> for a fail-fast outcome.</summary>
     protected void SetFailureSummary(string summary) => FailureSummary = summary;
 }

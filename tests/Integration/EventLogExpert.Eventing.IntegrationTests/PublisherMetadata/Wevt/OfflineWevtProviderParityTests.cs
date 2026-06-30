@@ -70,12 +70,9 @@ public sealed class OfflineWevtProviderParityTests(
             List<TemplateDataNode>? nativeNodes = ParseDataNodes(nativeEvent.Template);
             List<TemplateDataNode>? offlineNodes = ParseDataNodes(offlineEvent.Template);
 
-            // Skip struct-bearing native templates here: ParseDataNodes compares only top-level <data> nodes, so structs
-            // are covered by the dedicated Events_StructTemplates_CanonicalizeToNativeStructure test instead.
+            // ParseDataNodes ignores structs; the struct parity test owns those templates.
             if (nativeNodes is null || offlineNodes is null || TemplateHasStruct(nativeEvent.Template)) { continue; }
 
-            // The structural compare includes the length and count attributes, so a length field-reference miss, an array
-            // count miss, or a missing / wrong outType (the writer always emits one) all fail here.
             Assert.Equal(nativeNodes, offlineNodes);
             comparedCount++;
             lengthBearingNodes += offlineNodes.Count(static node => !string.IsNullOrEmpty(node.Length));
@@ -85,9 +82,7 @@ public sealed class OfflineWevtProviderParityTests(
 
         Assert.True(comparedCount > 0, "Expected at least one Kernel-Power non-struct template to compare.");
 
-        // Kernel-Power is the corpus that proves length field-references (FIX 1) and always-emitted outType for FILETIME
-        // (FIX 2): both must appear among the matched templates, otherwise the parity passed without exercising them. It
-        // also carries array fields, so count="N" / count="<field>" reproduction is proven non-vacuously here too.
+        // Kernel-Power must exercise length references, FILETIME outType, and array counts non-vacuously.
         Assert.True(lengthBearingNodes > 0, "Expected at least one matched length-bearing field (length field-reference parity).");
         Assert.True(fileTimeNodes > 0, "Expected at least one matched FILETIME field (always-emitted outType parity).");
         Assert.True(arrayBearingNodes > 0, "Expected at least one matched array field (count attribute parity).");
@@ -114,8 +109,7 @@ public sealed class OfflineWevtProviderParityTests(
             List<TemplateDataNode>? nativeNodes = ParseDataNodes(nativeEvent.Template);
             List<TemplateDataNode>? offlineNodes = ParseDataNodes(offlineEvent.Template);
 
-            // Skip struct-bearing native templates here: ParseDataNodes compares only top-level <data> nodes, so structs
-            // are covered by the dedicated Events_StructTemplates_CanonicalizeToNativeStructure test instead.
+            // ParseDataNodes ignores structs; the struct parity test owns those templates.
             if (nativeNodes is null || offlineNodes is null || TemplateHasStruct(nativeEvent.Template)) { continue; }
 
             Assert.Equal(nativeNodes, offlineNodes);
@@ -154,12 +148,7 @@ public sealed class OfflineWevtProviderParityTests(
     [Fact]
     public void Events_SharedNonStructTemplates_OfflineWritesWheneverNativeDoes()
     {
-        // Closes a weak-gate blindspot: the structural parity tests skip events whose offline Template is empty, so a
-        // partial fail-closed regression (some templates that should be written start returning "") would still pass as
-        // long as one survivor matched. Here, over the shared (Id, Version) events whose native template is non-empty and
-        // not a struct, the count of offline events that also wrote a non-empty template must equal the native
-        // count - whenever native renders a non-struct template, offline must too. Native-only events are ignored so the
-        // native superset is tolerated, matching the other parity tests.
+        // Count parity catches partial fail-closed regressions that structural parity would skip.
         (ProviderParityFixture Fixture, string Label)[] corpus =
         [
             (securityAuditing, nameof(securityAuditing)),
@@ -239,18 +228,14 @@ public sealed class OfflineWevtProviderParityTests(
 
                 string? nativeShape = CanonicalizeTemplate(nativeEvent.Template);
 
-                // Native always renders a parseable struct template here; if it somehow does not, there is nothing to gate.
                 if (nativeShape is null) { continue; }
 
-                // These four providers carry only non-nested structs, so offline must synthesize every struct event native
-                // renders - a null/empty offline shape is a fail-closed regression, not an expected skip.
+                // These providers have only non-nested structs, so an empty offline shape is a regression.
                 string? offlineShape = CanonicalizeTemplate(offlineEvent.Template);
                 Assert.True(
                     offlineShape is not null,
                     $"{providerName}: offline emitted an empty or unparseable template for struct event Id={nativeEvent.Id} V{nativeEvent.Version} that native renders.");
 
-                // The canonical form preserves struct name / count / nesting and each data node's name/inType/outType/
-                // length/count, so a struct-name, count-mode, member-type, or ordering regression fails here.
                 Assert.Equal(nativeShape, offlineShape);
                 comparedStructEvents++;
                 comparedThisProvider = true;
@@ -271,11 +256,9 @@ public sealed class OfflineWevtProviderParityTests(
     {
         Assert.SkipUnless(powerShell.Available, SkipReasonFor(powerShell));
 
-        // PowerShell defines keywords, so this exercises keyword decode non-vacuously.
         Assert.NotEmpty(powerShell.Offline!.Keywords);
 
-        // A partial decode regression is caught here: every parsed keyword (post-dedup by mask) must survive into the
-        // resolved table, not just a non-empty subset of it.
+        // Count parity catches partial keyword decode loss after mask de-duplication.
         Assert.Equal(powerShell.RawKeywordKeyCount, powerShell.Offline!.Keywords.Count);
 
         AssertOfflineMatchesNative(powerShell.Native!.Keywords, powerShell.Offline!.Keywords);
@@ -286,7 +269,6 @@ public sealed class OfflineWevtProviderParityTests(
     {
         Assert.SkipUnless(powerShell.Available, SkipReasonFor(powerShell));
 
-        // PowerShell defines value maps, so this exercises map decode non-vacuously.
         Assert.NotEmpty(powerShell.Offline!.Maps);
 
         Assert.Equal(powerShell.RawMapCount, powerShell.Offline!.Maps.Count);
@@ -315,8 +297,7 @@ public sealed class OfflineWevtProviderParityTests(
     {
         Assert.SkipUnless(powerShell.Available, SkipReasonFor(powerShell));
 
-        // PowerShell defines many opcodes, exercising opcode decode: the raw OPCO id is already opcode << 16 and is passed
-        // through unchanged so the factory's (int)((uint)Value >> 16) projection recovers the native opcode key.
+        // OPCO ids are already opcode << 16; parity guards the factory's key projection.
         Assert.NotEmpty(powerShell.Offline!.Opcodes);
 
         Assert.Equal(powerShell.RawOpcodeKeyCount, powerShell.Offline!.Opcodes.Count);
@@ -401,9 +382,7 @@ public sealed class OfflineWevtProviderParityTests(
     private static void AssertOfflineMatchesNative<TKey>(IDictionary<TKey, string> native, IDictionary<TKey, string> offline)
         where TKey : notnull
     {
-        // Parity is by key and value, tolerating native supersets (the native enumeration may carry standard entries the
-        // provider binary omits). Every offline entry must reproduce its native counterpart exactly; callers assert
-        // non-emptiness for providers known to define entries so a decode-to-empty regression fails rather than passing.
+        // Native may include standard entries the provider binary omits; offline entries must still match by key and value.
         foreach ((TKey key, string offlineValue) in offline)
         {
             Assert.True(native.TryGetValue(key, out string? nativeValue), $"Native result is missing offline key '{key}'.");
@@ -570,8 +549,7 @@ public sealed class OfflineWevtProviderParityTests(
 
         private void CaptureRawTableCounts(string resourceFilePath, Guid publisherGuid)
         {
-            // Re-parse the resource to record the post-dedup table sizes the resolved provider details must reproduce, so
-            // a partial decode regression (some entries dropped between parse and assembly) is detectable by count.
+            // Raw post-dedup counts catch entries dropped between parse and assembly.
             byte[]? rented = WevtTemplateReader.TryRentWevtResource(resourceFilePath, logger: null, out int size);
 
             if (rented is null) { return; }
