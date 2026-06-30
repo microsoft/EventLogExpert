@@ -26,6 +26,9 @@ internal static partial class NativeMethods
     /// <summary>Message callback return: abort the in-progress apply (WIMApplyImage then fails with ERROR_REQUEST_ABORTED).</summary>
     internal const uint WIM_MSG_ABORT_IMAGE = 0xFFFFFFFF;
 
+    /// <summary>Apply/capture progress message id; wParam carries the percent complete (0-100).</summary>
+    internal const uint WIM_MSG_PROGRESS = 0x9478;
+
     /// <summary>Message callback return: continue the operation.</summary>
     internal const uint WIM_MSG_SUCCESS = 0;
 

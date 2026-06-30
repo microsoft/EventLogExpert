@@ -4,6 +4,7 @@
 using Bunit;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
+using EventLogExpert.Eventing.PublisherMetadata.Offline;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
@@ -250,6 +251,27 @@ public sealed class CreateDatabaseTabTests : BunitContext
     }
 
     [Fact]
+    public void LoadEditions_FillsTheEmptyIndexBoxWithTheFirstEdition()
+    {
+        // Loading editions should drop the empty value so the first edition populates the box, visibly confirming the load
+        // worked rather than leaving the index blank.
+        ConfigureEditionsListed(
+            new WimImageEntry(2, "Windows Server 2025 Standard", "ServerStandard", null),
+            new WimImageEntry(4, "Windows Server 2025 Datacenter", "ServerDatacenter", null));
+
+        var component = Render<CreateDatabaseTab>();
+        component.Find("#create-source-path").Input(@"C:\images\install.wim");
+
+        Assert.True(string.IsNullOrEmpty(component.Find("#create-wim-index").GetAttribute("value")));
+
+        component.FindAll("button").Single(button => button.TextContent.Contains("Load editions")).Click();
+
+        component.WaitForAssertion(() => Assert.Equal(
+            "2: ServerStandard (Windows Server 2025 Standard)",
+            component.Find("#create-wim-index").GetAttribute("value")));
+    }
+
+    [Fact]
     public void LocalScanNonAdmin_OffersProtectedProvidersChoice_RunNotShielded()
     {
         // Default render: empty source (live local providers) on a non-admin process. The fast in-process scan is the
@@ -376,6 +398,15 @@ public sealed class CreateDatabaseTabTests : BunitContext
             });
         return writtenDatabasePaths;
     }
+
+    // Configures the elevated runner to return the given editions from a successful ListImageEditionsAsync.
+    private void ConfigureEditionsListed(params WimImageEntry[] editions) =>
+        Services.GetRequiredService<IElevatedDatabaseToolsRunner>()
+            .ListImageEditionsAsync(default!, default!, default)
+            .ReturnsForAnyArgs(Task.FromResult(new OfflineImageEditionsResult(
+                DatabaseToolsOutcome.Succeeded,
+                new WimImageList(WimImageListStatus.Ok, editions),
+                FailureSummary: null)));
 
     // Configures the elevated runner's create dispatch to succeed so a run routed through elevation completes.
     private IElevatedDatabaseToolsRunner ConfigureElevatedCreateSucceeded()
