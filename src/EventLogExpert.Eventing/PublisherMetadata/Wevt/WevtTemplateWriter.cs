@@ -6,15 +6,7 @@ using System.Text;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Wevt;
 
-/// <summary>
-///     Writes the manifest <c>&lt;template&gt;</c> XML for the parsed WEVT_TEMPLATE node tree: flat
-///     <c>&lt;data&gt;</c> leaves and <c>&lt;struct&gt;</c> wrappers around their member leaves. Each leaf carries only
-///     name / inType / outType / length / count; the <c>map</c> attribute is injected separately by
-///     <see cref="ProviderDetailsFactory.InjectMapAttribute" /> so a map is never written twice. The whole template fails
-///     closed (a null return) when any field is unrepresentable - an unknown inType or outType byte, a length that is
-///     neither the pinned field-name reference nor a fixed length on a variable-length type, or a count reference that is
-///     out of range or points at a struct - so the reader never emits a guessed or partial template.
-/// </summary>
+// Fail closed when WEVT fields cannot be represented; guessed template XML breaks native parity.
 internal static class WevtTemplateWriter
 {
     private const byte AnsiStringInType = 0x02;
@@ -33,19 +25,11 @@ internal static class WevtTemplateWriter
 
     private const uint VariableCountArrayFlag = 0x10;
 
-    /// <summary>
-    ///     Escapes a value for an XML attribute exactly as <see cref="Write" /> writes field names, so the factory's map
-    ///     injection searches for the same escaped name it emitted (otherwise injection silently misses).
-    /// </summary>
+    // Map injection must search the same escaped field names Write emits.
     internal static string EscapeXmlAttribute(string value) =>
         value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&apos;");
 
-    /// <summary>
-    ///     Decodes an attribute value produced by <see cref="EscapeXmlAttribute" /> back to its literal text, so a render
-    ///     consumer can match a parsed map / field name against the unescaped keys it was stored under. The exact inverse of
-    ///     <see cref="EscapeXmlAttribute" />: the <c>&amp;amp;</c> pass runs last so the body of an already-decoded entity is
-    ///     not re-decoded a second time.
-    /// </summary>
+    // Decode &amp; last so already-decoded entity bodies are not decoded twice.
     internal static string UnescapeXmlAttribute(ReadOnlySpan<char> value)
     {
         if (value.IndexOf('&') < 0) { return new string(value); }
@@ -94,7 +78,7 @@ internal static class WevtTemplateWriter
         builder.Append("<data name=\"").Append(EscapeXmlAttribute(leaf.Name)).Append('"');
         builder.Append(" inType=\"").Append(EscapeXmlAttribute(inType)).Append('"');
 
-        // The live API always emits an outType, even when it equals the inType's winmeta default, so it is never omitted.
+        // Live API always emits outType, even when it equals the winmeta default.
         builder.Append(" outType=\"").Append(EscapeXmlAttribute(outType)).Append('"');
 
         if (lengthValue is not null)

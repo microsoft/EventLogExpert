@@ -8,27 +8,10 @@ using System.Text;
 
 namespace EventLogExpert.ProviderDatabase.Hashing;
 
-/// <summary>
-///     Produces a canonical, deterministic, culture-invariant byte serialization of a <see cref="ProviderDetails" />
-///     rendering payload - the input to the content hash that becomes its <see cref="ProviderDetails.VersionKey" />. The
-///     encoding is a hand-written length-prefixed BINARY format (NOT JSON) so the bytes are stable across .NET versions
-///     and machines: two providers that render identically hash identically and collapse to one database row, while
-///     genuinely different payloads coexist. The provider NAME and the VersionKey itself are excluded (the name is the
-///     identity key; the VersionKey is the output).
-/// </summary>
-/// <remarks>
-///     Normalization is aligned with <c>ProviderDetailsMerger</c>'s equivalence so the hash and the merge agree on
-///     what makes two providers "the same version": dictionary entries are emitted sorted by key (dictionary enumeration
-///     order is unspecified); event keyword lists are sorted AND de-duplicated (the merger compares them as a set); event,
-///     message, and parameter entries are encoded to self-delimiting blobs that are sorted ordinally with exact duplicates
-///     dropped (manifest list order is not a stability contract); ValueMap entries keep their ORIGINAL order (bitmap
-///     decoding is order-dependent, so order is content). Strings are preserved EXACTLY, except an event's Template, which
-///     is encoded by <see cref="TemplateSignature" /> as render-relevant field tuples so templates that render identically
-///     collapse across live and offline builds.
-/// </remarks>
+// Canonical bytes must match merge equivalence so identical rendered providers share one VersionKey.
 internal static class ProviderContentEncoder
 {
-    // Bump to deliberately re-key every provider after a canonicalization change.
+    // Bump after canonicalization changes to re-key every provider deterministically.
     private const byte SchemeVersion = 1;
 
     internal static byte[] Encode(ProviderDetails provider)
@@ -37,8 +20,7 @@ internal static class ProviderContentEncoder
 
         WriteByte(buffer, SchemeVersion);
 
-        // The merger treats a null and an empty ResolvedFromOwningPublisher as the same "no owner" (IsNullOrEmpty), so
-        // normalize them to one value here - otherwise null vs "" would split two otherwise-identical providers.
+        // Merge treats null and empty owners as equivalent, so hash them as one value.
         WriteString(buffer, string.IsNullOrEmpty(provider.ResolvedFromOwningPublisher) ? null : provider.ResolvedFromOwningPublisher);
         WriteSortedBlobs(buffer, provider.Events, EncodeEvent);
         WriteSortedBlobs(buffer, provider.Messages, EncodeMessage);
@@ -61,8 +43,7 @@ internal static class ProviderContentEncoder
         WriteInt32(buffer, model.Opcode);
         WriteInt32(buffer, model.Task);
 
-        // The merger treats keywords as a SET (KeywordsEqual -> HashSet.SetEquals), so sort + de-duplicate to match:
-        // [1, 1, 2] and [2, 1] must hash identically.
+        // Merge treats keywords as a set, so ordering and duplicate rows must not affect the hash.
         var keywords = model.Keywords.Distinct().Order().ToArray();
         WriteInt32(buffer, keywords.Length);
 
@@ -82,9 +63,7 @@ internal static class ProviderContentEncoder
         WriteUInt16(buffer, (ushort)model.ShortId);
         WriteInt64(buffer, model.RawId);
 
-        // MessageModel.ProviderName is intentionally omitted: it mirrors the owning provider's name (excluded from the
-        // hash) and the merger's message equivalence ignores it, so hashing it would re-inject the provider name and
-        // stop two recordings of the same provider whose name differs only by case from collapsing to one row.
+        // ProviderName mirrors the excluded owner name; hashing it would split equivalent provider recordings.
         WriteString(buffer, model.LogLink);
         WriteString(buffer, model.Tag);
         WriteString(buffer, model.Template);
@@ -148,8 +127,7 @@ internal static class ProviderContentEncoder
             WriteString(buffer, key);
             WriteByte(buffer, map.IsBitMap ? (byte)1 : (byte)0);
 
-            // ValueMap entry order is SEMANTIC (TryDecodeBitMap iterates in order; the merger compares via
-            // SequenceEqual), so preserve it - do NOT sort.
+            // ValueMap entry order is semantic for bitmap decoding and merge equality, so do not sort it.
             WriteInt32(buffer, map.Entries.Count);
 
             foreach (var entry in map.Entries)
@@ -162,8 +140,7 @@ internal static class ProviderContentEncoder
 
     private static void WriteSortedBlobs<T>(ArrayBufferWriter<byte> buffer, IReadOnlyList<T> items, Func<T, byte[]> encode)
     {
-        // Encode each item to a self-delimiting blob, then order the blobs ordinally and drop exact duplicates so the
-        // hash is independent of the source list order and of duplicate rows.
+        // Framed blobs sort ordinally and de-duplicate so source order and duplicate rows do not affect the hash.
         var blobs = new List<byte[]>(items.Count);
 
         foreach (var item in items) { blobs.Add(encode(item)); }
@@ -193,8 +170,7 @@ internal static class ProviderContentEncoder
     {
         if (value is null)
         {
-            // A null string is distinct from an empty one (-1 length marker), so the encoding stays injective across
-            // the nullable string fields (Template/Description/LogName/LogLink/Tag).
+            // The -1 marker keeps null distinct from empty for nullable rendered fields.
             WriteInt32(buffer, -1);
 
             return;

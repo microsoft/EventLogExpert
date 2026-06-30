@@ -18,55 +18,7 @@ using System.Threading.Channels;
 
 namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 
-/// <summary>
-///     Production <see cref="IElevatedDatabaseToolsRunner" /> implementation. For each request: spawn helper -> wait
-///     for Hello message (10s) -> send request -> drain messages through a bounded <see cref="Channel{T}" /> -> forward
-///     Log/Progress to caller sinks + mirror to <see cref="ITraceLogger" /> with <c>[ElevatedHelper]</c> prefix -> capture
-///     terminal Result/Fatal -> await helper exit (5s grace, then force-kill if killable) -> translate to
-///     <see cref="DatabaseToolsResult" />.
-/// </summary>
-/// <remarks>
-///     <para>
-///         <b>Cancellation flow:</b> caller cancels -> runner writes <see cref="CancelMessage" /> to the pipe
-///         (best-effort) and starts a 30s grace timer. Helper observes the message, cancels its operation CTS, and emits a
-///         <see cref="ResultMessage" /> with <see cref="DatabaseToolsOutcome.Cancelled" />. If the helper does NOT emit a
-///         result within the grace window, the runner force-kills the process. On a successful kill the runner returns a
-///         synthesized Cancelled outcome with a "force-killed" note; if the kill itself fails (for example, a medium-IL
-///         runner cannot terminate a high-IL helper and <see cref="IElevatedHelperProcess.Kill" /> returns <c>false</c>),
-///         the runner disposes the pipe to unblock the drain loop and returns Cancelled with an explicit orphan warning so
-///         the caller can surface that the helper may continue running.
-///     </para>
-///     <para>
-///         <b>Early-return cleanup:</b> if <see cref="RunAsync" /> returns before the normal terminal-message path
-///         completes (Hello timeout, protocol mismatch, wrong-first-envelope, pipe-closed-before-Hello, cancel-while-
-///         sending-request), a centralized <c>finally</c> block disposes the pipe (graceful: helper sees EOF and exits
-///         cooperatively), bounded-waits for exit, and falls back to <see cref="IElevatedHelperProcess.Kill" /> only if
-///         the helper does not exit within the grace window. If the fallback kill also fails the helper becomes an orphan;
-///         the pipe is already closed so the runner returns without waiting further.
-///     </para>
-///     <para>
-///         <b>Concurrency invariants:</b>
-///         <list type="bullet">
-///             <item>
-///                 ONE dedicated pipe-reader task per RunAsync invocation, deserializing line-by-line into a bounded
-///                 <see cref="Channel{T}" /> (capacity 1024). Bounded channel + named-pipe OS buffer together provide
-///                 back-pressure to the helper if the caller's <see cref="IProgress{T}" /> sink is slow.
-///             </item>
-///             <item>Pipe WRITES (request + cancel) are guarded by a <see cref="SemaphoreSlim" />.</item>
-///             <item>
-///                 Concurrent read (drain task) + write (request + cancel) on the same <see cref="Stream" /> is safe
-///                 ONLY because the underlying duplex named pipe has independent OS-level buffers per direction (see
-///                 <see cref="IElevatedHelperProcess.Pipe" />'s contract documentation).
-///             </item>
-///             <item>
-///                 The drain loop awaits with <c>ConfigureAwait(false)</c>, so message mirroring and the Warning+ file
-///                 tee run off the dispatcher on a thread-pool thread; the underlying
-///                 <see cref="EventLogExpert.Runtime.DebugLog.DebugLogService" /> uses Mutex + Lock + drop-trace fallback
-///                 so concurrent appends from arbitrary callers are safe.
-///             </item>
-///         </list>
-///     </para>
-/// </remarks>
+// Duplex named-pipe buffers permit concurrent drain reads and request/cancel writes.
 internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 {
     internal const string ElevatedHelperTag = "[ElevatedHelper]";
@@ -413,7 +365,6 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
         try
         {
-            // 1) Spawn helper.
             try
             {
                 process = await _host.StartAsync(Array.Empty<string>(), cancellationToken);
@@ -441,7 +392,6 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
             writeLock = new SemaphoreSlim(initialCount: 1, maxCount: 1);
 
-            // 2) Set up the pipe-reader -> bounded channel pipeline.
             var channel = Channel.CreateBounded<DatabaseToolsIpcMessage>(
                 new BoundedChannelOptions(ChannelCapacity)
                 {
@@ -457,7 +407,6 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 () => DrainPipeAsync(pipeStream, channel.Writer, readerStopCts.Token),
                 readerStopCts.Token);
 
-            // 3) Wait for Hello message (deadline).
             try
             {
                 using var helloCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -508,7 +457,6 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                     stopwatch.Elapsed);
             }
 
-            // 4) Send the request.
             try
             {
                 await WriteRequestAsync(pipeStream, writeLock, request, cancellationToken);
@@ -518,13 +466,11 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, "Cancelled while sending request to helper.", stopwatch.Elapsed);
             }
 
-            // 5) Wire caller-cancellation -> CancelMessage + grace timer.
             if (cancellationToken.CanBeCanceled)
             {
                 cancelRegistration = cancellationToken.Register(() => HandleCallerCancellation(pipeStream, writeLock, process, killState));
             }
 
-            // 6) Drain messages until Result or Fatal arrives (or pipe closes).
             ResultMessage? result = null;
             FatalMessage? fatal = null;
 
@@ -572,7 +518,6 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 await cancelRegistration.DisposeAsync();
             }
 
-            // Helper sent a terminal message (or pipe closed). Cancel the kill-timer so it doesn't fire on a clean finish.
             killState.CancelGraceTimer();
 
             // Join the kill-timer so its disposition write happens-before the TranslateOutcome read.
@@ -582,7 +527,6 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 _traceLogger.Warning($"{ElevatedHelperTag} kill-timer did not settle within {_exitGrace.TotalSeconds:N0}s; proceeding with current disposition.");
             }
 
-            // 7) Wait for helper to exit (bounded by _exitGrace, then force-kill if it lingers and is killable).
             int exitCode;
             try
             {
@@ -627,7 +571,6 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 }
             }
 
-            // 8) Stop the pipe reader so it releases the StreamReader / Stream.
             readerStopCts.Cancel();
 
             try { await pipeReaderTask; }
@@ -639,7 +582,6 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
             _traceLogger.Trace($"{ElevatedHelperTag} Helper process exited; exit code = {exitCode}{(killState.HelperKilled ? " (force-killed)" : string.Empty)}.");
 
-            // 9) Translate to DatabaseToolsResult.
             exitHandled = true;
 
             return TranslateOutcome(result, fatal, exitCode, killState.Disposition, cancellationToken, stopwatch.Elapsed);
@@ -665,7 +607,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                     catch { /* best effort */ }
                 }
 
-                // Graceful first: dispose pipe so helper sees EOF and exits cooperatively.
+                // Dispose pipe before force-kill so the helper can exit cooperatively.
                 try { await ((IAsyncDisposable)process.Pipe).DisposeAsync(); }
                 catch { /* best effort */ }
 
@@ -677,7 +619,6 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 }
                 catch
                 {
-                    // Helper didn't exit cooperatively — force-kill as last resort.
                     if (process.Kill())
                     {
                         killState.MarkKillSucceeded();
@@ -693,7 +634,6 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                     else
                     {
                         killState.MarkKillFailed();
-                        // Kill failed → pipe already disposed, helper orphaned, nothing more to do.
                     }
                 }
             }

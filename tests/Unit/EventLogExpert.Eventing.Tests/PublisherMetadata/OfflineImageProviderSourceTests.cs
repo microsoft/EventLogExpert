@@ -62,8 +62,7 @@ public sealed class OfflineImageProviderSourceTests
 
         List<ProviderDetails> result = Enumerate(extractor);
 
-        // A name is marked seen only after a non-empty yield, so a modern build that fails closed leaves the legacy
-        // provider of the same name free to be built and yielded.
+        // Names are marked seen only after a non-empty yield, preserving legacy fallback after fail-closed modern builds.
         Assert.Equal(["X"], result.Select(details => details.ProviderName));
     }
 
@@ -80,8 +79,6 @@ public sealed class OfflineImageProviderSourceTests
 
         List<ProviderDetails> result = Enumerate(extractor);
 
-        // The modern build already populates the legacy tables, so the same-named legacy registration is skipped
-        // before it is even built.
         Assert.Equal(["Shared", "Legacy-Only"], result.Select(details => details.ProviderName));
         Assert.DoesNotContain("Shared", extractor.LegacyBuildRequests);
         Assert.Contains("Legacy-Only", extractor.LegacyBuildRequests);
@@ -132,7 +129,6 @@ public sealed class OfflineImageProviderSourceTests
 
         List<ProviderDetails> result = Enumerate(extractor);
 
-        // Modern providers are enumerated before pure-legacy providers.
         Assert.Equal(["Modern-A", "Legacy-B"], result.Select(details => details.ProviderName));
         Assert.All(result, details =>
         {
@@ -172,9 +168,7 @@ public sealed class OfflineImageProviderSourceTests
         var logger = new CapturingTraceLogger();
         using OfflineTestImage image = OfflineTestImage.Create(SeedSoftware, SeedSystem);
 
-        // A real extractor over a synthetic image: the re-rooted DLLs do not exist, so every modern and legacy build
-        // fails closed and the enumeration yields nothing - but TryCreate, both loops, the provenance read, and the
-        // hive unload all run end to end.
+        // Synthetic DLL paths fail closed while still exercising both enumeration loops and hive unload.
         List<ProviderDetails> result =
             OfflineImageProviderSource.LoadProviders(image.RootDirectory, logger).ToList();
 

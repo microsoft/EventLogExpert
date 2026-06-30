@@ -11,18 +11,12 @@ internal sealed class RegistryProvider(ITraceLogger? logger = null) : ILegacyMes
 {
     private readonly ITraceLogger? _logger = logger;
 
-    /// <summary>Returns the file paths for the message files for this provider on the local machine.</summary>
-    /// <remarks>
-    ///     EventLogExpert is a local-only tool. Remote-machine resolution is intentionally not supported because the
-    ///     modern provider metadata path (used as a fallback when no legacy registry entry exists) is local-only, and silently
-    ///     mixing local and remote sources produced wrong message text. Callers must already be operating in a local context.
-    /// </remarks>
+    // Local-only: mixing remote registry data with local modern metadata yields wrong message text.
     public IReadOnlyList<string> GetMessageFilesForLegacyProvider(string providerName)
     {
         _logger?.Debug($"{nameof(GetMessageFilesForLegacyProvider)} called for provider {providerName}");
 
-        // Open an owned base key (do NOT use Registry.LocalMachine — that's a shared static).
-        // This makes concurrent calls across instances safe to dispose independently.
+        // Owned base key: Registry.LocalMachine is shared static state and must not be disposed per instance.
         using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default);
 
         const string EventLogKeyPath = @"SYSTEM\CurrentControlSet\Services\EventLog";
@@ -33,7 +27,6 @@ internal sealed class RegistryProvider(ITraceLogger? logger = null) : ILegacyMes
 
         foreach (var logSubKeyName in eventLogKey.GetSubKeyNames())
         {
-            // Skip Security and State since it requires elevation
             if (LogChannelNames.AdminOnlyLiveChannels.Contains(logSubKeyName))
             {
                 continue;
@@ -61,8 +54,7 @@ internal sealed class RegistryProvider(ITraceLogger? logger = null) : ILegacyMes
             _logger?.Debug(
                 $"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}. EventMessageFile={eventMessageFilePath}, CategoryMessageFile={categoryMessageFilePath ?? "<null>"}, ParameterMessageFile={parameterMessageFilePath ?? "<null>"}.");
 
-            // Filter by extension. The FltMgr provider puts a .sys file in the EventMessageFile value,
-            // and trying to load that causes an access violation.
+            // Loading FltMgr's .sys EventMessageFile causes an access violation; only datafile DLL/EXE loads are safe.
             var supportedExtensions = new[] { ".dll", ".exe" };
 
             var messageFiles = eventMessageFilePath
@@ -83,7 +75,6 @@ internal sealed class RegistryProvider(ITraceLogger? logger = null) : ILegacyMes
                 files = messageFiles;
             }
 
-            // Materialize before the using-scopes close the registry handles
             return files.Select(Environment.ExpandEnvironmentVariables).ToList();
         }
 
@@ -94,6 +85,5 @@ internal sealed class RegistryProvider(ITraceLogger? logger = null) : ILegacyMes
 
     private class OpenEventLogRegistryKeyFailedException(string msg) : Exception(msg)
     {
-        /* marker exception — no extra state needed */
     }
 }

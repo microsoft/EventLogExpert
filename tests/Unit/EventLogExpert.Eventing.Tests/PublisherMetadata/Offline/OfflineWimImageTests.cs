@@ -9,13 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
 
-/// <summary>
-///     Drives the WIM read/validate/extract/cancel state machine deterministically through a fake
-///     <see cref="IWimOperations" />. The real <c>WIMApplyImage</c> path needs administrator privileges and a multi-GB
-///     image, so these tests assert the orchestration (index validation, elevation gate, disk precheck, failure-safe temp
-///     cleanup, status mapping) while a fake stands in for the native calls and creates/deletes a REAL temp directory so
-///     the cleanup assertions are real, not mocked. The actual native apply is covered by the manual real-WIM E2E.
-/// </summary>
 public sealed class OfflineWimImageTests
 {
     [Fact]
@@ -108,7 +101,6 @@ public sealed class OfflineWimImageTests
 
         Assert.Equal(OfflineWimExtractStatus.ApplyFailed, result.Status);
         Assert.Equal(1, nativeApi.ApplyCallCount);
-        // The partial extraction must not leak: no ELX_WIM_* directory remains under the temp parent.
         Assert.Empty(Directory.GetDirectories(workspace.TempParent));
     }
 
@@ -134,7 +126,6 @@ public sealed class OfflineWimImageTests
     [Fact]
     public async Task TryExtractAsync_WhenApplySucceeds_StreamsExtractingBeforeApplyAndExtractedAfter()
     {
-        // BUG #4: a multi-minute WIM apply must emit start/complete progress so the UI is not blank during extraction.
         using var workspace = new TempWorkspace();
         var events = new List<string>();
         var logger = new SequenceRecordingTraceLogger(events);
@@ -283,8 +274,6 @@ public sealed class OfflineWimImageTests
         }
     }
 
-    // Records every log message (any level) into a shared ordered list so a test can assert the streaming progress
-    // lines are emitted around the native apply; the fake WIM operations append their own "apply" marker to it.
     private sealed class SequenceRecordingTraceLogger(List<string> events) : ITraceLogger
     {
         public LogLevel MinimumLevel => LogLevel.Trace;

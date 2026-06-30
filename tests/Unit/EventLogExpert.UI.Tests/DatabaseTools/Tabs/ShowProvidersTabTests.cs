@@ -24,8 +24,6 @@ public sealed class ShowProvidersTabTests : BunitContext
     [Fact]
     public void IncludeProtectedProviders_ShieldsRunAndRoutesThroughElevatedHelper()
     {
-        // Opting to include protected providers must shield Run (the click now elevates) and route the run through the
-        // elevated helper, not the in-process service.
         var elevatedRunner = ConfigureElevatedShowSucceeded();
 
         var component = Render<ShowProvidersTab>();
@@ -41,8 +39,6 @@ public sealed class ShowProvidersTabTests : BunitContext
     [Fact]
     public void LocalScanNonAdmin_OffersProtectedProvidersChoice_RunNotShielded()
     {
-        // Empty source (live local providers) on a non-admin process: the fast in-process scan is the default, so Run
-        // is not shielded; the "include protected providers" checkbox is offered to opt into elevation.
         var component = Render<ShowProvidersTab>();
 
         Assert.NotNull(component.Find("#show-include-protected"));
@@ -83,8 +79,7 @@ public sealed class ShowProvidersTabTests : BunitContext
     [Fact]
     public void RunButton_ExposesElevationToScreenReaders_OnlyWhenElevating()
     {
-        // The shield glyph is aria-hidden, so a screen reader's only cue that Run will prompt for elevation is an
-        // aria-describedby pointing at a visually-hidden description; it must be present only while the click elevates.
+        // The aria-hidden shield needs aria-describedby as the screen-reader elevation cue.
         var component = Render<ShowProvidersTab>();
 
         Assert.Null(component.Find(".button-green").GetAttribute("aria-describedby"));
@@ -96,7 +91,6 @@ public sealed class ShowProvidersTabTests : BunitContext
         Assert.Contains("administrator access", component.Find("#show-run-elevation-help").TextContent);
     }
 
-    // Asserts the show ran through the elevated helper exactly once and never touched the in-process service.
     private void AssertShowRoutedThroughElevatedHelper(IElevatedDatabaseToolsRunner elevatedRunner)
     {
         elevatedRunner.ReceivedWithAnyArgs(1).ShowAsync(default!, default!, default, default);
@@ -104,7 +98,6 @@ public sealed class ShowProvidersTabTests : BunitContext
             .DidNotReceiveWithAnyArgs().ShowAsync(default!, default!, default, default);
     }
 
-    // Configures the elevated runner's show dispatch to succeed so a run routed through elevation completes.
     private IElevatedDatabaseToolsRunner ConfigureElevatedShowSucceeded()
     {
         var elevatedRunner = Services.GetRequiredService<IElevatedDatabaseToolsRunner>();

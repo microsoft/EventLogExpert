@@ -8,12 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
 
-/// <summary>
-///     Drives the VHD/VHDX attach / resolve-Windows-volume / cleanup state machine through a fake
-///     <see cref="IVirtualDiskOperations" />; the real <c>virtdisk</c> attach needs a real disk so it is covered by manual
-///     E2E. These assert the status mapping (NotAVhdx, NoWindowsVolume, MultipleWindowsVolumes, MountFailed), that a
-///     missing file never attaches, and that the attach lease is detached on dispose.
-/// </summary>
 public sealed class OfflineVhdxImageTests
 {
     [Fact]
@@ -94,7 +88,6 @@ public sealed class OfflineVhdxImageTests
     [Fact]
     public void TryMount_WhenWindowsVolumeResolved_StreamsMountingBeforeAttachAndMountedAfter()
     {
-        // BUG #4: the mount must emit start/complete progress so the UI is not blank during the slow native attach.
         using var workspace = new TempVhdx();
         var events = new List<string>();
         var logger = new SequenceRecordingTraceLogger(events);
@@ -140,8 +133,6 @@ public sealed class OfflineVhdxImageTests
         }
     }
 
-    // Records every log message (any level) into a shared ordered list so a test can assert the streaming progress
-    // lines are emitted around the native call; the fake disk operations append their own "attach" marker to it.
     private sealed class SequenceRecordingTraceLogger(List<string> events) : ITraceLogger
     {
         public LogLevel MinimumLevel => LogLevel.Trace;

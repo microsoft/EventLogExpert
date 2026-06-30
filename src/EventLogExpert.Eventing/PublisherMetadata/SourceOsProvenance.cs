@@ -7,23 +7,16 @@ using Microsoft.Win32;
 
 namespace EventLogExpert.Eventing.PublisherMetadata;
 
-/// <summary>
-///     Provenance of the OS a provider database is built from - the host (live build) or a foreign image (offline
-///     build) - read from <c>…\Microsoft\Windows NT\CurrentVersion</c>. Recorded per provider row so resolution can prefer
-///     the newest source (the recency tiebreak) without relying on the database file name. All fields are null when the
-///     key cannot be read; resolution degrades gracefully to completeness + load order.
-/// </summary>
+// Stored per provider so recency can prefer newer OS sources without trusting database filenames.
 public sealed record SourceOsProvenance(int? Build, int? Revision, string? Edition, string? DisplayVersion)
 {
     public static SourceOsProvenance Empty { get; } = new(null, null, null, null);
 
-    /// <summary>Reads the host OS provenance from the local <c>HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion</c>.</summary>
     public static SourceOsProvenance Read(ITraceLogger? logger = null)
     {
         try
         {
-            // Open an owned base key (do NOT use Registry.LocalMachine - that's a shared static), matching
-            // RegistryProvider so concurrent instances dispose independently.
+            // Owned base key: Registry.LocalMachine is shared static state and must not be disposed per instance.
             using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default);
             using var currentVersion = hklm.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
 
@@ -38,12 +31,7 @@ public sealed record SourceOsProvenance(int? Build, int? Revision, string? Editi
         }
     }
 
-    /// <summary>
-    ///     Reads a foreign image's OS provenance from its already-loaded <c>SOFTWARE</c> hive root (the
-    ///     <c>Microsoft\Windows NT\CurrentVersion</c> subkey), so an offline image build stamps rows with the IMAGE's OS
-    ///     rather than the host's. Never touches the host registry. Internal: the offline extraction path is the only caller;
-    ///     cross-assembly consumers use the host <see cref="Read" /> overload.
-    /// </summary>
+    // Offline builds stamp the image OS from the loaded SOFTWARE hive, never the host registry.
     internal static SourceOsProvenance ReadFromSoftwareHive(IOfflineRegistryKey softwareRoot, ITraceLogger? logger = null)
     {
         try
@@ -80,7 +68,6 @@ public sealed record SourceOsProvenance(int? Build, int? Revision, string? Editi
         return new SourceOsProvenance(build, revision, edition, displayVersion);
     }
 
-    // Reads stored strings literally (no host environment expansion): a foreign image's REG_EXPAND_SZ must reach
-    // provenance as its stored %token, not expanded against the host. UBR is a DWORD, read via GetValue(...) is int.
+    // Foreign-image REG_EXPAND_SZ values must stay literal instead of expanding against the host environment.
     private static string? ReadRawString(IOfflineRegistryKey key, string valueName) => key.GetValue(valueName) as string;
 }

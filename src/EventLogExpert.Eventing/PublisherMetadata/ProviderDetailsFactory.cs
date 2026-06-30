@@ -62,8 +62,7 @@ internal static class ProviderDetailsFactory
 
     internal static string InjectMapAttribute(string template, string fieldName, string mapName)
     {
-        // The field name is escaped the same way the template writer escaped it, so a name containing '&' or '<' still
-        // matches the emitted name= attribute instead of silently missing.
+        // Match the escaped emitted name= attribute so XML-special field names are still found.
         string nameAttribute = $"name=\"{WevtTemplateWriter.EscapeXmlAttribute(fieldName)}\"";
         int searchStart = 0;
 
@@ -76,7 +75,7 @@ internal static class ProviderDetailsFactory
             int afterTag = dataIndex + "<data".Length;
             char delimiter = afterTag < template.Length ? template[afterTag] : '\0';
 
-            // "<data" prefixes "<dataSource"; only an element whose tag ends here is a real <data> node.
+            // Reject <dataSource>; only a tag boundary means this is a real <data> element.
             if (delimiter is not (' ' or '\t' or '\r' or '\n' or '>' or '/'))
             {
                 searchStart = afterTag;
@@ -109,8 +108,7 @@ internal static class ProviderDetailsFactory
 
             events[i] = new EventModel
             {
-                // No-message events resolve to string.Empty (not null) to match the native path; the encoder hashes
-                // null and empty differently.
+                // No-message events use empty string, not null, to match native-path hashing.
                 Description = raw.MessageId == uint.MaxValue
                     ? string.Empty
                     : content.ResolveMessage(raw.MessageId)?.TrimEnd('\0', '\r', '\n', '\t', ' ') ?? string.Empty,
@@ -138,21 +136,19 @@ internal static class ProviderDetailsFactory
 
         foreach (RawNamedValue entry in entries)
         {
-            // Message-id wins over the inline name when a real id exists (mirrors the native getters); the resolver
-            // coalesce only guards the offline message-table resolver, which can return null - native never does.
+            // Message-id names win to match native getters; null only guards the offline resolver.
             string? resolvedName = entry.MessageId == uint.MaxValue
                 ? entry.InlineName
                 : resolveMessage(entry.MessageId) ?? string.Empty;
 
-            // Trailing control characters are trimmed so the two sources collapse to the same VersionKey: native
-            // FormatMessage names carry a trailing '\0', offline message-table names carry a trailing '\r\n'.
+            // Trim source-specific trailing controls so native and offline names share VersionKey values.
             dictionary.TryAdd(keyProjector(entry.Value), resolvedName?.TrimEnd('\0', '\r', '\n', '\t', ' ') ?? string.Empty);
         }
 
         return dictionary;
     }
 
-    /// <summary>Expands a u64 keyword mask MSB-first into individual set-bit values, matching the live event Keywords.</summary>
+    // Expand keyword masks MSB-first to match live event Keywords.
     private static long[] ExpandKeywords(ulong keywordsMask)
     {
         List<long> keywords = [];
@@ -212,8 +208,7 @@ internal static class ProviderDetailsFactory
     {
         try
         {
-            // The offline path supplies the already-parsed maps (single load); the native path reads them on demand.
-            // Both then run the same ResolveMap + InjectMapAttributes below.
+            // Offline supplies pre-parsed maps; native reads lazily, then both share map resolution and injection.
             WevtTemplateData? templateData = preParsed ?? TryReadTemplateData(content, logger);
 
             if (templateData is null || templateData.Maps.Count == 0) { return; }

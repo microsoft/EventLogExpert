@@ -12,10 +12,6 @@ public sealed record DatabaseEntry(
     DatabaseStatus Status,
     bool BackupExists = false)
 {
-    /// <summary>
-    ///     The distinct source-OS stamps found in this database's providers, read during classification for a Ready
-    ///     database. Empty for a legacy/unstamped database, a non-Ready one, or when the read could not be performed.
-    ///     Init-only (not a positional parameter) so existing positional constructions are unaffected.
-    /// </summary>
+    // Body property preserves existing positional construction while carrying classification OS stamps.
     public IReadOnlyList<ProviderDatabaseOsStamp> OsStamps { get; init; } = [];
 }

@@ -155,7 +155,7 @@ public sealed class DatabaseOperationCoordinatorTests
         var sut = CreateSut();
         await sut.ImportAsync(ThrowingCallback, Ct);
 
-        // Conflict defaults to Skip (safer than overwrite); import still proceeds.
+        // Conflict defaults to Skip because overwriting is riskier than importing nothing.
         await _databases.Received(1).ImportAsync(
             Arg.Any<IEnumerable<string>>(),
             Arg.Is<IReadOnlySet<string>>(s => s.Contains("exists.db")),
@@ -200,9 +200,7 @@ public sealed class DatabaseOperationCoordinatorTests
     [Fact]
     public async Task ImportAsync_LongRunningImport_PostOpRoutesDirectlyToInfoBannerRegardlessOfCallerLifetime()
     {
-        // Empty-body bug regression: the coordinator awaits the import then routes the summary
-        // directly to IInfoBannerService.ReportInfoBanner. No host lookup, no alert dialog service,
-        // so post-op routing is deterministic regardless of any modal lifetime.
+        // Post-import info routes directly to the banner so modal lifetime cannot suppress the summary.
         var importTcs = new TaskCompletionSource<ImportResult>();
         _filePicker.PickMultipleAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>())
             .Returns(["/path/A.db"]);
@@ -424,8 +422,7 @@ public sealed class DatabaseOperationCoordinatorTests
     [Fact]
     public async Task RemoveDatabaseAsync_DatabaseThrowsAfterSnapshotPopulated_SnapshotReopensAndErrorBannerReports()
     {
-        // This is the R3-BLOCKER-fix invariant: even though the helper would swallow the exception,
-        // the bespoke RemoveDatabaseAsync executes the reopen path AFTER both catches.
+        // RemoveDatabaseAsync must reopen after both catch paths even though the shared helper swallows exceptions.
         _databases.Entries.Returns([CreateEntry("a.db")]);
         _databases.RemoveAsync("a.db", Arg.Any<Func<CancellationToken, Task>?>(), Arg.Any<CancellationToken>())
             .Returns(async call =>
@@ -591,10 +588,10 @@ public sealed class DatabaseOperationCoordinatorTests
     }
 
     [Theory]
-    [InlineData(true, DatabaseStatus.Ready, true, true)]     // enabled+ready+activeLogs → warning
-    [InlineData(true, DatabaseStatus.Ready, false, false)]   // enabled+ready, no activeLogs → no warning
-    [InlineData(false, DatabaseStatus.Ready, true, false)]   // disabled+activeLogs → no warning
-    [InlineData(true, DatabaseStatus.UpgradeRequired, true, false)] // enabled but not-ready+activeLogs → no warning
+    [InlineData(true, DatabaseStatus.Ready, true, true)]
+    [InlineData(true, DatabaseStatus.Ready, false, false)]
+    [InlineData(false, DatabaseStatus.Ready, true, false)]
+    [InlineData(true, DatabaseStatus.UpgradeRequired, true, false)]
     public async Task RemoveDatabaseAsync_WarningFlag_DerivesFromEnabledStatusAndActiveLogs(
         bool isEnabled, DatabaseStatus status, bool hasActiveLogs, bool expectedWarning)
     {
@@ -681,8 +678,8 @@ public sealed class DatabaseOperationCoordinatorTests
     }
 
     [Theory]
-    [InlineData("a.db")]   // re-entrant same file
-    [InlineData("b.db")]   // different file (current behavior: block)
+    [InlineData("a.db")]
+    [InlineData("b.db")]
     public async Task UpgradeDatabaseAsync_SecondCallWhileFirstInFlight_NoOpsAndDoesNotInvokeDatabase(string secondFile)
     {
         var upgradeTcs = new TaskCompletionSource<UpgradeBatchResult>();
@@ -708,8 +705,7 @@ public sealed class DatabaseOperationCoordinatorTests
     [Fact]
     public async Task UpgradeDatabaseAsync_StateChangedSubscriberThrows_StateStillClearedAndUpgradeBodyRan()
     {
-        // RaiseSafely invariant (parallels BannerService.RaiseSafely): one bad subscriber must not
-        // wedge the upgrade-in-flight HashSet and must not skip the upgrade body.
+        // One bad subscriber must not wedge in-flight state or skip the upgrade body.
         _databases.UpgradeBatchAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<UpgradeProgressScope>(), Arg.Any<CancellationToken>())
             .Returns(new UpgradeBatchResult([], [], []));
 
@@ -725,17 +721,6 @@ public sealed class DatabaseOperationCoordinatorTests
             Arg.Any<UpgradeProgressScope>(),
             Arg.Any<CancellationToken>());
     }
-
-    // ===== UpgradeDatabaseAsync =====
-    //
-    // The behavioral contract:
-    // - Upgrade success → IsUpgradeInFlight(file) true during, false after; UpgradeStateChanged fires enter+exit.
-    // - Re-entrant same-file → second call no-ops (no DB call).
-    // - Different-file while one in-flight → second call no-ops (preserve current global-block).
-    // - DB throws → ErrorBanner; state cleared; subscriber-safe; event still fires exit.
-    // - DB throws OCE → silent (no banner); state cleared.
-    // - Result.Failed → one ErrorBanner per failure.
-    // - Throwing subscriber → state still cleared; upgrade body still ran (BannerService.RaiseSafely parity).
 
     [Fact]
     public async Task UpgradeDatabaseAsync_Success_TracksInFlightStateAndRaisesEnterExitEvents()

@@ -10,18 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace EventLogExpert.ElevationHelper.Operations;
 
-/// <summary>
-///     Helper-side operation dispatcher. Given an already-deserialized <see cref="DatabaseToolsIpcRequest" />,
-///     resolves <see cref="IDatabaseToolsService" /> via the helper-friendly <c>AddDatabaseToolsRuntime</c> DI extension,
-///     dispatches to the correct service method per request type, and returns the final <see cref="DatabaseToolsResult" />
-///     . Destructive-recovery wrapping (Create/Diff output cleanup on failure, Upgrade .bak/restore) lives in
-///     <see cref="DestructiveRecovery" /> and is applied transparently before the result is returned.
-/// </summary>
-/// <remarks>
-///     Request reading happens in <see cref="ProgramEntry" /> (so the helper can start a control-reader task on the
-///     same pipe AFTER the request is consumed and BEFORE this dispatch starts; that control reader watches for
-///     <see cref="CancelMessage" /> and cancels the operation CT).
-/// </remarks>
 internal static class OperationDispatcher
 {
     public static async Task<DatabaseToolsResult> DispatchAsync(
@@ -37,8 +25,7 @@ internal static class OperationDispatcher
         var logSink = new IpcLogSink(writer);
         var progressSink = new IpcProgressSink(writer);
 
-        // The list-editions request is read-only (it mounts/reads an image and streams the editions back); it never
-        // writes or renames a database, so it bypasses the destructive-recovery wrapper the five operations go through.
+        // List-editions is read-only, so it bypasses destructive database recovery.
         if (request is ListImageEditionsIpcRequest listEditions)
         {
             return await ListImageEditionsHandler.HandleAsync(listEditions.Request, writer, listEditions.Verbose, cancellationToken);

@@ -7,14 +7,6 @@ using System.Buffers.Binary;
 
 namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
 
-/// <summary>
-///     Exercises the managed <c>regf</c> parser (<see cref="OfflineHiveFile" />) directly: value-kind decoding and
-///     boxed-type parity with the live registry, key navigation and physical leaf order, and - because the hive is treated
-///     as hostile, attacker-controlled image content - that arbitrarily corrupted bytes degrade to <see langword="null" />
-///     /empty rather than throwing or looping. Real hives are materialized through <see cref="OfflineTestImage" /> (which
-///     loads and seeds a standalone hive via <c>RegLoadAppKey</c>); hostile cases mutate a real hive's bytes and re-open
-///     them in memory.
-/// </summary>
 public sealed class OfflineHiveFileTests
 {
     private const string TestKeyPath = @"Test\Values";
@@ -22,22 +14,21 @@ public sealed class OfflineHiveFileTests
     [Fact]
     public void Enumeration_WithEveryNkClaimingHugeSubkeyCountAndWildListOffset_TerminatesWithoutThrowing()
     {
-        // Drive the over-cap / out-of-bounds-offset guards directly: rewrite every nk record to claim int.MaxValue subkeys
-        // pointing at a wild list offset. The parser must reject the absurd count and the unreachable offset and finish.
+        // Crafted nk claims absurd subkeys and a wild list offset to hit cap/bounds guards.
         byte[] bytes = SeedRealHiveBytes();
 
         for (int i = 0x1000; i + 0x20 < bytes.Length; i++)
         {
             if (bytes[i] == 0x6E && bytes[i + 1] == 0x6B) // "nk"
             {
-                BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(i + 0x14), int.MaxValue);     // subkey count
-                BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(i + 0x1C), 0x0FFF_FFF0u);    // subkey-list offset
+                BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(i + 0x14), int.MaxValue); // subkey count
+                BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(i + 0x1C), 0x0FFF_FFF0u); // subkey-list offset
             }
         }
 
         OfflineHiveFile? hive = OfflineHiveFile.TryOpen(bytes, logger: null);
 
-        if (hive is null) { return; } // acceptable: the root nk corruption may have made the base block unreadable.
+        if (hive is null) { return; }
 
         using (hive)
         {
@@ -56,8 +47,7 @@ public sealed class OfflineHiveFileTests
     [Fact]
     public void GetSubKeyNames_DecodesBothAsciiCompressedAndUnicodeKeyNames()
     {
-        // The registry compresses all-ASCII names (Latin-1, flag bit set) but stores names with any non-ASCII character as
-        // UTF-16; the parser must decode both code paths.
+        // regf stores ASCII-compressed names as Latin-1 and non-ASCII names as UTF-16.
         using OfflineTestImage image = OfflineTestImage.Create(seedSoftware: software =>
         {
             using (software.CreateSubKey(@"Names\Alpha")) { }
@@ -75,8 +65,6 @@ public sealed class OfflineHiveFileTests
     [Fact]
     public void GetSubKeyNames_MatchesLiveRegistryPhysicalLeafOrder()
     {
-        // OfflineLegacyMessageFileResolver depends on "first channel wins", so the parser must surface subkeys in the same
-        // physical leaf order the live registry enumerates them in - never re-sorted by the parser.
         using OfflineTestImage image = OfflineTestImage.Create(seedSoftware: software =>
         {
             using (software.CreateSubKey(@"Channels\Zebra")) { }
@@ -84,6 +72,7 @@ public sealed class OfflineHiveFileTests
             using (software.CreateSubKey(@"Channels\Mango")) { }
         });
 
+        // First channel wins: parser order must match live registry leaf order.
         IReadOnlyList<string> live = OfflineTestImage.ReadSubKeyNamesViaLiveRegistry(image.ImageRoot.SoftwareHivePath, "Channels");
         using OfflineHiveFile hive = OpenSoftware(image);
 
@@ -95,16 +84,13 @@ public sealed class OfflineHiveFileTests
     [Fact]
     public void GetValue_DataLengthExceedingTheCap_ReturnsNullInsteadOfAllocating()
     {
-        // A real registry refuses to store a >16 MB value, so craft one: take a valid hive, pad the file past 16 MB (cheap
-        // zeros that are not part of any bin), and rewrite every vk record to CLAIM a ~16.5 MB non-resident length. The
-        // claimed length is below the padded file length but above the parser's 16 MB cap, so GetValue must reject it (null)
-        // rather than allocate ~16.5 MB and risk an OutOfMemoryException in the elevated helper.
+        // Crafted vk claims a >16 MB value so the cap rejects it before allocation.
         byte[] original = SeedRealHiveBytes();
         int originalLength = original.Length;
         byte[] padded = new byte[17 * 1024 * 1024];
         original.CopyTo(padded, 0);
 
-        const uint claimedLength = 0x0108_0000; // ~16.5 MB; high (resident) bit clear; > MaxValueBytes (16 MB).
+        const uint claimedLength = 0x0108_0000; // ~16.5 MB; high resident bit clear; exceeds MaxValueBytes.
 
         for (int i = 0x1000; i + 0x10 < originalLength; i++)
         {
@@ -120,7 +106,7 @@ public sealed class OfflineHiveFileTests
 
         IOfflineRegistryKey? currentVersion = hive!.OpenSubKey(@"Microsoft\Windows NT\CurrentVersion");
 
-        Assert.NotNull(currentVersion); // navigation still works; only the over-cap value read is rejected.
+        Assert.NotNull(currentVersion);
         Assert.Null(currentVersion!.GetValue("CurrentBuildNumber"));
     }
 
@@ -137,8 +123,7 @@ public sealed class OfflineHiveFileTests
     [Fact]
     public void GetValue_LargeBinary_IsReassembledFromBigDataSegments()
     {
-        // A value larger than a single 16344-byte cell is stored as a "db" big-data record pointing at segment cells; the
-        // parser must stitch them back into the original byte sequence.
+        // "db" big-data values are reassembled from segment cells.
         byte[] payload = new byte[40_000];
         new Random(1234).NextBytes(payload);
         using OfflineTestImage image = SeedSoftware(values => values.SetValue("Blob", payload, RegistryValueKind.Binary));
@@ -176,8 +161,7 @@ public sealed class OfflineHiveFileTests
     [Fact]
     public void GetValue_RegDword_ReturnsBoxedInt32MatchingLiveRegistry()
     {
-        // The boxed runtime type is load-bearing: OfflineLegacyMessageFileResolver and SourceOsProvenance test the result
-        // with `is int`, so a boxed uint would silently break parity with the native-built database.
+        // REG_DWORD must be boxed Int32; callers test with `is int`.
         using OfflineTestImage image = SeedSoftware(values => values.SetValue("Dw", unchecked((int)0x9ABCDEF0), RegistryValueKind.DWord));
 
         object? live = OfflineTestImage.ReadValueViaLiveRegistry(image.ImageRoot.SoftwareHivePath, TestKeyPath, "Dw");
@@ -201,7 +185,7 @@ public sealed class OfflineHiveFileTests
 
         object? offline = hive.OpenSubKey(TestKeyPath)!.GetValue("Expand");
 
-        // The %SystemRoot% token must survive verbatim; the parser never consults the host environment.
+        // REG_EXPAND_SZ stays literal; the host environment is not consulted.
         Assert.Equal(@"%SystemRoot%\System32\x.dll", Assert.IsType<string>(offline));
         Assert.Equal(live, offline);
     }
@@ -209,8 +193,7 @@ public sealed class OfflineHiveFileTests
     [Fact]
     public void GetValue_RegMultiSz_MatchesLiveRegistryExactly()
     {
-        // Lock REG_MULTI_SZ decoding to Microsoft.Win32.RegistryKey.GetValue (the oracle): interior empties preserved, only
-        // the final terminator dropped. Trailing-empty shapes like ["a",""] are the ones a whole-trailing-NUL-run trim breaks.
+        // REG_MULTI_SZ parity preserves interior empties and drops only the final terminator.
         string[][] shapes =
         [
             ["alpha", "beta"],
@@ -277,15 +260,12 @@ public sealed class OfflineHiveFileTests
     [Fact]
     public void GetValue_ValueCountExceedingTheCap_ReturnsNullWithoutScanning()
     {
-        // A crafted nk that declares a huge value count must be rejected before the per-name vk scan, so a lookup cannot be
-        // forced to walk hundreds of thousands of vk offsets. Pad the file past 4 * MaxValuesPerNode so the per-node cap
-        // (100k), not the file-size bound (_length/4), is the binding limit, then inflate every nk's value count.
         byte[] original = SeedRealHiveBytes();
         int originalLength = original.Length;
-        byte[] padded = new byte[1024 * 1024]; // _length/4 = 256k > MaxValuesPerNode (100k).
+        byte[] padded = new byte[1024 * 1024]; // _length/4 = 256k > MaxValuesPerNode.
         original.CopyTo(padded, 0);
 
-        const int absurdValueCount = 150_000; // > MaxValuesPerNode (100k), < padded _length/4 (256k).
+        const int absurdValueCount = 150_000; // exceeds MaxValuesPerNode; below padded _length/4.
 
         for (int i = 0x1000; i + 0x28 < originalLength; i++)
         {
@@ -301,7 +281,7 @@ public sealed class OfflineHiveFileTests
 
         IOfflineRegistryKey? currentVersion = hive!.OpenSubKey(@"Microsoft\Windows NT\CurrentVersion");
 
-        Assert.NotNull(currentVersion); // navigation (subkey list) is untouched; only the value scan is capped.
+        Assert.NotNull(currentVersion);
         Assert.Null(currentVersion!.GetValue("CurrentBuildNumber"));
     }
 
@@ -319,7 +299,7 @@ public sealed class OfflineHiveFileTests
     public void TryOpen_BadSignature_ReturnsNull()
     {
         byte[] bytes = SeedRealHiveBytes();
-        bytes[0] = (byte)'X'; // corrupt the "regf" signature.
+        bytes[0] = (byte)'X';
 
         Assert.Null(OfflineHiveFile.TryOpen(bytes, logger: null));
     }
@@ -329,14 +309,14 @@ public sealed class OfflineHiveFileTests
     {
         byte[] bytes = SeedRealHiveBytes();
         uint storedChecksum = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(0x1FC));
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(0x1FC), storedChecksum ^ 0xFFFFFFFFu); // torn base, seq untouched.
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(0x1FC), storedChecksum ^ 0xFFFFFFFFu); // torn base, sequence unchanged.
 
         using OfflineHiveFile? hive = OfflineHiveFile.TryOpen(bytes, logger: null);
 
         Assert.NotNull(hive);
         Assert.True(hive!.IsDirty);
 
-        // A torn base block is classified like a dirty hive: warn and read last-flushed, never reject.
+        // Torn/dirty hives warn, then read last-flushed state.
         Assert.Equal("20348", hive.OpenSubKey(@"Microsoft\Windows NT\CurrentVersion")!.GetValue("CurrentBuildNumber"));
     }
 
@@ -349,14 +329,14 @@ public sealed class OfflineHiveFileTests
     {
         byte[] bytes = SeedRealHiveBytes();
         uint primarySeq = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(0x04));
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(0x04), primarySeq + 1); // primary != secondary => dirty.
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(0x04), primarySeq + 1); // primary != secondary marks dirty.
 
         using OfflineHiveFile? hive = OfflineHiveFile.TryOpen(bytes, logger: null);
 
         Assert.NotNull(hive);
         Assert.True(hive!.IsDirty);
 
-        // A dirty hive is still read (last-flushed state), never rejected.
+        // Torn/dirty hives warn, then read last-flushed state.
         Assert.Equal("20348", hive.OpenSubKey(@"Microsoft\Windows NT\CurrentVersion")!.GetValue("CurrentBuildNumber"));
     }
 
@@ -373,7 +353,7 @@ public sealed class OfflineHiveFileTests
         for (int iteration = 0; iteration < 600; iteration++)
         {
             byte[] corrupt = (byte[])original.Clone();
-            int position = 0x1000 + random.Next(corrupt.Length - 0x1000); // corrupt only the hive bins, not the base block.
+            int position = 0x1000 + random.Next(corrupt.Length - 0x1000); // corrupt hive bins only; base block stays valid.
             corrupt[position] = (byte)random.Next(256);
 
             OfflineHiveFile? hive = OfflineHiveFile.TryOpen(corrupt, logger: null);
@@ -401,7 +381,7 @@ public sealed class OfflineHiveFileTests
     public void TryOpen_RootCellOffsetOutOfRange_ReturnsNull()
     {
         byte[] bytes = SeedRealHiveBytes();
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(0x24), 0x7FFF_FFFFu); // root cell far past the file.
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(0x24), 0x7FFF_FFFFu);
 
         Assert.Null(OfflineHiveFile.TryOpen(bytes, logger: null));
     }
@@ -414,7 +394,7 @@ public sealed class OfflineHiveFileTests
         return hive!;
     }
 
-    // A real, structurally-valid SOFTWARE hive (with CurrentVersion content) as raw bytes, for byte-level corruption tests.
+    // Real SOFTWARE hive bytes keep hostile-input mutations structurally plausible.
     private static byte[] SeedRealHiveBytes()
     {
         using OfflineTestImage image = OfflineTestImage.Create(seedSoftware: software =>

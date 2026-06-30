@@ -23,10 +23,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_FolderSourceWithSameContentUnderDifferentKeys_CollapsesInsteadOfColliding()
     {
-        // Two source files hold the SAME provider with byte-identical content but different stored VersionKeys (one
-        // unstamped legacy row, one already hashed). The cross-file dedup keys on the source key, so both survive
-        // load, then both re-hash to the same key. Without a post-stamp guard they would collide on the composite
-        // primary key and abort the create; they must instead collapse to one row.
+        // Identical providers can arrive under different source keys; post-stamp dedup must collapse them.
         var dir = CreateTempDir();
 
         var unstamped = DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName);
@@ -53,20 +50,14 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_OverwriteBackupTearsOnFirstMove_PreservesOriginalDatabase()
     {
-        // Regression lock for the torn-first-move data-loss window: if TakeOverwriteBackup throws on the VERY FIRST move
-        // (main file -> ".bak"), the original is still at the target path (a failed File.Move leaves the source intact).
-        // The catch-path partial-cleanup must NOT delete it as a stub, and the restore must leave it in place. We force
-        // the first move to fail deterministically by planting a DIRECTORY at the ".bak" path (File.Move into it throws,
-        // while File.Delete of the original would still succeed - which is exactly the genuine loss window).
+        // A failed first backup move leaves the original at target; cleanup must not delete it as a stub.
         var path = CreateTempPath();
         DatabaseTestUtils.CreateV4Database(path, DatabaseTestUtils.BuildProviderDetails("Original-Provider"));
 
-        // Release the test's own pooled handle on the original so a delete of it would NOT be blocked by a sharing lock
-        // (that would mask the bug). This isolates the guard as the only thing protecting the original.
+        // Release pooled handles so only the cleanup guard protects the original from deletion.
         SqliteConnection.ClearAllPools();
 
-        // A directory at the ".bak" path is not seen by the File.Exists stale-backup preflight, so the run proceeds and
-        // the first File.Move(target, target + ".bak") throws because a directory occupies the destination name.
+        // A directory at .bak bypasses File.Exists preflight but makes the first backup move throw.
         var backupDir = path + ".bak";
         _tempDirs.Add(backupDir);
         Directory.CreateDirectory(backupDir);
@@ -94,14 +85,11 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_OverwriteCancelledAfterHeaderFlush_RestoresOriginalAndLeavesNoStaleSidecars()
     {
-        // Cancel right after the 100-provider header flush (which is where the backup is taken and the new file first
-        // appears). The finalize must restore the original database AND remove the aborted build's WAL/SHM sidecars so
-        // the restored database is never paired with a stale -wal that would corrupt it.
+        // Cancellation after backup must restore the original and remove aborted WAL/SHM sidecars.
         var path = CreateTempPath();
         DatabaseTestUtils.CreateV4Database(path, DatabaseTestUtils.BuildProviderDetails("Original-Provider"));
 
-        // Release the test's own pooled handle on the original so the operation's backup move is not blocked (in the real
-        // flow the target is not held open in-process).
+        // Release pooled handles so the operation's backup move is not masked by the test.
         SqliteConnection.ClearAllPools();
 
         var source = CreateTempPath();
@@ -134,12 +122,11 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_OverwriteRestoreBlocked_PreservesBackupAndLogsRecoveryGuidance()
     {
-        // When the restore cannot move the .bak back (here: a foreign handle holds the backup open), the operation must
-        // NOT lose the snapshot - it leaves the .bak in place and logs an actionable recovery line pointing at it.
+        // If restore cannot move .bak back, the backup must remain with recovery guidance logged.
         var path = CreateTempPath();
         DatabaseTestUtils.CreateV4Database(path, DatabaseTestUtils.BuildProviderDetails("Original-Provider"));
 
-        // Release the test's own pooled handle on the original so the operation's backup move is not blocked.
+        // Release pooled handles so the operation's backup move is not blocked by the test.
         SqliteConnection.ClearAllPools();
 
         var source = CreateTempPath();
@@ -176,9 +163,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_OverwriteWithZeroProviders_LeavesExistingDatabaseUntouched()
     {
-        // Backup is taken lazily at the FIRST ProviderDbContext creation. When the rebuild resolves zero providers no
-        // context is ever created, so the old database must be left exactly as-is and no .bak should appear. The
-        // outcome is Failed (artifact-truthful): no database was produced, so the run must not report success.
+        // Zero-provider overwrites never create a DbContext, so no backup should be taken.
         var path = CreateTempPath();
         DatabaseTestUtils.CreateV4Database(path, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
 
@@ -203,9 +188,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_StampsContentHashVersionKey()
     {
-        // A source provider with an empty (unstamped) VersionKey must come out of create with its content hash
-        // stamped, so the composite (name, version) primary key can hold genuinely different versions of a provider
-        // and identical providers collapse to one row.
+        // Empty source VersionKey must be stamped so composite identity separates real versions.
         var source = CreateTempPath();
         DatabaseTestUtils.CreateV4Database(source, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
 
@@ -225,8 +208,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_WhenBothSourceAndOfflineImageGiven_LogsErrorAndDoesNotCreateFile()
     {
-        // Source and offline image are mutually exclusive. The mutual-exclusivity check must fire BEFORE source
-        // validation, so the user gets the clear "one or the other" message rather than a confusing "source not found".
+        // Mutual-exclusivity validation must beat source validation for a clear user error.
         var path = CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
@@ -241,15 +223,12 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_WhenExtensionNotDb_LogsErrorAndDoesNotCreateFile()
     {
-        // Arrange
         var path = DatabaseTestUtils.CreateTempPath(".txt");
         _tempPaths.Add(path);
         var logger = Substitute.For<ITraceLogger>();
 
-        // Act
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, null, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
-        // Assert
         Assert.False(File.Exists(path), "No file should be written when the extension is wrong.");
         logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
             h.ToString().Contains("File extension must be .db")));
@@ -258,9 +237,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_WhenFilterMatchesNoProviders_DoesNotLeaveEmptyDatabaseOnDisk()
     {
-        // Arrange — source has First+Second, filter excludes both. The command must not leave an
-        // empty .db file behind, because a downstream consumer would read it as "this collection
-        // has zero providers" instead of "this provider set was never collected".
+        // Zero resolved providers must not leave an empty .db that consumers would treat as a real collection.
         var source = CreateTempPath();
         DatabaseTestUtils.CreateV4Database(source,
             DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName),
@@ -269,28 +246,22 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var path = CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
-        // Act
         var operation = new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, new Regex("ZZZ_NoMatch_ZZZ", RegexOptions.IgnoreCase), null));
         var outcome = await operation.ExecuteAsync(logger, null, CancellationToken.None);
 
-        // Assert
         Assert.Equal(DatabaseToolsOutcome.Failed, outcome);
         Assert.Equal("No providers could be resolved from the source, so no database was created.", operation.FailureSummary);
         Assert.False(File.Exists(path), "No file should be written when zero providers were resolved.");
         logger.Received(1).Warning(Arg.Is<WarningLogHandler>(h =>
             h.ToString().Contains("No provider details could be resolved") &&
             h.ToString().Contains("Database was not created")));
-        // No errors should have been logged on this path; an extra error here would be a UX regression.
         logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
     }
 
     [Fact]
     public async Task CreateDatabase_WhenProviderCountCrossesBatchSize_PersistsEveryProviderWithoutErrors()
     {
-        // Arrange — exercises the mid-stream FlushHeaderAndBuffer path: at 100 providers the buffer
-        // is flushed, the DbContext is materialized, and subsequent providers are appended in
-        // BatchSize=100 chunks. 101 providers guarantees we cross the boundary AND continue beyond
-        // it, so a regression in the "after first flush" branch would lose providers.
+        // 101 providers crosses the 100-provider first-flush boundary and then appends another batch.
         const int ProviderCount = 101;
         var source = CreateTempPath();
         var providers = Enumerable.Range(0, ProviderCount)
@@ -301,10 +272,8 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var path = CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
-        // Act
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
-        // Assert
         Assert.True(File.Exists(path));
 
         using var verify = new ProviderDbContext(path, readOnly: true, ensureCreated: false);
@@ -320,9 +289,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_WhenSkipProvidersInFileExcludesAll_DoesNotLeaveEmptyDatabaseOnDisk()
     {
-        // Arrange — distinct contract path from the filter case: the skip-source contains every
-        // provider in the source, leaving zero to write. The "no empty .db" guarantee must hold
-        // here too; a regression in the skip-set integration could reintroduce the empty stub.
+        // Skip-source exclusion can also resolve zero providers; it must not leave an empty .db.
         var source = CreateTempPath();
         DatabaseTestUtils.CreateV4Database(source,
             DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName),
@@ -336,11 +303,9 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var path = CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
-        // Act
         var operation = new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, skipSource));
         var outcome = await operation.ExecuteAsync(logger, null, CancellationToken.None);
 
-        // Assert
         Assert.Equal(DatabaseToolsOutcome.Failed, outcome);
         Assert.Equal("No providers could be resolved from the source, so no database was created.", operation.FailureSummary);
         Assert.False(File.Exists(path), "No file should be written when the skip-set excludes all providers.");
@@ -353,8 +318,6 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_WhenSkipProvidersInFileResolves_ExcludesThoseProvidersFromOutput()
     {
-        // Arrange — source has First+Second+Shared. Skip-source has Shared. Output must contain
-        // First+Second only, exercising the skip-set integration with the streaming write path.
         var source = CreateTempPath();
         DatabaseTestUtils.CreateV4Database(source,
             DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName),
@@ -368,10 +331,8 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var path = CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
-        // Act
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, skipSource)).ExecuteAsync(logger, null, CancellationToken.None);
 
-        // Assert
         Assert.True(File.Exists(path));
 
         using var verify = new ProviderDbContext(path, readOnly: true, ensureCreated: false);
@@ -384,9 +345,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_WhenSkipProvidersInFileSourceDoesNotExist_LogsErrorAndDoesNotCreateFile()
     {
-        // Arrange — valid source but invalid skip-source. Validation order matters: a missing skip
-        // file must fail BEFORE we begin writing the output database, so an empty stub is never
-        // left behind.
+        // Missing skip-source validation must run before any output database is created.
         var path = CreateTempPath();
         var source = CreateTempPath();
         DatabaseTestUtils.CreateV4Database(source,
@@ -395,10 +354,8 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var missingSkipSource = DatabaseTestUtils.CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
-        // Act
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, missingSkipSource)).ExecuteAsync(logger, null, CancellationToken.None);
 
-        // Assert
         Assert.False(File.Exists(path), "No file should be written when the skip-source is missing.");
         logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
             h.ToString().Contains("Source not found") && h.ToString().Contains(missingSkipSource)));
@@ -407,15 +364,12 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_WhenSourceDoesNotExist_LogsErrorAndDoesNotCreateFile()
     {
-        // Arrange
         var path = CreateTempPath();
         var missingSource = DatabaseTestUtils.CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
-        // Act
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, missingSource, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
-        // Assert
         Assert.False(File.Exists(path), "No file should be written when the source is missing.");
         logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
             h.ToString().Contains("Source not found") && h.ToString().Contains(missingSource)));
@@ -424,8 +378,6 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_WhenSourceProvidersResolved_PersistsAllProvidersAndPreservesOwningPublisher()
     {
-        // Arrange — one provider has ResolvedFromOwningPublisher set; this round-trips through the
-        // full streaming write path and we verify the persisted DB matches the source contents.
         var source = CreateTempPath();
         DatabaseTestUtils.CreateV4Database(source,
             DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName),
@@ -434,10 +386,8 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var path = CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
-        // Act
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
-        // Assert
         Assert.True(File.Exists(path), "Output database should be created when providers are resolved.");
 
         using var verify = new ProviderDbContext(path, readOnly: true, ensureCreated: false);
@@ -447,8 +397,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         Assert.Null(rows[0].ResolvedFromOwningPublisher);
         Assert.Equal(Constants.SecondProviderName, rows[1].ProviderName);
         Assert.Equal(Constants.OwningPublisherName, rows[1].ResolvedFromOwningPublisher);
-        // Success path must not surface any errors or warnings; a regression that warned spuriously
-        // (e.g., "no providers resolved" reaching the success branch) would degrade operator trust.
+        // Success must not emit stale zero-provider warnings.
         logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
         logger.DidNotReceive().Warning(Arg.Any<WarningLogHandler>());
     }
@@ -456,8 +405,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_WhenStaleBackupExists_AndTargetMissing_FailsAndLeavesBackupUntouched()
     {
-        // The unconditional stale-.bak preflight must fire even when the target itself is gone (an interrupted prior
-        // overwrite can leave the snapshot as the SOLE surviving copy). Proceeding would let a later success delete it.
+        // Stale .bak may be the only surviving copy after an interrupted overwrite; never proceed over it.
         var path = CreateTempPath();
         var backupPath = path + ".bak";
         _tempPaths.Add(backupPath);
@@ -482,16 +430,13 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_WhenTargetFileAlreadyExists_LogsErrorAndDoesNotOverwrite()
     {
-        // Arrange — target file already exists with sentinel bytes; the command must not overwrite or truncate.
         var path = CreateTempPath();
         var sentinel = new byte[] { 0xDE, 0xAD, 0xBE, 0xEF };
         File.WriteAllBytes(path, sentinel);
         var logger = Substitute.For<ITraceLogger>();
 
-        // Act
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, null, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
-        // Assert
         Assert.Equal(sentinel, File.ReadAllBytes(path));
         logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
             h.ToString().Contains("file already exists") && h.ToString().Contains(path)));
@@ -500,8 +445,6 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_WhenWimImageFileMissing_LogsErrorAndDoesNotCreateFile()
     {
-        // WIM extraction is supported, but a .wim path that does not exist is rejected up front (before any extraction
-        // or elevation prompt), so no .db is written.
         var path = CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
@@ -516,8 +459,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     [Fact]
     public async Task CreateDatabase_WhenWimIndexGivenForDirectoryImage_LogsErrorAndDoesNotCreateFile()
     {
-        // WimIndex only means anything for a WIM image; supplying it for a directory image is rejected rather than
-        // silently ignored, so the request can't quietly do something other than what the caller asked.
+        // WimIndex on a directory image must fail instead of being silently ignored.
         var path = CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
@@ -558,7 +500,6 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         return path;
     }
 
-    /// <summary>Cancels the run the first time the operation reports having processed at least <c>threshold</c> providers.</summary>
     private sealed class CancelWhenProcessedReaches(int threshold, CancellationTokenSource cts) : IProgress<DatabaseToolsProgress>
     {
         public void Report(DatabaseToolsProgress value)
@@ -567,10 +508,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         }
     }
 
-    /// <summary>
-    ///     On reaching <c>threshold</c> processed providers (after the backup has been taken), opens the <c>.bak</c> with
-    ///     an exclusive share so the restore's move fails, then cancels - exercising the restore-blocked recovery path.
-    /// </summary>
+    // Locks .bak after backup so restore fails deterministically.
     private sealed class LockBackupThenCancel(int threshold, CancellationTokenSource cts, string backupPath, Action<FileStream> onLocked)
         : IProgress<DatabaseToolsProgress>
     {

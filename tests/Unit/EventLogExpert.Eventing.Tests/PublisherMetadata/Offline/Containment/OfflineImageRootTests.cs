@@ -20,8 +20,7 @@ public sealed class OfflineImageRootTests
     [Fact]
     public void ContainsPath_HostPathOutsideImageOnSameDrive_IsFalse()
     {
-        // The scaffold lives on the host drive, so the host's own System32 is NOT under the image root - a
-        // Path.GetPathRoot-based check (treating C:\ as the root) would wrongly accept it.
+        // Same-drive host paths catch Path.GetPathRoot-based containment bugs.
         using OfflineTestImage image = OfflineTestImage.Create();
 
         string hostPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "ntdll.dll");
@@ -44,7 +43,6 @@ public sealed class OfflineImageRootTests
     {
         using OfflineTestImage image = OfflineTestImage.Create();
 
-        // Same string prefix as the image root but a different directory (…elx_img_ABC vs …elx_img_ABCevil).
         string sibling = image.RootDirectory + "evil" + Path.DirectorySeparatorChar + "foo.dll";
 
         Assert.False(image.ImageRoot.ContainsPath(sibling));
@@ -88,8 +86,7 @@ public sealed class OfflineImageRootTests
 
         try
         {
-            // The image root is reached through a junction; TryCreate canonicalizes the boundary so a file under it is not
-            // falsely rejected by the (reparse-resolving) guard - without that, every resolved file path would mismatch.
+            // Canonicalizing a junction root prevents false guard rejections for files beneath it.
             OfflineImageRoot? viaJunction = OfflineImageRoot.TryCreate(rootLink, logger: null);
 
             Assert.NotNull(viaJunction);
@@ -116,9 +113,7 @@ public sealed class OfflineImageRootTests
     [Fact]
     public void TryCreate_WhenPathHasInvalidCharacters_ReturnsNullWithoutThrowing()
     {
-        // A NUL character makes Path.GetFullPath throw ArgumentException; the offline source promises a fail-closed
-        // skip (logged null) for a hostile or malformed image path, never an exception bubbling out of the public
-        // enumeration. The Assert.Null both asserts the contract and proves no exception was thrown.
+        // Embedded NULs must fail closed before Path.GetFullPath can throw.
         Assert.Null(OfflineImageRoot.TryCreate("foo\0bar", logger: null));
     }
 
@@ -130,7 +125,6 @@ public sealed class OfflineImageRootTests
         try
         {
             File.WriteAllBytes(Path.Combine(configDirectory, "SYSTEM"), []);
-            // SOFTWARE intentionally absent.
 
             Assert.Null(OfflineImageRoot.TryCreate(root, logger: null));
         }
@@ -148,7 +142,6 @@ public sealed class OfflineImageRootTests
         try
         {
             File.WriteAllBytes(Path.Combine(configDirectory, "SOFTWARE"), []);
-            // SYSTEM intentionally absent.
 
             Assert.Null(OfflineImageRoot.TryCreate(root, logger: null));
         }

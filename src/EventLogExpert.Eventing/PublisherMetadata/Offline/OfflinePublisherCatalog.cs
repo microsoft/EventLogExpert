@@ -6,10 +6,6 @@ using EventLogExpert.Logging.Abstractions;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
-/// <summary>
-///     One modern (manifest) publisher registered under the image's <c>WINEVT\Publishers</c>, with re-rooted file
-///     paths.
-/// </summary>
 internal sealed record OfflinePublisherRegistration(
     Guid PublisherGuid,
     string ProviderName,
@@ -17,13 +13,6 @@ internal sealed record OfflinePublisherRegistration(
     IReadOnlyList<string> MessageFilePaths,
     string? ParameterFilePath);
 
-/// <summary>
-///     Reads the modern publisher registrations from a foreign image's <c>SOFTWARE</c> hive (
-///     <c>Microsoft\Windows\CurrentVersion\WINEVT\Publishers</c>). Each <c>{guid}</c> subkey carries the provider name as
-///     its default value and the resource/message/parameter file paths as values, read without host environment expansion
-///     and mapped onto the image. Malformed entries (non-GUID key, missing name) are skipped rather than failing the whole
-///     read.
-/// </summary>
 internal sealed class OfflinePublisherCatalog(OfflineImagePathResolver pathResolver, ITraceLogger? logger)
 {
     private const string PublishersKeyPath = @"Microsoft\Windows\CurrentVersion\WINEVT\Publishers";
@@ -62,7 +51,6 @@ internal sealed class OfflinePublisherCatalog(OfflineImagePathResolver pathResol
         return registrations;
     }
 
-    // The managed hive reader returns REG_SZ/REG_EXPAND_SZ values literally (never host-expanded), so a stored %token
-    // reaches the mapper as-is.
+    // Registry values stay unexpanded so image-local mapping never uses the host environment.
     private static string? ReadString(IOfflineRegistryKey key, string? name) => key.GetValue(name) as string;
 }

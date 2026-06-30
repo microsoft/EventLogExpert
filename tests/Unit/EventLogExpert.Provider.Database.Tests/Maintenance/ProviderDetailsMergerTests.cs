@@ -17,8 +17,7 @@ public sealed class ProviderDetailsMergerTests
     [InlineData(false)]
     public void MergeCaseInsensitiveDuplicates_CarriesNewestSourceProvenanceAsCoherentUnit_RegardlessOfOrder(bool newerFirst)
     {
-        // Same identity (case-folded name + shared VersionKey) from two OS sources. The merged row must take the
-        // NEWEST source's provenance as one coherent unit, deterministically, not whichever row SELECT returned first.
+        // Provenance must be copied as one newest-source unit, not whichever row SELECT returns first.
         var older = EventUtils.CreateProvider("Same-Provider");
         older.VersionKey = "vk1:shared";
         older.SourceOsBuild = 17763;
@@ -245,9 +244,7 @@ public sealed class ProviderDetailsMergerTests
             events: [EventUtils.CreateEventModel(100, "second", logName: "App")]);
         second.VersionKey = "vk1:bbb";
 
-        // Same name + same event Id but DISTINCT VersionKeys are different provider versions, so they form separate
-        // groups and the conflicting event content is never compared. Name-only grouping would have merged them and
-        // thrown on the event conflict; tuple-keying lets both versions coexist.
+        // Distinct VersionKeys must group separately so conflicting provider versions can coexist.
         var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates([first, second], TestDatabasePath);
 
         Assert.Equal(2, merged.Count);
@@ -268,8 +265,6 @@ public sealed class ProviderDetailsMergerTests
 
         var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates([firstV1, secondV1, v2], TestDatabasePath);
 
-        // The two vk1 rows case-fold into one (name, vk1) group and merge to a single canonical "Foo" row; vk2 is a
-        // distinct version and coexists - the realistic post-hashing shape (mixed versions of one name) yields 2 rows.
         Assert.Equal(2, merged.Count);
         Assert.Equal(["vk1", "vk2"], merged.Select(p => p.VersionKey).OrderBy(v => v, StringComparer.Ordinal).ToArray());
         Assert.Equal("Foo", merged.Single(p => p.VersionKey == "vk1").ProviderName);
@@ -286,7 +281,6 @@ public sealed class ProviderDetailsMergerTests
 
         var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates([first, second], TestDatabasePath);
 
-        // Distinct VersionKeys are distinct provider versions and must coexist, not collapse to one row.
         Assert.Equal(2, merged.Count);
         Assert.Equal(["vk1:aaa", "vk1:bbb"], merged.Select(p => p.VersionKey).OrderBy(v => v, StringComparer.Ordinal).ToArray());
     }
@@ -416,8 +410,7 @@ public sealed class ProviderDetailsMergerTests
     [Fact]
     public void MergeCaseInsensitiveDuplicates_TemplatesDifferByteWiseButRenderIdentically_MergesWithoutThrowing()
     {
-        // A live capture and an offline rebuild serialize the same event template differently. The merge compares
-        // templates by render-equivalence, so the rows collapse instead of being rejected as a conflict.
+        // Live and offline captures can serialize equivalent templates differently, so merge by render-equivalence.
         var rows = new List<ProviderDetails>
         {
             EventUtils.CreateProvider("Same-Provider",
@@ -514,8 +507,7 @@ public sealed class ProviderDetailsMergerTests
     [Fact]
     public void MergeCaseInsensitiveDuplicates_WhenRecencyTies_PicksProvenanceDeterministicallyAcrossRowOrder()
     {
-        // Same recency key (build, revision, file version) but different edition: the merge must still pick the same
-        // winner regardless of source row order, since SELECT * has no defined order.
+        // SELECT order is undefined, so tied recency keys must still pick a deterministic edition.
         static ProviderDetails WithEdition(string nameCase, string edition)
         {
             var provider = EventUtils.CreateProvider(nameCase);
@@ -537,7 +529,7 @@ public sealed class ProviderDetailsMergerTests
             [WithEdition("Same-Provider", "ServerDatacenter"), WithEdition("same-provider", "ServerStandard")],
             TestDatabasePath);
 
-        // "ServerStandard" sorts after "ServerDatacenter" ordinally, so it is the deterministic winner either way.
+        // Ordinal edition tie-break makes ServerStandard the deterministic winner.
         Assert.Equal("ServerStandard", Assert.Single(forward).SourceOsEdition);
         Assert.Equal("ServerStandard", Assert.Single(reverse).SourceOsEdition);
     }

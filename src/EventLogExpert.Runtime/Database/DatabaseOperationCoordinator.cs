@@ -147,8 +147,7 @@ internal sealed class DatabaseOperationCoordinator(
 
         if (!confirmed) { return RemoveOutcome.NotConfirmed; }
 
-        // Remove is bespoke (not via RunOperationAsync) because of the snapshot-reopen-on-failure semantic:
-        // if RemoveAsync throws after populating snapshot.Items, logs that were closed must still reopen.
+        // Bespoke flow preserves snapshot reopen semantics if removal fails after closing logs.
         var snapshot = new LogReopenSnapshot();
         bool removed = false;
 
@@ -244,8 +243,7 @@ internal sealed class DatabaseOperationCoordinator(
 
         using (_upgradeGate.EnterScope())
         {
-            // Gate-denied: another upgrade is in flight. Null distinguishes
-            // this from a batch that ran but had every file cancelled per-file.
+            // Null means gate-denied by another upgrade, not a batch where every file was cancelled.
             if (_upgradesInFlight.Count > 0) { return null; }
 
             foreach (var fileName in fileNames) { _upgradesInFlight.Add(fileName); }
@@ -369,8 +367,7 @@ internal sealed class DatabaseOperationCoordinator(
 
         if (enableOnImport)
         {
-            // The import already committed to disk; an enable/reload failure (incl. a reload timeout or cancel) must not
-            // turn a successful import into a reported failure. Isolate it: log and continue with the real import outcome.
+            // Enable/reload failures must not turn a committed import into a reported import failure.
             try
             {
                 await EnableFreshlyImportedReadyDatabasesAsync(result, cancellationToken);
@@ -475,7 +472,7 @@ internal sealed class DatabaseOperationCoordinator(
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    // Defensive: unexpected callback exception → treat as Skip and log.
+                    // Defensive: unexpected callback exceptions are treated as Skip and logged.
                     _logger.Warning($"{nameof(ResolveImportConflictsAsync)} overwrite callback threw for '{candidateName}': {ex}");
                     skip.Add(candidateName);
 

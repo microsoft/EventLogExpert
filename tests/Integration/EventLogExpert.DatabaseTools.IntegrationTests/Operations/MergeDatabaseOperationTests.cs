@@ -66,8 +66,7 @@ public sealed class MergeDatabaseCommandTests : IDisposable
         var source = CreateTempDb();
         var target = CreateTempDb();
 
-        // A pre-stamp (v3) source is classified as needing an upgrade. Merge must FAIL with a clear error rather than
-        // silently reporting success while copying nothing (mirrors the diff operation's source-schema validation).
+        // Pre-stamp sources must fail clearly instead of reporting success while copying nothing.
         DatabaseTestUtils.CreateV3Database(source);
         DatabaseTestUtils.CreateV4Database(target, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
 
@@ -104,8 +103,7 @@ public sealed class MergeDatabaseCommandTests : IDisposable
         var source = CreateTempDb();
         var target = CreateTempDb();
 
-        // An empty (but valid v4) source resolves zero provider identities. Merge must FAIL with a clear summary rather
-        // than reporting success while modifying nothing, mirroring the zero-result truthfulness of the create path.
+        // Zero source providers must fail truthfully instead of reporting success while modifying nothing.
         DatabaseTestUtils.CreateV4Database(source);
         DatabaseTestUtils.CreateV4Database(target, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
 
@@ -138,8 +136,7 @@ public sealed class MergeDatabaseCommandTests : IDisposable
 
         var logger = Substitute.For<ITraceLogger>();
 
-        // Without overwrite, the merge skips only the (name, vk1) identity already in the target and still copies the
-        // source's new vk2 version of the same name. A name-level skip would drop vk2 as a duplicate name.
+        // Without overwrite, skip by composite identity; a name-level skip would drop vk2.
         await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false)).ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.Equal(["vk1", "vk2"], ReadVersionKeys(target, Constants.FirstProviderName));
@@ -151,9 +148,7 @@ public sealed class MergeDatabaseCommandTests : IDisposable
         var source = CreateTempDb();
         var target = CreateTempDb();
 
-        // Provider names differing only by NON-ASCII case (U+00C4 vs U+00E4). SQLite NOCASE folds only ASCII, so
-        // these are DISTINCT primary-key rows; the in-memory identity must treat them as distinct too, or an overwrite
-        // merge deletes only one and then re-inserts both, hitting a primary-key collision.
+        // SQLite NOCASE folds only ASCII, so non-ASCII case variants must remain distinct identities.
         DatabaseTestUtils.CreateV4Database(source,
             DatabaseTestUtils.BuildProviderDetails("Provider-\u00c4"),
             DatabaseTestUtils.BuildProviderDetails("Provider-\u00e4"));
@@ -193,8 +188,7 @@ public sealed class MergeDatabaseCommandTests : IDisposable
 
         var logger = Substitute.For<ITraceLogger>();
 
-        // Overwrite deletes only the colliding (name, vk1) identity by composite key and re-copies it from the source;
-        // the target's vk2 version, which the source does not carry, must survive. A name-level delete would drop vk2.
+        // Overwrite must delete by composite identity; a name-level delete would drop target vk2.
         await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, true)).ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.Equal(["vk1", "vk2"], ReadVersionKeys(target, Constants.FirstProviderName));

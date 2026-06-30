@@ -51,8 +51,6 @@ public sealed class IpcMessageRoundTripTests
     [Fact]
     public void ImageEditionsMessage_RoundTrips_PreservesStatusAndImages()
     {
-        // The streamed editions payload carries the nested WimImageList status plus each WimImageEntry; the source-gen
-        // context must serialize the whole graph so the runner reconstructs the exact edition list the helper read.
         var original = new ImageEditionsMessage(
             WimImageListStatus.Ok,
             [

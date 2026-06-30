@@ -13,8 +13,7 @@ public sealed class CommandExitCodeTests
     [InlineData(DatabaseToolsOutcome.Cancelled, 2)]
     public void ToExitCode_MapsOutcomeToProcessExitCode(DatabaseToolsOutcome outcome, int expectedExitCode)
     {
-        // The CLI propagates these codes to callers and scripts; a Failed operation must never exit 0 (the bug this
-        // fixes), and a Cancelled run is distinguishable from a hard failure.
+        // Scripts depend on Failed never mapping to 0 and Cancelled remaining distinct from hard failure.
         Assert.Equal(expectedExitCode, CommandExitCode.ToExitCode(outcome));
     }
 }

@@ -14,15 +14,6 @@ using System.Diagnostics;
 
 namespace EventLogExpert.Runtime.DatabaseTools;
 
-/// <summary>
-///     Default <see cref="IDatabaseToolsService" /> implementation. Dispatches each Operation on
-///     <see cref="Task.Run(System.Action)" /> so the calling (UI) thread is not blocked; wraps the Operation in a
-///     <see cref="StreamingTraceLogger" /> bound to the caller-supplied <see cref="IProgress{T}" /> sink so log entries
-///     stream as they are emitted; catches <see cref="OperationCanceledException" /> and other exceptions to produce an
-///     explicit <see cref="DatabaseToolsResult" /> rather than propagating into the UI's <see cref="Task" />. The
-///     operation construction is delegated to <see cref="IDatabaseToolsOperationFactory" /> so tests can substitute a fake
-///     factory and exercise this service's real dispatch + result-translation logic.
-/// </summary>
 internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factory) : IDatabaseToolsService
 {
     public Task<DatabaseToolsResult> CreateAsync(
@@ -87,8 +78,7 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
                 () => operation.ExecuteAsync(logger, progress, cancellationToken),
                 cancellationToken);
 
-            // A fail-fast operation (e.g. a Controlled Folder Access-blocked destination) records an actionable summary
-            // instead of throwing; surface it on the result so the UI chip shows the remedy, not a generic "see log".
+            // FailureSummary carries actionable UI text when operations fail without throwing.
             failureSummary = operation.FailureSummary;
         }
         catch (OperationCanceledException)

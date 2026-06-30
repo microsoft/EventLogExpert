@@ -3,29 +3,15 @@
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
-/// <summary>
-///     Single source of truth for the working ("scratch") folder offline-image operations write into - WIM/ESD image
-///     extraction and registry-hive staging. Deliberately NOT <see cref="Path.GetTempPath" />: a user's <c>%TEMP%</c> can
-///     resolve onto a folder that Windows Controlled Folder Access (ransomware protection) protects, which silently denies
-///     the elevated helper's writes and can wedge a native <c>WIMApplyImage</c> mid-extract. The scratch root lives under
-///     <c>%LocalAppData%\EventLogExpert\Scratch</c>, which CFA does not protect by default and which both the in-process
-///     app and the standalone elevated helper compute identically (same user), so the helper's orphan-mount sweep finds
-///     the same staging folders across runs.
-/// </summary>
+// Use LocalAppData scratch instead of Temp because Controlled Folder Access can block the elevated helper.
 public static class OfflineScratch
 {
-    /// <summary>The scratch root. Stable across runs of the same user, in a folder CFA does not protect by default.</summary>
     public static string Root => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "EventLogExpert",
         "Scratch");
 
-    /// <summary>
-    ///     Verifies <paramref name="directory" /> can actually be written to (creating it if missing), returning
-    ///     <see langword="null" /> when writable or an actionable, user-facing message naming the folder and the likely
-    ///     Controlled Folder Access remedy when not. Used as a fast pre-flight before a long native apply so a CFA/ACL denial
-    ///     fails in milliseconds with a clear message instead of wedging a native call that cannot be cancelled.
-    /// </summary>
+    // Preflight writes fail fast for CFA/ACL denial before a long native apply can wedge.
     public static string? ProbeWritable(string directory)
     {
         try
@@ -34,8 +20,7 @@ public static class OfflineScratch
 
             string probePath = Path.Combine(directory, $".elx-write-probe-{Guid.NewGuid():N}.tmp");
 
-            // CreateNew + a single byte exercises an actual write; DeleteOnClose removes the probe even if a later step
-            // throws. A Controlled Folder Access or ACL denial surfaces here as UnauthorizedAccessException.
+            // CreateNew plus one byte surfaces CFA/ACL denial here; DeleteOnClose removes the probe.
             using var probe = new FileStream(probePath,
                 FileMode.CreateNew,
                 FileAccess.Write,

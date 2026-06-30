@@ -40,7 +40,6 @@ internal sealed class WevtParsedTemplate
     public required IReadOnlyList<WevtTemplateNode> Nodes { get; init; }
 }
 
-/// <summary>A provider event read in full from the EVNT table, before any name/keyword resolution.</summary>
 internal sealed record WevtProviderEvent(
     uint Id,
     byte Version,
@@ -52,20 +51,13 @@ internal sealed record WevtProviderEvent(
     uint MessageId,
     WevtParsedTemplate? Template);
 
-/// <summary>A CHAN table row. <see cref="ReferenceId" /> (the @8 aux field) is what an event's channel byte references.</summary>
+// CHAN @8 auxiliary field is the reference id used by each event's channel byte.
 internal readonly record struct WevtChannelEntry(uint Id, uint ReferenceId, uint MessageId, string? InlineName);
 
-/// <summary>A LEVL / OPCO / TASK table row keyed by its numeric id.</summary>
 internal readonly record struct WevtIdentifiedEntry(uint Id, uint MessageId, string? InlineName);
 
-/// <summary>A KEYW table row keyed by its 64-bit bit mask.</summary>
 internal readonly record struct WevtKeywordEntry(ulong Mask, uint MessageId, string? InlineName);
 
-/// <summary>
-///     The full set of tables parsed from one provider's WEVT_TEMPLATE in a single pass: the value-map data the
-///     shipped map API exposes plus the events / channels / levels / opcodes / tasks / keywords the offline provider
-///     reader maps to <see cref="RawProviderContent" />.
-/// </summary>
 internal sealed class WevtProviderData
 {
     public required IReadOnlyList<WevtChannelEntry> Channels { get; init; }
@@ -83,17 +75,7 @@ internal sealed class WevtProviderData
     public required WevtTemplateData Templates { get; init; }
 }
 
-/// <summary>
-///     Reads the binary WEVT_TEMPLATE resource embedded in a provider DLL. A single pass extracts the value-map /
-///     bitMap definitions and per-event field-to-map associations (the shipped map API) as well as the full event,
-///     channel, level, opcode, task, and keyword tables the offline provider reader consumes.
-/// </summary>
-/// <remarks>
-///     EvtOpenPublisherMetadata exposes no valueMap / bitMap tables and strips the <c>map</c> attribute from the
-///     template XML, so the decoded names (for example a bus type of <c>10</c> shown as <c>SAS</c>) are recovered by
-///     parsing the compiled resource directly. Every offset is bounds-checked against the actual resource size; a
-///     malformed resource yields <c>null</c> for the map API and an empty table for the full parse.
-/// </remarks>
+// Parse WEVT_TEMPLATE directly because EvtOpenPublisherMetadata omits valueMap/bitMap data and map attributes.
 internal static class WevtTemplateReader
 {
     private const string BmapSignature = "BMAP";
@@ -169,11 +151,6 @@ internal static class WevtTemplateReader
     private const string WevtResourceType = "WEVT_TEMPLATE";
     private const string WevtSignature = "WEVT";
 
-    /// <summary>
-    ///     Parses the map API view of a provider: the value-map / bitMap definitions and per-event field-to-map
-    ///     associations. Returns <c>null</c> when the provider has no value maps (legacy contract), even though the full parse
-    ///     may still carry events and tables.
-    /// </summary>
     internal static WevtTemplateData? TryParse(ReadOnlySpan<byte> data, Guid publisherGuid, ITraceLogger? logger)
     {
         WevtProviderData? provider = TryParseProvider(data, publisherGuid, logger);
@@ -181,7 +158,6 @@ internal static class WevtTemplateReader
         return provider is null || provider.Templates.Maps.Count == 0 ? null : provider.Templates;
     }
 
-    /// <summary>Parses the full provider tables in a single pass. Name strings are materialized; no span escapes.</summary>
     internal static WevtProviderData? TryParseProvider(ReadOnlySpan<byte> data, Guid publisherGuid, ITraceLogger? logger)
     {
         if (!TryReadSignature(data, 0, out string signature) || signature != CrimSignature)
@@ -289,10 +265,7 @@ internal static class WevtTemplateReader
         }
     }
 
-    /// <summary>
-    ///     Rents an <see cref="ArrayPool{T}" /> buffer holding the WEVT_TEMPLATE resource. The caller owns the buffer and
-    ///     MUST return it; only the first <paramref name="resourceSize" /> bytes are valid (the rented buffer is oversized).
-    /// </summary>
+    // Caller owns the rented buffer; only the first resourceSize bytes are valid.
     internal static byte[]? TryRentWevtResource(string resourceFilePath, ITraceLogger? logger, out int resourceSize) =>
         TryCopyWevtResource(resourceFilePath, logger, static size => ArrayPool<byte>.Shared.Rent(size), out resourceSize);
 
@@ -609,7 +582,7 @@ internal static class WevtTemplateReader
 
             for (int member = descriptor.MemberStart; member < memberEnd; member++)
             {
-                // A member that is itself a struct (nested) or already claimed by another struct is unrepresentable.
+                // Nested or multiply-claimed struct members are unrepresentable in manifest XML.
                 if (raw[member].MemberCount != 0 || memberConsumed[member])
                 {
                     return null;
@@ -624,7 +597,7 @@ internal static class WevtTemplateReader
 
         for (int index = (int)itemCount; index < nameCount; index++)
         {
-            // Every appended member descriptor must be claimed by exactly one struct, or the template is malformed.
+            // Appended member descriptors must be claimed by exactly one struct.
             if (!memberConsumed[index])
             {
                 return null;

@@ -20,9 +20,7 @@ public sealed class TemplateSignatureTests
     [Fact]
     public void Equal_DataElementsWithNoSignatureAttributes_FailClosedAndDoNotCollapse()
     {
-        // A <data> element whose attributes are all non-signature (no name/inType/outType/length/map) is non-canonical;
-        // it must fall back to its raw substring so two such elements stay distinct instead of collapsing to one
-        // all-empty parsed signature.
+        // Non-canonical <data> elements fall back to raw text so distinct inputs do not collapse.
         const string Foo = "<template><data foo=\"1\"/></template>";
         const string Bar = "<template><data bar=\"2\"/></template>";
 
@@ -32,9 +30,7 @@ public sealed class TemplateSignatureTests
     [Fact]
     public void Equal_DataElementsWithOnlyEmptySignatureValues_FailClosedAndDoNotCollapse()
     {
-        // Signature attributes present but all empty-valued carry no render-relevant content; two distinct such elements
-        // (a different attribute present, both empty) must still fail closed to raw rather than collapse to one all-empty
-        // parsed signature.
+        // Empty signature values fail closed to raw text so distinct inputs do not collapse.
         const string EmptyName = "<template><data name=\"\"/></template>";
         const string EmptyInType = "<template><data inType=\"\"/></template>";
 
@@ -53,7 +49,7 @@ public sealed class TemplateSignatureTests
     [Fact]
     public void Equal_DifferentInType_AreNotEqual()
     {
-        // inType is part of provider content even though the formatter ignores it, so it is kept (conservative).
+        // inType is kept as provider content even though the formatter ignores it.
         const string AsUInt = "<template><data name=\"V\" inType=\"win:UInt32\" outType=\"xs:string\"/></template>";
         const string AsInt = "<template><data name=\"V\" inType=\"win:Int32\" outType=\"xs:string\"/></template>";
 
@@ -72,8 +68,7 @@ public sealed class TemplateSignatureTests
     [Fact]
     public void Equal_DistinctNonCanonicalElements_FailClosedAndDoNotCollapse()
     {
-        // Single-quoted attributes cannot be canonically extracted, so each element falls back to its raw substring -
-        // two genuinely different elements must NOT collapse to one empty signature.
+        // Single-quoted attributes fall back to raw text so distinct inputs do not collapse.
         const string SingleQuotedA = "<template><data name='A'/></template>";
         const string SingleQuotedB = "<template><data name='B'/></template>";
 
@@ -83,9 +78,7 @@ public sealed class TemplateSignatureTests
     [Fact]
     public void Equal_FieldsDifferingOnlyByUtf8CollapsingSurrogate_StayInSyncWithTheHashEncoding()
     {
-        // Equal must mirror AppendTo's UTF-8 encoding so merge equality and the content hash never drift. An unpaired
-        // surrogate encodes to the UTF-8 replacement bytes, so two names differing only in such a surrogate collapse to
-        // the same bytes - Equal must report them equal too, matching the hash rather than comparing raw UTF-16.
+        // Equal must mirror AppendTo's UTF-8 replacement-byte behavior so merge equality and hashing do not drift.
         const string FirstSurrogate = "<template><data name=\"\uD800\"/></template>";
         const string SecondSurrogate = "<template><data name=\"\uD801\"/></template>";
 
@@ -102,8 +95,7 @@ public sealed class TemplateSignatureTests
     [Fact]
     public void Equal_QuotedAngleBracketInValue_DoesNotTruncateOrCollapseDistinctTemplates()
     {
-        // A '>' or '/>' inside a quoted attribute value must NOT terminate the element early - the trailing
-        // attributes must still be read, so templates that differ only after such a value stay distinct.
+        // Quoted angle brackets must not terminate the element before later signature attributes are read.
         const string WithString = "<template><data name=\"x/>y\" outType=\"xs:string\"/></template>";
         const string WithHex = "<template><data name=\"x/>y\" outType=\"win:HexInt32\"/></template>";
 
@@ -114,7 +106,7 @@ public sealed class TemplateSignatureTests
     [Fact]
     public void Equal_StructGroupingDiffersOnly_AreEqual()
     {
-        // <struct> grouping is render-dead today and intentionally excluded; the flat data nodes are the signature.
+        // <struct> grouping is render-dead today; the flat data nodes are the signature.
         const string Flat = "<template><data name=\"A\" outType=\"xs:string\"/><data name=\"B\" outType=\"xs:string\"/></template>";
         const string Grouped = "<template><struct name=\"S\" count=\"2\"><data name=\"A\" outType=\"xs:string\"/><data name=\"B\" outType=\"xs:string\"/></struct></template>";
 
@@ -133,7 +125,7 @@ public sealed class TemplateSignatureTests
     [Fact]
     public void EventsAreEquivalent_ComparesTemplatesByTheSameSignature()
     {
-        // Locks the merge equivalence to TemplateSignature so the content hash and the merge can never disagree.
+        // Locks merge equivalence to TemplateSignature so hashing and merging cannot drift.
         const string Compact = "<template><data name=\"User\" outType=\"xs:string\"/></template>";
         const string Spaced = "<template>  <data   name=\"User\"   outType=\"xs:string\" />  </template>";
         const string Different = "<template><data name=\"User\" outType=\"win:HexInt32\"/></template>";

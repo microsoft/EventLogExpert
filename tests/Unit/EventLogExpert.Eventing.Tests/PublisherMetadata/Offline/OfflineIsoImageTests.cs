@@ -8,12 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
 
-/// <summary>
-///     Drives the ISO mount / find-install-image / cleanup state machine through a fake
-///     <see cref="IVirtualDiskOperations" /> pointed at a real temp dir; the real <c>virtdisk</c> attach needs a real ISO
-///     so it is covered by manual E2E. These assert install.wim-first precedence, the no-install-image outcome, NotAnIso
-///     vs MountFailed mapping, and that the attach lease is detached on every exit (success, no-image, dispose).
-/// </summary>
 public sealed class OfflineIsoImageTests
 {
     [Fact]
@@ -72,7 +66,6 @@ public sealed class OfflineIsoImageTests
     [Fact]
     public void TryMount_WhenMounted_StreamsMountingBeforeAttachAndMountedAfter()
     {
-        // BUG #4: the mount must emit start/complete progress so the UI is not blank during the slow native attach.
         using var workspace = new TempIso(installWim: true);
         var events = new List<string>();
         var logger = new SequenceRecordingTraceLogger(events);
@@ -143,8 +136,6 @@ public sealed class OfflineIsoImageTests
             throw new NotSupportedException("This fake covers ISO attach only.");
     }
 
-    // Records every log message (any level) into a shared ordered list so a test can assert the streaming progress
-    // lines are emitted around the native call; the fake disk operations append their own "attach" marker to it.
     private sealed class SequenceRecordingTraceLogger(List<string> events) : ITraceLogger
     {
         public LogLevel MinimumLevel => LogLevel.Trace;

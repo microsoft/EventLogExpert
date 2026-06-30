@@ -5,19 +5,11 @@ using EventLogExpert.Logging.Abstractions;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
-/// <summary>The result of <see cref="OfflineVhdxImage.TryMount(string, ITraceLogger?)" />: the outcome plus the mount.</summary>
 public readonly record struct OfflineVhdxMountResult(OfflineVhdxMountStatus Status, OfflineVhdxImage? Image)
 {
     internal static OfflineVhdxMountResult Failed(OfflineVhdxMountStatus status) => new(status, null);
 }
 
-/// <summary>
-///     Attaches a <c>.vhdx</c>/<c>.vhd</c> read-only with no drive letter, resolves the partition holding the offline
-///     Windows installation (<c>\Windows\System32</c>), and exposes that volume root so the existing directory-image
-///     extractor can read it; a VHD/VHDX is just a front-end producing a mounted volume. The mount detaches on
-///     <see cref="Dispose" />. The entry point NEVER throws for a bad / non-Windows / non-VHDX file - it returns a typed
-///     <see cref="OfflineVhdxMountStatus" />.
-/// </summary>
 public sealed class OfflineVhdxImage : IDisposable
 {
     private readonly IDisposable _lease;
@@ -29,10 +21,6 @@ public sealed class OfflineVhdxImage : IDisposable
         _lease = lease;
     }
 
-    /// <summary>
-    ///     Root of the mounted Windows volume (a volume-GUID path); read it as a directory image. Valid until
-    ///     <see cref="Dispose" />.
-    /// </summary>
     public string VolumeRoot { get; }
 
     public static OfflineVhdxMountResult TryMount(string vhdxPath, ITraceLogger? logger) =>
