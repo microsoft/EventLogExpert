@@ -14,7 +14,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Channels_WhenProviderHasChannels_ShouldHaveValidKeys()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var channels = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Channels;
 
@@ -31,7 +31,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Channels_WhenValidProvider_ShouldContainData()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var channels = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Channels;
 
@@ -45,7 +45,7 @@ public sealed class ProviderMetadataTests
     [InlineData(Constants.PowerShellLogName)]
     public void Create_WhenCommonProviders_ShouldReturnMetadata(string providerName)
     {
-        var metadata = ProviderMetadata.Create(providerName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(providerName);
 
         if (metadata != null)
         {
@@ -58,7 +58,7 @@ public sealed class ProviderMetadataTests
     {
         var mockLogger = Substitute.For<ITraceLogger>();
 
-        var metadata = ProviderMetadata.Create(string.Empty, logger: mockLogger);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(string.Empty, logger: mockLogger);
 
         mockLogger.DidNotReceive()
             .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Failed to create metadata")));
@@ -67,7 +67,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Create_WhenEmptyProviderName_ShouldReturnMetadata()
     {
-        var metadata = ProviderMetadata.Create(string.Empty);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(string.Empty);
 
         Assert.NotNull(metadata);
     }
@@ -78,7 +78,7 @@ public sealed class ProviderMetadataTests
         var providerName = "NonExistentProvider_" + Guid.NewGuid();
         var mockLogger = Substitute.For<ITraceLogger>();
 
-        var metadata = ProviderMetadata.Create(providerName, logger: mockLogger);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(providerName, logger: mockLogger);
 
         mockLogger.Received(1).Debug(
             Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Failed to create metadata") && h.ToString().Contains(providerName)));
@@ -89,7 +89,7 @@ public sealed class ProviderMetadataTests
     {
         var providerName = "NonExistentProvider_" + Guid.NewGuid();
 
-        var metadata = ProviderMetadata.Create(providerName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(providerName);
 
         Assert.Null(metadata);
     }
@@ -97,7 +97,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Create_WhenSpecialCharactersInProviderName_ShouldReturnNull()
     {
-        var metadata = ProviderMetadata.Create("Invalid<>Provider|Name");
+        using ProviderMetadata? metadata = ProviderMetadata.Create("Invalid<>Provider|Name");
 
         Assert.Null(metadata);
     }
@@ -107,7 +107,7 @@ public sealed class ProviderMetadataTests
     {
         var mockLogger = Substitute.For<ITraceLogger>();
 
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName, logger: mockLogger);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName, logger: mockLogger);
 
         Assert.NotNull(metadata);
 
@@ -118,7 +118,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Create_WhenValidProvider_ShouldReturnMetadata()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         Assert.NotNull(metadata);
     }
@@ -126,7 +126,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Create_WhenWhitespaceProviderName_ShouldReturnNull()
     {
-        var metadata = ProviderMetadata.Create("   ");
+        using ProviderMetadata? metadata = ProviderMetadata.Create("   ");
 
         Assert.Null(metadata);
     }
@@ -137,7 +137,7 @@ public sealed class ProviderMetadataTests
         var providerName = "NonExistentProvider_" + Guid.NewGuid();
         var mockLogger = Substitute.For<ITraceLogger>();
 
-        var metadata = ProviderMetadata.Create(providerName, logger: mockLogger);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(providerName, logger: mockLogger);
 
         Assert.Null(metadata);
 
@@ -148,7 +148,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Events_WhenProviderHasEvents_ShouldHaveValidEventMetadata()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var events = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Events;
 
@@ -163,7 +163,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Events_WhenValidProvider_ShouldContainEventMetadata()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var events = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Events;
 
@@ -182,7 +182,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Events_WhenValidProvider_ShouldContainEvents()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var events = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Events;
 
@@ -193,7 +193,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Keywords_WhenProviderHasKeywords_ShouldContainData()
     {
-        var metadata = ProviderMetadata.Create(Constants.PowerShellLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.PowerShellLogName);
 
         var keywords = metadata?.ToRawContent(Constants.PowerShellLogName, null).Keywords;
 
@@ -208,7 +208,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Keywords_WhenProviderHasKeywords_ShouldHaveValidValues()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var keywords = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Keywords;
 
@@ -224,7 +224,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void MessageFilePath_WhenCalledMultipleTimes_ShouldReturnConsistentPath()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var path1 = metadata?.MessageFilePath;
         var path2 = metadata?.MessageFilePath;
@@ -238,7 +238,7 @@ public sealed class ProviderMetadataTests
     public void MessageFilePath_WhenManifestUsesEnvironmentVariables_ShouldReturnExpandedPath()
     {
         // Host manifests can store environment variables that must expand before LoadLibraryEx.
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         Assert.SkipUnless(metadata is not null, "Test requires Microsoft-Windows-Security-Auditing provider on the host.");
         Assert.NotNull(metadata);
@@ -253,7 +253,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void MessageFilePath_WhenValidProvider_ShouldContainDllExtension()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var messageFilePath = metadata?.MessageFilePath;
 
@@ -264,7 +264,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void MessageFilePath_WhenValidProvider_ShouldNotBeEmpty()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var messageFilePath = metadata?.MessageFilePath;
 
@@ -275,7 +275,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void MessageFilePath_WhenValidProvider_ShouldReturnPath()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var messageFilePath = metadata?.MessageFilePath;
 
@@ -285,7 +285,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Opcodes_WhenProviderHasOpcodes_ShouldHaveValidValues()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var opcodes = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Opcodes;
 
@@ -301,7 +301,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Opcodes_WhenValidProvider_ShouldContainData()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var opcodes = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Opcodes;
 
@@ -312,7 +312,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void ParameterFilePath_WhenCalledMultipleTimes_ShouldReturnConsistentPath()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var path1 = metadata?.ParameterFilePath;
         var path2 = metadata?.ParameterFilePath;
@@ -326,7 +326,7 @@ public sealed class ProviderMetadataTests
     public void ParameterFilePath_WhenManifestUsesEnvironmentVariables_ShouldReturnExpandedPath()
     {
         // Host manifests can store environment variables that must expand before LoadLibraryEx.
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         Assert.SkipUnless(metadata is not null, "Test requires Microsoft-Windows-Security-Auditing provider on the host.");
         Assert.NotNull(metadata);
@@ -341,7 +341,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void ParameterFilePath_WhenValidProvider_ShouldReturnPath()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var parameterFilePath = metadata?.ParameterFilePath;
 
@@ -351,7 +351,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Tasks_WhenProviderHasTasks_ShouldHaveValidValues()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var tasks = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Tasks;
 
@@ -367,7 +367,7 @@ public sealed class ProviderMetadataTests
     [Fact]
     public void Tasks_WhenValidProvider_ShouldContainData()
     {
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         var tasks = metadata?.ToRawContent(Constants.SecurityAuditingLogName, null).Tasks;
 

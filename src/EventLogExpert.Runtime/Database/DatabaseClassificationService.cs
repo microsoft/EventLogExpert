@@ -115,7 +115,7 @@ internal sealed class DatabaseClassificationService
                 return new DatabaseClassificationResult(DatabaseStatus.UnrecognizedSchema, false, []);
             }
 
-            var state = _maintenance.CheckSchemaState(entry.FullPath);
+            var state = _maintenance.CheckSchemaState(entry.FullPath, readOnly: true);
             status = MapSchemaStateToStatus(state);
             backupExists = ProbeOrCleanupBackup(entry, status);
         }

@@ -33,6 +33,16 @@ internal static class ListImageEditionsHandler
                 stopwatch.Elapsed);
         }
 
+        if (!File.Exists(request.ImagePath))
+        {
+            var imageKindName = kind is OfflineImageKind.Iso ? "ISO" : "WIM";
+
+            return new DatabaseToolsResult(
+                DatabaseToolsOutcome.Failed,
+                $"{imageKindName} image file not found: {request.ImagePath}",
+                stopwatch.Elapsed);
+        }
+
         OfflineIsoImage? isoImage = null;
 
         try

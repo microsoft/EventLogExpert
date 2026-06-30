@@ -5,14 +5,13 @@ using EventLogExpert.Logging.Abstractions;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
-// A named mutex is the liveness beacon: process death releases it for orphan cleanup.
 internal static class OwnershipBeacon
 {
     public static bool IsAlive(string name)
     {
         try
         {
-            using Mutex owner = Mutex.OpenExisting($"Global\\{name}");
+            using Mutex owner = Mutex.OpenExisting($"Local\\{name}");
 
             return true;
         }
@@ -31,7 +30,7 @@ internal static class OwnershipBeacon
     {
         try
         {
-            return new Mutex(initiallyOwned: false, name: $"Global\\{name}");
+            return new Mutex(initiallyOwned: false, name: $"Local\\{name}");
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {

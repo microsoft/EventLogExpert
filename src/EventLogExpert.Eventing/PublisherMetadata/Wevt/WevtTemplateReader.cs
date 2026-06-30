@@ -474,15 +474,20 @@ internal static class WevtTemplateReader
         }
 
         if (!TryReadUInt32(data, (int)templateOffset + TemplateItemCountOffset, out uint itemCount) ||
+            !TryReadUInt32(data, (int)templateOffset + TemplateNameCountOffset, out uint nameCount) ||
             !TryReadUInt32(data, (int)templateOffset + TemplateItemsPointerOffset, out uint itemsOffset) ||
-            itemCount > MaxTemplateItemCount)
+            itemCount > MaxTemplateItemCount ||
+            nameCount > MaxTemplateItemCount ||
+            nameCount < itemCount)
         {
             return null;
         }
 
         Dictionary<string, string>? fieldMaps = null;
 
-        for (uint itemIndex = 0; itemIndex < itemCount; itemIndex++)
+        // Scan every descriptor up to nameCount, not just the itemCount top-level ones: a map attached to a struct-member
+        // descriptor (appended after itemCount) would otherwise be skipped and that field would render as a raw number.
+        for (uint itemIndex = 0; itemIndex < nameCount; itemIndex++)
         {
             int itemOffset = (int)itemsOffset + (int)(itemIndex * TemplateItemSize);
 

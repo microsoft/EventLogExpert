@@ -9,12 +9,14 @@
 
         <span class="entry-count">@Entries.Count @(Entries.Count == 1 ? "entry" : "entries")</span>
 
-        @if (Outcome is not null)
-        {
-            <span aria-atomic="true" aria-live="@OutcomeChipAriaLive" class="@OutcomeChipCss" role="@OutcomeChipRole">
-                <i aria-hidden="true" class="@OutcomeChipIcon"></i> @OutcomeChipText
-            </span>
-        }
+        <span aria-atomic="true" aria-live="@OutcomeChipAriaLive" role="@OutcomeChipRole">
+            @if (Outcome is not null)
+            {
+                <span class="@OutcomeChipCss">
+                    <i aria-hidden="true" class="@OutcomeChipIcon"></i> @OutcomeChipText
+                </span>
+            }
+        </span>
 
         <div class="toolbar-trailing">
             @if (ToolbarTrailingContent is not null)

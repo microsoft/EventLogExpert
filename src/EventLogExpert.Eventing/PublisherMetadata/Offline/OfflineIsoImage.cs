@@ -13,14 +13,12 @@ public readonly record struct OfflineIsoMountResult(OfflineIsoMountStatus Status
 public sealed class OfflineIsoImage : IDisposable
 {
     private readonly IDisposable _lease;
-    private readonly ITraceLogger? _logger;
     private bool _disposed;
 
-    private OfflineIsoImage(string installImagePath, IDisposable lease, ITraceLogger? logger)
+    private OfflineIsoImage(string installImagePath, IDisposable lease)
     {
         InstallImagePath = installImagePath;
         _lease = lease;
-        _logger = logger;
     }
 
     public string InstallImagePath { get; }
@@ -43,7 +41,8 @@ public sealed class OfflineIsoImage : IDisposable
         {
             logger?.Debug($"{nameof(OfflineIsoImage)}: ISO file not found: {isoPath}.");
 
-            return OfflineIsoMountResult.Failed(OfflineIsoMountStatus.NotAnIso);
+            // A missing file is an open/mount failure, not a format problem; NotAnIso would surface as "not a readable ISO".
+            return OfflineIsoMountResult.Failed(OfflineIsoMountStatus.MountFailed);
         }
 
         logger?.Information($"Mounting ISO {isoPath}...");
@@ -69,7 +68,7 @@ public sealed class OfflineIsoImage : IDisposable
 
         logger?.Information($"Mounted ISO at {attach.VolumeRoot}.");
 
-        return new OfflineIsoMountResult(OfflineIsoMountStatus.Mounted, new OfflineIsoImage(installImagePath, attach.Lease, logger));
+        return new OfflineIsoMountResult(OfflineIsoMountStatus.Mounted, new OfflineIsoImage(installImagePath, attach.Lease));
     }
 
     private static string? ResolveInstallImage(string volumeRoot)

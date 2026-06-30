@@ -33,14 +33,14 @@ public sealed class OfflineVhdxImageTests
     }
 
     [Fact]
-    public void TryMount_WhenFileMissing_ReturnsNotAVhdx()
+    public void TryMount_WhenFileMissing_ReturnsMountFailed()
     {
         var api = new FakeVirtualDiskOperations();
 
         OfflineVhdxMountResult result = OfflineVhdxImage.TryMount(
             Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".vhdx"), api, logger: null);
 
-        Assert.Equal(OfflineVhdxMountStatus.NotAVhdx, result.Status);
+        Assert.Equal(OfflineVhdxMountStatus.MountFailed, result.Status);
         Assert.False(api.Attached);
     }
 

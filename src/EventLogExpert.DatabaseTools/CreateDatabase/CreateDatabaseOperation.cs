@@ -91,7 +91,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 excludeProviderNames.Add(name);
             }
 
-            logger.Information($"Found {excludeProviderNames.Count} providers in {request.SkipProvidersInFile}. These will not be included in the new database.");
+            logger.Information($"{FormatSkippedProvidersMessage(excludeProviderNames.Count, request.SkipProvidersInFile)}");
         }
 
         var filterRegex = EnsureBoundedTimeout(request.FilterRegex, TimeSpan.FromSeconds(5));
@@ -365,6 +365,14 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         !string.IsNullOrWhiteSpace(request.OfflineImagePath) ? CreateDatabaseMode.OfflineImage
         : request.SourcePath is null ? CreateDatabaseMode.Local
         : CreateDatabaseMode.FileSource;
+
+    internal static string FormatSkippedProvidersMessage(int providerCount, string skipProvidersInFile)
+    {
+        var providerNoun = providerCount == 1 ? "provider" : "providers";
+        var providerSubject = providerCount == 1 ? "It" : "These";
+
+        return $"Found {providerCount} {providerNoun} in {skipProvidersInFile}. {providerSubject} will not be included in the new database.";
+    }
 
     internal static bool ValidateOfflineImageRequest(CreateDatabaseRequest request, ITraceLogger logger)
     {

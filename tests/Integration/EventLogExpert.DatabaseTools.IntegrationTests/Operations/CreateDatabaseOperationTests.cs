@@ -43,7 +43,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         using var verify = new ProviderDbContext(path, readOnly: true, ensureCreated: false);
         var single = Assert.Single(verify.ProviderDetails.ToList());
         Assert.Equal(Constants.FirstProviderName, single.ProviderName);
-        Assert.StartsWith("vk1:", single.VersionKey);
+        Assert.StartsWith(VersionKeyCalculator.SchemePrefix, single.VersionKey);
         logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
     }
 
@@ -201,7 +201,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var created = context.ProviderDetails.Single();
 
         Assert.Equal(Constants.FirstProviderName, created.ProviderName);
-        Assert.StartsWith("vk1:", created.VersionKey);
+        Assert.StartsWith(VersionKeyCalculator.SchemePrefix, created.VersionKey);
         Assert.Equal(VersionKeyCalculator.Compute(created), created.VersionKey);
     }
 

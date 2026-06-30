@@ -240,6 +240,7 @@ internal sealed class DatabaseImportService(
                 if (skipFileNames.Contains(entry.Name)) { continue; }
 
                 var destinationPath = Path.Join(_fileLocationOptions.DatabasePath, entry.Name);
+                var stagingPath = destinationPath + ".importing-" + Guid.NewGuid().ToString("N");
 
                 try
                 {
@@ -247,11 +248,15 @@ internal sealed class DatabaseImportService(
                     {
                         await using (var entryStream = await entry.OpenAsync(cancellationToken))
                         {
-                            await using (var fileStream = File.Create(destinationPath))
+                            await using (var fileStream = File.Create(stagingPath))
                             {
                                 await entryStream.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
                             }
                         }
+
+                        // Replace the destination only after a complete copy, so a failure or cancellation mid-extract
+                        // leaves any existing database intact rather than truncated or deleted.
+                        File.Move(stagingPath, destinationPath, overwrite: true);
                     }
 
                     imported++;
@@ -263,18 +268,17 @@ internal sealed class DatabaseImportService(
 
                     _traceLogger.Warning(
                         $"{nameof(DatabaseImportService)}.{nameof(ImportZipAsync)} failed to extract '{entry.Name}' from '{zipFileName}': {ex}");
-
+                }
+                finally
+                {
                     try
                     {
-                        if (File.Exists(destinationPath))
-                        {
-                            File.Delete(destinationPath);
-                        }
+                        if (File.Exists(stagingPath)) { File.Delete(stagingPath); }
                     }
                     catch (Exception cleanupEx)
                     {
                         _traceLogger.Warning(
-                            $"{nameof(DatabaseImportService)}.{nameof(ImportZipAsync)} failed to clean up partial extract '{destinationPath}': {cleanupEx}");
+                            $"{nameof(DatabaseImportService)}.{nameof(ImportZipAsync)} failed to clean up staging file '{stagingPath}': {cleanupEx}");
                     }
                 }
             }

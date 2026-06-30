@@ -4,7 +4,6 @@
 using EventLogExpert.Provider.Resolution;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Text;
 
 namespace EventLogExpert.ProviderDatabase.Hashing;
 
@@ -176,12 +175,18 @@ internal static class ProviderContentEncoder
             return;
         }
 
-        var byteCount = Encoding.UTF8.GetByteCount(value);
+        var byteCount = value.Length * sizeof(char);
         WriteInt32(buffer, byteCount);
 
         if (byteCount == 0) { return; }
 
-        Encoding.UTF8.GetBytes(value, buffer.GetSpan(byteCount));
+        Span<byte> destination = buffer.GetSpan(byteCount);
+
+        for (var index = 0; index < value.Length; index++)
+        {
+            BinaryPrimitives.WriteUInt16LittleEndian(destination[(index * sizeof(char))..], value[index]);
+        }
+
         buffer.Advance(byteCount);
     }
 

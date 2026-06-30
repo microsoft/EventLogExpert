@@ -66,7 +66,7 @@ public sealed class EventMessageProvider(
 
     private ProviderDetails LoadProviderDetailsCore(HashSet<string>? visited)
     {
-        var providerMetadata = ProviderMetadata.Create(_providerName, _metadataPaths, _logger);
+        using ProviderMetadata? providerMetadata = ProviderMetadata.Create(_providerName, _metadataPaths, _logger);
 
         ProviderDetails provider = providerMetadata is not null
             ? LoadMessagesFromModernProvider(providerMetadata)

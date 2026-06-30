@@ -33,6 +33,7 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
     private bool _isLoadingEditions;
     private string? _overwriteConfirmedFor;
     private string _skipPath = string.Empty;
+    private bool _sourceIsExistingDirectory;
     private string _sourcePath = string.Empty;
     private string _targetPath = string.Empty;
     private bool _treatFolderAsImage;
@@ -52,7 +53,7 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
 
     private bool IsLocalProviderScan => string.IsNullOrWhiteSpace(_sourcePath);
 
-    private bool IsMarkedFolderImage => _treatFolderAsImage && Directory.Exists(_sourcePath.Trim());
+    private bool IsMarkedFolderImage => _treatFolderAsImage && _sourceIsExistingDirectory;
 
     private bool IsOfflineImagePath =>
         !string.IsNullOrWhiteSpace(_sourcePath) &&
@@ -245,6 +246,19 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
         if (!string.IsNullOrEmpty(path)) { _targetPath = path; }
     }
 
+    // Directory.Exists can block for seconds on an unresponsive UNC path; the source box re-renders on every keystroke, so
+    // the folder-existence check runs off the UI thread and only its cached result drives the markup.
+    private async Task RefreshSourceIsDirectoryAsync(string path)
+    {
+        string trimmed = path.Trim();
+        bool exists = !string.IsNullOrEmpty(trimmed) && await Task.Run(() => Directory.Exists(trimmed));
+
+        if (_sourcePath != path || _sourceIsExistingDirectory == exists) { return; }
+
+        _sourceIsExistingDirectory = exists;
+        await InvokeAsync(StateHasChanged);
+    }
+
     private Task RunCreateAsync() => WillElevate ? RunElevatedAsync() : RunAsync();
 
     private Task RunElevatedAsync() =>
@@ -258,6 +272,7 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
             _wimIndex = null;
             _imageEditions = [];
             _editionsError = null;
+            _sourceIsExistingDirectory = false;
 
             _editionsCts?.Cancel();
             _editionsCts?.Dispose();
@@ -266,5 +281,6 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
         }
 
         _sourcePath = path;
+        _ = RefreshSourceIsDirectoryAsync(path);
     }
 }
