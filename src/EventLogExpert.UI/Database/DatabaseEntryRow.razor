@@ -11,10 +11,16 @@
 
     <div class="db-entry-row-content">
         <div class="db-entry-info">
-            <ChromelessButton CssClass="db-entry-name" id="@_nameButtonId" @ref="_nameButton">@Entry.FileName</ChromelessButton>
-            @if (ShouldShowBadge)
+            <div class="db-entry-name-line">
+                <ChromelessButton CssClass="db-entry-name" id="@_nameButtonId" @ref="_nameButton">@Entry.FileName</ChromelessButton>
+                @if (ShouldShowBadge)
+                {
+                    <span class="db-entry-badge" data-badge="@BadgeKind">@BadgeLabel</span>
+                }
+            </div>
+            @if (HasOsStamp)
             {
-                <span class="db-entry-badge" data-badge="@BadgeKind">@BadgeLabel</span>
+                <span aria-label="@OsStampAriaLabel" class="db-entry-osstamp" role="img" title="@OsStampDetail">@OsStampSummary</span>
             }
         </div>
 

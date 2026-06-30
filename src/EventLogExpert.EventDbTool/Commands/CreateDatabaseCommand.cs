@@ -49,16 +49,17 @@ public sealed class CreateDatabaseCommand
         {
             Description =
                 "Build the database from a Windows image, fully offline (no host registry or host files are " +
-                "read): a mounted volume root (e.g. an attached VHDX), an extracted image folder, a .wim/.esd " +
-                "file, or a .iso file (use --wim-index N to pick the image). The kind is auto-detected from the " +
-                "path; override with --image-kind. Mutually exclusive with the source argument."
+                "read): a mounted volume root, an extracted image folder, a .wim/.esd file, a .iso file (use " +
+                "--wim-index N to pick the image), or a .vhdx/.vhd file (auto-mounted read-only). The kind is " +
+                "auto-detected from the path; override with --image-kind. Mutually exclusive with the source argument."
         };
 
         Option<string> imageKindOption = new("--image-kind")
         {
             Description =
                 "Override how --offline-image is read: 'directory' (a mounted volume or extracted folder), 'wim' " +
-                "(a .wim/.esd file), or 'iso' (a Windows install ISO). Omit to auto-detect from the path."
+                "(a .wim/.esd file), 'iso' (a Windows install ISO), or 'vhdx' (a .vhdx/.vhd disk, auto-mounted). " +
+                "Omit to auto-detect from the path."
         };
 
         Option<int?> wimIndexOption = new("--wim-index")
@@ -66,6 +67,14 @@ public sealed class CreateDatabaseCommand
             Description =
                 "The 1-based image index to extract from a .wim/.esd (or an ISO's install.wim), for --image-kind " +
                 "wim or iso. Omit to list the available images."
+        };
+
+        Option<bool> overwriteOption = new("--overwrite")
+        {
+            Description =
+                "Replace the target database if it already exists. The existing file is backed up to a .bak " +
+                "snapshot before the rebuild and restored automatically if the rebuild fails, so a failed overwrite " +
+                "never destroys the prior database. Omit to fail when the target already exists."
         };
 
         Option<bool> verboseOption = new("--verbose")
@@ -80,9 +89,10 @@ public sealed class CreateDatabaseCommand
         createDatabaseCommand.Options.Add(offlineImageOption);
         createDatabaseCommand.Options.Add(imageKindOption);
         createDatabaseCommand.Options.Add(wimIndexOption);
+        createDatabaseCommand.Options.Add(overwriteOption);
         createDatabaseCommand.Options.Add(verboseOption);
 
-        createDatabaseCommand.SetAction(async result =>
+        createDatabaseCommand.SetAction(async (result, cancellationToken) =>
         {
             await using var sp = Program.BuildServiceProvider(result.GetValue(verboseOption));
             var logger = sp.GetRequiredService<ITraceLogger>();
@@ -93,7 +103,7 @@ public sealed class CreateDatabaseCommand
             {
                 logger.Error($"Invalid --filter regex '{filterValue}': {error}");
 
-                return;
+                return 1;
             }
 
             var imageKindValue = result.GetValue(imageKindOption);
@@ -104,9 +114,9 @@ public sealed class CreateDatabaseCommand
                 if (!Enum.TryParse(imageKindValue, ignoreCase: true, out OfflineImageKind parsed) ||
                     !Enum.IsDefined(parsed))
                 {
-                    logger.Error($"Invalid --image-kind '{imageKindValue}'. Valid values: directory, wim, iso.");
+                    logger.Error($"Invalid --image-kind '{imageKindValue}'. Valid values: directory, wim, iso, vhdx.");
 
-                    return;
+                    return 1;
                 }
 
                 imageKind = parsed;
@@ -119,11 +129,14 @@ public sealed class CreateDatabaseCommand
                 result.GetValue(skipProvidersInFileOption),
                 OfflineImagePath: result.GetValue(offlineImageOption),
                 ImageKind: imageKind,
-                WimIndex: result.GetValue(wimIndexOption));
+                WimIndex: result.GetValue(wimIndexOption),
+                Overwrite: result.GetValue(overwriteOption));
 
             var factory = sp.GetRequiredService<IDatabaseToolsOperationFactory>();
 
-            await factory.Create(request).ExecuteAsync(logger, progress: null, CancellationToken.None);
+            var outcome = await factory.Create(request).ExecuteAsync(logger, progress: null, cancellationToken);
+
+            return CommandExitCode.ToExitCode(outcome);
         });
 
         return createDatabaseCommand;

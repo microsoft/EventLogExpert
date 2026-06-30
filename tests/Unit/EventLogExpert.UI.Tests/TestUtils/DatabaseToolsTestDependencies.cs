@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
@@ -35,6 +36,7 @@ internal static class DatabaseToolsTestDependencies
             services.AddSingleton(Substitute.For<IAlertDialogService>());
             services.AddSingleton(Substitute.For<ICurrentVersionProvider>());
             services.AddSingleton(Substitute.For<IMenuActionService>());
+            services.AddSingleton(Substitute.For<ITraceLogger>());
 
             return services;
         }

@@ -48,7 +48,7 @@ public sealed class OfflineIsoImage : IDisposable
         _lease.Dispose();
     }
 
-    internal static OfflineIsoMountResult TryMount(string isoPath, IVirtualDiskOperations VirtualDiskOperations, ITraceLogger? logger)
+    internal static OfflineIsoMountResult TryMount(string isoPath, IVirtualDiskOperations virtualDiskOperations, ITraceLogger? logger)
     {
         if (!File.Exists(isoPath))
         {
@@ -57,7 +57,9 @@ public sealed class OfflineIsoImage : IDisposable
             return OfflineIsoMountResult.Failed(OfflineIsoMountStatus.NotAnIso);
         }
 
-        IsoAttachResult attach = VirtualDiskOperations.Attach(isoPath, logger);
+        logger?.Information($"Mounting ISO {isoPath}...");
+
+        IsoAttachResult attach = virtualDiskOperations.Attach(isoPath, logger);
 
         if (attach.Status != IsoAttachStatus.Attached || attach.VolumeRoot is null || attach.Lease is null)
         {
@@ -76,6 +78,8 @@ public sealed class OfflineIsoImage : IDisposable
 
             return OfflineIsoMountResult.Failed(OfflineIsoMountStatus.NoInstallImage);
         }
+
+        logger?.Information($"Mounted ISO at {attach.VolumeRoot}.");
 
         return new OfflineIsoMountResult(OfflineIsoMountStatus.Mounted, new OfflineIsoImage(installImagePath, attach.Lease, logger));
     }

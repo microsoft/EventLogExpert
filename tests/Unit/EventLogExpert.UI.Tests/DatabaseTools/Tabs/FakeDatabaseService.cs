@@ -56,13 +56,13 @@ internal sealed class FakeDatabaseService : IDatabaseService
     public Task<ImportResult> ImportAsync(
         IEnumerable<string> sourceFilePaths,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult(new ImportResult(0, [], []));
+        Task.FromResult(new ImportResult(0, [], [], []));
 
     public Task<ImportResult> ImportAsync(
         IEnumerable<string> sourceFilePaths,
         IReadOnlySet<string> skipFileNames,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult(new ImportResult(0, [], []));
+        Task.FromResult(new ImportResult(0, [], [], []));
 
     public void MarkStatus(string fileName, DatabaseStatus status) { }
 

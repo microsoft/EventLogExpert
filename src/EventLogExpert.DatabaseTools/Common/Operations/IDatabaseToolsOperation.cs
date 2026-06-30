@@ -14,6 +14,13 @@ namespace EventLogExpert.DatabaseTools.Common.Operations;
 public interface IDatabaseToolsOperation
 {
     /// <summary>
+    ///     A user-actionable failure reason that should surface in the result chip (not just the streamed log) - e.g. a
+    ///     Controlled Folder Access / ACL denial on the destination. Null when the generic "see debug log" message suffices.
+    ///     Read by the runner ONLY after <see cref="ExecuteAsync" /> returns <see cref="DatabaseToolsOutcome.Failed" />.
+    /// </summary>
+    string? FailureSummary => null;
+
+    /// <summary>
     ///     Executes the operation. All informational, warning, and error messages are emitted via
     ///     <paramref name="logger" /> (which streams to the UI). Optional progress updates flow via
     ///     <paramref name="progress" />. Cancellation is cooperative: implementations check the token at iteration boundaries

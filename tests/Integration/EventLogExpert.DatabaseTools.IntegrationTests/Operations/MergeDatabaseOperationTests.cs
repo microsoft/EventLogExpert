@@ -99,6 +99,28 @@ public sealed class MergeDatabaseCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task MergeDatabase_WithZeroSourceProviders_FailsInsteadOfReportingSuccess()
+    {
+        var source = CreateTempDb();
+        var target = CreateTempDb();
+
+        // An empty (but valid v4) source resolves zero provider identities. Merge must FAIL with a clear summary rather
+        // than reporting success while modifying nothing, mirroring the zero-result truthfulness of the create path.
+        DatabaseTestUtils.CreateV4Database(source);
+        DatabaseTestUtils.CreateV4Database(target, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
+
+        var logger = Substitute.For<ITraceLogger>();
+
+        var operation = new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false));
+        var outcome = await operation.ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.Equal(DatabaseToolsOutcome.Failed, outcome);
+        Assert.Equal("No providers were discovered in the source, so the database was not modified.", operation.FailureSummary);
+        logger.Received().Warning(Arg.Is<WarningLogHandler>(handler =>
+            handler.ToString().Contains("No providers were discovered in the source")));
+    }
+
+    [Fact]
     public async Task MergeDatabaseWithoutOverwrite_CopiesNewVersionOfExistingProviderName()
     {
         var source = CreateTempDb();

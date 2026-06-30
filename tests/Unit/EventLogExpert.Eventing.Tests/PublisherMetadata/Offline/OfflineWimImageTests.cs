@@ -4,6 +4,8 @@
 using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.PublisherMetadata.Offline;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
+using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
 
@@ -130,6 +132,30 @@ public sealed class OfflineWimImageTests
     }
 
     [Fact]
+    public async Task TryExtractAsync_WhenApplySucceeds_StreamsExtractingBeforeApplyAndExtractedAfter()
+    {
+        // BUG #4: a multi-minute WIM apply must emit start/complete progress so the UI is not blank during extraction.
+        using var workspace = new TempWorkspace();
+        var events = new List<string>();
+        var logger = new SequenceRecordingTraceLogger(events);
+        var nativeApi = new FakeWimOperations { OnApply = WriteAPartialFile, Events = events };
+
+        OfflineWimExtractResult result = await OfflineWimImage.TryExtractAsync(
+            workspace.WimPath, 1, workspace.TempParent, nativeApi, logger, CancellationToken.None);
+
+        Assert.Equal(OfflineWimExtractStatus.Extracted, result.Status);
+        var relevant = events
+            .Where(entry => entry == "apply"
+                || entry.StartsWith("Extracting image index", StringComparison.Ordinal)
+                || entry.StartsWith("Extracted image index", StringComparison.Ordinal))
+            .ToList();
+        Assert.Equal(3, relevant.Count);
+        Assert.StartsWith("Extracting image index", relevant[0], StringComparison.Ordinal);
+        Assert.Equal("apply", relevant[1]);
+        Assert.StartsWith("Extracted image index", relevant[2], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task TryExtractAsync_WhenExtractionContainsReadOnlyFiles_StillDeletesTheTemp()
     {
         using var workspace = new TempWorkspace();
@@ -225,6 +251,8 @@ public sealed class OfflineWimImageTests
 
         public bool Elevated { get; init; } = true;
 
+        public List<string>? Events { get; init; }
+
         public WimImageListStatus ImageListStatus { get; init; } = WimImageListStatus.Ok;
 
         public IReadOnlyList<WimImageEntry> Images { get; init; } = [new WimImageEntry(1, "Image", "Edition", null)];
@@ -237,6 +265,7 @@ public sealed class OfflineWimImageTests
             string wimPath, int imageIndex, string destinationDirectory, string scratchDirectory, CancellationToken cancellationToken, ITraceLogger? logger)
         {
             ApplyCallCount++;
+            Events?.Add("apply");
             OnApply?.Invoke(destinationDirectory);
 
             return ApplyResult;
@@ -252,6 +281,25 @@ public sealed class OfflineWimImageTests
                 ? new WimImageList(WimImageListStatus.Ok, Images)
                 : WimImageList.NotAWim;
         }
+    }
+
+    // Records every log message (any level) into a shared ordered list so a test can assert the streaming progress
+    // lines are emitted around the native apply; the fake WIM operations append their own "apply" marker to it.
+    private sealed class SequenceRecordingTraceLogger(List<string> events) : ITraceLogger
+    {
+        public LogLevel MinimumLevel => LogLevel.Trace;
+
+        public void Critical(CriticalLogHandler handler) => events.Add(handler.ToStringAndClear());
+
+        public void Debug(DebugLogHandler handler) => events.Add(handler.ToStringAndClear());
+
+        public void Error(ErrorLogHandler handler) => events.Add(handler.ToStringAndClear());
+
+        public void Information(InformationLogHandler handler) => events.Add(handler.ToStringAndClear());
+
+        public void Trace(TraceLogHandler handler) => events.Add(handler.ToStringAndClear());
+
+        public void Warning(WarningLogHandler handler) => events.Add(handler.ToStringAndClear());
     }
 
     private sealed class TempWorkspace : IDisposable

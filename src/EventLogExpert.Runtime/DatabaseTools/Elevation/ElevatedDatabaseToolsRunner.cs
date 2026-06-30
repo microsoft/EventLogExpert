@@ -8,6 +8,7 @@ using EventLogExpert.DatabaseTools.DiffDatabase;
 using EventLogExpert.DatabaseTools.MergeDatabase;
 using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
+using EventLogExpert.Eventing.PublisherMetadata.Offline;
 using EventLogExpert.Logging.Abstractions;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -32,16 +33,16 @@ namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 ///         result within the grace window, the runner force-kills the process. On a successful kill the runner returns a
 ///         synthesized Cancelled outcome with a "force-killed" note; if the kill itself fails (for example, a medium-IL
 ///         runner cannot terminate a high-IL helper and <see cref="IElevatedHelperProcess.Kill" /> returns <c>false</c>),
-///         the runner disposes the pipe to unblock the drain loop and returns Cancelled with an explicit orphan warning
-///         so the caller can surface that the helper may continue running.
+///         the runner disposes the pipe to unblock the drain loop and returns Cancelled with an explicit orphan warning so
+///         the caller can surface that the helper may continue running.
 ///     </para>
 ///     <para>
 ///         <b>Early-return cleanup:</b> if <see cref="RunAsync" /> returns before the normal terminal-message path
 ///         completes (Hello timeout, protocol mismatch, wrong-first-envelope, pipe-closed-before-Hello, cancel-while-
 ///         sending-request), a centralized <c>finally</c> block disposes the pipe (graceful: helper sees EOF and exits
 ///         cooperatively), bounded-waits for exit, and falls back to <see cref="IElevatedHelperProcess.Kill" /> only if
-///         the helper does not exit within the grace window. If the fallback kill also fails the helper becomes an
-///         orphan; the pipe is already closed so the runner returns without waiting further.
+///         the helper does not exit within the grace window. If the fallback kill also fails the helper becomes an orphan;
+///         the pipe is already closed so the runner returns without waiting further.
 ///     </para>
 ///     <para>
 ///         <b>Concurrency invariants:</b>
@@ -58,7 +59,8 @@ namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 ///                 <see cref="IElevatedHelperProcess.Pipe" />'s contract documentation).
 ///             </item>
 ///             <item>
-///                 <see cref="ITraceLogger" /> mirroring runs on the dispatcher (single thread); the underlying
+///                 The drain loop awaits with <c>ConfigureAwait(false)</c>, so message mirroring and the Warning+ file
+///                 tee run off the dispatcher on a thread-pool thread; the underlying
 ///                 <see cref="EventLogExpert.Runtime.DebugLog.DebugLogService" /> uses Mutex + Lock + drop-trace fallback
 ///                 so concurrent appends from arbitrary callers are safe.
 ///             </item>
@@ -112,20 +114,84 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         Failed = 2
     }
 
-    public Task<DatabaseToolsResult> CreateAsync(CreateDatabaseRequest request, IProgress<LogRecord> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
-        => RunAsync(new CreateDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
+    public Task<DatabaseToolsResult> CreateAsync(
+        CreateDatabaseRequest request,
+        IProgress<LogRecord> logSink,
+        IProgress<DatabaseToolsProgress>? progress,
+        CancellationToken cancellationToken,
+        bool verbose = false) =>
+        RunAsync(new CreateDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
 
-    public Task<DatabaseToolsResult> DiffAsync(DiffDatabaseRequest request, IProgress<LogRecord> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
-        => RunAsync(new DiffDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
+    public Task<DatabaseToolsResult> DiffAsync(
+        DiffDatabaseRequest request,
+        IProgress<LogRecord> logSink,
+        IProgress<DatabaseToolsProgress>? progress,
+        CancellationToken cancellationToken,
+        bool verbose = false) =>
+        RunAsync(new DiffDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
 
-    public Task<DatabaseToolsResult> MergeAsync(MergeDatabaseRequest request, IProgress<LogRecord> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
-        => RunAsync(new MergeDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
+    public async Task<OfflineImageEditionsResult> ListImageEditionsAsync(
+        ListOfflineImageEditionsRequest request,
+        IProgress<LogRecord> logSink,
+        CancellationToken cancellationToken,
+        bool verbose = false)
+    {
+        ArgumentNullException.ThrowIfNull(request);
 
-    public Task<DatabaseToolsResult> ShowAsync(ShowProvidersRequest request, IProgress<LogRecord> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
-        => RunAsync(new ShowProvidersIpcRequest(request, verbose), logSink, progress, cancellationToken);
+        ImageEditionsMessage? editions = null;
 
-    public Task<DatabaseToolsResult> UpgradeAsync(UpgradeDatabaseRequest request, IProgress<LogRecord> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
-        => RunAsync(new UpgradeDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
+        var result = await RunAsync(
+            new ListImageEditionsIpcRequest(request, verbose),
+            logSink,
+            progressSink: null,
+            cancellationToken,
+            onDataMessage: message =>
+            {
+                if (message is ImageEditionsMessage imageEditions) { editions = imageEditions; }
+            });
+
+        if (result.Outcome != DatabaseToolsOutcome.Succeeded)
+        {
+            return new OfflineImageEditionsResult(result.Outcome, null, result.FailureSummary);
+        }
+
+        if (editions is null)
+        {
+            return new OfflineImageEditionsResult(
+                DatabaseToolsOutcome.Failed,
+                null,
+                "The elevation helper reported success but did not return the image editions.");
+        }
+
+        return new OfflineImageEditionsResult(
+            DatabaseToolsOutcome.Succeeded,
+            new WimImageList(editions.Status, editions.Images),
+            null);
+    }
+
+    public Task<DatabaseToolsResult> MergeAsync(
+        MergeDatabaseRequest request,
+        IProgress<LogRecord> logSink,
+        IProgress<DatabaseToolsProgress>? progress,
+        CancellationToken cancellationToken,
+        bool verbose = false) =>
+        RunAsync(new MergeDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
+
+    public Task<DatabaseToolsResult> ShowAsync(
+        ShowProvidersRequest request,
+        IProgress<LogRecord> logSink,
+        IProgress<DatabaseToolsProgress>? progress,
+        CancellationToken cancellationToken,
+        bool verbose = false) =>
+        RunAsync(new ShowProvidersIpcRequest(request, verbose), logSink, progress, cancellationToken);
+
+    public Task<DatabaseToolsResult> UpgradeAsync(
+        UpgradeDatabaseRequest request,
+        IProgress<LogRecord> logSink,
+        IProgress<DatabaseToolsProgress>? progress,
+        CancellationToken cancellationToken,
+        bool verbose = false) =>
+        RunAsync(new UpgradeDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
 
     private static async Task DrainPipeAsync(Stream pipe, ChannelWriter<DatabaseToolsIpcMessage> writer, CancellationToken cancellationToken)
     {
@@ -317,6 +383,10 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             case CancelMessage:
                 _traceLogger.Warning($"{ElevatedHelperTag} (unexpected) CancelMessage received from helper. CancelMessage is a runner-to-helper control message; helpers must not emit it.");
                 break;
+
+            case ImageEditionsMessage e:
+                _traceLogger.Trace($"{ElevatedHelperTag} ImageEditions: status={e.Status}, count={e.Images.Count}.");
+                break;
         }
     }
 
@@ -324,7 +394,8 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         DatabaseToolsIpcRequest request,
         IProgress<LogRecord> logSink,
         IProgress<DatabaseToolsProgress>? progressSink,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<DatabaseToolsIpcMessage>? onDataMessage = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(logSink);
@@ -459,7 +530,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
             try
             {
-                while (await channel.Reader.WaitToReadAsync(CancellationToken.None))
+                while (await channel.Reader.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
                 {
                     if (!channel.Reader.TryRead(out var message)) { continue; }
 
@@ -473,6 +544,15 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
                         case ProgressMessage prog when progressSink is not null:
                             SafeReport(progressSink, new DatabaseToolsProgress(prog.Processed, prog.Total, prog.CurrentItem));
+                            break;
+
+                        case ImageEditionsMessage edition when onDataMessage is not null:
+                            try { onDataMessage(edition); }
+                            catch (Exception ex)
+                            {
+                                _traceLogger.Warning($"{ElevatedHelperTag} onDataMessage callback threw {ex.GetType().Name}: {ex.Message}");
+                            }
+
                             break;
 
                         case ResultMessage r:
@@ -699,6 +779,8 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
         public bool HelperKilled => Disposition == KillDisposition.Succeeded;
 
+        public Task KillTaskOrCompleted => Volatile.Read(ref _killTask) ?? Task.CompletedTask;
+
         public void CancelGraceTimer()
         {
             try { Volatile.Read(ref _graceTimerCts)?.Cancel(); }
@@ -723,7 +805,5 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         public void SetGraceTimer(CancellationTokenSource cts) => Volatile.Write(ref _graceTimerCts, cts);
 
         public void SetKillTask(Task task) => Volatile.Write(ref _killTask, task);
-
-        public Task KillTaskOrCompleted => Volatile.Read(ref _killTask) ?? Task.CompletedTask;
     }
 }

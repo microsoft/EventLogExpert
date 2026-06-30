@@ -97,6 +97,23 @@ public sealed class IpcRequestRoundTripTests
         Assert.True(diff.Verbose);
     }
 
+    [Fact]
+    public void ListImageEditionsIpcRequest_RoundTrips_PreservesImagePathAndVerbose()
+    {
+        // The read-only list-editions request rides the same polymorphic IPC payload as the five operations; the
+        // source-gen serializer must carry its $type discriminator and the inner image path intact so the elevated
+        // helper enumerates the editions for exactly the image the caller selected.
+        var domain = new ListOfflineImageEditionsRequest(@"C:\images\windows.iso");
+        var original = new ListImageEditionsIpcRequest(domain, Verbose: true);
+
+        var roundTripped = SerializeDeserialize(original, out var json);
+
+        AssertDiscriminator(json, "list-editions");
+        var listEditions = Assert.IsType<ListImageEditionsIpcRequest>(roundTripped);
+        Assert.Equal(@"C:\images\windows.iso", listEditions.Request.ImagePath);
+        Assert.True(listEditions.Verbose);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

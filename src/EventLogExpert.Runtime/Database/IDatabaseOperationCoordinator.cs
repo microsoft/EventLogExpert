@@ -19,6 +19,12 @@ public interface IDatabaseOperationCoordinator
         Func<string, CancellationToken, Task<bool>>? askOverwriteAsync = null,
         CancellationToken cancellationToken = default);
 
+    Task<ImportOutcome> ImportPathsAsync(
+        IReadOnlyList<string> sourcePaths,
+        bool enableOnImport,
+        Func<string, CancellationToken, Task<bool>>? askOverwriteAsync = null,
+        CancellationToken cancellationToken = default);
+
     bool IsUpgradeInFlight(string fileName);
 
     Task<RemoveOutcome> RemoveDatabaseAsync(

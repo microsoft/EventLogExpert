@@ -48,6 +48,8 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
     /// </summary>
     [Parameter] public RenderFragment? ToolbarLeadingContent { get; set; }
 
+    [Parameter] public RenderFragment? ToolbarTrailingContent { get; set; }
+
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;

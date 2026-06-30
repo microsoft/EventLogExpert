@@ -14,6 +14,36 @@ public sealed class ValueSelectTests : BunitContext
     }
 
     [Fact]
+    public void Input_WhenTypedTextDoesNotParse_ClearsValueInsteadOfKeepingStaleOne()
+    {
+        // Regression: an unparseable entry in an editable numeric combobox must clear the bound value rather than
+        // silently retaining the last valid one, so a consumer cannot submit a stale value the input no longer shows.
+        int? bound = 7;
+        var component = Render<ValueSelect<int?>>(parameters => parameters
+            .Add(p => p.IsInput, true)
+            .Add(p => p.Value, bound)
+            .Add(p => p.ValueChanged, value => bound = value));
+
+        component.Find("input[role='combobox']").Input("not-a-number");
+
+        Assert.Null(bound);
+    }
+
+    [Fact]
+    public void Input_WhenTypedTextParses_RaisesValueChangedWithParsedValue()
+    {
+        int? bound = 7;
+        var component = Render<ValueSelect<int?>>(parameters => parameters
+            .Add(p => p.IsInput, true)
+            .Add(p => p.Value, bound)
+            .Add(p => p.ValueChanged, value => bound = value));
+
+        component.Find("input[role='combobox']").Input("12");
+
+        Assert.Equal(12, bound);
+    }
+
+    [Fact]
     public void Render_AriaDescribedBy_AppliedToCombobox()
     {
         var component = Render<ValueSelect<string>>(parameters => parameters

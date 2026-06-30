@@ -3,6 +3,7 @@
 
 using Bunit;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Schema;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
@@ -150,6 +151,97 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.NotNull(capturedItems);
         var item = Assert.Single(capturedItems!);
         Assert.Equal("Remove", item.Label);
+    }
+
+    [Fact]
+    public void OsStamp_AboveDisplayCap_RendersOverflowCount()
+    {
+        // One past the cap collapses to "9+" so a merge with more distinct versions than the cap is never mislabelled with
+        // an exact count the classifier did not fully resolve (it reads only cap + 1 distinct stamps).
+        var entry = MakeEntry(DatabaseStatus.Ready) with { OsStamps = MakeDistinctStamps(10) };
+
+        var component = RenderRow(entry);
+
+        Assert.Equal("Mixed (9+ OS versions)", component.Find(".db-entry-osstamp").TextContent.Trim());
+    }
+
+    [Fact]
+    public void OsStamp_AllNullFields_DoesNotRenderSecondaryText()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready) with
+        {
+            OsStamps = [new ProviderDatabaseOsStamp(null, null, null, null)]
+        };
+
+        var component = RenderRow(entry);
+
+        Assert.Empty(component.FindAll(".db-entry-osstamp"));
+    }
+
+    [Fact]
+    public void OsStamp_AtDisplayCap_RendersExactCount()
+    {
+        // At the display cap (9 distinct meaningful stamps) the row still shows the exact count, not the "9+" overflow form.
+        var entry = MakeEntry(DatabaseStatus.Ready) with { OsStamps = MakeDistinctStamps(9) };
+
+        var component = RenderRow(entry);
+
+        Assert.Equal("Mixed (9 OS versions)", component.Find(".db-entry-osstamp").TextContent.Trim());
+    }
+
+    [Fact]
+    public void OsStamp_MultipleDistinctStamps_RendersMixedCount()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready) with
+        {
+            OsStamps =
+            [
+                new ProviderDatabaseOsStamp(26100, 1234, "ServerDatacenter", "24H2"),
+                new ProviderDatabaseOsStamp(22631, 3447, "Professional", "23H2")
+            ]
+        };
+
+        var component = RenderRow(entry);
+
+        Assert.Equal("Mixed (2 OS versions)", component.Find(".db-entry-osstamp").TextContent.Trim());
+    }
+
+    [Fact]
+    public void OsStamp_NoStamps_DoesNotRenderSecondaryText()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        var component = RenderRow(entry);
+
+        Assert.Empty(component.FindAll(".db-entry-osstamp"));
+    }
+
+    [Fact]
+    public void OsStamp_OmitsNullSegments()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready) with
+        {
+            OsStamps = [new ProviderDatabaseOsStamp(26100, null, null, "24H2")]
+        };
+
+        var component = RenderRow(entry);
+
+        Assert.Equal("24H2 \u00B7 26100", component.Find(".db-entry-osstamp").TextContent.Trim());
+    }
+
+    [Fact]
+    public void OsStamp_SingleStamp_RendersFormattedSecondaryTextWithAriaLabel()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready) with
+        {
+            OsStamps = [new ProviderDatabaseOsStamp(26100, 1234, "ServerDatacenter", "24H2")]
+        };
+
+        var component = RenderRow(entry);
+
+        var stamp = component.Find(".db-entry-osstamp");
+        Assert.Equal("ServerDatacenter \u00B7 24H2 \u00B7 26100.1234", stamp.TextContent.Trim());
+        Assert.Equal("Source OS: ServerDatacenter \u00B7 24H2 \u00B7 26100.1234", stamp.GetAttribute("aria-label"));
     }
 
     [Fact]
@@ -894,6 +986,11 @@ public sealed class DatabaseEntryRowTests : BunitContext
         // Assert
         Assert.Equal(0, invocationCount);
     }
+
+    // Distinct, display-meaningful OS stamps (each carries a positive build) for exercising the "Mixed (N)" cap boundary.
+    private static IReadOnlyList<ProviderDatabaseOsStamp> MakeDistinctStamps(int count) =>
+        [.. Enumerable.Range(0, count).Select(index =>
+            new ProviderDatabaseOsStamp(20000 + index, index, $"Edition{index}", $"Ver{index}"))];
 
     private static DatabaseEntry MakeEntry(
         DatabaseStatus status,

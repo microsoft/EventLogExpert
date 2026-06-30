@@ -40,6 +40,18 @@ public interface IElevatedDatabaseToolsRunner
         CancellationToken cancellationToken,
         bool verbose = false);
 
+    /// <summary>
+    ///     Read-only enumeration of an offline image's editions (the <c>--wim-index</c> choices). Unlike the operation
+    ///     methods this returns its payload (the editions) rather than persisting anything; failures surface as a non-success
+    ///     <see cref="OfflineImageEditionsResult.Outcome" />. Takes no progress sink because the operation is a single
+    ///     read/mount with no per-item progress.
+    /// </summary>
+    Task<OfflineImageEditionsResult> ListImageEditionsAsync(
+        ListOfflineImageEditionsRequest request,
+        IProgress<LogRecord> logSink,
+        CancellationToken cancellationToken,
+        bool verbose = false);
+
     Task<DatabaseToolsResult> MergeAsync(
         MergeDatabaseRequest request,
         IProgress<LogRecord> logSink,

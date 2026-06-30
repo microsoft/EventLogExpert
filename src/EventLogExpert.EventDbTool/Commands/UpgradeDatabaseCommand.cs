@@ -30,7 +30,7 @@ public sealed class UpgradeDatabaseCommand
         upgradeDatabaseCommand.Arguments.Add(fileArgument);
         upgradeDatabaseCommand.Options.Add(verboseOption);
 
-        upgradeDatabaseCommand.SetAction(async action =>
+        upgradeDatabaseCommand.SetAction(async (action, cancellationToken) =>
         {
             await using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
             var logger = sp.GetRequiredService<ITraceLogger>();
@@ -39,7 +39,9 @@ public sealed class UpgradeDatabaseCommand
 
             var factory = sp.GetRequiredService<IDatabaseToolsOperationFactory>();
 
-            await factory.Create(request).ExecuteAsync(logger, progress: null, CancellationToken.None);
+            var outcome = await factory.Create(request).ExecuteAsync(logger, progress: null, cancellationToken);
+
+            return CommandExitCode.ToExitCode(outcome);
         });
 
         return upgradeDatabaseCommand;

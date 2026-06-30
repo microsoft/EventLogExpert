@@ -25,13 +25,19 @@ namespace EventLogExpert.DatabaseTools.CreateDatabase;
 /// </param>
 /// <param name="ImageKind">
 ///     How <paramref name="OfflineImagePath" /> is accessed: a mounted volume/extracted folder (
-///     <see cref="OfflineImageKind.Directory" />), a <c>.wim</c>/<c>.esd</c> file (<see cref="OfflineImageKind.Wim" />),
-///     or a Windows install ISO (<see cref="OfflineImageKind.Iso" />); both extract <paramref name="WimIndex" /> first.
-///     Null = auto-detect from the path (directory vs .wim/.esd/.iso).
+///     <see cref="OfflineImageKind.Directory" />), a <c>.wim</c>/<c>.esd</c> file (<see cref="OfflineImageKind.Wim" />), a
+///     Windows install ISO (<see cref="OfflineImageKind.Iso" />; both extract <paramref name="WimIndex" /> first), or a
+///     <c>.vhdx</c>/<c>.vhd</c> disk (<see cref="OfflineImageKind.Vhdx" />, auto-mounted read-only, no index). Null =
+///     auto-detect from the path (directory vs .wim/.esd/.iso/.vhdx/.vhd).
 /// </param>
 /// <param name="WimIndex">
 ///     The 1-based image index to extract from a <c>.wim</c>/<c>.esd</c> (or an ISO's install.wim), for
-///     <see cref="OfflineImageKind.Wim" /> / <see cref="OfflineImageKind.Iso" />. Null otherwise.
+///     <see cref="OfflineImageKind.Wim" /> / <see cref="OfflineImageKind.Iso" />. Null otherwise (including Vhdx).
+/// </param>
+/// <param name="Overwrite">
+///     When true and <see cref="TargetPath" /> already exists, the existing database is replaced. The
+///     old file is moved aside to a <c>.bak</c> snapshot at the first write and restored if the rebuild fails, so a failed
+///     overwrite never destroys the prior database. When false (default), an existing target is rejected.
 /// </param>
 public sealed record CreateDatabaseRequest(
     string TargetPath,
@@ -40,4 +46,5 @@ public sealed record CreateDatabaseRequest(
     string? SkipProvidersInFile,
     string? OfflineImagePath = null,
     OfflineImageKind? ImageKind = null,
-    int? WimIndex = null);
+    int? WimIndex = null,
+    bool Overwrite = false);

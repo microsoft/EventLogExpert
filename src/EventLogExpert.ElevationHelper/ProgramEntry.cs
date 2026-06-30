@@ -6,6 +6,8 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.ElevationHelper.Diagnostics;
 using EventLogExpert.ElevationHelper.Ipc;
 using EventLogExpert.ElevationHelper.Operations;
+using EventLogExpert.Eventing.PublisherMetadata.Offline;
+using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text;
 
@@ -37,6 +39,19 @@ namespace EventLogExpert.ElevationHelper;
 /// </remarks>
 internal static class ProgramEntry
 {
+    // Distinct exit code so a watchdog self-terminate is identifiable in logs (the runner ignores it for a cancel).
+    private const int CancelWatchdogExitCode = 12;
+    // After a CancelMessage the helper waits this long for the operation to unwind cooperatively before self-terminating.
+    // Comfortably inside the runner's 30s cancellation grace so the helper releases its pipe first and the runner never
+    // needs its (futile, from medium IL) force-kill. A native call wedged on denied writes never pumps the WIM abort
+    // callback, so without this the operation would hang forever and the elevated child cannot be killed by the host.
+    private static readonly TimeSpan s_selfTerminateWatchdog = TimeSpan.FromSeconds(8);
+
+    // Upper bound the main flow waits for best-effort startup reconciliation before dispatching. A wedged native
+    // RegUnLoadKey on an orphaned hive must never block startup before the control reader can process a CancelMessage and
+    // self-terminate; past this bound the reconcile keeps running in the background, it just stops gating the operation.
+    private static readonly TimeSpan s_startupReconcileTimeout = TimeSpan.FromSeconds(30);
+
     public static async Task<int> MainAsync(string[] args)
     {
         try
@@ -55,6 +70,7 @@ internal static class ProgramEntry
         catch (Exception ex)
         {
             try { await WriteCrashLogAsync(ex, args); } catch { /* nothing more we can do */ }
+
             try { await Console.Error.WriteLineAsync($"eventlogexpert-elevated: fatal: {ex}"); } catch { /* stderr unavailable */ }
 
             return 3;
@@ -63,6 +79,8 @@ internal static class ProgramEntry
 
     private static async Task<int> RunOperationModeAsync(IpcMessageReader reader, IpcMessageWriter writer)
     {
+        var stopwatch = Stopwatch.StartNew();
+
         // 1) Read request (with deadline). The control reader cannot start until we've consumed it
         //    because they share the same StreamReader.
         DatabaseToolsIpcRequest? request;
@@ -95,6 +113,11 @@ internal static class ProgramEntry
         // 2) Set up operation cancellation. The control reader cancels this on receipt of a CancelMessage.
         using var operationCts = new CancellationTokenSource();
 
+        // Armed when a CancelMessage arrives and cancelled once the operation completes, so the self-terminate watchdog
+        // fires ONLY for an operation that ignored the cooperative cancel (e.g. a native WIMApplyImage wedged on
+        // Controlled Folder Access-denied writes, which never pumps the abort callback).
+        using var watchdogCts = new CancellationTokenSource();
+
         // 3) Start the control reader. Loops on the same StreamReader until either (a) it sees a CancelMessage
         //    (cancels operationCts and returns), (b) the pipe closes (returns), or (c) the operation completes
         //    and the main flow disposes the reader.
@@ -118,6 +141,15 @@ internal static class ProgramEntry
                     if (message is CancelMessage)
                     {
                         operationCts.Cancel();
+
+                        // Give the operation a brief window to unwind cooperatively. If it does not (a native call
+                        // ignoring the abort callback), self-terminate: the host's pipe drain then sees EOF and returns
+                        // promptly. The elevated helper CAN exit itself; the medium-IL host provably cannot kill it.
+                        try { await Task.Delay(s_selfTerminateWatchdog, watchdogCts.Token); }
+                        catch (OperationCanceledException) { return; }
+
+                        await SelfTerminateAfterUnresponsiveCancelAsync(writer, stopwatch.ElapsedMilliseconds);
+
                         return;
                     }
 
@@ -132,6 +164,22 @@ internal static class ProgramEntry
             }
         });
 
+        // 3a) Reclaim scratch resources (orphaned hive mounts / WIM extraction folders) a crashed or self-terminated
+        //     prior run left behind. MUST run elevated (the medium-IL host cannot unload an HKLM hive). Deliberately
+        //     started AFTER the control reader/watchdog are armed and run OFF the main flow: a wedged native RegUnLoadKey
+        //     on a dead orphan must not block startup before a CancelMessage can be processed (that would reintroduce the
+        //     unkillable hang this helper exists to prevent). Best-effort and self-swallowing; the main flow waits only up
+        //     to s_startupReconcileTimeout, then dispatches while any slow reconcile finishes in the background.
+        var reconcileTask = Task.Run(() =>
+        {
+            try { OfflineMaintenance.ReconcileOrphans(logger: null); }
+            catch { /* startup reconciliation is best-effort */ }
+        });
+
+        try { await reconcileTask.WaitAsync(s_startupReconcileTimeout, operationCts.Token); }
+        catch (TimeoutException) { /* a wedged unload keeps running in the background; proceed so the operation can run */ }
+        catch (OperationCanceledException) { /* cancel arrived mid-reconcile; the armed watchdog handles self-terminate */ }
+
         // 4) Dispatch the operation.
         DatabaseToolsResult result;
         try
@@ -140,6 +188,7 @@ internal static class ProgramEntry
         }
         catch (Exception ex)
         {
+            watchdogCts.Cancel();
             operationCts.Cancel();
             try { await controlReaderTask.WaitAsync(TimeSpan.FromSeconds(1)); } catch { /* swallow */ }
 
@@ -149,9 +198,11 @@ internal static class ProgramEntry
             return 11;
         }
 
-        // 5) Stop the control reader. operationCts.Cancel() makes the inner ReadMessageAsync throw
-        //    OperationCanceledException; the catch in the loop returns.
+        // 5) Stop the control reader + self-terminate watchdog. The operation completed, so cancel the watchdog before
+        //    it can fire, then cancel operationCts (makes the inner ReadMessageAsync throw) so the control loop returns.
+        watchdogCts.Cancel();
         operationCts.Cancel();
+
         try { await controlReaderTask.WaitAsync(TimeSpan.FromSeconds(1)); } catch { /* swallow */ }
 
         // 6) Emit the terminal Result message.
@@ -213,6 +264,27 @@ internal static class ProgramEntry
 
             return 5;
         }
+    }
+
+    // Last-resort cancellation for an operation that ignored the cooperative cancel (a native call wedged on denied
+    // writes never pumps the WIM abort callback). The elevated helper terminates ITSELF - the medium-IL host cannot kill
+    // a high-IL child. Any orphaned hive mount / WIM extraction is reclaimed by the next elevated launch's startup
+    // reconciliation, because their machine-global ownership beacons auto-release on process death.
+    private static async Task SelfTerminateAfterUnresponsiveCancelAsync(IpcMessageWriter writer, long elapsedMs)
+    {
+        // Best-effort terminal Result so the host shows a clean Cancelled outcome with a useful summary instead of only
+        // inferring EOF. The operation thread is wedged in native code, so the writer is not concurrently in use; bound
+        // the write so a blocked pipe cannot itself re-wedge the exit.
+        try
+        {
+            await TryWriteTerminalAsync(writer, new ResultMessage(
+                DatabaseToolsOutcome.Cancelled,
+                "Cancelled; the elevated helper self-terminated after a native operation ignored cancellation.",
+                elapsedMs)).WaitAsync(TimeSpan.FromSeconds(2));
+        }
+        catch { /* best-effort; the pipe EOF on exit is the guaranteed signal to the host */ }
+
+        Environment.Exit(CancelWatchdogExitCode);
     }
 
     private static async Task TryWriteTerminalAsync(IpcMessageWriter writer, DatabaseToolsIpcMessage message)

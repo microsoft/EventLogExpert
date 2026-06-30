@@ -69,7 +69,23 @@ internal sealed class OfflineRegistryHive : IDisposable
         }
 
         string mountSubKey = $"ELX_{Environment.ProcessId}_{Guid.NewGuid():N}";
-        string stagingDirectory = Path.Combine(Path.GetTempPath(), mountSubKey);
+        string stagingDirectory = Path.Combine(OfflineScratch.Root, mountSubKey);
+
+        // Publish the ownership beacon BEFORE the staging directory exists so a concurrent sibling's orphan sweep can never
+        // observe this staging copy (or a later recovery mount) without a live owner and reclaim it mid-load. The beacon is
+        // keyed on the staging-directory name and held as an open handle; a hard crash auto-releases it and the next run's
+        // sweep reclaims the leftover staging. Both the clean-hive and dirty-hive paths carry this same beacon - the
+        // clean-hive path has no HKLM mount, so without it a clean-hive staging copy would be leaked permanently.
+        Mutex? ownershipBeacon = TryCreateOwnershipBeacon(mountSubKey, logger);
+
+        if (ownershipBeacon is null)
+        {
+            // Fail closed: without a beacon a concurrent sweep would judge this staging directory ownerless and could
+            // delete it mid-load, so abort rather than create an unprotected staging copy.
+            logger?.Error($"{nameof(OfflineRegistryHive)}: cannot publish the staging ownership beacon for {mountSubKey}; aborting load to avoid a concurrent sweep reclaiming a live staging copy.");
+
+            return OfflineHiveLoadResult.Failed(OfflineHiveLoadStatus.RecoveryFailed);
+        }
 
         try
         {
@@ -83,6 +99,7 @@ internal sealed class OfflineRegistryHive : IDisposable
             {
                 logger?.Debug($"{nameof(OfflineRegistryHive)}: {hiveFilePath} is not a registry hive (no regf signature).");
                 TryDeleteDirectory(stagingDirectory);
+                ownershipBeacon.Dispose();
 
                 return OfflineHiveLoadResult.Failed(OfflineHiveLoadStatus.NotAHive);
             }
@@ -91,24 +108,26 @@ internal sealed class OfflineRegistryHive : IDisposable
 
             if (appKeyResult == Win32ErrorCodes.ERROR_SUCCESS && appKeyHandle is not null)
             {
-                // Clean hive: the handle owns the hive (closing it auto-unloads), so there is no mount to track.
+                // Clean hive: the handle owns the hive (closing it auto-unloads), so there is no HKLM mount to track - but
+                // the staging copy persists until Dispose, so the instance OWNS the beacon and releases it there.
                 RegistryKey root = RegistryKey.FromHandle(appKeyHandle);
 
                 return new OfflineHiveLoadResult(
                     OfflineHiveLoadStatus.Loaded,
-                    new OfflineRegistryHive(root, stagingDirectory, mountSubKey: null, ownershipMutex: null, nativeApi, logger));
+                    new OfflineRegistryHive(root, stagingDirectory, mountSubKey: null, ownershipBeacon, nativeApi, logger));
             }
 
             appKeyHandle?.Dispose();
 
             // It IS a hive (regf) but RegLoadAppKey failed: a dirty hive needing dual-log recovery via RegLoadKey.
-            return RecoverDirtyHive(stagedHive, stagingDirectory, mountSubKey, nativeApi, logger, appKeyResult);
+            return RecoverDirtyHive(stagedHive, stagingDirectory, mountSubKey, ownershipBeacon, nativeApi, logger, appKeyResult);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             logger?.Debug($"{nameof(OfflineRegistryHive)}: failed to load hive {hiveFilePath}: {ex}");
 
             TryDeleteDirectory(stagingDirectory);
+            ownershipBeacon.Dispose();
 
             return OfflineHiveLoadResult.Failed(OfflineHiveLoadStatus.RecoveryFailed);
         }
@@ -127,11 +146,23 @@ internal sealed class OfflineRegistryHive : IDisposable
         if (_mountSubKey is not null)
         {
             UnloadMountedHive(_nativeApi, _mountSubKey, _logger);
-            _ownershipMutex?.Dispose();
         }
 
         TryDeleteDirectory(_stagingDirectory);
+
+        // Release the staging/mount ownership beacon LAST - after the mount is unloaded and the staging copy is gone - so a
+        // concurrent sweep never observes a dead beacon while the resource still exists (a harmless but needless re-delete).
+        // The clean-hive path has no mount but still holds this beacon for its staging copy, so it is released here too.
+        _ownershipMutex?.Dispose();
     }
+
+    /// <summary>
+    ///     Reclaims dirty-hive recovery mounts (and their staging) orphaned by a crashed or self-terminated prior run.
+    ///     Helper-side only (unmounting needs backup/restore privilege). Idempotent within a process via the same one-shot
+    ///     gate the dirty-hive recovery path uses, so calling it at helper startup and during recovery sweeps at most once.
+    /// </summary>
+    internal static void SweepOrphanedMounts(ITraceLogger? logger) =>
+        SweepOrphanedMountsOnce(OfflineHiveOperations.Instance, logger);
 
     private static void CopyWritable(string source, string destination)
     {
@@ -153,29 +184,13 @@ internal sealed class OfflineRegistryHive : IDisposable
         return header.SequenceEqual(s_hiveSignature);
     }
 
-    private static bool IsMountOwnerAlive(string mountSubKey)
-    {
-        try
-        {
-            using Mutex owner = Mutex.OpenExisting($"Global\\{mountSubKey}");
-
-            return true;
-        }
-        catch (WaitHandleCannotBeOpenedException)
-        {
-            return false;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // The beacon exists but is not openable by us; treat as alive (do not reclaim someone else's live mount).
-            return true;
-        }
-    }
+    private static bool IsMountOwnerAlive(string mountSubKey) => OwnershipBeacon.IsAlive(mountSubKey);
 
     private static OfflineHiveLoadResult RecoverDirtyHive(
         string stagedHive,
         string stagingDirectory,
         string mountSubKey,
+        Mutex ownershipMutex,
         IOfflineHiveOperations nativeApi,
         ITraceLogger? logger,
         int appKeyResult)
@@ -184,22 +199,9 @@ internal sealed class OfflineRegistryHive : IDisposable
 
         SweepOrphanedMountsOnce(nativeApi, logger);
 
-        // Publish the ownership beacon BEFORE RegLoadKey makes the ELX_ mount visible under HKLM. Were the beacon
-        // created after the mount, a concurrent sibling process's orphan sweep could observe the new mount before its
-        // beacon exists, judge it ownerless, and unload it mid-load. The beacon is held only as an open handle, so a
-        // hard crash auto-releases it and the next run's sweep reclaims this mount.
-        Mutex? ownershipMutex = TryCreateOwnershipBeacon(mountSubKey, logger);
-
-        if (ownershipMutex is null)
-        {
-            // Fail closed: without a beacon a concurrent sibling sweep would judge this mount ownerless and could unload
-            // it mid-use, so abort recovery rather than create an unprotected mount.
-            logger?.Error($"{nameof(OfflineRegistryHive)}: cannot publish the ownership beacon for {mountSubKey}; aborting recovery to avoid a concurrent sweep unloading a live mount.");
-            TryDeleteDirectory(stagingDirectory);
-
-            return OfflineHiveLoadResult.Failed(OfflineHiveLoadStatus.RecoveryFailed);
-        }
-
+        // The ownership beacon was already published by TryLoad before the staging directory existed - so well before this
+        // RegLoadKey makes the ELX_ mount visible under HKLM. That preserves the beacon-before-mount invariant the orphan
+        // sweep relies on: a concurrent sibling can never observe this mount without first seeing its live beacon.
         using (IDisposable? privilege = nativeApi.TryEnterRecoveryPrivilege(logger))
         {
             if (privilege is null)
@@ -279,7 +281,7 @@ internal sealed class OfflineRegistryHive : IDisposable
     // exists (the owner died and the OS released the handle). A live owner's mutex still opens, so a recycled PID or a
     // concurrent sibling app (CLI vs UI) is never reclaimed out from under a live process.
     private static void SweepOrphanedMountsOnce(IOfflineHiveOperations nativeApi, ITraceLogger? logger)
-    {
+    {        
         lock (s_sweepGate)
         {
             if (s_sweptOrphanedMounts) { return; }
@@ -295,8 +297,13 @@ internal sealed class OfflineRegistryHive : IDisposable
 
                 logger?.Debug($"{nameof(OfflineRegistryHive)}: reclaiming orphaned recovery mount {mountSubKey}.");
                 UnloadMountedHive(nativeApi, mountSubKey, logger);
-                TryDeleteDirectory(Path.Combine(Path.GetTempPath(), mountSubKey));
+                TryDeleteDirectory(Path.Combine(OfflineScratch.Root, mountSubKey));
             }
+
+            // After every orphaned HKLM mount has been unloaded + its staging deleted, reclaim any remaining orphaned hive
+            // staging directories that never had a mount (the clean-hive RegLoadAppKey path) or outlived one - none of which
+            // the mount loop above can reach. Done last so a just-unloaded mount's staging is already gone.
+            SweepOrphanedStagingDirectories(logger);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
@@ -308,22 +315,40 @@ internal sealed class OfflineRegistryHive : IDisposable
         }
     }
 
-    // A machine-global ownership beacon (an open, unowned named mutex) so the next run's sweep can tell this mount has a
-    // live owner. Returns null if it cannot be created; recovery then fails closed (an unprotected mount could be unloaded
-    // mid-use by a concurrent sweep) rather than proceeding without crash-reclaim protection.
-    private static Mutex? TryCreateOwnershipBeacon(string mountSubKey, ITraceLogger? logger)
+    // Reclaims orphaned hive STAGING directories (ELX_<pid>_<guid>) left in the scratch root by a crashed or
+    // self-terminated prior run whose ownership beacon is gone. Covers the clean-hive load path (RegLoadAppKey, no HKLM
+    // mount) and a dirty-hive load that died after staging but before its RegLoadKey mount became visible - neither is
+    // reachable by the HKLM-mount sweep. Skips ELX_WIM_* (owned by OfflineWimImage's extraction sweep, whose extracted
+    // Windows trees carry junctions this plain recursive delete must not follow). A live sibling load keeps its beacon
+    // (published before its staging directory exists) and is skipped, so only true orphans are removed.
+    private static void SweepOrphanedStagingDirectories(ITraceLogger? logger)
     {
+        if (!Directory.Exists(OfflineScratch.Root)) { return; }
+
         try
         {
-            return new Mutex(initiallyOwned: false, name: $"Global\\{mountSubKey}");
-        }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
-        {
-            logger?.Debug($"{nameof(OfflineRegistryHive)}: could not create ownership beacon for {mountSubKey}: {ex.Message}");
+            foreach (string directory in Directory.EnumerateDirectories(OfflineScratch.Root, "ELX_*"))
+            {
+                string name = Path.GetFileName(directory);
 
-            return null;
+                if (name.StartsWith("ELX_WIM_", StringComparison.Ordinal) || IsMountOwnerAlive(name)) { continue; }
+
+                logger?.Debug($"{nameof(OfflineRegistryHive)}: reclaiming orphaned hive staging directory {directory}.");
+                TryDeleteDirectory(directory);
+            }
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        {
+            logger?.Debug($"{nameof(OfflineRegistryHive)}: orphaned hive-staging sweep failed: {ex.Message}");
         }
     }
+
+    // A machine-global ownership beacon (an open, unowned named mutex) so the next run's sweep can tell this staging
+    // directory / mount has a live owner. Returns null if it cannot be created; the load then fails closed (an unprotected
+    // staging copy or mount could be reclaimed mid-use by a concurrent sweep) rather than proceeding without crash-reclaim
+    // protection.
+    private static Mutex? TryCreateOwnershipBeacon(string mountSubKey, ITraceLogger? logger) =>
+        OwnershipBeacon.TryCreate(mountSubKey, logger);
 
     private static void TryDeleteDirectory(string directory)
     {
