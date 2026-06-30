@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.PublisherMetadata.Offline.Containment;
 using EventLogExpert.Logging.Abstractions;
-using Microsoft.Win32;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
@@ -29,9 +28,9 @@ internal sealed class OfflinePublisherCatalog(OfflineImagePathResolver pathResol
 {
     private const string PublishersKeyPath = @"Microsoft\Windows\CurrentVersion\WINEVT\Publishers";
 
-    public IReadOnlyList<OfflinePublisherRegistration> ReadRegistrations(RegistryKey softwareRoot)
+    public IReadOnlyList<OfflinePublisherRegistration> ReadRegistrations(IOfflineRegistryKey softwareRoot)
     {
-        using RegistryKey? publishers = softwareRoot.OpenSubKey(PublishersKeyPath);
+        using IOfflineRegistryKey? publishers = softwareRoot.OpenSubKey(PublishersKeyPath);
 
         if (publishers is null)
         {
@@ -46,7 +45,7 @@ internal sealed class OfflinePublisherCatalog(OfflineImagePathResolver pathResol
         {
             if (!Guid.TryParse(subKeyName, out Guid publisherGuid)) { continue; }
 
-            using RegistryKey? publisherKey = publishers.OpenSubKey(subKeyName);
+            using IOfflineRegistryKey? publisherKey = publishers.OpenSubKey(subKeyName);
 
             if (publisherKey is null) { continue; }
 
@@ -63,8 +62,7 @@ internal sealed class OfflinePublisherCatalog(OfflineImagePathResolver pathResol
         return registrations;
     }
 
-    // Read without host expansion: .NET otherwise expands REG_EXPAND_SZ against the HOST environment, so the literal
-    // %token must reach the mapper. (No effect on REG_SZ values, so this is safe for both kinds.)
-    private static string? ReadString(RegistryKey key, string? name) =>
-        key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames) as string;
+    // The managed hive reader returns REG_SZ/REG_EXPAND_SZ values literally (never host-expanded), so a stored %token
+    // reaches the mapper as-is.
+    private static string? ReadString(IOfflineRegistryKey key, string? name) => key.GetValue(name) as string;
 }

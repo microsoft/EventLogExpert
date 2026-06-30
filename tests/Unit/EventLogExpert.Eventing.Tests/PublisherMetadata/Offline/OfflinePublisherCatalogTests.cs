@@ -110,9 +110,9 @@ public sealed class OfflinePublisherCatalogTests
             new OfflineRootGuard(image.ImageRoot, logger: null));
         var catalog = new OfflinePublisherCatalog(pathResolver, logger: null);
 
-        using OfflineRegistryHive? hive = OfflineRegistryHive.TryLoad(image.ImageRoot.SoftwareHivePath, logger: null).Hive;
+        using OfflineHiveFile? hive = OfflineHiveFile.TryOpen(image.ImageRoot.SoftwareHivePath, logger: null);
         Assert.NotNull(hive);
 
-        return catalog.ReadRegistrations(hive!.Root);
+        return catalog.ReadRegistrations(hive!);
     }
 }

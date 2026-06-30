@@ -23,12 +23,12 @@ internal sealed class OfflineImageProviderExtractor : IOfflineImageProviderExtra
     private readonly OfflineLegacyProviderBuilder _legacyBuilder;
     private readonly OfflineLegacyMessageFileResolver _legacyResolver;
     private readonly ITraceLogger? _logger;
-    private readonly OfflineRegistryHive _softwareHive;
-    private readonly OfflineRegistryHive _systemHive;
+    private readonly OfflineHiveFile _softwareHive;
+    private readonly OfflineHiveFile _systemHive;
 
     private OfflineImageProviderExtractor(
-        OfflineRegistryHive softwareHive,
-        OfflineRegistryHive systemHive,
+        OfflineHiveFile softwareHive,
+        OfflineHiveFile systemHive,
         OfflinePublisherCatalog catalog,
         OfflineLegacyMessageFileResolver legacyResolver,
         OfflineLegacyProviderBuilder legacyBuilder,
@@ -44,24 +44,24 @@ internal sealed class OfflineImageProviderExtractor : IOfflineImageProviderExtra
 
     /// <summary>
     ///     Loads the image's hives and wires the offline readers, or returns <see langword="null" /> when either hive
-    ///     cannot be loaded (logging the specific reason - not a hive, recovery failed, or recovery needs administrator). The
-    ///     caller owns the returned extractor and must dispose it (which unloads both hives). Throws
+    ///     cannot be read (logging the specific reason - missing, not a hive, or inaccessible). The caller owns the returned
+    ///     extractor and must dispose it (which releases both hive mappings). Throws
     ///     <see cref="OfflineRootGuardViolationException" /> if the image's hive paths escape the image root (a malformed
     ///     image whose <c>config</c> directory is a junction out of the image).
     /// </summary>
     public static OfflineImageProviderExtractor? TryCreate(OfflineImageRoot imageRoot, ITraceLogger? logger)
     {
-        // Jail-check the hive paths BEFORE loading them: if Windows\System32\config is a junction that leaves the image,
-        // staging and loading the hive would read out-of-image (possibly host) registry data. Fail closed.
+        // Jail-check the hive paths BEFORE opening them: if Windows\System32\config is a junction that leaves the image,
+        // reading the hive would read out-of-image (possibly host) registry data. Fail closed.
         var guard = new OfflineRootGuard(imageRoot, logger);
         guard.Assert(imageRoot.SoftwareHivePath, "SOFTWARE hive");
         guard.Assert(imageRoot.SystemHivePath, "SYSTEM hive");
 
-        OfflineRegistryHive? softwareHive = LoadHive(imageRoot.SoftwareHivePath, "SOFTWARE", logger);
+        OfflineHiveFile? softwareHive = OfflineHiveFile.TryOpen(imageRoot.SoftwareHivePath, logger);
 
         if (softwareHive is null) { return null; }
 
-        OfflineRegistryHive? systemHive = LoadHive(imageRoot.SystemHivePath, "SYSTEM", logger);
+        OfflineHiveFile? systemHive = OfflineHiveFile.TryOpen(imageRoot.SystemHivePath, logger);
 
         if (systemHive is null)
         {
@@ -72,7 +72,7 @@ internal sealed class OfflineImageProviderExtractor : IOfflineImageProviderExtra
 
         var pathResolver = new OfflineImagePathResolver(new OfflineImagePathMapper(imageRoot, logger), guard);
         var catalog = new OfflinePublisherCatalog(pathResolver, logger);
-        var legacyResolver = new OfflineLegacyMessageFileResolver(systemHive.Root, pathResolver, logger);
+        var legacyResolver = new OfflineLegacyMessageFileResolver(systemHive, pathResolver, logger);
         var legacyBuilder = new OfflineLegacyProviderBuilder(legacyResolver, logger);
 
         return new OfflineImageProviderExtractor(softwareHive, systemHive, catalog, legacyResolver, legacyBuilder, logger);
@@ -88,10 +88,10 @@ internal sealed class OfflineImageProviderExtractor : IOfflineImageProviderExtra
     public IReadOnlyList<string> EnumerateLegacyProviderNames() => _legacyResolver.EnumerateProviderNames();
 
     /// <summary>Reads the image's OS provenance from its <c>SOFTWARE</c> hive (never the host registry).</summary>
-    public SourceOsProvenance ReadImageProvenance() => SourceOsProvenance.ReadFromSoftwareHive(_softwareHive.Root, _logger);
+    public SourceOsProvenance ReadImageProvenance() => SourceOsProvenance.ReadFromSoftwareHive(_softwareHive, _logger);
 
     /// <summary>The modern (manifest) publisher registrations declared in the image's <c>SOFTWARE</c> hive.</summary>
-    public IReadOnlyList<OfflinePublisherRegistration> ReadModernRegistrations() => _catalog.ReadRegistrations(_softwareHive.Root);
+    public IReadOnlyList<OfflinePublisherRegistration> ReadModernRegistrations() => _catalog.ReadRegistrations(_softwareHive);
 
     /// <summary>Builds a pure-legacy provider (no WEVT manifest) from the image's <c>SYSTEM</c> hive registration.</summary>
     public ProviderDetails? TryBuildLegacyProvider(string providerName) => _legacyBuilder.TryBuild(providerName);
@@ -117,30 +117,5 @@ internal sealed class OfflineImageProviderExtractor : IOfflineImageProviderExtra
             registration.ProviderName,
             _legacyResolver,
             _logger);
-    }
-
-    // Loads one hive, logging the specific failure reason at Error so a non-elevated user reading a real (dirty) image
-    // sees the actionable "re-run as administrator" message rather than a silent generic failure.
-    private static OfflineRegistryHive? LoadHive(string hivePath, string hiveName, ITraceLogger? logger)
-    {
-        OfflineHiveLoadResult result = OfflineRegistryHive.TryLoad(hivePath, logger);
-
-        switch (result.Status)
-        {
-            case OfflineHiveLoadStatus.Loaded:
-                return result.Hive;
-            case OfflineHiveLoadStatus.NeedsElevation:
-                logger?.Error($"The image's {hiveName} hive needs registry recovery, which requires running as administrator. Re-run elevated.");
-
-                return null;
-            case OfflineHiveLoadStatus.RecoveryFailed:
-                logger?.Error($"The image's {hiveName} hive could not be recovered; it may be corrupt or missing its transaction logs.");
-
-                return null;
-            default:
-                logger?.Error($"The image's {hiveName} hive is missing or is not a registry hive.");
-
-                return null;
-        }
     }
 }

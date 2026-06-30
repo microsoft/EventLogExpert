@@ -1,12 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.PublisherMetadata.Offline.Containment;
 using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
 
@@ -14,14 +14,15 @@ namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
 ///     Builds a throwaway on-disk Windows-image scaffold (
 ///     <c>&lt;temp&gt;\Windows\System32\config\{SOFTWARE,SYSTEM}</c>) for offline-extraction unit tests, with no admin and
 ///     no real Windows image. Each hive is either an empty placeholder (enough for path-only components such as the mapper
-///     and root-guard) or a real standalone hive seeded via <see cref="NativeMethods.RegLoadAppKey" /> (for the catalog
-///     and legacy-resolver readers). The scaffold's root directory is the image root, so a mapped host path such as
+///     and root-guard) or a real standalone hive seeded via <see cref="RegLoadAppKey" /> (for the catalog and
+///     legacy-resolver readers). The scaffold's root directory is the image root, so a mapped host path such as
 ///     <c>C:\Windows\System32\foo.dll</c> correctly lands under the scaffold - never the host - even though the scaffold
 ///     itself lives on the host drive.
 /// </summary>
-internal sealed class OfflineTestImage : IDisposable
+internal sealed partial class OfflineTestImage : IDisposable
 {
     private const int KeyAllAccess = 0xF003F;
+    private const int KeyRead = 0x20019; // STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS | KEY_NOTIFY.
 
     private OfflineTestImage(string rootDirectory, OfflineImageRoot imageRoot)
     {
@@ -49,6 +50,48 @@ internal sealed class OfflineTestImage : IDisposable
             ?? throw new InvalidOperationException($"Failed to create OfflineImageRoot for scaffold {rootDirectory}.");
 
         return new OfflineTestImage(rootDirectory, imageRoot);
+    }
+
+    /// <summary>
+    ///     Enumerates a key's immediate subkey names through the LIVE registry (read-only) so a test can assert
+    ///     <see cref="OfflineHiveFile.GetSubKeyNames" /> returns the identical physical leaf order. Same load/unload ordering
+    ///     caveat as <see cref="ReadValueViaLiveRegistry" />.
+    /// </summary>
+    public static IReadOnlyList<string> ReadSubKeyNamesViaLiveRegistry(string hivePath, string subKeyPath)
+    {
+        int result = RegLoadAppKey(hivePath, out nint handle, KeyRead, 0, 0);
+
+        if (result != 0)
+        {
+            throw new InvalidOperationException($"RegLoadAppKey (read) failed for {hivePath} (error {result}).");
+        }
+
+        using RegistryKey root = RegistryKey.FromHandle(new SafeRegistryHandle(handle, ownsHandle: true));
+        using RegistryKey? subKey = root.OpenSubKey(subKeyPath);
+
+        return subKey?.GetSubKeyNames() ?? [];
+    }
+
+    /// <summary>
+    ///     Reads a single value from a seeded hive through the LIVE Windows registry (<c>RegLoadAppKey</c>, read-only) so
+    ///     a test can assert the managed <see cref="OfflineHiveFile" /> parser returns the byte-identical boxed type and value
+    ///     that <see cref="RegistryKey.GetValue(string?)" /> would. The hive is loaded, read, and unloaded synchronously, so
+    ///     the file is fully released before a caller memory-maps it - call this BEFORE opening the same hive with
+    ///     <see cref="OfflineHiveFile" /> to avoid a sharing conflict.
+    /// </summary>
+    public static object? ReadValueViaLiveRegistry(string hivePath, string subKeyPath, string? valueName)
+    {
+        int result = RegLoadAppKey(hivePath, out nint handle, KeyRead, 0, 0);
+
+        if (result != 0)
+        {
+            throw new InvalidOperationException($"RegLoadAppKey (read) failed for {hivePath} (error {result}).");
+        }
+
+        using RegistryKey root = RegistryKey.FromHandle(new SafeRegistryHandle(handle, ownsHandle: true));
+        using RegistryKey? subKey = root.OpenSubKey(subKeyPath);
+
+        return subKey?.GetValue(valueName, defaultValue: null, RegistryValueOptions.DoNotExpandEnvironmentNames);
     }
 
     /// <summary>
@@ -91,6 +134,13 @@ internal sealed class OfflineTestImage : IDisposable
         }
     }
 
+    // Test-only P/Invoke. Production deleted its registry-load interop when the offline reader moved to the managed
+    // regf parser (OfflineHiveFile); the tests still need RegLoadAppKey to MATERIALIZE a real standalone hive on disk
+    // (the test process has no package identity, so the create-and-seed direction works) that OfflineHiveFile then
+    // parses back. RegLoadAppKey creates the file if it does not exist and returns a writable HKEY for seeding.
+    [LibraryImport("advapi32.dll", EntryPoint = "RegLoadAppKeyW", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial int RegLoadAppKey(string lpFile, out nint phkResult, int samDesired, int dwOptions, int reserved);
+
     private static void SeedOrTouchHive(string hivePath, Action<RegistryKey>? seed)
     {
         if (seed is null)
@@ -101,7 +151,7 @@ internal sealed class OfflineTestImage : IDisposable
             return;
         }
 
-        int result = NativeMethods.RegLoadAppKey(hivePath, out nint handle, KeyAllAccess, 0, 0);
+        int result = RegLoadAppKey(hivePath, out nint handle, KeyAllAccess, 0, 0);
 
         if (result != 0)
         {

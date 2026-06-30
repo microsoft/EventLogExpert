@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.PublisherMetadata.Offline.Containment;
 using EventLogExpert.Logging.Abstractions;
-using Microsoft.Win32;
 
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
@@ -19,7 +18,7 @@ namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 ///     admin channels - reading a hive file needs no elevation, so offline is intentionally more complete there.
 /// </summary>
 internal sealed class OfflineLegacyMessageFileResolver(
-    RegistryKey systemRoot,
+    IOfflineRegistryKey systemRoot,
     OfflineImagePathResolver pathResolver,
     ITraceLogger? logger) : ILegacyMessageFileResolver
 {
@@ -31,7 +30,7 @@ internal sealed class OfflineLegacyMessageFileResolver(
     /// </summary>
     public IReadOnlyList<string> EnumerateProviderNames()
     {
-        using RegistryKey? eventLogKey = OpenEventLogKey();
+        using IOfflineRegistryKey? eventLogKey = OpenEventLogKey();
 
         if (eventLogKey is null) { return []; }
 
@@ -40,13 +39,13 @@ internal sealed class OfflineLegacyMessageFileResolver(
 
         foreach (string channelName in eventLogKey.GetSubKeyNames())
         {
-            using RegistryKey? channelKey = eventLogKey.OpenSubKey(channelName);
+            using IOfflineRegistryKey? channelKey = eventLogKey.OpenSubKey(channelName);
 
             if (channelKey is null) { continue; }
 
             foreach (string providerName in channelKey.GetSubKeyNames())
             {
-                using RegistryKey? providerKey = channelKey.OpenSubKey(providerName);
+                using IOfflineRegistryKey? providerKey = channelKey.OpenSubKey(providerName);
 
                 if (providerKey is null) { continue; }
 
@@ -72,11 +71,10 @@ internal sealed class OfflineLegacyMessageFileResolver(
                 ? ResolveProviderFiles(parameterMessageFile, categoryMessageFile: null)
                 : []);
 
-    // Read without host expansion so REG_EXPAND_SZ tokens reach the mapper as literal %tokens (no effect on REG_SZ).
-    private static string? ReadString(RegistryKey key, string name) =>
-        key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames) as string;
+    // The managed hive reader returns REG_SZ/REG_EXPAND_SZ values literally, so a stored %token reaches the mapper as-is.
+    private static string? ReadString(IOfflineRegistryKey key, string name) => key.GetValue(name) as string;
 
-    private RegistryKey? OpenEventLogKey()
+    private IOfflineRegistryKey? OpenEventLogKey()
     {
         if (systemRoot.OpenSubKey("Select") is not { } selectKey)
         {
@@ -95,7 +93,7 @@ internal sealed class OfflineLegacyMessageFileResolver(
             }
 
             string eventLogPath = $@"ControlSet{currentControlSet:D3}\Services\EventLog";
-            RegistryKey? eventLogKey = systemRoot.OpenSubKey(eventLogPath);
+            IOfflineRegistryKey? eventLogKey = systemRoot.OpenSubKey(eventLogPath);
 
             if (eventLogKey is null)
             {
@@ -108,16 +106,16 @@ internal sealed class OfflineLegacyMessageFileResolver(
 
     private IReadOnlyList<string> ResolveFromRegisteringChannel(
         string providerName,
-        Func<RegistryKey, string, IReadOnlyList<string>> resolveFromProviderKey)
+        Func<IOfflineRegistryKey, string, IReadOnlyList<string>> resolveFromProviderKey)
     {
-        using RegistryKey? eventLogKey = OpenEventLogKey();
+        using IOfflineRegistryKey? eventLogKey = OpenEventLogKey();
 
         if (eventLogKey is null) { return []; }
 
         foreach (string channelName in eventLogKey.GetSubKeyNames())
         {
-            using RegistryKey? channelKey = eventLogKey.OpenSubKey(channelName);
-            using RegistryKey? providerKey = channelKey?.OpenSubKey(providerName);
+            using IOfflineRegistryKey? channelKey = eventLogKey.OpenSubKey(channelName);
+            using IOfflineRegistryKey? providerKey = channelKey?.OpenSubKey(providerName);
 
             if (providerKey is null) { continue; }
 

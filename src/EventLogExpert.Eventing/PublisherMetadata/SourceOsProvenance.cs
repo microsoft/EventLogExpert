@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.PublisherMetadata.Offline;
 using EventLogExpert.Logging.Abstractions;
 using Microsoft.Win32;
 
@@ -8,9 +9,9 @@ namespace EventLogExpert.Eventing.PublisherMetadata;
 
 /// <summary>
 ///     Provenance of the OS a provider database is built from - the host (live build) or a foreign image (offline
-///     build) - read from <c>…\Microsoft\Windows NT\CurrentVersion</c>. Recorded per provider row so resolution can
-///     prefer the newest source (the recency tiebreak) without relying on the database file name. All fields are null
-///     when the key cannot be read; resolution degrades gracefully to completeness + load order.
+///     build) - read from <c>…\Microsoft\Windows NT\CurrentVersion</c>. Recorded per provider row so resolution can prefer
+///     the newest source (the recency tiebreak) without relying on the database file name. All fields are null when the
+///     key cannot be read; resolution degrades gracefully to completeness + load order.
 /// </summary>
 public sealed record SourceOsProvenance(int? Build, int? Revision, string? Edition, string? DisplayVersion)
 {
@@ -26,7 +27,8 @@ public sealed record SourceOsProvenance(int? Build, int? Revision, string? Editi
             using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default);
             using var currentVersion = hklm.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
 
-            return ParseCurrentVersion(currentVersion, logger);
+            return ParseCurrentVersion(
+                currentVersion is null ? null : new LiveRegistryKeyAdapter(currentVersion, ownsKey: false), logger);
         }
         catch (Exception ex)
         {
@@ -39,10 +41,10 @@ public sealed record SourceOsProvenance(int? Build, int? Revision, string? Editi
     /// <summary>
     ///     Reads a foreign image's OS provenance from its already-loaded <c>SOFTWARE</c> hive root (the
     ///     <c>Microsoft\Windows NT\CurrentVersion</c> subkey), so an offline image build stamps rows with the IMAGE's OS
-    ///     rather than the host's. Never touches the host registry. Internal: the offline extraction path is the only
-    ///     caller; cross-assembly consumers use the host <see cref="Read" /> overload.
+    ///     rather than the host's. Never touches the host registry. Internal: the offline extraction path is the only caller;
+    ///     cross-assembly consumers use the host <see cref="Read" /> overload.
     /// </summary>
-    internal static SourceOsProvenance ReadFromSoftwareHive(RegistryKey softwareRoot, ITraceLogger? logger = null)
+    internal static SourceOsProvenance ReadFromSoftwareHive(IOfflineRegistryKey softwareRoot, ITraceLogger? logger = null)
     {
         try
         {
@@ -58,12 +60,7 @@ public sealed record SourceOsProvenance(int? Build, int? Revision, string? Editi
         }
     }
 
-    // Read the raw stored strings WITHOUT environment expansion: .NET's RegistryKey.GetValue expands a
-    // REG_EXPAND_SZ value against the HOST environment by default, so a foreign or malformed image SOFTWARE hive
-    // that stored these as REG_EXPAND_SZ would otherwise contaminate offline provenance with host data (and the
-    // literal stored value is what provenance wants regardless). The host Read() path is unaffected - these are
-    // REG_SZ there - and UBR is a DWORD, so expansion never applies to it.
-    private static SourceOsProvenance ParseCurrentVersion(RegistryKey? currentVersion, ITraceLogger? logger)
+    private static SourceOsProvenance ParseCurrentVersion(IOfflineRegistryKey? currentVersion, ITraceLogger? logger)
     {
         if (currentVersion is null)
         {
@@ -83,6 +80,7 @@ public sealed record SourceOsProvenance(int? Build, int? Revision, string? Editi
         return new SourceOsProvenance(build, revision, edition, displayVersion);
     }
 
-    private static string? ReadRawString(RegistryKey key, string valueName) =>
-        key.GetValue(valueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames) as string;
+    // Reads stored strings literally (no host environment expansion): a foreign image's REG_EXPAND_SZ must reach
+    // provenance as its stored %token, not expanded against the host. UBR is a DWORD, read via GetValue(...) is int.
+    private static string? ReadRawString(IOfflineRegistryKey key, string valueName) => key.GetValue(valueName) as string;
 }

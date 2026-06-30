@@ -53,7 +53,7 @@ public sealed class OfflineWimImage : IDisposable
     /// <summary>
     ///     Deletes WIM extraction folders in the scratch root left by a crashed or self-terminated prior run, identified
     ///     by a dead ownership beacon so a live sibling's in-progress extraction is never removed. Helper-side startup
-    ///     maintenance paired with <see cref="OfflineRegistryHive" />'s orphaned-mount sweep.
+    ///     maintenance run once before an operation is dispatched.
     /// </summary>
     public static void ReconcileOrphanedExtractions(ITraceLogger? logger) =>
         ReconcileOrphanedExtractions(OfflineScratch.Root, logger);
@@ -166,7 +166,7 @@ public sealed class OfflineWimImage : IDisposable
 
         if (ownershipBeacon is null)
         {
-            // Fail closed (mirrors OfflineRegistryHive's dirty-hive path): without a liveness beacon a concurrent
+            // Fail closed: without a liveness beacon a concurrent
             // reconciliation sweep would see no live owner for this ELX_WIM_* folder and could delete it mid-apply. Refuse
             // to create the folder or start the apply; nothing to clean up because the directory was never created.
             logger?.Error($"{nameof(OfflineWimImage)}: could not acquire an ownership beacon for {extractDirName}; refusing to extract without sweep protection against concurrent reconciliation.");

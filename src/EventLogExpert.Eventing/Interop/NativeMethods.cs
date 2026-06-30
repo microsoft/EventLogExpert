@@ -33,7 +33,7 @@ internal static partial class NativeMethods
 
             char next = text[i + 1];
 
-            // %% is an escaped percent literal — skip it
+            // %% is an escaped percent literal - skip it
             if (next == '%')
             {
                 i++;
@@ -58,6 +58,10 @@ internal static partial class NativeMethods
 
         return false;
     }
+
+    [LibraryImport(Kernel32Api, EntryPoint = "CloseHandle", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool CloseHandle(IntPtr handle);
 
     // Returns an HRSRC, which is a non-owning pointer into the loaded module's resource section.
     // It must NOT be released with FreeLibrary, so we deliberately marshal it as an IntPtr and

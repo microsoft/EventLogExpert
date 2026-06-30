@@ -6,12 +6,12 @@ using EventLogExpert.Logging.Abstractions;
 namespace EventLogExpert.Eventing.PublisherMetadata.Offline;
 
 /// <summary>
-///     A machine-global "liveness beacon" for a scratch resource (a loaded registry hive mount or an extracted WIM
-///     folder): an open, unowned named <see cref="Mutex" /> at <c>Global\&lt;name&gt;</c>. While the owning process holds
-///     the handle the beacon opens; when the process dies - including a hard <see cref="Environment.Exit" /> or a crash -
-///     the OS releases it, so a later run's reconciliation sweep can tell a leftover resource is an orphan (beacon gone)
-///     versus in use by a live sibling (beacon still opens). Shared by <see cref="OfflineRegistryHive" /> recovery mounts
-///     and <see cref="OfflineWimImage" /> extractions so both reclaim identically.
+///     A machine-global "liveness beacon" for a scratch resource (an extracted WIM folder): an open, unowned named
+///     <see cref="Mutex" /> at <c>Global\&lt;name&gt;</c>. While the owning process holds the handle the beacon opens;
+///     when the process dies - including a hard <see cref="Environment.Exit" /> or a crash - the OS releases it, so a
+///     later run's reconciliation sweep can tell a leftover resource is an orphan (beacon gone) versus in use by a live
+///     sibling (beacon still opens). Used by <see cref="OfflineWimImage" /> extractions so leftover folders reclaim
+///     identically.
 /// </summary>
 internal static class OwnershipBeacon
 {
