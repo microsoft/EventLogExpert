@@ -477,7 +477,7 @@ public sealed class OfflineWevtProviderParityTests(
         native = null;
         offline = null;
 
-        ProviderMetadata? metadata = ProviderMetadata.Create(providerName);
+        using ProviderMetadata? metadata = ProviderMetadata.Create(providerName);
 
         if (metadata is null || string.IsNullOrEmpty(metadata.ResourceFilePath))
         {
@@ -509,7 +509,7 @@ public sealed class OfflineWevtProviderParityTests(
         {
             ProviderName = providerName;
 
-            ProviderMetadata? metadata = ProviderMetadata.Create(providerName);
+            using ProviderMetadata? metadata = ProviderMetadata.Create(providerName);
 
             if (metadata is null) { return; }
 

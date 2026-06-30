@@ -292,6 +292,24 @@ public sealed class DatabaseOperationCoordinatorTests
         _errorBanners.DidNotReceiveWithAnyArgs().ReportError(null!, null!);
     }
 
+    [Fact]
+    public async Task ImportAsync_SameBasenameSourcesInOneBatch_AddsNameToSkipSet()
+    {
+        _filePicker.PickMultipleAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>())
+            .Returns([@"C:\first\A.db", @"C:\second\a.DB"]);
+        _databases.Entries.Returns([]);
+        _databases.ImportAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new ImportResult(0, [], [], []));
+
+        var sut = CreateSut();
+        await sut.ImportAsync(askOverwriteAsync: null, cancellationToken: Ct);
+
+        await _databases.Received(1).ImportAsync(
+            Arg.Any<IEnumerable<string>>(),
+            Arg.Is<IReadOnlySet<string>>(skipFileNames => skipFileNames.Contains("A.db")),
+            Arg.Any<CancellationToken>());
+    }
+
     [Theory]
     [InlineData(1, 0, 0, "Import Successful", BannerSeverity.Info)]
     [InlineData(3, 0, 0, "Import Successful", BannerSeverity.Info)]

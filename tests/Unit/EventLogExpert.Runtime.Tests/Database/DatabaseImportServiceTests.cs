@@ -7,11 +7,48 @@ using EventLogExpert.Provider.Schema;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Database;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 
 namespace EventLogExpert.Runtime.Tests.Database;
 
 public sealed class DatabaseImportServiceTests
 {
+    [Fact]
+    public async Task ClassifyEntriesAsync_WhenWritableOpenWouldFail_UsesReadOnlySchemaProbe()
+    {
+        var basePath = Path.Combine(AppContext.BaseDirectory, "DatabaseImportServiceTests", Guid.NewGuid().ToString("N"));
+        var fileLocationOptions = new FileLocationOptions(basePath);
+        Directory.CreateDirectory(fileLocationOptions.DatabasePath);
+        var databasePath = Path.Combine(fileLocationOptions.DatabasePath, "locked.db");
+        await File.WriteAllTextAsync(databasePath, "not empty", TestContext.Current.CancellationToken);
+
+        try
+        {
+            var preferences = new CapturingDatabasePreferencesProvider();
+            var logger = Substitute.For<ITraceLogger>();
+            var maintenance = Substitute.For<IProviderDatabaseMaintenance>();
+            maintenance.CheckSchemaState(databasePath, readOnly: false).Throws(new IOException("writable handle denied"));
+            maintenance.CheckSchemaState(databasePath, readOnly: true).Returns(new DatabaseSchemaState(DatabaseSchemaVersion.Current));
+            maintenance.ReadDistinctSourceOsStamps(databasePath, Arg.Any<int>()).Returns([]);
+
+            var registry = new DatabaseRegistry(fileLocationOptions, preferences, logger);
+            registry.Refresh();
+            var classification = new DatabaseClassificationService(registry, fileLocationOptions, maintenance, logger);
+
+            await classification.InitialClassificationTask;
+
+            maintenance.Received(1).CheckSchemaState(databasePath, readOnly: true);
+            maintenance.DidNotReceive().CheckSchemaState(databasePath, readOnly: false);
+            Assert.Contains(registry.Entries, entry =>
+                entry.FileName == "locked.db" &&
+                entry.Status == DatabaseStatus.Ready);
+        }
+        finally
+        {
+            Directory.Delete(basePath, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task ImportAsync_WhenSourceAlreadyEqualsManagedDestination_CountsImportedWithoutCopyException()
     {
@@ -25,7 +62,7 @@ public sealed class DatabaseImportServiceTests
 
         var logger = Substitute.For<ITraceLogger>();
         var maintenance = Substitute.For<IProviderDatabaseMaintenance>();
-        maintenance.CheckSchemaState(sourcePath).Returns(new DatabaseSchemaState(DatabaseSchemaVersion.Current));
+        maintenance.CheckSchemaState(sourcePath, readOnly: true).Returns(new DatabaseSchemaState(DatabaseSchemaVersion.Current));
         maintenance.ReadDistinctSourceOsStamps(sourcePath, Arg.Any<int>()).Returns([]);
 
         var registry = new DatabaseRegistry(fileLocationOptions, preferences, logger);

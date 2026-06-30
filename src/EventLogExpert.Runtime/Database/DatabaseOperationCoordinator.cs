@@ -425,8 +425,7 @@ internal sealed class DatabaseOperationCoordinator(
             .Select(entry => entry.FileName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        if (existingNames.Count == 0) { return new HashSet<string>(StringComparer.OrdinalIgnoreCase); }
-
+        var pendingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var skip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var resolved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -454,6 +453,15 @@ internal sealed class DatabaseOperationCoordinator(
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (string.IsNullOrEmpty(candidateName)) { continue; }
+
+                bool batchDuplicate = !pendingNames.Add(candidateName);
+
+                if (batchDuplicate)
+                {
+                    skip.Add(candidateName);
+
+                    continue;
+                }
 
                 if (!existingNames.Contains(candidateName)) { continue; }
 

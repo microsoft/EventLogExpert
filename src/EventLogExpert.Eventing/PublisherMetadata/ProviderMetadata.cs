@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.PublisherMetadata;
 
-internal sealed class ProviderMetadata
+internal sealed class ProviderMetadata : IDisposable
 {
     private readonly EvtHandle _publisherMetadataHandle;
 
@@ -67,6 +67,8 @@ internal sealed class ProviderMetadata
         }
     }
 
+    public void Dispose() => _publisherMetadataHandle.Dispose();
+
     internal static ProviderMetadata? Create(
         string providerName,
         IReadOnlyList<string>? metadataPath = null,
@@ -80,7 +82,7 @@ internal sealed class ProviderMetadata
 
                 if (localeMetadata.Error is not null)
                 {
-                    localeMetadata._publisherMetadataHandle.Dispose();
+                    localeMetadata.Dispose();
 
                     continue;
                 }
@@ -102,7 +104,7 @@ internal sealed class ProviderMetadata
             return metadata;
         }
 
-        metadata._publisherMetadataHandle.Dispose();
+        metadata.Dispose();
         logger?.Debug($"Failed to create metadata for {providerName} provider: {metadata.Error}");
 
         return null;

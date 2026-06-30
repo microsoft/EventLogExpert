@@ -51,7 +51,7 @@
             </div>
         }
 
-        @if (Directory.Exists(_sourcePath.Trim()))
+        @if (_sourceIsExistingDirectory)
         {
             <div class="form-row">
                 <label class="checkbox-label" for="create-folder-as-image">

@@ -14,6 +14,8 @@ namespace EventLogExpert.DatabaseTools.Common.Operations;
 
 internal abstract class OperationBase
 {
+    private static readonly string[] s_databaseFileSuffixes = ["", "-wal", "-shm"];
+
     private string _providerDetailFormat = "{0, -14} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8} {6, 8}";
 
     public string? FailureSummary { get; private set; }
@@ -26,18 +28,28 @@ internal abstract class OperationBase
     {
         if (dbContext is not null) { await dbContext.DisposeAsync(); }
 
-        if (!File.Exists(targetPath)) { return; }
+        if (!s_databaseFileSuffixes.Any(suffix => File.Exists(targetPath + suffix))) { return; }
 
         SqliteConnection.ClearAllPools();
 
-        try { File.Delete(targetPath); }
-        catch (IOException ex)
+        foreach (var suffix in s_databaseFileSuffixes)
         {
-            logger.Warning($"Could not delete partial database at {targetPath}: {ex.Message}. Delete manually before next run.");
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            logger.Warning($"Could not delete partial database at {targetPath}: {ex.Message}. Delete manually before next run.");
+            var databasePath = targetPath + suffix;
+
+            if (!File.Exists(databasePath)) { continue; }
+
+            try
+            {
+                File.Delete(databasePath);
+            }
+            catch (IOException ex)
+            {
+                logger.Warning($"Could not delete partial database at {databasePath}: {ex.Message}. Delete manually before next run.");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                logger.Warning($"Could not delete partial database at {databasePath}: {ex.Message}. Delete manually before next run.");
+            }
         }
     }
 
@@ -96,7 +108,8 @@ internal abstract class OperationBase
 
     protected void LogProviderDetailHeader(ITraceLogger logger, IEnumerable<string> providerNames)
     {
-        var maxNameLength = providerNames.Any() ? providerNames.Max(p => p.Length) : 14;
+        var names = providerNames as IReadOnlyList<string> ?? providerNames.ToList();
+        var maxNameLength = names.Count > 0 ? names.Max(providerName => providerName.Length) : 14;
 
         if (maxNameLength < 14) { maxNameLength = 14; }
 

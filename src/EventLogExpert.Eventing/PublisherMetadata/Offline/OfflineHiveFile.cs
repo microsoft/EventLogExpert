@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
+using System.Buffers;
 using System.Buffers.Binary;
 using System.IO.MemoryMappedFiles;
 using System.Text;
@@ -658,9 +659,17 @@ internal sealed class OfflineHiveFile : IOfflineRegistryKey
 
         public void ReadBytes(long offset, Span<byte> destination)
         {
-            byte[] temp = new byte[destination.Length];
-            view.ReadArray(offset, temp, 0, temp.Length);
-            temp.CopyTo(destination);
+            byte[] rented = ArrayPool<byte>.Shared.Rent(destination.Length);
+
+            try
+            {
+                view.ReadArray(offset, rented, 0, destination.Length);
+                rented.AsSpan(0, destination.Length).CopyTo(destination);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(rented);
+            }
         }
 
         public int ReadInt32(long offset) => view.ReadInt32(offset);

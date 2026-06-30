@@ -21,7 +21,6 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
     private ValueSelectItem<T>? _highlightedItem;
     private bool _inputFocused;
     private bool _isOpen;
-    private bool _preventDefault;
     private string? _rawInput;
     private ElementReference _selectComponent;
     private DotNetObjectReference<ValueSelect<T>>? _selfRef;
@@ -227,8 +226,6 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
     private async Task HandleKeyDown(KeyboardEventArgs args)
     {
-        _preventDefault = false;
-
         switch (args.Code)
         {
             case "Space":
@@ -236,15 +233,11 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
                 return;
             case "ArrowUp":
-                _preventDefault = true;
-
                 await OpenDropDown();
                 await SelectAdjacentItem(-1);
 
                 return;
             case "ArrowDown":
-                _preventDefault = true;
-
                 await OpenDropDown();
                 await SelectAdjacentItem(+1);
 

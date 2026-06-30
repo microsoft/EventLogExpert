@@ -11,9 +11,9 @@ internal sealed class OfflineLegacyProviderBuilder(OfflineLegacyMessageFileResol
 {
     public ProviderDetails? TryBuild(string providerName)
     {
-        IReadOnlyList<string> messageFiles = legacyResolver.GetMessageFilesForLegacyProvider(providerName);
+        OfflineLegacyMessageFileResolver.LegacyProviderFiles files = legacyResolver.ResolveFilesForLegacyProvider(providerName);
 
-        if (LegacyMessageFileSource.TryCreate(messageFiles, providerName, logger) is not { } messageSource)
+        if (LegacyMessageFileSource.TryCreate(files.MessageFiles, providerName, logger) is not { } messageSource)
         {
             logger?.Debug($"{nameof(OfflineLegacyProviderBuilder)}: no usable legacy message files for provider {providerName}.");
 
@@ -23,9 +23,7 @@ internal sealed class OfflineLegacyProviderBuilder(OfflineLegacyMessageFileResol
         var details = new ProviderDetails { ProviderName = providerName };
         details.SetLazyMessageSource(messageSource);
 
-        IReadOnlyList<string> parameterFiles = legacyResolver.GetParameterFilesForLegacyProvider(providerName);
-
-        if (LegacyMessageFileSource.TryCreate(parameterFiles, providerName, logger) is { } parameterSource)
+        if (LegacyMessageFileSource.TryCreate(files.ParameterFiles, providerName, logger) is { } parameterSource)
         {
             details.SetLazyParameterSource(parameterSource);
         }
