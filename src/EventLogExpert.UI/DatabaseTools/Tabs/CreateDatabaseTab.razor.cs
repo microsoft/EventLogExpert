@@ -224,7 +224,16 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
             {
                 _imageEditions = editions.Images;
 
-                if (_imageEditions.Count == 0) { _editionsError = "No editions were found in the selected image."; }
+                if (_imageEditions.Count == 0)
+                {
+                    _editionsError = "No editions were found in the selected image.";
+                }
+                else if (_imageEditions.All(edition => edition.Index != _wimIndex))
+                {
+                    // Populate the index box with the first edition so a successful load is visibly confirmed instead of
+                    // leaving the box empty; an index the user already typed that matches a loaded edition is preserved.
+                    _wimIndex = _imageEditions[0].Index;
+                }
             }
             else if (result.Outcome != DatabaseToolsOutcome.Cancelled)
             {

@@ -33,23 +33,44 @@ internal sealed class WimOperations : IWimOperations
 
         if (image.IsInvalid) { return Marshal.GetLastWin32Error(); }
 
-        // Cancellation is opt-in: the CLI passes a non-cancellable token, so no callback is marshalled at all. When a
-        // cancellable token IS supplied, the delegate MUST stay rooted for the whole apply (it fires per-message for
-        // minutes); a collected/moved delegate would be an intermittent AccessViolationException.
-        NativeMethods.WimMessageCallback? abortCallback = null;
+        // The message callback serves two purposes: aborting on cancellation, and surfacing extraction progress so the
+        // multi-minute apply does not leave the log silent. Register it when EITHER is wanted. While registered the delegate
+        // MUST stay rooted for the whole apply (it fires per-message for minutes); a collected/moved delegate would be an
+        // intermittent AccessViolationException - the GC.KeepAlive in the finally pins it.
+        NativeMethods.WimMessageCallback? messageCallback = null;
         IntPtr callbackPointer = IntPtr.Zero;
         uint registeredCallback = NativeMethods.WIM_INVALID_CALLBACK_VALUE;
 
-        if (cancellationToken.CanBeCanceled)
+        if (cancellationToken.CanBeCanceled || logger is not null)
         {
-            abortCallback = (_, _, _, _) =>
-                cancellationToken.IsCancellationRequested ? NativeMethods.WIM_MSG_ABORT_IMAGE : NativeMethods.WIM_MSG_SUCCESS;
-            callbackPointer = Marshal.GetFunctionPointerForDelegate(abortCallback);
+            int lastReportedDecile = 0; // start past the 0% band so the first line is "10% complete", not "0% complete".
+
+            messageCallback = (messageId, wParam, _, _) =>
+            {
+                if (cancellationToken.IsCancellationRequested) { return NativeMethods.WIM_MSG_ABORT_IMAGE; }
+
+                if (messageId != NativeMethods.WIM_MSG_PROGRESS || logger is null)
+                {
+                    return NativeMethods.WIM_MSG_SUCCESS;
+                }
+
+                int percent = (int)wParam; // WIM_MSG_PROGRESS: wParam is the percent complete (0-100).
+
+                // One Information line per 10% crossed: enough to show the long apply is alive without flooding the log.
+                if (TryAdvanceProgressDecile(percent, ref lastReportedDecile))
+                {
+                    logger.Information($"Extracting image: {percent}% complete...");
+                }
+
+                return NativeMethods.WIM_MSG_SUCCESS;
+            };
+
+            callbackPointer = Marshal.GetFunctionPointerForDelegate(messageCallback);
             registeredCallback = NativeMethods.WIMRegisterMessageCallback(wim, callbackPointer, IntPtr.Zero);
 
             if (registeredCallback == NativeMethods.WIM_INVALID_CALLBACK_VALUE)
             {
-                logger?.Debug($"{nameof(WimOperations)}: WIMRegisterMessageCallback failed (error {Marshal.GetLastWin32Error()}); apply will not be cancellable.");
+                logger?.Debug($"{nameof(WimOperations)}: WIMRegisterMessageCallback failed (error {Marshal.GetLastWin32Error()}); apply will not be cancellable and will not report progress.");
             }
         }
 
@@ -68,8 +89,24 @@ internal sealed class WimOperations : IWimOperations
             }
 
             // Root the delegate across the entire apply + unregister; only now may it be collected.
-            GC.KeepAlive(abortCallback);
+            GC.KeepAlive(messageCallback);
         }
+    }
+
+    // Returns true the first time `percent` enters a higher 10% band than `lastReportedDecile` (which it advances), so a
+    // per-message progress callback emits at most one line per 10% crossed. Percents outside 0-100 are ignored. Internal
+    // for testing the throttling without driving the real native apply.
+    internal static bool TryAdvanceProgressDecile(int percent, ref int lastReportedDecile)
+    {
+        if (percent is < 0 or > 100) { return false; }
+
+        int decile = percent / 10;
+
+        if (decile <= lastReportedDecile) { return false; }
+
+        lastReportedDecile = decile;
+
+        return true;
     }
 
     public bool IsProcessElevated()
