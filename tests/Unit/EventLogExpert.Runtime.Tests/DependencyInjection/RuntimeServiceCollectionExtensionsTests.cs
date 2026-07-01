@@ -17,6 +17,7 @@ using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
+using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
@@ -168,6 +169,9 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IMenuService))]
     [InlineData(typeof(IModalService))]
     [InlineData(typeof(ISettingsService))]
+    [InlineData(typeof(ITraceLogger))]
+    [InlineData(typeof(ILogSourceFactory))]
+    [InlineData(typeof(IFileLogger))]
     // Update + deployment services.
     [InlineData(typeof(ICurrentVersionProvider))]
     [InlineData(typeof(IDeploymentService))]

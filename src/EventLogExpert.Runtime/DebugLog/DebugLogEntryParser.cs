@@ -9,11 +9,11 @@ using System.Text.RegularExpressions;
 namespace EventLogExpert.Runtime.DebugLog;
 
 /// <summary>
-///     Parses lines written by <see cref="DebugLogService" /> into structured <see cref="DebugLogEntry" /> records.
-///     The writer formats each entry as
-///     <c>[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}</c>. Lines whose prefix does not
-///     parse fully are treated as continuations of the previous entry (e.g., subsequent lines of a multi-line stack trace)
-///     or, if there is no previous entry, as standalone entries with all metadata fields set to null.
+///     Parses lines written by <see cref="DebugFileSink" /> into structured <see cref="DebugLogEntry" /> records. The
+///     writer formats each entry as <c>[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}</c>.
+///     Lines whose prefix does not parse fully are treated as continuations of the previous entry (e.g., subsequent lines
+///     of a multi-line stack trace) or, if there is no previous entry, as standalone entries with all metadata fields set
+///     to null.
 /// </summary>
 public static partial class DebugLogEntryParser
 {
@@ -82,7 +82,7 @@ public static partial class DebugLogEntryParser
 }
 
 /// <summary>
-///     Stateful streaming parser for <see cref="DebugLogService" /> output. Emits a completed
+///     Stateful streaming parser for <see cref="DebugFileSink" /> output. Emits a completed
 ///     <see cref="DebugLogEntry" /> from <see cref="AddLine" /> the moment a new entry header arrives (with all preceding
 ///     continuation lines folded into the previous entry's <see cref="DebugLogEntry.Message" /> and
 ///     <see cref="DebugLogEntry.RawLine" />). Call <see cref="Flush" /> after the final line to drain any remaining
