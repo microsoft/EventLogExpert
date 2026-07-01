@@ -27,7 +27,9 @@ internal sealed class IpcLogSink(IpcMessageWriter writer) : IProgress<LogRecord>
         // case the runner's grace-then-kill path resolves it).
         try
         {
-            writer.WriteAsync(new LogMessage(value.TimestampUtc, value.Level, value.Message), CancellationToken.None)
+            writer.WriteAsync(
+                    new LogMessage(value.TimestampUtc, value.Level, value.Message, value.Origin, ProcessOrigin.ElevatedHelper),
+                    CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();
         }

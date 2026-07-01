@@ -104,7 +104,10 @@ public static class RuntimeServiceCollectionExtensions
         {
             ArgumentNullException.ThrowIfNull(services);
 
-            services.AddSingleton<IElevatedDatabaseToolsRunner, ElevatedDatabaseToolsRunner>();
+            services.AddSingleton<IElevatedDatabaseToolsRunner>(static sp =>
+                new ElevatedDatabaseToolsRunner(
+                    sp.GetRequiredService<IElevatedHelperProcessHost>(),
+                    sp.GetRequiredService<ILogSourceFactory>().ForCategory(LogCategories.ElevationIpc)));
 
             return services;
         }

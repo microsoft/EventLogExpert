@@ -4,6 +4,7 @@
 using EventLogExpert.DatabaseTools.Common.Ipc;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Eventing.PublisherMetadata.Offline;
+using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
@@ -78,6 +79,21 @@ public sealed class IpcMessageRoundTripTests
         var editions = Assert.IsType<ImageEditionsMessage>(roundTripped);
         Assert.Equal(WimImageListStatus.NotAWim, editions.Status);
         Assert.Empty(editions.Images);
+    }
+
+    [Fact]
+    public void LogMessage_RoundTrips_PreservesCategoryAndProcessOrigin()
+    {
+        var ts = new DateTime(2025, 6, 2, 14, 5, 0, DateTimeKind.Utc);
+        var original = new LogMessage(ts, LogLevel.Warning, "provider X failed", "Offline.Wim");
+
+        var roundTripped = SerializeDeserialize(original, out var json);
+
+        AssertDiscriminator(json, "log");
+        var log = Assert.IsType<LogMessage>(roundTripped);
+        Assert.Equal("Offline.Wim", log.Category);
+        Assert.Equal(ProcessOrigin.ElevatedHelper, log.ProcessOrigin);
+        Assert.DoesNotContain("ElevatedHelper", json);
     }
 
     [Fact]

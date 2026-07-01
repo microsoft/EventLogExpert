@@ -61,7 +61,9 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(Substitute.For<IElevatedHelperProcessHost>());
-        services.AddSingleton(Substitute.For<ITraceLogger>());
+        var logSourceFactory = Substitute.For<ILogSourceFactory>();
+        logSourceFactory.ForCategory(Arg.Any<string>()).Returns(Substitute.For<ITraceLogger>());
+        services.AddSingleton(logSourceFactory);
         services.AddElevatedDatabaseToolsRunner();
 
         await using var provider = services.BuildServiceProvider(

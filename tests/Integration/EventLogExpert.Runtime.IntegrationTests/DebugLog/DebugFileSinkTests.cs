@@ -266,6 +266,30 @@ public sealed class DebugFileSinkTests : IDisposable
         Assert.Null(Record.Exception(() => File.Delete(_testLogPath)));
     }
 
+    [Theory]
+    [InlineData(ProcessOrigin.ElevatedHelper, true)]
+    [InlineData(ProcessOrigin.InProcess, false)]
+    public void Emit_ShouldPrefixElevatedHelperTag_OnlyForElevatedHelperOrigin(ProcessOrigin origin, bool expectTag)
+    {
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
+
+        debugLogService.Emit(new LogRecord(DateTime.UtcNow, LogLevel.Information, Constants.DebugLogTestMessage, "", origin));
+
+        var content = ReadLogFile();
+        if (expectTag)
+        {
+            Assert.Contains($"[ElevatedHelper] {Constants.DebugLogTestMessage}", content);
+        }
+        else
+        {
+            Assert.Contains(Constants.DebugLogTestMessage, content);
+            Assert.DoesNotContain("[ElevatedHelper]", content);
+        }
+    }
+
     [Fact]
     public async Task LoadAsync_WhenLogFileDeletedDuringRead_ShouldAllowDeletion()
     {
