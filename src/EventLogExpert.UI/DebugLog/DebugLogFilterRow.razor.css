@@ -1,0 +1,104 @@
+.debug-log-filter-chip {
+    display: inline-flex;
+    align-items: stretch;
+    min-height: 24px;
+}
+
+.debug-log-filter-chip ::deep .debug-log-filter-exclude-toggle,
+.debug-log-filter-editor ::deep .debug-log-filter-exclude-toggle {
+    color: var(--text-secondary);
+    transition: color 0.1s ease-in-out;
+}
+
+.debug-log-filter-chip ::deep .debug-log-filter-exclude-toggle[data-excluded="true"],
+.debug-log-filter-editor ::deep .debug-log-filter-exclude-toggle[data-excluded="true"] {
+    color: var(--clr-red);
+}
+
+.debug-log-filter-chip ::deep .debug-log-filter-chip-edit,
+.debug-log-filter-chip ::deep .debug-log-filter-chip-remove {
+    display: inline-flex;
+    align-items: center;
+
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border-divider);
+
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1;
+    user-select: none;
+
+    transition: color 0.1s ease-in-out, background-color 0.1s ease-in-out, border-color 0.1s ease-in-out;
+}
+
+.debug-log-filter-chip ::deep .debug-log-filter-chip-edit {
+    gap: 0.25rem;
+    padding: 2px 6px 2px 10px;
+    border-right: none;
+    border-top-left-radius: 999px;
+    border-bottom-left-radius: 999px;
+}
+
+.debug-log-filter-chip ::deep .debug-log-filter-chip-remove {
+    min-width: 32px;
+    padding: 2px 10px 2px 8px;
+
+    color: var(--text-secondary);
+
+    justify-content: center;
+    border-top-right-radius: 999px;
+    border-bottom-right-radius: 999px;
+}
+
+.debug-log-filter-chip ::deep .debug-log-filter-chip-remove:hover {
+    color: var(--clr-on-status-fill);
+    background: var(--clr-red);
+    border-color: var(--clr-red) !important;
+}
+
+.debug-log-filter-summary {
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    line-height: 1;
+    white-space: nowrap;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.debug-log-filter-editor {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+
+    min-height: 24px;
+    min-width: 0;
+}
+
+/* Compact, fixed control widths so nothing shrinks when the value control changes (e.g. multi-select). */
+.debug-log-filter-editor ::deep .input {
+    margin: 0;
+}
+
+.debug-log-filter-editor ::deep .dropdown-input {
+    margin: 0;
+    flex: 0 0 auto;
+}
+
+.debug-log-filter-editor ::deep .input.filter-dropdown {
+    width: 110px;
+}
+
+.debug-log-filter-editor ::deep .input.filter-value-dropdown,
+.debug-log-filter-editor ::deep .input.filter-description {
+    width: 220px;
+}
+
+.debug-log-filter-editor ::deep .input.filter-multiselect-dropdown {
+    flex: 0 0 auto;
+    width: 220px;
+    min-width: 220px;
+    max-width: 220px;
+}

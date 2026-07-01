@@ -1,0 +1,114 @@
+@using EventLogExpert.Runtime.DebugLog
+@if (IsEditing)
+{
+    <div class="debug-log-filter-editor">
+        <Button aria-label="@(Draft.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
+            aria-pressed="@(Draft.IsExcluded ? "true" : "false")"
+            CssClass="debug-log-filter-exclude-toggle"
+            data-excluded="@(Draft.IsExcluded ? "true" : "false")"
+            IconClass="@(Draft.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
+            IconOnly
+            OnClick="@(() => OnExcludedChanged(!Draft.IsExcluded))"
+            @ref="_editorFirstControl"
+            title="@(Draft.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")" />
+
+        <ValueSelect AriaLabel="Filter field"
+            CssClass="input filter-dropdown"
+            T="DebugLogFilterField"
+            ToStringFunc="@(field => field.ToString())"
+            Value="Draft.Field"
+            ValueChanged="OnFieldChanged">
+            @foreach (var field in Enum.GetValues<DebugLogFilterField>())
+            {
+                <ValueSelectItem T="DebugLogFilterField" Value="field" />
+            }
+        </ValueSelect>
+
+        <ComparisonOperatorSelect AriaLabel="Filter operator"
+            MatchMode="Draft.MatchMode"
+            OnChanged="OnOperatorChanged"
+            Operator="Draft.Operator"
+            SupportsMany="FieldSupportsMany"
+            SupportsText="FieldSupportsText" />
+
+        @if (Draft.Field == DebugLogFilterField.Message)
+        {
+            <TextInput AriaLabel="Filter value"
+                CssClass="input filter-description"
+                Value="@SingleValue"
+                ValueChanged="OnSingleValueChanged" />
+        }
+        else if (Draft.MatchMode == MatchMode.Many)
+        {
+            <ValueSelect AriaLabel="Filter value"
+                CssClass="input filter-multiselect-dropdown"
+                EmptyText="Any"
+                IsMultiSelect
+                T="string"
+                ToStringFunc="@ValueLabel"
+                Values="Draft.Values"
+                ValuesChanged="OnValuesChanged">
+                <ValueSelectItem ClearItem T="string">Any</ValueSelectItem>
+                @foreach (var option in ValueOptions())
+                {
+                    <ValueSelectItem T="string" Value="option" />
+                }
+            </ValueSelect>
+        }
+        else
+        {
+            <ValueSelect AriaLabel="Filter value"
+                CssClass="input filter-value-dropdown"
+                T="string"
+                ToStringFunc="@ValueLabel"
+                Value="@SingleValue"
+                ValueChanged="OnSingleValueChanged">
+                <ValueSelectItem ClearItem T="string">Any</ValueSelectItem>
+                @foreach (var option in ValueOptions())
+                {
+                    <ValueSelectItem T="string" Value="option" />
+                }
+            </ValueSelect>
+        }
+
+        <Button aria-label="Done editing filter"
+            Disabled="@(!Draft.IsComplete)"
+            IconClass="bi bi-check-circle"
+            IconOnly
+            OnClick="OnDoneClick"
+            title="@(Draft.IsComplete ? "Done" : "Add a value to finish this filter")" />
+
+        <DangerButton aria-label="@($"Remove filter: {SummaryText}")"
+            IconClass="bi bi-x-circle"
+            IconOnly
+            OnClick="OnRemove"
+            title="Remove filter" />
+    </div>
+}
+else
+{
+    <div class="debug-log-filter-chip">
+        <Button aria-label="@(Draft.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
+            aria-pressed="@(Draft.IsExcluded ? "true" : "false")"
+            CssClass="debug-log-filter-exclude-toggle"
+            data-excluded="@(Draft.IsExcluded ? "true" : "false")"
+            IconClass="@(Draft.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
+            IconOnly
+            OnClick="@(() => OnExcludedChanged(!Draft.IsExcluded))"
+            title="@(Draft.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")" />
+
+        <ChromelessButton aria-label="@($"Edit filter: {SummaryText}")"
+            CssClass="debug-log-filter-chip-edit"
+            OnClick="OnEditChip"
+            @ref="_chipEditButton"
+            title="Edit filter">
+            <span class="debug-log-filter-summary" title="@SummaryText">@SummaryText</span>
+        </ChromelessButton>
+
+        <ChromelessButton aria-label="@($"Remove filter: {SummaryText}")"
+            CssClass="debug-log-filter-chip-remove"
+            IconClass="bi bi-x-circle"
+            OnClick="OnRemove"
+            title="Remove filter" />
+    </div>
+}

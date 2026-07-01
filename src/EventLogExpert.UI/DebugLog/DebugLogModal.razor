@@ -1,5 +1,3 @@
-@using EventLogExpert.Logging.Abstractions
-@using Microsoft.Extensions.Logging
 @inherits ModalBase<bool>
 
 <ModalChrome AriaLabel="Debug Log"
@@ -8,84 +6,36 @@
     Footer="FooterPreset.CloseOnly"
     Height="60%"
     InlineAlert="@CurrentInlineAlert"
-    MaxWidth="100rem"
-    MinWidth="100rem"
+    MaxWidth="min(100rem, calc(100vw - 2rem))"
+    MinWidth="min(100rem, calc(100vw - 2rem))"
     OnClose="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
     @ref="ChromeRef">
     <ChildContent>
-        <div aria-label="Filters" class="debug-log-filter-bar" role="group">
-            <label>Level</label>
-            <ComparisonOperatorSelect AriaLabel="Level operator"
-                MatchMode="_levelMatchMode"
-                OnChanged="HandleLevelChoiceChanged"
-                Operator="_levelOperator"
-                SupportsMany="true" />
-            @if (_levelMatchMode == MatchMode.Many)
+        <div aria-label="Filters" class="debug-log-filter-tray" role="group">
+            @foreach (var filter in _filters)
             {
-                <ValueSelect AriaLabel="Levels"
-                    CssClass="input filter-dropdown debug-log-level-multi"
-                    EmptyText="All"
-                    IsMultiSelect
-                    T="LogLevel"
-                    ToStringFunc="@(x => x.ToString())"
-                    Values="_multiLevels"
-                    ValuesChanged="HandleMultiLevelsChanged">
-                    <ValueSelectItem ClearItem T="LogLevel">All</ValueSelectItem>
-                    @foreach (var level in s_logLevels)
-                    {
-                        <ValueSelectItem T="LogLevel" Value="level" />
-                    }
-                </ValueSelect>
+                <DebugLogFilterRow AvailableCategories="CategoryFilterOptions()"
+                    Draft="filter"
+                    IsEditing="_editingFilterId == filter.Id"
+                    @key="filter.Id"
+                    OnChanged="OnFilterChanged"
+                    OnDone="CollapseEditor"
+                    OnEdit="@(() => StartEditing(filter.Id))"
+                    OnRemove="@(() => RemoveFilter(filter))"
+                    @ref="_editorRefs[filter.Id]" />
             }
-            else
-            {
-                <ValueSelect AriaLabel="Level"
-                    CssClass="input filter-dropdown"
-                    T="LogLevel?"
-                    ToStringFunc="@(x => x?.ToString() ?? "All")"
-                    Value="_singleLevel"
-                    ValueChanged="HandleSingleLevelChanged">
-                    <ValueSelectItem ClearItem T="LogLevel?">All</ValueSelectItem>
-                    @foreach (var level in s_logLevels)
-                    {
-                        <ValueSelectItem T="LogLevel?" Value="level" />
-                    }
-                </ValueSelect>
-            }
-            <label>Category</label>
-            <ValueSelect AriaLabel="Categories"
-                CssClass="input filter-dropdown debug-log-category-multi"
-                EmptyText="All"
-                IsMultiSelect
-                T="string"
-                ToStringFunc="@(x => x)"
-                Values="_selectedCategories"
-                ValuesChanged="HandleCategoriesChanged">
-                <ValueSelectItem ClearItem T="string">All</ValueSelectItem>
-                @foreach (var category in CategoryOptions())
-                {
-                    <ValueSelectItem T="string" Value="category" />
-                }
-            </ValueSelect>
-            <label>Process</label>
-            <ValueSelect AriaLabel="Process origin"
-                CssClass="input filter-dropdown"
-                T="ProcessOrigin?"
-                ToStringFunc="@(ProcessOriginLabel)"
-                Value="_processOriginFilter"
-                ValueChanged="HandleProcessOriginChanged">
-                <ValueSelectItem ClearItem T="ProcessOrigin?">All</ValueSelectItem>
-                <ValueSelectItem T="ProcessOrigin?" Value="ProcessOrigin.InProcess" />
-                <ValueSelectItem T="ProcessOrigin?" Value="ProcessOrigin.ElevatedHelper" />
-            </ValueSelect>
-            <input aria-label="Filter messages"
-                class="debug-log-text-filter input"
-                @oninput="HandleStringFilterInput"
-                placeholder="Filter messages..."
-                type="text"
-                value="@_pendingStringFilter" />
+
+            <Button aria-label="@(CanAddFilter ? "Add filter" : "Finish the current filter before adding another")"
+                CssClass="debug-log-add-filter"
+                Disabled="@(!CanAddFilter)"
+                IconClass="bi bi-plus-circle"
+                OnClick="AddFilter"
+                @ref="_addButton"
+                title="@(CanAddFilter ? "Add filter" : "Finish the current filter before adding another")">
+                Add Filter
+            </Button>
         </div>
         <div aria-busy="@(_hasLoaded ? "false" : "true")" aria-label="Debug log entries" class="debug-log-viewport" role="region" tabindex="0">
             <Virtualize Context="line" Items="_displayedView" ItemSize="@RowHeightPx" OverscanCount="20">
