@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
+using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Menu;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +38,18 @@ internal static class DatabaseToolsTestDependencies
             services.AddSingleton(Substitute.For<ICurrentVersionProvider>());
             services.AddSingleton(Substitute.For<IMenuActionService>());
             services.AddSingleton(Substitute.For<ITraceLogger>());
+            services.AddOperationLogSinkFactoryMock();
+
+            return services;
+        }
+
+        public IServiceCollection AddOperationLogSinkFactoryMock()
+        {
+            var operationLogSinkFactory = Substitute.For<IOperationLogSinkFactory>();
+            operationLogSinkFactory
+                .Create(Arg.Any<IProgress<LogRecord>>(), Arg.Any<string>(), Arg.Any<bool>())
+                .Returns(callInfo => callInfo.Arg<IProgress<LogRecord>>());
+            services.AddSingleton(operationLogSinkFactory);
 
             return services;
         }

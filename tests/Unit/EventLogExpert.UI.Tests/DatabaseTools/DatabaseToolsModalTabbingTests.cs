@@ -66,6 +66,7 @@ public sealed class DatabaseToolsModalTabbingTests : BunitContext
         Services.AddSingleton(Substitute.For<IAlertDialogService>());
         Services.AddSingleton(Substitute.For<ICurrentVersionProvider>());
         Services.AddSingleton(Substitute.For<IMenuActionService>());
+        Services.AddOperationLogSinkFactoryMock();
 
         Services.AddFluxor(options => options.ScanAssemblies(typeof(DatabaseToolsModal).Assembly));
     }

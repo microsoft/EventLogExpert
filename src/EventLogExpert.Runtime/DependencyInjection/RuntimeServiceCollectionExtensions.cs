@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.DependencyInjection;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Configuration;
 using EventLogExpert.Logging.Routing;
 using EventLogExpert.Logging.Sinks;
 using EventLogExpert.Provider.Maintenance;
@@ -30,6 +31,7 @@ using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
 using EventLogExpert.Scenarios.Catalog;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -191,6 +193,11 @@ public static class RuntimeServiceCollectionExtensions
 
             services.AddSingleton<IAnnouncementService, AnnouncementService>();
 
+            services.Configure<LoggingOptions>(LoggingOptions.ApplyShippedDefaults);
+            services.AddSingleton(static sp =>
+                new LogRoutingPolicy(
+                    sp.GetRequiredService<IOptions<LoggingOptions>>().Value,
+                    sp.GetRequiredService<ISettingsService>().LogLevel));
             services.AddSingleton<DebugFileSink>();
             services.AddSingleton<IFileLogger>(static sp => sp.GetRequiredService<DebugFileSink>());
             services.AddSingleton<ILogSourceFactory>(static sp =>
@@ -204,6 +211,7 @@ public static class RuntimeServiceCollectionExtensions
             });
             services.AddSingleton<ITraceLogger>(static sp =>
                 sp.GetRequiredService<ILogSourceFactory>().ForCategory(LogSourceFactory.DefaultCategory));
+            services.AddSingleton<IOperationLogSinkFactory, OperationLogSinkFactory>();
             services.AddSingleton<ILogWatcherService, LogWatcherService>();
             services.AddSingleton<IMenuService, MenuService>();
             services.AddSingleton<IModalCoordinator, ModalCoordinator>();

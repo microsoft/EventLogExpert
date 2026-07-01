@@ -172,6 +172,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(ITraceLogger))]
     [InlineData(typeof(ILogSourceFactory))]
     [InlineData(typeof(IFileLogger))]
+    [InlineData(typeof(IOperationLogSinkFactory))]
     // Update + deployment services.
     [InlineData(typeof(ICurrentVersionProvider))]
     [InlineData(typeof(IDeploymentService))]

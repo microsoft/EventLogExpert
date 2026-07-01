@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Configuration;
 using EventLogExpert.Logging.Routing;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.DebugLog;
@@ -35,7 +36,7 @@ public sealed class DebugFileSinkTests : IDisposable
             $"{Constants.DebugLogExistingContent}\n{Constants.DebugLogLine2}\n{Constants.DebugLogLine3}",
             TestContext.Current.CancellationToken);
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act
         await debugLogService.ClearAsync();
@@ -52,7 +53,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act
         await debugLogService.ClearAsync();
@@ -70,10 +71,10 @@ public sealed class DebugFileSinkTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        using var firstInstance = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var firstInstance = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
         firstInstance.Information("first instance line");
 
-        using var secondInstance = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var secondInstance = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
         secondInstance.Information("second instance line");
 
         // Act + Assert - clearing from one instance must not fail because the other holds the writer.
@@ -104,7 +105,7 @@ public sealed class DebugFileSinkTests : IDisposable
         // Act & Assert - Constructor should complete without throwing
         var exception = Record.Exception(() =>
         {
-            using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+            using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
         });
 
         Assert.Null(exception);
@@ -124,7 +125,7 @@ public sealed class DebugFileSinkTests : IDisposable
         }
 
         // Act
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Assert
         Assert.False(File.Exists(_testLogPath) && new FileInfo(_testLogPath).Length > 10 * 1024 * 1024);
@@ -140,7 +141,7 @@ public sealed class DebugFileSinkTests : IDisposable
         File.WriteAllText(_testLogPath, Constants.DebugLogExistingContent);
 
         // Act
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
         debugLogService.Information($"{Constants.DebugLogNewMessage}");
 
         // Assert
@@ -159,7 +160,7 @@ public sealed class DebugFileSinkTests : IDisposable
         // Act & Assert
         var exception = Record.Exception(() =>
         {
-            using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+            using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
         });
 
         Assert.Null(exception);
@@ -175,7 +176,7 @@ public sealed class DebugFileSinkTests : IDisposable
         // Act & Assert
         var exception = Record.Exception(() =>
         {
-            using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+            using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
         });
 
         Assert.Null(exception);
@@ -201,7 +202,7 @@ public sealed class DebugFileSinkTests : IDisposable
     {
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
-        var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         debugLogService.Dispose();
 
@@ -215,7 +216,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act & Assert - Dispose should complete without throwing
         var exception = Record.Exception(debugLogService.Dispose);
@@ -227,7 +228,7 @@ public sealed class DebugFileSinkTests : IDisposable
     {
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
-        var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         await debugLogService.DisposeAsync();
 
@@ -240,7 +241,7 @@ public sealed class DebugFileSinkTests : IDisposable
     {
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
-        var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         await debugLogService.DisposeAsync();
 
@@ -254,7 +255,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
         TraceAtLevel(debugLogService, "before dispose", LogLevel.Information);
 
         // Act - DisposeAsync should complete without throwing and release the log-file handle
@@ -275,7 +276,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var expectedLines = new[] { Constants.DebugLogLine1, Constants.DebugLogLine2, Constants.DebugLogLine3 };
         await File.WriteAllLinesAsync(_testLogPath, expectedLines, TestContext.Current.CancellationToken);
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act - Start enumeration and delete the file while the reader holds a handle
         await using var enumerator =
@@ -315,7 +316,7 @@ public sealed class DebugFileSinkTests : IDisposable
             File.Delete(_testLogPath);
         }
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act
         var lines = await debugLogService.LoadAsync(TestContext.Current.CancellationToken)
@@ -335,7 +336,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var expectedLines = new[] { Constants.DebugLogLine1, Constants.DebugLogLine2, Constants.DebugLogLine3 };
         await File.WriteAllLinesAsync(_testLogPath, expectedLines, TestContext.Current.CancellationToken);
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act
         var lines = await debugLogService.LoadAsync(TestContext.Current.CancellationToken)
@@ -357,7 +358,7 @@ public sealed class DebugFileSinkTests : IDisposable
 
         await File.WriteAllTextAsync(_testLogPath, string.Empty, TestContext.Current.CancellationToken);
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act
         var lines = await debugLogService.LoadAsync(TestContext.Current.CancellationToken)
@@ -375,7 +376,8 @@ public sealed class DebugFileSinkTests : IDisposable
 
         using var debugLogService = new DebugFileSink(
             new FileLocationOptions(_testDirectory),
-            mockSettingsService);
+            mockSettingsService,
+            CreateRoutingPolicy(mockSettingsService));
 
         // Assert initial
         Assert.Equal(LogLevel.Information, debugLogService.MinimumLevelFor(LogSourceFactory.DefaultCategory));
@@ -394,7 +396,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act
         debugLogService.Information($"{Constants.DebugLogTestMessage}");
@@ -412,7 +414,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act
         debugLogService.Information($"{Constants.DebugLogTestMessage}");
@@ -435,7 +437,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var startGate = new TaskCompletionSource();
 
         // Act
-        using (var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService))
+        using (var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService)))
         {
             var writers = Enumerable.Range(0, WriterCount)
                 .Select(writerIndex => Task.Run(async () =>
@@ -506,7 +508,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act
         debugLogService.Information($"{Constants.DebugLogFirstMessage}");
@@ -528,7 +530,8 @@ public sealed class DebugFileSinkTests : IDisposable
 
         using var debugLogService = new DebugFileSink(
             new FileLocationOptions(_testDirectory),
-            mockSettingsService);
+            mockSettingsService,
+            CreateRoutingPolicy(mockSettingsService));
 
         // Act - write at Information (should succeed)
         debugLogService.Information($"{Constants.DebugLogFirstMessage}");
@@ -562,7 +565,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(level);
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act
         TraceAtLevel(debugLogService, $"Message at {level}", level);
@@ -579,7 +582,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act
         debugLogService.Error($"{Constants.DebugLogErrorMessage}");
@@ -597,7 +600,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Warning);
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act
         debugLogService.Information($"{Constants.DebugLogTestMessage}");
@@ -613,7 +616,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act
         debugLogService.Information($"{Constants.DebugLogTestMessage}");
@@ -631,7 +634,7 @@ public sealed class DebugFileSinkTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act
         debugLogService.Information($"{Constants.DebugLogDefaultLevelMessage}");
@@ -650,7 +653,8 @@ public sealed class DebugFileSinkTests : IDisposable
 
         using var debugLogService = new DebugFileSink(
             new FileLocationOptions(_testDirectory),
-            mockSettingsService);
+            mockSettingsService,
+            CreateRoutingPolicy(mockSettingsService));
 
         // Act - write at Debug (should succeed)
         debugLogService.Debug("debug message before change");
@@ -680,10 +684,10 @@ public sealed class DebugFileSinkTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        using var firstInstance = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var firstInstance = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
         firstInstance.Information("first instance line");
 
-        using var secondInstance = new DebugFileSink(fileLocationOptions, mockSettingsService);
+        using var secondInstance = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
 
         // Act + Assert
         var exception = Record.Exception(() => secondInstance.Information("second instance line"));
@@ -714,6 +718,9 @@ public sealed class DebugFileSinkTests : IDisposable
 
         return (mockSettingsService, SetLogLevel);
     }
+
+    private static LogRoutingPolicy CreateRoutingPolicy(ISettingsService settings) =>
+        new(LoggingOptions.CreateShippedDefaults(), settings.LogLevel);
 
     private static void TraceAtLevel(DebugFileSink service, string message, LogLevel level)
     {
