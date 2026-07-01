@@ -2,17 +2,18 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Abstractions.Handlers;
+using EventLogExpert.Logging.Sinks;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Settings;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace EventLogExpert.Runtime.DebugLog;
 
-internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, IAsyncDisposable
+internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsyncDisposable
 {
     private const long MaxLogSize = 10 * 1024 * 1024;
 
@@ -27,7 +28,7 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, 
     private bool _disposed;
     private StreamWriter? _writer;
 
-    public DebugLogService(FileLocationOptions fileLocationOptions, ISettingsService settings)
+    public DebugFileSink(FileLocationOptions fileLocationOptions, ISettingsService settings)
     {
         _fileLocationOptions = fileLocationOptions;
         _settings = settings;
@@ -40,8 +41,6 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, 
 
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
     }
-
-    public LogLevel MinimumLevel => _cachedLogLevel;
 
     public Task ClearAsync()
     {
@@ -67,20 +66,6 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, 
         }
 
         return Task.CompletedTask;
-    }
-
-    public void Critical([InterpolatedStringHandlerArgument("")] CriticalLogHandler handler)
-    {
-        if (!handler.IsEnabled) { return; }
-
-        WriteTrace(handler.ToStringAndClear(), LogLevel.Critical);
-    }
-
-    public void Debug([InterpolatedStringHandlerArgument("")] DebugLogHandler handler)
-    {
-        if (!handler.IsEnabled) { return; }
-
-        WriteTrace(handler.ToStringAndClear(), LogLevel.Debug);
     }
 
     public void Dispose()
@@ -129,18 +114,12 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, 
         }
     }
 
-    public void Error([InterpolatedStringHandlerArgument("")] ErrorLogHandler handler)
+    public void Emit(LogRecord record)
     {
-        if (!handler.IsEnabled) { return; }
+        // Re-check this sink's own threshold: the dispatcher gates on the aggregate across all sinks, which may be lower.
+        if (record.Level < _cachedLogLevel) { return; }
 
-        WriteTrace(handler.ToStringAndClear(), LogLevel.Error);
-    }
-
-    public void Information([InterpolatedStringHandlerArgument("")] InformationLogHandler handler)
-    {
-        if (!handler.IsEnabled) { return; }
-
-        WriteTrace(handler.ToStringAndClear(), LogLevel.Information);
+        WriteOutput(FormatLine(record.TimestampUtc.ToLocalTime(), Environment.CurrentManagedThreadId, record.Level, record.Message));
     }
 
     public async IAsyncEnumerable<string> LoadAsync(
@@ -179,19 +158,7 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, 
         }
     }
 
-    public void Trace([InterpolatedStringHandlerArgument("")] TraceLogHandler handler)
-    {
-        if (!handler.IsEnabled) { return; }
-
-        WriteTrace(handler.ToStringAndClear(), LogLevel.Trace);
-    }
-
-    public void Warning([InterpolatedStringHandlerArgument("")] WarningLogHandler handler)
-    {
-        if (!handler.IsEnabled) { return; }
-
-        WriteTrace(handler.ToStringAndClear(), LogLevel.Warning);
-    }
+    public LogLevel MinimumLevelFor(string origin) => _cachedLogLevel;
 
     private static string DeriveMutexName(string path)
     {
@@ -202,6 +169,9 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, 
         var hash = SHA256.HashData(bytes);
         return $"Local\\EventLogExpert.DebugLog.{Convert.ToHexString(hash, 0, 8)}";
     }
+
+    private static string FormatLine(DateTime localTimestamp, int threadId, LogLevel level, string message) =>
+        $"[{localTimestamp:o}] [{threadId}] [{level}] {message}";
 
     private void CloseWriter()
     {
@@ -247,7 +217,7 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, 
 
     private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
-        WriteTrace($"Unhandled Exception: {e.ExceptionObject}", LogLevel.Critical);
+        WriteOutput(FormatLine(DateTime.Now, Environment.CurrentManagedThreadId, LogLevel.Critical, $"Unhandled Exception: {e.ExceptionObject}"));
     }
 
     private void WithInterprocessLock(Action action, bool throwOnTimeout)
@@ -286,13 +256,11 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, 
         }
     }
 
-    private void WriteTrace(string message, LogLevel level)
+    private void WriteOutput(string output)
     {
         using (_writeLock.EnterScope())
         {
             if (_disposed) { return; }
-
-            string output = $"[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}";
 
             EnsureWriter();
 
@@ -309,7 +277,7 @@ internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable, 
                 throwOnTimeout: false);
 
 #if DEBUG
-            System.Diagnostics.Debug.WriteLine(output);
+            Debug.WriteLine(output);
 #endif
         }
     }

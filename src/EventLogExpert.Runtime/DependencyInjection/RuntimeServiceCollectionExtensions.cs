@@ -3,6 +3,8 @@
 
 using EventLogExpert.DatabaseTools.DependencyInjection;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Routing;
+using EventLogExpert.Logging.Sinks;
 using EventLogExpert.Provider.Maintenance;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Runtime.Announcement;
@@ -189,9 +191,19 @@ public static class RuntimeServiceCollectionExtensions
 
             services.AddSingleton<IAnnouncementService, AnnouncementService>();
 
-            services.AddSingleton<DebugLogService>();
-            services.AddSingleton<ITraceLogger>(static sp => sp.GetRequiredService<DebugLogService>());
-            services.AddSingleton<IFileLogger>(static sp => sp.GetRequiredService<DebugLogService>());
+            services.AddSingleton<DebugFileSink>();
+            services.AddSingleton<IFileLogger>(static sp => sp.GetRequiredService<DebugFileSink>());
+            services.AddSingleton<ILogSourceFactory>(static sp =>
+            {
+                List<ILogSink> sinks = [sp.GetRequiredService<DebugFileSink>()];
+#if DEBUG
+                // Debug builds also mirror to the console so logs surface in the F12 / debug window; Release is file-only.
+                sinks.Add(new ConsoleSink());
+#endif
+                return new LogSourceFactory(sinks);
+            });
+            services.AddSingleton<ITraceLogger>(static sp =>
+                sp.GetRequiredService<ILogSourceFactory>().ForCategory(LogSourceFactory.DefaultCategory));
             services.AddSingleton<ILogWatcherService, LogWatcherService>();
             services.AddSingleton<IMenuService, MenuService>();
             services.AddSingleton<IModalCoordinator, ModalCoordinator>();
