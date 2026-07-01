@@ -9,5 +9,5 @@ public sealed record LogRecord(
     DateTime TimestampUtc,
     LogLevel Level,
     string Message,
-    string Origin = "",
+    string Category = "",
     ProcessOrigin ProcessOrigin = ProcessOrigin.InProcess);

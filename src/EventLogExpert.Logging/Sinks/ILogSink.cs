@@ -10,5 +10,5 @@ public interface ILogSink
 {
     void Emit(LogRecord record);
 
-    LogLevel MinimumLevelFor(string origin);
+    LogLevel MinimumLevelFor(string category);
 }

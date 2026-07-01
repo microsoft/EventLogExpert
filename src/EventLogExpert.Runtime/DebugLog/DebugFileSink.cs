@@ -118,12 +118,12 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
     public void Emit(LogRecord record)
     {
         // Re-check this sink's own threshold: the dispatcher gates on the aggregate across all sinks, which may be lower.
-        if (record.Level < _routingPolicy.FileMinimumFor(record.Origin)) { return; }
+        if (record.Level < _routingPolicy.FileMinimumFor(record.Category)) { return; }
 
         WriteOutput(FormatLine(record.TimestampUtc.ToLocalTime(),
             Environment.CurrentManagedThreadId,
             record.Level,
-            record.Origin,
+            record.Category,
             record.ProcessOrigin,
             record.Message));
     }
@@ -164,7 +164,7 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
         }
     }
 
-    public LogLevel MinimumLevelFor(string origin) => _routingPolicy.FileMinimumFor(origin);
+    public LogLevel MinimumLevelFor(string category) => _routingPolicy.FileMinimumFor(category);
 
     private static string DeriveMutexName(string path)
     {

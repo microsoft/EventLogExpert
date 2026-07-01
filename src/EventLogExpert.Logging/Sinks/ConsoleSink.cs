@@ -45,5 +45,5 @@ public sealed class ConsoleSink(LogLevel minimumLevel = LogLevel.Information) : 
         }
     }
 
-    public LogLevel MinimumLevelFor(string origin) => minimumLevel;
+    public LogLevel MinimumLevelFor(string category) => minimumLevel;
 }

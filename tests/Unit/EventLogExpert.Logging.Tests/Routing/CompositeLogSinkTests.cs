@@ -45,7 +45,7 @@ public sealed class CompositeLogSinkTests
 
         composite.Report(new LogRecord(DateTime.UtcNow, LogLevel.Information, "hi", "Offline.Wim"));
 
-        Assert.Equal("Offline.Wim", Assert.Single(sink.Received).Origin);
+        Assert.Equal("Offline.Wim", Assert.Single(sink.Received).Category);
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public sealed class CompositeLogSinkTests
 
         composite.Report(new LogRecord(DateTime.UtcNow, LogLevel.Information, "hi"));
 
-        Assert.Equal("DatabaseTools.Create", Assert.Single(sink.Received).Origin);
+        Assert.Equal("DatabaseTools.Create", Assert.Single(sink.Received).Category);
     }
 
     [Fact]
@@ -76,6 +76,6 @@ public sealed class CompositeLogSinkTests
     {
         public void Emit(LogRecord record) => throw new IOException("sink down");
 
-        public LogLevel MinimumLevelFor(string origin) => LogLevel.Trace;
+        public LogLevel MinimumLevelFor(string category) => LogLevel.Trace;
     }
 }

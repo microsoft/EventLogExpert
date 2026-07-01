@@ -62,7 +62,7 @@ public sealed class DispatchingTraceLoggerTests
         logger.Error($"boom");
 
         var record = Assert.Single(sink.Received);
-        Assert.Equal("Offline.Wim", record.Origin);
+        Assert.Equal("Offline.Wim", record.Category);
         Assert.Equal(ProcessOrigin.ElevatedHelper, record.ProcessOrigin);
     }
 
