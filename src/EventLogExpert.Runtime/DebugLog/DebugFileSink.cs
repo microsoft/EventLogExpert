@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Routing;
 using EventLogExpert.Logging.Sinks;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Settings;
@@ -21,18 +22,18 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
 
     private readonly FileLocationOptions _fileLocationOptions;
     private readonly Mutex _interprocessMutex;
+    private readonly LogRoutingPolicy _routingPolicy;
     private readonly ISettingsService _settings;
     private readonly Lock _writeLock = new();
 
-    private volatile LogLevel _cachedLogLevel;
     private bool _disposed;
     private StreamWriter? _writer;
 
-    public DebugFileSink(FileLocationOptions fileLocationOptions, ISettingsService settings)
+    public DebugFileSink(FileLocationOptions fileLocationOptions, ISettingsService settings, LogRoutingPolicy routingPolicy)
     {
         _fileLocationOptions = fileLocationOptions;
         _settings = settings;
-        _cachedLogLevel = _settings.LogLevel;
+        _routingPolicy = routingPolicy;
         _interprocessMutex = new Mutex(false, DeriveMutexName(_fileLocationOptions.LoggingPath));
 
         InitTracing();
@@ -117,7 +118,7 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
     public void Emit(LogRecord record)
     {
         // Re-check this sink's own threshold: the dispatcher gates on the aggregate across all sinks, which may be lower.
-        if (record.Level < _cachedLogLevel) { return; }
+        if (record.Level < _routingPolicy.FileMinimumFor(record.Origin)) { return; }
 
         WriteOutput(FormatLine(record.TimestampUtc.ToLocalTime(), Environment.CurrentManagedThreadId, record.Level, record.Message));
     }
@@ -158,7 +159,7 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
         }
     }
 
-    public LogLevel MinimumLevelFor(string origin) => _cachedLogLevel;
+    public LogLevel MinimumLevelFor(string origin) => _routingPolicy.FileMinimumFor(origin);
 
     private static string DeriveMutexName(string path)
     {
@@ -212,7 +213,7 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
 
     private void OnLogLevelChanged()
     {
-        _cachedLogLevel = _settings.LogLevel;
+        _routingPolicy.UpdateGlobalBaseline(_settings.LogLevel);
     }
 
     private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)

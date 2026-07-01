@@ -2,11 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.Common.Operations;
-using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Sinks;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.DatabaseTools;
+using EventLogExpert.Runtime.DebugLog;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
@@ -52,8 +51,6 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
     [Inject] protected IDatabaseToolsService DatabaseToolsService { get; init; } = null!;
 
-    [Inject] protected ITraceLogger FileLogger { get; init; } = null!;
-
     [Inject] protected IFilePickerService FilePickerService { get; init; } = null!;
 
     protected string ImportDatabaseButtonText
@@ -88,6 +85,8 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     protected bool IsImportInProgress => _autoImportState == AutoImportState.Importing;
 
     protected ImmutableList<LogRecord> LogEntries { get; set; } = ImmutableList<LogRecord>.Empty;
+
+    [Inject] protected IOperationLogSinkFactory OperationLogSinkFactory { get; init; } = null!;
 
     protected DatabaseToolsResult? Outcome { get; set; }
 
@@ -337,7 +336,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
             _flushScheduled = false;
         }
 
-        IProgress<LogRecord> logSink = new FileTeeLogSink(new Progress<LogRecord>(AppendEntry), FileLogger);
+        IProgress<LogRecord> logSink = OperationLogSinkFactory.Create(new Progress<LogRecord>(AppendEntry), LogCategories.DatabaseTools, VerboseLogging);
         var startTimestamp = Stopwatch.GetTimestamp();
 
         try
