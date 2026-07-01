@@ -84,6 +84,8 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     // Post-success auto-import runs while IsRunning remains true; hide Cancel because it cannot cancel the import.
     protected bool IsImportInProgress => _autoImportState == AutoImportState.Importing;
 
+    protected virtual string LogCategory => LogCategories.DatabaseTools;
+
     protected ImmutableList<LogRecord> LogEntries { get; set; } = ImmutableList<LogRecord>.Empty;
 
     [Inject] protected IOperationLogSinkFactory OperationLogSinkFactory { get; init; } = null!;
@@ -336,7 +338,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
             _flushScheduled = false;
         }
 
-        IProgress<LogRecord> logSink = OperationLogSinkFactory.Create(new Progress<LogRecord>(AppendEntry), LogCategories.DatabaseTools, VerboseLogging);
+        IProgress<LogRecord> logSink = OperationLogSinkFactory.Create(new Progress<LogRecord>(AppendEntry), LogCategory, VerboseLogging);
         var startTimestamp = Stopwatch.GetTimestamp();
 
         try

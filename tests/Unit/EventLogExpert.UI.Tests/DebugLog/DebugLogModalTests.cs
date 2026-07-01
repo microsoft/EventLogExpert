@@ -137,6 +137,80 @@ public sealed class DebugLogModalTests : BunitContext
     }
 
     [Fact]
+    public async Task DebugLogModal_CategoryFilterSelected_NarrowsToThatCategory()
+    {
+        var lines = new[]
+        {
+            DebugLogUtils.BuildLine(LogLevel.Warning, "DatabaseTools.Create", "create line"),
+            DebugLogUtils.BuildLine(LogLevel.Warning, "Elevation.Ipc", "ipc line"),
+            DebugLogUtils.BuildLine(LogLevel.Warning, "DatabaseTools.Create", "another create line"),
+        };
+
+        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("3 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        var categoriesDropdown = component.Find("input[aria-label='Categories']").ParentElement;
+        Assert.NotNull(categoriesDropdown);
+        var createOption = categoriesDropdown.QuerySelectorAll("[role='option']")
+            .First(o => o.TextContent.Trim() == "DatabaseTools.Create");
+
+        await createOption.MouseDownAsync(new MouseEventArgs());
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+    }
+
+    [Fact]
+    public async Task DebugLogModal_CategorySelectedMidStream_SurvivesNewCategoryArriving()
+    {
+        var gate = new TaskCompletionSource();
+
+        async IAsyncEnumerable<string> Source()
+        {
+            for (var i = 0; i < 100; i++)
+            {
+                yield return DebugLogUtils.BuildLine(LogLevel.Warning, "DatabaseTools.Create", $"create-{i}");
+            }
+
+            await gate.Task;
+
+            for (var i = 0; i < 30; i++)
+            {
+                yield return DebugLogUtils.BuildLine(LogLevel.Warning, "Elevation.Ipc", $"ipc-{i}");
+            }
+        }
+
+        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(Source());
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(
+            () => Assert.Equal("99 of 99 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()),
+            TimeSpan.FromSeconds(2));
+
+        var categoriesDropdown = component.Find("input[aria-label='Categories']").ParentElement;
+        Assert.NotNull(categoriesDropdown);
+        var createOption = categoriesDropdown.QuerySelectorAll("[role='option']")
+            .First(o => o.TextContent.Trim() == "DatabaseTools.Create");
+
+        await createOption.MouseDownAsync(new MouseEventArgs());
+
+        await component.WaitForAssertionAsync(
+            () => Assert.Equal("99 of 99 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()),
+            TimeSpan.FromSeconds(2));
+
+        gate.SetResult();
+
+        await component.WaitForAssertionAsync(
+            () => Assert.Equal("100 of 130 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()),
+            TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
     public async Task DebugLogModal_ClearDuringStreamingLoad_StaleStreamDoesNotMutateState()
     {
         // Arrange
@@ -581,10 +655,13 @@ public sealed class DebugLogModalTests : BunitContext
             Assert.Equal("0 of 0 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
 
         // Assert
-        var allOption = component.FindAll("[role='option']").Single(o => o.TextContent.Trim() == "All");
+        var levelDropdown = component.FindAll(".dropdown-input")
+            .Single(dropdown => dropdown.QuerySelector("input[aria-label='Level']") is not null);
+
+        var allOption = levelDropdown.QuerySelectorAll("[role='option']").Single(o => o.TextContent.Trim() == "All");
         Assert.Equal("true", allOption.GetAttribute("aria-selected"));
 
-        var traceOption = component.FindAll("[role='option']").Single(o => o.TextContent.Trim() == nameof(LogLevel.Trace));
+        var traceOption = levelDropdown.QuerySelectorAll("[role='option']").Single(o => o.TextContent.Trim() == nameof(LogLevel.Trace));
         Assert.Equal("false", traceOption.GetAttribute("aria-selected"));
     }
 
@@ -837,6 +914,33 @@ public sealed class DebugLogModalTests : BunitContext
     }
 
     [Fact]
+    public async Task DebugLogModal_ProcessOriginFilterElevatedHelper_NarrowsToHelperLines()
+    {
+        var lines = new[]
+        {
+            DebugLogUtils.BuildLine(LogLevel.Warning, "DatabaseTools.Create", "in-process line"),
+            DebugLogUtils.BuildElevatedHelperLine(LogLevel.Warning, "DatabaseTools.Create", "helper line"),
+        };
+
+        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        var processDropdown = component.Find("input[aria-label='Process origin']").ParentElement;
+        Assert.NotNull(processDropdown);
+        var helperOption = processDropdown.QuerySelectorAll("[role='option']")
+            .First(o => o.TextContent.Trim() == "Elevated helper");
+
+        await helperOption.MouseDownAsync(new MouseEventArgs());
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+    }
+
+    [Fact]
     public async Task DebugLogModal_RefreshClickedWhilePendingFilterPending_UsesNewFilterForReloadedEntries()
     {
         // Arrange
@@ -912,6 +1016,33 @@ public sealed class DebugLogModalTests : BunitContext
         await component.WaitForAssertionAsync(
             () => Assert.Equal("1 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()),
             TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task DebugLogModal_UncategorizedCategorySelected_NarrowsToNullCategoryLines()
+    {
+        var lines = new[]
+        {
+            DebugLogUtils.BuildLine(LogLevel.Warning, "DatabaseTools.Create", "categorized line"),
+            DebugLogUtils.BuildLine(LogLevel.Warning, "uncategorized line"),
+        };
+
+        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        var categoriesDropdown = component.Find("input[aria-label='Categories']").ParentElement;
+        Assert.NotNull(categoriesDropdown);
+        var uncategorizedOption = categoriesDropdown.QuerySelectorAll("[role='option']")
+            .First(o => o.TextContent.Trim() == "(Uncategorized)");
+
+        await uncategorizedOption.MouseDownAsync(new MouseEventArgs());
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
     }
 
     [Fact]

@@ -22,6 +22,8 @@ public sealed partial class DiffDatabasesTab : DatabaseToolsTabBase<DiffDatabase
         !string.IsNullOrWhiteSpace(_secondPath) &&
         !string.IsNullOrWhiteSpace(_newDbPath);
 
+    protected override string LogCategory => LogCategories.DatabaseToolsDiff;
+
     protected override DiffDatabaseRequest BuildRequest() =>
         new(_firstPath.Trim(), _secondPath.Trim(), _newDbPath.Trim());
 

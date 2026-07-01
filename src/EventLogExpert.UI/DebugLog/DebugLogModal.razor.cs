@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Common.Filtering;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;
@@ -19,6 +20,8 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     private const int RowHeightPx = 18;
     private const int StringFilterDebounceMs = 250;
 
+    private const string UncategorizedLabel = "(Uncategorized)";
+
     private static readonly LogLevel[] s_logLevels =
     [
         LogLevel.Trace,
@@ -28,6 +31,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         LogLevel.Error,
         LogLevel.Critical,
     ];
+    private readonly SortedSet<string> _availableCategories = new(StringComparer.Ordinal);
 
     private string _activeStringFilter = string.Empty;
     private List<string> _displayed = [];
@@ -35,13 +39,16 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     private IReadOnlyList<DebugLogEntry> _entries = [];
     private int _filteredEntryCount;
     private bool _hasLoaded;
+    private bool _hasUncategorized;
     private MatchMode _levelMatchMode = MatchMode.Single;
     private ComparisonOperator _levelOperator = ComparisonOperator.Equals;
     private CancellationTokenSource? _loadCts;
     private int _loadGeneration;
     private List<LogLevel> _multiLevels = [];
     private string _pendingStringFilter = string.Empty;
+    private ProcessOrigin? _processOriginFilter;
     private int _projectedThroughIndex;
+    private List<string> _selectedCategories = [];
     private LogLevel? _singleLevel;
     private CancellationTokenSource? _stringFilterCts;
     private int _stringFilterGeneration;
@@ -81,6 +88,13 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         await base.OnInitializedAsync();
     }
 
+    private static string ProcessOriginLabel(ProcessOrigin? origin) => origin switch
+    {
+        ProcessOrigin.InProcess => "In-process",
+        ProcessOrigin.ElevatedHelper => "Elevated helper",
+        _ => "All",
+    };
+
     private void ApplyIncrementalProjection()
     {
         if (_projectedThroughIndex >= _entries.Count) { return; }
@@ -93,7 +107,9 @@ public sealed partial class DebugLogModal : ModalBase<bool>
             _entries.Count,
             _levelOperator,
             levels,
-            _activeStringFilter);
+            _activeStringFilter,
+            BuildCategoriesForProjection(),
+            _processOriginFilter);
 
         if (newLines.Count > 0) { _displayed.AddRange(newLines); }
 
@@ -104,17 +120,41 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     private void ApplyProjection()
     {
         var levels = BuildLevelsForProjection();
-        var (lines, count) = DebugLogProjection.Project(_entries, _levelOperator, levels, _activeStringFilter);
+        var (lines, count) = DebugLogProjection.Project(_entries, _levelOperator, levels, _activeStringFilter, BuildCategoriesForProjection(), _processOriginFilter);
 
         SetDisplayed(lines);
         _filteredEntryCount = count;
         _projectedThroughIndex = _entries.Count;
     }
 
+    private IReadOnlyList<string>? BuildCategoriesForProjection()
+    {
+        if (_selectedCategories.Count == 0) { return null; }
+
+        return [.. _selectedCategories.Select(static category => category == UncategorizedLabel ? string.Empty : category)];
+    }
+
     private IReadOnlyList<LogLevel> BuildLevelsForProjection() =>
         _levelMatchMode == MatchMode.Many
             ? _multiLevels
             : _singleLevel.HasValue ? [_singleLevel.Value] : [];
+
+    private IReadOnlyList<string> CategoryOptions()
+    {
+        var options = new SortedSet<string>(_availableCategories, StringComparer.Ordinal);
+
+        foreach (var selected in _selectedCategories)
+        {
+            if (selected != UncategorizedLabel) { options.Add(selected); }
+        }
+
+        if (_hasUncategorized || _selectedCategories.Contains(UncategorizedLabel))
+        {
+            options.Add(UncategorizedLabel);
+        }
+
+        return [.. options];
+    }
 
     private async Task Clear()
     {
@@ -135,6 +175,8 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         SetDisplayed([]);
         _filteredEntryCount = 0;
         _projectedThroughIndex = 0;
+        _availableCategories.Clear();
+        _hasUncategorized = false;
         _hasLoaded = true;
 
         StateHasChanged();
@@ -146,6 +188,13 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         {
             ApplyProjection();
         }
+    }
+
+    private void HandleCategoriesChanged(List<string> categories)
+    {
+        _selectedCategories = categories;
+        SyncPendingStringFilter();
+        ApplyProjection();
     }
 
     private async Task HandleCopyAsync()
@@ -201,6 +250,13 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         ApplyProjection();
     }
 
+    private void HandleProcessOriginChanged(ProcessOrigin? processOrigin)
+    {
+        _processOriginFilter = processOrigin;
+        SyncPendingStringFilter();
+        ApplyProjection();
+    }
+
     private void HandleSingleLevelChanged(LogLevel? level)
     {
         _singleLevel = level;
@@ -250,6 +306,8 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         SetDisplayed([]);
         _filteredEntryCount = 0;
         _projectedThroughIndex = 0;
+        _availableCategories.Clear();
+        _hasUncategorized = false;
         StateHasChanged();
 
         var parser = new DebugLogEntryStreamParser();
@@ -264,7 +322,11 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
                 var emitted = parser.AddLine(line);
 
-                if (emitted is not null) { streamingEntries.Add(emitted); }
+                if (emitted is not null)
+                {
+                    streamingEntries.Add(emitted);
+                    TrackEntryCategory(emitted);
+                }
 
                 if (++sinceRender < RenderBatchSize) { continue; }
 
@@ -286,7 +348,11 @@ public sealed partial class DebugLogModal : ModalBase<bool>
             {
                 var final = parser.Flush();
 
-                if (final is not null) { streamingEntries.Add(final); }
+                if (final is not null)
+                {
+                    streamingEntries.Add(final);
+                    TrackEntryCategory(final);
+                }
 
                 ApplyIncrementalProjection();
                 _hasLoaded = true;
@@ -321,5 +387,17 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         _activeStringFilter = _pendingStringFilter;
 
         return true;
+    }
+
+    private void TrackEntryCategory(DebugLogEntry entry)
+    {
+        if (entry.Category is { Length: > 0 } category)
+        {
+            _availableCategories.Add(category);
+        }
+        else
+        {
+            _hasUncategorized = true;
+        }
     }
 }

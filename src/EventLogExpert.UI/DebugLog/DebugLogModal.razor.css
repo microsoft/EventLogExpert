@@ -39,6 +39,10 @@
     min-width: 18rem;
 }
 
+.debug-log-filter-bar ::deep .debug-log-category-multi {
+    min-width: 18rem;
+}
+
 .debug-log-footer {
     display: grid;
     grid-template-columns: 1fr auto 1fr;

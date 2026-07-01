@@ -43,6 +43,8 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
 
     protected override bool CanRun => _filterError is null && !_isLoadingEditions && !string.IsNullOrWhiteSpace(_targetPath);
 
+    protected override string LogCategory => LogCategories.DatabaseToolsCreate;
+
     protected override string? ProducedDatabasePathCandidate => _targetPath.Trim();
 
     [Inject] private ICurrentVersionProvider CurrentVersionProvider { get; init; } = null!;

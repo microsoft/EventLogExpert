@@ -24,6 +24,8 @@ public sealed partial class ShowProvidersTab : DatabaseToolsTabBase<ShowProvider
 
     protected override bool CanRun => _filterError is null;
 
+    protected override string LogCategory => LogCategories.DatabaseToolsShow;
+
     [Inject] private ICurrentVersionProvider CurrentVersionProvider { get; init; } = null!;
 
     [Inject] private IElevatedDatabaseToolsRunner ElevatedRunner { get; init; } = null!;

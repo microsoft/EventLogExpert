@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,31 @@ namespace EventLogExpert.Runtime.Tests.DebugLog;
 
 public sealed class DebugLogEntryParserTests
 {
+    [Fact]
+    public void Parse_WhenCategoryAndElevatedHelperTags_ShouldExtractBoth()
+    {
+        var line = $"[{Constants.DebugLogTestTimestamp}] [{Constants.DebugLogTestThreadId}] [{nameof(LogLevel.Warning)}] [{LogCategories.DatabaseToolsCreate}] [ElevatedHelper] {Constants.DebugLogTestMessage}";
+
+        var entry = Assert.Single(DebugLogEntryParser.Parse([line]));
+
+        Assert.Equal(LogCategories.DatabaseToolsCreate, entry.Category);
+        Assert.Equal(ProcessOrigin.ElevatedHelper, entry.ProcessOrigin);
+        Assert.Equal(Constants.DebugLogTestMessage, entry.Message);
+    }
+
+    [Fact]
+    public void Parse_WhenCategorySegmentPresent_ShouldExtractCategoryWithInProcessOrigin()
+    {
+        var line = $"[{Constants.DebugLogTestTimestamp}] [{Constants.DebugLogTestThreadId}] [{nameof(LogLevel.Warning)}] [{LogCategories.DatabaseToolsCreate}] {Constants.DebugLogTestMessage}";
+
+        var entry = Assert.Single(DebugLogEntryParser.Parse([line]));
+
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Equal(LogCategories.DatabaseToolsCreate, entry.Category);
+        Assert.Equal(ProcessOrigin.InProcess, entry.ProcessOrigin);
+        Assert.Equal(Constants.DebugLogTestMessage, entry.Message);
+    }
+
     [Fact]
     public void Parse_WhenContinuationHasBareDateHeaderShape_ShouldNotSplitFromPriorEntry()
     {
@@ -68,6 +94,18 @@ public sealed class DebugLogEntryParserTests
         Assert.Null(entry.Level);
         Assert.Equal(orphan, entry.Message);
         Assert.Equal(orphan, entry.RawLine);
+    }
+
+    [Fact]
+    public void Parse_WhenElevatedHelperTagWithoutCategory_ShouldSetOriginAndLeaveCategoryNull()
+    {
+        var line = $"[{Constants.DebugLogTestTimestamp}] [{Constants.DebugLogTestThreadId}] [{nameof(LogLevel.Warning)}] [ElevatedHelper] {Constants.DebugLogTestMessage}";
+
+        var entry = Assert.Single(DebugLogEntryParser.Parse([line]));
+
+        Assert.Null(entry.Category);
+        Assert.Equal(ProcessOrigin.ElevatedHelper, entry.ProcessOrigin);
+        Assert.Equal(Constants.DebugLogTestMessage, entry.Message);
     }
 
     [Fact]
@@ -181,6 +219,17 @@ public sealed class DebugLogEntryParserTests
     }
 
     [Fact]
+    public void Parse_WhenMessageStartsWithNonRootBracket_ShouldLeaveCategoryNull()
+    {
+        var line = $"[{Constants.DebugLogTestTimestamp}] [{Constants.DebugLogTestThreadId}] [{nameof(LogLevel.Warning)}] [Custom] tag prefix";
+
+        var entry = Assert.Single(DebugLogEntryParser.Parse([line]));
+
+        Assert.Null(entry.Category);
+        Assert.Equal("[Custom] tag prefix", entry.Message);
+    }
+
+    [Fact]
     public void Parse_WhenMultipleContinuationLines_ShouldFoldAllIntoPrevious()
     {
         // Arrange
@@ -204,6 +253,30 @@ public sealed class DebugLogEntryParserTests
         Assert.Equal(LogLevel.Critical, entry.Level);
         Assert.Equal($"Unhandled exception:\n{string.Join('\n', stackTrace)}", entry.Message);
         Assert.Equal($"{firstLine}\n{string.Join('\n', stackTrace)}", entry.RawLine);
+    }
+
+    [Fact]
+    public void Parse_WhenMultipleEntries_ShouldReturnInOrder()
+    {
+        // Arrange
+        string[] lines =
+        [
+            BuildLine(Constants.DebugLogTestTimestamp, Constants.DebugLogTestThreadId, nameof(LogLevel.Trace), Constants.DebugLogFirstMessage),
+            BuildLine(Constants.DebugLogTestTimestamp, Constants.DebugLogTestThreadId, nameof(LogLevel.Information), Constants.DebugLogSecondMessage),
+            BuildLine(Constants.DebugLogTestTimestamp, Constants.DebugLogTestThreadId, nameof(LogLevel.Error), Constants.DebugLogThirdMessage)
+        ];
+
+        // Act
+        var entries = DebugLogEntryParser.Parse(lines);
+
+        // Assert
+        Assert.Equal(3, entries.Count);
+        Assert.Equal(LogLevel.Trace, entries[0].Level);
+        Assert.Equal(Constants.DebugLogFirstMessage, entries[0].Message);
+        Assert.Equal(LogLevel.Information, entries[1].Level);
+        Assert.Equal(Constants.DebugLogSecondMessage, entries[1].Message);
+        Assert.Equal(LogLevel.Error, entries[2].Level);
+        Assert.Equal(Constants.DebugLogThirdMessage, entries[2].Message);
     }
 
     [Fact]
@@ -246,27 +319,18 @@ public sealed class DebugLogEntryParserTests
     }
 
     [Fact]
-    public void Parse_WhenMultipleEntries_ShouldReturnInOrder()
+    public void Parse_WhenNoCategoryOrOriginTags_ShouldLeaveCategoryNullWithInProcessOrigin()
     {
-        // Arrange
-        string[] lines =
-        [
-            BuildLine(Constants.DebugLogTestTimestamp, Constants.DebugLogTestThreadId, nameof(LogLevel.Trace), Constants.DebugLogFirstMessage),
-            BuildLine(Constants.DebugLogTestTimestamp, Constants.DebugLogTestThreadId, nameof(LogLevel.Information), Constants.DebugLogSecondMessage),
-            BuildLine(Constants.DebugLogTestTimestamp, Constants.DebugLogTestThreadId, nameof(LogLevel.Error), Constants.DebugLogThirdMessage)
-        ];
+        var line = BuildLine(
+            Constants.DebugLogTestTimestamp,
+            Constants.DebugLogTestThreadId,
+            nameof(LogLevel.Information),
+            Constants.DebugLogTestMessage);
 
-        // Act
-        var entries = DebugLogEntryParser.Parse(lines);
+        var entry = Assert.Single(DebugLogEntryParser.Parse([line]));
 
-        // Assert
-        Assert.Equal(3, entries.Count);
-        Assert.Equal(LogLevel.Trace, entries[0].Level);
-        Assert.Equal(Constants.DebugLogFirstMessage, entries[0].Message);
-        Assert.Equal(LogLevel.Information, entries[1].Level);
-        Assert.Equal(Constants.DebugLogSecondMessage, entries[1].Message);
-        Assert.Equal(LogLevel.Error, entries[2].Level);
-        Assert.Equal(Constants.DebugLogThirdMessage, entries[2].Message);
+        Assert.Null(entry.Category);
+        Assert.Equal(ProcessOrigin.InProcess, entry.ProcessOrigin);
     }
 
     [Fact]

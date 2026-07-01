@@ -291,6 +291,49 @@ public sealed class DebugFileSinkTests : IDisposable
     }
 
     [Fact]
+    public void Emit_WhenRecordHasCategory_ShouldRenderCategorySegment()
+    {
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
+
+        debugLogService.Emit(new LogRecord(DateTime.UtcNow, LogLevel.Warning, Constants.DebugLogTestMessage, LogCategories.DatabaseToolsCreate));
+
+        var content = ReadLogFile();
+        Assert.Contains($"[{LogCategories.DatabaseToolsCreate}] {Constants.DebugLogTestMessage}", content);
+    }
+
+    [Fact]
+    public void Emit_WhenRecordHasCategoryAndElevatedHelperOrigin_ShouldRenderBothSegments()
+    {
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
+
+        debugLogService.Emit(new LogRecord(DateTime.UtcNow, LogLevel.Warning, Constants.DebugLogTestMessage, LogCategories.DatabaseToolsCreate, ProcessOrigin.ElevatedHelper));
+
+        var content = ReadLogFile();
+        Assert.Contains($"[{LogCategories.DatabaseToolsCreate}] [ElevatedHelper] {Constants.DebugLogTestMessage}", content);
+    }
+
+    [Fact]
+    public void Emit_WhenRecordHasEmptyOrigin_ShouldNotRenderCategorySegment()
+    {
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+
+        using var debugLogService = new DebugFileSink(fileLocationOptions, mockSettingsService, CreateRoutingPolicy(mockSettingsService));
+
+        debugLogService.Emit(new LogRecord(DateTime.UtcNow, LogLevel.Warning, Constants.DebugLogTestMessage, string.Empty));
+
+        var content = ReadLogFile();
+        Assert.Contains($"[{nameof(LogLevel.Warning)}] {Constants.DebugLogTestMessage}", content);
+        Assert.DoesNotContain("[DatabaseTools", content);
+    }
+
+    [Fact]
     public async Task LoadAsync_WhenLogFileDeletedDuringRead_ShouldAllowDeletion()
     {
         // Arrange
