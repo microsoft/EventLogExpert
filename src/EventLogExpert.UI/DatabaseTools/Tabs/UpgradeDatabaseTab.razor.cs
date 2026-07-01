@@ -16,6 +16,8 @@ public sealed partial class UpgradeDatabaseTab : DatabaseToolsTabBase<UpgradeDat
 
     protected override bool CanRun => !string.IsNullOrWhiteSpace(_dbPath);
 
+    protected override string LogCategory => LogCategories.DatabaseToolsUpgrade;
+
     protected override UpgradeDatabaseRequest BuildRequest() => new(_dbPath.Trim());
 
     protected override Task<DatabaseToolsResult> DispatchAsync(

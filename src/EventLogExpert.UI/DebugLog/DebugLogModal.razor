@@ -1,3 +1,4 @@
+@using EventLogExpert.Logging.Abstractions
 @using Microsoft.Extensions.Logging
 @inherits ModalBase<bool>
 
@@ -53,6 +54,32 @@
                     }
                 </ValueSelect>
             }
+            <label>Category</label>
+            <ValueSelect AriaLabel="Categories"
+                CssClass="input filter-dropdown debug-log-category-multi"
+                EmptyText="All"
+                IsMultiSelect
+                T="string"
+                ToStringFunc="@(x => x)"
+                Values="_selectedCategories"
+                ValuesChanged="HandleCategoriesChanged">
+                <ValueSelectItem ClearItem T="string">All</ValueSelectItem>
+                @foreach (var category in CategoryOptions())
+                {
+                    <ValueSelectItem T="string" Value="category" />
+                }
+            </ValueSelect>
+            <label>Process</label>
+            <ValueSelect AriaLabel="Process origin"
+                CssClass="input filter-dropdown"
+                T="ProcessOrigin?"
+                ToStringFunc="@(ProcessOriginLabel)"
+                Value="_processOriginFilter"
+                ValueChanged="HandleProcessOriginChanged">
+                <ValueSelectItem ClearItem T="ProcessOrigin?">All</ValueSelectItem>
+                <ValueSelectItem T="ProcessOrigin?" Value="ProcessOrigin.InProcess" />
+                <ValueSelectItem T="ProcessOrigin?" Value="ProcessOrigin.ElevatedHelper" />
+            </ValueSelect>
             <input aria-label="Filter messages"
                 class="debug-log-text-filter input"
                 @oninput="HandleStringFilterInput"

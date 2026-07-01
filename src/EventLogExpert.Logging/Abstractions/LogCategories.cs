@@ -7,7 +7,19 @@ public static class LogCategories
 {
     public const string DatabaseTools = "DatabaseTools";
 
+    public const string DatabaseToolsCreate = "DatabaseTools.Create";
+
+    public const string DatabaseToolsDiff = "DatabaseTools.Diff";
+
+    public const string DatabaseToolsMerge = "DatabaseTools.Merge";
+
+    public const string DatabaseToolsShow = "DatabaseTools.Show";
+
+    public const string DatabaseToolsUpgrade = "DatabaseTools.Upgrade";
+
     public const string ElevationIpc = "Elevation.Ipc";
 
     public const string Offline = "Offline";
+
+    public static readonly IReadOnlyList<string> KnownRoots = ["App", DatabaseTools, "Elevation", Offline];
 }

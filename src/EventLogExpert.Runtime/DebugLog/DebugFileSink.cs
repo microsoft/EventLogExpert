@@ -120,7 +120,12 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
         // Re-check this sink's own threshold: the dispatcher gates on the aggregate across all sinks, which may be lower.
         if (record.Level < _routingPolicy.FileMinimumFor(record.Origin)) { return; }
 
-        WriteOutput(FormatLine(record.TimestampUtc.ToLocalTime(), Environment.CurrentManagedThreadId, record.Level, record.ProcessOrigin, record.Message));
+        WriteOutput(FormatLine(record.TimestampUtc.ToLocalTime(),
+            Environment.CurrentManagedThreadId,
+            record.Level,
+            record.Origin,
+            record.ProcessOrigin,
+            record.Message));
     }
 
     public async IAsyncEnumerable<string> LoadAsync(
@@ -171,11 +176,18 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
         return $"Local\\EventLogExpert.DebugLog.{Convert.ToHexString(hash, 0, 8)}";
     }
 
-    private static string FormatLine(DateTime localTimestamp, int threadId, LogLevel level, ProcessOrigin processOrigin, string message)
+    private static string FormatLine(
+        DateTime localTimestamp,
+        int threadId,
+        LogLevel level,
+        string category,
+        ProcessOrigin processOrigin,
+        string message)
     {
+        string categoryTag = string.IsNullOrEmpty(category) ? string.Empty : $"[{category}] ";
         string originTag = processOrigin == ProcessOrigin.ElevatedHelper ? "[ElevatedHelper] " : string.Empty;
 
-        return $"[{localTimestamp:o}] [{threadId}] [{level}] {originTag}{message}";
+        return $"[{localTimestamp:o}] [{threadId}] [{level}] {categoryTag}{originTag}{message}";
     }
 
     private void CloseWriter()
@@ -222,7 +234,12 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
 
     private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
-        WriteOutput(FormatLine(DateTime.Now, Environment.CurrentManagedThreadId, LogLevel.Critical, ProcessOrigin.InProcess, $"Unhandled Exception: {e.ExceptionObject}"));
+        WriteOutput(FormatLine(DateTime.Now,
+            Environment.CurrentManagedThreadId,
+            LogLevel.Critical,
+            string.Empty,
+            ProcessOrigin.InProcess,
+            $"Unhandled Exception: {e.ExceptionObject}"));
     }
 
     private void WithInterprocessLock(Action action, bool throwOnTimeout)

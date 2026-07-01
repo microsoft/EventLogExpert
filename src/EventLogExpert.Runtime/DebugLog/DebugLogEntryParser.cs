@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -15,8 +16,10 @@ namespace EventLogExpert.Runtime.DebugLog;
 ///     of a multi-line stack trace) or, if there is no previous entry, as standalone entries with all metadata fields set
 ///     to null.
 /// </summary>
-public static partial class DebugLogEntryParser
+public static class DebugLogEntryParser
 {
+    private static readonly Regex s_linePrefixRegex = BuildLinePrefixRegex();
+
     /// <summary>
     ///     Parses a complete sequence of log lines into entries. Continuation lines fold into the previous entry's
     ///     <see cref="DebugLogEntry.Message" /> and <see cref="DebugLogEntry.RawLine" /> joined by <c>\n</c>. A continuation
@@ -53,7 +56,7 @@ public static partial class DebugLogEntryParser
     {
         ArgumentNullException.ThrowIfNull(line);
 
-        var match = LinePrefixRegex().Match(line);
+        var match = s_linePrefixRegex.Match(line);
 
         if (!match.Success ||
             !DateTimeOffset.TryParseExact(match.Groups["ts"].Value,
@@ -72,13 +75,26 @@ public static partial class DebugLogEntryParser
             return false;
         }
 
-        entry = new DebugLogEntry(timestamp, threadId, level, match.Groups["message"].Index, line);
+        entry = new DebugLogEntry(
+            timestamp,
+            threadId,
+            level,
+            match.Groups["message"].Index,
+            line,
+            match.Groups["category"].Success ? match.Groups["category"].Value : null,
+            match.Groups["origin"].Success ? ProcessOrigin.ElevatedHelper : ProcessOrigin.InProcess);
 
         return true;
     }
 
-    [GeneratedRegex(@"^\[(?<ts>[^\]]+)\] \[(?<tid>\d+)\] \[(?<level>[A-Za-z]+)\] (?<message>.*)$")]
-    private static partial Regex LinePrefixRegex();
+    private static Regex BuildLinePrefixRegex()
+    {
+        string roots = string.Join('|', LogCategories.KnownRoots.Select(Regex.Escape));
+
+        return new Regex(
+            $@"^\[(?<ts>[^\]]+)\] \[(?<tid>\d+)\] \[(?<level>[A-Za-z]+)\](?: \[(?<category>(?:{roots})(?:\.[A-Za-z0-9]+)*)\])?(?: \[(?<origin>ElevatedHelper)\])? (?<message>.*)$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    }
 }
 
 /// <summary>

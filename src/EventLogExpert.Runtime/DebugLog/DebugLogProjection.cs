@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Common.Filtering;
+using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Runtime.DebugLog;
@@ -12,11 +13,13 @@ public static class DebugLogProjection
         IReadOnlyList<DebugLogEntry> entries,
         ComparisonOperator levelOperator,
         IReadOnlyList<LogLevel> levels,
-        string? textFilter)
+        string? textFilter,
+        IReadOnlyList<string>? categories = null,
+        ProcessOrigin? processOriginFilter = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
 
-        return ProjectRange(entries, 0, entries.Count, levelOperator, levels, textFilter);
+        return ProjectRange(entries, 0, entries.Count, levelOperator, levels, textFilter, categories, processOriginFilter);
     }
 
     public static (List<string> Lines, int MatchedEntryCount) ProjectRange(
@@ -25,7 +28,9 @@ public static class DebugLogProjection
         int endIndex,
         ComparisonOperator levelOperator,
         IReadOnlyList<LogLevel> levels,
-        string? textFilter)
+        string? textFilter,
+        IReadOnlyList<string>? categories = null,
+        ProcessOrigin? processOriginFilter = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
         ArgumentNullException.ThrowIfNull(levels);
@@ -38,6 +43,8 @@ public static class DebugLogProjection
         var matchedCount = 0;
 
         var hasLevelFilter = levels.Count > 0;
+        var hasCategoryFilter = categories is { Count: > 0 };
+        var hasProcessOriginFilter = processOriginFilter.HasValue;
         var hasTextFilter = !string.IsNullOrEmpty(textFilter);
 
         for (var i = startIndex; i < endIndex; i++)
@@ -45,6 +52,10 @@ public static class DebugLogProjection
             var entry = entries[i];
 
             if (hasLevelFilter && !MatchesLevel(entry, levelOperator, levels)) { continue; }
+
+            if (hasCategoryFilter && !categories!.Contains(entry.Category ?? string.Empty)) { continue; }
+
+            if (hasProcessOriginFilter && entry.ProcessOrigin != processOriginFilter) { continue; }
 
             if (hasTextFilter &&
                 entry.RawLine.IndexOf(textFilter!, entry.MessageStartIndex, StringComparison.OrdinalIgnoreCase) < 0)

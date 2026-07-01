@@ -23,6 +23,8 @@ public sealed partial class MergeDatabaseTab : DatabaseToolsTabBase<MergeDatabas
     protected override bool CanRun =>
         !string.IsNullOrWhiteSpace(_sourcePath) && !string.IsNullOrWhiteSpace(_targetPath);
 
+    protected override string LogCategory => LogCategories.DatabaseToolsMerge;
+
     protected override string? ProducedDatabasePathCandidate => _targetPath.Trim();
 
     protected override MergeDatabaseRequest BuildRequest() =>

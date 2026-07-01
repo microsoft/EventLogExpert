@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
@@ -11,107 +12,66 @@ namespace EventLogExpert.Runtime.Tests.DebugLog;
 public sealed class DebugLogProjectionTests
 {
     [Fact]
-    public void ProjectRange_WhenFilterApplied_ShouldEvaluateAgainstSliceOnly()
+    public void Project_WhenCategoryFilterActive_ShouldExcludeNullCategoryWithoutSentinel()
     {
-        // Arrange
         var entries = new[]
         {
-            BuildEntry(LogLevel.Information, Constants.DebugLogFirstMessage),
-            BuildEntry(LogLevel.Warning, Constants.DebugLogSecondMessage),
-            BuildEntry(LogLevel.Information, Constants.DebugLogThirdMessage),
+            BuildEntry(LogLevel.Information, "categorized", LogCategories.DatabaseToolsCreate),
+            BuildEntry(LogLevel.Information, "uncategorized"),
         };
 
-        // Act
-        var (lines, count) = DebugLogProjection.ProjectRange(
+        var (_, count) = DebugLogProjection.Project(
             entries,
-            1,
-            3,
             ComparisonOperator.Equals,
-            [LogLevel.Information],
-            string.Empty);
+            [],
+            string.Empty,
+            [LogCategories.DatabaseToolsCreate]);
 
-        // Assert
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public void Project_WhenCategoryFilterActive_ShouldKeepOnlyMatchingCategories()
+    {
+        var entries = new[]
+        {
+            BuildEntry(LogLevel.Information, "a", LogCategories.DatabaseToolsCreate),
+            BuildEntry(LogLevel.Information, "b", LogCategories.ElevationIpc),
+            BuildEntry(LogLevel.Information, "c", LogCategories.DatabaseToolsMerge),
+        };
+
+        var (_, count) = DebugLogProjection.Project(
+            entries,
+            ComparisonOperator.Equals,
+            [],
+            string.Empty,
+            [LogCategories.DatabaseToolsCreate, LogCategories.DatabaseToolsMerge]);
+
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public void Project_WhenCategoryLevelAndProcessOriginCombined_ShouldRequireAll()
+    {
+        var entries = new[]
+        {
+            BuildEntry(LogLevel.Warning, "match", LogCategories.DatabaseToolsCreate, ProcessOrigin.ElevatedHelper),
+            BuildEntry(LogLevel.Information, "wrong level", LogCategories.DatabaseToolsCreate, ProcessOrigin.ElevatedHelper),
+            BuildEntry(LogLevel.Warning, "wrong category", LogCategories.ElevationIpc, ProcessOrigin.ElevatedHelper),
+            BuildEntry(LogLevel.Warning, "wrong origin", LogCategories.DatabaseToolsCreate, ProcessOrigin.InProcess),
+        };
+
+        var (lines, count) = DebugLogProjection.Project(
+            entries,
+            ComparisonOperator.Equals,
+            [LogLevel.Warning],
+            string.Empty,
+            [LogCategories.DatabaseToolsCreate],
+            ProcessOrigin.ElevatedHelper);
+
         Assert.Equal(1, count);
         var only = Assert.Single(lines);
-        Assert.Contains(Constants.DebugLogThirdMessage, only);
-    }
-
-    [Theory]
-    [InlineData(-1, 0)]
-    [InlineData(0, 4)]
-    [InlineData(2, 1)]
-    public void ProjectRange_WhenIndicesOutOfRange_ShouldThrow(int startIndex, int endIndex)
-    {
-        // Arrange
-        var entries = new[]
-        {
-            BuildEntry(LogLevel.Information, Constants.DebugLogFirstMessage),
-            BuildEntry(LogLevel.Warning, Constants.DebugLogSecondMessage),
-            BuildEntry(LogLevel.Information, Constants.DebugLogThirdMessage),
-        };
-
-        // Act + Assert
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            DebugLogProjection.ProjectRange(
-                entries,
-                startIndex,
-                endIndex,
-                ComparisonOperator.Equals,
-                [],
-                string.Empty));
-    }
-
-    [Fact]
-    public void ProjectRange_WhenSliceIsEmpty_ShouldReturnEmpty()
-    {
-        // Arrange
-        var entries = new[]
-        {
-            BuildEntry(LogLevel.Information, Constants.DebugLogFirstMessage),
-            BuildEntry(LogLevel.Warning, Constants.DebugLogSecondMessage),
-        };
-
-        // Act
-        var (lines, count) = DebugLogProjection.ProjectRange(
-            entries,
-            2,
-            2,
-            ComparisonOperator.Equals,
-            [],
-            string.Empty);
-
-        // Assert
-        Assert.Empty(lines);
-        Assert.Equal(0, count);
-    }
-
-    [Fact]
-    public void ProjectRange_WhenSliceIsTrailingThird_ShouldReturnOnlyThatSliceInDisplayOrderViaReversedView()
-    {
-        // Arrange
-        var entries = new[]
-        {
-            BuildEntry(LogLevel.Information, Constants.DebugLogFirstMessage),
-            BuildEntry(LogLevel.Warning, Constants.DebugLogSecondMessage),
-            BuildEntry(LogLevel.Error, Constants.DebugLogThirdMessage),
-        };
-
-        // Act
-        var (lines, count) = DebugLogProjection.ProjectRange(
-            entries,
-            1,
-            3,
-            ComparisonOperator.Equals,
-            [],
-            string.Empty);
-
-        var view = new ReversedListView<string>(lines);
-
-        // Assert
-        Assert.Equal(2, count);
-        Assert.Equal(2, view.Count);
-        Assert.Contains(Constants.DebugLogThirdMessage, view[0]);
-        Assert.Contains(Constants.DebugLogSecondMessage, view[1]);
+        Assert.Contains("match", only);
     }
 
     [Fact]
@@ -204,27 +164,6 @@ public sealed class DebugLogProjectionTests
     }
 
     [Fact]
-    public void Project_WhenLevelMultiSelectAndEntryHasNullLevel_ShouldExcludeEntry()
-    {
-        // Arrange
-        var entries = new[]
-        {
-            BuildEntry(LogLevel.Information, Constants.DebugLogFirstMessage),
-            new DebugLogEntry(null, null, null, 0, "orphan"),
-        };
-
-        // Act
-        var (_, count) = DebugLogProjection.Project(
-            entries,
-            ComparisonOperator.Equals,
-            [LogLevel.Information, LogLevel.Warning],
-            string.Empty);
-
-        // Assert
-        Assert.Equal(1, count);
-    }
-
-    [Fact]
     public void Project_WhenLevelMultiSelect_ShouldKeepAnyListedLevel()
     {
         // Arrange
@@ -251,9 +190,9 @@ public sealed class DebugLogProjectionTests
     }
 
     [Fact]
-    public void Project_WhenLevelNotEqualAndEntryHasNullLevel_ShouldIncludeEntry()
+    public void Project_WhenLevelMultiSelectAndEntryHasNullLevel_ShouldExcludeEntry()
     {
-        // Arrange — null Level is "not equal" to any specific level, so NotEqual must include it.
+        // Arrange
         var entries = new[]
         {
             BuildEntry(LogLevel.Information, Constants.DebugLogFirstMessage),
@@ -261,16 +200,14 @@ public sealed class DebugLogProjectionTests
         };
 
         // Act
-        var (lines, count) = DebugLogProjection.Project(
+        var (_, count) = DebugLogProjection.Project(
             entries,
-            ComparisonOperator.NotEqual,
-            [LogLevel.Information],
+            ComparisonOperator.Equals,
+            [LogLevel.Information, LogLevel.Warning],
             string.Empty);
 
         // Assert
         Assert.Equal(1, count);
-        var only = Assert.Single(lines);
-        Assert.Equal("orphan", only);
     }
 
     [Fact]
@@ -295,6 +232,29 @@ public sealed class DebugLogProjectionTests
         Assert.Equal(1, count);
         var only = Assert.Single(lines);
         Assert.Contains(Constants.DebugLogSecondMessage, only);
+    }
+
+    [Fact]
+    public void Project_WhenLevelNotEqualAndEntryHasNullLevel_ShouldIncludeEntry()
+    {
+        // Arrange — null Level is "not equal" to any specific level, so NotEqual must include it.
+        var entries = new[]
+        {
+            BuildEntry(LogLevel.Information, Constants.DebugLogFirstMessage),
+            new DebugLogEntry(null, null, null, 0, "orphan"),
+        };
+
+        // Act
+        var (lines, count) = DebugLogProjection.Project(
+            entries,
+            ComparisonOperator.NotEqual,
+            [LogLevel.Information],
+            string.Empty);
+
+        // Assert
+        Assert.Equal(1, count);
+        var only = Assert.Single(lines);
+        Assert.Equal("orphan", only);
     }
 
     [Fact]
@@ -399,6 +359,28 @@ public sealed class DebugLogProjectionTests
     }
 
     [Fact]
+    public void Project_WhenProcessOriginFilterActive_ShouldKeepOnlyMatchingOrigin()
+    {
+        var entries = new[]
+        {
+            BuildEntry(LogLevel.Information, "in-proc", LogCategories.DatabaseToolsCreate, ProcessOrigin.InProcess),
+            BuildEntry(LogLevel.Information, "helper", LogCategories.DatabaseToolsCreate, ProcessOrigin.ElevatedHelper),
+        };
+
+        var (lines, count) = DebugLogProjection.Project(
+            entries,
+            ComparisonOperator.Equals,
+            [],
+            string.Empty,
+            categories: null,
+            processOriginFilter: ProcessOrigin.ElevatedHelper);
+
+        Assert.Equal(1, count);
+        var only = Assert.Single(lines);
+        Assert.Contains("helper", only);
+    }
+
+    [Fact]
     public void Project_WhenTextFilterDifferentCase_ShouldMatchCaseInsensitively()
     {
         // Arrange
@@ -435,7 +417,132 @@ public sealed class DebugLogProjectionTests
         Assert.Contains("alpha foo bravo", view[1]);
     }
 
-    private static DebugLogEntry BuildEntry(LogLevel level, string message)
+    [Fact]
+    public void Project_WhenUncategorizedSentinelSelected_ShouldKeepNullCategoryEntries()
+    {
+        var entries = new[]
+        {
+            BuildEntry(LogLevel.Information, "categorized", LogCategories.DatabaseToolsCreate),
+            BuildEntry(LogLevel.Information, "uncategorized"),
+        };
+
+        var (lines, count) = DebugLogProjection.Project(
+            entries,
+            ComparisonOperator.Equals,
+            [],
+            string.Empty,
+            [string.Empty]);
+
+        Assert.Equal(1, count);
+        var only = Assert.Single(lines);
+        Assert.Contains("uncategorized", only);
+    }
+
+    [Fact]
+    public void ProjectRange_WhenFilterApplied_ShouldEvaluateAgainstSliceOnly()
+    {
+        // Arrange
+        var entries = new[]
+        {
+            BuildEntry(LogLevel.Information, Constants.DebugLogFirstMessage),
+            BuildEntry(LogLevel.Warning, Constants.DebugLogSecondMessage),
+            BuildEntry(LogLevel.Information, Constants.DebugLogThirdMessage),
+        };
+
+        // Act
+        var (lines, count) = DebugLogProjection.ProjectRange(
+            entries,
+            1,
+            3,
+            ComparisonOperator.Equals,
+            [LogLevel.Information],
+            string.Empty);
+
+        // Assert
+        Assert.Equal(1, count);
+        var only = Assert.Single(lines);
+        Assert.Contains(Constants.DebugLogThirdMessage, only);
+    }
+
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(0, 4)]
+    [InlineData(2, 1)]
+    public void ProjectRange_WhenIndicesOutOfRange_ShouldThrow(int startIndex, int endIndex)
+    {
+        // Arrange
+        var entries = new[]
+        {
+            BuildEntry(LogLevel.Information, Constants.DebugLogFirstMessage),
+            BuildEntry(LogLevel.Warning, Constants.DebugLogSecondMessage),
+            BuildEntry(LogLevel.Information, Constants.DebugLogThirdMessage),
+        };
+
+        // Act + Assert
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            DebugLogProjection.ProjectRange(
+                entries,
+                startIndex,
+                endIndex,
+                ComparisonOperator.Equals,
+                [],
+                string.Empty));
+    }
+
+    [Fact]
+    public void ProjectRange_WhenSliceIsEmpty_ShouldReturnEmpty()
+    {
+        // Arrange
+        var entries = new[]
+        {
+            BuildEntry(LogLevel.Information, Constants.DebugLogFirstMessage),
+            BuildEntry(LogLevel.Warning, Constants.DebugLogSecondMessage),
+        };
+
+        // Act
+        var (lines, count) = DebugLogProjection.ProjectRange(
+            entries,
+            2,
+            2,
+            ComparisonOperator.Equals,
+            [],
+            string.Empty);
+
+        // Assert
+        Assert.Empty(lines);
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public void ProjectRange_WhenSliceIsTrailingThird_ShouldReturnOnlyThatSliceInDisplayOrderViaReversedView()
+    {
+        // Arrange
+        var entries = new[]
+        {
+            BuildEntry(LogLevel.Information, Constants.DebugLogFirstMessage),
+            BuildEntry(LogLevel.Warning, Constants.DebugLogSecondMessage),
+            BuildEntry(LogLevel.Error, Constants.DebugLogThirdMessage),
+        };
+
+        // Act
+        var (lines, count) = DebugLogProjection.ProjectRange(
+            entries,
+            1,
+            3,
+            ComparisonOperator.Equals,
+            [],
+            string.Empty);
+
+        var view = new ReversedListView<string>(lines);
+
+        // Assert
+        Assert.Equal(2, count);
+        Assert.Equal(2, view.Count);
+        Assert.Contains(Constants.DebugLogThirdMessage, view[0]);
+        Assert.Contains(Constants.DebugLogSecondMessage, view[1]);
+    }
+
+    private static DebugLogEntry BuildEntry(LogLevel level, string message, string? category = null, ProcessOrigin? processOrigin = null)
     {
         var rawLine = $"[{Constants.DebugLogTestTimestamp}] [{Constants.DebugLogTestThreadId}] [{level}] {message}";
 
@@ -444,7 +551,9 @@ public sealed class DebugLogProjectionTests
             Constants.DebugLogTestThreadId,
             level,
             rawLine.Length - message.Length,
-            rawLine);
+            rawLine,
+            category,
+            processOrigin);
     }
 
     private static (ReversedListView<string> View, int Count) ProjectView(
