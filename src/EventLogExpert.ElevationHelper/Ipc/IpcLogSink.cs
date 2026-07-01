@@ -28,7 +28,7 @@ internal sealed class IpcLogSink(IpcMessageWriter writer) : IProgress<LogRecord>
         try
         {
             writer.WriteAsync(
-                    new LogMessage(value.TimestampUtc, value.Level, value.Message, value.Origin, ProcessOrigin.ElevatedHelper),
+                    new LogMessage(value.TimestampUtc, value.Level, value.Message, value.Category, ProcessOrigin.ElevatedHelper),
                     CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();

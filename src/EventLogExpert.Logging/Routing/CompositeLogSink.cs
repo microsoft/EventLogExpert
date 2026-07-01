@@ -10,7 +10,7 @@ public sealed class CompositeLogSink(IReadOnlyList<ILogSink> sinks, string categ
 {
     public void Report(LogRecord value)
     {
-        LogRecord routed = string.IsNullOrEmpty(value.Origin) ? value with { Origin = category } : value;
+        LogRecord routed = string.IsNullOrEmpty(value.Category) ? value with { Category = category } : value;
 
         foreach (ILogSink sink in sinks)
         {

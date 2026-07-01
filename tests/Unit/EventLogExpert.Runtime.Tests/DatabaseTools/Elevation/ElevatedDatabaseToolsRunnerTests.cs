@@ -341,7 +341,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         Assert.Equal(DatabaseToolsOutcome.Succeeded, result.Outcome);
         var entry = Assert.Single(logSink.Entries);
         Assert.Equal("wim probe failed", entry.Message);
-        Assert.Equal("Offline.Wim", entry.Origin);
+        Assert.Equal("Offline.Wim", entry.Category);
         Assert.Equal(ProcessOrigin.ElevatedHelper, entry.ProcessOrigin);
     }
 

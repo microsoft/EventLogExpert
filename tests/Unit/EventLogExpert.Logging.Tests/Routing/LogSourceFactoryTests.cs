@@ -57,9 +57,9 @@ public sealed class LogSourceFactoryTests
         factory.ForCategory("Offline.Wim").Information($"a");
         factory.ForCategory("DatabaseTools.Merge").Information($"b");
 
-        string[] origins = [.. sink.Received.Select(record => record.Origin)];
+        string[] categories = [.. sink.Received.Select(record => record.Category)];
 
-        Assert.Equal(["Offline.Wim", "DatabaseTools.Merge"], origins);
+        Assert.Equal(["Offline.Wim", "DatabaseTools.Merge"], categories);
     }
 
     [Fact]
@@ -71,6 +71,6 @@ public sealed class LogSourceFactoryTests
         factory.ForCategory("DatabaseTools.Create").Information($"created");
 
         var record = Assert.Single(sink.Received);
-        Assert.Equal("DatabaseTools.Create", record.Origin);
+        Assert.Equal("DatabaseTools.Create", record.Category);
     }
 }
