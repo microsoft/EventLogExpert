@@ -37,6 +37,9 @@ public sealed partial class ComparisonOperatorSelect
     /// <summary>Set <c>false</c> for fields that do not support multi-value selection (e.g., free-text Description/Xml).</summary>
     [Parameter] public bool SupportsMany { get; set; } = true;
 
+    /// <summary>Set <c>false</c> for non-text fields where substring comparison is meaningless (e.g., an enum field).</summary>
+    [Parameter] public bool SupportsText { get; set; } = true;
+
     private ComparisonKind Current =>
         (Operator, MatchMode) switch
         {

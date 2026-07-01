@@ -1,16 +1,15 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Common.Filtering;
-using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.DebugLog;
+using EventLogExpert.UI.Focus;
+using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.UI.DebugLog;
 
@@ -18,40 +17,25 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 {
     private const int RenderBatchSize = 100;
     private const int RowHeightPx = 18;
-    private const int StringFilterDebounceMs = 250;
 
-    private const string UncategorizedLabel = "(Uncategorized)";
-
-    private static readonly LogLevel[] s_logLevels =
-    [
-        LogLevel.Trace,
-        LogLevel.Debug,
-        LogLevel.Information,
-        LogLevel.Warning,
-        LogLevel.Error,
-        LogLevel.Critical,
-    ];
     private readonly SortedSet<string> _availableCategories = new(StringComparer.Ordinal);
+    private readonly Dictionary<Guid, DebugLogFilterRow?> _editorRefs = new();
+    private readonly List<DebugLogFilterDraft> _filters = [];
 
-    private string _activeStringFilter = string.Empty;
+    private Button? _addButton;
     private List<string> _displayed = [];
     private ReversedListView<string> _displayedView;
+    private Guid? _editingFilterId;
     private IReadOnlyList<DebugLogEntry> _entries = [];
     private int _filteredEntryCount;
+    private bool _focusAddButtonAfterRender;
+    private Guid? _focusChipAfterRender;
+    private Guid? _focusEditorAfterRender;
     private bool _hasLoaded;
     private bool _hasUncategorized;
-    private MatchMode _levelMatchMode = MatchMode.Single;
-    private ComparisonOperator _levelOperator = ComparisonOperator.Equals;
     private CancellationTokenSource? _loadCts;
     private int _loadGeneration;
-    private List<LogLevel> _multiLevels = [];
-    private string _pendingStringFilter = string.Empty;
-    private ProcessOrigin? _processOriginFilter;
     private int _projectedThroughIndex;
-    private List<string> _selectedCategories = [];
-    private LogLevel? _singleLevel;
-    private CancellationTokenSource? _stringFilterCts;
-    private int _stringFilterGeneration;
 
     public DebugLogModal()
     {
@@ -59,6 +43,8 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     }
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
+
+    private bool CanAddFilter => _filters.TrueForAll(static filter => filter.IsComplete);
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
@@ -73,12 +59,39 @@ public sealed partial class DebugLogModal : ModalBase<bool>
             _loadGeneration++;
             // Only signal cancel; the owning Refresh's using var disposes its CTS.
             _loadCts?.Cancel();
-            _stringFilterCts?.Cancel();
-            _stringFilterCts?.Dispose();
-            _stringFilterCts = null;
         }
 
         await base.DisposeAsyncCore(disposing);
+    }
+
+    // After the chip<->editor swap unmounts the previously focused control, move keyboard focus to the new
+    // target (newly opened editor, then collapsed chip, then the Add button) so focus never falls to the body.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        PruneStaleEditorRefs();
+
+        if (_focusEditorAfterRender is { } editingId
+            && _editorRefs.TryGetValue(editingId, out var editor)
+            && editor is not null)
+        {
+            _focusEditorAfterRender = null;
+            await editor.FocusEditorFirstControlAsync();
+        }
+        else if (_focusChipAfterRender is { } chipId
+            && _editorRefs.TryGetValue(chipId, out var chipRow)
+            && chipRow is not null)
+        {
+            _focusChipAfterRender = null;
+            await chipRow.FocusChipEditButtonAsync();
+        }
+        else if (_focusAddButtonAfterRender)
+        {
+            _focusAddButtonAfterRender = false;
+
+            if (_addButton is { } button) { await ElementFocus.SafelyAsync(button.Element); }
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
     }
 
     protected override async Task OnInitializedAsync()
@@ -88,28 +101,26 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         await base.OnInitializedAsync();
     }
 
-    private static string ProcessOriginLabel(ProcessOrigin? origin) => origin switch
+    private void AddFilter()
     {
-        ProcessOrigin.InProcess => "In-process",
-        ProcessOrigin.ElevatedHelper => "Elevated helper",
-        _ => "All",
-    };
+        if (!CanAddFilter) { return; }
+
+        var draft = new DebugLogFilterDraft();
+        _filters.Add(draft);
+        _editingFilterId = draft.Id;
+        _focusEditorAfterRender = draft.Id;
+        // A fresh draft is incomplete, so it is a projection no-op until the user configures a value.
+    }
 
     private void ApplyIncrementalProjection()
     {
         if (_projectedThroughIndex >= _entries.Count) { return; }
 
-        var levels = BuildLevelsForProjection();
-
         var (newLines, newCount) = DebugLogProjection.ProjectRange(
             _entries,
             _projectedThroughIndex,
             _entries.Count,
-            _levelOperator,
-            levels,
-            _activeStringFilter,
-            BuildCategoriesForProjection(),
-            _processOriginFilter);
+            SnapshotFilters());
 
         if (newLines.Count > 0) { _displayed.AddRange(newLines); }
 
@@ -119,39 +130,18 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
     private void ApplyProjection()
     {
-        var levels = BuildLevelsForProjection();
-        var (lines, count) = DebugLogProjection.Project(_entries, _levelOperator, levels, _activeStringFilter, BuildCategoriesForProjection(), _processOriginFilter);
+        var (lines, count) = DebugLogProjection.Project(_entries, SnapshotFilters());
 
         SetDisplayed(lines);
         _filteredEntryCount = count;
         _projectedThroughIndex = _entries.Count;
     }
 
-    private IReadOnlyList<string>? BuildCategoriesForProjection()
-    {
-        if (_selectedCategories.Count == 0) { return null; }
-
-        return [.. _selectedCategories.Select(static category => category == UncategorizedLabel ? string.Empty : category)];
-    }
-
-    private IReadOnlyList<LogLevel> BuildLevelsForProjection() =>
-        _levelMatchMode == MatchMode.Many
-            ? _multiLevels
-            : _singleLevel.HasValue ? [_singleLevel.Value] : [];
-
-    private IReadOnlyList<string> CategoryOptions()
+    private IReadOnlyList<string> CategoryFilterOptions()
     {
         var options = new SortedSet<string>(_availableCategories, StringComparer.Ordinal);
 
-        foreach (var selected in _selectedCategories)
-        {
-            if (selected != UncategorizedLabel) { options.Add(selected); }
-        }
-
-        if (_hasUncategorized || _selectedCategories.Contains(UncategorizedLabel))
-        {
-            options.Add(UncategorizedLabel);
-        }
+        if (_hasUncategorized) { options.Add(string.Empty); }
 
         return [.. options];
     }
@@ -182,25 +172,15 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         StateHasChanged();
     }
 
-    private void FlushPendingStringFilter()
+    private void CollapseEditor()
     {
-        if (SyncPendingStringFilter())
-        {
-            ApplyProjection();
-        }
-    }
-
-    private void HandleCategoriesChanged(List<string> categories)
-    {
-        _selectedCategories = categories;
-        SyncPendingStringFilter();
-        ApplyProjection();
+        var previouslyEditing = _editingFilterId;
+        _editingFilterId = null;
+        _focusChipAfterRender = previouslyEditing;
     }
 
     private async Task HandleCopyAsync()
     {
-        FlushPendingStringFilter();
-
         if (_filteredEntryCount == 0) { return; }
 
         await ClipboardService.CopyTextAsync(string.Join(Environment.NewLine, _displayedView));
@@ -208,8 +188,6 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
     private async Task HandleExportAsync()
     {
-        FlushPendingStringFilter();
-
         if (_filteredEntryCount == 0) { return; }
 
         var suggestedFileName = $"debug-log-{DateTime.Now:yyyyMMdd-HHmmss}.log";
@@ -235,64 +213,30 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         }
     }
 
-    private void HandleLevelChoiceChanged((ComparisonOperator Op, MatchMode Mode) value)
+    private void OnFilterChanged() => ApplyProjection();
+
+    private void PruneStaleEditorRefs()
     {
-        _levelOperator = value.Op;
-        _levelMatchMode = value.Mode;
-        SyncPendingStringFilter();
-        ApplyProjection();
-    }
+        if (_editorRefs.Count == 0) { return; }
 
-    private void HandleMultiLevelsChanged(List<LogLevel> levels)
-    {
-        _multiLevels = levels;
-        SyncPendingStringFilter();
-        ApplyProjection();
-    }
-
-    private void HandleProcessOriginChanged(ProcessOrigin? processOrigin)
-    {
-        _processOriginFilter = processOrigin;
-        SyncPendingStringFilter();
-        ApplyProjection();
-    }
-
-    private void HandleSingleLevelChanged(LogLevel? level)
-    {
-        _singleLevel = level;
-        SyncPendingStringFilter();
-        ApplyProjection();
-    }
-
-    private async Task HandleStringFilterInput(ChangeEventArgs args)
-    {
-        _pendingStringFilter = args.Value?.ToString() ?? string.Empty;
-
-        var generation = ++_stringFilterGeneration;
-
-        _stringFilterCts?.Cancel();
-        _stringFilterCts?.Dispose();
-
-        var cts = new CancellationTokenSource();
-        _stringFilterCts = cts;
-
-        try
+        if (_filters.Count == 0)
         {
-            await Task.Delay(StringFilterDebounceMs, cts.Token);
-
-            if (generation != _stringFilterGeneration) { return; }
-
-            _activeStringFilter = _pendingStringFilter;
-            ApplyProjection();
-            StateHasChanged();
+            _editorRefs.Clear();
+            return;
         }
-        catch (TaskCanceledException) { }
+
+        var liveIds = _filters.Select(static filter => filter.Id).ToHashSet();
+
+        var stale = _editorRefs
+            .Where(entry => !liveIds.Contains(entry.Key) || entry.Value is null)
+            .Select(entry => entry.Key)
+            .ToList();
+
+        foreach (var id in stale) { _editorRefs.Remove(id); }
     }
 
     private async Task Refresh()
     {
-        SyncPendingStringFilter();
-
         var generation = ++_loadGeneration;
 
         // Cancel the prior load; its own using var will dispose its CTS.
@@ -369,24 +313,27 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         }
     }
 
+    private void RemoveFilter(DebugLogFilterDraft draft)
+    {
+        if (_editingFilterId == draft.Id) { _editingFilterId = null; }
+
+        _filters.Remove(draft);
+        _focusAddButtonAfterRender = true;
+        ApplyProjection();
+    }
+
     private void SetDisplayed(List<string> lines)
     {
         _displayed = lines;
         _displayedView = new ReversedListView<string>(_displayed);
     }
 
-    private bool SyncPendingStringFilter()
+    private IReadOnlyList<DebugLogFilter> SnapshotFilters() => [.. _filters.Select(static draft => draft.ToFilter())];
+
+    private void StartEditing(Guid filterId)
     {
-        if (_activeStringFilter == _pendingStringFilter) { return false; }
-
-        _stringFilterCts?.Cancel();
-        _stringFilterCts?.Dispose();
-        _stringFilterCts = null;
-        _stringFilterGeneration++;
-
-        _activeStringFilter = _pendingStringFilter;
-
-        return true;
+        _editingFilterId = filterId;
+        _focusEditorAfterRender = filterId;
     }
 
     private void TrackEntryCategory(DebugLogEntry entry)

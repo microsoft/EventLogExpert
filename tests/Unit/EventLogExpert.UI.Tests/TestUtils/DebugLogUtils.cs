@@ -7,8 +7,8 @@ namespace EventLogExpert.UI.Tests.TestUtils;
 
 public static class DebugLogUtils
 {
-    public static string BuildElevatedHelperLine(LogLevel level, string category, string message) =>
-        $"[{Constants.Constants.DebugLogTestTimestamp}] [{Constants.Constants.DebugLogTestThreadId}] [{level}] [{category}] [ElevatedHelper] {message}";
+    public static string BuildElevatedHelperLine(LogLevel level, string message) =>
+        $"[{Constants.Constants.DebugLogTestTimestamp}] [{Constants.Constants.DebugLogTestThreadId}] [{level}] [ElevatedHelper] {message}";
 
     public static string BuildLine(LogLevel level, string message) =>
         $"[{Constants.Constants.DebugLogTestTimestamp}] [{Constants.Constants.DebugLogTestThreadId}] [{level}] {message}";
