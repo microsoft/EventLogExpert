@@ -310,6 +310,42 @@ public sealed class ElevatedDatabaseToolsRunnerTests
     }
 
     [Fact]
+    public async Task HelperLogMessage_ForwardsCategoryAndProcessOriginToCallerSink()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
+        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 9999);
+        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
+        var logger = new LoggerUtils.RecordingTraceLogger();
+        var runner = CreateRunner(host, logger);
+
+        var logSink = new ListProgress<LogRecord>();
+        var progressSink = new ListProgress<DatabaseToolsProgress>();
+
+        await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
+        using var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
+
+        var runTask = runner.ShowAsync(
+            new ShowProvidersRequest(null, null), logSink, progressSink, ct);
+
+        await WriteMessageAsync(clientWriter, new HelloMessage(9999, HelloMessage.CurrentProtocolVersion), ct);
+        await ReadRequestAsync(clientReader, ct);
+
+        var ts = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        await WriteMessageAsync(clientWriter, new LogMessage(ts, LogLevel.Warning, "wim probe failed", "Offline.Wim"), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, null, 250), ct);
+        fakeProcess.SignalExited(0);
+
+        var result = await runTask;
+
+        Assert.Equal(DatabaseToolsOutcome.Succeeded, result.Outcome);
+        var entry = Assert.Single(logSink.Entries);
+        Assert.Equal("wim probe failed", entry.Message);
+        Assert.Equal("Offline.Wim", entry.Origin);
+        Assert.Equal(ProcessOrigin.ElevatedHelper, entry.ProcessOrigin);
+    }
+
+    [Fact]
     public async Task HelperNotFound_HostThrowsFileNotFound_RunnerReturnsFailedWithNotFoundMessage()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -436,8 +472,8 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         Assert.DoesNotContain(allTraceMessages, m => m.Contains("OPERATION_LOG_LINE_"));
         Assert.DoesNotContain(allTraceMessages, m => m.Contains("OPERATION_PROGRESS_ITEM_"));
-        Assert.Contains(logger.TraceMessages, m => m.Contains("Hello") && m.Contains("2222"));
-        Assert.Contains(logger.TraceMessages, m => m.Contains("Result: Succeeded"));
+        Assert.Contains(logger.TraceMessages, m => m.Contains("Helper handshake") && m.Contains("2222"));
+        Assert.Contains(logger.TraceMessages, m => m.Contains("Helper result: Succeeded"));
     }
 
     [Fact]

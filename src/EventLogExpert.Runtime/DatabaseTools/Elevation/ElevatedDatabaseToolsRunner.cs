@@ -21,8 +21,6 @@ namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 // Duplex named-pipe buffers permit concurrent drain reads and request/cancel writes.
 internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 {
-    internal const string ElevatedHelperTag = "[ElevatedHelper]";
-
     private const int ChannelCapacity = 1024;
 
     private static readonly UTF8Encoding s_utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
@@ -249,7 +247,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
     {
         if (!killState.MarkCancelRequested()) { return; }
 
-        _traceLogger.Information($"{ElevatedHelperTag} Caller cancellation requested; sending CancelMessage to helper and starting {_cancellationGrace.TotalSeconds:N0}s grace window.");
+        _traceLogger.Information($"Caller cancellation requested; sending CancelMessage to helper and starting {_cancellationGrace.TotalSeconds:N0}s grace window.");
 
         _ = Task.Run(async () =>
         {
@@ -259,7 +257,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             }
             catch (Exception ex)
             {
-                _traceLogger.Trace($"{ElevatedHelperTag} CancelMessage write threw {ex.GetType().Name}: {ex.Message} (likely helper already exited)");
+                _traceLogger.Trace($"CancelMessage write threw {ex.GetType().Name}: {ex.Message} (likely helper already exited)");
             }
         });
 
@@ -272,7 +270,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             {
                 await Task.Delay(_cancellationGrace, graceCts.Token);
 
-                _traceLogger.Warning($"{ElevatedHelperTag} Helper did not respond with a Result message within {_cancellationGrace.TotalSeconds:N0}s of CancelMessage - force-killing.");
+                _traceLogger.Warning($"Helper did not respond with a Result message within {_cancellationGrace.TotalSeconds:N0}s of CancelMessage - force-killing.");
 
                 if (process.Kill())
                 {
@@ -282,7 +280,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 {
                     killState.MarkKillFailed();
 
-                    _traceLogger.Error($"{ElevatedHelperTag} Kill returned false; helper may continue running as orphan. Disposing pipe to unblock drain loop.");
+                    _traceLogger.Error($"Kill returned false; helper may continue running as orphan. Disposing pipe to unblock drain loop.");
 
                     try { await ((IAsyncDisposable)process.Pipe).DisposeAsync(); }
                     catch { /* best effort */ }
@@ -291,7 +289,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             catch (OperationCanceledException) { /* helper finished in time */ }
             catch (Exception ex)
             {
-                _traceLogger.Warning($"{ElevatedHelperTag} kill-timer task threw {ex.GetType().Name}: {ex.Message}");
+                _traceLogger.Warning($"kill-timer task threw {ex.GetType().Name}: {ex.Message}");
             }
         });
 
@@ -303,41 +301,41 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         switch (message)
         {
             case HelloMessage h:
-                _traceLogger.Trace($"{ElevatedHelperTag} Hello: helperPid={h.HelperProcessId}, protocol={h.ProtocolVersion}");
+                _traceLogger.Trace($"Helper handshake: helperPid={h.HelperProcessId}, protocol={h.ProtocolVersion}");
                 break;
 
             case ResultMessage { Outcome: DatabaseToolsOutcome.Succeeded } r:
-                _traceLogger.Trace($"{ElevatedHelperTag} Result: Succeeded ({r.DurationMs} ms).");
+                _traceLogger.Trace($"Helper result: Succeeded ({r.DurationMs} ms).");
                 break;
 
             case ResultMessage { Outcome: DatabaseToolsOutcome.Cancelled } r:
-                _traceLogger.Information($"{ElevatedHelperTag} Result: Cancelled ({r.DurationMs} ms). {r.FailureSummary}");
+                _traceLogger.Information($"Helper result: Cancelled ({r.DurationMs} ms). {r.FailureSummary}");
                 break;
 
             case ResultMessage r:
-                _traceLogger.Error($"{ElevatedHelperTag} Result: Failed ({r.DurationMs} ms). {r.FailureSummary}");
+                _traceLogger.Error($"Helper result: Failed ({r.DurationMs} ms). {r.FailureSummary}");
                 break;
 
             case FatalMessage f:
-                _traceLogger.Error($"{ElevatedHelperTag} Fatal: {f.ExceptionType}: {f.Message}");
+                _traceLogger.Error($"Helper fatal exception: {f.ExceptionType}: {f.Message}");
 
                 if (!string.IsNullOrWhiteSpace(f.StackTrace))
                 {
-                    _traceLogger.Error($"{ElevatedHelperTag} Fatal stack: {f.StackTrace}");
+                    _traceLogger.Error($"Helper fatal stack: {f.StackTrace}");
                 }
 
                 break;
 
             case ProbeMessage p:
-                _traceLogger.Warning($"{ElevatedHelperTag} (unexpected) Probe message received during operation path: processPath={p.ProcessPath}, integrity={p.IntegrityLevel}, packageIdentityOk={p.PackageIdentityOk}");
+                _traceLogger.Warning($"(unexpected) Probe message received during operation path: processPath={p.ProcessPath}, integrity={p.IntegrityLevel}, packageIdentityOk={p.PackageIdentityOk}");
                 break;
 
             case CancelMessage:
-                _traceLogger.Warning($"{ElevatedHelperTag} (unexpected) CancelMessage received from helper. CancelMessage is a runner-to-helper control message; helpers must not emit it.");
+                _traceLogger.Warning($"(unexpected) CancelMessage received from helper. CancelMessage is a runner-to-helper control message; helpers must not emit it.");
                 break;
 
             case ImageEditionsMessage e:
-                _traceLogger.Trace($"{ElevatedHelperTag} ImageEditions: status={e.Status}, count={e.Images.Count}.");
+                _traceLogger.Trace($"Helper image editions: status={e.Status}, count={e.Images.Count}.");
                 break;
         }
     }
@@ -361,7 +359,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         CancellationTokenSource? readerStopCts = null;
         bool exitHandled = false;
 
-        _traceLogger.Trace($"{ElevatedHelperTag} Starting {request.GetType().Name} (verbose={request.Verbose})...");
+        _traceLogger.Trace($"Starting {request.GetType().Name} (verbose={request.Verbose})...");
 
         try
         {
@@ -371,24 +369,24 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             }
             catch (Win32Exception w32) when (w32.NativeErrorCode == 1223)
             {
-                _traceLogger.Information($"{ElevatedHelperTag} User declined the UAC prompt.");
+                _traceLogger.Information($"User declined the UAC prompt.");
 
                 return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, "User declined the UAC prompt.", stopwatch.Elapsed);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                _traceLogger.Information($"{ElevatedHelperTag} Caller cancelled before helper spawn completed.");
+                _traceLogger.Information($"Caller cancelled before helper spawn completed.");
 
                 return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, "Cancelled before helper spawn completed.", stopwatch.Elapsed);
             }
             catch (FileNotFoundException fnf)
             {
-                _traceLogger.Error($"{ElevatedHelperTag} Helper executable not found: {fnf.Message}");
+                _traceLogger.Error($"Helper executable not found: {fnf.Message}");
 
                 return new DatabaseToolsResult(DatabaseToolsOutcome.Failed, $"Elevation helper not found: {fnf.Message}", stopwatch.Elapsed);
             }
 
-            _traceLogger.Trace($"{ElevatedHelperTag} Helper process started; PID={process.ProcessId}.");
+            _traceLogger.Trace($"Helper process started; PID={process.ProcessId}.");
 
             writeLock = new SemaphoreSlim(initialCount: 1, maxCount: 1);
 
@@ -419,7 +417,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 {
                     if (hello.HelperProcessId != process.ProcessId)
                     {
-                        _traceLogger.Warning($"{ElevatedHelperTag} Hello.HelperProcessId={hello.HelperProcessId} does not match spawned PID={process.ProcessId}; continuing (PID was already verified at pipe-accept time).");
+                        _traceLogger.Warning($"Hello.HelperProcessId={hello.HelperProcessId} does not match spawned PID={process.ProcessId}; continuing (PID was already verified at pipe-accept time).");
                     }
 
                     if (hello.ProtocolVersion != HelloMessage.CurrentProtocolVersion)
@@ -485,7 +483,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                     switch (message)
                     {
                         case LogMessage log:
-                            SafeReport(logSink, new LogRecord(log.TimestampUtc, log.Level, log.Message));
+                            SafeReport(logSink, new LogRecord(log.TimestampUtc, log.Level, log.Message, log.Category, log.ProcessOrigin));
                             break;
 
                         case ProgressMessage prog when progressSink is not null:
@@ -496,7 +494,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                             try { onDataMessage(edition); }
                             catch (Exception ex)
                             {
-                                _traceLogger.Warning($"{ElevatedHelperTag} onDataMessage callback threw {ex.GetType().Name}: {ex.Message}");
+                                _traceLogger.Warning($"onDataMessage callback threw {ex.GetType().Name}: {ex.Message}");
                             }
 
                             break;
@@ -524,7 +522,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             try { await killState.KillTaskOrCompleted.WaitAsync(_exitGrace); }
             catch (TimeoutException)
             {
-                _traceLogger.Warning($"{ElevatedHelperTag} kill-timer did not settle within {_exitGrace.TotalSeconds:N0}s; proceeding with current disposition.");
+                _traceLogger.Warning($"kill-timer did not settle within {_exitGrace.TotalSeconds:N0}s; proceeding with current disposition.");
             }
 
             int exitCode;
@@ -538,7 +536,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             {
                 if (killState.Disposition != KillDisposition.Failed)
                 {
-                    _traceLogger.Warning($"{ElevatedHelperTag} Helper did not exit within {_exitGrace.TotalSeconds:N0}s after IPC drained - force-killing.");
+                    _traceLogger.Warning($"Helper did not exit within {_exitGrace.TotalSeconds:N0}s after IPC drained - force-killing.");
 
                     if (process.Kill())
                     {
@@ -548,7 +546,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                     {
                         killState.MarkKillFailed();
 
-                        _traceLogger.Error($"{ElevatedHelperTag} Kill returned false; helper may continue running as orphan. Disposing pipe.");
+                        _traceLogger.Error($"Kill returned false; helper may continue running as orphan. Disposing pipe.");
 
                         try { await ((IAsyncDisposable)process.Pipe).DisposeAsync(); }
                         catch { /* best effort */ }
@@ -577,10 +575,10 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             catch (OperationCanceledException) { /* normal */ }
             catch (Exception ex)
             {
-                _traceLogger.Warning($"{ElevatedHelperTag} Pipe reader task ended with {ex.GetType().Name}: {ex.Message}");
+                _traceLogger.Warning($"Pipe reader task ended with {ex.GetType().Name}: {ex.Message}");
             }
 
-            _traceLogger.Trace($"{ElevatedHelperTag} Helper process exited; exit code = {exitCode}{(killState.HelperKilled ? " (force-killed)" : string.Empty)}.");
+            _traceLogger.Trace($"Helper process exited; exit code = {exitCode}{(killState.HelperKilled ? " (force-killed)" : string.Empty)}.");
 
             exitHandled = true;
 
@@ -588,7 +586,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         }
         catch (Exception ex)
         {
-            _traceLogger.Error($"{ElevatedHelperTag} Unhandled exception in runner: {ex}");
+            _traceLogger.Error($"Unhandled exception in runner: {ex}");
 
             return new DatabaseToolsResult(DatabaseToolsOutcome.Failed, $"{ex.GetType().Name}: {ex.Message}", stopwatch.Elapsed);
         }
@@ -658,7 +656,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         }
         catch (Exception ex)
         {
-            _traceLogger.Warning($"{ElevatedHelperTag} {typeof(IProgress<T>).Name}.Report threw {ex.GetType().Name}: {ex.Message}");
+            _traceLogger.Warning($"{typeof(IProgress<T>).Name}.Report threw {ex.GetType().Name}: {ex.Message}");
         }
     }
 

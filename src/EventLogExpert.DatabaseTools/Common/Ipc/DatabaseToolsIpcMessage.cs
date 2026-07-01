@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Eventing.PublisherMetadata.Offline;
+using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 using System.Text.Json.Serialization;
 
@@ -21,7 +22,7 @@ public abstract record DatabaseToolsIpcMessage;
 
 public sealed record HelloMessage(int HelperProcessId, int ProtocolVersion) : DatabaseToolsIpcMessage
 {
-    public const int CurrentProtocolVersion = 2;
+    public const int CurrentProtocolVersion = 3;
 }
 
 public sealed record ProbeMessage(
@@ -33,7 +34,12 @@ public sealed record ProbeMessage(
     string? LocalProviderEnumerationError,
     int LocalProviderCount) : DatabaseToolsIpcMessage;
 
-public sealed record LogMessage(DateTime TimestampUtc, LogLevel Level, string Message) : DatabaseToolsIpcMessage;
+public sealed record LogMessage(
+    DateTime TimestampUtc,
+    LogLevel Level,
+    string Message,
+    string Category = "",
+    ProcessOrigin ProcessOrigin = ProcessOrigin.ElevatedHelper) : DatabaseToolsIpcMessage;
 
 public sealed record ProgressMessage(int Processed, int? Total, string? CurrentItem) : DatabaseToolsIpcMessage;
 
