@@ -48,6 +48,8 @@ public sealed partial class DebugLogFilterRow
 
     [Parameter] public EventCallback OnRemove { get; set; }
 
+    [Parameter] public EventCallback OnStaged { get; set; }
+
     // Process is intentionally single-select only: ProcessOrigin has two values, so multi-select adds no
     // expressive power over single Equals plus the Include/Exclude toggle.
     private bool FieldSupportsMany => Draft.Field is DebugLogFilterField.Level or DebugLogFilterField.Category;
@@ -95,15 +97,24 @@ public sealed partial class DebugLogFilterRow
         return [.. options];
     }
 
-    private Task OnDoneClick() => OnDone.InvokeAsync();
-
-    private Task OnEditChip() => OnEdit.InvokeAsync();
-
-    private async Task OnExcludedChanged(bool excluded)
+    // Chip exclude toggles a COMMITTED filter, so it applies live (OnChanged). Editor exclude STAGES like the other
+    // editor controls (OnStaged) - it only takes effect when the user clicks Done.
+    private async Task OnChipExcludedChanged(bool excluded)
     {
         Draft.IsExcluded = excluded;
 
         await OnChanged.InvokeAsync();
+    }
+
+    private Task OnDoneClick() => OnDone.InvokeAsync();
+
+    private Task OnEditChip() => OnEdit.InvokeAsync();
+
+    private async Task OnEditorExcludedChanged(bool excluded)
+    {
+        Draft.IsExcluded = excluded;
+
+        await OnStaged.InvokeAsync();
     }
 
     private async Task OnFieldChanged(DebugLogFilterField field)
@@ -113,7 +124,7 @@ public sealed partial class DebugLogFilterRow
         Draft.MatchMode = MatchMode.Single;
         Draft.Values = [];
 
-        await OnChanged.InvokeAsync();
+        await OnStaged.InvokeAsync();
     }
 
     private async Task OnOperatorChanged((ComparisonOperator Op, MatchMode Mode) value)
@@ -126,7 +137,7 @@ public sealed partial class DebugLogFilterRow
             Draft.Values = [Draft.Values[0]];
         }
 
-        await OnChanged.InvokeAsync();
+        await OnStaged.InvokeAsync();
     }
 
     private async Task OnSingleValueChanged(string? value)
@@ -134,14 +145,14 @@ public sealed partial class DebugLogFilterRow
         // Clear only on the ValueSelect's null clear-item; the empty string is the real "(Uncategorized)" category value.
         Draft.Values = value is null ? [] : [value];
 
-        await OnChanged.InvokeAsync();
+        await OnStaged.InvokeAsync();
     }
 
     private async Task OnValuesChanged(List<string> values)
     {
         Draft.Values = values;
 
-        await OnChanged.InvokeAsync();
+        await OnStaged.InvokeAsync();
     }
 
     private string ValueLabel(string? value) => Draft.Field switch

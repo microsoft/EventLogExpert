@@ -18,6 +18,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     private const int RenderBatchSize = 100;
     private const int RowHeightPx = 18;
 
+    private readonly Dictionary<Guid, DebugLogFilter> _appliedFilters = new();
     private readonly SortedSet<string> _availableCategories = new(StringComparer.Ordinal);
     private readonly Dictionary<Guid, DebugLogFilterRow?> _editorRefs = new();
     private readonly List<DebugLogFilterDraft> _filters = [];
@@ -120,7 +121,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
             _entries,
             _projectedThroughIndex,
             _entries.Count,
-            SnapshotFilters());
+            AppliedFilters());
 
         if (newLines.Count > 0) { _displayed.AddRange(newLines); }
 
@@ -130,7 +131,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
     private void ApplyProjection()
     {
-        var (lines, count) = DebugLogProjection.Project(_entries, SnapshotFilters());
+        var (lines, count) = DebugLogProjection.Project(_entries, AppliedFilters());
 
         SetDisplayed(lines);
         _filteredEntryCount = count;
@@ -213,7 +214,17 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         }
     }
 
-    private void OnFilterChanged() => ApplyProjection();
+    // A committed chip's live action (exclude toggle): re-apply only that filter's snapshot, then reproject.
+    private void OnFilterChanged(DebugLogFilterDraft draft)
+    {
+        _appliedFilters[draft.Id] = draft.ToFilter();
+        ApplyProjection();
+    }
+
+    // An editor mutation staged into the Draft: re-render only, so CanAddFilter / the Add button disabled state
+    // update as the editing filter's completeness changes. The staged filter does not enter _appliedFilters (and so
+    // does not affect the projection) until the user clicks Done.
+    private void OnFilterStaged() => StateHasChanged();
 
     private void PruneStaleEditorRefs()
     {
@@ -313,11 +324,24 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         }
     }
 
+    private void HandleFilterDone()
+    {
+        if (_editingFilterId is { } editingId
+            && _filters.Find(filter => filter.Id == editingId) is { IsComplete: true } draft)
+        {
+            _appliedFilters[draft.Id] = draft.ToFilter();
+            ApplyProjection();
+        }
+
+        CollapseEditor();
+    }
+
     private void RemoveFilter(DebugLogFilterDraft draft)
     {
         if (_editingFilterId == draft.Id) { _editingFilterId = null; }
 
         _filters.Remove(draft);
+        _appliedFilters.Remove(draft.Id);
         _focusAddButtonAfterRender = true;
         ApplyProjection();
     }
@@ -328,7 +352,10 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         _displayedView = new ReversedListView<string>(_displayed);
     }
 
-    private IReadOnlyList<DebugLogFilter> SnapshotFilters() => [.. _filters.Select(static draft => draft.ToFilter())];
+    // The committed filter set the projection reads. Maintained INCREMENTALLY per-filter (only the acted-on filter is
+    // written, on Done / chip-live-exclude / remove) and NEVER rebuilt wholesale from the live _filters drafts - so a
+    // staged in-progress edit of one filter can never leak into projection when the user applies/removes another.
+    private IReadOnlyList<DebugLogFilter> AppliedFilters() => [.. _appliedFilters.Values];
 
     private void StartEditing(Guid filterId)
     {

@@ -57,6 +57,7 @@ internal sealed class OpenLogEffects(
     private readonly Lock _globalCtsLock = new();
     private readonly ConcurrentDictionary<EventLogId, CancellationTokenSource> _logCts = new();
     private readonly ITraceLogger _logger = logger;
+    private readonly ITraceLogger _lifecycleLogger = logger.ForCategory(LogCategories.EventLogLifecycle);
     private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logLoadCompletions = new();
     private readonly ILogWatcherService _logWatcherService = logWatcherService;
     private readonly IEventLogReaderFactory _readerFactory = readerFactory;
@@ -70,7 +71,7 @@ internal sealed class OpenLogEffects(
     [EffectMethod(typeof(CloseAllLogsAction))]
     public async Task HandleCloseAll(IDispatcher dispatcher)
     {
-        _logger.Trace($"{nameof(HandleCloseAll)} requested ({_eventLogState.Value.OpenLogs.Count} active logs).");
+        _lifecycleLogger.Debug($"Close-all requested ({_eventLogState.Value.OpenLogs.Count} active logs).");
 
         _coordinator.DiscardAll();
 
@@ -90,7 +91,7 @@ internal sealed class OpenLogEffects(
     [EffectMethod]
     public async Task HandleCloseLog(CloseLogAction action, IDispatcher dispatcher)
     {
-        _logger.Trace($"{nameof(HandleCloseLog)} requested for '{action.LogName}' (id: {action.LogId}).");
+        _lifecycleLogger.Debug($"Close requested for '{action.LogName}' (id: {action.LogId}).");
 
         _coordinator.Discard(action.LogId);
 
@@ -139,7 +140,7 @@ internal sealed class OpenLogEffects(
     {
         var stopwatch = Stopwatch.StartNew();
 
-        _logger.Information($"{nameof(HandleOpenLog)} '{action.LogName}' (path type: {action.LogPathType}).");
+        _lifecycleLogger.Debug($"Open requested for '{action.LogName}' (path type: {action.LogPathType}).");
 
         long cancelTokenAtStart = Volatile.Read(ref _cancelToken);
 
@@ -283,7 +284,7 @@ internal sealed class OpenLogEffects(
                         {
                             Array.Sort(mtaFiles, StringComparer.Ordinal);
                             eventResolver.SetMetadataPaths(mtaFiles);
-                            _logger.Information($"Using locale metadata from: {localeDir} ({mtaFiles.Length} file(s))");
+                            _logger.Debug($"Using locale metadata from: {localeDir} ({mtaFiles.Length} file(s))");
                         }
                     }
                 }
@@ -538,7 +539,7 @@ internal sealed class OpenLogEffects(
 
         dispatcher.Dispatch(new SetResolverStatusAction(string.Empty));
 
-        _logger.Information($"Loaded '{action.LogName}': {events.Count} events ({failed} failed) in {stopwatch.ElapsedMilliseconds}ms.");
+        _logger.Debug($"Loaded '{action.LogName}': {events.Count} events ({failed} failed) in {stopwatch.ElapsedMilliseconds}ms.");
 
         return;
 

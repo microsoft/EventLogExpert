@@ -20,10 +20,11 @@
                     Draft="filter"
                     IsEditing="_editingFilterId == filter.Id"
                     @key="filter.Id"
-                    OnChanged="OnFilterChanged"
-                    OnDone="CollapseEditor"
+                    OnChanged="@(() => OnFilterChanged(filter))"
+                    OnDone="HandleFilterDone"
                     OnEdit="@(() => StartEditing(filter.Id))"
                     OnRemove="@(() => RemoveFilter(filter))"
+                    OnStaged="OnFilterStaged"
                     @ref="_editorRefs[filter.Id]" />
             }
 

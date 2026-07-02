@@ -117,7 +117,7 @@ internal sealed class LogWatcherService : ILogWatcherService
         {
             watcher.Dispose();
 
-            _debugLogger.Information($"{nameof(LogWatcherService)} disposed the old watcher for log {logName}.");
+            _debugLogger.Debug($"{nameof(LogWatcherService)} disposed the old watcher for log {logName}.");
         });
     }
 
@@ -191,7 +191,7 @@ internal sealed class LogWatcherService : ILogWatcherService
         {
             watcher.Enabled = true;
 
-            _debugLogger.Information($"{nameof(LogWatcherService)} started watching {logName}.");
+            _debugLogger.Debug($"{nameof(LogWatcherService)} started watching {logName}.");
         });
     }
 
@@ -228,7 +228,7 @@ internal sealed class LogWatcherService : ILogWatcherService
         {
             watcher.Dispose();
 
-            _debugLogger.Information($"{nameof(LogWatcherService)} disposed the old watcher for log {logName}.");
+            _debugLogger.Debug($"{nameof(LogWatcherService)} disposed the old watcher for log {logName}.");
         });
     }
 }

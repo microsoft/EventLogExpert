@@ -8,7 +8,7 @@
             data-excluded="@(Draft.IsExcluded ? "true" : "false")"
             IconClass="@(Draft.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
             IconOnly
-            OnClick="@(() => OnExcludedChanged(!Draft.IsExcluded))"
+            OnClick="@(() => OnEditorExcludedChanged(!Draft.IsExcluded))"
             @ref="_editorFirstControl"
             title="@(Draft.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")" />
 
@@ -71,12 +71,12 @@
             </ValueSelect>
         }
 
-        <Button aria-label="Done editing filter"
+        <Button aria-label="Apply filter"
             Disabled="@(!Draft.IsComplete)"
             IconClass="bi bi-check-circle"
             IconOnly
             OnClick="OnDoneClick"
-            title="@(Draft.IsComplete ? "Done" : "Add a value to finish this filter")" />
+            title="@(Draft.IsComplete ? "Apply filter" : "Add a value to finish this filter")" />
 
         <DangerButton aria-label="@($"Remove filter: {SummaryText}")"
             IconClass="bi bi-x-circle"
@@ -94,7 +94,7 @@ else
             data-excluded="@(Draft.IsExcluded ? "true" : "false")"
             IconClass="@(Draft.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
             IconOnly
-            OnClick="@(() => OnExcludedChanged(!Draft.IsExcluded))"
+            OnClick="@(() => OnChipExcludedChanged(!Draft.IsExcluded))"
             title="@(Draft.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")" />
 
         <ChromelessButton aria-label="@($"Edit filter: {SummaryText}")"
