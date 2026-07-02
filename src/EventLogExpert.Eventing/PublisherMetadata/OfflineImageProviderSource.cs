@@ -79,27 +79,29 @@ public static class OfflineImageProviderSource
     // Keep this out of the iterator so image-root failures log and yield nothing before lazy enumeration starts.
     private static IOfflineImageProviderExtractor? TryCreateExtractor(string imageRootPath, ITraceLogger logger)
     {
-        if (OfflineImageRoot.TryCreate(imageRootPath, logger) is not { } imageRoot)
+        ITraceLogger providersLogger = logger.ForCategory(LogCategories.OfflineProviders);
+
+        if (OfflineImageRoot.TryCreate(imageRootPath, providersLogger) is not { } imageRoot)
         {
-            logger.Error($"'{imageRootPath}' is not a readable Windows image (no SOFTWARE/SYSTEM hive found).");
+            providersLogger.Error($"'{imageRootPath}' is not a readable Windows image (no SOFTWARE/SYSTEM hive found).");
 
             return null;
         }
 
         try
         {
-            IOfflineImageProviderExtractor? extractor = OfflineImageProviderExtractor.TryCreate(imageRoot, logger);
+            IOfflineImageProviderExtractor? extractor = OfflineImageProviderExtractor.TryCreate(imageRoot, providersLogger);
 
             if (extractor is null)
             {
-                logger.Debug($"Could not load the SOFTWARE/SYSTEM hives from '{imageRootPath}'.");
+                providersLogger.Debug($"Could not load the SOFTWARE/SYSTEM hives from '{imageRootPath}'.");
             }
 
             return extractor;
         }
         catch (OfflineRootGuardViolationException ex)
         {
-            logger.Error(
+            providersLogger.Error(
                 $"The image at '{imageRootPath}' has hive paths that escape the image root; refusing to read it. {ex.Message}");
 
             return null;

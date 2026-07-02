@@ -84,6 +84,28 @@ public sealed class DispatchingTraceLoggerTests
     }
 
     [Fact]
+    public void ForCategory_RecomputesMinimumLevel_FromTheNewCategory()
+    {
+        // The sink throttles App at Warning but Offline.Wim at Trace, so re-categorizing must re-key the level.
+        var sink = new RecordingSink(category => category == LogCategories.OfflineWim ? LogLevel.Trace : LogLevel.Warning);
+        ITraceLogger appLogger = new DispatchingTraceLogger([sink], "App", ProcessOrigin.InProcess);
+
+        Assert.Equal(LogLevel.Warning, appLogger.MinimumLevel);
+        Assert.Equal(LogLevel.Trace, appLogger.ForCategory(LogCategories.OfflineWim).MinimumLevel);
+    }
+
+    [Fact]
+    public void ForCategory_ReturnsALoggerThatStampsTheNewCategory()
+    {
+        var sink = new RecordingSink(_ => LogLevel.Trace);
+        ITraceLogger logger = new DispatchingTraceLogger([sink], "App", ProcessOrigin.InProcess);
+
+        logger.ForCategory(LogCategories.OfflineHive).Warning($"hive parse");
+
+        Assert.Equal(LogCategories.OfflineHive, Assert.Single(sink.Received).Category);
+    }
+
+    [Fact]
     public void MinimumLevel_IsTheLowestAcrossSinks()
     {
         var warningsOnly = new RecordingSink(_ => LogLevel.Warning);

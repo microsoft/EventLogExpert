@@ -81,6 +81,30 @@ public sealed class StreamingTraceLoggerTests
     }
 
     [Fact]
+    public void Emit_WithoutForCategory_LeavesCategoryEmpty_SoTheCompositeSinkCanStampTheOperationCategory()
+    {
+        var captured = new List<LogRecord>();
+        var sink = new SynchronousProgress<LogRecord>(captured.Add);
+        ITraceLogger logger = new StreamingTraceLogger(sink, LogLevel.Trace);
+
+        logger.Information($"uncategorized");
+
+        Assert.Equal(string.Empty, Assert.Single(captured).Category);
+    }
+
+    [Fact]
+    public void ForCategory_StampsTheGivenCategory_OnEmittedRecords()
+    {
+        var captured = new List<LogRecord>();
+        var sink = new SynchronousProgress<LogRecord>(captured.Add);
+        ITraceLogger logger = new StreamingTraceLogger(sink, LogLevel.Trace);
+
+        logger.ForCategory(LogCategories.OfflineWim).Information($"wim step");
+
+        Assert.Equal(LogCategories.OfflineWim, Assert.Single(captured).Category);
+    }
+
+    [Fact]
     public void MinimumLevel_DefaultsToInformation_SoTraceAndDebugAreFiltered()
     {
         // Default Information level keeps verbose provider/reader chatter out of the UI log.

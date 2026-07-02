@@ -36,6 +36,8 @@ public sealed class DispatchingTraceLogger(
 
     public void Error(ErrorLogHandler handler) => Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Error);
 
+    public ITraceLogger ForCategory(string category) => new DispatchingTraceLogger(sinks, category, processOrigin);
+
     public void Information(InformationLogHandler handler) => Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Information);
 
     public void Trace(TraceLogHandler handler) => Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Trace);

@@ -3,6 +3,9 @@
 
 using EventLogExpert.Eventing.PublisherMetadata;
 using EventLogExpert.Eventing.PublisherMetadata.Offline;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Sinks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 
 namespace EventLogExpert.Eventing.Tests.PublisherMetadata.Offline;
@@ -47,6 +50,23 @@ public sealed class OfflineImageProviderExtractorTests
         Assert.Equal(2700, provenance.Revision);
         Assert.Equal("ServerDatacenter", provenance.Edition);
         Assert.Equal("21H2", provenance.DisplayVersion);
+    }
+
+    [Fact]
+    public void ReadImageProvenance_WhenCurrentVersionIsAbsent_LogsUnderTheProvidersCategory_NotTheHiveCategory()
+    {
+        // The semantic "provenance unavailable" message belongs to Offline.Providers; only the raw regf parser
+        // (OfflineHiveFile) is Offline.Hive. This locks the Providers-vs-Hive attribution split.
+        using OfflineTestImage image = OfflineTestImage.Create(seedSoftware: _ => { }, SeedSystem);
+        var captured = new List<LogRecord>();
+        ITraceLogger providersLogger = new StreamingTraceLogger(new RecordingProgress(captured.Add), LogLevel.Trace)
+            .ForCategory(LogCategories.OfflineProviders);
+        using OfflineImageProviderExtractor extractor = OfflineImageProviderExtractor.TryCreate(image.ImageRoot, providersLogger)!;
+
+        extractor.ReadImageProvenance();
+
+        Assert.NotEmpty(captured);
+        Assert.All(captured, record => Assert.Equal(LogCategories.OfflineProviders, record.Category));
     }
 
     [Fact]
@@ -109,5 +129,10 @@ public sealed class OfflineImageProviderExtractorTests
 
         using RegistryKey provider = system.CreateSubKey(@"ControlSet001\Services\EventLog\Application\LegacyTestProvider");
         provider.SetValue("EventMessageFile", @"C:\Windows\System32\legacy.dll", RegistryValueKind.ExpandString);
+    }
+
+    private sealed class RecordingProgress(Action<LogRecord> onReport) : IProgress<LogRecord>
+    {
+        public void Report(LogRecord value) => onReport(value);
     }
 }

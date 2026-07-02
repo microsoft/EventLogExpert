@@ -21,5 +21,15 @@ public static class LogCategories
 
     public const string Offline = "Offline";
 
+    public const string OfflineHive = "Offline.Hive";
+
+    public const string OfflineIso = "Offline.Iso";
+
+    public const string OfflineProviders = "Offline.Providers";
+
+    public const string OfflineVhdx = "Offline.Vhdx";
+
+    public const string OfflineWim = "Offline.Wim";
+
     public static readonly IReadOnlyList<string> KnownRoots = ["App", DatabaseTools, "Elevation", Offline];
 }
