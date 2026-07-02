@@ -16,4 +16,6 @@ public sealed record DebugLogFilter(
         Field == DebugLogFilterField.Message
             ? Values.Count > 0 && !string.IsNullOrWhiteSpace(Values[0])
             : Values.Count > 0;
+
+    public bool IsEnabled { get; init; } = true;
 }

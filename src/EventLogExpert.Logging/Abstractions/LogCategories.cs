@@ -27,6 +27,8 @@ public static class LogCategories
 
     public const string EventLog = "EventLog";
 
+    public const string EventLogLifecycle = "EventLog.Lifecycle";
+
     public const string Offline = "Offline";
 
     public const string OfflineHive = "Offline.Hive";

@@ -48,26 +48,6 @@ public sealed class DebugLogModalTests : BunitContext
     }
 
     [Fact]
-    public async Task DebugLogModal_AddFilter_DisabledUntilCurrentFilterComplete()
-    {
-        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(
-            DebugLogUtils.ToAsyncEnumerable([DebugLogUtils.BuildLine(LogLevel.Information, "alpha foo")]));
-
-        var component = Render<DebugLogModal>();
-
-        await component.WaitForAssertionAsync(() =>
-            Assert.Equal("1 of 1 entry", component.Find(".debug-log-footer-counter").TextContent.Trim()));
-
-        await AddFilterAsync(component);
-
-        Assert.True(FindButton(component, "Add Filter").HasAttribute("disabled"));
-
-        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
-
-        Assert.False(FindButton(component, "Add Filter").HasAttribute("disabled"));
-    }
-
-    [Fact]
     public async Task DebugLogModal_AddFilter_OpensAnEditor()
     {
         _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(
@@ -84,34 +64,6 @@ public sealed class DebugLogModalTests : BunitContext
         await AddFilterAsync(component);
 
         Assert.Single(component.FindAll(".debug-log-filter-editor"));
-    }
-
-    [Fact]
-    public async Task DebugLogModal_AddingSecondFilter_LeavesOnlyOneEditorOpen()
-    {
-        var lines = new[]
-        {
-            DebugLogUtils.BuildLine(LogLevel.Information, "alpha foo"),
-            DebugLogUtils.BuildLine(LogLevel.Information, "bravo bar"),
-        };
-
-        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
-
-        var component = Render<DebugLogModal>();
-
-        await component.WaitForAssertionAsync(() =>
-            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
-
-        await AddFilterAsync(component);
-        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
-        await component.Find("button[aria-label='Done editing filter']").ClickAsync(new MouseEventArgs());
-
-        await component.WaitForAssertionAsync(() => Assert.Single(component.FindAll(".debug-log-filter-chip")));
-
-        await AddFilterAsync(component);
-
-        Assert.Single(component.FindAll(".debug-log-filter-editor"));
-        Assert.Single(component.FindAll(".debug-log-filter-chip"));
     }
 
     [Fact]
@@ -154,6 +106,66 @@ public sealed class DebugLogModalTests : BunitContext
     }
 
     [Fact]
+    public async Task DebugLogModal_CancelEditing_EditedChip_RevertsToAppliedForm()
+    {
+        var lines = new[]
+        {
+            DebugLogUtils.BuildLine(LogLevel.Information, "alpha foo"),
+            DebugLogUtils.BuildLine(LogLevel.Information, "bravo bar"),
+        };
+
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        // Apply A (contains "foo") -> 1 of 2, chip shows "Message contains foo".
+        await AddFilterAsync(component);
+        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
+        await SaveFilterAsync(component);
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        // Re-open the chip (edit-on-copy) and change the value to "bar", then Cancel. The applied form must be
+        // untouched: the chip still reads "Message contains foo" and the projection stays 1 of 2.
+        await component.Find(".debug-log-filter-chip-edit").ClickAsync(new MouseEventArgs());
+        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "bar" });
+        await component.Find("button[aria-label='Cancel edit']").ClickAsync(new MouseEventArgs());
+
+        await component.WaitForAssertionAsync(() =>
+        {
+            Assert.Empty(component.FindAll(".debug-log-filter-editor"));
+            Assert.Equal("Message contains foo", component.Find(".debug-log-filter-summary").TextContent.Trim());
+            Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim());
+        });
+    }
+
+    [Fact]
+    public async Task DebugLogModal_CancelEditing_NewRow_RemovesIt()
+    {
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(
+            DebugLogUtils.ToAsyncEnumerable([DebugLogUtils.BuildLine(LogLevel.Information, "alpha foo")]));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("1 of 1 entry", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        await AddFilterAsync(component);
+        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
+
+        Assert.Single(component.FindAll(".debug-log-filter-editor"));
+
+        await component.Find("button[aria-label='Cancel edit']").ClickAsync(new MouseEventArgs());
+
+        await component.WaitForAssertionAsync(() => Assert.Empty(component.FindAll(".debug-log-filter-editor")));
+        Assert.Empty(component.FindAll(".debug-log-filter-chip"));
+    }
+
+    [Fact]
     public async Task DebugLogModal_CategoryEqualsFilter_NarrowsToSelectedCategory()
     {
         var lines = new[]
@@ -172,6 +184,8 @@ public sealed class DebugLogModalTests : BunitContext
         await AddFilterAsync(component);
         await SelectOptionAsync(component, "Filter field", "Category");
         await SelectOptionAsync(component, "Filter value", "DatabaseTools.Create");
+
+        await SaveFilterAsync(component);
 
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
@@ -197,6 +211,8 @@ public sealed class DebugLogModalTests : BunitContext
         await SelectOptionAsync(component, "Filter field", "Category");
         await SelectOptionAsync(component, "Filter value", "(Uncategorized)");
 
+        await SaveFilterAsync(component);
+
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
     }
@@ -220,8 +236,8 @@ public sealed class DebugLogModalTests : BunitContext
         await AddFilterAsync(component);
         await SelectOptionAsync(component, "Filter field", "Category");
 
-        // Regression: with nothing selected the value header must be blank, not the "(Uncategorized)"
-        // sentinel label, and the incomplete filter stays a no-op (all entries remain visible).
+        // Regression: with nothing selected the value header must be blank, not the "(Uncategorized)" sentinel
+        // label, and nothing is applied yet so all entries remain visible.
         var valueHeader = component.Find("input[aria-label='Filter value']");
         Assert.True(
             string.IsNullOrEmpty(valueHeader.GetAttribute("value")),
@@ -232,12 +248,84 @@ public sealed class DebugLogModalTests : BunitContext
 
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("(Uncategorized)", component.Find("input[aria-label='Filter value']").GetAttribute("value")));
+
+        await SaveFilterAsync(component);
+
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
     }
 
     [Fact]
-    public async Task DebugLogModal_Clear_ClearsTheLogFile()
+    public async Task DebugLogModal_ChipExcludeToggle_AppliesImmediately()
+    {
+        var lines = new[]
+        {
+            DebugLogUtils.BuildLine(LogLevel.Information, "foo a"),
+            DebugLogUtils.BuildLine(LogLevel.Information, "foo b"),
+            DebugLogUtils.BuildLine(LogLevel.Information, "bar"),
+        };
+
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("3 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        await AddFilterAsync(component);
+        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
+        await SaveFilterAsync(component);
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        // The chip exclude toggle acts on the applied filter, so it re-projects immediately.
+        await component.Find("button[aria-label='Filter is included; activate to exclude']").ClickAsync(new MouseEventArgs());
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("1 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+    }
+
+    [Fact]
+    public async Task DebugLogModal_ClearFilters_RemovesAllRowsAndShowsAllEntries()
+    {
+        var lines = new[]
+        {
+            DebugLogUtils.BuildLine(LogLevel.Information, "alpha foo"),
+            DebugLogUtils.BuildLine(LogLevel.Error, "bravo"),
+        };
+
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        // Apply two filters (A: contains "foo", B: Level == Error) -> both narrow to 0 of 2 (no line is both).
+        await AddFilterAsync(component);
+        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
+        await SaveFilterAsync(component);
+
+        await AddFilterAsync(component);
+        await SelectOptionAsync(component, "Filter field", "Level");
+        await SelectOptionAsync(component, "Filter value", "Error");
+        await SaveFilterAsync(component);
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("0 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        await FindButton(component, "Clear Filters").ClickAsync(new MouseEventArgs());
+
+        await component.WaitForAssertionAsync(() =>
+        {
+            Assert.Empty(component.FindAll(".debug-log-filter-chip"));
+            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim());
+        });
+    }
+
+    [Fact]
+    public async Task DebugLogModal_ClearLog_ClearsTheLogFile()
     {
         _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(
             DebugLogUtils.ToAsyncEnumerable([DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogFirstMessage)]));
@@ -247,7 +335,7 @@ public sealed class DebugLogModalTests : BunitContext
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("1 of 1 entry", component.Find(".debug-log-footer-counter").TextContent.Trim()));
 
-        await FindButton(component, "Clear").ClickAsync(new MouseEventArgs());
+        await FindButton(component, "Clear Log").ClickAsync(new MouseEventArgs());
 
         await _debugLogReader.Received(1).ClearAsync();
 
@@ -272,35 +360,6 @@ public sealed class DebugLogModalTests : BunitContext
     }
 
     [Fact]
-    public async Task DebugLogModal_DoneEditing_CollapsesToChipWithSummary()
-    {
-        var lines = new[]
-        {
-            DebugLogUtils.BuildLine(LogLevel.Information, "alpha foo"),
-            DebugLogUtils.BuildLine(LogLevel.Information, "bravo"),
-        };
-
-        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
-
-        var component = Render<DebugLogModal>();
-
-        await component.WaitForAssertionAsync(() =>
-            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
-
-        await AddFilterAsync(component);
-        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
-
-        Assert.Single(component.FindAll(".debug-log-filter-editor"));
-
-        await component.Find("button[aria-label='Done editing filter']").ClickAsync(new MouseEventArgs());
-
-        await component.WaitForAssertionAsync(() => Assert.Single(component.FindAll(".debug-log-filter-chip")));
-        Assert.Empty(component.FindAll(".debug-log-filter-editor"));
-        Assert.Equal("Message contains foo", component.Find(".debug-log-filter-summary").TextContent.Trim());
-        Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim());
-    }
-
-    [Fact]
     public async Task DebugLogModal_EditChip_ReopensTheEditor()
     {
         var lines = new[]
@@ -318,7 +377,7 @@ public sealed class DebugLogModalTests : BunitContext
 
         await AddFilterAsync(component);
         await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
-        await component.Find("button[aria-label='Done editing filter']").ClickAsync(new MouseEventArgs());
+        await SaveFilterAsync(component);
 
         await component.WaitForAssertionAsync(() => Assert.Single(component.FindAll(".debug-log-filter-chip")));
 
@@ -329,7 +388,7 @@ public sealed class DebugLogModalTests : BunitContext
     }
 
     [Fact]
-    public async Task DebugLogModal_EditingAnotherChipWhileIncomplete_LeavesPlaceholderChipAndGatesAdd()
+    public async Task DebugLogModal_EnableToggle_DisablesFilterLive()
     {
         var lines = new[]
         {
@@ -346,22 +405,21 @@ public sealed class DebugLogModalTests : BunitContext
 
         await AddFilterAsync(component);
         await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
-        await component.Find("button[aria-label='Done editing filter']").ClickAsync(new MouseEventArgs());
+        await SaveFilterAsync(component);
 
-        await component.WaitForAssertionAsync(() => Assert.Single(component.FindAll(".debug-log-filter-chip")));
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
 
-        // Add a fresh (incomplete) filter, then edit the existing complete chip. The abandoned incomplete
-        // draft collapses to a placeholder "?" chip (a projection no-op) and Add stays gated.
-        await AddFilterAsync(component);
-        await component.Find("button[aria-label='Edit filter: Message contains foo']").ClickAsync(new MouseEventArgs());
+        // Disabling the chip drops it from the projection live; re-enabling restores it.
+        await component.Find("button[aria-label='Filter is enabled; activate to disable']").ClickAsync(new MouseEventArgs());
 
-        await component.WaitForAssertionAsync(() => Assert.Single(component.FindAll(".debug-log-filter-editor")));
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
 
-        var chips = component.FindAll(".debug-log-filter-chip");
-        Assert.Single(chips);
-        Assert.Contains("?", chips[0].TextContent);
-        Assert.True(FindButton(component, "Add Filter").HasAttribute("disabled"));
-        Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim());
+        await component.Find("button[aria-label='Filter is disabled; activate to enable']").ClickAsync(new MouseEventArgs());
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
     }
 
     [Fact]
@@ -383,6 +441,8 @@ public sealed class DebugLogModalTests : BunitContext
         await AddFilterAsync(component);
         await component.Find("button[aria-label='Filter is included; activate to exclude']").ClickAsync(new MouseEventArgs());
         await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
+
+        await SaveFilterAsync(component);
 
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
@@ -408,8 +468,39 @@ public sealed class DebugLogModalTests : BunitContext
 
         await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
 
+        // Configuring the value does not change the projection until Save is clicked.
+        Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim());
+
+        await SaveFilterAsync(component);
+
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+    }
+
+    [Fact]
+    public async Task DebugLogModal_MultipleEditorsOpenSimultaneously()
+    {
+        var lines = new[]
+        {
+            DebugLogUtils.BuildLine(LogLevel.Information, "alpha foo"),
+            DebugLogUtils.BuildLine(LogLevel.Information, "bravo bar"),
+        };
+
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        // Adding a second filter while the first is still being edited keeps both editors open (no block, no
+        // implicit collapse); neither is applied until its own Save.
+        await AddFilterAsync(component);
+        await AddFilterAsync(component);
+
+        Assert.Equal(2, component.FindAll(".debug-log-filter-editor").Count);
+        Assert.Empty(component.FindAll(".debug-log-filter-chip"));
+        Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim());
     }
 
     [Fact]
@@ -434,11 +525,16 @@ public sealed class DebugLogModalTests : BunitContext
         await SelectOptionAsync(component, "Filter operator", "Multi Select");
         await SelectOptionAsync(component, "Filter value", "Error");
         await SelectOptionAsync(component, "Filter value", "Warning");
+        await SaveFilterAsync(component);
 
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("2 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
 
+        // Re-open the chip and switch Multi Select -> Equals; the stale second value is dropped so only Error
+        // (the first value) remains after Save.
+        await component.Find(".debug-log-filter-chip-edit").ClickAsync(new MouseEventArgs());
         await SelectOptionAsync(component, "Filter operator", "Equals");
+        await SaveFilterAsync(component);
 
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("1 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
@@ -464,8 +560,45 @@ public sealed class DebugLogModalTests : BunitContext
         await SelectOptionAsync(component, "Filter field", "Process");
         await SelectOptionAsync(component, "Filter value", "Elevated helper");
 
+        await SaveFilterAsync(component);
+
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+    }
+
+    [Fact]
+    public async Task DebugLogModal_RefreshWhileEditing_ProjectsAppliedNotEditedCopy()
+    {
+        var lines = new[]
+        {
+            DebugLogUtils.BuildLine(LogLevel.Information, "foo 1"),
+            DebugLogUtils.BuildLine(LogLevel.Information, "foo 2"),
+            DebugLogUtils.BuildLine(LogLevel.Information, "bar 1"),
+        };
+
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(_ => DebugLogUtils.ToAsyncEnumerable(lines));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("3 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        // Apply A: contains "foo" -> 2 of 3.
+        await AddFilterAsync(component);
+        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
+        await SaveFilterAsync(component);
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        // Re-open A and edit the copy to "bar" WITHOUT Save, then Refresh. Refresh must project A's applied "foo"
+        // form (2 of 3), not the edited copy "bar" (which would be 1 of 3).
+        await component.Find(".debug-log-filter-chip-edit").ClickAsync(new MouseEventArgs());
+        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "bar" });
+        await FindButton(component, "Refresh").ClickAsync(new MouseEventArgs());
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
     }
 
     [Fact]
@@ -486,14 +619,65 @@ public sealed class DebugLogModalTests : BunitContext
 
         await AddFilterAsync(component);
         await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
+        await SaveFilterAsync(component);
 
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
 
-        await component.Find("button[aria-label^='Remove filter']").ClickAsync(new MouseEventArgs());
+        // Removing the applied chip re-projects live.
+        await component.Find(".debug-log-filter-chip-remove").ClickAsync(new MouseEventArgs());
 
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+    }
+
+    [Fact]
+    public async Task DebugLogModal_SaveFilter_CollapsesToChipWithSummaryAndApplies()
+    {
+        var lines = new[]
+        {
+            DebugLogUtils.BuildLine(LogLevel.Information, "alpha foo"),
+            DebugLogUtils.BuildLine(LogLevel.Information, "bravo"),
+        };
+
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        await AddFilterAsync(component);
+        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
+
+        Assert.Single(component.FindAll(".debug-log-filter-editor"));
+
+        await SaveFilterAsync(component);
+
+        await component.WaitForAssertionAsync(() => Assert.Single(component.FindAll(".debug-log-filter-chip")));
+        Assert.Empty(component.FindAll(".debug-log-filter-editor"));
+        Assert.Equal("Message contains foo", component.Find(".debug-log-filter-summary").TextContent.Trim());
+        Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim());
+    }
+
+    [Fact]
+    public async Task DebugLogModal_SaveFilter_DisabledUntilComplete()
+    {
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(
+            DebugLogUtils.ToAsyncEnumerable([DebugLogUtils.BuildLine(LogLevel.Information, "alpha foo")]));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("1 of 1 entry", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        await AddFilterAsync(component);
+
+        Assert.True(component.Find("button[aria-label='Save filter']").HasAttribute("disabled"));
+
+        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
+
+        Assert.False(component.Find("button[aria-label='Save filter']").HasAttribute("disabled"));
     }
 
     [Fact]
@@ -514,6 +698,9 @@ public sealed class DebugLogModalTests : BunitContext
 
     private static IElement FindButton(IRenderedComponent<DebugLogModal> component, string text) =>
         component.FindAll("button").First(button => button.TextContent.Contains(text));
+
+    private static async Task SaveFilterAsync(IRenderedComponent<DebugLogModal> component) =>
+        await component.Find("button[aria-label='Save filter']").ClickAsync(new MouseEventArgs());
 
     private static async Task SelectOptionAsync(IRenderedComponent<DebugLogModal> component, string ariaLabel, string optionText)
     {

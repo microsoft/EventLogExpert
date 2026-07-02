@@ -20,12 +20,12 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
     private readonly SortedSet<string> _availableCategories = new(StringComparer.Ordinal);
     private readonly Dictionary<Guid, DebugLogFilterRow?> _editorRefs = new();
-    private readonly List<DebugLogFilterDraft> _filters = [];
+    private readonly List<DebugLogFilterRowState> _rows = [];
 
     private Button? _addButton;
+    private IReadOnlyList<DebugLogFilter> _appliedFilters = [];
     private List<string> _displayed = [];
     private ReversedListView<string> _displayedView;
-    private Guid? _editingFilterId;
     private IReadOnlyList<DebugLogEntry> _entries = [];
     private int _filteredEntryCount;
     private bool _focusAddButtonAfterRender;
@@ -43,8 +43,6 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     }
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
-
-    private bool CanAddFilter => _filters.TrueForAll(static filter => filter.IsComplete);
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
@@ -103,13 +101,9 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
     private void AddFilter()
     {
-        if (!CanAddFilter) { return; }
-
-        var draft = new DebugLogFilterDraft();
-        _filters.Add(draft);
-        _editingFilterId = draft.Id;
-        _focusEditorAfterRender = draft.Id;
-        // A fresh draft is incomplete, so it is a projection no-op until the user configures a value.
+        var row = new DebugLogFilterRowState { Editing = new DebugLogFilterDraft() };
+        _rows.Add(row);
+        _focusEditorAfterRender = row.Id;
     }
 
     private void ApplyIncrementalProjection()
@@ -120,7 +114,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
             _entries,
             _projectedThroughIndex,
             _entries.Count,
-            SnapshotFilters());
+            _appliedFilters);
 
         if (newLines.Count > 0) { _displayed.AddRange(newLines); }
 
@@ -128,13 +122,31 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         _projectedThroughIndex = _entries.Count;
     }
 
+    // Rebuild the applied filter set from the rows and fully reproject. Called on every action that changes the
+    // applied set (Save / enable / exclude toggle / remove / clear); streaming reads the cached _appliedFilters.
     private void ApplyProjection()
     {
-        var (lines, count) = DebugLogProjection.Project(_entries, SnapshotFilters());
+        _appliedFilters = [.. _rows.Where(static row => row.Applied is not null).Select(static row => row.Applied!)];
+
+        var (lines, count) = DebugLogProjection.Project(_entries, _appliedFilters);
 
         SetDisplayed(lines);
         _filteredEntryCount = count;
         _projectedThroughIndex = _entries.Count;
+    }
+
+    private void CancelEditing(DebugLogFilterRowState row)
+    {
+        if (row.Applied is null)
+        {
+            _rows.Remove(row);
+            _focusAddButtonAfterRender = true;
+        }
+        else
+        {
+            row.Editing = null;
+            _focusChipAfterRender = row.Id;
+        }
     }
 
     private IReadOnlyList<string> CategoryFilterOptions()
@@ -146,7 +158,15 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         return [.. options];
     }
 
-    private async Task Clear()
+    private void ClearFilters()
+    {
+        _rows.Clear();
+        _focusAddButtonAfterRender = true;
+        ApplyProjection();
+    }
+
+    // Clears the debug-log FILE (not the filters), then resets the streamed view.
+    private async Task ClearLog()
     {
         try
         {
@@ -154,7 +174,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         }
         catch (Exception ex)
         {
-            await AlertDialogService.ShowAlert("Clear Failed", ex.Message, "OK");
+            await AlertDialogService.ShowAlert("Clear Log Failed", ex.Message, "OK");
 
             return;
         }
@@ -170,13 +190,6 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         _hasLoaded = true;
 
         StateHasChanged();
-    }
-
-    private void CollapseEditor()
-    {
-        var previouslyEditing = _editingFilterId;
-        _editingFilterId = null;
-        _focusChipAfterRender = previouslyEditing;
     }
 
     private async Task HandleCopyAsync()
@@ -213,19 +226,21 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         }
     }
 
-    private void OnFilterChanged() => ApplyProjection();
+    // An editor mutation (field/operator/value/exclude on the draft copy): re-render only so the Save button's
+    // enabled state tracks completeness. Nothing reaches the projection until the user clicks Save on the row.
+    private void OnEditorChanged() => StateHasChanged();
 
     private void PruneStaleEditorRefs()
     {
         if (_editorRefs.Count == 0) { return; }
 
-        if (_filters.Count == 0)
+        if (_rows.Count == 0)
         {
             _editorRefs.Clear();
             return;
         }
 
-        var liveIds = _filters.Select(static filter => filter.Id).ToHashSet();
+        var liveIds = _rows.Select(static row => row.Id).ToHashSet();
 
         var stale = _editorRefs
             .Where(entry => !liveIds.Contains(entry.Key) || entry.Value is null)
@@ -313,12 +328,20 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         }
     }
 
-    private void RemoveFilter(DebugLogFilterDraft draft)
+    private void RemoveFilter(DebugLogFilterRowState row)
     {
-        if (_editingFilterId == draft.Id) { _editingFilterId = null; }
-
-        _filters.Remove(draft);
+        _rows.Remove(row);
         _focusAddButtonAfterRender = true;
+        ApplyProjection();
+    }
+
+    private void SaveFilter(DebugLogFilterRowState row)
+    {
+        if (row.Editing is not { IsComplete: true } draft) { return; }
+
+        row.Applied = draft.ToFilter();
+        row.Editing = null;
+        _focusChipAfterRender = row.Id;
         ApplyProjection();
     }
 
@@ -328,12 +351,28 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         _displayedView = new ReversedListView<string>(_displayed);
     }
 
-    private IReadOnlyList<DebugLogFilter> SnapshotFilters() => [.. _filters.Select(static draft => draft.ToFilter())];
-
-    private void StartEditing(Guid filterId)
+    private void StartEditing(DebugLogFilterRowState row)
     {
-        _editingFilterId = filterId;
-        _focusEditorAfterRender = filterId;
+        row.Editing = DebugLogFilterDraft.FromFilter(row.Applied!);
+        _focusEditorAfterRender = row.Id;
+    }
+
+    // A committed chip's live enable/disable toggle: flip IsEnabled on the applied filter and reproject.
+    private void ToggleEnable(DebugLogFilterRowState row)
+    {
+        if (row.Applied is not { } applied) { return; }
+
+        row.Applied = applied with { IsEnabled = !applied.IsEnabled };
+        ApplyProjection();
+    }
+
+    // A committed chip's live include/exclude toggle: flip IsExcluded on the applied filter and reproject.
+    private void ToggleExclude(DebugLogFilterRowState row)
+    {
+        if (row.Applied is not { } applied) { return; }
+
+        row.Applied = applied with { IsExcluded = !applied.IsExcluded };
+        ApplyProjection();
     }
 
     private void TrackEntryCategory(DebugLogEntry entry)
@@ -346,5 +385,17 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         {
             _hasUncategorized = true;
         }
+    }
+
+    // A single filter row: its committed, immutable Applied filter (shown as a chip; null until first Save) and an
+    // optional Editing draft copy (shown as the editor while non-null). Editing never mutates Applied - that is the
+    // edit-on-copy invariant that keeps the chip truthful.
+    private sealed class DebugLogFilterRowState
+    {
+        public DebugLogFilter? Applied { get; set; }
+
+        public DebugLogFilterDraft? Editing { get; set; }
+
+        public Guid Id { get; } = Guid.NewGuid();
     }
 }

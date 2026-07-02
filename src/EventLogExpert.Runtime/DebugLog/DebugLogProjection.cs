@@ -64,10 +64,10 @@ public static class DebugLogProjection
         }
     }
 
-    // A null predicate marks an incomplete filter as a no-op, so a half-configured row never hides entries.
+    // A null predicate makes a filter a no-op, so an incomplete (half-configured) or disabled row never hides entries.
     private static Func<DebugLogEntry, bool>? Compile(DebugLogFilter filter)
     {
-        if (!filter.IsComplete) { return null; }
+        if (!filter.IsComplete || !filter.IsEnabled) { return null; }
 
         var excluded = filter.IsExcluded;
         var wantIn = filter.Operator != ComparisonOperator.NotEqual;
