@@ -16,7 +16,7 @@ namespace EventLogExpert.ElevationHelper.Ipc;
 ///     ). The underlying writer's semaphore serializes the writes so concurrent log entries from different operation
 ///     phases (or the operation thread + the control reader's fault-emission path) cannot interleave on the wire.
 /// </remarks>
-internal sealed class IpcLogSink(IpcMessageWriter writer) : IProgress<LogRecord>
+internal sealed class IpcLogForwarder(IpcMessageWriter writer) : IProgress<LogRecord>
 {
     public void Report(LogRecord value)
     {
@@ -28,7 +28,7 @@ internal sealed class IpcLogSink(IpcMessageWriter writer) : IProgress<LogRecord>
         try
         {
             writer.WriteAsync(
-                    new LogMessage(value.TimestampUtc, value.Level, value.Message, value.Category, ProcessOrigin.ElevatedHelper),
+                    new LogMessage(value.TimestampUtc, value.Level, value.Message, value.Category),
                     CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();

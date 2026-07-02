@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Sinks;
 using EventLogExpert.Provider.Maintenance;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Runtime.Alerts;
@@ -141,6 +142,33 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         Assert.Same(attentionScope1, attentionScope2);
     }
 
+    [Fact]
+    public async Task AddEventLogRuntime_SharesOneFileLogSinkSingleton()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        RegisterHostDependencies(services);
+        services.AddEventLogRuntime();
+
+        await using var provider = services.BuildServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+
+        await using var scope1 = provider.CreateAsyncScope();
+        await using var scope2 = provider.CreateAsyncScope();
+
+        // Act - the IDebugLogReader (whose ClearAsync truncates the writer), the ILogSourceFactory sink list,
+        // and OperationLogSinkFactory all inject the concrete FileLogSink. A single shared singleton is
+        // load-bearing: a second instance would let the reader's Clear truncate a different handle than the
+        // one the sinks write through.
+        var sinkScope1 = scope1.ServiceProvider.GetRequiredService<FileLogSink>();
+        var sinkScope2 = scope2.ServiceProvider.GetRequiredService<FileLogSink>();
+
+        // Assert - one shared singleton, and every file-sink consumer resolves against it.
+        Assert.Same(sinkScope1, sinkScope2);
+        Assert.NotNull(scope1.ServiceProvider.GetRequiredService<IDebugLogReader>());
+        Assert.NotNull(scope1.ServiceProvider.GetRequiredService<IOperationLogSinkFactory>());
+    }
+
     [Theory]
     // Command facades.
     [InlineData(typeof(IEventLogCommands))]
@@ -173,7 +201,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(ISettingsService))]
     [InlineData(typeof(ITraceLogger))]
     [InlineData(typeof(ILogSourceFactory))]
-    [InlineData(typeof(IFileLogger))]
+    [InlineData(typeof(IDebugLogReader))]
     [InlineData(typeof(IOperationLogSinkFactory))]
     // Update + deployment services.
     [InlineData(typeof(ICurrentVersionProvider))]

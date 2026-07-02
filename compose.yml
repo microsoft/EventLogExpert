@@ -32,6 +32,13 @@ services:
       - --logger
       - "trx;LogFileName=eventing.trx"
 
+  logging:
+    <<: *base
+    command:
+      - tests/Integration/EventLogExpert.Logging.IntegrationTests/EventLogExpert.Logging.IntegrationTests.csproj
+      - --logger
+      - "trx;LogFileName=logging.trx"
+
   runtime:
     <<: *base
     command:

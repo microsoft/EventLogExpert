@@ -49,6 +49,7 @@
   </Folder>
   <Folder Name="/tests/Integration/">
     <Project Path="tests/Integration/EventLogExpert.Eventing.IntegrationTests/EventLogExpert.Eventing.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/EventLogExpert.Logging.IntegrationTests/EventLogExpert.Logging.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.Runtime.IntegrationTests/EventLogExpert.Runtime.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.Provider.Database.IntegrationTests/EventLogExpert.Provider.Database.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.DatabaseTools.IntegrationTests/EventLogExpert.DatabaseTools.IntegrationTests.csproj" />

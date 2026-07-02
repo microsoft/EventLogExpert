@@ -22,7 +22,7 @@ internal static class OperationDispatcher
             .BuildServiceProvider();
 
         var service = services.GetRequiredService<IDatabaseToolsService>();
-        var logSink = new IpcLogSink(writer);
+        var logSink = new IpcLogForwarder(writer);
         var progressSink = new IpcProgressSink(writer);
 
         // List-editions is read-only, so it bypasses destructive database recovery.
