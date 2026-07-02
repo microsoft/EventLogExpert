@@ -10,8 +10,6 @@ public sealed class DebugLogFilterDraft
 {
     public DebugLogFilterField Field { get; set; } = DebugLogFilterField.Message;
 
-    public Guid Id { get; } = Guid.NewGuid();
-
     // Delegates to the immutable filter so the completeness rule has a single source of truth.
     public bool IsComplete => ToFilter().IsComplete;
 
@@ -23,5 +21,16 @@ public sealed class DebugLogFilterDraft
 
     public List<string> Values { get; set; } = [];
 
+    // A value-detached copy of an applied filter for edit-on-copy: editing the draft never mutates the applied form.
+    public static DebugLogFilterDraft FromFilter(DebugLogFilter filter) => new()
+    {
+        Field = filter.Field,
+        Operator = filter.Operator,
+        MatchMode = filter.MatchMode,
+        IsExcluded = filter.IsExcluded,
+        Values = [.. filter.Values],
+    };
+
+    // A saved filter is always enabled (IsEnabled defaults to true); the enable/disable toggle acts on the chip.
     public DebugLogFilter ToFilter() => new(Field, Operator, MatchMode, IsExcluded, [.. Values]);
 }

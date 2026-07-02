@@ -15,6 +15,16 @@
     color: var(--clr-red);
 }
 
+.debug-log-filter-chip ::deep .debug-log-filter-enable-toggle {
+    color: var(--text-secondary);
+    transition: color 0.1s ease-in-out;
+}
+
+/* A disabled filter stays visible (and its enable toggle stays clickable) but is greyed to show it is inactive. */
+.debug-log-filter-chip[data-disabled="true"] {
+    opacity: 0.55;
+}
+
 .debug-log-filter-chip ::deep .debug-log-filter-chip-edit,
 .debug-log-filter-chip ::deep .debug-log-filter-chip-remove {
     display: inline-flex;

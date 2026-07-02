@@ -22,7 +22,6 @@ public sealed class LoggingOptions
                 {
                     [LogCategories.Database] = LogLevel.Warning,
                     [LogCategories.DatabaseTools] = LogLevel.Warning,
-                    [LogCategories.EventLog] = LogLevel.Warning,
                     [LogCategories.Offline] = LogLevel.Warning,
                     [LogCategories.Resolution] = LogLevel.Warning
                 }

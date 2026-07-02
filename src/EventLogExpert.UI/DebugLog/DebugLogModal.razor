@@ -14,27 +14,38 @@
     @ref="ChromeRef">
     <ChildContent>
         <div aria-label="Filters" class="debug-log-filter-tray" role="group">
-            @foreach (var filter in _filters)
+            @foreach (var row in _rows)
             {
-                <DebugLogFilterRow AvailableCategories="CategoryFilterOptions()"
-                    Draft="filter"
-                    IsEditing="_editingFilterId == filter.Id"
-                    @key="filter.Id"
-                    OnChanged="OnFilterChanged"
-                    OnDone="CollapseEditor"
-                    OnEdit="@(() => StartEditing(filter.Id))"
-                    OnRemove="@(() => RemoveFilter(filter))"
-                    @ref="_editorRefs[filter.Id]" />
+                <DebugLogFilterRow Applied="row.Applied"
+                    AvailableCategories="CategoryFilterOptions()"
+                    Draft="row.Editing"
+                    @key="row.Id"
+                    OnCancel="@(() => CancelEditing(row))"
+                    OnChanged="OnEditorChanged"
+                    OnEdit="@(() => StartEditing(row))"
+                    OnEnableToggled="@(() => ToggleEnable(row))"
+                    OnExcludeToggled="@(() => ToggleExclude(row))"
+                    OnRemove="@(() => RemoveFilter(row))"
+                    OnSave="@(() => SaveFilter(row))"
+                    @ref="_editorRefs[row.Id]" />
             }
 
-            <Button aria-label="@(CanAddFilter ? "Add filter" : "Finish the current filter before adding another")"
+            <Button aria-label="Add filter"
                 CssClass="debug-log-add-filter"
-                Disabled="@(!CanAddFilter)"
                 IconClass="bi bi-plus-circle"
                 OnClick="AddFilter"
                 @ref="_addButton"
-                title="@(CanAddFilter ? "Add filter" : "Finish the current filter before adding another")">
+                title="Add filter">
                 Add Filter
+            </Button>
+
+            <Button aria-label="Clear all filters"
+                CssClass="debug-log-clear-filters"
+                Disabled="@(_rows.Count == 0)"
+                IconClass="bi bi-x-circle"
+                OnClick="ClearFilters"
+                title="Clear all filters">
+                Clear Filters
             </Button>
         </div>
         <div aria-busy="@(_hasLoaded ? "false" : "true")" aria-label="Debug log entries" class="debug-log-viewport" role="region" tabindex="0">
@@ -68,7 +79,7 @@
             </span>
             <div class="debug-log-footer-actions debug-log-footer-right">
                 <Button OnClick="Refresh">Refresh</Button>
-                <Button OnClick="Clear">Clear</Button>
+                <Button OnClick="ClearLog">Clear Log</Button>
             </div>
         </div>
     </ExtraFooterContent>

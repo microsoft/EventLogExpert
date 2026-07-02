@@ -42,7 +42,9 @@ do not conflate them.
 - `LogCategories` - where THIS solution centralizes its category-name constants (roots: `App`, `Database`,
   `DatabaseTools`, `Elevation`, `EventLog`, `Offline`, `Resolution`, each with dotted sub-categories) so multiple
   executables route and filter consistently. The shipped defaults throttle the verbose roots (`Database`,
-  `DatabaseTools`, `EventLog`, `Offline`, `Resolution`) to `Warning` in the file sink. When reusing the library in
+  `DatabaseTools`, `Offline`, `Resolution`) to `Warning` in the file sink (channel-authoritative). `EventLog` is
+  intentionally NOT throttled - its operational detail is Debug-level, so it follows the global level (reachable at
+  Debug/Trace) while its `Warning`/`Error` still surface at the default. When reusing the library in
   another project, replace these with your own (the routing itself treats categories as opaque strings).
 
 ### Sinks (`ILogSink { void Emit(LogRecord); LogLevel MinimumLevelFor(string category); }`)

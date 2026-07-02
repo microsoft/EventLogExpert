@@ -22,7 +22,17 @@ public sealed class LogRoutingPolicyTests
         Assert.Equal(LogLevel.Warning, policy.FileMinimumFor("Offline.Wim"));
         Assert.Equal(LogLevel.Warning, policy.FileMinimumFor("Resolution"));
         Assert.Equal(LogLevel.Warning, policy.FileMinimumFor("Database"));
-        Assert.Equal(LogLevel.Warning, policy.FileMinimumFor("EventLog"));
+    }
+
+    [Fact]
+    public void FileMinimumFor_EventLog_FollowsGlobalBaseline_ReachableAtTrace()
+    {
+        var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), LogLevel.Trace);
+
+        // Lowering the global level to Trace reveals EventLog's operational Debug/Trace detail (it is not
+        // channel-authoritatively throttled).
+        Assert.Equal(LogLevel.Trace, policy.FileMinimumFor("EventLog"));
+        Assert.Equal(LogLevel.Trace, policy.FileMinimumFor("EventLog.Lifecycle"));
     }
 
     [Fact]
@@ -71,6 +81,10 @@ public sealed class LogRoutingPolicyTests
 
         Assert.Equal(LogLevel.Information, policy.FileMinimumFor("App"));
         Assert.Equal(LogLevel.Information, policy.FileMinimumFor("Elevation.Ipc"));
+        // EventLog is intentionally un-floored (unlike Database/DatabaseTools/Offline/Resolution), so it and its
+        // Lifecycle sub-category follow the global baseline.
+        Assert.Equal(LogLevel.Information, policy.FileMinimumFor("EventLog"));
+        Assert.Equal(LogLevel.Information, policy.FileMinimumFor("EventLog.Lifecycle"));
     }
 
     [Fact]

@@ -1,22 +1,22 @@
 @using EventLogExpert.Runtime.DebugLog
-@if (IsEditing)
+@if (Draft is { } draft)
 {
     <div class="debug-log-filter-editor">
-        <Button aria-label="@(Draft.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
-            aria-pressed="@(Draft.IsExcluded ? "true" : "false")"
+        <Button aria-label="@(draft.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
+            aria-pressed="@(draft.IsExcluded ? "true" : "false")"
             CssClass="debug-log-filter-exclude-toggle"
-            data-excluded="@(Draft.IsExcluded ? "true" : "false")"
-            IconClass="@(Draft.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
+            data-excluded="@(draft.IsExcluded ? "true" : "false")"
+            IconClass="@(draft.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
             IconOnly
-            OnClick="@(() => OnExcludedChanged(!Draft.IsExcluded))"
+            OnClick="OnEditorExcludeToggled"
             @ref="_editorFirstControl"
-            title="@(Draft.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")" />
+            title="@(draft.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")" />
 
         <ValueSelect AriaLabel="Filter field"
             CssClass="input filter-dropdown"
             T="DebugLogFilterField"
             ToStringFunc="@(field => field.ToString())"
-            Value="Draft.Field"
+            Value="draft.Field"
             ValueChanged="OnFieldChanged">
             @foreach (var field in Enum.GetValues<DebugLogFilterField>())
             {
@@ -25,20 +25,20 @@
         </ValueSelect>
 
         <ComparisonOperatorSelect AriaLabel="Filter operator"
-            MatchMode="Draft.MatchMode"
+            MatchMode="draft.MatchMode"
             OnChanged="OnOperatorChanged"
-            Operator="Draft.Operator"
+            Operator="draft.Operator"
             SupportsMany="FieldSupportsMany"
             SupportsText="FieldSupportsText" />
 
-        @if (Draft.Field == DebugLogFilterField.Message)
+        @if (draft.Field == DebugLogFilterField.Message)
         {
             <TextInput AriaLabel="Filter value"
                 CssClass="input filter-description"
                 Value="@SingleValue"
                 ValueChanged="OnSingleValueChanged" />
         }
-        else if (Draft.MatchMode == MatchMode.Many)
+        else if (draft.MatchMode == MatchMode.Many)
         {
             <ValueSelect AriaLabel="Filter value"
                 CssClass="input filter-multiselect-dropdown"
@@ -46,7 +46,7 @@
                 IsMultiSelect
                 T="string"
                 ToStringFunc="@ValueLabel"
-                Values="Draft.Values"
+                Values="draft.Values"
                 ValuesChanged="OnValuesChanged">
                 <ValueSelectItem ClearItem T="string">Any</ValueSelectItem>
                 @foreach (var option in ValueOptions())
@@ -71,41 +71,61 @@
             </ValueSelect>
         }
 
-        <Button aria-label="Done editing filter"
-            Disabled="@(!Draft.IsComplete)"
+        <Button aria-label="Save filter"
+            Disabled="@(!draft.IsComplete)"
             IconClass="bi bi-check-circle"
             IconOnly
-            OnClick="OnDoneClick"
-            title="@(Draft.IsComplete ? "Done" : "Add a value to finish this filter")" />
+            OnClick="OnSave"
+            title="@(draft.IsComplete ? "Save filter" : "Add a value to finish this filter")" />
 
-        <DangerButton aria-label="@($"Remove filter: {SummaryText}")"
+        <Button aria-label="Cancel edit"
             IconClass="bi bi-x-circle"
             IconOnly
-            OnClick="OnRemove"
-            title="Remove filter" />
+            OnClick="OnCancel"
+            title="Cancel edit" />
+
+        @if (Applied is not null)
+        {
+            <DangerButton aria-label="Remove filter"
+                IconClass="bi bi-dash-circle"
+                IconOnly
+                OnClick="OnRemove"
+                title="Remove filter" />
+        }
     </div>
 }
-else
+else if (Applied is { } applied)
 {
-    <div class="debug-log-filter-chip">
-        <Button aria-label="@(Draft.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
-            aria-pressed="@(Draft.IsExcluded ? "true" : "false")"
-            CssClass="debug-log-filter-exclude-toggle"
-            data-excluded="@(Draft.IsExcluded ? "true" : "false")"
-            IconClass="@(Draft.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
-            IconOnly
-            OnClick="@(() => OnExcludedChanged(!Draft.IsExcluded))"
-            title="@(Draft.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")" />
+    var summary = FilterSummary(applied);
 
-        <ChromelessButton aria-label="@($"Edit filter: {SummaryText}")"
+    <div class="debug-log-filter-chip" data-disabled="@(applied.IsEnabled ? "false" : "true")">
+        <Button aria-label="@(applied.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
+            aria-pressed="@(applied.IsExcluded ? "true" : "false")"
+            CssClass="debug-log-filter-exclude-toggle"
+            data-excluded="@(applied.IsExcluded ? "true" : "false")"
+            IconClass="@(applied.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
+            IconOnly
+            OnClick="OnExcludeToggled"
+            title="@(applied.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")" />
+
+        <Button aria-label="@(applied.IsEnabled ? "Filter is enabled; activate to disable" : "Filter is disabled; activate to enable")"
+            aria-pressed="@(applied.IsEnabled ? "true" : "false")"
+            CssClass="debug-log-filter-enable-toggle"
+            data-enabled="@(applied.IsEnabled ? "true" : "false")"
+            IconClass="@(applied.IsEnabled ? "bi bi-toggle-on" : "bi bi-toggle-off")"
+            IconOnly
+            OnClick="OnEnableToggled"
+            title="@(applied.IsEnabled ? "Enabled - click to disable" : "Disabled - click to enable")" />
+
+        <ChromelessButton aria-label="@($"Edit filter: {summary}")"
             CssClass="debug-log-filter-chip-edit"
-            OnClick="OnEditChip"
+            OnClick="OnEdit"
             @ref="_chipEditButton"
             title="Edit filter">
-            <span class="debug-log-filter-summary" title="@SummaryText">@SummaryText</span>
+            <span class="debug-log-filter-summary" title="@summary">@summary</span>
         </ChromelessButton>
 
-        <ChromelessButton aria-label="@($"Remove filter: {SummaryText}")"
+        <ChromelessButton aria-label="@($"Remove filter: {summary}")"
             CssClass="debug-log-filter-chip-remove"
             IconClass="bi bi-x-circle"
             OnClick="OnRemove"

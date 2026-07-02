@@ -75,6 +75,25 @@ public sealed class DebugLogProjectionTests
         Assert.Contains("in-proc", Assert.Single(lines));
     }
 
+    [Fact]
+    public void Project_WhenFilterDisabled_ShouldBeNoOp()
+    {
+        var entries = new[]
+        {
+            BuildEntry(LogLevel.Information, "info"),
+            BuildEntry(LogLevel.Error, "err"),
+        };
+
+        var disabled = new DebugLogFilter(DebugLogFilterField.Level, ComparisonOperator.Equals, MatchMode.Single, false, [nameof(LogLevel.Error)])
+        {
+            IsEnabled = false,
+        };
+
+        var (_, count) = DebugLogProjection.Project(entries, [disabled]);
+
+        Assert.Equal(2, count);
+    }
+
     [Theory]
     [InlineData(ComparisonOperator.Equals, false)]
     [InlineData(ComparisonOperator.NotEqual, false)]
