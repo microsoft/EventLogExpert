@@ -131,7 +131,8 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
             {
                 Logger?.Debug($"Loading supplemental local provider for {name}");
 
-                return new EventMessageProvider(name, logger: Logger).LoadProviderDetails();
+                return new EventMessageProvider(name, logger: Logger?.ForCategory(LogCategories.ResolutionProviders))
+            .LoadProviderDetails();
             });
     }
 
@@ -241,7 +242,8 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
 
     private void ResolveFromLocalProvider(string providerName)
     {
-        var details = new EventMessageProvider(providerName, logger: Logger).LoadProviderDetails();
+        var details = new EventMessageProvider(providerName,
+            logger: Logger?.ForCategory(LogCategories.ResolutionProviders)).LoadProviderDetails();
 
         ProviderDetails.TryAdd(providerName, details);
     }
@@ -314,7 +316,7 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
         var details = new EventMessageProvider(
             providerName,
             metadataPaths,
-            Logger).LoadProviderDetails();
+            Logger?.ForCategory(LogCategories.ResolutionProviders)).LoadProviderDetails();
 
         if (details.Events.Count == 0 && details.Keywords.Count == 0 && details.Messages.Count == 0)
         {

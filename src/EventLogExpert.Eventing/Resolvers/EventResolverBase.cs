@@ -27,9 +27,10 @@ public class EventResolverBase : IDisposable
     {
         _cache = cache;
         _logger = logger;
-        _matcher = new ModernEventMatcher(_templates, logger);
-        _taskKeywords = new TaskKeywordResolver(cache, logger);
-        _descriptions = new DescriptionFormatter(_templates, cache, logger, TryGetSupplementalDetails);
+        _matcher = new ModernEventMatcher(_templates, logger?.ForCategory(LogCategories.ResolutionModern));
+        _taskKeywords = new TaskKeywordResolver(cache, logger?.ForCategory(LogCategories.ResolutionTasks));
+        _descriptions = new DescriptionFormatter(_templates, cache,
+            logger?.ForCategory(LogCategories.ResolutionDescription), TryGetSupplementalDetails);
     }
 
     protected bool IsDisposed => Volatile.Read(ref _disposed) != 0;

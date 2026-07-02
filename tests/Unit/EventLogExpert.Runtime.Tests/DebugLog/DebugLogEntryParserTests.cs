@@ -28,6 +28,10 @@ public sealed class DebugLogEntryParserTests
     [InlineData(LogCategories.DatabaseTools)]
     [InlineData(LogCategories.DatabaseToolsCreate)]
     [InlineData(LogCategories.Resolution)]
+    [InlineData(LogCategories.ResolutionModern)]
+    [InlineData(LogCategories.ResolutionProviders)]
+    [InlineData(LogCategories.ResolutionDescription)]
+    [InlineData(LogCategories.ResolutionTasks)]
     [InlineData(LogCategories.EventLog)]
     [InlineData(LogCategories.OfflineWim)]
     public void Parse_WhenCategoryIsAKnownRoot_ExtractsItExactly_IncludingDatabaseVsDatabaseToolsDisambiguation(string category)

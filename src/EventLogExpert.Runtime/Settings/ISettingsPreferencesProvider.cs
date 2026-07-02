@@ -19,4 +19,6 @@ public interface ISettingsPreferencesProvider
     Theme ThemePreference { get; set; }
 
     string TimeZonePreference { get; set; }
+
+    bool VerboseResolutionPreference { get; set; }
 }

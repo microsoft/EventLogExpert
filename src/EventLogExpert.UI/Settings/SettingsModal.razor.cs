@@ -19,6 +19,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
     private bool _showDisplayPaneOnSelectionChange;
     private Theme _theme;
     private string _timeZoneId = string.Empty;
+    private bool _verboseResolution;
 
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
@@ -55,6 +56,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
         _showDisplayPaneOnSelectionChange = DetailsPanePreferences.DisplayPaneSelectionPreference;
         _theme = Settings.Theme;
         _timeZoneId = Settings.TimeZoneId;
+        _verboseResolution = Settings.VerboseResolution;
     }
 
     private void SaveSettings()
@@ -65,5 +67,6 @@ public sealed partial class SettingsModal : ModalBase<bool>
         DetailsPanePreferences.DisplayPaneSelectionPreference = _showDisplayPaneOnSelectionChange;
         Settings.Theme = _theme;
         Settings.TimeZoneId = _timeZoneId;
+        Settings.VerboseResolution = _verboseResolution;
     }
 }

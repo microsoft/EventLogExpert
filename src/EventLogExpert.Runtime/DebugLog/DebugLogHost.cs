@@ -11,10 +11,13 @@ namespace EventLogExpert.Runtime.DebugLog;
 
 /// <summary>
 ///     Owns the application-level logging hooks that previously lived in the file sink: it bridges the user's global
-///     log-level setting to the routing baseline, and persists unhandled exceptions to the file sink. This is an eager
-///     lifecycle singleton - nothing depends on it, so the composition root MUST force-resolve it at startup (see the
-///     eager <c>GetRequiredService</c> call in the MAUI head). It depends on <see cref="FileLogSink" /> so the DI
-///     container disposes it BEFORE the sink, detaching both hooks before the writer closes.
+///     log-level setting to the routing baseline and the verbose-resolution toggle to a runtime routing override, and
+///     persists unhandled exceptions to the file sink. This is an eager lifecycle singleton - nothing depends on it, so
+///     the composition root MUST force-resolve it at startup (see the eager <c>GetRequiredService</c> call in the MAUI
+///     head) or runtime toggling is silently dropped; the INITIAL verbose state is seeded at
+///     <see cref="LogRoutingPolicy" /> construction so a persisted-ON toggle survives even before this resolve. It depends
+///     on <see cref="FileLogSink" /> so the DI container disposes it BEFORE the sink, detaching the hooks before the
+///     writer closes.
 /// </summary>
 public sealed class DebugLogHost : IDisposable
 {
@@ -31,6 +34,7 @@ public sealed class DebugLogHost : IDisposable
         _settings = settings;
 
         _settings.LogLevelChanged += OnLogLevelChanged;
+        _settings.VerboseResolutionChanged += OnVerboseResolutionChanged;
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
     }
 
@@ -42,6 +46,7 @@ public sealed class DebugLogHost : IDisposable
 
         AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
         _settings.LogLevelChanged -= OnLogLevelChanged;
+        _settings.VerboseResolutionChanged -= OnVerboseResolutionChanged;
     }
 
     private void OnLogLevelChanged() => _routingPolicy.UpdateGlobalBaseline(_settings.LogLevel);
@@ -52,4 +57,11 @@ public sealed class DebugLogHost : IDisposable
             LogLevel.Critical,
             $"Unhandled Exception: {e.ExceptionObject}",
             string.Empty));
+
+    // Raises (or resets) the whole Resolution.* subtree to Trace on demand so a user can troubleshoot why an event
+    // failed to resolve without dropping the global baseline. The initial state is seeded at LogRoutingPolicy
+    // construction; this bridge handles subsequent toggles.
+    private void OnVerboseResolutionChanged() => _routingPolicy.SetCategoryOverride(
+        LogCategories.Resolution,
+        _settings.VerboseResolution ? LogLevel.Trace : null);
 }

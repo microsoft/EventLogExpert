@@ -56,10 +56,14 @@ do not conflate them.
   `IProgress<LogRecord>` (e.g. a UI progress consumer).
 
 ### Routing
-- `LogRoutingPolicy(LoggingOptions options, LogLevel globalBaseline)` - `FileMinimumFor(category)` returns the
-  configured throttle for the longest matching category prefix (dot-segment: `Offline` covers `Offline.Wim`
-  but not `OfflineExtras`), else the live global baseline. `UpdateGlobalBaseline(level)` changes the baseline
-  at runtime.
+- `LogRoutingPolicy(LoggingOptions options, LogLevel globalBaseline)` - `FileMinimumFor(category)` resolves a
+  category to a minimum level by precedence: runtime overrides, then the shipped throttle for the longest
+  matching category prefix (dot-segment: `Offline` covers `Offline.Wim` but not `OfflineExtras`), then the live
+  global baseline. `UpdateGlobalBaseline(level)` changes the baseline at runtime. `SetCategoryOverride(category,
+  level?)` sets (or clears, with `null`) a runtime per-category override that beats the shipped throttle - e.g. a
+  verbose-troubleshooting toggle raising `Resolution` (and its `Resolution.*` sub-categories) to `Trace` on
+  demand. A broad runtime prefix shadows a narrower shipped override regardless of specificity (first matching
+  tier wins), so use it for opt-in diagnostics, not as a floor. Reads are lock-free; writes are serialized.
 - `LogSourceFactory(IEnumerable<ILogSink> sinks, ProcessOrigin processOrigin = InProcess)` - the composition
   root's fan-out. `ForCategory(category)` produces a `DispatchingTraceLogger` that emits to every sink.
   `DefaultCategory` is `"App"`.
@@ -128,5 +132,6 @@ shared file. This mirrors Serilog's shared-file sink.
 
 The MAUI head registers one shared `FileLogSink` singleton, exposes the read side as `IDebugLogReader`, and
 force-resolves a `DebugLogHost` at startup that bridges the user's log-level setting to
-`LogRoutingPolicy.UpdateGlobalBaseline` and persists unhandled exceptions via `FileLogSink.EmitUnfiltered`. The
+`LogRoutingPolicy.UpdateGlobalBaseline` and the verbose-resolution setting to
+`LogRoutingPolicy.SetCategoryOverride`, and persists unhandled exceptions via `FileLogSink.EmitUnfiltered`. The
 eventdbtool CLI composes a console-only `LogSourceFactory`. Both share this one library.

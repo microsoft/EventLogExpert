@@ -9,8 +9,10 @@ namespace EventLogExpert.Logging.Routing;
 public sealed class LogRoutingPolicy
 {
     private readonly IReadOnlyList<CategoryOverride> _fileOverrides;
+    private readonly Lock _writeLock = new();
 
     private volatile LogLevel _globalBaseline;
+    private volatile IReadOnlyList<CategoryOverride> _runtimeOverrides = [];
 
     public LogRoutingPolicy(LoggingOptions options, LogLevel globalBaseline)
     {
@@ -22,8 +24,38 @@ public sealed class LogRoutingPolicy
 
     // The file sink writes a category at its configured throttle where one is set (channel-authoritative); every other
     // category follows the live global baseline, so raising the global level never un-floors a configured throttle.
-    public LogLevel FileMinimumFor(string category) =>
-        TryMatchLongestPrefix(_fileOverrides, category, out LogLevel level) ? level : _globalBaseline;
+    // Precedence returns on the first matching tier: runtime overrides (troubleshooting toggles) beat shipped
+    // throttles, which beat the global baseline.
+    public LogLevel FileMinimumFor(string category)
+    {
+        if (TryMatchLongestPrefix(_runtimeOverrides, category, out LogLevel runtimeLevel)) { return runtimeLevel; }
+
+        return TryMatchLongestPrefix(_fileOverrides, category, out LogLevel fileLevel) ? fileLevel : _globalBaseline;
+    }
+
+    // Runtime per-category override (e.g. the verbose-resolution troubleshooting toggle): raise or reset a category
+    // live without touching the shipped throttles or the global baseline. The read-modify-write runs under _writeLock
+    // so concurrent writers cannot lose updates; readers take a single lock-free volatile snapshot. Because
+    // FileMinimumFor returns on the first matching tier, a broad runtime prefix (e.g. "Resolution") shadows a narrower
+    // shipped override ("Resolution.Sub") regardless of specificity - intended for the toggle, and harmless today
+    // because no shipped "Resolution.*" override exists.
+    public void SetCategoryOverride(string category, LogLevel? level)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(category);
+
+        lock (_writeLock)
+        {
+            IEnumerable<CategoryOverride> updated = _runtimeOverrides
+                .Where(entry => !string.Equals(entry.Prefix, category, StringComparison.Ordinal));
+
+            if (level.HasValue)
+            {
+                updated = updated.Append(new CategoryOverride(category, level.Value));
+            }
+
+            _runtimeOverrides = [.. updated.OrderByDescending(static entry => entry.Prefix.Length)];
+        }
+    }
 
     public LogLevel UiMinimumFor(bool verbose) => verbose ? LogLevel.Trace : LogLevel.Information;
 
@@ -49,8 +81,10 @@ public sealed class LogRoutingPolicy
 
     private static bool TryMatchLongestPrefix(IReadOnlyList<CategoryOverride> overrides, string category, out LogLevel level)
     {
-        foreach (CategoryOverride entry in overrides)
+        for (int index = 0; index < overrides.Count; index++)
         {
+            CategoryOverride entry = overrides[index];
+
             if (IsSegmentPrefix(entry.Prefix, category))
             {
                 level = entry.Level;

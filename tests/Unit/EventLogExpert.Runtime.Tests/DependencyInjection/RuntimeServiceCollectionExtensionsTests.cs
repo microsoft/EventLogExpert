@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Routing;
 using EventLogExpert.Logging.Sinks;
 using EventLogExpert.Provider.Maintenance;
 using EventLogExpert.Provider.Resolution;
@@ -33,6 +34,7 @@ using EventLogExpert.Runtime.Update.Deployment;
 using EventLogExpert.Scenarios.Catalog;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace EventLogExpert.Runtime.Tests.DependencyInjection;
@@ -259,6 +261,51 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public async Task AddEventLogRuntime_WhenVerboseResolutionPersistedOff_LeavesResolutionAtShippedThrottle()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var preferences = Substitute.For<ISettingsPreferencesProvider>();
+        preferences.VerboseResolutionPreference.Returns(false);
+        RegisterHostDependencies(services, preferences);
+        services.AddEventLogRuntime();
+
+        await using var provider = services.BuildServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+
+        await using var scope = provider.CreateAsyncScope();
+
+        // Act
+        var routingPolicy = scope.ServiceProvider.GetRequiredService<LogRoutingPolicy>();
+
+        // Assert - no runtime override, so the fine categories follow the shipped Resolution throttle.
+        Assert.Equal(LogLevel.Warning, routingPolicy.FileMinimumFor("Resolution"));
+    }
+
+    [Fact]
+    public async Task AddEventLogRuntime_WhenVerboseResolutionPersistedOn_SeedsResolutionOverrideAtConstruction()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var preferences = Substitute.For<ISettingsPreferencesProvider>();
+        preferences.VerboseResolutionPreference.Returns(true);
+        RegisterHostDependencies(services, preferences);
+        services.AddEventLogRuntime();
+
+        await using var provider = services.BuildServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+
+        await using var scope = provider.CreateAsyncScope();
+
+        // Act - the routing policy is the shared singleton the file sink reads on every emit.
+        var routingPolicy = scope.ServiceProvider.GetRequiredService<LogRoutingPolicy>();
+
+        // Assert - a persisted-ON toggle is in effect the moment the singleton is visible, before DebugLogHost resolves.
+        Assert.Equal(LogLevel.Trace, routingPolicy.FileMinimumFor("Resolution"));
+        Assert.Equal(LogLevel.Trace, routingPolicy.FileMinimumFor("Resolution.Modern"));
+    }
+
+    [Fact]
     public async Task BothSqliteStores_ShareOneDatabasePath_ResolveIndependently()
     {
         var dbPath = Path.Combine(Path.GetTempPath(), $"EventLogExpertDualStore_{Guid.NewGuid()}.db");
@@ -276,12 +323,12 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         Assert.NotNull(scope.ServiceProvider.GetService<IScenarioFavoriteStore>());
     }
 
-    private static void RegisterHostDependencies(IServiceCollection services)
+    private static void RegisterHostDependencies(IServiceCollection services, ISettingsPreferencesProvider? preferences = null)
     {
         services.AddSingleton(Substitute.For<IDispatcher>());
         services.AddSingleton(Substitute.For<IAlertDialogService>());
         services.AddSingleton(Substitute.For<IApplicationRestartService>());
-        services.AddSingleton(Substitute.For<ISettingsPreferencesProvider>());
+        services.AddSingleton(preferences ?? Substitute.For<ISettingsPreferencesProvider>());
         services.AddSingleton(Substitute.For<IDatabasePreferencesProvider>());
         services.AddSingleton(Substitute.For<IProviderDatabaseMaintenance>());
         services.AddSingleton(Substitute.For<ITitleProvider>());
