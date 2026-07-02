@@ -3,7 +3,7 @@
 
 using EventLogExpert.DatabaseTools.DependencyInjection;
 using EventLogExpert.EventDbTool.Commands;
-using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Routing;
 using EventLogExpert.Logging.Sinks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -16,7 +16,9 @@ internal class Program
 {
     internal static ServiceProvider BuildServiceProvider(bool verbose) =>
         new ServiceCollection()
-            .AddSingleton<ITraceLogger>(new TraceLogger(verbose ? LogLevel.Trace : LogLevel.Information))
+            .AddSingleton(
+                new LogSourceFactory([new ConsoleSink(verbose ? LogLevel.Trace : LogLevel.Information)])
+                    .ForCategory(LogSourceFactory.DefaultCategory))
             .AddDatabaseToolsServices()
             .BuildServiceProvider();
 
