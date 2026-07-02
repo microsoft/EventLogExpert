@@ -50,7 +50,10 @@ internal static class DebugLogEntryParser
     /// <summary>
     ///     Attempts to parse a single line as a new entry start. Returns true and emits the parsed entry only when all
     ///     three prefix fields (timestamp, thread id, level) parse successfully. The emitted entry's
-    ///     <see cref="DebugLogEntry.RawLine" /> equals <paramref name="line" />.
+    ///     <see cref="DebugLogEntry.RawLine" /> equals <paramref name="line" /> except when the formatter escaped a message
+    ///     beginning with <c>[</c> or <c>\</c> (see <see cref="DebugLogFormatter.EscapeLeadingBracket" />): the one leading
+    ///     escape <c>\</c> is stripped so RawLine carries the real text. A legacy pre-escape log whose message starts with
+    ///     <c>\</c> therefore renders one <c>\</c> short until the log rotates - display-only, no on-disk change.
     /// </summary>
     public static bool TryParseLine(string line, [NotNullWhen(true)] out DebugLogEntry? entry)
     {
@@ -75,12 +78,22 @@ internal static class DebugLogEntryParser
             return false;
         }
 
+        int messageStart = match.Groups["message"].Index;
+        string rawLine = line;
+
+        // Un-escape a message the formatter escaped (leading '\' before a '[' or '\'); RawLine is what projection,
+        // copy/export, and filtering read, so the real text must live there, with MessageStartIndex unchanged.
+        if (messageStart < line.Length && line[messageStart] == '\\')
+        {
+            rawLine = string.Concat(line.AsSpan(0, messageStart), line.AsSpan(messageStart + 1));
+        }
+
         entry = new DebugLogEntry(
             timestamp,
             threadId,
             level,
-            match.Groups["message"].Index,
-            line,
+            messageStart,
+            rawLine,
             match.Groups["category"].Success ? match.Groups["category"].Value : null,
             match.Groups["origin"].Success ? ProcessOrigin.ElevatedHelper : ProcessOrigin.InProcess);
 

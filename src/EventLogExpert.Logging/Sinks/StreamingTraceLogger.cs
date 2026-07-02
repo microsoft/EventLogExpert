@@ -4,6 +4,7 @@
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using Microsoft.Extensions.Logging;
+using System.Runtime.CompilerServices;
 
 namespace EventLogExpert.Logging.Sinks;
 
@@ -34,21 +35,34 @@ public sealed class StreamingTraceLogger(
     LogLevel minimumLevel = LogLevel.Information,
     string category = "") : ITraceLogger
 {
+    private readonly IProgress<LogRecord> _logSink = logSink ?? throw new ArgumentNullException(nameof(logSink));
+
     public LogLevel MinimumLevel { get; } = minimumLevel;
 
-    public void Critical(CriticalLogHandler handler) => Emit(LogLevel.Critical, handler.ToStringAndClear());
+    public void Critical([InterpolatedStringHandlerArgument("")] CriticalLogHandler handler) =>
+        Emit(LogLevel.Critical, handler.ToStringAndClear());
 
-    public void Debug(DebugLogHandler handler) => Emit(LogLevel.Debug, handler.ToStringAndClear());
+    public void Debug([InterpolatedStringHandlerArgument("")] DebugLogHandler handler) =>
+        Emit(LogLevel.Debug, handler.ToStringAndClear());
 
-    public void Error(ErrorLogHandler handler) => Emit(LogLevel.Error, handler.ToStringAndClear());
+    public void Error([InterpolatedStringHandlerArgument("")] ErrorLogHandler handler) =>
+        Emit(LogLevel.Error, handler.ToStringAndClear());
 
-    public ITraceLogger ForCategory(string category) => new StreamingTraceLogger(logSink, MinimumLevel, category);
+    public ITraceLogger ForCategory(string category)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(category);
 
-    public void Information(InformationLogHandler handler) => Emit(LogLevel.Information, handler.ToStringAndClear());
+        return new StreamingTraceLogger(_logSink, MinimumLevel, category);
+    }
 
-    public void Trace(TraceLogHandler handler) => Emit(LogLevel.Trace, handler.ToStringAndClear());
+    public void Information([InterpolatedStringHandlerArgument("")] InformationLogHandler handler) =>
+        Emit(LogLevel.Information, handler.ToStringAndClear());
 
-    public void Warning(WarningLogHandler handler) => Emit(LogLevel.Warning, handler.ToStringAndClear());
+    public void Trace([InterpolatedStringHandlerArgument("")] TraceLogHandler handler) =>
+        Emit(LogLevel.Trace, handler.ToStringAndClear());
+
+    public void Warning([InterpolatedStringHandlerArgument("")] WarningLogHandler handler) =>
+        Emit(LogLevel.Warning, handler.ToStringAndClear());
 
     private void Emit(LogLevel level, string message)
     {
@@ -56,6 +70,6 @@ public sealed class StreamingTraceLogger(
 
         if (string.IsNullOrEmpty(message)) { return; }
 
-        logSink.Report(new LogRecord(DateTime.UtcNow, level, message, category));
+        _logSink.Report(new LogRecord(DateTime.UtcNow, level, message, category));
     }
 }

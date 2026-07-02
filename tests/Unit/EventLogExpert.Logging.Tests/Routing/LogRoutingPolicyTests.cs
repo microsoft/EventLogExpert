@@ -67,6 +67,15 @@ public sealed class LogRoutingPolicyTests
     }
 
     [Fact]
+    public void FileMinimumFor_NullOrEmptyCategory_ReturnsGlobalBaseline()
+    {
+        var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), LogLevel.Warning);
+
+        Assert.Equal(LogLevel.Warning, policy.FileMinimumFor(null!));
+        Assert.Equal(LogLevel.Warning, policy.FileMinimumFor(string.Empty));
+    }
+
+    [Fact]
     public void FileMinimumFor_PartialSegment_DoesNotMatchOverride()
     {
         var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), LogLevel.Information);
