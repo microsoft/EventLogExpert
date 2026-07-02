@@ -36,9 +36,14 @@ do not conflate them.
   logger.Information($"Loaded {count} rows for {name}");   // formatted only if Information is enabled
   ```
 - `ILogSourceFactory.ForCategory(string category)` - returns an `ITraceLogger` stamped with that category.
-- `LogCategories` - where THIS solution centralizes its category-name constants so multiple executables route
-  and filter consistently. When reusing the library in another project, replace these with your own (the
-  routing itself treats categories as opaque strings).
+- `ITraceLogger.ForCategory(string category)` - derives a logger that stamps `category` on its records while
+  sharing the original's sinks (a `ForContext`-style re-categorization). The default implementation returns the
+  same instance, so a logger that supports categories must override it.
+- `LogCategories` - where THIS solution centralizes its category-name constants (roots: `App`, `Database`,
+  `DatabaseTools`, `Elevation`, `EventLog`, `Offline`, `Resolution`, each with dotted sub-categories) so multiple
+  executables route and filter consistently. The shipped defaults throttle the verbose roots (`Database`,
+  `DatabaseTools`, `EventLog`, `Offline`, `Resolution`) to `Warning` in the file sink. When reusing the library in
+  another project, replace these with your own (the routing itself treats categories as opaque strings).
 
 ### Sinks (`ILogSink { void Emit(LogRecord); LogLevel MinimumLevelFor(string category); }`)
 - `ConsoleSink(LogLevel minimumLevel = Information)` - colored console output.
@@ -60,8 +65,9 @@ do not conflate them.
   `DefaultCategory` is `"App"`.
 - `DispatchingTraceLogger` - an `ITraceLogger` that dispatches each call to all sinks; its `MinimumLevel` is
   the lowest across the sinks for the category.
-- `StreamingTraceLogger(IProgress<LogRecord> progress, LogLevel minimumLevel = Information)` - a lightweight
-  `ITraceLogger` that reports each record to an `IProgress<LogRecord>` (used for per-operation progress).
+- `StreamingTraceLogger(IProgress<LogRecord> progress, LogLevel minimumLevel = Information, string category = "")` -
+  a lightweight `ITraceLogger` that reports each record to an `IProgress<LogRecord>` (used for per-operation
+  progress). An empty `category` lets a downstream `CompositeLogSink` stamp the operation category.
 - `CompositeLogSink(IReadOnlyList<ILogSink> sinks, string category)` - an `IProgress<LogRecord>` that stamps a
   category and fans out to several sinks (used to build a per-operation logger that also writes to the shared
   file sink).

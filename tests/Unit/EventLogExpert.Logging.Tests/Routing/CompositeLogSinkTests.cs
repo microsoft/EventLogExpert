@@ -38,7 +38,7 @@ public sealed class CompositeLogSinkTests
     }
 
     [Fact]
-    public void Report_PreservesExistingOrigin_WhenAlreadyCategorized()
+    public void Report_PreservesExistingCategory_WhenAlreadyCategorized()
     {
         var sink = new RecordingSink(_ => LogLevel.Trace);
         var composite = new CompositeLogSink([sink], "DatabaseTools.Create");

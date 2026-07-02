@@ -23,6 +23,23 @@ public sealed class DebugLogEntryParserTests
         Assert.Equal(Constants.DebugLogTestMessage, entry.Message);
     }
 
+    [Theory]
+    [InlineData(LogCategories.Database)]
+    [InlineData(LogCategories.DatabaseTools)]
+    [InlineData(LogCategories.DatabaseToolsCreate)]
+    [InlineData(LogCategories.Resolution)]
+    [InlineData(LogCategories.EventLog)]
+    [InlineData(LogCategories.OfflineWim)]
+    public void Parse_WhenCategoryIsAKnownRoot_ExtractsItExactly_IncludingDatabaseVsDatabaseToolsDisambiguation(string category)
+    {
+        var line = $"[{Constants.DebugLogTestTimestamp}] [{Constants.DebugLogTestThreadId}] [{nameof(LogLevel.Warning)}] [{category}] {Constants.DebugLogTestMessage}";
+
+        var entry = Assert.Single(DebugLogEntryParser.Parse([line]));
+
+        Assert.Equal(category, entry.Category);
+        Assert.Equal(Constants.DebugLogTestMessage, entry.Message);
+    }
+
     [Fact]
     public void Parse_WhenCategorySegmentPresent_ShouldExtractCategoryWithInProcessOrigin()
     {

@@ -33,7 +33,7 @@ public sealed class UiStreamingSinkTests
     }
 
     [Fact]
-    public void MinimumLevelFor_ReturnsTheConfiguredLevel_RegardlessOfOrigin()
+    public void MinimumLevelFor_ReturnsTheConfiguredLevel_RegardlessOfCategory()
     {
         var sink = new UiStreamingSink(new CapturingProgress([]), LogLevel.Trace);
 
