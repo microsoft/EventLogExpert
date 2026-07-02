@@ -44,29 +44,34 @@ public static class RuntimeServiceCollectionExtensions
             var store = new DatabaseRegistry(
                 sp.GetRequiredService<FileLocationOptions>(),
                 sp.GetRequiredService<IDatabasePreferencesProvider>(),
-                sp.GetRequiredService<ITraceLogger>());
+                CategoryLogger(sp, LogCategories.Database));
 
             store.Refresh();
 
             return store;
         });
 
-        services.AddSingleton<DatabaseClassificationService>();
+        services.AddSingleton<DatabaseClassificationService>(static sp =>
+            ActivatorUtilities.CreateInstance<DatabaseClassificationService>(sp, CategoryLogger(sp, LogCategories.Database)));
 
         services.AddSingleton<DatabaseUpgradeService>(static sp => new DatabaseUpgradeService(
             sp.GetRequiredService<DatabaseRegistry>(),
             sp.GetRequiredService<DatabaseClassificationService>().InitialClassificationTask,
             sp.GetRequiredService<IProviderDatabaseMaintenance>(),
-            sp.GetRequiredService<ITraceLogger>()));
+            CategoryLogger(sp, LogCategories.Database)));
 
-        services.AddSingleton<DatabaseImportService>();
-        services.AddSingleton<DatabaseRecoveryService>();
+        services.AddSingleton<DatabaseImportService>(static sp =>
+            ActivatorUtilities.CreateInstance<DatabaseImportService>(sp, CategoryLogger(sp, LogCategories.Database)));
+
+        services.AddSingleton<DatabaseRecoveryService>(static sp =>
+            ActivatorUtilities.CreateInstance<DatabaseRecoveryService>(sp, CategoryLogger(sp, LogCategories.Database)));
 
         services.AddSingleton<DatabaseService>();
         services.AddSingleton<IDatabaseService>(static sp => sp.GetRequiredService<DatabaseService>());
         services.AddSingleton<IActiveDatabases>(static sp => sp.GetRequiredService<DatabaseService>());
 
-        services.AddSingleton<IDatabaseOperationCoordinator, DatabaseOperationCoordinator>();
+        services.AddSingleton<IDatabaseOperationCoordinator>(static sp =>
+            ActivatorUtilities.CreateInstance<DatabaseOperationCoordinator>(sp, CategoryLogger(sp, LogCategories.Database)));
     }
 
     private static void AddExportServices(IServiceCollection services)
@@ -74,6 +79,9 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<ITabularExportWriter, TabularExportWriter>();
         services.AddSingleton<IEventTableExporter, EventTableExporter>();
     }
+
+    private static ITraceLogger CategoryLogger(IServiceProvider serviceProvider, string category) =>
+        serviceProvider.GetRequiredService<ILogSourceFactory>().ForCategory(category);
 
     extension(IServiceCollection services)
     {
@@ -222,6 +230,8 @@ public static class RuntimeServiceCollectionExtensions
             });
             services.AddSingleton<ITraceLogger>(static sp =>
                 sp.GetRequiredService<ILogSourceFactory>().ForCategory(LogSourceFactory.DefaultCategory));
+            services.AddKeyedSingleton<ITraceLogger>(LogCategories.EventLog, static (sp, _) =>
+                sp.GetRequiredService<ILogSourceFactory>().ForCategory(LogCategories.EventLog));
             services.AddSingleton<IOperationLogSinkFactory, OperationLogSinkFactory>();
             services.AddSingleton<ILogWatcherService, LogWatcherService>();
             services.AddSingleton<IMenuService, MenuService>();

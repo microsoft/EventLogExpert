@@ -22,7 +22,7 @@ internal sealed class LogWatcherService : ILogWatcherService
 
     public LogWatcherService(
         IStateSelection<EventLogState, bool> newEventBufferIsFull,
-        ITraceLogger debugLogger,
+        [FromKeyedServices(LogCategories.EventLog)] ITraceLogger debugLogger,
         IDispatcher dispatcher,
         IServiceScopeFactory serviceScopeFactory)
     {

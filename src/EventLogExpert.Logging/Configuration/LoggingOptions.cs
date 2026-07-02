@@ -20,8 +20,11 @@ public sealed class LoggingOptions
             {
                 Categories = new Dictionary<string, LogLevel>(StringComparer.Ordinal)
                 {
+                    [LogCategories.Database] = LogLevel.Warning,
                     [LogCategories.DatabaseTools] = LogLevel.Warning,
-                    [LogCategories.Offline] = LogLevel.Warning
+                    [LogCategories.EventLog] = LogLevel.Warning,
+                    [LogCategories.Offline] = LogLevel.Warning,
+                    [LogCategories.Resolution] = LogLevel.Warning
                 }
             }
         };

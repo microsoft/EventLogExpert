@@ -20,6 +20,9 @@ public sealed class LogRoutingPolicyTests
 
         Assert.Equal(LogLevel.Warning, policy.FileMinimumFor("DatabaseTools.Create"));
         Assert.Equal(LogLevel.Warning, policy.FileMinimumFor("Offline.Wim"));
+        Assert.Equal(LogLevel.Warning, policy.FileMinimumFor("Resolution"));
+        Assert.Equal(LogLevel.Warning, policy.FileMinimumFor("Database"));
+        Assert.Equal(LogLevel.Warning, policy.FileMinimumFor("EventLog"));
     }
 
     [Fact]

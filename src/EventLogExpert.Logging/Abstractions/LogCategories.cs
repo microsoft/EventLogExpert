@@ -5,6 +5,10 @@ namespace EventLogExpert.Logging.Abstractions;
 
 public static class LogCategories
 {
+    public const string App = "App";
+
+    public const string Database = "Database";
+
     public const string DatabaseTools = "DatabaseTools";
 
     public const string DatabaseToolsCreate = "DatabaseTools.Create";
@@ -17,7 +21,11 @@ public static class LogCategories
 
     public const string DatabaseToolsUpgrade = "DatabaseTools.Upgrade";
 
+    public const string Elevation = "Elevation";
+
     public const string ElevationIpc = "Elevation.Ipc";
+
+    public const string EventLog = "EventLog";
 
     public const string Offline = "Offline";
 
@@ -31,5 +39,8 @@ public static class LogCategories
 
     public const string OfflineWim = "Offline.Wim";
 
-    public static readonly IReadOnlyList<string> KnownRoots = ["App", DatabaseTools, "Elevation", Offline];
+    public const string Resolution = "Resolution";
+
+    public static readonly IReadOnlyList<string> KnownRoots =
+        [App, Database, DatabaseTools, Elevation, EventLog, Offline, Resolution];
 }

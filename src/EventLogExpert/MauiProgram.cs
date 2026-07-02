@@ -4,6 +4,7 @@
 using EventLogExpert.Adapters.Settings;
 using EventLogExpert.DependencyInjection;
 using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.DebugLog;
@@ -75,7 +76,8 @@ public static class MauiProgram
         builder.Services.AddEventLogProviderDatabase();
         builder.Services.AddSingleton<IEventResolverCache, EventResolverCache>();
         builder.Services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
-        builder.Services.AddTransient<IEventResolver, EventResolver>();
+        builder.Services.AddTransient<IEventResolver>(sp => ActivatorUtilities.CreateInstance<EventResolver>(sp,
+            sp.GetRequiredService<ILogSourceFactory>().ForCategory(LogCategories.Resolution)));
 
         // FilterLibrary persistence
         var appDbPath = Path.Combine(FileSystem.AppDataDirectory, "filter-library.db");

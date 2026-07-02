@@ -26,7 +26,7 @@ namespace EventLogExpert.Runtime.EventLog;
 
 internal sealed class OpenLogEffects(
     IState<EventLogState> eventLogState,
-    ITraceLogger logger,
+    [FromKeyedServices(LogCategories.EventLog)] ITraceLogger logger,
     ILogWatcherService logWatcherService,
     IEventResolverCache resolverCache,
     IEventXmlResolver xmlResolver,

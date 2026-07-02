@@ -10,6 +10,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Immutable;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -20,7 +21,7 @@ internal sealed class FilteringEffects(
     IState<RawEventStoreState> rawEventStore,
     IState<LogTableState> logTableState,
     IFilterService filterService,
-    ITraceLogger logger,
+    [FromKeyedServices(LogCategories.EventLog)] ITraceLogger logger,
     LogCloseCoordinator closeCoordinator,
     EventLogConcurrencyState concurrencyState,
     TimeSpan? convergenceDelay = null)

@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Logging.Abstractions;
 using Fluxor;
+using Microsoft.Extensions.DependencyInjection;
 using System.Runtime.ExceptionServices;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -12,7 +13,7 @@ namespace EventLogExpert.Runtime.EventLog;
 
 internal sealed class DatabaseCoordinationEffects(
     IState<EventLogState> eventLogState,
-    ITraceLogger logger,
+    [FromKeyedServices(LogCategories.EventLog)] ITraceLogger logger,
     LogCloseCoordinator closeCoordinator,
     IDispatcher dispatcher,
     IEventLogCommands eventLogCommands) : ILogReloadCoordinator
