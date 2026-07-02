@@ -41,13 +41,13 @@ public static class DebugLogProjection
             if (!Matches(entry, predicates)) { continue; }
 
             matchedCount++;
-            AppendPhysicalLinesReversed(entry.RawLine, lines);
+            AppendPhysicalLines(entry.RawLine, lines);
         }
 
         return (lines, matchedCount);
     }
 
-    private static void AppendPhysicalLinesReversed(string raw, List<string> lines)
+    private static void AppendPhysicalLines(string raw, List<string> lines)
     {
         if (raw.Length == 0)
         {
@@ -58,9 +58,9 @@ public static class DebugLogProjection
 
         var split = raw.Split('\n');
 
-        for (var i = split.Length - 1; i >= 0; i--)
+        foreach (var line in split)
         {
-            lines.Add(split[i]);
+            lines.Add(line);
         }
     }
 

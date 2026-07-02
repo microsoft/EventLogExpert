@@ -91,8 +91,10 @@ public sealed class DebugLogModalTests : BunitContext
         const string ContinuationLine = "  at MyMethod()";
         var thirdHeader = DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogThirdMessage);
 
+        // The reader yields NEWEST-first, so the mock returns the file's lines reversed; the parser reassembles the
+        // second entry's continuation and the viewer renders newest-first with continuation lines in natural order.
         _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(
-            DebugLogUtils.ToAsyncEnumerable([firstHeader, secondHeader, ContinuationLine, thirdHeader]));
+            DebugLogUtils.ToAsyncEnumerable([thirdHeader, ContinuationLine, secondHeader, firstHeader]));
 
         var component = Render<DebugLogModal>();
 
