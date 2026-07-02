@@ -151,15 +151,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         return [.. options];
     }
 
-    private void ClearFilters()
-    {
-        _rows.Clear();
-        _focusAddButtonAfterRender = true;
-        ApplyProjection();
-    }
-
-    // Clears the debug-log FILE (not the filters), then resets the streamed view.
-    private async Task ClearLog()
+    private async Task ClearDebugLogFileAsync()
     {
         try
         {
@@ -183,6 +175,13 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         _hasLoaded = true;
 
         StateHasChanged();
+    }
+
+    private void ClearFilters()
+    {
+        _rows.Clear();
+        _focusAddButtonAfterRender = true;
+        ApplyProjection();
     }
 
     private async Task HandleCopyAsync()
