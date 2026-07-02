@@ -6,6 +6,7 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.ElevationHelper.Ipc;
 using EventLogExpert.Eventing.PublisherMetadata.Offline;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Sinks;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -51,11 +52,13 @@ internal static class ListImageEditionsHandler
 
             if (kind is OfflineImageKind.Iso)
             {
-                OfflineIsoMountResult mount = OfflineIsoImage.TryMount(request.ImagePath, logger);
+                OfflineIsoMountResult mount = OfflineIsoImage.TryMount(request.ImagePath, logger.ForCategory(LogCategories.OfflineIso));
 
                 if (mount.Status != OfflineIsoMountStatus.Mounted)
                 {
-                    return new DatabaseToolsResult(DatabaseToolsOutcome.Failed, DescribeIsoMountFailure(mount.Status, request.ImagePath), stopwatch.Elapsed);
+                    return new DatabaseToolsResult(DatabaseToolsOutcome.Failed,
+                        DescribeIsoMountFailure(mount.Status, request.ImagePath),
+                        stopwatch.Elapsed);
                 }
 
                 isoImage = mount.Image;
@@ -68,7 +71,7 @@ internal static class ListImageEditionsHandler
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            WimImageList imageList = OfflineWimImage.ReadIndexList(wimPath, logger);
+            WimImageList imageList = OfflineWimImage.ReadIndexList(wimPath, logger.ForCategory(LogCategories.OfflineWim));
 
             if (imageList.Status != WimImageListStatus.Ok)
             {

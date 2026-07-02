@@ -29,7 +29,10 @@ namespace EventLogExpert.Logging.Sinks;
 ///         MUST provide their own concurrency discipline; this logger does not serialize calls internally.
 ///     </para>
 /// </remarks>
-public sealed class StreamingTraceLogger(IProgress<LogRecord> logSink, LogLevel minimumLevel = LogLevel.Information) : ITraceLogger
+public sealed class StreamingTraceLogger(
+    IProgress<LogRecord> logSink,
+    LogLevel minimumLevel = LogLevel.Information,
+    string category = "") : ITraceLogger
 {
     public LogLevel MinimumLevel { get; } = minimumLevel;
 
@@ -38,6 +41,8 @@ public sealed class StreamingTraceLogger(IProgress<LogRecord> logSink, LogLevel 
     public void Debug(DebugLogHandler handler) => Emit(LogLevel.Debug, handler.ToStringAndClear());
 
     public void Error(ErrorLogHandler handler) => Emit(LogLevel.Error, handler.ToStringAndClear());
+
+    public ITraceLogger ForCategory(string category) => new StreamingTraceLogger(logSink, MinimumLevel, category);
 
     public void Information(InformationLogHandler handler) => Emit(LogLevel.Information, handler.ToStringAndClear());
 
@@ -51,6 +56,6 @@ public sealed class StreamingTraceLogger(IProgress<LogRecord> logSink, LogLevel 
 
         if (string.IsNullOrEmpty(message)) { return; }
 
-        logSink.Report(new LogRecord(DateTime.UtcNow, level, message));
+        logSink.Report(new LogRecord(DateTime.UtcNow, level, message, category));
     }
 }

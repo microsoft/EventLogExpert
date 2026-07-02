@@ -41,11 +41,14 @@ internal sealed class OfflineImageProviderExtractor : IOfflineImageProviderExtra
         guard.Assert(imageRoot.SoftwareHivePath, "SOFTWARE hive");
         guard.Assert(imageRoot.SystemHivePath, "SYSTEM hive");
 
-        OfflineHiveFile? softwareHive = OfflineHiveFile.TryOpen(imageRoot.SoftwareHivePath, logger);
+        // Raw hive parsing logs under Offline.Hive; extraction orchestration keeps the caller's Offline.Providers logger.
+        ITraceLogger? hiveLogger = logger?.ForCategory(LogCategories.OfflineHive);
+
+        OfflineHiveFile? softwareHive = OfflineHiveFile.TryOpen(imageRoot.SoftwareHivePath, hiveLogger);
 
         if (softwareHive is null) { return null; }
 
-        OfflineHiveFile? systemHive = OfflineHiveFile.TryOpen(imageRoot.SystemHivePath, logger);
+        OfflineHiveFile? systemHive = OfflineHiveFile.TryOpen(imageRoot.SystemHivePath, hiveLogger);
 
         if (systemHive is null)
         {

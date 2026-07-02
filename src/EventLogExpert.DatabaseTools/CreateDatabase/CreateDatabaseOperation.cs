@@ -136,7 +136,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
                 if (scratchBlocked is not null)
                 {
-                    logger.Error($"{scratchBlocked}");
+                    logger.ForCategory(LogCategories.OfflineWim).Error($"{scratchBlocked}");
                     SetFailureSummary(scratchBlocked);
 
                     return DatabaseToolsOutcome.Failed;
@@ -145,11 +145,12 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
             if (kind is OfflineImageKind.Iso)
             {
-                OfflineIsoMountResult mount = OfflineIsoImage.TryMount(request.OfflineImagePath!, logger);
+                ITraceLogger isoLogger = logger.ForCategory(LogCategories.OfflineIso);
+                OfflineIsoMountResult mount = OfflineIsoImage.TryMount(request.OfflineImagePath!, isoLogger);
 
                 if (mount.Status != OfflineIsoMountStatus.Mounted)
                 {
-                    return HandleIsoMountFailure(mount.Status, request.OfflineImagePath!, logger);
+                    return HandleIsoMountFailure(mount.Status, request.OfflineImagePath!, isoLogger);
                 }
 
                 isoImage = mount.Image;
@@ -157,11 +158,12 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
             if (kind is OfflineImageKind.Vhdx)
             {
-                OfflineVhdxMountResult mount = OfflineVhdxImage.TryMount(request.OfflineImagePath!, logger);
+                ITraceLogger vhdxLogger = logger.ForCategory(LogCategories.OfflineVhdx);
+                OfflineVhdxMountResult mount = OfflineVhdxImage.TryMount(request.OfflineImagePath!, vhdxLogger);
 
                 if (mount.Status != OfflineVhdxMountStatus.Mounted)
                 {
-                    return HandleVhdxMountFailure(mount.Status, request.OfflineImagePath!, logger);
+                    return HandleVhdxMountFailure(mount.Status, request.OfflineImagePath!, vhdxLogger);
                 }
 
                 vhdxImage = mount.Image;
@@ -170,14 +172,15 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
             if (kind is OfflineImageKind.Wim or OfflineImageKind.Iso)
             {
+                ITraceLogger wimLogger = logger.ForCategory(LogCategories.OfflineWim);
                 string wimSourcePath = isoImage?.InstallImagePath ?? request.OfflineImagePath!;
 
                 OfflineWimExtractResult extraction = await OfflineWimImage.TryExtractAsync(
-                    wimSourcePath, request.WimIndex!.Value, OfflineScratch.Root, logger, cancellationToken);
+                    wimSourcePath, request.WimIndex!.Value, OfflineScratch.Root, wimLogger, cancellationToken);
 
                 if (extraction.Status != OfflineWimExtractStatus.Extracted)
                 {
-                    return HandleWimExtractionFailure(extraction.Status, wimSourcePath, request.WimIndex!.Value, logger);
+                    return HandleWimExtractionFailure(extraction.Status, wimSourcePath, request.WimIndex!.Value, wimLogger);
                 }
 
                 wimImage = extraction.Image;
@@ -358,14 +361,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
     }
 
-    internal static OfflineImageKind? ResolveImageKind(CreateDatabaseRequest request) =>
-        OfflineImageKindResolver.ResolveFromPath(request.OfflineImagePath, request.ImageKind);
-
-    internal static CreateDatabaseMode SelectMode(CreateDatabaseRequest request) =>
-        !string.IsNullOrWhiteSpace(request.OfflineImagePath) ? CreateDatabaseMode.OfflineImage
-        : request.SourcePath is null ? CreateDatabaseMode.Local
-        : CreateDatabaseMode.FileSource;
-
     internal static string FormatSkippedProvidersMessage(int providerCount, string skipProvidersInFile)
     {
         var providerNoun = providerCount == 1 ? "provider" : "providers";
@@ -374,21 +369,32 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         return $"Found {providerCount} {providerNoun} in {skipProvidersInFile}. {providerSubject} will not be included in the new database.";
     }
 
+    internal static OfflineImageKind? ResolveImageKind(CreateDatabaseRequest request) =>
+        OfflineImageKindResolver.ResolveFromPath(request.OfflineImagePath, request.ImageKind);
+
+    internal static CreateDatabaseMode SelectMode(CreateDatabaseRequest request) =>
+        !string.IsNullOrWhiteSpace(request.OfflineImagePath) ? CreateDatabaseMode.OfflineImage
+        : request.SourcePath is null ? CreateDatabaseMode.Local
+        : CreateDatabaseMode.FileSource;
+
     internal static bool ValidateOfflineImageRequest(CreateDatabaseRequest request, ITraceLogger logger)
     {
+        // Kind-ambiguous validation errors are attributed to the Offline root; each resolved kind uses its fine category.
+        ITraceLogger offlineLogger = logger.ForCategory(LogCategories.Offline);
+
         // Reject orphan WIM options so the command cannot silently fall back to local providers.
         if (string.IsNullOrWhiteSpace(request.OfflineImagePath))
         {
             if (request.ImageKind is not null)
             {
-                logger.Error($"--image-kind requires an offline image (--offline-image).");
+                offlineLogger.Error($"--image-kind requires an offline image (--offline-image).");
 
                 return false;
             }
 
             if (request.WimIndex is not null)
             {
-                logger.Error($"--wim-index requires an offline image (--offline-image) pointing at a .wim/.esd file.");
+                offlineLogger.Error($"--wim-index requires an offline image (--offline-image) pointing at a .wim/.esd file.");
 
                 return false;
             }
@@ -398,7 +404,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
         if (request.SourcePath is not null)
         {
-            logger.Error($"Specify a source OR an offline image, not both.");
+            offlineLogger.Error($"Specify a source OR an offline image, not both.");
 
             return false;
         }
@@ -406,9 +412,12 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         switch (ResolveImageKind(request))
         {
             case OfflineImageKind.Directory:
+            {
+                ITraceLogger directoryLogger = logger.ForCategory(LogCategories.OfflineProviders);
+
                 if (request.WimIndex is not null)
                 {
-                    logger.Error($"--wim-index applies only to --image-kind wim or iso.");
+                    directoryLogger.Error($"--wim-index applies only to --image-kind wim or iso.");
 
                     return false;
                 }
@@ -417,51 +426,59 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
                 if (File.Exists(request.OfflineImagePath))
                 {
-                    logger.Error($"Offline image path is a file, not a directory: {request.OfflineImagePath}. For a .wim/.esd file, add --image-kind wim --wim-index N.");
+                    directoryLogger.Error($"Offline image path is a file, not a directory: {request.OfflineImagePath}. For a .wim/.esd file, add --image-kind wim --wim-index N.");
                 }
                 else
                 {
-                    logger.Error($"Offline image directory not found: {request.OfflineImagePath}");
+                    directoryLogger.Error($"Offline image directory not found: {request.OfflineImagePath}");
                 }
 
                 return false;
+            }
 
             case OfflineImageKind.Wim:
+            {
+                ITraceLogger wimLogger = logger.ForCategory(LogCategories.OfflineWim);
+
                 if (!File.Exists(request.OfflineImagePath))
                 {
-                    logger.Error($"WIM image file not found: {request.OfflineImagePath}");
+                    wimLogger.Error($"WIM image file not found: {request.OfflineImagePath}");
 
                     return false;
                 }
 
                 if (!IsWimImageFile(request.OfflineImagePath))
                 {
-                    logger.Error($"--image-kind wim expects a .wim or .esd file: {request.OfflineImagePath}");
+                    wimLogger.Error($"--image-kind wim expects a .wim or .esd file: {request.OfflineImagePath}");
 
                     return false;
                 }
 
                 if (request.WimIndex is null)
                 {
-                    logger.Error($"--wim-index is required for --image-kind wim. Choose an image:");
-                    LogAvailableWimIndices(request.OfflineImagePath, logger);
+                    wimLogger.Error($"--wim-index is required for --image-kind wim. Choose an image:");
+                    LogAvailableWimIndices(request.OfflineImagePath, wimLogger);
 
                     return false;
                 }
 
                 return true;
+            }
 
             case OfflineImageKind.Iso:
+            {
+                ITraceLogger isoLogger = logger.ForCategory(LogCategories.OfflineIso);
+
                 if (!File.Exists(request.OfflineImagePath))
                 {
-                    logger.Error($"ISO image file not found: {request.OfflineImagePath}");
+                    isoLogger.Error($"ISO image file not found: {request.OfflineImagePath}");
 
                     return false;
                 }
 
                 if (!IsIsoFile(request.OfflineImagePath))
                 {
-                    logger.Error($"--image-kind iso expects a .iso file: {request.OfflineImagePath}");
+                    isoLogger.Error($"--image-kind iso expects a .iso file: {request.OfflineImagePath}");
 
                     return false;
                 }
@@ -469,7 +486,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 // Validator cannot mount ISO just to list choices; extraction reports bad indices after mount.
                 if (request.WimIndex is null)
                 {
-                    logger.Error(
+                    isoLogger.Error(
                         $"--wim-index is required for --image-kind iso (sources\\install.wim is a multi-edition image). " +
                         $"Pass --wim-index 1 for the default edition, or extract sources\\install.wim and run --image-kind wim to list editions.");
 
@@ -477,40 +494,45 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 }
 
                 return true;
+            }
 
             case OfflineImageKind.Vhdx:
+            {
+                ITraceLogger vhdxLogger = logger.ForCategory(LogCategories.OfflineVhdx);
+
                 if (!File.Exists(request.OfflineImagePath))
                 {
-                    logger.Error($"VHD/VHDX image file not found: {request.OfflineImagePath}");
+                    vhdxLogger.Error($"VHD/VHDX image file not found: {request.OfflineImagePath}");
 
                     return false;
                 }
 
                 if (!IsVhdxFile(request.OfflineImagePath))
                 {
-                    logger.Error($"--image-kind vhdx expects a .vhdx or .vhd file: {request.OfflineImagePath}");
+                    vhdxLogger.Error($"--image-kind vhdx expects a .vhdx or .vhd file: {request.OfflineImagePath}");
 
                     return false;
                 }
 
                 if (request.WimIndex is not null)
                 {
-                    logger.Error($"--wim-index applies only to --image-kind wim or iso, not vhdx.");
+                    vhdxLogger.Error($"--wim-index applies only to --image-kind wim or iso, not vhdx.");
 
                     return false;
                 }
 
                 return true;
+            }
 
             case null:
-                logger.Error(
+                offlineLogger.Error(
                     $"Could not determine the offline image kind for '{request.OfflineImagePath}'. Pass --image-kind " +
                     $"directory or wim (.wim/.esd) or iso (.iso) or vhdx (.vhdx/.vhd), or point at a mounted volume / extracted image folder.");
 
                 return false;
 
             default:
-                logger.Error($"Offline image kind {ResolveImageKind(request)} is not supported.");
+                offlineLogger.Error($"Offline image kind {ResolveImageKind(request)} is not supported.");
 
                 return false;
         }
