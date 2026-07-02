@@ -54,6 +54,21 @@ public sealed class DebugLogHostTests : IDisposable
     }
 
     [Fact]
+    public void Dispose_WhenVerboseResolutionChangedRaisedAfterDispose_ShouldDetachHandler()
+    {
+        TestSettingsService settings = new() { LogLevel = LogLevel.Information };
+        LogRoutingPolicy routingPolicy = CreateRoutingPolicy(settings.LogLevel);
+        using FileLogSink fileSink = new(_testLogPath, routingPolicy, DebugLogFormatter.Format);
+        using DebugLogHost host = new(fileSink, routingPolicy, settings);
+
+        host.Dispose();
+        settings.VerboseResolution = true;
+        settings.RaiseVerboseResolutionChanged();
+
+        Assert.Equal(LogLevel.Warning, routingPolicy.FileMinimumFor("Resolution"));
+    }
+
+    [Fact]
     public void EmitUnfiltered_WhenBaselineIsNone_ShouldWriteCriticalLine()
     {
         TestSettingsService settings = new() { LogLevel = LogLevel.None };
@@ -127,6 +142,40 @@ public sealed class DebugLogHostTests : IDisposable
         Assert.Contains("warning message after change", content);
     }
 
+    [Fact]
+    public void VerboseResolutionChanged_WhenDisabledAgain_RevertsToShippedThrottle()
+    {
+        TestSettingsService settings = new() { LogLevel = LogLevel.Information, VerboseResolution = true };
+        LogRoutingPolicy routingPolicy = CreateRoutingPolicy(settings.LogLevel);
+        using FileLogSink fileSink = new(_testLogPath, routingPolicy, DebugLogFormatter.Format);
+        using DebugLogHost host = new(fileSink, routingPolicy, settings);
+
+        settings.RaiseVerboseResolutionChanged();
+        Assert.Equal(LogLevel.Trace, routingPolicy.FileMinimumFor("Resolution"));
+
+        settings.VerboseResolution = false;
+        settings.RaiseVerboseResolutionChanged();
+
+        Assert.Equal(LogLevel.Warning, routingPolicy.FileMinimumFor("Resolution"));
+    }
+
+    [Fact]
+    public void VerboseResolutionChanged_WhenEnabled_RaisesResolutionSubtreeToTrace()
+    {
+        TestSettingsService settings = new() { LogLevel = LogLevel.Information };
+        LogRoutingPolicy routingPolicy = CreateRoutingPolicy(settings.LogLevel);
+        using FileLogSink fileSink = new(_testLogPath, routingPolicy, DebugLogFormatter.Format);
+        using DebugLogHost host = new(fileSink, routingPolicy, settings);
+
+        Assert.Equal(LogLevel.Warning, routingPolicy.FileMinimumFor("Resolution.Modern"));
+
+        settings.VerboseResolution = true;
+        settings.RaiseVerboseResolutionChanged();
+
+        Assert.Equal(LogLevel.Trace, routingPolicy.FileMinimumFor("Resolution"));
+        Assert.Equal(LogLevel.Trace, routingPolicy.FileMinimumFor("Resolution.Modern"));
+    }
+
     private static LogRoutingPolicy CreateRoutingPolicy(LogLevel logLevel) =>
         new(LoggingOptions.CreateShippedDefaults(), logLevel);
 
@@ -167,7 +216,13 @@ public sealed class DebugLogHostTests : IDisposable
 
         public TimeZoneInfo TimeZoneInfo => TimeZoneInfo.Local;
 
+        public bool VerboseResolution { get; set; }
+
+        public Action? VerboseResolutionChanged { get; set; }
+
         public void RaiseLogLevelChanged() => LogLevelChanged?.Invoke();
+
+        public void RaiseVerboseResolutionChanged() => VerboseResolutionChanged?.Invoke();
     }
 }
 

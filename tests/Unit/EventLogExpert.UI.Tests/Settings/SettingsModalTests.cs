@@ -42,6 +42,28 @@ public sealed class SettingsModalTests : BunitContext
     }
 
     [Fact]
+    public void SettingsModal_LoadsVerboseResolutionFromSettings()
+    {
+        _settings.VerboseResolution.Returns(true);
+
+        var component = Render<SettingsModal>();
+
+        Assert.True(component.Find("#settings-verbose-resolution").HasAttribute("checked"));
+    }
+
+    [Fact]
+    public async Task SettingsModal_OnSave_PersistsStagedVerboseResolution()
+    {
+        _settings.VerboseResolution.Returns(false);
+        var component = Render<SettingsModal>();
+        component.Find("#settings-verbose-resolution").Change(true);
+
+        await component.InvokeAsync(() => component.Instance.InvokeOnSaveAsyncForTests());
+
+        _settings.Received().VerboseResolution = true;
+    }
+
+    [Fact]
     public async Task SettingsModal_OnSaveSuccess_AnnouncesSettingsSaved()
     {
         var component = Render<SettingsModal>();
@@ -79,5 +101,27 @@ public sealed class SettingsModalTests : BunitContext
         var dialog = component.Find("dialog");
         Assert.Equal("Settings", dialog.GetAttribute("aria-label"));
         Assert.False(dialog.HasAttribute("aria-labelledby"));
+    }
+
+    [Fact]
+    public void SettingsModal_VerboseResolutionToggle_HasLabelForAssociation()
+    {
+        var component = Render<SettingsModal>();
+
+        var label = component.Find("label[for='settings-verbose-resolution']");
+        Assert.Equal("Verbose Event Resolution Logging:", label.TextContent.Trim());
+        var input = component.Find("#settings-verbose-resolution");
+        Assert.Equal("settings-verbose-resolution", input.Id);
+    }
+
+    [Fact]
+    public void SettingsModal_WhenNotSaved_DoesNotPersistVerboseResolution()
+    {
+        _settings.VerboseResolution.Returns(false);
+        var component = Render<SettingsModal>();
+
+        component.Find("#settings-verbose-resolution").Change(true);
+
+        _settings.DidNotReceive().VerboseResolution = Arg.Any<bool>();
     }
 }

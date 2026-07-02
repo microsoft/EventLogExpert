@@ -29,4 +29,8 @@ public interface ISettingsService
     string TimeZoneId { get; set; }
 
     TimeZoneInfo TimeZoneInfo { get; }
+
+    bool VerboseResolution { get; set; }
+
+    Action? VerboseResolutionChanged { get; set; }
 }

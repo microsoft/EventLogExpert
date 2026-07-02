@@ -341,6 +341,21 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void IsPreReleaseEnabled_WhenSetToTrueAndChannelNeverEnabled_ShouldCascadeStickyBit()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.IsPreReleaseEnabled = true;
+
+        // Assert
+        mockPreferences.Received(1).PreReleasePreference = true;
+        mockPreferences.Received(1).HasEverEnabledPreReleasePreference = true;
+    }
+
+    [Fact]
     public void IsPreReleaseEnabled_WhenSetToTrueAndChannelPreviouslyEnabled_ShouldNotRewriteStickyBit()
     {
         // Arrange
@@ -357,21 +372,6 @@ public sealed class SettingsServiceTests
         // Assert
         mockPreferences.Received(1).PreReleasePreference = true;
         mockPreferences.DidNotReceive().HasEverEnabledPreReleasePreference = Arg.Any<bool>();
-    }
-
-    [Fact]
-    public void IsPreReleaseEnabled_WhenSetToTrueAndChannelNeverEnabled_ShouldCascadeStickyBit()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.IsPreReleaseEnabled = true;
-
-        // Assert
-        mockPreferences.Received(1).PreReleasePreference = true;
-        mockPreferences.Received(1).HasEverEnabledPreReleasePreference = true;
     }
 
     [Fact]
@@ -822,6 +822,82 @@ public sealed class SettingsServiceTests
 
         // Assert
         Assert.Equal(TimeZoneInfo.Utc, result);
+    }
+
+    [Fact]
+    public void VerboseResolution_WhenFirstAccessed_ShouldReturnFromPreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        mockPreferences.VerboseResolutionPreference.Returns(true);
+
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act & Assert
+        Assert.True(settingsService.VerboseResolution);
+    }
+
+    [Fact]
+    public void VerboseResolution_WhenPreferenceUnset_ShouldDefaultToFalse()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act & Assert
+        Assert.False(settingsService.VerboseResolution);
+    }
+
+    [Fact]
+    public void VerboseResolution_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.VerboseResolution = true;
+
+        // Assert
+        mockPreferences.Received(1).VerboseResolutionPreference = true;
+    }
+
+    [Fact]
+    public void VerboseResolution_WhenSetToDifferentValue_ShouldInvokeChangedEvent()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        var eventInvoked = false;
+        settingsService.VerboseResolutionChanged = () => eventInvoked = true;
+
+        // Act
+        settingsService.VerboseResolution = true;
+
+        // Assert
+        Assert.True(eventInvoked);
+    }
+
+    [Fact]
+    public void VerboseResolution_WhenSetToSameValue_ShouldNotInvokeChangedEvent()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        mockPreferences.VerboseResolutionPreference.Returns(true);
+
+        var settingsService = CreateSettingsService(mockPreferences);
+        _ = settingsService.VerboseResolution; // Cache the value
+
+        var eventInvoked = false;
+        settingsService.VerboseResolutionChanged = () => eventInvoked = true;
+
+        // Act
+        settingsService.VerboseResolution = true;
+
+        // Assert
+        Assert.False(eventInvoked);
     }
 
     private static SettingsService CreateSettingsService(ISettingsPreferencesProvider? preferencesProvider = null) =>

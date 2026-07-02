@@ -41,6 +41,14 @@ public static class LogCategories
 
     public const string Resolution = "Resolution";
 
+    public const string ResolutionDescription = "Resolution.Description";
+
+    public const string ResolutionModern = "Resolution.Modern";
+
+    public const string ResolutionProviders = "Resolution.Providers";
+
+    public const string ResolutionTasks = "Resolution.Tasks";
+
     public static readonly IReadOnlyList<string> KnownRoots =
         [App, Database, DatabaseTools, Elevation, EventLog, Offline, Resolution];
 }

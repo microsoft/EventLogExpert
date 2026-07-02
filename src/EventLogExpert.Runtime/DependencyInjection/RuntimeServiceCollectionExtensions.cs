@@ -31,6 +31,7 @@ using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
 using EventLogExpert.Scenarios.Catalog;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -206,9 +207,22 @@ public static class RuntimeServiceCollectionExtensions
 
             services.Configure<LoggingOptions>(LoggingOptions.ApplyShippedDefaults);
             services.AddSingleton(static sp =>
-                new LogRoutingPolicy(
+            {
+                ISettingsService settings = sp.GetRequiredService<ISettingsService>();
+                LogRoutingPolicy policy = new(
                     sp.GetRequiredService<IOptions<LoggingOptions>>().Value,
-                    sp.GetRequiredService<ISettingsService>().LogLevel));
+                    settings.LogLevel);
+
+                // Seed the initial verbose-resolution override at construction (mirrors the LogLevel baseline seeding
+                // above) so a persisted-ON toggle is in effect the moment the singleton is visible - before the eager
+                // DebugLogHost resolve. DebugLogHost then bridges only subsequent toggles.
+                if (settings.VerboseResolution)
+                {
+                    policy.SetCategoryOverride(LogCategories.Resolution, LogLevel.Trace);
+                }
+
+                return policy;
+            });
             services.AddSingleton(static sp => new FileLogSink(
                 sp.GetRequiredService<FileLocationOptions>().LoggingPath,
                 sp.GetRequiredService<LogRoutingPolicy>(),

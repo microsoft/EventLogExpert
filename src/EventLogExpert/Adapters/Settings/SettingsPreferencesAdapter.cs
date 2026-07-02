@@ -15,6 +15,7 @@ internal sealed class SettingsPreferencesAdapter : ISettingsPreferencesProvider
     private const string PreReleaseEnabled = "prerelease-enabled";
     private const string ThemeName = "theme";
     private const string TimeZone = "timezone";
+    private const string VerboseResolution = "verbose-resolution";
 
     public bool HasEverEnabledPreReleasePreference
     {
@@ -56,5 +57,11 @@ internal sealed class SettingsPreferencesAdapter : ISettingsPreferencesProvider
     {
         get => Preferences.Default.Get(TimeZone, TimeZoneInfo.Local.Id);
         set => Preferences.Default.Set(TimeZone, value);
+    }
+
+    public bool VerboseResolutionPreference
+    {
+        get => Preferences.Default.Get(VerboseResolution, false);
+        set => Preferences.Default.Set(VerboseResolution, value);
     }
 }

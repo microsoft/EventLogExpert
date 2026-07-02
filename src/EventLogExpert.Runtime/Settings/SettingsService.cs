@@ -16,6 +16,7 @@ internal sealed class SettingsService(ISettingsPreferencesProvider preferences) 
     private LogLevel? _logLevel;
     private Theme? _theme;
     private string? _timeZoneId;
+    private bool? _verboseResolution;
 
     public EventCopyFormat CopyFormat
     {
@@ -144,4 +145,24 @@ internal sealed class SettingsService(ISettingsPreferencesProvider preferences) 
     }
 
     public TimeZoneInfo TimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(TimeZoneId);
+
+    public bool VerboseResolution
+    {
+        get
+        {
+            _verboseResolution ??= _preferences.VerboseResolutionPreference;
+
+            return _verboseResolution ?? false;
+        }
+        set
+        {
+            if (_verboseResolution == value) { return; }
+
+            _verboseResolution = value;
+            _preferences.VerboseResolutionPreference = value;
+            VerboseResolutionChanged?.Invoke();
+        }
+    }
+
+    public Action? VerboseResolutionChanged { get; set; }
 }
