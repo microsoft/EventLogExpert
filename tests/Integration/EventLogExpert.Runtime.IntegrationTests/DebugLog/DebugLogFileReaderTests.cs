@@ -52,6 +52,25 @@ public sealed class DebugLogFileReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadAsync_WhenCancelled_ShouldStopEnumeration()
+    {
+        using FileLogSink fileSink = CreateFileSink();
+        DebugLogFileReader reader = CreateReader(fileSink);
+        fileSink.Information(Constants.DebugLogLine1);
+        fileSink.Information(Constants.DebugLogLine2);
+
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+        {
+            await foreach (string _ in reader.LoadAsync(cts.Token))
+            {
+            }
+        });
+    }
+
+    [Fact]
     public async Task LoadAsync_WhenLogFileDeletedDuringRead_ShouldAllowDeletion()
     {
         using FileLogSink fileSink = CreateFileSink();
@@ -64,7 +83,7 @@ public sealed class DebugLogFileReaderTests : IDisposable
             .GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Contains(Constants.DebugLogLine1, enumerator.Current);
+        Assert.Contains(Constants.DebugLogLine3, enumerator.Current);
 
         Exception? deleteException = Record.Exception(() => File.Delete(_testLogPath));
 
@@ -74,7 +93,7 @@ public sealed class DebugLogFileReaderTests : IDisposable
         Assert.Contains(Constants.DebugLogLine2, enumerator.Current);
 
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Contains(Constants.DebugLogLine3, enumerator.Current);
+        Assert.Contains(Constants.DebugLogLine1, enumerator.Current);
 
         Assert.False(await enumerator.MoveNextAsync());
     }
@@ -109,9 +128,9 @@ public sealed class DebugLogFileReaderTests : IDisposable
             .ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(3, lines.Count);
-        Assert.Contains(Constants.DebugLogLine1, lines[0]);
+        Assert.Contains(Constants.DebugLogLine3, lines[0]);
         Assert.Contains(Constants.DebugLogLine2, lines[1]);
-        Assert.Contains(Constants.DebugLogLine3, lines[2]);
+        Assert.Contains(Constants.DebugLogLine1, lines[2]);
     }
 
     [Fact]

@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using Microsoft.Extensions.Logging;
@@ -256,7 +255,7 @@ public sealed class DebugLogProjectionTests
     }
 
     [Fact]
-    public void Project_WhenMultiLineEntryMatches_ShouldEmitAllPhysicalLinesReversed()
+    public void Project_WhenMultiLineEntryMatches_ShouldEmitAllPhysicalLinesInNaturalOrder()
     {
         var rawLine = $"[{Constants.DebugLogTestTimestamp}] [{Constants.DebugLogTestThreadId}] [Error] outer\nstack-trace-foo\nat MoreFrames";
         var message = "outer\nstack-trace-foo\nat MoreFrames";
@@ -268,13 +267,12 @@ public sealed class DebugLogProjectionTests
             rawLine);
 
         var (lines, count) = DebugLogProjection.Project([entry], [Include(DebugLogFilterField.Message, ComparisonOperator.Contains, "foo")]);
-        var view = new ReversedListView<string>(lines);
 
         Assert.Equal(1, count);
-        Assert.Equal(3, view.Count);
-        Assert.Contains("outer", view[0]);
-        Assert.Equal("stack-trace-foo", view[1]);
-        Assert.Equal("at MoreFrames", view[2]);
+        Assert.Equal(3, lines.Count);
+        Assert.Contains("outer", lines[0]);
+        Assert.Equal("stack-trace-foo", lines[1]);
+        Assert.Equal("at MoreFrames", lines[2]);
     }
 
     [Fact]

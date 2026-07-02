@@ -3,7 +3,6 @@
 
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
-using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.UI.Focus;
@@ -25,7 +24,6 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     private Button? _addButton;
     private IReadOnlyList<DebugLogFilter> _appliedFilters = [];
     private List<string> _displayed = [];
-    private ReversedListView<string> _displayedView;
     private IReadOnlyList<DebugLogEntry> _entries = [];
     private int _filteredEntryCount;
     private bool _focusAddButtonAfterRender;
@@ -36,11 +34,6 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     private CancellationTokenSource? _loadCts;
     private int _loadGeneration;
     private int _projectedThroughIndex;
-
-    public DebugLogModal()
-    {
-        _displayedView = new ReversedListView<string>(_displayed);
-    }
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
@@ -196,7 +189,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     {
         if (_filteredEntryCount == 0) { return; }
 
-        await ClipboardService.CopyTextAsync(string.Join(Environment.NewLine, _displayedView));
+        await ClipboardService.CopyTextAsync(string.Join(Environment.NewLine, _displayed));
     }
 
     private async Task HandleExportAsync()
@@ -204,7 +197,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         if (_filteredEntryCount == 0) { return; }
 
         var suggestedFileName = $"debug-log-{DateTime.Now:yyyyMMdd-HHmmss}.log";
-        var snapshot = _displayedView.ToArray();
+        var snapshot = _displayed.ToArray();
 
         try
         {
@@ -269,7 +262,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         _hasUncategorized = false;
         StateHasChanged();
 
-        var parser = new DebugLogEntryStreamParser();
+        var parser = new DebugLogEntryReverseStreamParser();
         var sinceRender = 0;
         Exception? loadException = null;
 
@@ -348,7 +341,6 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     private void SetDisplayed(List<string> lines)
     {
         _displayed = lines;
-        _displayedView = new ReversedListView<string>(_displayed);
     }
 
     private void StartEditing(DebugLogFilterRowState row)

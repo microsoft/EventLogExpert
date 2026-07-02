@@ -8,9 +8,10 @@ using System.Runtime.CompilerServices;
 namespace EventLogExpert.Runtime.DebugLog;
 
 /// <summary>
-///     Reads the debug log for the viewer. <see cref="LoadAsync" /> streams the file directly;
-///     <see cref="ClearAsync" /> delegates to the shared <see cref="FileLogSink" /> so truncation coordinates with the
-///     sink's active writer and interprocess mutex. Does NOT dispose the sink (the DI container owns its lifetime).
+///     Reads the debug log for the viewer. <see cref="LoadAsync" /> reads the (startup-bounded) file and yields its
+///     lines NEWEST-first so the viewer pins the newest entry at the top; <see cref="ClearAsync" /> delegates to the
+///     shared <see cref="FileLogSink" /> so truncation coordinates with the sink's active writer and interprocess mutex.
+///     Does NOT dispose the sink (the DI container owns its lifetime).
 /// </summary>
 internal sealed class DebugLogFileReader(FileLocationOptions fileLocationOptions, FileLogSink fileSink) : IDebugLogReader
 {
@@ -41,14 +42,23 @@ internal sealed class DebugLogFileReader(FileLocationOptions fileLocationOptions
             yield break;
         }
 
+        var lines = new List<string>();
+
         await using (stream)
         {
             using var reader = new StreamReader(stream);
 
             while (await reader.ReadLineAsync(cancellationToken) is { } line)
             {
-                yield return line;
+                lines.Add(line);
             }
+        }
+
+        for (var i = lines.Count - 1; i >= 0; i--)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            yield return lines[i];
         }
     }
 }

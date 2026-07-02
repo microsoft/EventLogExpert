@@ -121,8 +121,8 @@ the application also owns the matching parser if it reads the file back.
 
 By design this library does not read the log file back - that is an application concern (matching Serilog /
 NLog / Microsoft.Extensions.Logging, none of which provide a read/tail API). In EventLogExpert the read/clear
-side is `EventLogExpert.Runtime.DebugLog.IDebugLogReader` (`LoadAsync` streams the file; `ClearAsync` delegates
-to the file sink so truncation coordinates with the sink's writer and mutex).
+side is `EventLogExpert.Runtime.DebugLog.IDebugLogReader` (`LoadAsync` reads the file back newest-first; `ClearAsync`
+delegates to the file sink so truncation coordinates with the sink's writer and mutex).
 
 ## Multi-process file logging
 

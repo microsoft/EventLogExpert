@@ -49,7 +49,7 @@
             </Button>
         </div>
         <div aria-busy="@(_hasLoaded ? "false" : "true")" aria-label="Debug log entries" class="debug-log-viewport" role="region" tabindex="0">
-            <Virtualize Context="line" Items="_displayedView" ItemSize="@RowHeightPx" OverscanCount="20">
+            <Virtualize Context="line" Items="_displayed" ItemSize="@RowHeightPx" OverscanCount="20">
                 <ItemContent>
                     <div class="debug-log-row" title="@line">@line</div>
                 </ItemContent>
