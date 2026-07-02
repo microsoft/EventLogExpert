@@ -5,6 +5,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Logging.Sinks;
 using Microsoft.Extensions.Logging;
+using System.Runtime.CompilerServices;
 
 namespace EventLogExpert.Logging.Routing;
 
@@ -13,13 +14,15 @@ public sealed class DispatchingTraceLogger(
     string category,
     ProcessOrigin processOrigin) : ITraceLogger
 {
+    private readonly IReadOnlyList<ILogSink> _sinks = sinks ?? throw new ArgumentNullException(nameof(sinks));
+
     public LogLevel MinimumLevel
     {
         get
         {
             LogLevel aggregate = LogLevel.None;
 
-            foreach (ILogSink sink in sinks)
+            foreach (ILogSink sink in _sinks)
             {
                 LogLevel level = sink.MinimumLevelFor(category);
 
@@ -30,19 +33,30 @@ public sealed class DispatchingTraceLogger(
         }
     }
 
-    public void Critical(CriticalLogHandler handler) => Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Critical);
+    public void Critical([InterpolatedStringHandlerArgument("")] CriticalLogHandler handler) =>
+        Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Critical);
 
-    public void Debug(DebugLogHandler handler) => Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Debug);
+    public void Debug([InterpolatedStringHandlerArgument("")] DebugLogHandler handler) =>
+        Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Debug);
 
-    public void Error(ErrorLogHandler handler) => Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Error);
+    public void Error([InterpolatedStringHandlerArgument("")] ErrorLogHandler handler) =>
+        Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Error);
 
-    public ITraceLogger ForCategory(string category) => new DispatchingTraceLogger(sinks, category, processOrigin);
+    public ITraceLogger ForCategory(string category)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(category);
 
-    public void Information(InformationLogHandler handler) => Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Information);
+        return new DispatchingTraceLogger(_sinks, category, processOrigin);
+    }
 
-    public void Trace(TraceLogHandler handler) => Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Trace);
+    public void Information([InterpolatedStringHandlerArgument("")] InformationLogHandler handler) =>
+        Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Information);
 
-    public void Warning(WarningLogHandler handler) => Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Warning);
+    public void Trace([InterpolatedStringHandlerArgument("")] TraceLogHandler handler) =>
+        Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Trace);
+
+    public void Warning([InterpolatedStringHandlerArgument("")] WarningLogHandler handler) =>
+        Dispatch(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Warning);
 
     private void Dispatch(bool isEnabled, string message, LogLevel level)
     {
@@ -50,9 +64,16 @@ public sealed class DispatchingTraceLogger(
 
         LogRecord record = new(DateTime.UtcNow, level, message, category, processOrigin);
 
-        foreach (ILogSink sink in sinks)
+        foreach (ILogSink sink in _sinks)
         {
-            sink.Emit(record);
+            try
+            {
+                sink.Emit(record);
+            }
+            catch
+            {
+                // Best-effort: a sink fault (e.g. transient file I/O) must not crash the caller or skip the other sinks.
+            }
         }
     }
 }

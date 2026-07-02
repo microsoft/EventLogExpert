@@ -124,7 +124,17 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
     ///     Writes a record bypassing the routing threshold, for fatal records (e.g. an unhandled exception) that must be
     ///     persisted regardless of the configured minimum level.
     /// </summary>
-    public void EmitUnfiltered(LogRecord record) => WriteOutput(_formatter(record));
+    public void EmitUnfiltered(LogRecord record)
+    {
+        try
+        {
+            WriteOutput(_formatter(record));
+        }
+        catch
+        {
+            // Runs from the unhandled-exception handler; a write fault here must not mask the original crash.
+        }
+    }
 
     public LogLevel MinimumLevelFor(string category) => _routingPolicy.FileMinimumFor(category);
 
@@ -162,12 +172,31 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
 
     private void InitTracing()
     {
-        var fileInfo = new FileInfo(_path);
+        // Rotate under the interprocess lock (throwOnTimeout: false so transient contention skips rotation rather than
+        // failing sink construction) and truncate instead of deleting so a concurrent opener never loses the file.
+        WithInterprocessLock(
+            () =>
+            {
+                var fileInfo = new FileInfo(_path);
 
-        if (fileInfo is { Exists: true, Length: > MaxLogSize })
-        {
-            fileInfo.Delete();
-        }
+                if (fileInfo is not { Exists: true, Length: > MaxLogSize }) { return; }
+
+                try
+                {
+                    using var stream = new FileStream(
+                        _path,
+                        FileMode.Open,
+                        FileAccess.Write,
+                        FileShare.ReadWrite | FileShare.Delete);
+
+                    stream.SetLength(0);
+                }
+                catch (IOException)
+                {
+                    // The file was deleted or locked between the size check and the open; skip rotation (next start retries).
+                }
+            },
+            throwOnTimeout: false);
     }
 
     private void WithInterprocessLock(Action action, bool throwOnTimeout)

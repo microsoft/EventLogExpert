@@ -3,12 +3,17 @@
 
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Routing;
+using EventLogExpert.Logging.Sinks;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Logging.Tests.Routing;
 
 public sealed class DispatchingTraceLoggerTests
 {
+    [Fact]
+    public void Constructor_NullSinks_Throws() =>
+        Assert.Throws<ArgumentNullException>(static () => new DispatchingTraceLogger(null!, "App", ProcessOrigin.InProcess));
+
     [Fact]
     public void Dispatch_BuildsOneRecord_AndHandsTheSameInstanceToEverySink()
     {
@@ -54,6 +59,17 @@ public sealed class DispatchingTraceLoggerTests
     }
 
     [Fact]
+    public void Dispatch_IsolatesSinkFaults_SoOtherSinksReceiveAndTheCallerDoesNotThrow()
+    {
+        var healthy = new RecordingSink(_ => LogLevel.Trace);
+        ITraceLogger logger = new DispatchingTraceLogger([new ThrowingSink(), healthy], "App", ProcessOrigin.InProcess);
+
+        logger.Error($"boom");
+
+        Assert.Equal("boom", Assert.Single(healthy.Received).Message);
+    }
+
+    [Fact]
     public void Dispatch_StampsCategoryAndProcessOrigin_OnEveryRecord()
     {
         var sink = new RecordingSink(_ => LogLevel.Trace);
@@ -81,6 +97,15 @@ public sealed class DispatchingTraceLoggerTests
 
         Assert.Equal([LogLevel.Information, LogLevel.Warning], verboseWrote);
         Assert.Equal([LogLevel.Warning], warningsOnlyWrote);
+    }
+
+    [Fact]
+    public void ForCategory_NullOrEmptyCategory_Throws()
+    {
+        ITraceLogger logger = new DispatchingTraceLogger([new RecordingSink(_ => LogLevel.Trace)], "App", ProcessOrigin.InProcess);
+
+        Assert.Throws<ArgumentNullException>(() => logger.ForCategory(null!));
+        Assert.Throws<ArgumentException>(() => logger.ForCategory(string.Empty));
     }
 
     [Fact]
@@ -149,4 +174,11 @@ public sealed class DispatchingTraceLoggerTests
 
         return "probe";
     }
+}
+
+sealed file class ThrowingSink : ILogSink
+{
+    public void Emit(LogRecord record) => throw new InvalidOperationException("sink fault");
+
+    public LogLevel MinimumLevelFor(string category) => LogLevel.Trace;
 }

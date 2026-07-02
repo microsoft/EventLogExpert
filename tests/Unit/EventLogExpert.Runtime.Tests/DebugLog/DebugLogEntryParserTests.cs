@@ -11,6 +11,42 @@ namespace EventLogExpert.Runtime.Tests.DebugLog;
 
 public sealed class DebugLogEntryParserTests
 {
+    [Theory]
+    [InlineData("plain message", "plain message")]
+    [InlineData("[Resolution] tag-looking", "\\[Resolution] tag-looking")]
+    [InlineData("[ElevatedHelper] origin-looking", "\\[ElevatedHelper] origin-looking")]
+    [InlineData("\\backslash-leading", "\\\\backslash-leading")]
+    public void EscapeLeadingBracket_EscapesOnlyBracketOrBackslashLeadingMessages(string message, string expected) =>
+        Assert.Equal(expected, DebugLogFormatter.EscapeLeadingBracket(message));
+
+    [Theory]
+    [InlineData("an ordinary message")]
+    [InlineData("[Resolution] a message that starts like a category tag")]
+    [InlineData("[ElevatedHelper] a message that starts like the origin tag")]
+    [InlineData("\\a backslash-leading message")]
+    [InlineData("\\\\server\\share a UNC-looking message")]
+    public void Format_ThenParse_RoundTripsAMessageThatLooksLikeMetadata(string message)
+    {
+        var line = DebugLogFormatter.Format(new LogRecord(DateTime.UtcNow, LogLevel.Information, message));
+
+        var entry = Assert.Single(DebugLogEntryParser.Parse([line]));
+
+        Assert.Equal(message, entry.Message);
+        Assert.Null(entry.Category);
+        Assert.Equal(ProcessOrigin.InProcess, entry.ProcessOrigin);
+    }
+
+    [Fact]
+    public void Format_ThenParse_UnescapesRawLineSegment_NotJustTheMessageProperty()
+    {
+        const string message = "[tag-looking message]";
+        var line = DebugLogFormatter.Format(new LogRecord(DateTime.UtcNow, LogLevel.Information, message));
+
+        Assert.Contains("\\[", line);
+        Assert.True(DebugLogEntryParser.TryParseLine(line, out var entry));
+        Assert.Equal(message, entry.RawLine[entry.MessageStartIndex..]);
+    }
+
     [Fact]
     public void Parse_WhenCategoryAndElevatedHelperTags_ShouldExtractBoth()
     {
@@ -436,6 +472,19 @@ public sealed class DebugLogEntryParserTests
         var entry = Assert.Single(entries);
         Assert.Equal(LogLevel.Information, entry.Level);
         Assert.Equal($"{Constants.DebugLogFirstMessage}\n{malformed}", entry.Message);
+    }
+
+    [Fact]
+    public void ReverseStreamParser_UnescapesMessage_LikeTheForwardParser()
+    {
+        const string message = "[Resolution] a message that starts like a category tag";
+        var line = DebugLogFormatter.Format(new LogRecord(DateTime.UtcNow, LogLevel.Information, message));
+
+        var entry = new DebugLogEntryReverseStreamParser().AddLine(line);
+
+        Assert.NotNull(entry);
+        Assert.Equal(message, entry.Message);
+        Assert.Null(entry.Category);
     }
 
     [Fact]

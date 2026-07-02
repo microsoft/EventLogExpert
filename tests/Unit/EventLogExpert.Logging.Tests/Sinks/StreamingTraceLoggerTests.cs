@@ -41,6 +41,10 @@ public sealed class StreamingTraceLoggerTests
     }
 
     [Fact]
+    public void Constructor_NullLogSink_Throws() =>
+        Assert.Throws<ArgumentNullException>(static () => new StreamingTraceLogger(null!));
+
+    [Fact]
     public void Emit_AtDefaultMinimumLevel_DropsTraceAndDebug_KeepsInformationAndAbove()
     {
         var captured = new List<LogRecord>();
@@ -90,6 +94,15 @@ public sealed class StreamingTraceLoggerTests
         logger.Information($"uncategorized");
 
         Assert.Equal(string.Empty, Assert.Single(captured).Category);
+    }
+
+    [Fact]
+    public void ForCategory_NullOrEmptyCategory_Throws()
+    {
+        ITraceLogger logger = new StreamingTraceLogger(new SynchronousProgress<LogRecord>(_ => { }));
+
+        Assert.Throws<ArgumentNullException>(() => logger.ForCategory(null!));
+        Assert.Throws<ArgumentException>(() => logger.ForCategory(string.Empty));
     }
 
     [Fact]

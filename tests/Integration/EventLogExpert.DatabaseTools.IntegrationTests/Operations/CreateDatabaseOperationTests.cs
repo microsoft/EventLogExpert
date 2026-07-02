@@ -211,6 +211,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         // Mutual-exclusivity validation must beat source validation for a clear user error.
         var path = CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
+        logger.ForCategory(Arg.Any<string>()).Returns(logger);
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(
             path, SourcePath: @"C:\src.db", FilterRegex: null, SkipProvidersInFile: null, OfflineImagePath: @"X:\"))
@@ -447,6 +448,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     {
         var path = CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
+        logger.ForCategory(Arg.Any<string>()).Returns(logger);
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(
             path, SourcePath: null, FilterRegex: null, SkipProvidersInFile: null, OfflineImagePath: @"X:\missing.wim",
@@ -462,6 +464,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         // WimIndex on a directory image must fail instead of being silently ignored.
         var path = CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
+        logger.ForCategory(Arg.Any<string>()).Returns(logger);
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(
             path, SourcePath: null, FilterRegex: null, SkipProvidersInFile: null, OfflineImagePath: @"X:\",

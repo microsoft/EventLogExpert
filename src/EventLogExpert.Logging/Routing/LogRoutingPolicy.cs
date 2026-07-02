@@ -28,6 +28,8 @@ public sealed class LogRoutingPolicy
     // throttles, which beat the global baseline.
     public LogLevel FileMinimumFor(string category)
     {
+        if (string.IsNullOrEmpty(category)) { return _globalBaseline; }
+
         if (TryMatchLongestPrefix(_runtimeOverrides, category, out LogLevel runtimeLevel)) { return runtimeLevel; }
 
         return TryMatchLongestPrefix(_fileOverrides, category, out LogLevel fileLevel) ? fileLevel : _globalBaseline;
