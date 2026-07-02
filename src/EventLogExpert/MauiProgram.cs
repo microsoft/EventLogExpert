@@ -6,6 +6,7 @@ using EventLogExpert.DependencyInjection;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Files;
+using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Scenarios;
@@ -116,6 +117,7 @@ public static class MauiProgram
         // UpgradeBatch* events. Any facet resolves to the same singleton instance.
         mauiApp.Services.GetRequiredService<IAttentionBannerService>();
         mauiApp.Services.GetRequiredService<DatabaseRecoveryHost>();
+        mauiApp.Services.GetRequiredService<DebugLogHost>();
 
         return mauiApp;
     }

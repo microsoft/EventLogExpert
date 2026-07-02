@@ -8,7 +8,7 @@ namespace EventLogExpert.ElevationHelper.Ipc;
 
 /// <summary>
 ///     Helper-side <see cref="IProgress{T}" /> implementation for <see cref="DatabaseToolsProgress" />. Same contract
-///     as <see cref="IpcLogSink" />: wraps each report in a <see cref="ProgressMessage" /> and writes it through the
+///     as <see cref="IpcLogForwarder" />: wraps each report in a <see cref="ProgressMessage" /> and writes it through the
 ///     shared semaphore-guarded <see cref="IpcMessageWriter" />.
 /// </summary>
 internal sealed class IpcProgressSink(IpcMessageWriter writer) : IProgress<DatabaseToolsProgress>

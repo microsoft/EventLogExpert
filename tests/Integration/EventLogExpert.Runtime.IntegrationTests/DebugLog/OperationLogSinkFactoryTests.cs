@@ -4,7 +4,7 @@
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Configuration;
 using EventLogExpert.Logging.Routing;
-using EventLogExpert.Runtime.Common.Files;
+using EventLogExpert.Logging.Sinks;
 using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.Settings;
 using Microsoft.Extensions.Logging;
@@ -30,7 +30,7 @@ public sealed class OperationLogSinkFactoryTests : IDisposable
         var settings = Substitute.For<ISettingsService>();
         settings.LogLevel.Returns(LogLevel.Information);
         var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), settings.LogLevel);
-        using var fileSink = new DebugFileSink(new FileLocationOptions(_testDirectory), settings, policy);
+        using var fileSink = new FileLogSink(_testLogPath, policy, DebugLogFormatter.Format);
         var factory = new OperationLogSinkFactory(fileSink, policy);
         var uiCaptured = new List<LogRecord>();
 

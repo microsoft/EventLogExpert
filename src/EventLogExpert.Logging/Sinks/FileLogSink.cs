@@ -3,44 +3,45 @@
 
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Routing;
-using EventLogExpert.Logging.Sinks;
-using EventLogExpert.Runtime.Common.Files;
-using EventLogExpert.Runtime.Settings;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace EventLogExpert.Runtime.DebugLog;
+namespace EventLogExpert.Logging.Sinks;
 
-internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsyncDisposable
+/// <summary>
+///     Write-only file sink. Formats each record via the injected <paramref name="formatter" /> and appends it to a
+///     shared log file, serializing in-process writes with a lock and cross-process writes with a named mutex derived from
+///     the canonical path. Reading the file back is deliberately NOT part of this sink (an application concern).
+/// </summary>
+public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
 {
     private const long MaxLogSize = 10 * 1024 * 1024;
 
     private static readonly TimeSpan s_interprocessLockTimeout = TimeSpan.FromSeconds(2);
 
-    private readonly FileLocationOptions _fileLocationOptions;
+    private readonly Func<LogRecord, string> _formatter;
     private readonly Mutex _interprocessMutex;
+    private readonly string _path;
     private readonly LogRoutingPolicy _routingPolicy;
-    private readonly ISettingsService _settings;
     private readonly Lock _writeLock = new();
 
     private bool _disposed;
     private StreamWriter? _writer;
 
-    public DebugFileSink(FileLocationOptions fileLocationOptions, ISettingsService settings, LogRoutingPolicy routingPolicy)
+    public FileLogSink(string path, LogRoutingPolicy routingPolicy, Func<LogRecord, string> formatter)
     {
-        _fileLocationOptions = fileLocationOptions;
-        _settings = settings;
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        ArgumentNullException.ThrowIfNull(routingPolicy);
+        ArgumentNullException.ThrowIfNull(formatter);
+
+        _path = path;
         _routingPolicy = routingPolicy;
-        _interprocessMutex = new Mutex(false, DeriveMutexName(_fileLocationOptions.LoggingPath));
+        _formatter = formatter;
+        _interprocessMutex = new Mutex(false, DeriveMutexName(path));
 
         InitTracing();
-
-        _settings.LogLevelChanged += OnLogLevelChanged;
-
-        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
     }
 
     public Task ClearAsync()
@@ -56,7 +57,7 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
                 {
                     // Share with concurrent writers; SetLength(0) truncates without closing them.
                     using var stream = new FileStream(
-                        _fileLocationOptions.LoggingPath,
+                        _path,
                         FileMode.OpenOrCreate,
                         FileAccess.Write,
                         FileShare.ReadWrite | FileShare.Delete);
@@ -71,8 +72,6 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
 
     public void Dispose()
     {
-        try { DetachEvents(); } catch { }
-
         using (_writeLock.EnterScope())
         {
             if (_disposed) { return; }
@@ -92,8 +91,6 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
 
     public async ValueTask DisposeAsync()
     {
-        try { DetachEvents(); } catch { }
-
         StreamWriter? writer;
 
         using (_writeLock.EnterScope())
@@ -120,49 +117,14 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
         // Re-check this sink's own threshold: the dispatcher gates on the aggregate across all sinks, which may be lower.
         if (record.Level < _routingPolicy.FileMinimumFor(record.Category)) { return; }
 
-        WriteOutput(FormatLine(record.TimestampUtc.ToLocalTime(),
-            Environment.CurrentManagedThreadId,
-            record.Level,
-            record.Category,
-            record.ProcessOrigin,
-            record.Message));
+        WriteOutput(_formatter(record));
     }
 
-    public async IAsyncEnumerable<string> LoadAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        // ReadWrite + Delete share: concurrent writers (second app instance) and rotation-driven deletion.
-        var options = new FileStreamOptions
-        {
-            Mode = FileMode.Open,
-            Access = FileAccess.Read,
-            Share = FileShare.ReadWrite | FileShare.Delete,
-            Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
-            BufferSize = 4096
-        };
-
-        FileStream stream;
-
-        try
-        {
-            stream = new FileStream(_fileLocationOptions.LoggingPath, options);
-        }
-        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
-        {
-            // Log not yet created (fresh install) or rotation deleted it; treat as empty.
-            yield break;
-        }
-
-        await using (stream)
-        {
-            using var reader = new StreamReader(stream);
-
-            while (await reader.ReadLineAsync(cancellationToken) is { } line)
-            {
-                yield return line;
-            }
-        }
-    }
+    /// <summary>
+    ///     Writes a record bypassing the routing threshold, for fatal records (e.g. an unhandled exception) that must be
+    ///     persisted regardless of the configured minimum level.
+    /// </summary>
+    public void EmitUnfiltered(LogRecord record) => WriteOutput(_formatter(record));
 
     public LogLevel MinimumLevelFor(string category) => _routingPolicy.FileMinimumFor(category);
 
@@ -173,21 +135,8 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var bytes = Encoding.UTF8.GetBytes(canonical.ToUpperInvariant());
         var hash = SHA256.HashData(bytes);
+
         return $"Local\\EventLogExpert.DebugLog.{Convert.ToHexString(hash, 0, 8)}";
-    }
-
-    private static string FormatLine(
-        DateTime localTimestamp,
-        int threadId,
-        LogLevel level,
-        string category,
-        ProcessOrigin processOrigin,
-        string message)
-    {
-        string categoryTag = string.IsNullOrEmpty(category) ? string.Empty : $"[{category}] ";
-        string originTag = processOrigin == ProcessOrigin.ElevatedHelper ? "[ElevatedHelper] " : string.Empty;
-
-        return $"[{localTimestamp:o}] [{threadId}] [{level}] {categoryTag}{originTag}{message}";
     }
 
     private void CloseWriter()
@@ -196,19 +145,13 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
         _writer = null;
     }
 
-    private void DetachEvents()
-    {
-        AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
-        _settings.LogLevelChanged -= OnLogLevelChanged;
-    }
-
     private void EnsureWriter()
     {
         if (_writer is not null) { return; }
 
         // OpenOrCreate (not Append) avoids stale-position writes after cross-instance SetLength(0).
         var stream = new FileStream(
-            _fileLocationOptions.LoggingPath,
+            _path,
             FileMode.OpenOrCreate,
             FileAccess.Write,
             FileShare.ReadWrite | FileShare.Delete,
@@ -219,27 +162,12 @@ internal sealed class DebugFileSink : ILogSink, IFileLogger, IDisposable, IAsync
 
     private void InitTracing()
     {
-        var fileInfo = new FileInfo(_fileLocationOptions.LoggingPath);
+        var fileInfo = new FileInfo(_path);
 
         if (fileInfo is { Exists: true, Length: > MaxLogSize })
         {
             fileInfo.Delete();
         }
-    }
-
-    private void OnLogLevelChanged()
-    {
-        _routingPolicy.UpdateGlobalBaseline(_settings.LogLevel);
-    }
-
-    private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
-    {
-        WriteOutput(FormatLine(DateTime.Now,
-            Environment.CurrentManagedThreadId,
-            LogLevel.Critical,
-            string.Empty,
-            ProcessOrigin.InProcess,
-            $"Unhandled Exception: {e.ExceptionObject}"));
     }
 
     private void WithInterprocessLock(Action action, bool throwOnTimeout)

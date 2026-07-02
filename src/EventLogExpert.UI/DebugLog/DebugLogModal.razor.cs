@@ -48,7 +48,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
-    [Inject] private IFileLogger FileLogger { get; init; } = null!;
+    [Inject] private IDebugLogReader DebugLogReader { get; init; } = null!;
 
     [Inject] private IFileSaveService FileSaveService { get; init; } = null!;
 
@@ -150,7 +150,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     {
         try
         {
-            await FileLogger.ClearAsync();
+            await DebugLogReader.ClearAsync();
         }
         catch (Exception ex)
         {
@@ -260,7 +260,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
         try
         {
-            await foreach (var line in FileLogger.LoadAsync(loadCts.Token))
+            await foreach (var line in DebugLogReader.LoadAsync(loadCts.Token))
             {
                 if (generation != _loadGeneration) { return; }
 

@@ -21,7 +21,7 @@ internal static class ListImageEditionsHandler
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
-        var logger = new StreamingTraceLogger(new IpcLogSink(writer), verbose ? LogLevel.Trace : LogLevel.Information);
+        var logger = new StreamingTraceLogger(new IpcLogForwarder(writer), verbose ? LogLevel.Trace : LogLevel.Information);
 
         OfflineImageKind? kind = OfflineImageKindResolver.ResolveFromPath(request.ImagePath);
 

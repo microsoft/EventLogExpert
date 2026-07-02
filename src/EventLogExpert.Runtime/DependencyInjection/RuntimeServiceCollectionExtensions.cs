@@ -201,11 +201,19 @@ public static class RuntimeServiceCollectionExtensions
                 new LogRoutingPolicy(
                     sp.GetRequiredService<IOptions<LoggingOptions>>().Value,
                     sp.GetRequiredService<ISettingsService>().LogLevel));
-            services.AddSingleton<DebugFileSink>();
-            services.AddSingleton<IFileLogger>(static sp => sp.GetRequiredService<DebugFileSink>());
+            services.AddSingleton(static sp => new FileLogSink(
+                sp.GetRequiredService<FileLocationOptions>().LoggingPath,
+                sp.GetRequiredService<LogRoutingPolicy>(),
+                DebugLogFormatter.Format));
+            services.AddSingleton<IDebugLogReader>(static sp => new DebugLogFileReader(
+                sp.GetRequiredService<FileLocationOptions>(),
+                sp.GetRequiredService<FileLogSink>()));
+            // Owns the settings->routing-baseline bridge + the unhandled-exception hook. Nothing depends on it, so the
+            // MAUI head force-resolves it at startup; it depends on FileLogSink so it is disposed (hooks detached) first.
+            services.AddSingleton<DebugLogHost>();
             services.AddSingleton<ILogSourceFactory>(static sp =>
             {
-                List<ILogSink> sinks = [sp.GetRequiredService<DebugFileSink>()];
+                List<ILogSink> sinks = [sp.GetRequiredService<FileLogSink>()];
 #if DEBUG
                 // Debug builds also mirror to the console so logs surface in the F12 / debug window; Release is file-only.
                 sinks.Add(new ConsoleSink());

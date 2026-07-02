@@ -24,7 +24,7 @@ public sealed class DebugLogModalTests : BunitContext
 {
     private readonly IAlertDialogService _alertDialogService = Substitute.For<IAlertDialogService>();
     private readonly IClipboardService _clipboardService = Substitute.For<IClipboardService>();
-    private readonly IFileLogger _fileLogger = Substitute.For<IFileLogger>();
+    private readonly IDebugLogReader _debugLogReader = Substitute.For<IDebugLogReader>();
     private readonly IFileSaveService _fileSaveService = Substitute.For<IFileSaveService>();
     private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
     private readonly IModalService _modalService = Substitute.For<IModalService>();
@@ -38,7 +38,7 @@ public sealed class DebugLogModalTests : BunitContext
 
         Services.AddSingleton(_alertDialogService);
         Services.AddSingleton(_clipboardService);
-        Services.AddSingleton(_fileLogger);
+        Services.AddSingleton(_debugLogReader);
         Services.AddSingleton(_fileSaveService);
         Services.AddSingleton(_modalCoordinator);
         Services.AddSingleton(_modalService);
@@ -50,7 +50,7 @@ public sealed class DebugLogModalTests : BunitContext
     [Fact]
     public async Task DebugLogModal_AddFilter_DisabledUntilCurrentFilterComplete()
     {
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(
             DebugLogUtils.ToAsyncEnumerable([DebugLogUtils.BuildLine(LogLevel.Information, "alpha foo")]));
 
         var component = Render<DebugLogModal>();
@@ -70,7 +70,7 @@ public sealed class DebugLogModalTests : BunitContext
     [Fact]
     public async Task DebugLogModal_AddFilter_OpensAnEditor()
     {
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(
             DebugLogUtils.ToAsyncEnumerable([DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogFirstMessage)]));
 
         var component = Render<DebugLogModal>();
@@ -95,7 +95,7 @@ public sealed class DebugLogModalTests : BunitContext
             DebugLogUtils.BuildLine(LogLevel.Information, "bravo bar"),
         };
 
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
         var component = Render<DebugLogModal>();
 
@@ -118,7 +118,7 @@ public sealed class DebugLogModalTests : BunitContext
     public async Task DebugLogModal_AfterLoad_FooterCounterIsPoliteLiveStatusRegion()
     {
         var lines = new[] { DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogFirstMessage) };
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
         var component = Render<DebugLogModal>();
 
@@ -139,7 +139,7 @@ public sealed class DebugLogModalTests : BunitContext
         const string ContinuationLine = "  at MyMethod()";
         var thirdHeader = DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogThirdMessage);
 
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(
             DebugLogUtils.ToAsyncEnumerable([firstHeader, secondHeader, ContinuationLine, thirdHeader]));
 
         var component = Render<DebugLogModal>();
@@ -162,7 +162,7 @@ public sealed class DebugLogModalTests : BunitContext
             DebugLogUtils.BuildLine(LogLevel.Warning, "Elevation.Ipc", "ipc line"),
         };
 
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
         var component = Render<DebugLogModal>();
 
@@ -186,7 +186,7 @@ public sealed class DebugLogModalTests : BunitContext
             DebugLogUtils.BuildLine(LogLevel.Warning, "uncategorized"),
         };
 
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
         var component = Render<DebugLogModal>();
 
@@ -210,7 +210,7 @@ public sealed class DebugLogModalTests : BunitContext
             DebugLogUtils.BuildLine(LogLevel.Warning, "uncategorized"),
         };
 
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
         var component = Render<DebugLogModal>();
 
@@ -239,7 +239,7 @@ public sealed class DebugLogModalTests : BunitContext
     [Fact]
     public async Task DebugLogModal_Clear_ClearsTheLogFile()
     {
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(
             DebugLogUtils.ToAsyncEnumerable([DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogFirstMessage)]));
 
         var component = Render<DebugLogModal>();
@@ -249,7 +249,7 @@ public sealed class DebugLogModalTests : BunitContext
 
         await FindButton(component, "Clear").ClickAsync(new MouseEventArgs());
 
-        await _fileLogger.Received(1).ClearAsync();
+        await _debugLogReader.Received(1).ClearAsync();
 
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("0 of 0 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
@@ -258,7 +258,7 @@ public sealed class DebugLogModalTests : BunitContext
     [Fact]
     public async Task DebugLogModal_Copy_CopiesTheDisplayedView()
     {
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(
             DebugLogUtils.ToAsyncEnumerable([DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogFirstMessage)]));
 
         var component = Render<DebugLogModal>();
@@ -280,7 +280,7 @@ public sealed class DebugLogModalTests : BunitContext
             DebugLogUtils.BuildLine(LogLevel.Information, "bravo"),
         };
 
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
         var component = Render<DebugLogModal>();
 
@@ -309,7 +309,7 @@ public sealed class DebugLogModalTests : BunitContext
             DebugLogUtils.BuildLine(LogLevel.Information, "bravo"),
         };
 
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
         var component = Render<DebugLogModal>();
 
@@ -337,7 +337,7 @@ public sealed class DebugLogModalTests : BunitContext
             DebugLogUtils.BuildLine(LogLevel.Information, "bravo"),
         };
 
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
         var component = Render<DebugLogModal>();
 
@@ -373,7 +373,7 @@ public sealed class DebugLogModalTests : BunitContext
             DebugLogUtils.BuildLine(LogLevel.Information, "no match"),
         };
 
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
         var component = Render<DebugLogModal>();
 
@@ -397,7 +397,7 @@ public sealed class DebugLogModalTests : BunitContext
             DebugLogUtils.BuildLine(LogLevel.Information, "charlie delta"),
         };
 
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
         var component = Render<DebugLogModal>();
 
@@ -422,7 +422,7 @@ public sealed class DebugLogModalTests : BunitContext
             DebugLogUtils.BuildLine(LogLevel.Information, "info"),
         };
 
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
         var component = Render<DebugLogModal>();
 
@@ -453,7 +453,7 @@ public sealed class DebugLogModalTests : BunitContext
             DebugLogUtils.BuildLine(LogLevel.Warning, "in-process line"),
         };
 
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
         var component = Render<DebugLogModal>();
 
@@ -477,7 +477,7 @@ public sealed class DebugLogModalTests : BunitContext
             DebugLogUtils.BuildLine(LogLevel.Information, "charlie delta"),
         };
 
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
 
         var component = Render<DebugLogModal>();
 
@@ -499,7 +499,7 @@ public sealed class DebugLogModalTests : BunitContext
     [Fact]
     public async Task DebugLogModal_WhenLogEmpty_ShowsEmptyState()
     {
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable([]));
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable([]));
 
         var component = Render<DebugLogModal>();
 
