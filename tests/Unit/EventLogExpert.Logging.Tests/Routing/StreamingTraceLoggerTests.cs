@@ -85,7 +85,7 @@ public sealed class StreamingTraceLoggerTests
     }
 
     [Fact]
-    public void Emit_WithoutForCategory_LeavesCategoryEmpty_SoTheCompositeSinkCanStampTheOperationCategory()
+    public void Emit_WithoutForCategory_LeavesCategoryEmpty_SoTheBroadcastLogProgressCanStampTheOperationCategory()
     {
         var captured = new List<LogRecord>();
         var sink = new SynchronousProgress<LogRecord>(captured.Add);

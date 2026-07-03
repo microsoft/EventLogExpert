@@ -8,7 +8,7 @@ namespace EventLogExpert.Logging.Configuration;
 
 public sealed class LoggingOptions
 {
-    public const string FileSink = "FileLogSink";
+    public const string FileLogSink = "FileLogSink";
 
     public Dictionary<string, LogSinkOptions> Sinks { get; set; } = [];
 
@@ -16,7 +16,7 @@ public sealed class LoggingOptions
     {
         options.Sinks = new Dictionary<string, LogSinkOptions>(StringComparer.Ordinal)
         {
-            [FileSink] = new LogSinkOptions
+            [FileLogSink] = new LogSinkOptions
             {
                 Categories = new Dictionary<string, LogLevel>(StringComparer.Ordinal)
                 {

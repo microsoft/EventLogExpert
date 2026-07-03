@@ -5,7 +5,7 @@ using EventLogExpert.Logging.Abstractions;
 
 namespace EventLogExpert.Logging.Routing;
 
-public sealed class CompositeLogSink(IReadOnlyList<ILogSink> sinks, string category) : IProgress<LogRecord>
+public sealed class BroadcastLogProgress(IReadOnlyList<ILogSink> sinks, string category) : IProgress<LogRecord>
 {
     private readonly IReadOnlyList<ILogSink> _sinks = sinks ?? throw new ArgumentNullException(nameof(sinks));
 

@@ -76,15 +76,17 @@ Concrete `ILogSink` implementations (the `ILogSink` contract itself lives under 
   the lowest across the sinks for the category.
 - `StreamingTraceLogger(IProgress<LogRecord> progress, LogLevel minimumLevel = Information, string category = "")` -
   a lightweight `ITraceLogger` that reports each record to an `IProgress<LogRecord>` (used for per-operation
-  progress). An empty `category` lets a downstream `CompositeLogSink` stamp the operation category.
-- `CompositeLogSink(IReadOnlyList<ILogSink> sinks, string category)` - an `IProgress<LogRecord>` that stamps a
+  progress). An empty `category` lets a downstream `BroadcastLogProgress` stamp the operation category.
+- `BroadcastLogProgress(IReadOnlyList<ILogSink> sinks, string category)` - an `IProgress<LogRecord>` that stamps a
   category and fans out to several sinks (used to build a per-operation logger that also writes to the shared
   file sink).
 
 ### Configuration
 - `LoggingOptions { Dictionary<string, LogSinkOptions> Sinks }` + `LogSinkOptions { Dictionary<string, LogLevel> Categories }` -
-  per-sink, per-category level throttles. `LoggingOptions.FileSink` is the config KEY name for the file sink's
-  throttle map (a data key, not a type name). `CreateShippedDefaults()` builds this solution's defaults.
+  per-sink, per-category level throttles. `LoggingOptions.FileLogSink` is the config dictionary KEY for the file
+  sink's throttle map; its value `"FileLogSink"` matches the `FileLogSink` sink type by design but is a stable
+  config key, not a type reference (changing the string breaks config compatibility). `CreateShippedDefaults()`
+  builds this solution's defaults.
 
 ## Composing a logger
 

@@ -17,6 +17,6 @@ internal sealed class OperationLogSinkFactory(FileLogSink fileSink, LogRoutingPo
 
         List<ILogSink> sinks = [new UiStreamingSink(uiProgress, routingPolicy.UiMinimumFor(verbose)), fileSink];
 
-        return new CompositeLogSink(sinks, category);
+        return new BroadcastLogProgress(sinks, category);
     }
 }
