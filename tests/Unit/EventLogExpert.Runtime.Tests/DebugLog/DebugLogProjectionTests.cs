@@ -68,7 +68,7 @@ public sealed class DebugLogProjectionTests
             BuildEntry(LogLevel.Warning, "in-proc", null, ProcessOrigin.InProcess),
         };
 
-        var (lines, count) = DebugLogProjection.Project(entries, [Exclude(DebugLogFilterField.Process, ComparisonOperator.Equals, nameof(ProcessOrigin.ElevatedHelper))]);
+        var (lines, count) = DebugLogProjection.Project(entries, [Exclude(DebugLogFilterField.ProcessOrigin, ComparisonOperator.Equals, nameof(ProcessOrigin.ElevatedHelper))]);
 
         Assert.Equal(1, count);
         Assert.Contains("in-proc", Assert.Single(lines));
@@ -202,7 +202,7 @@ public sealed class DebugLogProjectionTests
             BuildEntry(null, "orphan"),
         };
 
-        var (lines, count) = DebugLogProjection.Project(entries, [Include(DebugLogFilterField.Process, ComparisonOperator.Equals, nameof(ProcessOrigin.ElevatedHelper))]);
+        var (lines, count) = DebugLogProjection.Project(entries, [Include(DebugLogFilterField.ProcessOrigin, ComparisonOperator.Equals, nameof(ProcessOrigin.ElevatedHelper))]);
 
         Assert.Equal(1, count);
         Assert.Contains("helper", Assert.Single(lines));
@@ -218,7 +218,7 @@ public sealed class DebugLogProjectionTests
             BuildEntry(null, "orphan"),
         };
 
-        var (_, count) = DebugLogProjection.Project(entries, [Include(DebugLogFilterField.Process, ComparisonOperator.NotEqual, nameof(ProcessOrigin.ElevatedHelper))]);
+        var (_, count) = DebugLogProjection.Project(entries, [Include(DebugLogFilterField.ProcessOrigin, ComparisonOperator.NotEqual, nameof(ProcessOrigin.ElevatedHelper))]);
 
         Assert.Equal(2, count);
     }
@@ -336,8 +336,8 @@ public sealed class DebugLogProjectionTests
             BuildEntry(LogLevel.Warning, "in-proc", null, ProcessOrigin.InProcess),
         };
 
-        var (_, includeCount) = DebugLogProjection.Project(entries, [Include(DebugLogFilterField.Process, ComparisonOperator.Equals, "Bogus")]);
-        var (_, excludeCount) = DebugLogProjection.Project(entries, [Exclude(DebugLogFilterField.Process, ComparisonOperator.Equals, "Bogus")]);
+        var (_, includeCount) = DebugLogProjection.Project(entries, [Include(DebugLogFilterField.ProcessOrigin, ComparisonOperator.Equals, "Bogus")]);
+        var (_, excludeCount) = DebugLogProjection.Project(entries, [Exclude(DebugLogFilterField.ProcessOrigin, ComparisonOperator.Equals, "Bogus")]);
 
         Assert.Equal(2, includeCount);
         Assert.Equal(2, excludeCount);

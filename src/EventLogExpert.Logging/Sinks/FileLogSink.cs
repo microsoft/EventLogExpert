@@ -114,6 +114,8 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
 
     public void Emit(LogRecord record)
     {
+        ArgumentNullException.ThrowIfNull(record);
+
         // Re-check this sink's own threshold: the dispatcher gates on the aggregate across all sinks, which may be lower.
         if (record.Level < _routingPolicy.FileMinimumFor(record.Category)) { return; }
 
@@ -126,6 +128,8 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
     /// </summary>
     public void EmitUnfiltered(LogRecord record)
     {
+        ArgumentNullException.ThrowIfNull(record);
+
         try
         {
             WriteOutput(_formatter(record));

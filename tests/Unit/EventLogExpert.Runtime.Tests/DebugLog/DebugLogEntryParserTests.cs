@@ -47,6 +47,20 @@ public sealed class DebugLogEntryParserTests
         Assert.Equal(message, entry.RawLine[entry.MessageStartIndex..]);
     }
 
+    [Theory]
+    [InlineData("\\Device\\Harddisk0 a legacy path-leading message")]
+    [InlineData("\\t literal-backslash-t, not a real tab")]
+    public void Parse_LegacyMessageStartingWithBackslashThenNonEscapeChar_KeepsTheBackslash(string message)
+    {
+        // Pre-escape releases wrote messages verbatim, so a legacy line can legitimately begin with a single '\'
+        // that was never doubled. The parser un-escapes only the formatter's own sequences ('\[' and '\\'), so any
+        // other leading '\' must survive intact rather than losing a character.
+        var line = $"[{Constants.DebugLogTestTimestamp}] [{Constants.DebugLogTestThreadId}] [{nameof(LogLevel.Information)}] {message}";
+
+        Assert.True(DebugLogEntryParser.TryParseLine(line, out var entry));
+        Assert.Equal(message, entry.RawLine[entry.MessageStartIndex..]);
+    }
+
     [Fact]
     public void Parse_WhenCategoryAndElevatedHelperTags_ShouldExtractBoth()
     {

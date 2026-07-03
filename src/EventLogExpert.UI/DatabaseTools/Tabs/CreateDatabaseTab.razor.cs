@@ -175,7 +175,7 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
 
         try
         {
-            var logSink = new Progress<LogRecord>(AppendEntry);
+            IProgress<LogRecord> logSink = OperationLogSinkFactory.Create(new Progress<LogRecord>(AppendEntry), LogCategory, VerboseLogging);
 
             var result = await ElevatedRunner.ListImageEditionsAsync(
                 new ListOfflineImageEditionsRequest(imagePath), logSink, token, VerboseLogging);

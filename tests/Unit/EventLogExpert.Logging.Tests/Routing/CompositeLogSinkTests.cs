@@ -3,7 +3,6 @@
 
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Routing;
-using EventLogExpert.Logging.Sinks;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Logging.Tests.Routing;
@@ -22,6 +21,14 @@ public sealed class CompositeLogSinkTests
 
         Assert.Equal([LogLevel.Information, LogLevel.Warning], ui.Written.Select(record => record.Level).ToArray());
         Assert.Equal([LogLevel.Warning], file.Written.Select(record => record.Level).ToArray());
+    }
+
+    [Fact]
+    public void Report_NullValue_Throws()
+    {
+        var composite = new CompositeLogSink([new RecordingSink(_ => LogLevel.Trace)], "DatabaseTools.Create");
+
+        Assert.Throws<ArgumentNullException>(() => composite.Report(null!));
     }
 
     [Fact]

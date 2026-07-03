@@ -7,7 +7,7 @@ using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.ElevationHelper.Ipc;
 using EventLogExpert.Eventing.PublisherMetadata.Offline;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Sinks;
+using EventLogExpert.Logging.Routing;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 

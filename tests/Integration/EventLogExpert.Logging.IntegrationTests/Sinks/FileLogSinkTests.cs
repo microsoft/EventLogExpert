@@ -33,6 +33,22 @@ public sealed class FileLogSinkTests : IDisposable
     }
 
     [Fact]
+    public void Emit_NullRecord_Throws()
+    {
+        using FileLogSink fileSink = CreateFileSink(LogLevel.Information);
+
+        Assert.Throws<ArgumentNullException>(() => fileSink.Emit(null!));
+    }
+
+    [Fact]
+    public void EmitUnfiltered_NullRecord_Throws()
+    {
+        using FileLogSink fileSink = CreateFileSink(LogLevel.Information);
+
+        Assert.Throws<ArgumentNullException>(() => fileSink.EmitUnfiltered(null!));
+    }
+
+    [Fact]
     public async Task ClearAsync_WhenCalled_ShouldClearLogFile()
     {
         await File.WriteAllTextAsync(_testLogPath,

@@ -3,7 +3,6 @@
 
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
-using EventLogExpert.Logging.Sinks;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 

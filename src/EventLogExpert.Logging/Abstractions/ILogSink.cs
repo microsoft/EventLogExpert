@@ -1,10 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 
-namespace EventLogExpert.Logging.Sinks;
+namespace EventLogExpert.Logging.Abstractions;
 
 public interface ILogSink
 {

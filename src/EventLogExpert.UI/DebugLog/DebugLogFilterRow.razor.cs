@@ -25,7 +25,7 @@ public sealed partial class DebugLogFilterRow
         nameof(LogLevel.Critical),
     ];
 
-    private static readonly IReadOnlyList<string> s_processValues =
+    private static readonly IReadOnlyList<string> s_processOriginValues =
     [
         nameof(ProcessOrigin.InProcess),
         nameof(ProcessOrigin.ElevatedHelper),
@@ -56,7 +56,7 @@ public sealed partial class DebugLogFilterRow
 
     [Parameter] public EventCallback OnSave { get; set; }
 
-    // Process is intentionally single-select only: ProcessOrigin has two values, so multi-select adds no
+    // ProcessOrigin is intentionally single-select only: it has two values, so multi-select adds no
     // expressive power over single Equals plus the Include/Exclude toggle.
     private bool FieldSupportsMany => Draft?.Field is DebugLogFilterField.Level or DebugLogFilterField.Category;
 
@@ -93,7 +93,7 @@ public sealed partial class DebugLogFilterRow
 
     private static string FormatValue(DebugLogFilterField field, string? value) => field switch
     {
-        DebugLogFilterField.Process => value switch
+        DebugLogFilterField.ProcessOrigin => value switch
         {
             nameof(ProcessOrigin.InProcess) => "In-process",
             nameof(ProcessOrigin.ElevatedHelper) => "Elevated helper",
@@ -173,7 +173,7 @@ public sealed partial class DebugLogFilterRow
     private IReadOnlyList<string> ValueOptions() => Draft?.Field switch
     {
         DebugLogFilterField.Level => s_levelValues,
-        DebugLogFilterField.Process => s_processValues,
+        DebugLogFilterField.ProcessOrigin => s_processOriginValues,
         DebugLogFilterField.Category => CategoryOptions(),
         _ => []
     };

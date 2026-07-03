@@ -83,7 +83,7 @@ public static class DebugLogProjection
                 return entry => Effective(wantIn == (entry.Level.HasValue && set.Contains(entry.Level.Value)), excluded);
             }
 
-            case DebugLogFilterField.Process:
+            case DebugLogFilterField.ProcessOrigin:
             {
                 var set = ParseProcessOrigins(filter.Values);
 

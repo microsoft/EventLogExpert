@@ -21,6 +21,10 @@ public sealed class ConsoleSinkTests
     }
 
     [Fact]
+    public void Emit_NullRecord_Throws() =>
+        Assert.Throws<ArgumentNullException>(static () => new ConsoleSink(LogLevel.Trace).Emit(null!));
+
+    [Fact]
     public void Emit_InformationLevel_WritesBareMessage_WithoutLevelPrefix()
     {
         var sink = new ConsoleSink(LogLevel.Trace);

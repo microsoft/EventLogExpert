@@ -2,11 +2,11 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Sinks;
+using EventLogExpert.Logging.Routing;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 
-namespace EventLogExpert.Logging.Tests.Sinks;
+namespace EventLogExpert.Logging.Tests.Routing;
 
 public sealed class StreamingTraceLoggerTests
 {

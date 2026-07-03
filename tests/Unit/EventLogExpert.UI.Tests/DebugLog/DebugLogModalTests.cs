@@ -598,7 +598,7 @@ public sealed class DebugLogModalTests : BunitContext
             Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
 
         await AddFilterAsync(component);
-        await SelectOptionAsync(component, "Filter field", "Process");
+        await SelectOptionAsync(component, "Filter field", "ProcessOrigin");
         await SelectOptionAsync(component, "Filter value", "Elevated helper");
 
         await SaveFilterAsync(component);

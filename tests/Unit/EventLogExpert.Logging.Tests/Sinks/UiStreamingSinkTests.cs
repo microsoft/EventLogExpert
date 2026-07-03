@@ -41,6 +41,18 @@ public sealed class UiStreamingSinkTests
         Assert.Equal(LogLevel.Trace, sink.MinimumLevelFor("App"));
     }
 
+    [Fact]
+    public void Constructor_NullProgress_Throws() =>
+        Assert.Throws<ArgumentNullException>(static () => new UiStreamingSink(null!, LogLevel.Information));
+
+    [Fact]
+    public void Emit_NullRecord_Throws()
+    {
+        var sink = new UiStreamingSink(new CapturingProgress([]), LogLevel.Information);
+
+        Assert.Throws<ArgumentNullException>(() => sink.Emit(null!));
+    }
+
     private sealed class CapturingProgress(List<LogRecord> captured) : IProgress<LogRecord>
     {
         public void Report(LogRecord value) => captured.Add(value);

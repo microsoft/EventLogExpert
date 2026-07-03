@@ -12,6 +12,8 @@ public sealed class ConsoleSink(LogLevel minimumLevel = LogLevel.Information) : 
 
     public void Emit(LogRecord record)
     {
+        ArgumentNullException.ThrowIfNull(record);
+
         if (record.Level < minimumLevel || string.IsNullOrEmpty(record.Message)) { return; }
 
         ConsoleColor? color = record.Level switch

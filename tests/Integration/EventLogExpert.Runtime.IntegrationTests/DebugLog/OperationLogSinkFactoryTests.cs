@@ -25,6 +25,26 @@ public sealed class OperationLogSinkFactoryTests : IDisposable
     }
 
     [Fact]
+    public void Create_EmptyCategory_Throws()
+    {
+        var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), LogLevel.Information);
+        using var fileSink = new FileLogSink(_testLogPath, policy, DebugLogFormatter.Format);
+        var factory = new OperationLogSinkFactory(fileSink, policy);
+
+        Assert.Throws<ArgumentException>(() => factory.Create(new CapturingProgress([]), string.Empty, verbose: false));
+    }
+
+    [Fact]
+    public void Create_NullUiProgress_Throws()
+    {
+        var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), LogLevel.Information);
+        using var fileSink = new FileLogSink(_testLogPath, policy, DebugLogFormatter.Format);
+        var factory = new OperationLogSinkFactory(fileSink, policy);
+
+        Assert.Throws<ArgumentNullException>(() => factory.Create(null!, LogCategories.DatabaseTools, verbose: false));
+    }
+
+    [Fact]
     public void Create_OperationSink_StreamsEverythingToTheUi_ButThrottlesTheFileToWarning()
     {
         var settings = Substitute.For<ISettingsService>();

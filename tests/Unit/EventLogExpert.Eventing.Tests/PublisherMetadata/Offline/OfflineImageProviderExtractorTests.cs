@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.PublisherMetadata;
 using EventLogExpert.Eventing.PublisherMetadata.Offline;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Sinks;
+using EventLogExpert.Logging.Routing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 
