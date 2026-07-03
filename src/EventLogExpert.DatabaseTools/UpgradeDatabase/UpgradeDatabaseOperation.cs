@@ -3,8 +3,8 @@
 
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Schema;
-using EventLogExpert.ProviderDatabase.Context;
 using System.Data.Common;
 
 namespace EventLogExpert.DatabaseTools.UpgradeDatabase;

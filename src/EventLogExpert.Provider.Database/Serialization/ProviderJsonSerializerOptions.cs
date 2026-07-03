@@ -4,7 +4,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
-namespace EventLogExpert.ProviderDatabase.Serialization;
+namespace EventLogExpert.Provider.Database.Serialization;
 
 internal static class ProviderJsonSerializerOptions
 {

@@ -3,7 +3,7 @@
   <PropertyGroup>
     <SingleProject>true</SingleProject>
     <AssemblyName>EventLogExpert.Provider.Database</AssemblyName>
-    <RootNamespace>EventLogExpert.ProviderDatabase</RootNamespace>
+    <RootNamespace>EventLogExpert.Provider.Database</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

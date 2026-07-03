@@ -31,12 +31,12 @@ The script runs all services defined in `compose.yml` (eventing, runtime, elevat
 ./scripts/run-tests.ps1 -Suite runtime,elevationhelper
 ```
 
-Integration test projects that do not require a Windows container (e.g., ProviderDatabase)
+Integration test projects that do not require a Windows container (e.g., Provider.Database)
 are not in `compose.yml` and should be run directly:
 
 ```powershell
 $env:EVENTLOG_CONTAINER = "1"
-dotnet test tests/Integration/EventLogExpert.ProviderDatabase.IntegrationTests/ -p:RunSettingsFilePath=""
+dotnet test tests/Integration/EventLogExpert.Provider.Database.IntegrationTests/ -p:RunSettingsFilePath=""
 ```
 
 The script detects the current Docker daemon mode, switches to Windows containers

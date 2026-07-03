@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.TestUtils;
+using EventLogExpert.Provider.Database.Hashing;
 using EventLogExpert.Provider.Resolution;
-using EventLogExpert.ProviderDatabase.Hashing;
 
 namespace EventLogExpert.Provider.Database.Tests.Hashing;
 

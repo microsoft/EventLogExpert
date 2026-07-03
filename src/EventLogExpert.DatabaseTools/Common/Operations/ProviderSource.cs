@@ -3,9 +3,9 @@
 
 using EventLogExpert.Eventing.PublisherMetadata;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Provider.Schema;
-using EventLogExpert.ProviderDatabase.Context;
 using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
 using System.Runtime.CompilerServices;

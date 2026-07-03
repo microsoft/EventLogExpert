@@ -7,7 +7,7 @@ using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
-using EventLogExpert.ProviderDatabase.Context;
+using EventLogExpert.Provider.Database.Context;
 using NSubstitute;
 
 namespace EventLogExpert.DatabaseTools.IntegrationTests.Operations;

@@ -2,12 +2,12 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Maintenance;
 using EventLogExpert.Provider.Schema;
-using EventLogExpert.ProviderDatabase.Context;
 using Microsoft.Data.Sqlite;
 
-namespace EventLogExpert.ProviderDatabase.Maintenance;
+namespace EventLogExpert.Provider.Database.Maintenance;
 
 internal sealed class ProviderDatabaseMaintenance(ITraceLogger? logger = null) : IProviderDatabaseMaintenance
 {

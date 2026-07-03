@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.IO.Compression;
 using System.Text.Json;
 
-namespace EventLogExpert.ProviderDatabase.Serialization;
+namespace EventLogExpert.Provider.Database.Serialization;
 
 internal sealed class CompressedJsonValueConverter<T>() : ValueConverter<T, byte[]>(v => ConvertToCompressedJson(v),
     v => ConvertFromCompressedJson(v))

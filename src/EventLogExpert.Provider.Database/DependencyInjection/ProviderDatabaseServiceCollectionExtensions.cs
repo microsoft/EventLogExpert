@@ -1,10 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Provider.Database.Context;
+using EventLogExpert.Provider.Database.Maintenance;
 using EventLogExpert.Provider.Lookup;
 using EventLogExpert.Provider.Maintenance;
-using EventLogExpert.ProviderDatabase.Context;
-using EventLogExpert.ProviderDatabase.Maintenance;
 
 namespace Microsoft.Extensions.DependencyInjection;
 

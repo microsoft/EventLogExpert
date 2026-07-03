@@ -5,8 +5,8 @@ using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
+using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Schema;
-using EventLogExpert.ProviderDatabase.Context;
 using NSubstitute;
 
 namespace EventLogExpert.DatabaseTools.IntegrationTests.Operations;

@@ -4,8 +4,8 @@
 using EventLogExpert.Eventing.PublisherMetadata;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Resolution;
-using EventLogExpert.ProviderDatabase.Context;
 using Microsoft.Data.Sqlite;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
