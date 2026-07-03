@@ -50,7 +50,7 @@ public sealed class LogRoutingPolicyTests
         {
             Sinks = new Dictionary<string, LogSinkOptions>(StringComparer.Ordinal)
             {
-                [LoggingOptions.FileSink] = new LogSinkOptions
+                [LoggingOptions.FileLogSink] = new LogSinkOptions
                 {
                     Categories = new Dictionary<string, LogLevel>(StringComparer.Ordinal)
                     {

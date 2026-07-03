@@ -31,11 +31,11 @@ namespace EventLogExpert.Logging.Routing;
 ///     </para>
 /// </remarks>
 public sealed class StreamingTraceLogger(
-    IProgress<LogRecord> logSink,
+    IProgress<LogRecord> progress,
     LogLevel minimumLevel = LogLevel.Information,
     string category = "") : ITraceLogger
 {
-    private readonly IProgress<LogRecord> _logSink = logSink ?? throw new ArgumentNullException(nameof(logSink));
+    private readonly IProgress<LogRecord> _progress = progress ?? throw new ArgumentNullException(nameof(progress));
 
     public LogLevel MinimumLevel { get; } = minimumLevel;
 
@@ -52,7 +52,7 @@ public sealed class StreamingTraceLogger(
     {
         ArgumentException.ThrowIfNullOrEmpty(category);
 
-        return new StreamingTraceLogger(_logSink, MinimumLevel, category);
+        return new StreamingTraceLogger(_progress, MinimumLevel, category);
     }
 
     public void Information([InterpolatedStringHandlerArgument("")] InformationLogHandler handler) =>
@@ -70,6 +70,6 @@ public sealed class StreamingTraceLogger(
 
         if (string.IsNullOrEmpty(message)) { return; }
 
-        _logSink.Report(new LogRecord(DateTime.UtcNow, level, message, category));
+        _progress.Report(new LogRecord(DateTime.UtcNow, level, message, category));
     }
 }

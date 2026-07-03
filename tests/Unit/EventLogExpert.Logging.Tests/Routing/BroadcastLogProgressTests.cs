@@ -7,14 +7,14 @@ using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Logging.Tests.Routing;
 
-public sealed class CompositeLogSinkTests
+public sealed class BroadcastLogProgressTests
 {
     [Fact]
     public void Report_EachSinkAppliesItsOwnLevel_ReproducingTheUiAllFileWarningSplit()
     {
         var ui = new RecordingSink(_ => LogLevel.Information);
         var file = new RecordingSink(_ => LogLevel.Warning);
-        var composite = new CompositeLogSink([ui, file], "DatabaseTools.Create");
+        var composite = new BroadcastLogProgress([ui, file], "DatabaseTools.Create");
 
         composite.Report(new LogRecord(DateTime.UtcNow, LogLevel.Information, "progress"));
         composite.Report(new LogRecord(DateTime.UtcNow, LogLevel.Warning, "problem"));
@@ -26,7 +26,7 @@ public sealed class CompositeLogSinkTests
     [Fact]
     public void Report_NullValue_Throws()
     {
-        var composite = new CompositeLogSink([new RecordingSink(_ => LogLevel.Trace)], "DatabaseTools.Create");
+        var composite = new BroadcastLogProgress([new RecordingSink(_ => LogLevel.Trace)], "DatabaseTools.Create");
 
         Assert.Throws<ArgumentNullException>(() => composite.Report(null!));
     }
@@ -36,7 +36,7 @@ public sealed class CompositeLogSinkTests
     {
         var first = new RecordingSink(_ => LogLevel.Trace);
         var second = new RecordingSink(_ => LogLevel.Trace);
-        var composite = new CompositeLogSink([first, second], "DatabaseTools.Create");
+        var composite = new BroadcastLogProgress([first, second], "DatabaseTools.Create");
 
         composite.Report(new LogRecord(DateTime.UtcNow, LogLevel.Warning, "warn"));
 
@@ -48,7 +48,7 @@ public sealed class CompositeLogSinkTests
     public void Report_PreservesExistingCategory_WhenAlreadyCategorized()
     {
         var sink = new RecordingSink(_ => LogLevel.Trace);
-        var composite = new CompositeLogSink([sink], "DatabaseTools.Create");
+        var composite = new BroadcastLogProgress([sink], "DatabaseTools.Create");
 
         composite.Report(new LogRecord(DateTime.UtcNow, LogLevel.Information, "hi", "Offline.Wim"));
 
@@ -59,7 +59,7 @@ public sealed class CompositeLogSinkTests
     public void Report_StampsOperationCategory_WhenRecordIsUncategorized()
     {
         var sink = new RecordingSink(_ => LogLevel.Trace);
-        var composite = new CompositeLogSink([sink], "DatabaseTools.Create");
+        var composite = new BroadcastLogProgress([sink], "DatabaseTools.Create");
 
         composite.Report(new LogRecord(DateTime.UtcNow, LogLevel.Information, "hi"));
 
@@ -70,7 +70,7 @@ public sealed class CompositeLogSinkTests
     public void Report_WhenASinkThrows_IsolatesTheFault_AndStillReachesTheOtherSinks()
     {
         var healthy = new RecordingSink(_ => LogLevel.Trace);
-        var composite = new CompositeLogSink([new ThrowingSink(), healthy], "DatabaseTools.Create");
+        var composite = new BroadcastLogProgress([new ThrowingSink(), healthy], "DatabaseTools.Create");
 
         Exception? exception = Record.Exception(() =>
             composite.Report(new LogRecord(DateTime.UtcNow, LogLevel.Warning, "warn")));

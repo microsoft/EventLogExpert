@@ -18,7 +18,7 @@ public sealed class LogRoutingPolicy
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        _fileOverrides = BuildOverrides(options, LoggingOptions.FileSink);
+        _fileOverrides = BuildOverrides(options, LoggingOptions.FileLogSink);
         _globalBaseline = globalBaseline;
     }
 
