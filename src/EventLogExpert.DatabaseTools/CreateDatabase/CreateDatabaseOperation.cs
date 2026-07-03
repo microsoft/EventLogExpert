@@ -5,9 +5,9 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Eventing.PublisherMetadata;
 using EventLogExpert.Eventing.PublisherMetadata.Offline;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Database.Context;
+using EventLogExpert.Provider.Database.Hashing;
 using EventLogExpert.Provider.Resolution;
-using EventLogExpert.ProviderDatabase.Context;
-using EventLogExpert.ProviderDatabase.Hashing;
 using Microsoft.Data.Sqlite;
 using System.Text.RegularExpressions;
 

@@ -4,7 +4,7 @@
 using EventLogExpert.Provider.Resolution;
 using System.Text.Json.Serialization;
 
-namespace EventLogExpert.ProviderDatabase.Serialization;
+namespace EventLogExpert.Provider.Database.Serialization;
 
 [JsonSourceGenerationOptions(GenerationMode = JsonSourceGenerationMode.Metadata)]
 [JsonSerializable(typeof(MessageModel))]

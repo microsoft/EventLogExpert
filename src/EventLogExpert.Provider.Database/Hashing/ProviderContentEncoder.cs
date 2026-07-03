@@ -5,7 +5,7 @@ using EventLogExpert.Provider.Resolution;
 using System.Buffers;
 using System.Buffers.Binary;
 
-namespace EventLogExpert.ProviderDatabase.Hashing;
+namespace EventLogExpert.Provider.Database.Hashing;
 
 // Canonical bytes must match merge equivalence so identical rendered providers share one VersionKey.
 internal static class ProviderContentEncoder

@@ -2,17 +2,17 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Database.Maintenance;
+using EventLogExpert.Provider.Database.Serialization;
 using EventLogExpert.Provider.Lookup;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Provider.Schema;
-using EventLogExpert.ProviderDatabase.Maintenance;
-using EventLogExpert.ProviderDatabase.Serialization;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Data.Common;
 
-namespace EventLogExpert.ProviderDatabase.Context;
+namespace EventLogExpert.Provider.Database.Context;
 
 public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
 {

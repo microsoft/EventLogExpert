@@ -4,10 +4,10 @@
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
+using EventLogExpert.Provider.Database.Context;
+using EventLogExpert.Provider.Database.Serialization;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Provider.Schema;
-using EventLogExpert.ProviderDatabase.Context;
-using EventLogExpert.ProviderDatabase.Serialization;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;

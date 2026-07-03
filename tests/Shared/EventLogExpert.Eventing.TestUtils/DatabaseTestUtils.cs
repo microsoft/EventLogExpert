@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Resolution;
-using EventLogExpert.ProviderDatabase.Context;
 using Microsoft.Data.Sqlite;
 
 namespace EventLogExpert.Eventing.TestUtils;

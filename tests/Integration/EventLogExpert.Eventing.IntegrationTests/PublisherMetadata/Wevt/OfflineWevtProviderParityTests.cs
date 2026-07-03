@@ -4,8 +4,8 @@
 using EventLogExpert.Eventing.PublisherMetadata;
 using EventLogExpert.Eventing.PublisherMetadata.Wevt;
 using EventLogExpert.Eventing.TestUtils.Constants;
+using EventLogExpert.Provider.Database.Hashing;
 using EventLogExpert.Provider.Resolution;
-using EventLogExpert.ProviderDatabase.Hashing;
 using System.Buffers;
 using System.Text;
 using System.Xml;

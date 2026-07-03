@@ -4,7 +4,7 @@
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Lookup;
 
-namespace EventLogExpert.ProviderDatabase.Context;
+namespace EventLogExpert.Provider.Database.Context;
 
 public sealed class ProviderDbContextFactory : IProviderDetailsLookupFactory
 {

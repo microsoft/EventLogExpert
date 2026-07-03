@@ -5,7 +5,7 @@ using EventLogExpert.Provider.Resolution;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace EventLogExpert.ProviderDatabase.Hashing;
+namespace EventLogExpert.Provider.Database.Hashing;
 
 // Version keys hash canonical rendering payloads so identical providers collapse and divergent ones coexist.
 public static class VersionKeyCalculator

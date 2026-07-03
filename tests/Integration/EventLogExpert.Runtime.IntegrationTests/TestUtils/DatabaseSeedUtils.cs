@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.ProviderDatabase.Context;
+using EventLogExpert.Provider.Database.Context;
 using Microsoft.Data.Sqlite;
 
 namespace EventLogExpert.Runtime.IntegrationTests.TestUtils;

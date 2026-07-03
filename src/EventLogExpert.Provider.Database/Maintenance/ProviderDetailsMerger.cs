@@ -4,7 +4,7 @@
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Provider.Schema;
 
-namespace EventLogExpert.ProviderDatabase.Maintenance;
+namespace EventLogExpert.Provider.Database.Maintenance;
 
 internal static class ProviderDetailsMerger
 {

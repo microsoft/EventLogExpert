@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Provider.Database.Serialization;
 using EventLogExpert.Provider.Resolution;
-using EventLogExpert.ProviderDatabase.Serialization;
 
 namespace EventLogExpert.Provider.Database.Tests.Serialization;
 

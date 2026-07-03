@@ -12,7 +12,7 @@ public sealed class ContainerRequiredFixture
         {
             throw new InvalidOperationException(
                 "Integration tests require EVENTLOG_CONTAINER to be set. " +
-                "Set the variable and run: dotnet test tests/Integration/EventLogExpert.ProviderDatabase.IntegrationTests/ -p:RunSettingsFilePath=\"\"");
+                "Set the variable and run: dotnet test tests/Integration/EventLogExpert.Provider.Database.IntegrationTests/ -p:RunSettingsFilePath=\"\"");
         }
     }
 }

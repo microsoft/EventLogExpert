@@ -3,8 +3,8 @@
 
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Resolution;
-using EventLogExpert.ProviderDatabase.Context;
 
 namespace EventLogExpert.DatabaseTools.DiffDatabase;
 

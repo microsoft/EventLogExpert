@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.TestUtils;
-using EventLogExpert.ProviderDatabase.Serialization;
+using EventLogExpert.Provider.Database.Serialization;
 using System.Text;
 using System.Text.Json;
 

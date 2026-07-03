@@ -8,7 +8,7 @@
 
     Available suites are discovered dynamically from compose.yml services.
     Defaults to running all suites defined in compose.yml. Integration test projects
-    that do not require a Windows container (e.g., ProviderDatabase) are not included
+    that do not require a Windows container (e.g., Provider.Database) are not included
     in compose.yml and should be run directly via dotnet test.
 
 .PARAMETER Suite
