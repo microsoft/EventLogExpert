@@ -93,7 +93,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         var result = await RunAsync(
             new ListImageEditionsIpcRequest(request, verbose),
             logProgress,
-            progressSink: null,
+            progress: null,
             cancellationToken,
             onDataMessage: message =>
             {
@@ -343,7 +343,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
     private async Task<DatabaseToolsResult> RunAsync(
         DatabaseToolsIpcRequest request,
         IProgress<LogRecord> logProgress,
-        IProgress<DatabaseToolsProgress>? progressSink,
+        IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         Action<DatabaseToolsIpcMessage>? onDataMessage = null)
     {
@@ -486,8 +486,8 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                             SafeReport(logProgress, new LogRecord(log.TimestampUtc, log.Level, log.Message, log.Category, log.ProcessOrigin));
                             break;
 
-                        case ProgressMessage prog when progressSink is not null:
-                            SafeReport(progressSink, new DatabaseToolsProgress(prog.Processed, prog.Total, prog.CurrentItem));
+                        case ProgressMessage prog when progress is not null:
+                            SafeReport(progress, new DatabaseToolsProgress(prog.Processed, prog.Total, prog.CurrentItem));
                             break;
 
                         case ImageEditionsMessage edition when onDataMessage is not null:
