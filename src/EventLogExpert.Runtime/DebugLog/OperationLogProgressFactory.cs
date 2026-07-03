@@ -7,8 +7,8 @@ using EventLogExpert.Logging.Sinks;
 
 namespace EventLogExpert.Runtime.DebugLog;
 
-internal sealed class OperationLogSinkFactory(FileLogSink fileSink, LogRoutingPolicy routingPolicy)
-    : IOperationLogSinkFactory
+internal sealed class OperationLogProgressFactory(FileLogSink fileSink, LogRoutingPolicy routingPolicy)
+    : IOperationLogProgressFactory
 {
     public IProgress<LogRecord> Create(IProgress<LogRecord> uiProgress, string category, bool verbose)
     {

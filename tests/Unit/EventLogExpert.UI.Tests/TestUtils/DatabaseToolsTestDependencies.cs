@@ -38,18 +38,18 @@ internal static class DatabaseToolsTestDependencies
             services.AddSingleton(Substitute.For<ICurrentVersionProvider>());
             services.AddSingleton(Substitute.For<IMenuActionService>());
             services.AddSingleton(Substitute.For<ITraceLogger>());
-            services.AddOperationLogSinkFactoryMock();
+            services.AddOperationLogProgressFactoryMock();
 
             return services;
         }
 
-        public IServiceCollection AddOperationLogSinkFactoryMock()
+        public IServiceCollection AddOperationLogProgressFactoryMock()
         {
-            var operationLogSinkFactory = Substitute.For<IOperationLogSinkFactory>();
-            operationLogSinkFactory
+            var operationLogProgressFactory = Substitute.For<IOperationLogProgressFactory>();
+            operationLogProgressFactory
                 .Create(Arg.Any<IProgress<LogRecord>>(), Arg.Any<string>(), Arg.Any<bool>())
                 .Returns(callInfo => callInfo.Arg<IProgress<LogRecord>>());
-            services.AddSingleton(operationLogSinkFactory);
+            services.AddSingleton(operationLogProgressFactory);
 
             return services;
         }

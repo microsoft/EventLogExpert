@@ -53,9 +53,9 @@ public sealed partial class ShowProvidersTab : DatabaseToolsTabBase<ShowProvider
 
     protected override Task<DatabaseToolsResult> DispatchAsync(
         ShowProvidersRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         CancellationToken cancellationToken) =>
-        DatabaseToolsService.ShowAsync(request, logSink, progress: null, cancellationToken, VerboseLogging);
+        DatabaseToolsService.ShowAsync(request, logProgress, progress: null, cancellationToken, VerboseLogging);
 
     private void OnFilterInput(ChangeEventArgs e)
     {
@@ -75,7 +75,7 @@ public sealed partial class ShowProvidersTab : DatabaseToolsTabBase<ShowProvider
     }
 
     private Task RunElevatedAsync() =>
-        base.RunElevatedAsync((request, logSink, ct) => ElevatedRunner.ShowAsync(request, logSink, progress: null, ct, VerboseLogging));
+        base.RunElevatedAsync((request, logProgress, ct) => ElevatedRunner.ShowAsync(request, logProgress, progress: null, ct, VerboseLogging));
 
     private Task RunShowAsync() => WillElevate ? RunElevatedAsync() : RunAsync();
 }

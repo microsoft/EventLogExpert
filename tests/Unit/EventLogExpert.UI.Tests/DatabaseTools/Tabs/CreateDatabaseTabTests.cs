@@ -249,10 +249,10 @@ public sealed class CreateDatabaseTabTests : BunitContext
     }
 
     [Fact]
-    public void LoadEditions_RoutesLogsThroughTheOperationLogSinkFactory()
+    public void LoadEditions_RoutesLogsThroughTheOperationLogProgressFactory()
     {
         // F1: the edition probe crosses IPC to the elevated helper, so it must build its sink via the
-        // OperationLogSinkFactory (which tees to the shared file sink under this tab's category), not a bare
+        // OperationLogProgressFactory (which tees to the shared file sink under this tab's category), not a bare
         // UI-only Progress.
         ConfigureEditionsListed(new WimImageEntry(2, "Windows Server 2025 Standard", "ServerStandard", null));
 
@@ -261,7 +261,7 @@ public sealed class CreateDatabaseTabTests : BunitContext
 
         component.FindAll("button").Single(button => button.TextContent.Contains("Load editions")).Click();
 
-        component.WaitForAssertion(() => Services.GetRequiredService<IOperationLogSinkFactory>()
+        component.WaitForAssertion(() => Services.GetRequiredService<IOperationLogProgressFactory>()
             .Received()
             .Create(Arg.Any<IProgress<LogRecord>>(), LogCategories.DatabaseToolsCreate, Arg.Any<bool>()));
     }

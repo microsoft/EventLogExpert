@@ -29,9 +29,9 @@ public sealed partial class DiffDatabasesTab : DatabaseToolsTabBase<DiffDatabase
 
     protected override Task<DatabaseToolsResult> DispatchAsync(
         DiffDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         CancellationToken cancellationToken) =>
-        DatabaseToolsService.DiffAsync(request, logSink, progress: null, cancellationToken, VerboseLogging);
+        DatabaseToolsService.DiffAsync(request, logProgress, progress: null, cancellationToken, VerboseLogging);
 
     private void OnFirstPathInput(ChangeEventArgs e) => _firstPath = e.Value?.ToString() ?? string.Empty;
 

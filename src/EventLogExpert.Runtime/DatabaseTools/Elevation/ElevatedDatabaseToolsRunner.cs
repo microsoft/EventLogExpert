@@ -66,23 +66,23 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
     public Task<DatabaseToolsResult> CreateAsync(
         CreateDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false) =>
-        RunAsync(new CreateDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
+        RunAsync(new CreateDatabaseIpcRequest(request, verbose), logProgress, progress, cancellationToken);
 
     public Task<DatabaseToolsResult> DiffAsync(
         DiffDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false) =>
-        RunAsync(new DiffDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
+        RunAsync(new DiffDatabaseIpcRequest(request, verbose), logProgress, progress, cancellationToken);
 
     public async Task<OfflineImageEditionsResult> ListImageEditionsAsync(
         ListOfflineImageEditionsRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         CancellationToken cancellationToken,
         bool verbose = false)
     {
@@ -92,7 +92,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
         var result = await RunAsync(
             new ListImageEditionsIpcRequest(request, verbose),
-            logSink,
+            logProgress,
             progressSink: null,
             cancellationToken,
             onDataMessage: message =>
@@ -121,27 +121,27 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
     public Task<DatabaseToolsResult> MergeAsync(
         MergeDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false) =>
-        RunAsync(new MergeDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
+        RunAsync(new MergeDatabaseIpcRequest(request, verbose), logProgress, progress, cancellationToken);
 
     public Task<DatabaseToolsResult> ShowAsync(
         ShowProvidersRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false) =>
-        RunAsync(new ShowProvidersIpcRequest(request, verbose), logSink, progress, cancellationToken);
+        RunAsync(new ShowProvidersIpcRequest(request, verbose), logProgress, progress, cancellationToken);
 
     public Task<DatabaseToolsResult> UpgradeAsync(
         UpgradeDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false) =>
-        RunAsync(new UpgradeDatabaseIpcRequest(request, verbose), logSink, progress, cancellationToken);
+        RunAsync(new UpgradeDatabaseIpcRequest(request, verbose), logProgress, progress, cancellationToken);
 
     private static async Task DrainPipeAsync(Stream pipe, ChannelWriter<DatabaseToolsIpcMessage> writer, CancellationToken cancellationToken)
     {
@@ -342,13 +342,13 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
     private async Task<DatabaseToolsResult> RunAsync(
         DatabaseToolsIpcRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progressSink,
         CancellationToken cancellationToken,
         Action<DatabaseToolsIpcMessage>? onDataMessage = null)
     {
         ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(logSink);
+        ArgumentNullException.ThrowIfNull(logProgress);
 
         var stopwatch = Stopwatch.StartNew();
         var killState = new KillState();
@@ -483,7 +483,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                     switch (message)
                     {
                         case LogMessage log:
-                            SafeReport(logSink, new LogRecord(log.TimestampUtc, log.Level, log.Message, log.Category, log.ProcessOrigin));
+                            SafeReport(logProgress, new LogRecord(log.TimestampUtc, log.Level, log.Message, log.Category, log.ProcessOrigin));
                             break;
 
                         case ProgressMessage prog when progressSink is not null:

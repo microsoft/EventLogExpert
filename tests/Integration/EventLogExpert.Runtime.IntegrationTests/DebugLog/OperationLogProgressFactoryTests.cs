@@ -12,14 +12,14 @@ using NSubstitute;
 
 namespace EventLogExpert.Runtime.IntegrationTests.DebugLog;
 
-public sealed class OperationLogSinkFactoryTests : IDisposable
+public sealed class OperationLogProgressFactoryTests : IDisposable
 {
     private readonly string _testDirectory;
     private readonly string _testLogPath;
 
-    public OperationLogSinkFactoryTests()
+    public OperationLogProgressFactoryTests()
     {
-        _testDirectory = Path.Combine(Path.GetTempPath(), $"OperationLogSinkFactoryTests_{Guid.NewGuid()}");
+        _testDirectory = Path.Combine(Path.GetTempPath(), $"OperationLogProgressFactoryTests_{Guid.NewGuid()}");
         Directory.CreateDirectory(_testDirectory);
         _testLogPath = Path.Combine(_testDirectory, "debug.log");
     }
@@ -29,7 +29,7 @@ public sealed class OperationLogSinkFactoryTests : IDisposable
     {
         var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), LogLevel.Information);
         using var fileSink = new FileLogSink(_testLogPath, policy, DebugLogFormatter.Format);
-        var factory = new OperationLogSinkFactory(fileSink, policy);
+        var factory = new OperationLogProgressFactory(fileSink, policy);
 
         Assert.Throws<ArgumentException>(() => factory.Create(new CapturingProgress([]), string.Empty, verbose: false));
     }
@@ -39,26 +39,26 @@ public sealed class OperationLogSinkFactoryTests : IDisposable
     {
         var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), LogLevel.Information);
         using var fileSink = new FileLogSink(_testLogPath, policy, DebugLogFormatter.Format);
-        var factory = new OperationLogSinkFactory(fileSink, policy);
+        var factory = new OperationLogProgressFactory(fileSink, policy);
 
         Assert.Throws<ArgumentNullException>(() => factory.Create(null!, LogCategories.DatabaseTools, verbose: false));
     }
 
     [Fact]
-    public void Create_OperationSink_StreamsEverythingToTheUi_ButThrottlesTheFileToWarning()
+    public void Create_OperationProgress_StreamsEverythingToTheUi_ButThrottlesTheFileToWarning()
     {
         var settings = Substitute.For<ISettingsService>();
         settings.LogLevel.Returns(LogLevel.Information);
         var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), settings.LogLevel);
         using var fileSink = new FileLogSink(_testLogPath, policy, DebugLogFormatter.Format);
-        var factory = new OperationLogSinkFactory(fileSink, policy);
+        var factory = new OperationLogProgressFactory(fileSink, policy);
         var uiCaptured = new List<LogRecord>();
 
-        IProgress<LogRecord> logSink = factory.Create(
+        IProgress<LogRecord> logProgress = factory.Create(
             new CapturingProgress(uiCaptured), LogCategories.DatabaseTools, verbose: false);
 
-        logSink.Report(new LogRecord(DateTime.UtcNow, LogLevel.Information, "progress"));
-        logSink.Report(new LogRecord(DateTime.UtcNow, LogLevel.Warning, "problem"));
+        logProgress.Report(new LogRecord(DateTime.UtcNow, LogLevel.Information, "progress"));
+        logProgress.Report(new LogRecord(DateTime.UtcNow, LogLevel.Warning, "problem"));
 
         string[] uiMessages = [.. uiCaptured.Select(record => record.Message)];
         Assert.Equal(["progress", "problem"], uiMessages);

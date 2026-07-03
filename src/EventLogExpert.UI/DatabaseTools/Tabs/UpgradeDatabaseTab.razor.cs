@@ -22,9 +22,9 @@ public sealed partial class UpgradeDatabaseTab : DatabaseToolsTabBase<UpgradeDat
 
     protected override Task<DatabaseToolsResult> DispatchAsync(
         UpgradeDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         CancellationToken cancellationToken) =>
-        DatabaseToolsService.UpgradeAsync(request, logSink, progress: null, cancellationToken, VerboseLogging);
+        DatabaseToolsService.UpgradeAsync(request, logProgress, progress: null, cancellationToken, VerboseLogging);
 
     private void OnDbPathInput(ChangeEventArgs e) => _dbPath = e.Value?.ToString() ?? string.Empty;
 

@@ -22,7 +22,7 @@ internal static class OperationDispatcher
             .BuildServiceProvider();
 
         var service = services.GetRequiredService<IDatabaseToolsService>();
-        var logSink = new IpcLogForwarder(writer);
+        var logProgress = new IpcLogForwarder(writer);
         var progressSink = new IpcProgressSink(writer);
 
         // List-editions is read-only, so it bypasses destructive database recovery.
@@ -33,7 +33,7 @@ internal static class OperationDispatcher
 
         return await DestructiveRecovery.WrapAsync(
             request,
-            (req, ct) => RawDispatchAsync(service, req, logSink, progressSink, ct),
+            (req, ct) => RawDispatchAsync(service, req, logProgress, progressSink, ct),
             cancellationToken);
     }
 

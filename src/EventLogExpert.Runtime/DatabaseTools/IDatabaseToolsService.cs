@@ -15,7 +15,7 @@ namespace EventLogExpert.Runtime.DatabaseTools;
 ///     Runtime-level facade for the five DatabaseTools operations (Show / Create / Merge / Diff / Upgrade). Each
 ///     method dispatches the matching
 ///     <see cref="EventLogExpert.DatabaseTools.Common.Operations.IDatabaseToolsOperation" /> on a worker thread, streams
-///     log entries via <paramref name="logSink" /> as they are emitted (not batched at end), and returns the final outcome
+///     log entries via <paramref name="logProgress" /> as they are emitted (not batched at end), and returns the final outcome
 ///     + duration. Cancellation is cooperative - see the Operation contract for the per-step cancellation semantics.
 /// </summary>
 /// <remarks>
@@ -27,35 +27,35 @@ public interface IDatabaseToolsService
 {
     Task<DatabaseToolsResult> CreateAsync(
         CreateDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);
 
     Task<DatabaseToolsResult> DiffAsync(
         DiffDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);
 
     Task<DatabaseToolsResult> MergeAsync(
         MergeDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);
 
     Task<DatabaseToolsResult> ShowAsync(
         ShowProvidersRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);
 
     Task<DatabaseToolsResult> UpgradeAsync(
         UpgradeDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);

@@ -18,55 +18,55 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
 {
     public Task<DatabaseToolsResult> CreateAsync(
         CreateDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
-        => RunAsync(factory.Create(request), logSink, progress, cancellationToken, verbose);
+        => RunAsync(factory.Create(request), logProgress, progress, cancellationToken, verbose);
 
     public Task<DatabaseToolsResult> DiffAsync(
         DiffDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
-        => RunAsync(factory.Create(request), logSink, progress, cancellationToken, verbose);
+        => RunAsync(factory.Create(request), logProgress, progress, cancellationToken, verbose);
 
     public Task<DatabaseToolsResult> MergeAsync(
         MergeDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
-        => RunAsync(factory.Create(request), logSink, progress, cancellationToken, verbose);
+        => RunAsync(factory.Create(request), logProgress, progress, cancellationToken, verbose);
 
     public Task<DatabaseToolsResult> ShowAsync(
         ShowProvidersRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
-        => RunAsync(factory.Create(request), logSink, progress, cancellationToken, verbose);
+        => RunAsync(factory.Create(request), logProgress, progress, cancellationToken, verbose);
 
     public Task<DatabaseToolsResult> UpgradeAsync(
         UpgradeDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
-        => RunAsync(factory.Create(request), logSink, progress, cancellationToken, verbose);
+        => RunAsync(factory.Create(request), logProgress, progress, cancellationToken, verbose);
 
     private static async Task<DatabaseToolsResult> RunAsync(
         IDatabaseToolsOperation operation,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose)
     {
         ArgumentNullException.ThrowIfNull(operation);
-        ArgumentNullException.ThrowIfNull(logSink);
+        ArgumentNullException.ThrowIfNull(logProgress);
 
-        ITraceLogger logger = new StreamingTraceLogger(logSink, verbose ? LogLevel.Trace : LogLevel.Information);
+        ITraceLogger logger = new StreamingTraceLogger(logProgress, verbose ? LogLevel.Trace : LogLevel.Information);
         var startTimestamp = Stopwatch.GetTimestamp();
 
         DatabaseToolsOutcome outcome;
