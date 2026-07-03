@@ -11,7 +11,7 @@ namespace EventLogExpert.ElevationHelper.Ipc;
 ///     as <see cref="IpcLogForwarder" />: wraps each report in a <see cref="ProgressMessage" /> and writes it through the
 ///     shared semaphore-guarded <see cref="IpcMessageWriter" />.
 /// </summary>
-internal sealed class IpcProgressSink(IpcMessageWriter writer) : IProgress<DatabaseToolsProgress>
+internal sealed class IpcProgressForwarder(IpcMessageWriter writer) : IProgress<DatabaseToolsProgress>
 {
     public void Report(DatabaseToolsProgress value)
     {

@@ -41,7 +41,7 @@ public sealed class StreamingTraceLoggerTests
     }
 
     [Fact]
-    public void Constructor_NullLogSink_Throws() =>
+    public void Constructor_NullProgress_Throws() =>
         Assert.Throws<ArgumentNullException>(static () => new StreamingTraceLogger(null!));
 
     [Fact]
