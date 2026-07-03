@@ -157,13 +157,13 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runner = CreateRunner(host, logger);
 
         var logProgress = new ListProgress<LogRecord>();
-        var progressSink = new ListProgress<DatabaseToolsProgress>();
+        var progress = new ListProgress<DatabaseToolsProgress>();
 
         await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
         using var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
 
         var runTask = runner.ShowAsync(
-            new ShowProvidersRequest(null, null), logProgress, progressSink, ct);
+            new ShowProvidersRequest(null, null), logProgress, progress, ct);
 
         await WriteMessageAsync(clientWriter, new HelloMessage(9999, HelloMessage.CurrentProtocolVersion), ct);
         await ReadRequestAsync(clientReader, ct);
@@ -187,10 +187,10 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         Assert.Equal("second", logProgress.Entries[1].Message);
         Assert.Equal(LogLevel.Warning, logProgress.Entries[1].Level);
 
-        Assert.Single(progressSink.Entries);
-        Assert.Equal(1, progressSink.Entries[0].Processed);
-        Assert.Equal(10, progressSink.Entries[0].Total);
-        Assert.Equal("item-1", progressSink.Entries[0].CurrentItem);
+        Assert.Single(progress.Entries);
+        Assert.Equal(1, progress.Entries[0].Processed);
+        Assert.Equal(10, progress.Entries[0].Total);
+        Assert.Equal("item-1", progress.Entries[0].CurrentItem);
     }
 
     [Fact]
@@ -320,13 +320,13 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var runner = CreateRunner(host, logger);
 
         var logProgress = new ListProgress<LogRecord>();
-        var progressSink = new ListProgress<DatabaseToolsProgress>();
+        var progress = new ListProgress<DatabaseToolsProgress>();
 
         await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
         using var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
 
         var runTask = runner.ShowAsync(
-            new ShowProvidersRequest(null, null), logProgress, progressSink, ct);
+            new ShowProvidersRequest(null, null), logProgress, progress, ct);
 
         await WriteMessageAsync(clientWriter, new HelloMessage(9999, HelloMessage.CurrentProtocolVersion), ct);
         await ReadRequestAsync(clientReader, ct);
@@ -434,13 +434,13 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var logger = new LoggerUtils.RecordingTraceLogger();
         var runner = CreateRunner(host, logger);
         var logProgress = new ListProgress<LogRecord>();
-        var progressSink = new ListProgress<DatabaseToolsProgress>();
+        var progress = new ListProgress<DatabaseToolsProgress>();
 
         await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
         using var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
 
         var runTask = runner.ShowAsync(
-            new ShowProvidersRequest(null, null), logProgress, progressSink, ct);
+            new ShowProvidersRequest(null, null), logProgress, progress, ct);
 
         await WriteMessageAsync(clientWriter, new HelloMessage(2222, HelloMessage.CurrentProtocolVersion), ct);
         await ReadRequestAsync(clientReader, ct);
@@ -460,7 +460,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         Assert.Equal(DatabaseToolsOutcome.Succeeded, result.Outcome);
         Assert.Equal(20, logProgress.Entries.Count);
-        Assert.Equal(20, progressSink.Entries.Count);
+        Assert.Equal(20, progress.Entries.Count);
 
         var allTraceMessages = logger.TraceMessages
             .Concat(logger.DebugMessages)
