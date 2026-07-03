@@ -5,7 +5,7 @@ using EventLogExpert.Logging.Abstractions;
 
 namespace EventLogExpert.Runtime.DebugLog;
 
-public interface IOperationLogSinkFactory
+public interface IOperationLogProgressFactory
 {
     IProgress<LogRecord> Create(IProgress<LogRecord> uiProgress, string category, bool verbose);
 }

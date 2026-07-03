@@ -88,7 +88,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
     protected ImmutableList<LogRecord> LogEntries { get; set; } = ImmutableList<LogRecord>.Empty;
 
-    [Inject] protected IOperationLogSinkFactory OperationLogSinkFactory { get; init; } = null!;
+    [Inject] protected IOperationLogProgressFactory OperationLogProgressFactory { get; init; } = null!;
 
     protected DatabaseToolsResult? Outcome { get; set; }
 
@@ -193,7 +193,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
     protected abstract Task<DatabaseToolsResult> DispatchAsync(
         TRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         CancellationToken cancellationToken);
 
     protected async Task FlushPendingEntriesAsync()
@@ -228,7 +228,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     protected Task<string?> PickSaveFileAsync(string pickerTitle, IReadOnlyList<string> extensions, string? suggestedFileName = null) =>
         FilePickerService.PickSaveAsync(pickerTitle, extensions, suggestedFileName);
 
-    protected Task RunAsync() => RunCoreAsync((request, logSink, ct) => DispatchAsync(request, logSink, ct));
+    protected Task RunAsync() => RunCoreAsync((request, logProgress, ct) => DispatchAsync(request, logProgress, ct));
 
     protected Task RunElevatedAsync(Func<TRequest, IProgress<LogRecord>, CancellationToken, Task<DatabaseToolsResult>> elevatedDispatcher) =>
         RunCoreAsync(elevatedDispatcher);
@@ -338,12 +338,12 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
             _flushScheduled = false;
         }
 
-        IProgress<LogRecord> logSink = OperationLogSinkFactory.Create(new Progress<LogRecord>(AppendEntry), LogCategory, VerboseLogging);
+        IProgress<LogRecord> logProgress = OperationLogProgressFactory.Create(new Progress<LogRecord>(AppendEntry), LogCategory, VerboseLogging);
         var startTimestamp = Stopwatch.GetTimestamp();
 
         try
         {
-            var result = await dispatcher(request, logSink, Cts.Token);
+            var result = await dispatcher(request, logProgress, Cts.Token);
             Outcome = result;
             AppendOutcome(result);
         }

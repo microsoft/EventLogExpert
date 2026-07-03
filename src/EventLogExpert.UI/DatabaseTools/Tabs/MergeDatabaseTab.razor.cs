@@ -32,9 +32,9 @@ public sealed partial class MergeDatabaseTab : DatabaseToolsTabBase<MergeDatabas
 
     protected override Task<DatabaseToolsResult> DispatchAsync(
         MergeDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         CancellationToken cancellationToken) =>
-        DatabaseToolsService.MergeAsync(request, logSink, progress: null, cancellationToken, VerboseLogging);
+        DatabaseToolsService.MergeAsync(request, logProgress, progress: null, cancellationToken, VerboseLogging);
 
     private static string FormatOverwriteMode(bool overwrite) => overwrite ? OverwriteModeLabel : KeepModeLabel;
 

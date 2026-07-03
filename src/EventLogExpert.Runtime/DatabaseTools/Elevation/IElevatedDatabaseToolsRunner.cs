@@ -15,41 +15,41 @@ public interface IElevatedDatabaseToolsRunner
 {
     Task<DatabaseToolsResult> CreateAsync(
         CreateDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);
 
     Task<DatabaseToolsResult> DiffAsync(
         DiffDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);
 
     Task<OfflineImageEditionsResult> ListImageEditionsAsync(
         ListOfflineImageEditionsRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         CancellationToken cancellationToken,
         bool verbose = false);
 
     Task<DatabaseToolsResult> MergeAsync(
         MergeDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);
 
     Task<DatabaseToolsResult> ShowAsync(
         ShowProvidersRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);
 
     Task<DatabaseToolsResult> UpgradeAsync(
         UpgradeDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false);

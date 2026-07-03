@@ -25,13 +25,13 @@ public sealed class OperationsEndToEndTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         try
         {
             var result = await runner.CreateAsync(
                 new CreateDatabaseRequest(targetPath, SourcePath: null, FilterRegex: null, SkipProvidersInFile: null),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Succeeded, result.Outcome);
             Assert.True(File.Exists(targetPath), $"Expected target db at {targetPath} after successful Create.");
@@ -55,23 +55,23 @@ public sealed class OperationsEndToEndTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         try
         {
             var firstCreate = await runner.CreateAsync(
                 new CreateDatabaseRequest(firstPath, null, null, null),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
             Assert.Equal(DatabaseToolsOutcome.Succeeded, firstCreate.Outcome);
 
             var secondCreate = await runner.CreateAsync(
                 new CreateDatabaseRequest(secondPath, null, null, null),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
             Assert.Equal(DatabaseToolsOutcome.Succeeded, secondCreate.Outcome);
 
             var diffResult = await runner.DiffAsync(
                 new DiffDatabaseRequest(firstPath, secondPath, diffPath),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Succeeded, diffResult.Outcome);
         }
@@ -92,23 +92,23 @@ public sealed class OperationsEndToEndTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         try
         {
             var sourceCreate = await runner.CreateAsync(
                 new CreateDatabaseRequest(sourcePath, null, null, null),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
             Assert.Equal(DatabaseToolsOutcome.Succeeded, sourceCreate.Outcome);
 
             var targetCreate = await runner.CreateAsync(
                 new CreateDatabaseRequest(targetPath, null, null, null),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
             Assert.Equal(DatabaseToolsOutcome.Succeeded, targetCreate.Outcome);
 
             var mergeResult = await runner.MergeAsync(
                 new MergeDatabaseRequest(sourcePath, targetPath, Overwrite: false),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Succeeded, mergeResult.Outcome);
             Assert.True(File.Exists(targetPath), "Target db must still exist after merge.");
@@ -126,15 +126,15 @@ public sealed class OperationsEndToEndTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         var result = await runner.ShowAsync(
             new ShowProvidersRequest(SourcePath: null, FilterRegex: null),
-            logSink, progress: null, ct);
+            logProgress, progress: null, ct);
 
         Assert.True(result.Outcome == DatabaseToolsOutcome.Succeeded,
             $"Expected Succeeded but got {result.Outcome}. FailureSummary: {result.FailureSummary}. Trace:\n  {string.Join("\n  ", logger.Messages)}");
-        Assert.NotEmpty(logSink.Entries);
+        Assert.NotEmpty(logProgress.Entries);
     }
 
     [Fact]
@@ -148,18 +148,18 @@ public sealed class OperationsEndToEndTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         try
         {
             var createResult = await runner.CreateAsync(
                 new CreateDatabaseRequest(dbPath, null, null, null),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
             Assert.Equal(DatabaseToolsOutcome.Succeeded, createResult.Outcome);
 
             var upgradeResult = await runner.UpgradeAsync(
                 new UpgradeDatabaseRequest(dbPath),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Succeeded, upgradeResult.Outcome);
             Assert.True(File.Exists(dbPath), "Database must remain after successful upgrade.");

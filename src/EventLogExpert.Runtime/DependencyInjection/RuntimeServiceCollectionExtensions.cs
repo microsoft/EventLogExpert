@@ -246,7 +246,7 @@ public static class RuntimeServiceCollectionExtensions
                 sp.GetRequiredService<ILogSourceFactory>().ForCategory(LogSourceFactory.DefaultCategory));
             services.AddKeyedSingleton<ITraceLogger>(LogCategories.EventLog, static (sp, _) =>
                 sp.GetRequiredService<ILogSourceFactory>().ForCategory(LogCategories.EventLog));
-            services.AddSingleton<IOperationLogSinkFactory, OperationLogSinkFactory>();
+            services.AddSingleton<IOperationLogProgressFactory, OperationLogProgressFactory>();
             services.AddSingleton<ILogWatcherService, LogWatcherService>();
             services.AddSingleton<IMenuService, MenuService>();
             services.AddSingleton<IModalCoordinator, ModalCoordinator>();

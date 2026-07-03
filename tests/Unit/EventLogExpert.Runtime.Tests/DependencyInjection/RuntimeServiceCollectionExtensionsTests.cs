@@ -159,7 +159,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         await using var scope2 = provider.CreateAsyncScope();
 
         // Act - the IDebugLogReader (whose ClearAsync truncates the writer), the ILogSourceFactory sink list,
-        // and OperationLogSinkFactory all inject the concrete FileLogSink. A single shared singleton is
+        // and OperationLogProgressFactory all inject the concrete FileLogSink. A single shared singleton is
         // load-bearing: a second instance would let the reader's Clear truncate a different handle than the
         // one the sinks write through.
         var sinkScope1 = scope1.ServiceProvider.GetRequiredService<FileLogSink>();
@@ -168,7 +168,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         // Assert - one shared singleton, and every file-sink consumer resolves against it.
         Assert.Same(sinkScope1, sinkScope2);
         Assert.NotNull(scope1.ServiceProvider.GetRequiredService<IDebugLogReader>());
-        Assert.NotNull(scope1.ServiceProvider.GetRequiredService<IOperationLogSinkFactory>());
+        Assert.NotNull(scope1.ServiceProvider.GetRequiredService<IOperationLogProgressFactory>());
     }
 
     [Theory]
@@ -204,7 +204,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(ITraceLogger))]
     [InlineData(typeof(ILogSourceFactory))]
     [InlineData(typeof(IDebugLogReader))]
-    [InlineData(typeof(IOperationLogSinkFactory))]
+    [InlineData(typeof(IOperationLogProgressFactory))]
     // Update + deployment services.
     [InlineData(typeof(ICurrentVersionProvider))]
     [InlineData(typeof(IDeploymentService))]

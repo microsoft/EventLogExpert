@@ -26,13 +26,13 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         try
         {
             var result = await runner.CreateAsync(
                 new CreateDatabaseRequest(targetPath, SourcePath: null, FilterRegex: null, SkipProvidersInFile: null),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
             Assert.True(File.Exists(targetPath),
@@ -57,13 +57,13 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         try
         {
             var result = await runner.CreateAsync(
                 new CreateDatabaseRequest(targetPath, bogusSourcePath, FilterRegex: null, SkipProvidersInFile: null),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
             Assert.False(File.Exists(targetPath),
@@ -90,21 +90,21 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         try
         {
             var firstCreate = await runner.CreateAsync(
-                new CreateDatabaseRequest(firstPath, null, null, null), logSink, progress: null, ct);
+                new CreateDatabaseRequest(firstPath, null, null, null), logProgress, progress: null, ct);
             Assert.Equal(DatabaseToolsOutcome.Succeeded, firstCreate.Outcome);
 
             var secondCreate = await runner.CreateAsync(
-                new CreateDatabaseRequest(secondPath, null, null, null), logSink, progress: null, ct);
+                new CreateDatabaseRequest(secondPath, null, null, null), logProgress, progress: null, ct);
             Assert.Equal(DatabaseToolsOutcome.Succeeded, secondCreate.Outcome);
 
             var result = await runner.DiffAsync(
                 new DiffDatabaseRequest(firstPath, secondPath, diffOutputPath),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
             Assert.True(File.Exists(diffOutputPath),
@@ -130,13 +130,13 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         try
         {
             var result = await runner.DiffAsync(
                 new DiffDatabaseRequest(bogusFirstPath, bogusSecondPath, diffOutputPath),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
             Assert.False(File.Exists(diffOutputPath),
@@ -162,13 +162,13 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         try
         {
             var result = await runner.UpgradeAsync(
                 new UpgradeDatabaseRequest(dbPath),
-                logSink, progress: null, ct);
+                logProgress, progress: null, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
             Assert.True(File.Exists(dbPath), "Original file must be restored from backup after failed upgrade.");
@@ -199,12 +199,12 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         try
         {
             var result = await runner.UpgradeAsync(
-                new UpgradeDatabaseRequest(dbPath), logSink, progress: null, ct);
+                new UpgradeDatabaseRequest(dbPath), logProgress, progress: null, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
             Assert.NotNull(result.FailureSummary);
@@ -232,12 +232,12 @@ public sealed class DestructiveRecoveryTests
         var logger = new IntegrationTraceLogger();
         var host = new TestElevatedHelperProcessHost(logger);
         var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         try
         {
             var result = await runner.UpgradeAsync(
-                new UpgradeDatabaseRequest(dbPath), logSink, progress: null, ct);
+                new UpgradeDatabaseRequest(dbPath), logProgress, progress: null, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
             Assert.False(File.Exists(dbPath),

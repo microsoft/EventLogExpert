@@ -142,9 +142,9 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
 
     protected override Task<DatabaseToolsResult> DispatchAsync(
         CreateDatabaseRequest request,
-        IProgress<LogRecord> logSink,
+        IProgress<LogRecord> logProgress,
         CancellationToken cancellationToken) =>
-        DatabaseToolsService.CreateAsync(request, logSink, progress: null, cancellationToken, VerboseLogging);
+        DatabaseToolsService.CreateAsync(request, logProgress, progress: null, cancellationToken, VerboseLogging);
 
     private static string FormatEditionLabel(WimImageEntry edition) =>
         $"{edition.Index}: {edition.Edition} ({edition.Name})";
@@ -175,10 +175,10 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
 
         try
         {
-            IProgress<LogRecord> logSink = OperationLogSinkFactory.Create(new Progress<LogRecord>(AppendEntry), LogCategory, VerboseLogging);
+            IProgress<LogRecord> logProgress = OperationLogProgressFactory.Create(new Progress<LogRecord>(AppendEntry), LogCategory, VerboseLogging);
 
             var result = await ElevatedRunner.ListImageEditionsAsync(
-                new ListOfflineImageEditionsRequest(imagePath), logSink, token, VerboseLogging);
+                new ListOfflineImageEditionsRequest(imagePath), logProgress, token, VerboseLogging);
 
             if (token.IsCancellationRequested) { return; }
 
@@ -264,7 +264,7 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
     private Task RunCreateAsync() => WillElevate ? RunElevatedAsync() : RunAsync();
 
     private Task RunElevatedAsync() =>
-        base.RunElevatedAsync((request, logSink, ct) => ElevatedRunner.CreateAsync(request, logSink, progress: null, ct, VerboseLogging));
+        base.RunElevatedAsync((request, logProgress, ct) => ElevatedRunner.CreateAsync(request, logProgress, progress: null, ct, VerboseLogging));
 
     private void SetSourcePath(string path)
     {

@@ -26,16 +26,16 @@ public sealed class DatabaseToolsServiceTests
             return Task.FromResult(DatabaseToolsOutcome.Succeeded);
         });
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         await service.ShowAsync(
-            new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None);
+            new ShowProvidersRequest(null, null), logProgress, progress: null, CancellationToken.None);
 
-        Assert.Equal(3, logSink.Entries.Count);
-        Assert.Contains("one", logSink.Entries[0].Message);
-        Assert.Contains("two", logSink.Entries[1].Message);
-        Assert.Contains("three", logSink.Entries[2].Message);
-        Assert.Equal(LogLevel.Warning, logSink.Entries[2].Level);
+        Assert.Equal(3, logProgress.Entries.Count);
+        Assert.Contains("one", logProgress.Entries[0].Message);
+        Assert.Contains("two", logProgress.Entries[1].Message);
+        Assert.Contains("three", logProgress.Entries[2].Message);
+        Assert.Equal(LogLevel.Warning, logProgress.Entries[2].Level);
     }
 
     [Fact]
@@ -47,10 +47,10 @@ public sealed class DatabaseToolsServiceTests
             return DatabaseToolsOutcome.Succeeded;
         });
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         var result = await service.ShowAsync(
-            new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None);
+            new ShowProvidersRequest(null, null), logProgress, progress: null, CancellationToken.None);
 
         Assert.True(result.Duration > TimeSpan.Zero, $"Duration was {result.Duration}.");
     }
@@ -60,10 +60,10 @@ public sealed class DatabaseToolsServiceTests
     {
         var fake = new RecordingOperation(DatabaseToolsOutcome.Succeeded);
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         var result = await service.ShowAsync(
-            new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None);
+            new ShowProvidersRequest(null, null), logProgress, progress: null, CancellationToken.None);
 
         Assert.Equal(DatabaseToolsOutcome.Succeeded, result.Outcome);
         Assert.Null(result.FailureSummary);
@@ -74,14 +74,14 @@ public sealed class DatabaseToolsServiceTests
     {
         var fake = new RecordingOperation(_ => throw new InvalidOperationException("boom"));
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         var result = await service.ShowAsync(
-            new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None);
+            new ShowProvidersRequest(null, null), logProgress, progress: null, CancellationToken.None);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
         Assert.Equal("boom", result.FailureSummary);
-        Assert.Contains(logSink.Entries, e => e.Level == LogLevel.Error);
+        Assert.Contains(logProgress.Entries, e => e.Level == LogLevel.Error);
     }
 
     [Fact]
@@ -89,10 +89,10 @@ public sealed class DatabaseToolsServiceTests
     {
         var fake = new RecordingOperation(_ => throw new OperationCanceledException());
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         var result = await service.ShowAsync(
-            new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None);
+            new ShowProvidersRequest(null, null), logProgress, progress: null, CancellationToken.None);
 
         Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
         Assert.Null(result.FailureSummary);
@@ -103,12 +103,12 @@ public sealed class DatabaseToolsServiceTests
     {
         var fake = new RecordingOperation(DatabaseToolsOutcome.Succeeded);
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
         var cts = new CancellationTokenSource();
         cts.Cancel();
 
         var result = await service.ShowAsync(
-            new ShowProvidersRequest(null, null), logSink, progress: null, cts.Token);
+            new ShowProvidersRequest(null, null), logProgress, progress: null, cts.Token);
 
         Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
         Assert.False(fake.WasInvoked, "Operation must not run when token is already cancelled.");
@@ -129,32 +129,32 @@ public sealed class DatabaseToolsServiceTests
             mergeOperation: () => fake,
             diffOperation: () => fake,
             upgradeOperation: () => fake);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         switch (method)
         {
             case "Show":
-                await service.ShowAsync(new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None);
+                await service.ShowAsync(new ShowProvidersRequest(null, null), logProgress, progress: null, CancellationToken.None);
                 Assert.Equal(1, factory.ShowCallCount);
                 Assert.Equal(0, factory.CreateCallCount + factory.MergeCallCount + factory.DiffCallCount + factory.UpgradeCallCount);
                 break;
             case "Create":
-                await service.CreateAsync(new CreateDatabaseRequest("target.db", null, null, null), logSink, progress: null, CancellationToken.None);
+                await service.CreateAsync(new CreateDatabaseRequest("target.db", null, null, null), logProgress, progress: null, CancellationToken.None);
                 Assert.Equal(1, factory.CreateCallCount);
                 Assert.Equal(0, factory.ShowCallCount + factory.MergeCallCount + factory.DiffCallCount + factory.UpgradeCallCount);
                 break;
             case "Merge":
-                await service.MergeAsync(new MergeDatabaseRequest("source.db", "target.db", false), logSink, progress: null, CancellationToken.None);
+                await service.MergeAsync(new MergeDatabaseRequest("source.db", "target.db", false), logProgress, progress: null, CancellationToken.None);
                 Assert.Equal(1, factory.MergeCallCount);
                 Assert.Equal(0, factory.ShowCallCount + factory.CreateCallCount + factory.DiffCallCount + factory.UpgradeCallCount);
                 break;
             case "Diff":
-                await service.DiffAsync(new DiffDatabaseRequest("first.db", "second.db", "out.db"), logSink, progress: null, CancellationToken.None);
+                await service.DiffAsync(new DiffDatabaseRequest("first.db", "second.db", "out.db"), logProgress, progress: null, CancellationToken.None);
                 Assert.Equal(1, factory.DiffCallCount);
                 Assert.Equal(0, factory.ShowCallCount + factory.CreateCallCount + factory.MergeCallCount + factory.UpgradeCallCount);
                 break;
             case "Upgrade":
-                await service.UpgradeAsync(new UpgradeDatabaseRequest("target.db"), logSink, progress: null, CancellationToken.None);
+                await service.UpgradeAsync(new UpgradeDatabaseRequest("target.db"), logProgress, progress: null, CancellationToken.None);
                 Assert.Equal(1, factory.UpgradeCallCount);
                 Assert.Equal(0, factory.ShowCallCount + factory.CreateCallCount + factory.MergeCallCount + factory.DiffCallCount);
                 break;
@@ -174,13 +174,13 @@ public sealed class DatabaseToolsServiceTests
             return Task.FromResult(DatabaseToolsOutcome.Succeeded);
         });
         var (service, _) = CreateSut(showOperation: () => fake);
-        var logSink = new ListProgress<LogRecord>();
+        var logProgress = new ListProgress<LogRecord>();
 
         await service.ShowAsync(
-            new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None, verbose: verbose);
+            new ShowProvidersRequest(null, null), logProgress, progress: null, CancellationToken.None, verbose: verbose);
 
-        var traceEntries = logSink.Entries.Where(e => e.Level == LogLevel.Trace).ToList();
-        var infoEntries = logSink.Entries.Where(e => e.Level == LogLevel.Information).ToList();
+        var traceEntries = logProgress.Entries.Where(e => e.Level == LogLevel.Trace).ToList();
+        var infoEntries = logProgress.Entries.Where(e => e.Level == LogLevel.Information).ToList();
 
         if (verbose)
         {
