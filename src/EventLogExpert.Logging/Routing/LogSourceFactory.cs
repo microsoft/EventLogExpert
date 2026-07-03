@@ -23,7 +23,7 @@ public sealed class LogSourceFactory : ILogSourceFactory
 
     public ITraceLogger ForCategory(string category)
     {
-        ArgumentNullException.ThrowIfNull(category);
+        ArgumentException.ThrowIfNullOrEmpty(category);
 
         return new DispatchingTraceLogger(_sinks, category, _processOrigin);
     }

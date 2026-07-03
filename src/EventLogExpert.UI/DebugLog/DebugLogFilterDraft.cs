@@ -31,6 +31,6 @@ public sealed class DebugLogFilterDraft
         Values = [.. filter.Values],
     };
 
-    // A saved filter is always enabled (IsEnabled defaults to true); the enable/disable toggle acts on the chip.
+    // ToFilter defaults IsEnabled to true (a new filter starts enabled); the caller preserves an edited chip's enable state.
     public DebugLogFilter ToFilter() => new(Field, Operator, MatchMode, IsExcluded, [.. Values]);
 }

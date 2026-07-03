@@ -331,7 +331,8 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     {
         if (row.Editing is not { IsComplete: true } draft) { return; }
 
-        row.Applied = draft.ToFilter();
+        // Editing a filter's predicate must not flip its enable state; carry the chip's state across (a new filter starts enabled).
+        row.Applied = draft.ToFilter() with { IsEnabled = row.Applied?.IsEnabled ?? true };
         row.Editing = null;
         _focusChipAfterRender = row.Id;
         ApplyProjection();

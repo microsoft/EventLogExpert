@@ -191,9 +191,9 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
 
                     stream.SetLength(0);
                 }
-                catch (IOException)
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    // The file was deleted or locked between the size check and the open; skip rotation (next start retries).
+                    // The file was deleted, locked, or read-only between the size check and the open; skip rotation (best-effort).
                 }
             },
             throwOnTimeout: false);

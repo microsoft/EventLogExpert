@@ -29,11 +29,12 @@ public sealed class LogSourceFactoryTests
     }
 
     [Fact]
-    public void ForCategory_NullCategory_Throws()
+    public void ForCategory_NullOrEmptyCategory_Throws()
     {
         var factory = new LogSourceFactory([new RecordingSink(_ => LogLevel.Trace)]);
 
         Assert.Throws<ArgumentNullException>(() => factory.ForCategory(null!));
+        Assert.Throws<ArgumentException>(() => factory.ForCategory(string.Empty));
     }
 
     [Fact]

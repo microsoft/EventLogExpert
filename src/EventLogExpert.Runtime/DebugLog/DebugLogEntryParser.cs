@@ -102,7 +102,7 @@ internal static class DebugLogEntryParser
 
     private static Regex BuildLinePrefixRegex()
     {
-        string roots = string.Join('|', LogCategories.KnownRoots.Select(Regex.Escape));
+        string roots = string.Join('|', LogCategories.KnownRoots.OrderByDescending(static root => root.Length).Select(Regex.Escape));
 
         return new Regex(
             $@"^\[(?<ts>[^\]]+)\] \[(?<tid>\d+)\] \[(?<level>[A-Za-z]+)\](?: \[(?<category>(?:{roots})(?:\.[A-Za-z0-9]+)*)\])?(?: \[(?<origin>ElevatedHelper)\])? (?<message>.*)$",
