@@ -5,9 +5,11 @@ using Bunit;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.Eventing.PublisherMetadata.Offline;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
+using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.UI.DatabaseTools.Tabs;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
@@ -244,6 +246,24 @@ public sealed class CreateDatabaseTabTests : BunitContext
         component.WaitForAssertion(() => Assert.Equal(
             "2: ServerStandard (Windows Server 2025 Standard)",
             component.Find("#create-wim-index").GetAttribute("value")));
+    }
+
+    [Fact]
+    public void LoadEditions_RoutesLogsThroughTheOperationLogSinkFactory()
+    {
+        // F1: the edition probe crosses IPC to the elevated helper, so it must build its sink via the
+        // OperationLogSinkFactory (which tees to the shared file sink under this tab's category), not a bare
+        // UI-only Progress.
+        ConfigureEditionsListed(new WimImageEntry(2, "Windows Server 2025 Standard", "ServerStandard", null));
+
+        var component = Render<CreateDatabaseTab>();
+        component.Find("#create-source-path").Input(@"C:\images\install.wim");
+
+        component.FindAll("button").Single(button => button.TextContent.Contains("Load editions")).Click();
+
+        component.WaitForAssertion(() => Services.GetRequiredService<IOperationLogSinkFactory>()
+            .Received()
+            .Create(Arg.Any<IProgress<LogRecord>>(), LogCategories.DatabaseToolsCreate, Arg.Any<bool>()));
     }
 
     [Fact]

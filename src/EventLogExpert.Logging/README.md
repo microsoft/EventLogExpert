@@ -39,6 +39,8 @@ do not conflate them.
 - `ITraceLogger.ForCategory(string category)` - derives a logger that stamps `category` on its records while
   sharing the original's sinks (a `ForContext`-style re-categorization). The default implementation returns the
   same instance, so a logger that supports categories must override it.
+- `ILogSink { void Emit(LogRecord); LogLevel MinimumLevelFor(string category); }` - the destination contract a
+  record is written to; concrete implementations live under **Sinks** below.
 - `LogCategories` - where THIS solution centralizes its category-name constants (roots: `App`, `Database`,
   `DatabaseTools`, `Elevation`, `EventLog`, `Offline`, `Resolution`, each with dotted sub-categories) so multiple
   executables route and filter consistently. The shipped defaults throttle the verbose roots (`Database`,
@@ -47,7 +49,8 @@ do not conflate them.
   Debug/Trace) while its `Warning`/`Error` still surface at the default. When reusing the library in
   another project, replace these with your own (the routing itself treats categories as opaque strings).
 
-### Sinks (`ILogSink { void Emit(LogRecord); LogLevel MinimumLevelFor(string category); }`)
+### Sinks
+Concrete `ILogSink` implementations (the `ILogSink` contract itself lives under **Abstractions**):
 - `ConsoleSink(LogLevel minimumLevel = Information)` - colored console output.
 - `FileLogSink(string path, LogRoutingPolicy routingPolicy, Func<LogRecord,string> formatter)` - a pure,
   write-only file sink. It formats each record via the injected `formatter`, appends to a shared file, and

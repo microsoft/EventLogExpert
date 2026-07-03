@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Sinks;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Logging.Tests.Routing;

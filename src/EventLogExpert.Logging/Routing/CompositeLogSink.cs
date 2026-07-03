@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Sinks;
 
 namespace EventLogExpert.Logging.Routing;
 
@@ -12,6 +11,8 @@ public sealed class CompositeLogSink(IReadOnlyList<ILogSink> sinks, string categ
 
     public void Report(LogRecord value)
     {
+        ArgumentNullException.ThrowIfNull(value);
+
         LogRecord routed = string.IsNullOrEmpty(value.Category) ? value with { Category = category } : value;
 
         foreach (ILogSink sink in _sinks)

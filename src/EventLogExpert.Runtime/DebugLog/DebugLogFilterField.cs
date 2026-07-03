@@ -7,6 +7,6 @@ public enum DebugLogFilterField
 {
     Level,
     Category,
-    Process,
+    ProcessOrigin,
     Message
 }

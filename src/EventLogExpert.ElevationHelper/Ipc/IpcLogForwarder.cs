@@ -28,7 +28,10 @@ internal sealed class IpcLogForwarder(IpcMessageWriter writer) : IProgress<LogRe
         try
         {
             writer.WriteAsync(
-                    new LogMessage(value.TimestampUtc, value.Level, value.Message, value.Category),
+                    // Re-stamp origin at the IPC boundary: helper LogRecords carry ProcessOrigin.InProcess by
+                    // default (StreamingTraceLogger does not set it), so pass ElevatedHelper explicitly - forwarding
+                    // value.ProcessOrigin would mis-tag every helper line as in-process.
+                    new LogMessage(value.TimestampUtc, value.Level, value.Message, value.Category, ProcessOrigin.ElevatedHelper),
                     CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();

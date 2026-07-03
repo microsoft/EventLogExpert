@@ -12,6 +12,9 @@ internal sealed class OperationLogSinkFactory(FileLogSink fileSink, LogRoutingPo
 {
     public IProgress<LogRecord> Create(IProgress<LogRecord> uiProgress, string category, bool verbose)
     {
+        ArgumentNullException.ThrowIfNull(uiProgress);
+        ArgumentException.ThrowIfNullOrEmpty(category);
+
         List<ILogSink> sinks = [new UiStreamingSink(uiProgress, routingPolicy.UiMinimumFor(verbose)), fileSink];
 
         return new CompositeLogSink(sinks, category);

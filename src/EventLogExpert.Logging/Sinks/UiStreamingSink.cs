@@ -8,12 +8,16 @@ namespace EventLogExpert.Logging.Sinks;
 
 public sealed class UiStreamingSink(IProgress<LogRecord> progress, LogLevel minimumLevel) : ILogSink
 {
+    private readonly IProgress<LogRecord> _progress = progress ?? throw new ArgumentNullException(nameof(progress));
+
     public LogLevel MinimumLevelFor(string category) => minimumLevel;
 
     public void Emit(LogRecord record)
     {
+        ArgumentNullException.ThrowIfNull(record);
+
         if (record.Level < minimumLevel) { return; }
 
-        progress.Report(record);
+        _progress.Report(record);
     }
 }

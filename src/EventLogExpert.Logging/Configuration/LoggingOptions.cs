@@ -8,7 +8,7 @@ namespace EventLogExpert.Logging.Configuration;
 
 public sealed class LoggingOptions
 {
-    public const string FileSink = "DebugFileSink";
+    public const string FileSink = "FileLogSink";
 
     public Dictionary<string, LogSinkOptions> Sinks { get; set; } = [];
 

@@ -3,7 +3,6 @@
 
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Routing;
-using EventLogExpert.Logging.Sinks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 

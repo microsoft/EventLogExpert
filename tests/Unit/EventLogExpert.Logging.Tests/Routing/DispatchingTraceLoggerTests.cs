@@ -3,7 +3,6 @@
 
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Routing;
-using EventLogExpert.Logging.Sinks;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Logging.Tests.Routing;
