@@ -390,6 +390,45 @@ public sealed class DebugLogModalTests : BunitContext
     }
 
     [Fact]
+    public async Task DebugLogModal_EditingADisabledFilter_KeepsItDisabled()
+    {
+        var lines = new[]
+        {
+            DebugLogUtils.BuildLine(LogLevel.Information, "alpha foo"),
+            DebugLogUtils.BuildLine(LogLevel.Information, "bravo"),
+        };
+
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        await AddFilterAsync(component);
+        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
+        await SaveFilterAsync(component);
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        await component.Find("button[aria-label='Filter is enabled; activate to disable']").ClickAsync(new MouseEventArgs());
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        // Editing then saving a disabled filter must not silently re-enable it.
+        await component.Find("button[aria-label='Edit filter: Message contains foo']").ClickAsync(new MouseEventArgs());
+        await SaveFilterAsync(component);
+
+        await component.WaitForAssertionAsync(() =>
+        {
+            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim());
+            Assert.NotNull(component.Find("button[aria-label='Filter is disabled; activate to enable']"));
+        });
+    }
+
+    [Fact]
     public async Task DebugLogModal_EnableToggle_DisablesFilterLive()
     {
         var lines = new[]
