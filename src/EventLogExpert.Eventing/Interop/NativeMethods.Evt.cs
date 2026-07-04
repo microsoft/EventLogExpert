@@ -4,7 +4,6 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
 using Microsoft.Win32.SafeHandles;
-using System.Buffers;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 
@@ -13,7 +12,65 @@ namespace EventLogExpert.Eventing.Interop;
 internal static partial class NativeMethods
 {
     private const string EventLogApi = "wevtapi.dll";
-    private const int MaxStackAllocChars = 4096;
+
+    // Per-thread, grow-only scratch buffers reused by the wevtapi wrappers below (each family owns its buffer so the
+    // "no same-family reentrancy" invariant stays local; the three families never nest on a thread). [ThreadStatic]
+    // (not shared) because EventLogWatcher renders on overlapping ThreadPool callback threads; each thread owns its
+    // buffer, so no lock is needed. Retained up to MaxRetainedChars (below the ~85 KB LOH threshold); a call larger than
+    // that uses a transient array that is not stored back, bounding steady-state per-thread retention to ~64 KB each.
+#if DEBUG
+    // Debug-settable so a test can force the grow / retained-cap / skip-probe paths deterministically without a
+    // multi-KB event (const in Release).
+    internal static int InitialRenderChars = 4096;
+    internal static int MaxRetainedChars = 32768;
+#else
+    private const int InitialRenderChars = 4096;
+    private const int MaxRetainedChars = 32768;
+#endif
+
+    [ThreadStatic]
+    private static char[]? t_renderBuffer;
+
+    [ThreadStatic]
+    private static char[]? t_formatBuffer;
+
+    [ThreadStatic]
+    private static char[]? t_objectArrayBuffer;
+
+#if DEBUG
+    // Invoked by the variant-reading processors immediately before the first EVT_VARIANT read, while the buffer is still
+    // pinned, so a GC-move regression test can force a compacting collection at the moment of highest vulnerability.
+    internal static Action? BeforeVariantReadForTest;
+
+    // Count native P/Invokes on the calling thread, so the "one call = one P/Invoke" gate (probe eliminated) can be
+    // asserted without tearing under parallel tests.
+    [ThreadStatic]
+    internal static int RenderPInvokeCountForTest;
+
+    [ThreadStatic]
+    internal static int FormatPInvokeCountForTest;
+
+    [ThreadStatic]
+    internal static int ObjectArrayPInvokeCountForTest;
+
+    internal static int? RetainedRenderBufferChars => t_renderBuffer?.Length;
+
+    internal static int? RetainedFormatBufferChars => t_formatBuffer?.Length;
+
+    internal static int? RetainedObjectArrayBufferChars => t_objectArrayBuffer?.Length;
+
+    // Resets the calling thread's scratch buffers + P/Invoke counters so a test can deterministically drive the
+    // first-touch / grow / retained-cap paths (pair with lowering InitialRenderChars / MaxRetainedChars).
+    internal static void ResetRenderScratchForTest()
+    {
+        t_renderBuffer = null;
+        t_formatBuffer = null;
+        t_objectArrayBuffer = null;
+        RenderPInvokeCountForTest = 0;
+        FormatPInvokeCountForTest = 0;
+        ObjectArrayPInvokeCountForTest = 0;
+    }
+#endif
 
     internal static object? ConvertVariant(EvtVariant variant)
     {
@@ -373,70 +430,70 @@ internal static partial class NativeMethods
 
     /// <summary>Formats a message string</summary>
     /// <param name="publisherMetadataHandle">Handle returned from <see cref="EvtOpenPublisherMetadata" /></param>
-    /// <param name="messageId">The resource identifier of the message string that you want formated</param>
+    /// <param name="messageId">The resource identifier of the message string that you want formatted</param>
     internal static string FormatMessage(EvtHandle publisherMetadataHandle, uint messageId)
     {
-        Span<char> emptyBuffer = ['\0'];
+        char[] buffer = t_formatBuffer ??= new char[InitialRenderChars];
 
-        bool success = EvtFormatMessage(
-            publisherMetadataHandle,
-            EvtHandle.Zero,
-            messageId,
-            0,
-            IntPtr.Zero,
-            EvtFormatMessageFlags.Id,
-            0,
-            emptyBuffer,
-            out int bufferUsed);
-
-        int error = Marshal.GetLastWin32Error();
-
-        if (!success &&
-            error != Win32ErrorCodes.ERROR_EVT_UNRESOLVED_VALUE_INSERT &&
-            error != Win32ErrorCodes.ERROR_EVT_UNRESOLVED_PARAMETER_INSERT &&
-            error != Win32ErrorCodes.ERROR_EVT_MAX_INSERTS_REACHED)
+        // Common path: 1 P/Invoke. Copy out only when the message actually fit the buffer.
+        if (TryFormat(buffer, out int usedChars, out int error))
         {
-            if (error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
-            {
-                ThrowEventLogException(error);
-            }
+            return Materialize(buffer, usedChars);
         }
 
-        int charCount = bufferUsed;
-        char[]? rented = null;
-        Span<char> buffer = charCount <= MaxStackAllocChars
-            ? stackalloc char[charCount]
-            : (rented = ArrayPool<char>.Shared.Rent(charCount)).AsSpan(0, charCount);
-
-        try
+        if (error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
         {
-            success = EvtFormatMessage(
-                publisherMetadataHandle,
-                EvtHandle.Zero,
-                messageId,
-                0,
-                IntPtr.Zero,
-                EvtFormatMessageFlags.Id,
-                bufferUsed,
-                buffer,
-                out bufferUsed);
+            ThrowEventLogException(error);
+        }
 
-            error = Marshal.GetLastWin32Error();
+        // usedChars carried the required char count; grow to exactly that and retry once.
+        buffer = GrowScratch(ref t_formatBuffer, usedChars);
 
-            if (!success &&
-                error != Win32ErrorCodes.ERROR_EVT_UNRESOLVED_VALUE_INSERT &&
-                error != Win32ErrorCodes.ERROR_EVT_UNRESOLVED_PARAMETER_INSERT &&
-                error != Win32ErrorCodes.ERROR_EVT_MAX_INSERTS_REACHED)
+        if (!TryFormat(buffer, out usedChars, out error))
+        {
+            ThrowEventLogException(error);
+        }
+
+        return Materialize(buffer, usedChars);
+
+        // EvtFormatMessage sizes in CHARACTERS (not bytes). An unresolved-insert code means the message was still
+        // written best-effort - tolerate + copy out, but ONLY when it fit; a too-large tolerated insert is reported as
+        // INSUFFICIENT so the caller grows. Every other failure (e.g. MESSAGE_ID_NOT_FOUND) is thrown, as before.
+        bool TryFormat(char[] target, out int chars, out int lastError)
+        {
+#if DEBUG
+            FormatPInvokeCountForTest++;
+#endif
+            if (EvtFormatMessage(publisherMetadataHandle, EvtHandle.Zero, messageId, 0, IntPtr.Zero,
+                EvtFormatMessageFlags.Id, target.Length, target, out chars))
             {
-                ThrowEventLogException(error);
+                lastError = 0;
+                return true;
             }
 
-            return bufferUsed - 1 <= 0 ? string.Empty : new string(buffer[..(bufferUsed - 1)]);
+            lastError = Marshal.GetLastWin32Error();
+
+            bool unresolvedInsert =
+                lastError == Win32ErrorCodes.ERROR_EVT_UNRESOLVED_VALUE_INSERT ||
+                lastError == Win32ErrorCodes.ERROR_EVT_UNRESOLVED_PARAMETER_INSERT ||
+                lastError == Win32ErrorCodes.ERROR_EVT_MAX_INSERTS_REACHED;
+
+            if (unresolvedInsert && chars <= target.Length)
+            {
+                lastError = 0;
+                return true;
+            }
+
+            if (unresolvedInsert)
+            {
+                lastError = Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER;
+            }
+
+            return false;
         }
-        finally
-        {
-            if (rented is not null) { ArrayPool<char>.Shared.Return(rented, clearArray: true); }
-        }
+
+        static string Materialize(char[] target, int chars) =>
+            chars - 1 <= 0 ? string.Empty : new string(target, 0, chars - 1);
     }
 
     /// <summary>Converts a buffer that was returned from <see cref="EvtRender" /> to an <see cref="EventRecord" /></summary>
@@ -518,63 +575,59 @@ internal static partial class NativeMethods
         return properties;
     }
 
-    internal static object GetObjectArrayProperty(
+    internal static unsafe object GetObjectArrayProperty(
         EvtHandle array,
         int index,
         EvtPublisherMetadataPropertyId propertyId)
     {
-        bool success = EvtGetObjectArrayProperty(array, propertyId, index, 0, 0, IntPtr.Zero, out int bufferUsed);
-        int error = Marshal.GetLastWin32Error();
+        char[] buffer = t_objectArrayBuffer ??= new char[InitialRenderChars];
+        int neededBytes;
 
-        if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
+        fixed (char* pinned = buffer)
         {
-            ThrowEventLogException(error);
-        }
-
-        int charCount = bufferUsed;
-        char[]? rented = null;
-        Span<char> buffer = charCount <= MaxStackAllocChars
-            ? stackalloc char[charCount]
-            : (rented = ArrayPool<char>.Shared.Rent(charCount)).AsSpan(0, charCount);
-
-        try
-        {
-            unsafe
+#if DEBUG
+            ObjectArrayPInvokeCountForTest++;
+#endif
+            if (EvtGetObjectArrayProperty(array, propertyId, index, 0, buffer.Length * sizeof(char), (IntPtr)pinned, out int usedBytes))
             {
-                fixed (char* bufferPtr = buffer)
-                {
-                    success = EvtGetObjectArrayProperty(array,
-                        propertyId,
-                        index,
-                        0,
-                        bufferUsed,
-                        (IntPtr)bufferPtr,
-                        out bufferUsed);
-                }
+                return ConvertObjectArrayVariant(pinned, propertyId);
             }
 
-            error = Marshal.GetLastWin32Error();
+            int error = Marshal.GetLastWin32Error();
 
-            if (!success)
+            if (error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
                 ThrowEventLogException(error);
             }
 
-            unsafe
-            {
-                fixed (char* bufferPtr = buffer)
-                {
-                    var variant = *(EvtVariant*)bufferPtr;
+            neededBytes = usedBytes;
+        }
 
-                    return ConvertVariant(variant) ??
-                        throw new InvalidDataException($"Invalid Object Array for Property: {propertyId}");
-                }
-            }
-        }
-        finally
+        buffer = GrowScratch(ref t_objectArrayBuffer, CharsForBytes(neededBytes));
+
+        fixed (char* pinned = buffer)
         {
-            if (rented is not null) { ArrayPool<char>.Shared.Return(rented, clearArray: true); }
+#if DEBUG
+            ObjectArrayPInvokeCountForTest++;
+#endif
+            if (!EvtGetObjectArrayProperty(array, propertyId, index, 0, buffer.Length * sizeof(char), (IntPtr)pinned, out int _))
+            {
+                ThrowEventLogException(Marshal.GetLastWin32Error());
+            }
+
+            return ConvertObjectArrayVariant(pinned, propertyId);
         }
+    }
+
+    // Reads the single EVT_VARIANT written by EvtGetObjectArrayProperty while the buffer is still pinned (the variant's
+    // string/SID fields point into it). The GC-move hook fires immediately before the read, shared with the render path.
+    private static unsafe object ConvertObjectArrayVariant(char* pinned, EvtPublisherMetadataPropertyId propertyId)
+    {
+#if DEBUG
+        BeforeVariantReadForTest?.Invoke();
+#endif
+        return ConvertVariant(*(EvtVariant*)pinned) ??
+            throw new InvalidDataException($"Invalid Object Array for Property: {propertyId}");
     }
 
     internal static int GetObjectArraySize(EvtHandle array)
@@ -590,196 +643,119 @@ internal static partial class NativeMethods
         return size;
     }
 
-    internal static EventRecord RenderEvent(EvtHandle eventHandle)
+    // Overflow-safe byte->char ceil for the render + object-array paths (EvtRender / EvtGetObjectArrayProperty size in
+    // bytes). Bounding neededBytes first keeps (neededBytes + sizeof(char) - 1) from overflowing int.
+    private static int CharsForBytes(int neededBytes)
     {
-        bool success = EvtRender(
-            EventLogSession.GlobalSession.SystemRenderContext,
-            eventHandle,
-            EvtRenderFlags.EventValues,
-            0,
-            IntPtr.Zero,
-            out int bufferUsed,
-            out int propertyCount);
-
-        int error = Marshal.GetLastWin32Error();
-
-        if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
+        // Reject only the values where the ceil's `+ (sizeof(char) - 1)` would overflow int, so the bound matches the
+        // expression below exactly (int.MaxValue - 1 is still in range and allowed).
+        if (neededBytes is < 0 or > int.MaxValue - (sizeof(char) - 1))
         {
-            ThrowEventLogException(error);
+            ThrowEventLogException(Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER);
         }
 
-        int charCount = bufferUsed / sizeof(char);
-        char[]? rented = null;
-        Span<char> buffer = charCount <= MaxStackAllocChars
-            ? stackalloc char[charCount]
-            : (rented = ArrayPool<char>.Shared.Rent(charCount)).AsSpan(0, charCount);
+        return (neededBytes + sizeof(char) - 1) / sizeof(char);
+    }
 
-        try
+    // Grows a [ThreadStatic] scratch slot to at least neededChars, grow-only: reuses the retained buffer when it is
+    // already large enough (no shrink, no redundant allocation), grows + retains when within the LOH-bounded cap, or
+    // returns a transient array (not stored back) so a rare huge call cannot permanently bloat the thread.
+    private static char[] GrowScratch(ref char[]? retained, int neededChars)
+    {
+        if (retained is not null && retained.Length >= neededChars) { return retained; }
+
+        return neededChars <= MaxRetainedChars ? (retained = new char[neededChars]) : new char[neededChars];
+    }
+
+    // Renders <paramref name="fragment"/> into the per-thread grow-only buffer and invokes <paramref name="process"/>
+    // WHILE THE BUFFER IS STILL PINNED. The continuous pin is load-bearing: for EvtRenderContextValues the rendered
+    // EVT_VARIANTs hold absolute pointers into the buffer, so a GC compaction between render and variant read would
+    // leave them stale. The size-probe pass is skipped - on ERROR_INSUFFICIENT_BUFFER, EvtRender reports the required
+    // size, so the buffer is grown once and retried. INVARIANT: a processor must NOT trigger another render on the
+    // current thread - t_renderBuffer is live and pinned for the duration.
+    private static unsafe T RenderWhilePinned<T>(
+        EvtHandle context,
+        EvtHandle fragment,
+        EvtRenderFlags flags,
+        delegate*<IntPtr, int, int, T> process)
+    {
+        char[] buffer = t_renderBuffer ??= new char[InitialRenderChars];
+        int neededBytes;
+
+        fixed (char* pinned = buffer)
         {
-            unsafe
+#if DEBUG
+            RenderPInvokeCountForTest++;
+#endif
+            if (EvtRender(context, fragment, flags, buffer.Length * sizeof(char), (IntPtr)pinned, out int usedBytes, out int propertyCount))
             {
-                fixed (char* bufferPtr = buffer)
-                {
-                    success = EvtRender(
-                        EventLogSession.GlobalSession.SystemRenderContext,
-                        eventHandle,
-                        EvtRenderFlags.EventValues,
-                        bufferUsed,
-                        (IntPtr)bufferPtr,
-                        out bufferUsed,
-                        out propertyCount);
-                }
+                return process((IntPtr)pinned, usedBytes, propertyCount);
             }
 
-            error = Marshal.GetLastWin32Error();
+            int error = Marshal.GetLastWin32Error();
 
-            if (!success)
+            if (error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
                 ThrowEventLogException(error);
             }
 
-            unsafe
-            {
-                fixed (char* bufferPtr = buffer)
-                {
-                    return GetEventRecord((IntPtr)bufferPtr, propertyCount);
-                }
-            }
+            neededBytes = usedBytes;
         }
-        finally
+
+        buffer = GrowScratch(ref t_renderBuffer, CharsForBytes(neededBytes));
+
+        fixed (char* pinned = buffer)
         {
-            if (rented is not null) { ArrayPool<char>.Shared.Return(rented, clearArray: true); }
+#if DEBUG
+            RenderPInvokeCountForTest++;
+#endif
+            if (!EvtRender(context, fragment, flags, buffer.Length * sizeof(char), (IntPtr)pinned, out int usedBytes, out int propertyCount))
+            {
+                ThrowEventLogException(Marshal.GetLastWin32Error());
+            }
+
+            return process((IntPtr)pinned, usedBytes, propertyCount);
         }
     }
 
-    internal static IReadOnlyList<EventProperty> RenderEventProperties(EvtHandle eventHandle)
+    private static EventRecord ProcessRenderedEventRecord(IntPtr buffer, int usedBytes, int propertyCount)
     {
-        bool success = EvtRender(
-            EventLogSession.GlobalSession.UserRenderContext,
-            eventHandle,
-            EvtRenderFlags.EventValues,
-            0,
-            IntPtr.Zero,
-            out int bufferUsed,
-            out int propertyCount);
-
-        int error = Marshal.GetLastWin32Error();
-
-        if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
-        {
-            ThrowEventLogException(error);
-        }
-
-        int charCount = bufferUsed / sizeof(char);
-        char[]? rented = null;
-        Span<char> buffer = charCount <= MaxStackAllocChars
-            ? stackalloc char[charCount]
-            : (rented = ArrayPool<char>.Shared.Rent(charCount)).AsSpan(0, charCount);
-
-        try
-        {
-            unsafe
-            {
-                fixed (char* bufferPtr = buffer)
-                {
-                    success = EvtRender(
-                        EventLogSession.GlobalSession.UserRenderContext,
-                        eventHandle,
-                        EvtRenderFlags.EventValues,
-                        bufferUsed,
-                        (IntPtr)bufferPtr,
-                        out bufferUsed,
-                        out propertyCount);
-                }
-            }
-
-            error = Marshal.GetLastWin32Error();
-
-            if (!success)
-            {
-                ThrowEventLogException(error);
-            }
-
-            if (propertyCount <= 0) { return []; }
-
-            var properties = new EventProperty[propertyCount];
-
-            unsafe
-            {
-                fixed (char* bufferPtr = buffer)
-                {
-                    var variants = (EvtVariant*)bufferPtr;
-
-                    for (int i = 0; i < propertyCount; i++)
-                    {
-                        properties[i] = ConvertVariantToProperty(variants[i]);
-                    }
-                }
-            }
-
-            return properties;
-        }
-        finally
-        {
-            if (rented is not null) { ArrayPool<char>.Shared.Return(rented, clearArray: true); }
-        }
+#if DEBUG
+        BeforeVariantReadForTest?.Invoke();
+#endif
+        return GetEventRecord(buffer, propertyCount);
     }
 
-    internal static string? RenderEventXml(EvtHandle eventHandle)
+    private static unsafe IReadOnlyList<EventProperty> ProcessRenderedEventProperties(IntPtr buffer, int usedBytes, int propertyCount)
     {
-        bool success = EvtRender(
-            EvtHandle.Zero,
-            eventHandle,
-            EvtRenderFlags.EventXml,
-            0,
-            IntPtr.Zero,
-            out int bufferUsed,
-            out int _);
+        if (propertyCount <= 0) { return []; }
 
-        int error = Marshal.GetLastWin32Error();
+#if DEBUG
+        BeforeVariantReadForTest?.Invoke();
+#endif
 
-        if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
+        var properties = new EventProperty[propertyCount];
+        var variants = (EvtVariant*)buffer;
+
+        for (int i = 0; i < propertyCount; i++)
         {
-            ThrowEventLogException(error);
+            properties[i] = ConvertVariantToProperty(variants[i]);
         }
 
-        int charCount = bufferUsed / sizeof(char);
-        char[]? rented = null;
-        Span<char> buffer = charCount <= MaxStackAllocChars
-            ? stackalloc char[charCount]
-            : (rented = ArrayPool<char>.Shared.Rent(charCount)).AsSpan(0, charCount);
-
-        try
-        {
-            unsafe
-            {
-                fixed (char* bufferPtr = buffer)
-                {
-                    success = EvtRender(
-                        EvtHandle.Zero,
-                        eventHandle,
-                        EvtRenderFlags.EventXml,
-                        bufferUsed,
-                        (IntPtr)bufferPtr,
-                        out bufferUsed,
-                        out int _);
-                }
-            }
-
-            error = Marshal.GetLastWin32Error();
-
-            if (!success)
-            {
-                ThrowEventLogException(error);
-            }
-
-            return bufferUsed - 1 <= 0 ? null : new string(buffer[..((bufferUsed - 1) / sizeof(char))]);
-        }
-        finally
-        {
-            if (rented is not null) { ArrayPool<char>.Shared.Return(rented, clearArray: true); }
-        }
+        return properties;
     }
+
+    private static unsafe string? ProcessRenderedEventXml(IntPtr buffer, int usedBytes, int propertyCount) =>
+        usedBytes - 1 <= 0 ? null : new string((char*)buffer, 0, (usedBytes - 1) / sizeof(char));
+
+    internal static unsafe EventRecord RenderEvent(EvtHandle eventHandle) =>
+        RenderWhilePinned(EventLogSession.GlobalSession.SystemRenderContext, eventHandle, EvtRenderFlags.EventValues, &ProcessRenderedEventRecord);
+
+    internal static unsafe IReadOnlyList<EventProperty> RenderEventProperties(EvtHandle eventHandle) =>
+        RenderWhilePinned(EventLogSession.GlobalSession.UserRenderContext, eventHandle, EvtRenderFlags.EventValues, &ProcessRenderedEventProperties);
+
+    internal static unsafe string? RenderEventXml(EvtHandle eventHandle) =>
+        RenderWhilePinned(EvtHandle.Zero, eventHandle, EvtRenderFlags.EventXml, &ProcessRenderedEventXml);
 
     internal static void ThrowEventLogException(int error)
     {
