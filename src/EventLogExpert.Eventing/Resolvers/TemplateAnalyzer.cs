@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.PublisherMetadata.Wevt;
+using EventLogExpert.Eventing.ProviderMetadata.Wevt;
 using EventLogExpert.Provider.Resolution;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;

@@ -6,7 +6,7 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.ElevationHelper.Diagnostics;
 using EventLogExpert.ElevationHelper.Ipc;
 using EventLogExpert.ElevationHelper.Operations;
-using EventLogExpert.Eventing.PublisherMetadata.Offline;
+using EventLogExpert.Eventing.OfflineImaging.Workspace;
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text;

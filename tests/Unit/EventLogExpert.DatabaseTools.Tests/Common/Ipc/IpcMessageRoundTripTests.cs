@@ -3,7 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common.Ipc;
 using EventLogExpert.DatabaseTools.Common.Operations;
-using EventLogExpert.Eventing.PublisherMetadata.Offline;
+using EventLogExpert.Eventing.OfflineImaging.Wim;
 using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;

@@ -2,8 +2,12 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.Common.Operations;
-using EventLogExpert.Eventing.PublisherMetadata;
-using EventLogExpert.Eventing.PublisherMetadata.Offline;
+using EventLogExpert.Eventing.OfflineImaging;
+using EventLogExpert.Eventing.OfflineImaging.Iso;
+using EventLogExpert.Eventing.OfflineImaging.VirtualDisk;
+using EventLogExpert.Eventing.OfflineImaging.Wim;
+using EventLogExpert.Eventing.OfflineImaging.Workspace;
+using EventLogExpert.Eventing.ProviderMetadata;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Database.Hashing;

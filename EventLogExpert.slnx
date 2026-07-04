@@ -16,6 +16,7 @@
     <Project Path="src/EventLogExpert.UI/EventLogExpert.UI.csproj" />
     <Project Path="src/EventLogExpert.Runtime/EventLogExpert.Runtime.csproj" />
     <Project Path="src/EventLogExpert.Eventing/EventLogExpert.Eventing.csproj" />
+    <Project Path="src/EventLogExpert.Eventing.OfflineImaging/EventLogExpert.Eventing.OfflineImaging.csproj" />
     <Project Path="src/EventLogExpert.Logging/EventLogExpert.Logging.csproj" />
     <Project Path="src/EventLogExpert.Provider/EventLogExpert.Provider.csproj" />
     <Project Path="src/EventLogExpert.EventDbTool/EventLogExpert.EventDbTool.csproj" />
@@ -40,6 +41,7 @@
     <Project Path="tests/Unit/EventLogExpert.DatabaseTools.Tests/EventLogExpert.DatabaseTools.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.EventDbTool.Tests/EventLogExpert.EventDbTool.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Eventing.Tests/EventLogExpert.Eventing.Tests.csproj" />
+    <Project Path="tests/Unit/EventLogExpert.Eventing.OfflineImaging.Tests/EventLogExpert.Eventing.OfflineImaging.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Logging.Tests/EventLogExpert.Logging.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Runtime.Tests/EventLogExpert.Runtime.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Filtering.Tests/EventLogExpert.Filtering.Tests.csproj" />
@@ -49,6 +51,7 @@
   </Folder>
   <Folder Name="/tests/Integration/">
     <Project Path="tests/Integration/EventLogExpert.Eventing.IntegrationTests/EventLogExpert.Eventing.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/EventLogExpert.Eventing.OfflineImaging.IntegrationTests/EventLogExpert.Eventing.OfflineImaging.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.Logging.IntegrationTests/EventLogExpert.Logging.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.Runtime.IntegrationTests/EventLogExpert.Runtime.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.Provider.Database.IntegrationTests/EventLogExpert.Provider.Database.IntegrationTests.csproj" />

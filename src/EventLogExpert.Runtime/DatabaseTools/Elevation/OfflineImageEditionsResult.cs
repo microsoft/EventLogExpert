@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.Common.Operations;
-using EventLogExpert.Eventing.PublisherMetadata.Offline;
+using EventLogExpert.Eventing.OfflineImaging.Wim;
 
 namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 
