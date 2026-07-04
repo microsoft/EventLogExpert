@@ -15,6 +15,16 @@ public sealed class CombinedEventViewTests
         [null, ColumnName.DateAndTime, ColumnName.Source, ColumnName.Level, ColumnName.EventId];
 
     [Fact]
+    public void Constructor_DuplicateOwningLog_Throws()
+    {
+        var context = new SortContext(ColumnName.DateAndTime, true, null, false);
+        var first = SegmentedSortedList.CreateSorted(MakeLog("Shared", 1, 5), context);
+        var second = SegmentedSortedList.CreateSorted(MakeLog("Shared", 100, 5), context);
+
+        Assert.Throws<UnreachableException>(() => new CombinedEventView([first, second], context));
+    }
+
+    [Fact]
     public void CopyTo_ValidatesDestinationBeforeWriting()
     {
         var (facade, oracle) = Build([MakeLog("Log0", 1, 100)], ColumnName.DateAndTime, true, null);
@@ -28,16 +38,6 @@ public sealed class CombinedEventViewTests
         Assert.Null(destination[0]);
 
         for (int i = 0; i < facade.Count; i++) { Assert.Same(oracle[i], destination[i + 1]); }
-    }
-
-    [Fact]
-    public void Constructor_DuplicateOwningLog_Throws()
-    {
-        var context = new SortContext(ColumnName.DateAndTime, true, null, false);
-        var first = SegmentedSortedList.CreateSorted(MakeLog("Shared", 1, 5), context);
-        var second = SegmentedSortedList.CreateSorted(MakeLog("Shared", 100, 5), context);
-
-        Assert.Throws<UnreachableException>(() => new CombinedEventView([first, second], context));
     }
 
     [Fact]
@@ -166,6 +166,35 @@ public sealed class CombinedEventViewTests
     }
 
     [Fact]
+    public void Slice_CrossListComparerTie_ResolvedByListIndex_MatchesEnumerator()
+    {
+        // Force a TRUE cross-list comparer tie: each list's HEAD has a distinct OwningLog (ctor requirement), but the
+        // interior "Tie" events share OwningLog + identical keys across lists, so the merged heads become comparer-equal.
+        // Production never does this (lists are per-OwningLog), but SegmentedSortedList permits mixed logs, so this
+        // exercises the heap's list-index tiebreak. Slice (heap) and the enumerator (PickBest) both break ties by
+        // ascending list index, so they must agree.
+        var context = new SortContext(ColumnName.DateAndTime, false, null, false);
+        var time = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        List<ResolvedEvent> TieList(string head) =>
+        [
+            MakeEvent(head, 1, time, 1000, "S", "Information"),
+            MakeEvent("Tie", 2, time.AddMilliseconds(10), 1000, "S", "Information"),
+            MakeEvent("Tie", 3, time.AddMilliseconds(20), 1000, "S", "Information"),
+        ];
+
+        var lists = new List<SegmentedSortedList>
+        {
+            SegmentedSortedList.CreateSorted(TieList("L0"), context),
+            SegmentedSortedList.CreateSorted(TieList("L1"), context),
+            SegmentedSortedList.CreateSorted(TieList("L2"), context),
+        };
+        var facade = new CombinedEventView(lists, context);
+
+        AssertSliceMatchesEnumerator(facade);
+    }
+
+    [Fact]
     public void Slice_HandlesBoundariesAndOverflowWithoutWrongEmpty()
     {
         var (facade, oracle) = Build([MakeLog("Log0", 1, 1000)], ColumnName.DateAndTime, true, null);
@@ -178,6 +207,85 @@ public sealed class CombinedEventViewTests
         Assert.Equal(oracle.Count - 5, tail.Count);
         Assert.Same(oracle[5], tail[0]);
         Assert.Same(oracle[^1], tail[^1]);
+    }
+
+    [Fact]
+    public void Slice_UnderHeavyPrimaryKeyTies_MatchesEnumerator()
+    {
+        // Every event shares Source, ordered by Source, so the primary key ties for ALL of them and the comparer
+        // falls to its secondary keys - heavy comparer work through the heap. Assert against the enumerator (the real
+        // PickBest merge), never the unstable SortEvents oracle.
+        var time = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var perLog = new List<List<ResolvedEvent>>();
+
+        for (int k = 0; k < 4; k++)
+        {
+            var events = new List<ResolvedEvent>(300);
+
+            for (long record = 1; record <= 300; record++)
+            {
+                events.Add(MakeEvent($"Log{k}", record, time.AddMilliseconds(record), 1000, "SameSource", "Information"));
+            }
+
+            perLog.Add(events);
+        }
+
+        var context = new SortContext(ColumnName.Source, false, null, false);
+        var facade = new CombinedEventView(perLog.Select(e => SegmentedSortedList.CreateSorted(e, context)).ToList(), context);
+
+        AssertSliceMatchesEnumerator(facade);
+    }
+
+    [Fact]
+    public void Slice_UnevenLogLengths_MatchesEnumeratorAcrossExhaustion()
+    {
+        // A short list exhausts long before the long one; slices crossing that exhaustion point must still match.
+        var context = new SortContext(ColumnName.DateAndTime, false, null, false);
+        var lists = new List<SegmentedSortedList>
+        {
+            SegmentedSortedList.CreateSorted(MakeLog("Short", 1, 5), context),
+            SegmentedSortedList.CreateSorted(MakeLog("Long", 1, 500), context),
+        };
+        var facade = new CombinedEventView(lists, context);
+
+        AssertSliceMatchesEnumerator(facade);
+    }
+
+    [Fact]
+    public void Slice_WithEmptyListPresent_MatchesEnumerator()
+    {
+        var context = new SortContext(ColumnName.DateAndTime, false, null, false);
+        var lists = new List<SegmentedSortedList>
+        {
+            SegmentedSortedList.CreateSorted(MakeLog("Log0", 1, 200), context),
+            SegmentedSortedList.CreateSorted([], context),                       // empty list among the non-empty ones
+            SegmentedSortedList.CreateSorted(MakeLog("Log2", 1, 150), context),
+        };
+        var facade = new CombinedEventView(lists, context);
+
+        AssertSliceMatchesEnumerator(facade);
+    }
+
+    private static void AssertSliceMatchesEnumerator(CombinedEventView facade)
+    {
+        var enumerated = facade.ToList();   // the current PickBest merge - the parity reference (NOT the unstable sort)
+
+        int[] starts = [0, 1, 63, 64, 65, 127, 128, 255, 256, enumerated.Count / 2, Math.Max(0, enumerated.Count - 3)];
+
+        foreach (int start in starts)
+        {
+            if (start >= enumerated.Count) { continue; }
+
+            foreach (int count in new[] { 1, 40, 100, enumerated.Count })
+            {
+                var slice = facade.Slice(start, count);
+                int expected = Math.Min(count, enumerated.Count - start);
+
+                Assert.Equal(expected, slice.Count);
+
+                for (int j = 0; j < expected; j++) { Assert.Same(enumerated[start + j], slice[j]); }
+            }
+        }
     }
 
     private static (CombinedEventView Facade, IReadOnlyList<ResolvedEvent> Oracle) Build(

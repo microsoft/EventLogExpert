@@ -210,9 +210,14 @@ internal sealed class CombinedEventView : IReadOnlyList<ResolvedEvent>, IList<Re
         Span<int> listOffsets = k <= MaxStackOffsets ? stackalloc int[k] : new int[k];
         int position = SeekTo(start, listOffsets);
 
+        Span<int> segment = k <= MaxStackOffsets ? stackalloc int[k] : new int[k];
+        Span<int> offset = k <= MaxStackOffsets ? stackalloc int[k] : new int[k];
+        Span<int> heap = k <= MaxStackOffsets ? stackalloc int[k] : new int[k];
+        var merger = new PerLogMerger(_lists.AsSpan(), _comparer, segment, offset, heap, listOffsets);
+
         while (position < start)
         {
-            listOffsets[PickBest(listOffsets)]++;
+            merger.AdvanceBest();
             position++;
         }
 
@@ -220,9 +225,8 @@ internal sealed class CombinedEventView : IReadOnlyList<ResolvedEvent>, IList<Re
 
         for (int i = 0; position < end; i++, position++)
         {
-            int best = PickBest(listOffsets);
-            result[i] = _lists[best][listOffsets[best]];
-            listOffsets[best]++;
+            result[i] = merger.Current(merger.PeekBest());
+            merger.AdvanceBest();
         }
 
         return result;
@@ -307,5 +311,118 @@ internal sealed class CombinedEventView : IReadOnlyList<ResolvedEvent>, IList<Re
         checkpoints[checkpoint - 1].CopyTo(listOffsets);
 
         return checkpoint * Stride;
+    }
+
+    /// <summary>
+    ///     Walks the per-log lists as one globally-sorted stream via per-list positions and a min-heap of the active
+    ///     heads, byte-identical to <see cref="PickBest" /> (ties broken by ascending list index). All state is
+    ///     caller-provided <c>stackalloc</c> spans, so the merge allocates nothing, and a <see langword="ref" /> struct so it
+    ///     cannot escape or be shared. Parity relies on the comparer being a strict weak ordering.
+    /// </summary>
+    private ref struct PerLogMerger
+    {
+        private readonly ReadOnlySpan<SegmentedSortedList> _lists;
+        private readonly Comparison<ResolvedEvent> _comparer;
+        private readonly Span<int> _segment;
+        private readonly Span<int> _offset;
+        private readonly Span<int> _heap;
+        private int _count;
+
+        internal PerLogMerger(
+            ReadOnlySpan<SegmentedSortedList> lists,
+            Comparison<ResolvedEvent> comparer,
+            Span<int> segment,
+            Span<int> offset,
+            Span<int> heap,
+            ReadOnlySpan<int> flatOffsets)
+        {
+            _lists = lists;
+            _comparer = comparer;
+            _segment = segment;
+            _offset = offset;
+            _heap = heap;
+            _count = 0;
+
+            for (int list = 0; list < lists.Length; list++)
+            {
+                if (lists[list].TryGetSegmentOffset(flatOffsets[list], out int seg, out int off))
+                {
+                    _segment[list] = seg;
+                    _offset[list] = off;
+                    Push(list);
+                }
+            }
+        }
+
+        internal readonly int PeekBest() => _count > 0 ? _heap[0] : -1;
+
+        internal readonly ResolvedEvent Current(int list) => _lists[list].GetAt(_segment[list], _offset[list]);
+
+        internal void AdvanceBest()
+        {
+            Debug.Assert(_count > 0, "AdvanceBest called on an empty heap.");
+
+            int best = _heap[0];
+
+            if (_lists[best].TryAdvance(ref _segment[best], ref _offset[best]))
+            {
+                // The root's key only increased, so a single sift-down from the root restores the heap.
+                SiftDown(0);
+            }
+            else
+            {
+                _count--;
+
+                if (_count > 0)
+                {
+                    _heap[0] = _heap[_count];
+                    SiftDown(0);
+                }
+            }
+        }
+
+        private void Push(int list)
+        {
+            int child = _count++;
+            _heap[child] = list;
+
+            while (child > 0)
+            {
+                int parent = (child - 1) >> 1;
+
+                if (!Less(_heap[child], _heap[parent])) { break; }
+
+                (_heap[parent], _heap[child]) = (_heap[child], _heap[parent]);
+                child = parent;
+            }
+        }
+
+        private void SiftDown(int parent)
+        {
+            while (true)
+            {
+                int smallest = parent;
+                int left = (parent << 1) + 1;
+                int right = left + 1;
+
+                if (left < _count && Less(_heap[left], _heap[smallest])) { smallest = left; }
+
+                if (right < _count && Less(_heap[right], _heap[smallest])) { smallest = right; }
+
+                if (smallest == parent) { break; }
+
+                (_heap[parent], _heap[smallest]) = (_heap[smallest], _heap[parent]);
+                parent = smallest;
+            }
+        }
+
+        // Strict total order over list indices: the full comparer on the two heads, ties broken by ascending list
+        // index (earliest wins, matching PickBest's strict-< scan).
+        private readonly bool Less(int a, int b)
+        {
+            int comparison = _comparer(Current(a), Current(b));
+
+            return comparison != 0 ? comparison < 0 : a < b;
+        }
     }
 }

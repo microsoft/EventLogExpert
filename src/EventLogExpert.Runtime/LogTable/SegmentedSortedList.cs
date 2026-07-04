@@ -190,6 +190,8 @@ internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IList<
         return new SegmentedSortedList([merged], _context, _comparer);
     }
 
+    internal ResolvedEvent GetAt(int segment, int offset) => _segments[segment][offset];
+
     internal bool HasContext(SortContext context) => _context == context;
 
     internal int Rank(ResolvedEvent target)
@@ -291,6 +293,37 @@ internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IList<
         }
 
         return result;
+    }
+
+    internal bool TryAdvance(ref int segment, ref int offset)
+    {
+        offset++;
+
+        if (offset < _segments[segment].Length) { return true; }
+
+        offset = 0;
+        segment++;
+
+        // Segments are never empty (CreateSorted/Append/WhereSegmented drop empties), so the while is insurance only.
+        while (segment < _segments.Length && _segments[segment].IsEmpty) { segment++; }
+
+        return segment < _segments.Length;
+    }
+
+    internal bool TryGetSegmentOffset(int flatOffset, out int segment, out int offset)
+    {
+        if ((uint)flatOffset >= (uint)Count)
+        {
+            segment = 0;
+            offset = 0;
+
+            return false;
+        }
+
+        segment = FindSegment(flatOffset);
+        offset = flatOffset - _prefix[segment];
+
+        return true;
     }
 
     internal SegmentedSortedList WhereSegmented(Func<ResolvedEvent, bool> predicate)
