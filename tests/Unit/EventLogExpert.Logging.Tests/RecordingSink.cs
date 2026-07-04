@@ -4,7 +4,7 @@
 using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 
-namespace EventLogExpert.Logging.Tests.Routing;
+namespace EventLogExpert.Logging.Tests;
 
     internal sealed class RecordingSink(Func<string, LogLevel> minimumForCategory) : ILogSink
     {

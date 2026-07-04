@@ -125,7 +125,7 @@ public sealed class LogRoutingPolicyTests
                 policy.SetCategoryOverride("Resolution", enabled ? LogLevel.Trace : null);
                 enabled = !enabled;
             }
-        }, token);
+        }, TestContext.Current.CancellationToken);
 
         List<Task> tasks = [.. Enumerable.Range(0, 4).Select(_ => Task.Run(() =>
         {
@@ -136,7 +136,7 @@ public sealed class LogRoutingPolicyTests
                 LogLevel level = policy.FileMinimumFor("Resolution.Modern");
                 Assert.True(level is LogLevel.Trace or LogLevel.Warning);
             }
-        }, token))];
+        }, TestContext.Current.CancellationToken))];
         tasks.Add(writer);
 
         await Task.WhenAll(tasks);

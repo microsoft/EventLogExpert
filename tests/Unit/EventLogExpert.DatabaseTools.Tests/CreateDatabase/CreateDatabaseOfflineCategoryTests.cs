@@ -3,7 +3,7 @@
 
 using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Routing;
+using EventLogExpert.Logging.Loggers;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.DatabaseTools.Tests.CreateDatabase;

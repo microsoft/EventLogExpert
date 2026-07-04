@@ -8,7 +8,7 @@ using EventLogExpert.ElevationHelper.Ipc;
 using EventLogExpert.Eventing.OfflineImaging.Iso;
 using EventLogExpert.Eventing.OfflineImaging.Wim;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Routing;
+using EventLogExpert.Logging.Loggers;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
