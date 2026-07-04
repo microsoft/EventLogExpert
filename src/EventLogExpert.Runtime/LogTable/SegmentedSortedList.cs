@@ -266,6 +266,33 @@ internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IList<
         return null;
     }
 
+    internal ResolvedEvent[] Slice(int start, int count)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(start);
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+
+        int end = (int)Math.Min((long)start + count, Count);
+
+        if (start >= end) { return []; }
+
+        var result = new ResolvedEvent[end - start];
+        int segment = FindSegment(start);
+        int position = start;
+        int destination = 0;
+
+        while (position < end)
+        {
+            int segmentStart = position - _prefix[segment];
+            int take = Math.Min(_prefix[segment + 1] - position, end - position);
+            _segments[segment].CopyTo(segmentStart, result, destination, take);
+            destination += take;
+            position += take;
+            segment++;
+        }
+
+        return result;
+    }
+
     internal SegmentedSortedList WhereSegmented(Func<ResolvedEvent, bool> predicate)
     {
         var builder = ImmutableArray.CreateBuilder<ImmutableArray<ResolvedEvent>>(_segments.Length);
@@ -327,6 +354,9 @@ internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IList<
 
     private int FindSegment(int index)
     {
+#if DEBUG
+        FindSegmentCallCount++;
+#endif
         int low = 0;
         int high = _segments.Length - 1;
 
@@ -372,4 +402,12 @@ internal sealed class SegmentedSortedList : IReadOnlyList<ResolvedEvent>, IList<
 
         return result.MoveToImmutable();
     }
+
+#if DEBUG
+    // Test-only (Item 4a): lets a test assert SegmentedSortedList.Slice does exactly one FindSegment. Instance-scoped
+    // so xUnit's parallel test classes never share it; DEBUG-only so Release/benchmark builds carry zero overhead.
+    internal int FindSegmentCallCount { get; private set; }
+
+    internal void ResetFindSegmentCallCount() => FindSegmentCallCount = 0;
+#endif
 }
