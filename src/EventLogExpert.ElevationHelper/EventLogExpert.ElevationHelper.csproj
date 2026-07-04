@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EventLogExpert.DatabaseTools\EventLogExpert.DatabaseTools.csproj" />
+    <ProjectReference Include="..\EventLogExpert.Eventing.OfflineImaging\EventLogExpert.Eventing.OfflineImaging.csproj" />
     <ProjectReference Include="..\EventLogExpert.Logging\EventLogExpert.Logging.csproj" />
     <ProjectReference Include="..\EventLogExpert.Runtime\EventLogExpert.Runtime.csproj" />
   </ItemGroup>

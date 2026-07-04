@@ -1,7 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.PublisherMetadata;
+using EventLogExpert.Eventing.OfflineImaging.Extraction;
+using EventLogExpert.Eventing.ProviderMetadata;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Database.Context;
