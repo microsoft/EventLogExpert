@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\EventLogExpert.Eventing.OfflineImaging\EventLogExpert.Eventing.OfflineImaging.csproj" />
     <ProjectReference Include="..\..\..\src\EventLogExpert.UI\EventLogExpert.UI.csproj" />
   </ItemGroup>
 

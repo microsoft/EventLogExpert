@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Eventing.PublisherMetadata;
+using EventLogExpert.Eventing.ProviderMetadata;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Lookup;

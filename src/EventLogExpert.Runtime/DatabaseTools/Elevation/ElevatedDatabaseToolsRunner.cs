@@ -8,7 +8,7 @@ using EventLogExpert.DatabaseTools.DiffDatabase;
 using EventLogExpert.DatabaseTools.MergeDatabase;
 using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
-using EventLogExpert.Eventing.PublisherMetadata.Offline;
+using EventLogExpert.Eventing.OfflineImaging.Wim;
 using EventLogExpert.Logging.Abstractions;
 using System.ComponentModel;
 using System.Diagnostics;

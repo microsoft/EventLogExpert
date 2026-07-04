@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.PublisherMetadata;
+using EventLogExpert.Eventing.ProviderMetadata;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Resolution;

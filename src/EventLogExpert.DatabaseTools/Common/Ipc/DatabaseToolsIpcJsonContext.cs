@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.CreateDatabase;
-using EventLogExpert.Eventing.PublisherMetadata.Offline;
+using EventLogExpert.Eventing.OfflineImaging.Wim;
 using System.Text.Json.Serialization;
 
 namespace EventLogExpert.DatabaseTools.Common.Ipc;
