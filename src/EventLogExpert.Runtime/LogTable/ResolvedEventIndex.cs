@@ -114,6 +114,8 @@ public static class ResolvedEventIndex
 
         if (events is CombinedEventView combined) { return combined.Slice(start, count); }
 
+        if (events is SegmentedSortedList segmented) { return segmented.Slice(start, count); }
+
         if (start < 0) { throw new ArgumentOutOfRangeException(nameof(start)); }
 
         if (count < 0) { throw new ArgumentOutOfRangeException(nameof(count)); }

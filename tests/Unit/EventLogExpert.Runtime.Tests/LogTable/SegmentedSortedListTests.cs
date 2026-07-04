@@ -263,6 +263,68 @@ public sealed class SegmentedSortedListTests
     }
 
     [Fact]
+    public void Slice_CountOverflowingIntMax_ClampsToCount()
+    {
+        var list = BuildManySegments(segments: 3, perSegment: 4);   // 12 events
+
+        var slice = list.Slice(2, int.MaxValue);
+
+        Assert.Equal(10, slice.Length);
+        Assert.Same(list[2], slice[0]);
+        Assert.Same(list[^1], slice[^1]);
+    }
+
+    [Fact]
+    public void Slice_MatchesIndexerLoop_AcrossSegmentsAndBoundaries()
+    {
+        var list = BuildManySegments(segments: 10, perSegment: 7);   // 70 events across 10 segments
+        Assert.Equal(10, list.SegmentCount);
+        Assert.Equal(70, list.Count);
+
+        (int start, int count)[] cases =
+        [
+            (0, 5), (3, 10), (0, 70), (69, 1), (0, 1), (65, 20), (35, 7), (7, 14), (0, 0), (70, 5), (50, 0), (68, 100),
+        ];
+
+        foreach (var (start, count) in cases)
+        {
+            var actual = list.Slice(start, count);
+            var expected = ExpectedSlice(list, start, count);
+
+            Assert.Equal(expected.Length, actual.Length);
+
+            for (int i = 0; i < actual.Length; i++) { Assert.Same(expected[i], actual[i]); }
+        }
+    }
+
+    [Fact]
+    public void Slice_NegativeStartOrCount_Throws()
+    {
+        var list = BuildManySegments(segments: 3, perSegment: 4);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.Slice(-1, 5));
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.Slice(0, -1));
+    }
+
+    [Fact]
+    public void Slice_SingleSegment_MatchesIndexerLoop()
+    {
+        var list = SegmentedSortedList.CreateSorted(
+            [Ev("LogA", 10, 1), Ev("LogA", 20, 2), Ev("LogA", 30, 3), Ev("LogA", 40, 4)], s_byTime);
+        Assert.Equal(1, list.SegmentCount);
+
+        foreach (var (start, count) in new[] { (0, 4), (1, 2), (3, 1), (0, 0), (4, 2), (2, 10) })
+        {
+            var actual = list.Slice(start, count);
+            var expected = ExpectedSlice(list, start, count);
+
+            Assert.Equal(expected.Length, actual.Length);
+
+            for (int i = 0; i < actual.Length; i++) { Assert.Same(expected[i], actual[i]); }
+        }
+    }
+
+    [Fact]
     public void WhereSegmented_DropsEmptyMiddleSegment()
     {
         var middle = SegmentedSortedList.CreateSorted([Ev("LogC", 100, 1), Ev("LogC", 110, 2)], s_byTime);
@@ -294,6 +356,25 @@ public sealed class SegmentedSortedListTests
         }
     }
 
+    private static SegmentedSortedList BuildManySegments(int segments, int perSegment)
+    {
+        var list = SegmentedSortedList.CreateSorted([], s_byTime);
+        int time = 0;
+        long recordId = 0;
+
+        for (int segment = 0; segment < segments; segment++)
+        {
+            var batch = new ResolvedEvent[perSegment];
+
+            // Strictly ascending time per batch so each Append lands entirely after the previous -> a new segment.
+            for (int i = 0; i < perSegment; i++) { batch[i] = Ev("LogA", time++, recordId++); }
+
+            list = list.Append(batch);
+        }
+
+        return list;
+    }
+
     private static ResolvedEvent Ev(string owningLog, int timeMs, long? recordId, string level = "") =>
         new(owningLog, LogPathType.Channel)
         {
@@ -301,6 +382,19 @@ public sealed class SegmentedSortedListTests
             RecordId = recordId,
             Level = level
         };
+
+    private static ResolvedEvent[] ExpectedSlice(SegmentedSortedList list, int start, int count)
+    {
+        int end = (int)Math.Min((long)start + count, list.Count);
+
+        if (start >= end) { return []; }
+
+        var expected = new ResolvedEvent[end - start];
+
+        for (int i = 0; i < expected.Length; i++) { expected[i] = list[start + i]; }
+
+        return expected;
+    }
 
     private static List<ResolvedEvent> StableMerge(IReadOnlyList<ResolvedEvent> existing, IReadOnlyList<ResolvedEvent> batch)
     {
@@ -321,4 +415,31 @@ public sealed class SegmentedSortedListTests
 
         return result;
     }
+
+#if DEBUG
+    [Fact]
+    public void Slice_NonEmpty_DoesExactlyOneFindSegment()
+    {
+        var list = BuildManySegments(segments: 8, perSegment: 5);   // 40 events across 8 segments
+        list.ResetFindSegmentCallCount();
+
+        _ = list.Slice(10, 20);   // spans several segments, still a single FindSegment
+
+        Assert.Equal(1, list.FindSegmentCallCount);
+    }
+
+    [Fact]
+    public void Slice_Empty_DoesNoFindSegment()
+    {
+        var list = BuildManySegments(segments: 8, perSegment: 5);
+
+        list.ResetFindSegmentCallCount();
+        _ = list.Slice(list.Count, 5);   // start == Count -> empty, early return before FindSegment
+        Assert.Equal(0, list.FindSegmentCallCount);
+
+        list.ResetFindSegmentCallCount();
+        _ = list.Slice(5, 0);            // count == 0 -> empty
+        Assert.Equal(0, list.FindSegmentCallCount);
+    }
+#endif
 }
