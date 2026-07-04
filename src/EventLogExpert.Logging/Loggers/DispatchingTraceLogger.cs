@@ -6,7 +6,7 @@ using EventLogExpert.Logging.Abstractions.Handlers;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 
-namespace EventLogExpert.Logging.Routing;
+namespace EventLogExpert.Logging.Loggers;
 
 public sealed class DispatchingTraceLogger(
     IReadOnlyList<ILogSink> sinks,
