@@ -8,7 +8,7 @@ using EventLogExpert.DatabaseTools.MergeDatabase;
 using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Routing;
+using EventLogExpert.Logging.Loggers;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 

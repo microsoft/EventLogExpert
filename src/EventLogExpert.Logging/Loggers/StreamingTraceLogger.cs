@@ -6,7 +6,7 @@ using EventLogExpert.Logging.Abstractions.Handlers;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 
-namespace EventLogExpert.Logging.Routing;
+namespace EventLogExpert.Logging.Loggers;
 
 /// <summary>
 ///     <see cref="ITraceLogger" /> implementation that streams every emitted message as a <see cref="LogRecord" />
