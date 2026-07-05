@@ -113,8 +113,9 @@ internal sealed class FilteringEffects(
         if (_concurrencyState.GetCurrentFilterToken() != filterToken) { return; }
 
         var filter = _eventLogState.Value.AppliedFilter;
-        var context = _logTableState.Value.SortContext;
-        var version = _logTableState.Value.DisplayListVersion;
+        var logTable = _logTableState.Value;
+        var context = logTable.SortContext;
+        var version = logTable.DisplayListVersion;
 
         var targets = ResidualOpenStale(action.StaleIds);
 
@@ -228,8 +229,9 @@ internal sealed class FilteringEffects(
     private async Task ApplyFilterAndPublishAsync(Filter filter, long filterToken, IDispatcher dispatcher)
     {
         var snapshot = SnapshotOpenLogEvents();
-        var capturedContext = _logTableState.Value.SortContext;
-        var version = _logTableState.Value.DisplayListVersion;
+        var logTable = _logTableState.Value;
+        var capturedContext = logTable.SortContext;
+        var version = logTable.DisplayListVersion;
 
         dispatcher.Dispatch(new SetFilterProgressAction(true));
 
