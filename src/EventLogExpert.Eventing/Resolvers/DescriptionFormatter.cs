@@ -44,7 +44,8 @@ internal sealed partial class DescriptionFormatter(
         ProviderDetails? descriptionDetails,
         EventModel? modernEvent,
         ProviderDetails? supplemental,
-        EventModel? supplementalModernEvent)
+        EventModel? supplementalModernEvent,
+        TemplateInfo? primaryInfo)
     {
         if (descriptionDetails is null)
         {
@@ -53,7 +54,7 @@ internal sealed partial class DescriptionFormatter(
             return DefaultNoProviderDescription;
         }
 
-        var properties = GetFormattedProperties(modernEvent?.Template, eventRecord.Properties, descriptionDetails.Maps);
+        var properties = GetFormattedProperties(primaryInfo?.Metadata ?? default, eventRecord.Properties, descriptionDetails.Maps);
 
         var descriptionFromSupplemental = supplemental is not null && ReferenceEquals(descriptionDetails, supplemental);
 
@@ -96,7 +97,10 @@ internal sealed partial class DescriptionFormatter(
                 {
                     _logger?.Debug($"{nameof(Resolve)}: Disambiguated via supplemental modern event - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
 
-                    var supplementalProperties = GetFormattedProperties(supplementalModernEvent!.Template, eventRecord.Properties, supplemental.Maps);
+                    var supplementalProperties = GetFormattedProperties(
+                        _templates.GetTemplateInfo(supplementalModernEvent.Template).Metadata,
+                        eventRecord.Properties,
+                        supplemental.Maps);
 
                     // Supplemental descriptions resolve %%n against supplemental parameters first.
                     return FormatDescription(supplementalProperties, supplementalModernEvent.Description,
@@ -330,6 +334,35 @@ internal sealed partial class DescriptionFormatter(
         _ => reference?.ToString() ?? string.Empty
     };
 
+    private static List<string> GetFormattedProperties(
+        in TemplateMetadata metadata,
+        ImmutableArray<EventProperty> properties,
+        IReadOnlyDictionary<string, ValueMapDefinition> maps)
+    {
+        ImmutableArray<string> dataNodes = default;
+        ImmutableArray<string> mapNodes = default;
+        List<string> formattedValues = new(properties.Length);
+
+        if (FieldNameOrderingSelector.TrySelectOrdering(metadata, properties.Length, out FieldNameOrdering ordering))
+        {
+            dataNodes = ordering == FieldNameOrdering.Visible ? metadata.VisibleOutTypes : metadata.AllOutTypes;
+            mapNodes = ordering == FieldNameOrdering.Visible ? metadata.VisibleMaps : metadata.AllMaps;
+        }
+
+        int index = 0;
+
+        foreach (EventProperty property in properties)
+        {
+            string? outType = !dataNodes.IsDefault && index < dataNodes.Length ? dataNodes[index] : null;
+            string? mapName = !mapNodes.IsDefault && index < mapNodes.Length ? mapNodes[index] : null;
+
+            formattedValues.Add(FormatProperty(property, outType, mapName, maps));
+            index++;
+        }
+
+        return formattedValues;
+    }
+
     private static void ResizeBuffer(ref char[] buffer, ref Span<char> source, int sizeToAdd)
     {
         char[] newBuffer = ArrayPool<char>.Shared.Rent(source.Length + sizeToAdd);
@@ -536,46 +569,6 @@ internal sealed partial class DescriptionFormatter(
 
             if (cleanupRented is not null) { ArrayPool<char>.Shared.Return(cleanupRented); }
         }
-    }
-
-    private List<string> GetFormattedProperties(
-        ReadOnlySpan<char> template,
-        IReadOnlyList<EventProperty> properties,
-        IReadOnlyDictionary<string, ValueMapDefinition> maps)
-    {
-        ImmutableArray<string> dataNodes = default;
-        ImmutableArray<string> mapNodes = default;
-        List<string> formattedValues = new(properties.Count);
-
-        if (!template.IsEmpty)
-        {
-            // Match outTypes to actual property count because EvtRender may omit hidden length-provider fields.
-            var meta = _templates.Analyze(template);
-
-            if (meta.VisibleOutTypes.Length == properties.Count)
-            {
-                dataNodes = meta.VisibleOutTypes;
-                mapNodes = meta.VisibleMaps;
-            }
-            else if (meta.AllOutTypes.Length == properties.Count)
-            {
-                dataNodes = meta.AllOutTypes;
-                mapNodes = meta.AllMaps;
-            }
-        }
-
-        int index = 0;
-
-        foreach (EventProperty property in properties)
-        {
-            string? outType = !dataNodes.IsDefault && index < dataNodes.Length ? dataNodes[index] : null;
-            string? mapName = !mapNodes.IsDefault && index < mapNodes.Length ? mapNodes[index] : null;
-
-            formattedValues.Add(FormatProperty(property, outType, mapName, maps));
-            index++;
-        }
-
-        return formattedValues;
     }
 
     // Bias %%n lookup toward the provider that supplied the description, lazy-loading supplemental only when needed.

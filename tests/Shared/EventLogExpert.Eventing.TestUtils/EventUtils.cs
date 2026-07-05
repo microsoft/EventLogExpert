@@ -189,7 +189,7 @@ public static class EventUtils
             Id = id,
             Version = version,
             LogName = ApplicationLogName,
-            Properties = properties
+            Properties = [.. properties]
         }
     );
 }

@@ -17,7 +17,8 @@ public sealed class PropertyResolverSchemaTests
     [
         "OwningLog", // Internal: identifies the log file/live channel; not user-visible filter target.
         "LogPathType", // Enum discriminator paired with OwningLog; not a user-facing filter target.
-        "KeywordsDisplayName" // Computed convenience accessor; users filter via Keywords directly.
+        "KeywordsDisplayName", // Computed convenience accessor; users filter via Keywords directly.
+        "EventData" // Structured field accessor; named-field filtering arrives with the filter DSL, not as a scalar column.
     ];
 
     [Fact]

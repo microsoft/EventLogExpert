@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
@@ -100,6 +101,26 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_ModernTemplateWithMatchingProperties_PopulatesNamedEventData()
+    {
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "User %1 from %2",
+            """<template><data name="User" inType="win:UnicodeString"/><data name="Source" inType="win:UnicodeString"/></template>""",
+            ["alice", "10.0.0.1"]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var resolved = resolver.ResolveEvent(eventRecord);
+
+        Assert.Equal(EventDataKind.EventData, resolved.EventData.Kind);
+        Assert.Equal(2, resolved.EventData.Count);
+        Assert.True(resolved.EventData.TryGetValue("User", out var user));
+        Assert.Equal("alice", user.AsString());
+        Assert.True(resolved.EventData.TryGetValue("Source", out var source));
+        Assert.Equal("10.0.0.1", source.AsString());
+    }
+
+    [Fact]
     public void ResolveEvent_MSExchangeReplEvent_ShouldResolveCorrectly()
     {
         // Arrange
@@ -114,6 +135,33 @@ public sealed class EventResolverBaseTests
         Assert.NotNull(displayEvent);
         Assert.Equal(Constants.ExchangeFormattedDescription, displayEvent.Description);
         Assert.Equal("Service", displayEvent.TaskCategory);
+    }
+
+    [Fact]
+    public void ResolveEvent_NoModernTemplate_YieldsNoneEventData()
+    {
+        var (details, eventRecord) = EventUtils.CreateModernEvent("desc", "", ["value"]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var resolved = resolver.ResolveEvent(eventRecord);
+
+        Assert.Equal(EventDataKind.None, resolved.EventData.Kind);
+    }
+
+    [Fact]
+    public void ResolveEvent_PropertyCountMatchesNeitherOrdering_FailsClosedToNone()
+    {
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "desc",
+            """<template><data name="A" inType="win:UnicodeString"/><data name="B" inType="win:UnicodeString"/></template>""",
+            ["one", "two", "three"]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var resolved = resolver.ResolveEvent(eventRecord);
+
+        Assert.Equal(EventDataKind.None, resolved.EventData.Kind);
     }
 
     [Fact]

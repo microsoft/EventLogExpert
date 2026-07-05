@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using System.Collections.Immutable;
 using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Readers;
@@ -30,7 +31,7 @@ public sealed record EventRecord
 
     public long? RecordId { get; set; }
 
-    internal IReadOnlyList<EventProperty> Properties { get; set; } = [];
+    internal ImmutableArray<EventProperty> Properties { get; set; } = [];
 
     public string ProviderName { get; set; } = string.Empty;
 
