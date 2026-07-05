@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Interop;
-using EventLogExpert.Eventing.PublisherMetadata;
+using EventLogExpert.Eventing.ProviderMetadata;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.TestUtils.Constants;
 using System.Runtime.InteropServices;
@@ -12,7 +12,7 @@ namespace EventLogExpert.Eventing.IntegrationTests.Interop;
 
 // Item 1: validates the wevtapi [ThreadStatic] buffer-reuse rewrite of NativeMethods.RenderEvent* / FormatMessage /
 // GetObjectArrayProperty - the skip-probe P/Invoke counts and the continuous-pin GC-move guarantee. Real wevtapi ->
-// container-gated integration tier (no committed .evtx exists; the convention is ProviderMetadata.Create + live
+// container-gated integration tier (no committed .evtx exists; the convention is PublisherMetadataHandle.Create + live
 // handles). The P/Invoke counters and the BeforeVariantReadForTest hook are #if DEBUG-only seams, so the tests that
 // use them are #if DEBUG-guarded.
 public sealed class WevtapiBufferReuseTests
@@ -20,7 +20,7 @@ public sealed class WevtapiBufferReuseTests
     [Fact]
     public void FormatMessage_WhenUnknownMessageId_Throws()
     {
-        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using PublisherMetadataHandle? metadata = PublisherMetadataHandle.Create(Constants.SecurityAuditingLogName);
         Assert.SkipUnless(metadata is not null, "Requires the Microsoft-Windows-Security-Auditing provider on the host.");
 
         // 0xFFFFFFFE is not a resolvable resource id. The rewrite preserves the pre-existing behavior: any error that is
@@ -49,7 +49,7 @@ public sealed class WevtapiBufferReuseTests
     [Fact]
     public void FormatMessage_WhenWarmed_IssuesSingleProbelessPInvoke()
     {
-        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using PublisherMetadataHandle? metadata = PublisherMetadataHandle.Create(Constants.SecurityAuditingLogName);
         Assert.SkipUnless(metadata is not null, "Requires the Microsoft-Windows-Security-Auditing provider on the host.");
 
         uint messageId = FirstResolvableMessageId(metadata!);
@@ -108,13 +108,13 @@ public sealed class WevtapiBufferReuseTests
     [Fact]
     public void GetObjectArrayProperty_WhenCompactingGcDuringVariantRead_ReturnsIntactChannels()
     {
-        using ProviderMetadata? reference = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using PublisherMetadataHandle? reference = PublisherMetadataHandle.Create(Constants.SecurityAuditingLogName);
         Assert.SkipUnless(reference is not null, "Requires the Microsoft-Windows-Security-Auditing provider on the host.");
 
         var expected = reference!.ToRawContent(Constants.SecurityAuditingLogName, null).Channels;
         Assert.NotEmpty(expected);
 
-        using ProviderMetadata? underGc = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using PublisherMetadataHandle? underGc = PublisherMetadataHandle.Create(Constants.SecurityAuditingLogName);
         Assert.SkipUnless(underGc is not null, "Requires the Microsoft-Windows-Security-Auditing provider on the host.");
 
         try
@@ -143,7 +143,7 @@ public sealed class WevtapiBufferReuseTests
         GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
     }
 
-    private static uint FirstResolvableMessageId(ProviderMetadata metadata)
+    private static uint FirstResolvableMessageId(PublisherMetadataHandle metadata)
     {
         RawProviderContent content = metadata.ToRawContent(Constants.SecurityAuditingLogName, null);
 
@@ -254,7 +254,7 @@ public sealed class WevtapiBufferReuseTests
     [Fact]
     public void FormatMessage_WhenMessageExceedsInitialBuffer_GrowsRetriesThenReuses()
     {
-        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using PublisherMetadataHandle? metadata = PublisherMetadataHandle.Create(Constants.SecurityAuditingLogName);
         Assert.SkipUnless(metadata is not null, "Requires the Microsoft-Windows-Security-Auditing provider on the host.");
 
         uint messageId = FirstResolvableMessageId(metadata!);
@@ -289,7 +289,7 @@ public sealed class WevtapiBufferReuseTests
     [Fact]
     public void FormatMessage_WhenMessageHasInserts_ReturnsBestEffortTextWithoutThrowing()
     {
-        using ProviderMetadata? metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        using PublisherMetadataHandle? metadata = PublisherMetadataHandle.Create(Constants.SecurityAuditingLogName);
         Assert.SkipUnless(metadata is not null, "Requires the Microsoft-Windows-Security-Auditing provider on the host.");
 
         // Event messages formatted by id (with no insert values) exercise the unresolved-insert tolerance:
