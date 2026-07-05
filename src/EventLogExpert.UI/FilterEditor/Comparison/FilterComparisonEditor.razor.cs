@@ -29,6 +29,8 @@ public sealed partial class FilterComparisonEditor : ComponentBase
 
     [Parameter] public string? PropertyAriaLabelledBy { get; set; }
 
+    private ImmutableArray<string> EventDataFieldNames => EventLogQueries.GetEventDataFieldNames();
+
     [Inject] private IEventLogQueries EventLogQueries { get; init; } = null!;
 
     private List<string> FilteredItems
@@ -52,7 +54,11 @@ public sealed partial class FilterComparisonEditor : ComponentBase
         }
     } = [];
 
-    private ImmutableArray<string> Items => EventLogQueries.GetPropertyValues(Comparison.Property);
+    private bool IsEventDataProperty => Comparison.Property is EventProperty.EventData;
+
+    private ImmutableArray<string> Items => Comparison.Property is EventProperty.EventData
+        ? EventLogQueries.GetEventDataFieldValues(Comparison.EventDataFieldName ?? string.Empty)
+        : EventLogQueries.GetPropertyValues(Comparison.Property);
 
     private EventProperty PropertyBinding
     {
@@ -72,6 +78,16 @@ public sealed partial class FilterComparisonEditor : ComponentBase
     }
 
     private static bool IsTextOnlyProperty(EventProperty property) => FilterPropertyConstraints.IsTextOnly(property);
+
+    private async Task HandleEventDataFieldNameChanged(string? fieldName)
+    {
+        Comparison.EventDataFieldName = fieldName;
+
+        // The available value space is field-specific, so a field-name change invalidates the current value(s).
+        Comparison.Value = null;
+        Comparison.Values.Clear();
+        await OnChanged.InvokeAsync();
+    }
 
     private async Task HandleOperatorChanged((ComparisonOperator Op, MatchMode Mode) value)
     {

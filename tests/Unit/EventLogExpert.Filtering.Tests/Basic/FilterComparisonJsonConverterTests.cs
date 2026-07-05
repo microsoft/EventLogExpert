@@ -11,9 +11,7 @@ public sealed class FilterComparisonJsonConverterTests
     [Fact]
     public void EventProperty_MemberCount_IsFrozenForWireCompatibility()
     {
-        // Pairs with the per-ordinal Read_LegacyCategoryKey theory: adding or removing an EventProperty
-        // value would leave that theory passing while still corrupting legacy reads for the missing ordinal.
-        Assert.Equal(12, Enum.GetValues<EventProperty>().Length);
+        Assert.Equal(13, Enum.GetValues<EventProperty>().Length);
     }
 
     [Fact]

@@ -18,13 +18,28 @@ public sealed class FilterPredicateDraft
     ///     <list type="bullet">
     ///         <item><c>Single</c> match mode requires a non-whitespace <see cref="FilterComparisonDraft.Value" />.</item>
     ///         <item><c>Many</c> match mode requires at least one entry in <see cref="FilterComparisonDraft.Values" />.</item>
+    ///         <item>
+    ///             An <see cref="EventProperty.EventData" /> row additionally requires a non-whitespace
+    ///             <see cref="FilterComparisonDraft.EventDataFieldName" />.
+    ///         </item>
     ///     </list>
     ///     Mirrors the formatter's strict-mode validation so the in-flight UI state matches the eventual save guard.
     /// </summary>
-    public bool IsComplete =>
-        Comparison.MatchMode == MatchMode.Many
-            ? Comparison.Values.Count > 0
-            : !string.IsNullOrWhiteSpace(Comparison.Value);
+    public bool IsComplete
+    {
+        get
+        {
+            if (Comparison.Property is EventProperty.EventData
+                && string.IsNullOrWhiteSpace(Comparison.EventDataFieldName))
+            {
+                return false;
+            }
+
+            return Comparison.MatchMode == MatchMode.Many
+                ? Comparison.Values.Count > 0
+                : !string.IsNullOrWhiteSpace(Comparison.Value);
+        }
+    }
 
     public bool JoinWithAny { get; set; }
 

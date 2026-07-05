@@ -18,6 +18,9 @@ public sealed class FilterComparisonDraft
 
     public List<string> Values { get; set; } = [];
 
+    /// <summary>The named EventData field this row targets; meaningful only when <see cref="Property" /> is EventData.</summary>
+    public string? EventDataFieldName { get; set; }
+
     public static FilterComparisonDraft FromComparison(FilterComparison comparison) =>
         new()
         {
@@ -25,7 +28,8 @@ public sealed class FilterComparisonDraft
             Operator = comparison.Operator,
             MatchMode = comparison.MatchMode,
             Value = comparison.Value,
-            Values = [.. comparison.Values]
+            Values = [.. comparison.Values],
+            EventDataFieldName = comparison.EventDataFieldName
         };
 
     public void ChangeProperty(EventProperty property)
@@ -33,6 +37,7 @@ public sealed class FilterComparisonDraft
         Property = property;
         Value = null;
         Values.Clear();
+        EventDataFieldName = null;
     }
 
     public FilterComparison ToComparison() =>
@@ -42,6 +47,7 @@ public sealed class FilterComparisonDraft
             Operator = Operator,
             MatchMode = MatchMode,
             Value = Value,
-            Values = [.. Values]
+            Values = [.. Values],
+            EventDataFieldName = EventDataFieldName
         };
 }
