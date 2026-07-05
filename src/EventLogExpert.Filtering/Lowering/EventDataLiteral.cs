@@ -59,8 +59,12 @@ internal sealed class EventDataLiteral
             double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : null;
         float? single = float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var f) ? f : null;
         bool? boolean = bool.TryParse(raw, out var b) ? b : null;
+        // Strictly the inverse of EventFieldValue.AsString's ToString("O"): only the canonical round-trip form
+        // matches (picklist values are already "O"), not lenient/ambiguous date formats.
         DateTime? dateTime =
-            DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dt) ? dt : null;
+            DateTime.TryParseExact(raw, "O", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dt)
+                ? dt
+                : null;
         Guid? guid = Guid.TryParse(raw, out var g) ? g : null;
 
         return new EventDataLiteral(raw, int64, uint64, doubleValue, single, boolean, dateTime, guid);
