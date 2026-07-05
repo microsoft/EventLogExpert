@@ -31,7 +31,10 @@ public static class EventPropertyValuesCache
     /// </summary>
     public static ImmutableArray<string> GetEventDataFieldNames(object cacheKey, IEnumerable<ResolvedEvent> events) =>
         s_fieldNameCache
-            .GetValue(cacheKey, _ => new Lazy<ImmutableArray<string>>(() => [.. events.GetEventDataFieldNames().Order()]))
+            .GetValue(
+                cacheKey,
+                _ => new Lazy<ImmutableArray<string>>(
+                    () => [.. events.GetEventDataFieldNames().Order(StringComparer.Ordinal)]))
             .Value;
 
     /// <summary>
@@ -65,7 +68,7 @@ public static class EventPropertyValuesCache
             .GetOrAdd(
                 fieldName,
                 name => new Lazy<ImmutableArray<string>>(
-                    () => [.. events.GetEventDataFieldValues(name).Distinct().Order()]))
+                    () => [.. events.GetEventDataFieldValues(name).Distinct().Order(StringComparer.Ordinal)]))
             .Value;
     }
 
