@@ -88,6 +88,16 @@ public sealed class EventDataFilterCompilationTests
     }
 
     [Fact]
+    public void DateTimeEquality_RejectsNonRoundTripLiteral()
+    {
+        // Only the canonical "O" round-trip form parses to a DateTime candidate; a lenient date string does not,
+        // so it never matches a DateTime field (even the same instant).
+        var predicate = Compile("EventData[\"When\"] == \"2024-01-01\"");
+
+        Assert.False(predicate(Event(("When", new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)))));
+    }
+
+    [Fact]
     public void DoubleEquality_MatchesNaN()
     {
         var predicate = Compile("EventData[\"Ratio\"] == \"NaN\"");
