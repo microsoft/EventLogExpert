@@ -162,17 +162,21 @@ public readonly struct EventFieldValue
             case EventPropertyKind.DateTime:
                 return new(EventFieldValueKind.DateTime, property.AsDateTime.ToBinary(), null);
             default:
-                return property.Reference switch
+            {
+                object? reference = property.Reference;
+
+                return reference switch
                 {
                     null => new(EventFieldValueKind.Null, 0, null),
                     string text => new(EventFieldValueKind.String, 0, text),
-                    Guid guid => new(EventFieldValueKind.Guid, 0, guid),
+                    Guid => new(EventFieldValueKind.Guid, 0, reference),
                     SecurityIdentifier sid => new(EventFieldValueKind.Sid, 0, sid),
                     byte[] bytes => new(EventFieldValueKind.Bytes, 0, bytes),
                     string[] strings => new(EventFieldValueKind.StringArray, 0, strings),
                     Array array => new(EventFieldValueKind.Array, 0, array),
-                    var other => new(EventFieldValueKind.String, 0, other.ToString() ?? string.Empty)
+                    _ => new(EventFieldValueKind.String, 0, reference.ToString() ?? string.Empty)
                 };
+            }
         }
     }
 }
