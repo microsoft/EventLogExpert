@@ -198,6 +198,79 @@ internal static class BasicFilterDecomposer
         return true;
     }
 
+    private static bool TryMapEventDataComparison(
+        EventDataComparisonNode node,
+        [NotNullWhen(true)] out FilterComparison? comparison)
+    {
+        comparison = null;
+
+        if (string.IsNullOrWhiteSpace(node.FieldName) || string.IsNullOrWhiteSpace(node.Literal.Raw))
+        {
+            return false;
+        }
+
+        comparison = new FilterComparison
+        {
+            Property = EventProperty.EventData,
+            EventDataFieldName = node.FieldName,
+            Operator = node.Op == FilterBinaryOperator.Equal
+                ? ComparisonOperator.Equals
+                : ComparisonOperator.NotEqual,
+            MatchMode = MatchMode.Single,
+            Value = node.Literal.Raw
+        };
+
+        return true;
+    }
+
+    private static bool TryMapEventDataContains(
+        EventDataContainsNode node,
+        [NotNullWhen(true)] out FilterComparison? comparison)
+    {
+        comparison = null;
+
+        // Mirror the ContainsNode guard: a case-sensitive Advanced contains is not Basic vocabulary (Basic is always
+        // OrdinalIgnoreCase), so leave it Advanced-only rather than re-encode it as an OIC Basic row.
+        if (!node.IgnoreCase || string.IsNullOrWhiteSpace(node.FieldName) || string.IsNullOrWhiteSpace(node.Needle))
+        {
+            return false;
+        }
+
+        comparison = new FilterComparison
+        {
+            Property = EventProperty.EventData,
+            EventDataFieldName = node.FieldName,
+            Operator = node.Negated ? ComparisonOperator.NotContains : ComparisonOperator.Contains,
+            MatchMode = MatchMode.Single,
+            Value = node.Needle
+        };
+
+        return true;
+    }
+
+    private static bool TryMapEventDataMultiEquals(
+        EventDataMultiEqualsNode node,
+        [NotNullWhen(true)] out FilterComparison? comparison)
+    {
+        comparison = null;
+
+        if (node.Literals.Count == 0 || string.IsNullOrWhiteSpace(node.FieldName))
+        {
+            return false;
+        }
+
+        comparison = new FilterComparison
+        {
+            Property = EventProperty.EventData,
+            EventDataFieldName = node.FieldName,
+            Operator = ComparisonOperator.Equals,
+            MatchMode = MatchMode.Many,
+            Values = [.. node.Literals.Select(literal => literal.Raw)]
+        };
+
+        return true;
+    }
+
     private static bool TryMapField(ResolvedEventField field, out EventProperty property)
     {
         switch (field)
@@ -317,6 +390,15 @@ internal static class BasicFilterDecomposer
                 };
 
                 return true;
+
+            case EventDataComparisonNode eventDataComparison:
+                return TryMapEventDataComparison(eventDataComparison, out comparison);
+
+            case EventDataContainsNode eventDataContains:
+                return TryMapEventDataContains(eventDataContains, out comparison);
+
+            case EventDataMultiEqualsNode eventDataMulti:
+                return TryMapEventDataMultiEquals(eventDataMulti, out comparison);
 
             case NotNode not:
                 return TryMapNegatedLeaf(not, out comparison);

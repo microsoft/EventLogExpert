@@ -177,6 +177,53 @@ internal static class Emitter
             _ => throw new EmitException($"Operator '{op}' is not supported on string properties.")
         };
 
+    private static Func<ResolvedEvent, bool> EmitEventDataComparison(EventDataComparisonNode node)
+    {
+        var name = node.FieldName;
+        var literal = node.Literal;
+
+        if (node.Op == FilterBinaryOperator.Equal)
+        {
+            return e => e.EventData.TryGetValue(name, out var value) && literal.MatchesValue(value);
+        }
+
+        return e => e.EventData.TryGetValue(name, out var value) && !literal.MatchesValue(value);
+    }
+
+    private static Func<ResolvedEvent, bool> EmitEventDataContains(EventDataContainsNode node)
+    {
+        var name = node.FieldName;
+        var needle = node.Needle;
+        var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+        if (node.Negated)
+        {
+            return e => e.EventData.TryGetValue(name, out var value)
+                && !value.AsString().Contains(needle, comparison);
+        }
+
+        return e => e.EventData.TryGetValue(name, out var value)
+            && value.AsString().Contains(needle, comparison);
+    }
+
+    private static Func<ResolvedEvent, bool> EmitEventDataMultiEquals(EventDataMultiEqualsNode node)
+    {
+        var name = node.FieldName;
+        var literals = node.Literals;
+
+        return e =>
+        {
+            if (!e.EventData.TryGetValue(name, out var value)) { return false; }
+
+            for (var i = 0; i < literals.Count; i++)
+            {
+                if (literals[i].MatchesValue(value)) { return true; }
+            }
+
+            return false;
+        };
+    }
+
     private static Func<ResolvedEvent, bool> EmitIntComparison(
         Func<ResolvedEvent, int> getter,
         FilterBinaryOperator op,
@@ -408,6 +455,9 @@ internal static class Emitter
             NotNode not => EmitNot(not),
             ComparisonNode cmp => EmitComparison(cmp),
             ContainsNode cn => EmitContains(cn),
+            EventDataComparisonNode edCmp => EmitEventDataComparison(edCmp),
+            EventDataContainsNode edContains => EmitEventDataContains(edContains),
+            EventDataMultiEqualsNode edMulti => EmitEventDataMultiEquals(edMulti),
             KeywordsAnyEqualsNode kn => EmitKeywordsAnyEquals(kn),
             KeywordsAnyContainsNode kn => EmitKeywordsAnyContains(kn),
             KeywordsMatchAnyOfNode kn => EmitKeywordsMatchAnyOf(kn),
