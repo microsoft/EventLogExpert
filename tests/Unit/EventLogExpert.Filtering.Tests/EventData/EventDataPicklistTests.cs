@@ -9,6 +9,7 @@ namespace EventLogExpert.Filtering.Tests.EventData;
 ///     Field-name and per-field value picklists that feed the Basic editor's EventData row. Exercises the composite
 ///     <c>(snapshot, fieldName)</c> cache key (R7) so distinct fields keep distinct value lists.
 /// </summary>
+[Collection("EventPropertyValuesCache")]
 public sealed class EventDataPicklistTests : IDisposable
 {
     public EventDataPicklistTests() => EventPropertyValuesCache.Clear();
