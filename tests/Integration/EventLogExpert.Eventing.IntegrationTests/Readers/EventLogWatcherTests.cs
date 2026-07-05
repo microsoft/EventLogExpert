@@ -666,7 +666,7 @@ public sealed class EventLogWatcherTests
         var snapshot = Volatile.Read(ref capturedEvent);
         Assert.True(received, "Did not receive event within timeout period");
         Assert.NotNull(snapshot);
-        Assert.NotNull(snapshot.Properties);
+        Assert.False(snapshot.Properties.IsDefault);
     }
 
     [Fact]

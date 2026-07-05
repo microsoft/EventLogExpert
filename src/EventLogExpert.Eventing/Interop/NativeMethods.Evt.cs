@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
 using Microsoft.Win32.SafeHandles;
+using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 
@@ -726,9 +727,9 @@ internal static partial class NativeMethods
         return GetEventRecord(buffer, propertyCount);
     }
 
-    private static unsafe IReadOnlyList<EventProperty> ProcessRenderedEventProperties(IntPtr buffer, int usedBytes, int propertyCount)
+    private static unsafe ImmutableArray<EventProperty> ProcessRenderedEventProperties(IntPtr buffer, int usedBytes, int propertyCount)
     {
-        if (propertyCount <= 0) { return []; }
+        if (propertyCount <= 0) { return ImmutableArray<EventProperty>.Empty; }
 
 #if DEBUG
         BeforeVariantReadForTest?.Invoke();
@@ -742,7 +743,7 @@ internal static partial class NativeMethods
             properties[i] = ConvertVariantToProperty(variants[i]);
         }
 
-        return properties;
+        return ImmutableCollectionsMarshal.AsImmutableArray(properties);
     }
 
     private static unsafe string? ProcessRenderedEventXml(IntPtr buffer, int usedBytes, int propertyCount) =>
@@ -751,7 +752,7 @@ internal static partial class NativeMethods
     internal static unsafe EventRecord RenderEvent(EvtHandle eventHandle) =>
         RenderWhilePinned(EventLogSession.GlobalSession.SystemRenderContext, eventHandle, EvtRenderFlags.EventValues, &ProcessRenderedEventRecord);
 
-    internal static unsafe IReadOnlyList<EventProperty> RenderEventProperties(EvtHandle eventHandle) =>
+    internal static unsafe ImmutableArray<EventProperty> RenderEventProperties(EvtHandle eventHandle) =>
         RenderWhilePinned(EventLogSession.GlobalSession.UserRenderContext, eventHandle, EvtRenderFlags.EventValues, &ProcessRenderedEventProperties);
 
     internal static unsafe string? RenderEventXml(EvtHandle eventHandle) =>

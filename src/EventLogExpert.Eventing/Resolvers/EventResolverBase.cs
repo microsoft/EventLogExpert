@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Resolution;
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.Eventing.Resolvers;
 
@@ -112,6 +113,20 @@ public class EventResolverBase : IDisposable
     /// </summary>
     protected virtual ProviderDetails? TryGetSupplementalDetails(EventRecord eventRecord) => null;
 
+    private (ImmutableArray<EventProperty> Values, TemplateFieldSchema? Schema) BuildEventData(
+        EventRecord eventRecord,
+        TemplateInfo? primaryInfo)
+    {
+        if (eventRecord.Properties.Length == 0 || primaryInfo is not { } info)
+        {
+            return (default, null);
+        }
+
+        // Fail closed: a count matching neither ordering would mislabel fields, so expose nothing (values still format positionally).
+        return !FieldNameOrderingSelector.TrySelectOrdering(info.Metadata, eventRecord.Properties.Length, out _) ?
+            (default, null) : (eventRecord.Properties, info.Schema);
+    }
+
     private ResolvedEvent CreateEventModel(
         EventRecord eventRecord,
         EventModel? modernEvent,
@@ -122,11 +137,17 @@ public class EventResolverBase : IDisposable
     {
         var keywords = _taskKeywords.ResolveKeywords(eventRecord, details, supplemental);
 
+        TemplateInfo? primaryInfo = modernEvent?.Template is { } template ? _templates.GetTemplateInfo(template) : null;
+
+        var (eventDataValues, eventDataSchema) = BuildEventData(eventRecord, primaryInfo);
+
         return new(eventRecord.PathName, eventRecord.LogPathType)
         {
             ActivityId = eventRecord.ActivityId,
             ComputerName = _cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
-            Description = _descriptions.Resolve(eventRecord, details, descriptionDetails, modernEvent, supplemental, supplementalModernEvent),
+            Description = _descriptions.Resolve(eventRecord, details, descriptionDetails, modernEvent, supplemental, supplementalModernEvent, primaryInfo),
+            EventDataValues = eventDataValues,
+            EventDataSchema = eventDataSchema,
             Id = eventRecord.Id,
             Keywords = _cache?.GetOrAddKeywords(keywords) ?? keywords,
             Level = SeverityFormatter.Format(eventRecord.Level),
