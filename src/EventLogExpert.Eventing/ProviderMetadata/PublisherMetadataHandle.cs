@@ -199,7 +199,7 @@ internal sealed class PublisherMetadataHandle : IDisposable
         };
     }
 
-    private static object GetEventMetadataProperty(EvtHandle metadataHandle, EvtEventMetadataPropertyId propertyId)
+    private static unsafe object GetEventMetadataProperty(EvtHandle metadataHandle, EvtEventMetadataPropertyId propertyId)
     {
         IntPtr buffer = IntPtr.Zero;
 
@@ -223,7 +223,7 @@ internal sealed class PublisherMetadataHandle : IDisposable
                 NativeMethods.ThrowEventLogException(error);
             }
 
-            var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
+            var variant = *(EvtVariant*)buffer;
 
             return NativeMethods.ConvertVariant(variant) ??
                 throw new InvalidDataException($"Invalid Metadata for PropertyId: {propertyId}");
@@ -249,7 +249,7 @@ internal sealed class PublisherMetadataHandle : IDisposable
         return null;
     }
 
-    private object? GetPublisherMetadataObject(EvtPublisherMetadataPropertyId propertyId)
+    private unsafe object? GetPublisherMetadataObject(EvtPublisherMetadataPropertyId propertyId)
     {
         IntPtr buffer = IntPtr.Zero;
 
@@ -287,7 +287,7 @@ internal sealed class PublisherMetadataHandle : IDisposable
                 NativeMethods.ThrowEventLogException(error);
             }
 
-            var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
+            var variant = *(EvtVariant*)buffer;
 
             return NativeMethods.ConvertVariant(variant);
         }
@@ -297,7 +297,7 @@ internal sealed class PublisherMetadataHandle : IDisposable
         }
     }
 
-    private string GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId propertyId)
+    private unsafe string GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId propertyId)
     {
         IntPtr buffer = IntPtr.Zero;
 
@@ -335,7 +335,7 @@ internal sealed class PublisherMetadataHandle : IDisposable
                 NativeMethods.ThrowEventLogException(error);
             }
 
-            var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
+            var variant = *(EvtVariant*)buffer;
 
             return (string?)NativeMethods.ConvertVariant(variant) ?? string.Empty;
         }
@@ -345,7 +345,7 @@ internal sealed class PublisherMetadataHandle : IDisposable
         }
     }
 
-    private EvtHandle GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId propertyId)
+    private unsafe EvtHandle GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId propertyId)
     {
         IntPtr buffer = IntPtr.Zero;
 
@@ -383,7 +383,7 @@ internal sealed class PublisherMetadataHandle : IDisposable
                 NativeMethods.ThrowEventLogException(error);
             }
 
-            var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
+            var variant = *(EvtVariant*)buffer;
 
             return variant.EvtHandleVal == IntPtr.Zero ?
                 EvtHandle.Zero :

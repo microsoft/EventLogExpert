@@ -194,7 +194,7 @@ public sealed class EventMessageProvider(
         target.ResolvedFromOwningPublisher = owningPublisher;
     }
 
-    private bool TryGetChannelOwningPublisher(string channelName, out string? publisher)
+    private unsafe bool TryGetChannelOwningPublisher(string channelName, out string? publisher)
     {
         publisher = null;
 
@@ -255,7 +255,7 @@ public sealed class EventMessageProvider(
                 return false;
             }
 
-            var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
+            var variant = *(EvtVariant*)buffer;
             var value = NativeMethods.ConvertVariant(variant) as string;
 
             if (string.IsNullOrWhiteSpace(value))
