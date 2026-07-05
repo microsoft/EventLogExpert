@@ -22,9 +22,15 @@ public sealed record FilterComparison
     public ImmutableList<string> Values { get; init; } = [];
 
     /// <summary>
-    ///     Returns a copy with the new <paramref name="property" /> and Value/Values cleared, since the available value
-    ///     space changes when the property changes.
+    ///     The named &lt;EventData&gt; field this row targets. Meaningful only when <see cref="Property" /> is
+    ///     <see cref="EventProperty.EventData" /> (null for every other property).
+    /// </summary>
+    public string? EventDataFieldName { get; init; }
+
+    /// <summary>
+    ///     Returns a copy with the new <paramref name="property" /> and Value/Values/EventDataFieldName cleared, since
+    ///     the available value space (and whether a field name applies) changes when the property changes.
     /// </summary>
     public FilterComparison WithProperty(EventProperty property) =>
-        this with { Property = property, Value = null, Values = [] };
+        this with { Property = property, Value = null, Values = [], EventDataFieldName = null };
 }

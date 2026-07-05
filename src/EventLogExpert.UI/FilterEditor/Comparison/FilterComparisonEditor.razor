@@ -10,6 +10,23 @@
     }
 </ValueSelect>
 
+@if (IsEventDataProperty)
+{
+    <label class="visually-hidden" id="@($"{Id}_FieldName")">Field name</label>
+
+    <ValueSelect AriaLabelledBy="@($"{Id}_FieldName")"
+        CssClass="input filter-value-dropdown"
+        IsInput
+        T="string"
+        Value="Comparison.EventDataFieldName"
+        ValueChanged="HandleEventDataFieldNameChanged">
+        @foreach (var name in EventDataFieldNames)
+        {
+            <ValueSelectItem T="string" Value="name" />
+        }
+    </ValueSelect>
+}
+
 <label class="visually-hidden" id="@($"{Id}_Comparison")">Comparison</label>
 <ComparisonOperatorSelect AriaLabelledBy="@($"{Id}_Comparison")"
     MatchMode="Comparison.MatchMode"

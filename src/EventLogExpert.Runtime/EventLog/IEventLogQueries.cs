@@ -15,6 +15,18 @@ public interface IEventLogQueries
     IReadOnlyList<string> GetChannelNames();
 
     /// <summary>
+    ///     Returns the distinct, sorted &lt;EventData&gt; field names present across all open raw events (used to
+    ///     populate the Basic editor's EventData field-name picker).
+    /// </summary>
+    ImmutableArray<string> GetEventDataFieldNames();
+
+    /// <summary>
+    ///     Returns the distinct, sorted values of the named EventData <paramref name="fieldName" /> across all open raw
+    ///     events (used to populate the value picker for an EventData filter row).
+    /// </summary>
+    ImmutableArray<string> GetEventDataFieldValues(string fieldName);
+
+    /// <summary>
     ///     Returns the UTC date range covering all events across the active logs, with bounds rounded outward to the
     ///     hour, falling back to <paramref name="fallbackUtcNow" /> when no log has events.
     /// </summary>

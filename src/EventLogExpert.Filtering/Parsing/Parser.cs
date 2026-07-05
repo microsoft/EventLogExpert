@@ -12,7 +12,7 @@ namespace EventLogExpert.Filtering.Parsing;
 /// </summary>
 internal static class Parser
 {
-    public static bool TryParse(IReadOnlyList<Token> tokens, out SyntaxNode? root, [NotNullWhen(false)] out string? error)
+    public static bool TryParse(IReadOnlyList<Token>? tokens, out SyntaxNode? root, [NotNullWhen(false)] out string? error)
     {
         root = null;
         error = null;
@@ -30,15 +30,13 @@ internal static class Parser
         {
             root = ParseExpression(state, 0);
 
-            if (state.Current.Kind != TokenKind.End)
-            {
-                error = $"Unexpected token '{state.Current.Text}' (position {state.Current.Position}).";
-                root = null;
+            if (state.Current.Kind == TokenKind.End) { return true; }
 
-                return false;
-            }
+            error = $"Unexpected token '{state.Current.Text}' (position {state.Current.Position}).";
+            root = null;
 
-            return true;
+            return false;
+
         }
         catch (ParseException ex)
         {
@@ -213,6 +211,20 @@ internal static class Parser
                         Position = dotPosition
                     };
                 }
+            }
+            else if (state.Current.Kind == TokenKind.LBracket)
+            {
+                var bracketPosition = state.Current.Position;
+                state.Advance();
+                var argument = ParseExpression(state, 0);
+                Expect(state, TokenKind.RBracket);
+
+                node = new IndexAccessSyntax
+                {
+                    Target = node,
+                    Argument = argument,
+                    Position = bracketPosition
+                };
             }
             else
             {

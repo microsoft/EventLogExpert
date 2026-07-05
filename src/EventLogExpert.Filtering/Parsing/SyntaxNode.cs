@@ -63,6 +63,13 @@ internal sealed class MethodCallSyntax : SyntaxNode
     public required SyntaxNode Target { get; init; }
 }
 
+internal sealed class IndexAccessSyntax : SyntaxNode
+{
+    public required SyntaxNode Argument { get; init; }
+
+    public required SyntaxNode Target { get; init; }
+}
+
 internal sealed class ArrayCreationSyntax : SyntaxNode
 {
     public required IReadOnlyList<SyntaxNode> Elements { get; init; }

@@ -26,6 +26,23 @@ internal sealed class EventLogQueries(
             .Distinct(StringComparer.OrdinalIgnoreCase)
     ];
 
+    public ImmutableArray<string> GetEventDataFieldNames()
+    {
+        var byLog = _rawEventStore.Value.ByLog;
+
+        return EventPropertyValuesCache.GetEventDataFieldNames(byLog, byLog.Values.SelectMany(events => events));
+    }
+
+    public ImmutableArray<string> GetEventDataFieldValues(string fieldName)
+    {
+        var byLog = _rawEventStore.Value.ByLog;
+
+        return EventPropertyValuesCache.GetEventDataFieldValues(
+            byLog,
+            byLog.Values.SelectMany(events => events),
+            fieldName);
+    }
+
     public (DateTime After, DateTime Before) GetEventDateRange(DateTime fallbackUtcNow) =>
         _rawEventStore.Value.TryGetRawEventDateRange().RoundOrFallback(fallbackUtcNow);
 
