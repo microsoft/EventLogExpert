@@ -70,6 +70,19 @@ public sealed class EventDataRoundTripTests
     }
 
     [Fact]
+    public void Json_Read_NormalizesWhitespaceFieldName_ToNull()
+    {
+        const string json =
+            """{"Property":"EventData","Operator":"Equals","MatchMode":"Single","Value":"x","EventDataFieldName":"   "}""";
+
+        var restored = JsonSerializer.Deserialize<FilterComparison>(json);
+
+        Assert.NotNull(restored);
+        Assert.Equal(EventProperty.EventData, restored!.Property);
+        Assert.Null(restored.EventDataFieldName);
+    }
+
+    [Fact]
     public void ManyValues_RoundTrips()
     {
         var original = new FilterComparison
