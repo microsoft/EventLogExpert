@@ -32,6 +32,21 @@ public sealed class EventDataPicklistTests : IDisposable
     }
 
     [Fact]
+    public void GetEventDataFieldNames_SortsOrdinal()
+    {
+        var snapshot = new object();
+        var events = new[]
+        {
+            EventDataTestFactory.CreateEventWithData(("b", "1")),
+            EventDataTestFactory.CreateEventWithData(("A", "2")),
+            EventDataTestFactory.CreateEventWithData(("a", "3"))
+        };
+
+        // Ordinal orders uppercase before lowercase ('A'=65, 'a'=97, 'b'=98), unlike a culture-sensitive sort.
+        Assert.Equal(["A", "a", "b"], EventPropertyValuesCache.GetEventDataFieldNames(snapshot, events));
+    }
+
+    [Fact]
     public void GetEventDataFieldValues_DifferentFields_ProduceDifferentLists()
     {
         var snapshot = new object();
