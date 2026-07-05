@@ -428,8 +428,7 @@ public sealed class EventLogReaderTests
         if (events.Length > 0)
         {
             var evt = events[0];
-            Assert.NotNull(evt.Properties);
-            // Properties might be empty array, but should not be null
+            Assert.False(evt.Properties.IsDefault);
         }
     }
 

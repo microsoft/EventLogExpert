@@ -12,37 +12,19 @@ namespace EventLogExpert.Eventing.Resolvers;
 // Length-provider <data> nodes are consumed by EvtRender, so visible metadata excludes referenced length fields.
 internal sealed class TemplateAnalyzer
 {
-    private static readonly TemplateMetadata s_empty = new(
-        0,
-        ImmutableArray<string>.Empty,
-        ImmutableArray<string>.Empty,
-        ImmutableArray<string>.Empty,
-        ImmutableArray<string>.Empty);
+    private static readonly TemplateInfo s_empty = new(
+        new TemplateMetadata(
+            0,
+            ImmutableArray<string>.Empty,
+            ImmutableArray<string>.Empty,
+            ImmutableArray<string>.Empty,
+            ImmutableArray<string>.Empty),
+        TemplateFieldSchema.Empty);
 
-    private readonly ConcurrentDictionary<string, TemplateMetadata> _cache =
+    private readonly ConcurrentDictionary<string, TemplateInfo> _cache =
         new(StringComparer.Ordinal);
 
-    public TemplateMetadata Analyze(ReadOnlySpan<char> template)
-    {
-        if (template.IsEmpty)
-        {
-            return s_empty;
-        }
-
-        var lookup = _cache.GetAlternateLookup<ReadOnlySpan<char>>();
-
-        if (lookup.TryGetValue(template, out var cached))
-        {
-            return cached;
-        }
-
-        TemplateMetadata metadata = Parse(template);
-
-        // Publish to cache only after parsing completes so readers never observe partial metadata.
-        lookup.TryAdd(template, metadata);
-
-        return metadata;
-    }
+    public TemplateMetadata Analyze(ReadOnlySpan<char> template) => GetTemplateInfo(template).Metadata;
 
     // Allows one extra template node for newer manifest versions with an added optional field.
     public bool ApproximatelyMatchesPropertyCount(ReadOnlySpan<char> template, int eventPropertyCount)
@@ -59,6 +41,28 @@ internal sealed class TemplateAnalyzer
         }
 
         return templateCount - eventPropertyCount == 1;
+    }
+
+    public TemplateInfo GetTemplateInfo(ReadOnlySpan<char> template)
+    {
+        if (template.IsEmpty)
+        {
+            return s_empty;
+        }
+
+        var lookup = _cache.GetAlternateLookup<ReadOnlySpan<char>>();
+
+        if (lookup.TryGetValue(template, out var cached))
+        {
+            return cached;
+        }
+
+        TemplateInfo info = Parse(template);
+
+        // Publish to cache only after parsing completes so readers never observe partial metadata.
+        lookup.TryAdd(template, info);
+
+        return info;
     }
 
     // Accept full or visible counts because providers vary on length-provider field output.
@@ -80,26 +84,31 @@ internal sealed class TemplateAnalyzer
         return MatchesPropertyCount(template, eventPropertyCount);
     }
 
-    private static TemplateMetadata BuildMetadata(
+    private static TemplateInfo BuildInfo(
         List<(string name, string outType, string map)> elements,
         HashSet<string> lengthProviderNames)
     {
+        var allNamesArray = new string[elements.Count];
         var allOutTypesArray = new string[elements.Count];
         var allMapsArray = new string[elements.Count];
 
         for (int i = 0; i < elements.Count; i++)
         {
+            allNamesArray[i] = elements[i].name;
             allOutTypesArray[i] = elements[i].outType;
             allMapsArray[i] = elements[i].map;
         }
 
-        // ImmutableArray safely takes over this fresh local array without copying.
+        // ImmutableArray safely takes over each fresh local array without copying.
+        var allNames = ImmutableCollectionsMarshal.AsImmutableArray(allNamesArray);
         var allOutTypes = ImmutableCollectionsMarshal.AsImmutableArray(allOutTypesArray);
         var allMaps = ImmutableCollectionsMarshal.AsImmutableArray(allMapsArray);
 
         if (lengthProviderNames.Count == 0)
         {
-            return new TemplateMetadata(elements.Count, allOutTypes, allOutTypes, allMaps, allMaps);
+            var metadata = new TemplateMetadata(elements.Count, allOutTypes, allOutTypes, allMaps, allMaps);
+
+            return new TemplateInfo(metadata, new TemplateFieldSchema(allNames, allNames));
         }
 
         int visibleCount = 0;
@@ -112,6 +121,7 @@ internal sealed class TemplateAnalyzer
             }
         }
 
+        var visibleNamesArray = new string[visibleCount];
         var visibleOutTypesArray = new string[visibleCount];
         var visibleMapsArray = new string[visibleCount];
         int write = 0;
@@ -120,19 +130,23 @@ internal sealed class TemplateAnalyzer
         {
             if (string.IsNullOrEmpty(name) || !lengthProviderNames.Contains(name))
             {
+                visibleNamesArray[write] = name;
                 visibleOutTypesArray[write] = outType;
                 visibleMapsArray[write] = map;
                 write++;
             }
         }
 
+        var visibleNames = ImmutableCollectionsMarshal.AsImmutableArray(visibleNamesArray);
         var visibleOutTypes = ImmutableCollectionsMarshal.AsImmutableArray(visibleOutTypesArray);
         var visibleMaps = ImmutableCollectionsMarshal.AsImmutableArray(visibleMapsArray);
 
-        return new TemplateMetadata(visibleCount, allOutTypes, visibleOutTypes, allMaps, visibleMaps);
+        var visibleMetadata = new TemplateMetadata(visibleCount, allOutTypes, visibleOutTypes, allMaps, visibleMaps);
+
+        return new TemplateInfo(visibleMetadata, new TemplateFieldSchema(allNames, visibleNames));
     }
 
-    private static TemplateMetadata Parse(ReadOnlySpan<char> template)
+    private static TemplateInfo Parse(ReadOnlySpan<char> template)
     {
         List<(string name, string outType, string map)> elements = [];
         HashSet<string> lengthProviderNames = new(StringComparer.OrdinalIgnoreCase);
@@ -158,6 +172,6 @@ internal sealed class TemplateAnalyzer
             }
         }
 
-        return BuildMetadata(elements, lengthProviderNames);
+        return BuildInfo(elements, lengthProviderNames);
     }
 }

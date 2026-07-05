@@ -2,6 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Resolvers;
+using System.Collections.Immutable;
 using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Common.Events;
@@ -48,4 +51,16 @@ public sealed record ResolvedEvent(
     ///     demand.
     /// </summary>
     public string Xml { get; init; } = string.Empty;
+
+    internal ImmutableArray<EventProperty> EventDataValues { get; init; }
+
+    internal TemplateFieldSchema? EventDataSchema { get; init; }
+
+    /// <summary>
+    ///     Named &lt;EventData&gt; fields for this event, or <see cref="EventDataKind.None" /> for legacy / template-less
+    ///     events. The underlying values also remain reachable positionally through the description and XML.
+    /// </summary>
+    public EventDataView EventData => EventDataValues.IsDefaultOrEmpty
+        ? EventDataView.Empty
+        : new(EventDataValues, EventDataSchema);
 }

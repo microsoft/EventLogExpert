@@ -114,7 +114,7 @@ internal sealed class ModernEventMatcher(TemplateAnalyzer templates, ITraceLogge
             return null;
         }
 
-        int eventPropertyCount = eventRecord.Properties.Count;
+        int eventPropertyCount = eventRecord.Properties.Length;
 
         var candidateEvents = details.GetEventsById(eventRecord.Id);
 
