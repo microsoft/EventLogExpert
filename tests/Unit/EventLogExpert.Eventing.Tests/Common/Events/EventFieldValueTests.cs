@@ -69,6 +69,28 @@ public sealed class EventFieldValueTests
     }
 
     [Fact]
+    public void FromProperty_Guid_DoesNotReBox()
+    {
+        EventProperty property = Guid.NewGuid();
+
+        EventFieldValue.FromProperty(property).TryGetGuid(out _);
+
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        Guid sink = default;
+
+        for (int i = 0; i < 1000; i++)
+        {
+            EventFieldValue.FromProperty(property).TryGetGuid(out Guid read);
+            sink = read;
+        }
+
+        long after = GC.GetAllocatedBytesForCurrentThread();
+
+        Assert.Equal(before, after);
+        Assert.NotEqual(Guid.Empty, sink);
+    }
+
+    [Fact]
     public void FromProperty_IntegerArray_JoinsInvariantInAsString()
     {
         EventFieldValue value = EventFieldValue.FromProperty(EventProperty.FromReference(new uint[] { 1, 2, 3 }));
