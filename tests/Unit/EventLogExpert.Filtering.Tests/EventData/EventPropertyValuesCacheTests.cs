@@ -7,6 +7,7 @@ using EventLogExpert.Filtering.Tests.TestUtils.Constants;
 
 namespace EventLogExpert.Filtering.Tests.EventData;
 
+[Collection("EventPropertyValuesCache")]
 public sealed class EventPropertyValuesCacheTests : IDisposable
 {
     public EventPropertyValuesCacheTests() => EventPropertyValuesCache.Clear();

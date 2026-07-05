@@ -25,14 +25,15 @@ public sealed class EventDataRoundTripTests
         AssertSingleRoundTrips(ComparisonOperator.Equals, fieldName, "value");
 
     [Fact]
-    public void Json_NonEventDataRow_OmitsEventDataFieldName()
+    public void Json_NonEventDataRow_OmitsEventDataFieldName_EvenWhenSet()
     {
         var comparison = new FilterComparison
         {
             Property = EventProperty.Source,
             Operator = ComparisonOperator.Equals,
             MatchMode = MatchMode.Single,
-            Value = "x"
+            Value = "x",
+            EventDataFieldName = "stale"
         };
 
         var json = JsonSerializer.Serialize(comparison);
@@ -53,6 +54,19 @@ public sealed class EventDataRoundTripTests
         Assert.Equal("TargetUserName", restored.EventDataFieldName);
         Assert.Equal(ComparisonOperator.Contains, restored.Operator);
         Assert.Equal("admin", restored.Value);
+    }
+
+    [Fact]
+    public void Json_Read_DropsEventDataFieldName_ForNonEventDataRow()
+    {
+        const string json =
+            """{"Property":"Source","Operator":"Equals","MatchMode":"Single","Value":"x","EventDataFieldName":"stale"}""";
+
+        var restored = JsonSerializer.Deserialize<FilterComparison>(json);
+
+        Assert.NotNull(restored);
+        Assert.Equal(EventProperty.Source, restored!.Property);
+        Assert.Null(restored.EventDataFieldName);
     }
 
     [Fact]
@@ -89,7 +103,7 @@ public sealed class EventDataRoundTripTests
     }
 
     [Fact]
-    public void NegatedEquality_CanonicalizesToNotEqual()
+    public void NegatedNotEqual_CanonicalizesToEquals()
     {
         Assert.True(
             BasicFilterDecomposer.TryDecompose("!(EventData[\"User\"] != \"admin\")", out var structured),
