@@ -23,6 +23,7 @@ internal sealed class FilterComparisonJsonConverter : JsonConverter<FilterCompar
         bool operatorSet = false;
         bool matchModeSet = false;
         string? value = null;
+        string? eventDataFieldName = null;
         ImmutableList<string> values = [];
 
         while (reader.Read())
@@ -66,6 +67,9 @@ internal sealed class FilterComparisonJsonConverter : JsonConverter<FilterCompar
                 case "Value":
                     value = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
                     break;
+                case "EventDataFieldName":
+                    eventDataFieldName = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
+                    break;
                 case "Values":
                     values = ReadStringList(ref reader);
                     break;
@@ -81,7 +85,8 @@ internal sealed class FilterComparisonJsonConverter : JsonConverter<FilterCompar
             Operator = op,
             MatchMode = matchMode,
             Value = value,
-            Values = values
+            Values = values,
+            EventDataFieldName = eventDataFieldName
         };
     }
 
@@ -103,6 +108,12 @@ internal sealed class FilterComparisonJsonConverter : JsonConverter<FilterCompar
         foreach (var item in value.Values) { writer.WriteStringValue(item); }
 
         writer.WriteEndArray();
+
+        if (value.EventDataFieldName is not null)
+        {
+            writer.WriteString("EventDataFieldName", value.EventDataFieldName);
+        }
+
         writer.WriteEndObject();
     }
 

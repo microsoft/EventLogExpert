@@ -59,13 +59,21 @@ public static class BasicFilterFormatter
             return false;
         }
 
+        if (comparison.Property is EventProperty.EventData && string.IsNullOrWhiteSpace(comparison.EventDataFieldName))
+        {
+            return false;
+        }
+
+        var propertyExpression = FormatPropertyExpression(comparison);
+
         StringBuilder stringBuilder = new(joinPrefix ?? string.Empty);
 
         // The Many+non-Keywords shape is `(new[]{...}).Contains(property)` — the property-reference template
         // moves to the suffix. Everything else prepends the operator+property template.
         if (comparison.MatchMode != MatchMode.Many || comparison.Property is EventProperty.Keywords)
         {
-            stringBuilder.Append(GetComparisonString(comparison.Property, comparison.Operator, comparison.MatchMode));
+            stringBuilder.Append(
+                GetComparisonString(comparison.Property, propertyExpression, comparison.Operator, comparison.MatchMode));
         }
 
         if (comparison.MatchMode == MatchMode.Many)
@@ -79,7 +87,8 @@ public static class BasicFilterFormatter
 
         if (comparison is { MatchMode: MatchMode.Many, Property: not EventProperty.Keywords })
         {
-            stringBuilder.Append(GetComparisonString(comparison.Property, comparison.Operator, comparison.MatchMode));
+            stringBuilder.Append(
+                GetComparisonString(comparison.Property, propertyExpression, comparison.Operator, comparison.MatchMode));
         }
 
         formatted = stringBuilder.ToString();
@@ -162,7 +171,18 @@ public static class BasicFilterFormatter
         return builder.ToString();
     }
 
-    private static string GetComparisonString(EventProperty property, ComparisonOperator op, MatchMode matchMode)
+    // The Advanced-text reference for a comparison's property: `EventData["escaped field name"]` for an EventData
+    // row, otherwise the bare property name (which the tokenizer reads as an identifier).
+    private static string FormatPropertyExpression(FilterComparison comparison) =>
+        comparison.Property is EventProperty.EventData
+            ? $"EventData[\"{EscapeStringLiteral(comparison.EventDataFieldName)}\"]"
+            : comparison.Property.ToString();
+
+    private static string GetComparisonString(
+        EventProperty property,
+        string propertyExpression,
+        ComparisonOperator op,
+        MatchMode matchMode)
     {
         if (matchMode == MatchMode.Many)
         {
@@ -171,7 +191,7 @@ public static class BasicFilterFormatter
             return property switch
             {
                 EventProperty.Keywords => $"{property}.Any",
-                _ => $"{property})"
+                _ => $"{propertyExpression})"
             };
         }
 
@@ -181,25 +201,25 @@ public static class BasicFilterFormatter
             {
                 EventProperty.Keywords => $"{property}.Any(e => string.Equals(e, ",
                 EventProperty.UserId => $"{property} != null && {property}.Value == ",
-                _ => $"{property} == "
+                _ => $"{propertyExpression} == "
             },
             ComparisonOperator.Contains => property switch
             {
                 EventProperty.Keywords => $"{property}.Any(e => e.Contains",
                 EventProperty.UserId => $"{property} != null && {property}.Value.Contains",
-                _ => $"{property}.Contains"
+                _ => $"{propertyExpression}.Contains"
             },
             ComparisonOperator.NotEqual => property switch
             {
                 EventProperty.Keywords => $"!{property}.Any(e => string.Equals(e, ",
                 EventProperty.UserId => $"{property} != null && {property}.Value != ",
-                _ => $"{property} != "
+                _ => $"{propertyExpression} != "
             },
             ComparisonOperator.NotContains => property switch
             {
                 EventProperty.Keywords => $"!{property}.Any(e => e.Contains",
                 EventProperty.UserId => $"{property} != null && !{property}.Value.Contains",
-                _ => $"!{property}.Contains"
+                _ => $"!{propertyExpression}.Contains"
             },
             _ => string.Empty
         };

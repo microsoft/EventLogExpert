@@ -88,6 +88,16 @@ internal static class Lowerer
         }
     }
 
+    private static bool ContainsEventDataNode(SemanticNode node) =>
+        node switch
+        {
+            EventDataComparisonNode or EventDataContainsNode or EventDataMultiEqualsNode => true,
+            AndNode and => ContainsEventDataNode(and.Left) || ContainsEventDataNode(and.Right),
+            OrNode or => ContainsEventDataNode(or.Left) || ContainsEventDataNode(or.Right),
+            NotNode not => ContainsEventDataNode(not.Operand),
+            _ => false
+        };
+
     private static IReadOnlyList<string> ExtractStringArray(ArrayCreationSyntax array, int position)
     {
         if (array.Elements.Count == 0)
@@ -123,6 +133,15 @@ internal static class Lowerer
             acc.Add(node);
         }
     }
+
+    private static string GetEventDataLiteralText(LiteralSyntax literal) =>
+        literal.Kind switch
+        {
+            LiteralKind.String => literal.Text,
+            LiteralKind.Int => literal.Text,
+            _ => throw new LowerException(
+                $"EventData comparison value must be a string or integer literal (position {literal.Position}).")
+        };
 
     private static bool IsCaseInsensitiveMatch(string left, string right) =>
         string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
@@ -179,7 +198,7 @@ internal static class Lowerer
             case BinarySyntax bin when IsComparisonOp(bin.Op):
                 return LowerComparison(bin);
             case UnarySyntax { Op: TokenKind.Bang } neg:
-                return new NotNode(Lower(neg.Operand));
+                return LowerNegation(neg);
             case MethodCallSyntax call:
                 return LowerMethodCall(call);
             case BinarySyntax bin:
@@ -234,6 +253,11 @@ internal static class Lowerer
 
     private static SemanticNode LowerComparison(BinarySyntax bin)
     {
+        if (TryResolveEventDataField(bin.Left, out var eventDataFieldName))
+        {
+            return LowerEventDataComparison(eventDataFieldName, bin);
+        }
+
         // Property <op> Literal  -or-  Property.ToString() <op> Literal (formatter shape, normalized away)
         var (field, fieldExpression) = ResolveFieldOrToString(bin.Left, bin.Position);
 
@@ -247,6 +271,25 @@ internal static class Lowerer
         var typed = CoerceLiteral(literal, literalKind);
 
         return new ComparisonNode(field, MapBinaryOp(bin.Op), typed);
+    }
+
+    private static SemanticNode LowerEventDataComparison(string fieldName, BinarySyntax bin)
+    {
+        if (bin.Op is not (TokenKind.EqEq or TokenKind.NotEq))
+        {
+            throw new LowerException(
+                $"Operator '{bin.Op}' is not supported on EventData fields; use '==' or '!=' (position {bin.Position}).");
+        }
+
+        if (bin.Right is not LiteralSyntax literal)
+        {
+            throw new LowerException(
+                $"Right-hand side of an EventData comparison must be a literal (position {bin.Right.Position}).");
+        }
+
+        var op = bin.Op == TokenKind.EqEq ? FilterBinaryOperator.Equal : FilterBinaryOperator.NotEqual;
+
+        return new EventDataComparisonNode(fieldName, op, EventDataLiteral.Parse(GetEventDataLiteralText(literal)));
     }
 
     private static SemanticNode LowerKeywordsAnyLambda(LambdaSyntax lambda)
@@ -299,9 +342,27 @@ internal static class Lowerer
             && call is { Target: ArrayCreationSyntax array, Arguments.Count: 1 })
         {
             var elements = ExtractStringArray(array, call.Position);
+
+            // EventData any-of must be recognized before ResolveFieldOrToString, which rejects an IndexAccess argument.
+            if (TryResolveEventDataField(call.Arguments[0], out var eventDataAnyOfName))
+            {
+                return new EventDataMultiEqualsNode(
+                    eventDataAnyOfName,
+                    [.. elements.Select(EventDataLiteral.Parse)]);
+            }
+
             var argField = ResolveFieldOrToString(call.Arguments[0], call.Arguments[0].Position).Field;
 
             return new MultiEqualsNode(argField, elements);
+        }
+
+        // EventData["Name"].Contains(needle, OIC)
+        if (IsCaseInsensitiveMatch(call.Name, "Contains")
+            && TryResolveEventDataField(call.Target, out var eventDataContainsName))
+        {
+            var (needle, ignoreCase) = ParseContainsArgs(call.Arguments, call.Position);
+
+            return new EventDataContainsNode(eventDataContainsName, needle, ignoreCase, negated: false);
         }
 
         // P.Contains(needle, StringComparison.OrdinalIgnoreCase) for any Contains-supported field. Denylist
@@ -345,6 +406,41 @@ internal static class Lowerer
 
         throw new LowerException(
             $"Unsupported method call '{call.Name}' (position {call.Position}).");
+    }
+
+    // Normalizes `!` over EventData so a NotNode never wraps an EventData node (presence-required must hold at any
+    // depth): comparison flips Equal<->NotEqual, Contains toggles Negated; the unrepresentable none-of and any group
+    // that contains an EventData node are rejected. Non-EventData operands wrap in NotNode as before.
+    private static SemanticNode LowerNegation(UnarySyntax neg)
+    {
+        var inner = Lower(neg.Operand);
+
+        switch (inner)
+        {
+            case EventDataComparisonNode comparison:
+                var flipped = comparison.Op == FilterBinaryOperator.Equal
+                    ? FilterBinaryOperator.NotEqual
+                    : FilterBinaryOperator.Equal;
+
+                return new EventDataComparisonNode(comparison.FieldName, flipped, comparison.Literal);
+            case EventDataContainsNode contains:
+                return new EventDataContainsNode(
+                    contains.FieldName,
+                    contains.Needle,
+                    contains.IgnoreCase,
+                    !contains.Negated);
+            case EventDataMultiEqualsNode:
+                throw new LowerException(
+                    $"Negating an EventData any-of match is not supported; use separate '!=' conditions (position {neg.Position}).");
+            default:
+                if (ContainsEventDataNode(inner))
+                {
+                    throw new LowerException(
+                        $"Negating a group that contains EventData conditions is not supported; negate each EventData condition individually (position {neg.Position}).");
+                }
+
+                return new NotNode(inner);
+        }
     }
 
     private static FilterBinaryOperator MapBinaryOp(TokenKind op) =>
@@ -461,6 +557,36 @@ internal static class Lowerer
         }
 
         return false;
+    }
+
+    // Returns true for a well-formed `EventData["FieldName"]` access (case-insensitive target, Ordinal field name);
+    // throws a descriptive LowerException for a malformed EventData index (non-string / empty key); returns false for
+    // any non-EventData expression.
+    private static bool TryResolveEventDataField(SyntaxNode expr, [NotNullWhen(true)] out string? fieldName)
+    {
+        fieldName = null;
+
+        if (expr is not IndexAccessSyntax index
+            || index.Target is not IdentifierSyntax id
+            || !IsCaseInsensitiveMatch(id.Name, "EventData"))
+        {
+            return false;
+        }
+
+        if (index.Argument is not LiteralSyntax { Kind: LiteralKind.String } key)
+        {
+            throw new LowerException(
+                $"EventData field name must be a string literal (position {index.Argument.Position}).");
+        }
+
+        if (string.IsNullOrWhiteSpace(key.Text))
+        {
+            throw new LowerException($"EventData field name must not be empty (position {key.Position}).");
+        }
+
+        fieldName = key.Text;
+
+        return true;
     }
 
     private sealed class LowerException(string message) : Exception(message);
