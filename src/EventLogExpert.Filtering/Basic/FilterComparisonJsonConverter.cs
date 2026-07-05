@@ -86,7 +86,7 @@ internal sealed class FilterComparisonJsonConverter : JsonConverter<FilterCompar
             MatchMode = matchMode,
             Value = value,
             Values = values,
-            EventDataFieldName = eventDataFieldName
+            EventDataFieldName = property is EventProperty.EventData ? eventDataFieldName : null
         };
     }
 
@@ -109,7 +109,7 @@ internal sealed class FilterComparisonJsonConverter : JsonConverter<FilterCompar
 
         writer.WriteEndArray();
 
-        if (value.EventDataFieldName is not null)
+        if (value.Property is EventProperty.EventData && !string.IsNullOrWhiteSpace(value.EventDataFieldName))
         {
             writer.WriteString("EventDataFieldName", value.EventDataFieldName);
         }
