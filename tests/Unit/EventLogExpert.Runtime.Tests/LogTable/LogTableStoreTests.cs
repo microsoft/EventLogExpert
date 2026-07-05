@@ -1081,6 +1081,44 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
+    public void ReduceDisplayReady_WhenSecondLogOpensAcrossTheGap_HealsOneLogListToTwoLogDefault()
+    {
+        var first = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
+        var second = new EventLogData(Constants.LogNameLog2, LogPathType.Channel);
+        var state = new LogTableState();
+        state = Reducers.ReduceAddTable(state, new AddTableAction(first));
+        state = Reducers.ReduceAddTable(state, new AddTableAction(second));
+
+        state = Reducers.ReduceUpdateTable(
+            state,
+            new UpdateTableAction(second.Id, new List<ResolvedEvent>
+            {
+                new(Constants.LogNameLog2, LogPathType.Channel) { Id = 200, RecordId = 20 }
+            }));
+
+        var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var firstEvents = new List<ResolvedEvent>
+        {
+            new(Constants.LogNameLog1, LogPathType.Channel) { Id = 10, RecordId = 1, TimeCreated = baseTime.AddMinutes(3) },
+            new(Constants.LogNameLog1, LogPathType.Channel) { Id = 20, RecordId = 2, TimeCreated = baseTime.AddMinutes(2) },
+            new(Constants.LogNameLog1, LogPathType.Channel) { Id = 30, RecordId = 3, TimeCreated = baseTime.AddMinutes(1) }
+        };
+
+        var prebuiltOneLog = SegmentedSortedList.CreateSorted(firstEvents, new SortContext(null, true, null, false));
+        Assert.Equal(new[] { 30, 20, 10 }, prebuiltOneLog.Select(e => e.Id).ToArray());
+
+        var lists = new Dictionary<EventLogId, SegmentedSortedList> { { first.Id, prebuiltOneLog } };
+
+        var after = Reducers.ReduceDisplayReady(
+            state, new DisplayReadyAction { Lists = lists, Version = state.DisplayListVersion });
+
+        var healed = after.PerLogEvents[first.Id];
+        Assert.NotSame(prebuiltOneLog, healed);
+        Assert.True(healed.HasContext(new SortContext(ColumnName.DateAndTime, true, null, false)));
+        Assert.Equal(new[] { 10, 20, 30 }, healed.Select(e => e.Id).ToArray());
+    }
+
+    [Fact]
     public void ReduceDisplayReady_WhenSomeLogsOmitted_ShouldReplaceIncludedAndPreserveOmitted()
     {
         // Arrange - two logs, both populated via UpdateTable. Filter dispatch arrives for log A
