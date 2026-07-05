@@ -49,7 +49,7 @@ public sealed class EventLogInformation
 
     public long? RecordCount { get; }
 
-    private static object? GetLogProperty(EvtHandle handle, EvtLogPropertyId property)
+    private static unsafe object? GetLogProperty(EvtHandle handle, EvtLogPropertyId property)
     {
         IntPtr buffer = IntPtr.Zero;
 
@@ -73,7 +73,7 @@ public sealed class EventLogInformation
                 NativeMethods.ThrowEventLogException(error);
             }
 
-            var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
+            var variant = *(EvtVariant*)buffer;
 
             return NativeMethods.ConvertVariant(variant);
         }
