@@ -171,6 +171,7 @@ public sealed class StructuredFieldPathTests
     [InlineData("Event/System/@Name/Extra")]
     [InlineData("Event/System/@")]
     [InlineData("Event/1System/EventID")]
+    [InlineData("@Name")]
     public void IsValidCanonical_RejectsMalformedPaths(string path) =>
         Assert.False(StructuredFieldPath.IsValidCanonical(path));
 
