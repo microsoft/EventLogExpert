@@ -144,11 +144,7 @@ internal ref struct XmlSpanScanner(ReadOnlySpan<char> xml)
 
             ReadOnlySpan<char> entity = value.Slice(index + 1, semicolon - 1);
 
-            if (TryDecodeEntity(entity, out char decoded))
-            {
-                builder.Append(decoded);
-            }
-            else
+            if (!TryDecodeEntity(entity, builder))
             {
                 builder.Append(value.Slice(index, semicolon + 1));
             }
@@ -159,37 +155,38 @@ internal ref struct XmlSpanScanner(ReadOnlySpan<char> xml)
         return builder.ToString();
     }
 
-    private static bool TryDecodeEntity(ReadOnlySpan<char> entity, out char decoded)
+    private static bool TryDecodeEntity(ReadOnlySpan<char> entity, StringBuilder builder)
     {
         switch (entity)
         {
-            case "amp": decoded = '&'; return true;
-            case "lt": decoded = '<'; return true;
-            case "gt": decoded = '>'; return true;
-            case "quot": decoded = '"'; return true;
-            case "apos": decoded = '\''; return true;
+            case "amp": builder.Append('&'); return true;
+            case "lt": builder.Append('<'); return true;
+            case "gt": builder.Append('>'); return true;
+            case "quot": builder.Append('"'); return true;
+            case "apos": builder.Append('\''); return true;
         }
 
-        if (entity.Length >= 2 && entity[0] == '#')
+        if (entity.Length < 2 || entity[0] != '#') { return false; }
+
+        bool hex = entity[1] is 'x' or 'X';
+        ReadOnlySpan<char> digits = hex ? entity[2..] : entity[1..];
+
+        if (!int.TryParse(digits,
+                hex ? NumberStyles.HexNumber : NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out int code) ||
+            code <= 0 ||
+            !Rune.TryCreate(code, out Rune rune))
         {
-            bool hex = entity[1] is 'x' or 'X';
-            ReadOnlySpan<char> digits = hex ? entity[2..] : entity[1..];
-
-            if (int.TryParse(digits,
-                    hex ? NumberStyles.HexNumber : NumberStyles.Integer,
-                    CultureInfo.InvariantCulture,
-                    out int code) &&
-                code is > 0 and <= char.MaxValue)
-            {
-                decoded = (char)code;
-
-                return true;
-            }
+            return false;
         }
 
-        decoded = '\0';
+        Span<char> utf16 = stackalloc char[2];
+        int written = rune.EncodeToUtf16(utf16);
+        builder.Append(utf16[..written]);
 
-        return false;
+        return true;
+
     }
 
     private static ReadOnlySpan<char> LocalNameOf(ReadOnlySpan<char> name)

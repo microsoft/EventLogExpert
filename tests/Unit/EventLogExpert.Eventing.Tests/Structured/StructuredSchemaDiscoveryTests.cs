@@ -98,4 +98,12 @@ public sealed class StructuredSchemaDiscoveryTests
         Assert.Contains("Event/UserData/Root/A/@x", paths);
         Assert.Contains("Event/UserData/Root/B/@y", paths);
     }
+
+    [Fact]
+    public void DiscoverUserDataPaths_WhitespaceOnlySamples_ReturnEmpty()
+    {
+        var paths = StructuredSchemaDiscovery.DiscoverUserDataPaths(["   ", "\n\t"]);
+
+        Assert.Empty(paths);
+    }
 }
