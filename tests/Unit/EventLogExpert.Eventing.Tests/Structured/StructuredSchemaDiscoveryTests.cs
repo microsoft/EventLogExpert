@@ -100,7 +100,7 @@ public sealed class StructuredSchemaDiscoveryTests
     }
 
     [Fact]
-    public void DiscoverUserDataPaths_WhitespaceOnlySamples_ReturnEmpty()
+    public void DiscoverUserDataPaths_WhitespaceOnlySamples_ReturnsEmpty()
     {
         var paths = StructuredSchemaDiscovery.DiscoverUserDataPaths(["   ", "\n\t"]);
 
