@@ -88,7 +88,7 @@ internal static class StructuredFieldPath
 
             if (index == segments.Length - 1 && segment.StartsWith('@'))
             {
-                if (!IsValidName(segment[1..])) { return false; }
+                if (index == 0 || !IsValidName(segment[1..])) { return false; }
 
                 continue;
             }
