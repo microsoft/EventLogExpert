@@ -34,6 +34,16 @@ public sealed class StructuredFieldPathTests
     }
 
     [Fact]
+    public void CollectValues_DecodesAstralNumericEntity()
+    {
+        StructuredFieldResult result = Collect(
+            $"<Event {Ns}><UserData><Root><Item value='&#x1F600;'/></Root></UserData></Event>",
+            "Event/UserData/Root/Item/@value");
+
+        Assert.Equal("\U0001F600", result.Value.AsString());
+    }
+
+    [Fact]
     public void CollectValues_DecodesEntitiesInValues()
     {
         StructuredFieldResult result = Collect(
@@ -97,6 +107,20 @@ public sealed class StructuredFieldPathTests
         Assert.Equal(EventFieldValueKind.StringArray, result.Value.Kind);
         Assert.Equal("only", result.Value.AsString());
         Assert.False(result.IsTruncated);
+    }
+
+    [Fact]
+    public void CollectValues_NonPositiveCap_IsAbsent()
+    {
+        (string[] elements, string? attribute) = StructuredFieldPath.Parse("Event/UserData/Root/Item/@value");
+
+        StructuredFieldResult result = StructuredFieldPath.CollectValues(
+            $"<Event {Ns}><UserData><Root><Item value='x'/></Root></UserData></Event>".AsSpan(),
+            elements,
+            attribute,
+            cap: 0);
+
+        Assert.Equal(EventFieldValueKind.Null, result.Value.Kind);
     }
 
     [Fact]

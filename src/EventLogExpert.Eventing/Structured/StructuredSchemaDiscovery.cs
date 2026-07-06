@@ -21,7 +21,7 @@ public static class StructuredSchemaDiscovery
 
         foreach (string xml in eventXmlSamples)
         {
-            if (!string.IsNullOrEmpty(xml)) { samples.Add(xml); }
+            if (!string.IsNullOrWhiteSpace(xml)) { samples.Add(xml); }
         }
 
         if (samples.Count == 0) { return []; }
