@@ -28,7 +28,7 @@ internal static class StructuredFieldPath
     /// </summary>
     internal static StructuredFieldResult CollectValues(ReadOnlySpan<char> xml, string[] elements, string? attribute, int cap)
     {
-        if (elements.Length == 0) { return s_absent; }
+        if (elements.Length == 0 || cap <= 0) { return s_absent; }
 
         List<string>? values = null;
         bool truncated = false;
