@@ -231,7 +231,7 @@ internal static partial class NativeMethods
     [LibraryImport(EventLogApi, SetLastError = true)]
     internal static partial EvtHandle EvtCreateRenderContext(
         int valuePathsCount,
-        [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPWStr)][Out] string[]? valuePaths,
+        [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPWStr)][In] string[]? valuePaths,
         EvtRenderContextFlags flags);
 
     /// <summary>Formats a message string</summary>
@@ -749,11 +749,45 @@ internal static partial class NativeMethods
     private static unsafe string? ProcessRenderedEventXml(IntPtr buffer, int usedBytes, int propertyCount) =>
         usedBytes - 1 <= 0 ? null : new string((char*)buffer, 0, (usedBytes - 1) / sizeof(char));
 
+    // A value-path that is absent on the event renders as Null; map it to a null-reference property (surfaced as
+    // EventFieldValueKind.Null) instead of letting ConvertVariantToProperty throw on it.
+    private static unsafe ImmutableArray<EventProperty> ProcessRenderedValuePaths(IntPtr buffer, int usedBytes, int propertyCount)
+    {
+        if (propertyCount <= 0) { return ImmutableArray<EventProperty>.Empty; }
+
+#if DEBUG
+        BeforeVariantReadForTest?.Invoke();
+#endif
+
+        var properties = new EventProperty[propertyCount];
+        var variants = (EvtVariant*)buffer;
+
+        for (int i = 0; i < propertyCount; i++)
+        {
+            properties[i] = variants[i].Type == (int)EvtVariantType.Null
+                ? EventProperty.FromReference(null)
+                : ConvertVariantToProperty(variants[i]);
+        }
+
+        return ImmutableCollectionsMarshal.AsImmutableArray(properties);
+    }
+
     internal static unsafe EventRecord RenderEvent(EvtHandle eventHandle) =>
-        RenderWhilePinned(EventLogSession.GlobalSession.SystemRenderContext, eventHandle, EvtRenderFlags.EventValues, &ProcessRenderedEventRecord);
+        RenderWhilePinned(EventLogSession.GlobalSession.SystemRenderContext,
+            eventHandle,
+            EvtRenderFlags.EventValues,
+            &ProcessRenderedEventRecord);
 
     internal static unsafe ImmutableArray<EventProperty> RenderEventProperties(EvtHandle eventHandle) =>
-        RenderWhilePinned(EventLogSession.GlobalSession.UserRenderContext, eventHandle, EvtRenderFlags.EventValues, &ProcessRenderedEventProperties);
+        RenderWhilePinned(EventLogSession.GlobalSession.UserRenderContext,
+            eventHandle,
+            EvtRenderFlags.EventValues,
+            &ProcessRenderedEventProperties);
+
+    internal static unsafe ImmutableArray<EventProperty> RenderEventValues(
+        EvtHandle valuePathsContext,
+        EvtHandle eventHandle) =>
+        RenderWhilePinned(valuePathsContext, eventHandle, EvtRenderFlags.EventValues, &ProcessRenderedValuePaths);
 
     internal static unsafe string? RenderEventXml(EvtHandle eventHandle) =>
         RenderWhilePinned(EvtHandle.Zero, eventHandle, EvtRenderFlags.EventXml, &ProcessRenderedEventXml);
