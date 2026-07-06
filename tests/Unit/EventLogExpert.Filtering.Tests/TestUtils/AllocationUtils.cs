@@ -13,11 +13,13 @@ namespace EventLogExpert.Filtering.Tests.TestUtils;
 internal static class AllocationUtils
 {
     public const int MeasurementIterations = 10_000;
+    public const int StabilizationIterations = MeasurementIterations;
     public const int WarmupIterations = 1_000;
 
     public static long MeasurePredicateAllocations(Func<ResolvedEvent, bool> predicate, ResolvedEvent evt)
     {
         for (var i = 0; i < WarmupIterations; i++) { predicate(evt); }
+        for (var i = 0; i < StabilizationIterations; i++) { predicate(evt); }
 
         GC.Collect();
         GC.WaitForPendingFinalizers();
