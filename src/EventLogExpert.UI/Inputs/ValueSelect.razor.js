@@ -73,6 +73,21 @@ export function registerDropdown(root, dotNetRef) {
     input.addEventListener("blur", (e) => closeDropdown(e), { signal: controller.signal });
     dropdown.addEventListener("blur", (e) => closeDropdown(e), { signal: controller.signal });
 
+    // Native title tooltip, only when the text is actually clipped (scrollWidth > clientWidth): recovers a long
+    // selected value or option that overflows the fixed dropdown width, and stays silent when it already fits.
+    root.addEventListener("mouseover", (e) => {
+        const el = e.target.closest("input, [role='option']");
+        if (!el || !root.contains(el)) { return; }
+
+        const text = el.tagName === "INPUT" ? el.value : el.textContent.trim();
+
+        if (text && el.scrollWidth > el.clientWidth) {
+            el.title = text;
+        } else if (el.hasAttribute("title")) {
+            el.removeAttribute("title");
+        }
+    }, { signal: controller.signal });
+
     root._dropdownController = controller;
 }
 

@@ -5,6 +5,9 @@
     display: block;
     clear: both;
     color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 
     &:hover,
     &[highlighted] { background-color: var(--background-darkgray); }
