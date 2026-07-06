@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Readers;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Security.Principal;
 
@@ -102,7 +103,21 @@ public readonly struct EventFieldValue
     {
         if (_kind == EventFieldValueKind.Guid && _reference is Guid guid) { value = guid; return true; }
 
-        value = default;
+        value = Guid.Empty;
+
+        return false;
+    }
+
+    public bool TryGetStringArray([NotNullWhen(true)] out string[]? values)
+    {
+        if (_kind == EventFieldValueKind.StringArray && _reference is string[] array)
+        {
+            values = array;
+
+            return true;
+        }
+
+        values = null;
 
         return false;
     }

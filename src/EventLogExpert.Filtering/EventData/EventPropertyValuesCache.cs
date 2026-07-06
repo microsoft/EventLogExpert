@@ -24,6 +24,10 @@ public static class EventPropertyValuesCache
         object,
         ConcurrentDictionary<string, Lazy<ImmutableArray<string>>>> s_fieldValueCache = new();
     private static readonly ImmutableArray<string> s_levelValues = [.. Enum.GetNames<SeverityLevel>()];
+    private static readonly ConditionalWeakTable<object, Lazy<ImmutableArray<string>>> s_userDataFieldNameCache = new();
+    private static readonly ConditionalWeakTable<
+        object,
+        ConcurrentDictionary<string, Lazy<ImmutableArray<string>>>> s_userDataFieldValueCache = new();
 
     /// <summary>
     ///     Returns the distinct, sorted &lt;EventData&gt; field names across <paramref name="events" />, cached per
@@ -72,6 +76,51 @@ public static class EventPropertyValuesCache
             .Value;
     }
 
+    /// <summary>
+    ///     Distinct, sorted structured &lt;UserData&gt; field paths (storage keys) across <paramref name="events" />,
+    ///     cached per snapshot <paramref name="cacheKey" /> (auto-evicted when the snapshot changes).
+    /// </summary>
+    public static ImmutableArray<string> GetUserDataFieldNames(object cacheKey, IEnumerable<ResolvedEvent> events) =>
+        s_userDataFieldNameCache
+            .GetValue(
+                cacheKey,
+                _ => new Lazy<ImmutableArray<string>>(
+                    () => [.. events.GetUserDataFieldNames().Order(StringComparer.Ordinal)]))
+            .Value;
+
+    /// <summary>
+    ///     Distinct, sorted values of the structured UserData field <paramref name="fieldName" /> (a storage key) across
+    ///     <paramref name="events" />, cached per <c>(snapshot, fieldName)</c> so each field keeps its own value list.
+    /// </summary>
+    public static ImmutableArray<string> GetUserDataFieldValues(
+        object cacheKey,
+        IEnumerable<ResolvedEvent> events,
+        string? fieldName)
+    {
+        if (string.IsNullOrEmpty(fieldName))
+        {
+            return [];
+        }
+
+        // Only cache values for field names that exist in the snapshot (bounded-membership guard), so an arbitrary or
+        // partial typed path adds no cache entry or full log scan per keystroke; the field-name list is itself cached.
+        if (!GetUserDataFieldNames(cacheKey, events).Contains(fieldName, StringComparer.Ordinal))
+        {
+            return [];
+        }
+
+        var perSnapshot = s_userDataFieldValueCache.GetValue(
+            cacheKey,
+            static _ => new ConcurrentDictionary<string, Lazy<ImmutableArray<string>>>(StringComparer.Ordinal));
+
+        return perSnapshot
+            .GetOrAdd(
+                fieldName,
+                name => new Lazy<ImmutableArray<string>>(
+                    () => [.. events.GetUserDataFieldValues(name).Distinct().Order(StringComparer.Ordinal)]))
+            .Value;
+    }
+
     public static ImmutableArray<string> GetValues(
         object cacheKey,
         IEnumerable<ResolvedEvent> events,
@@ -102,6 +151,8 @@ public static class EventPropertyValuesCache
         s_cache.Clear();
         s_fieldNameCache.Clear();
         s_fieldValueCache.Clear();
+        s_userDataFieldNameCache.Clear();
+        s_userDataFieldValueCache.Clear();
     }
 
     private static ImmutableArray<string> Compute(

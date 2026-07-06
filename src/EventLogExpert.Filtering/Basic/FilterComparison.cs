@@ -11,7 +11,7 @@ namespace EventLogExpert.Filtering.Basic;
 [JsonConverter(typeof(FilterComparisonJsonConverter))]
 public sealed record FilterComparison
 {
-    public EventProperty Property { get; init; }
+    public EventProperty Property { get; init; } = EventProperty.Id;
 
     public ComparisonOperator Operator { get; init; }
 
@@ -28,9 +28,15 @@ public sealed record FilterComparison
     public string? EventDataFieldName { get; init; }
 
     /// <summary>
-    ///     Returns a copy with the new <paramref name="property" /> and Value/Values/EventDataFieldName cleared, since
-    ///     the available value space (and whether a field name applies) changes when the property changes.
+    ///     The structured &lt;UserData&gt; path (storage-key form, e.g. <c>X509Objects/Certificate/SubjectName</c>) this
+    ///     row targets. Meaningful only when <see cref="Property" /> is <see cref="EventProperty.UserData" />, else null.
+    /// </summary>
+    public string? UserDataFieldName { get; init; }
+
+    /// <summary>
+    ///     Returns a copy with the new <paramref name="property" /> and Value/Values/EventDataFieldName/UserDataFieldName
+    ///     cleared, since the available value space (and whether a field name applies) changes when the property changes.
     /// </summary>
     public FilterComparison WithProperty(EventProperty property) =>
-        this with { Property = property, Value = null, Values = [], EventDataFieldName = null };
+        this with { Property = property, Value = null, Values = [], EventDataFieldName = null, UserDataFieldName = null };
 }

@@ -15,5 +15,7 @@ public interface IEventResolverCache
 
     SecurityIdentifier? GetOrAddSid(SecurityIdentifier? sid);
 
+    string GetOrAddUserDataString(string value);
+
     string GetOrAddValue(string value);
 }

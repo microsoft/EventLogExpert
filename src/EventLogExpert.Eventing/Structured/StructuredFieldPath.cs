@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Readers;
+using System.Text;
 
 namespace EventLogExpert.Eventing.Structured;
 
@@ -127,6 +128,31 @@ internal static class StructuredFieldPath
         }
 
         return (elements, attribute);
+    }
+
+    /// <summary>
+    ///     Maps a canonical UserData path to its storage key on a resolved event (local-name chain under <c>UserData</c>,
+    ///     <c>/@attr</c> for an attribute). A leading <c>Event/UserData</c> envelope is dropped so a rooted grammar path and
+    ///     an already-plain picker key normalize alike; idempotent and tolerant of unrooted input.
+    /// </summary>
+    internal static string ToStorageKey(string canonicalPath)
+    {
+        (string[] elements, string? attribute) = Parse(canonicalPath);
+
+        int start = elements is ["Event", "UserData", ..] ? 2 : 0;
+
+        var builder = new StringBuilder();
+
+        for (int index = start; index < elements.Length; index++)
+        {
+            if (builder.Length > 0) { builder.Append('/'); }
+
+            builder.Append(elements[index]);
+        }
+
+        if (attribute is not null) { builder.Append("/@").Append(attribute); }
+
+        return builder.ToString();
     }
 
     private static bool IsValidName(string name)

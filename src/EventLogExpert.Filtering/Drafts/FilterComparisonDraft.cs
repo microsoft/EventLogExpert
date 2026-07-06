@@ -8,18 +8,21 @@ namespace EventLogExpert.Filtering.Drafts;
 
 public sealed class FilterComparisonDraft
 {
+    /// <summary>The named EventData field this row targets; meaningful only when <see cref="Property" /> is EventData.</summary>
+    public string? EventDataFieldName { get; set; }
+
     public MatchMode MatchMode { get; set; }
 
     public ComparisonOperator Operator { get; set; }
 
-    public EventProperty Property { get; set; }
+    public EventProperty Property { get; set; } = EventProperty.Id;
+
+    /// <summary>The structured UserData path this row targets; meaningful only when <see cref="Property" /> is UserData.</summary>
+    public string? UserDataFieldName { get; set; }
 
     public string? Value { get; set; }
 
     public List<string> Values { get; set; } = [];
-
-    /// <summary>The named EventData field this row targets; meaningful only when <see cref="Property" /> is EventData.</summary>
-    public string? EventDataFieldName { get; set; }
 
     public static FilterComparisonDraft FromComparison(FilterComparison comparison) =>
         new()
@@ -29,7 +32,8 @@ public sealed class FilterComparisonDraft
             MatchMode = comparison.MatchMode,
             Value = comparison.Value,
             Values = [.. comparison.Values],
-            EventDataFieldName = comparison.EventDataFieldName
+            EventDataFieldName = comparison.EventDataFieldName,
+            UserDataFieldName = comparison.UserDataFieldName
         };
 
     public void ChangeProperty(EventProperty property)
@@ -38,6 +42,7 @@ public sealed class FilterComparisonDraft
         Value = null;
         Values.Clear();
         EventDataFieldName = null;
+        UserDataFieldName = null;
     }
 
     public FilterComparison ToComparison() =>
@@ -48,6 +53,7 @@ public sealed class FilterComparisonDraft
             MatchMode = MatchMode,
             Value = Value,
             Values = [.. Values],
-            EventDataFieldName = EventDataFieldName
+            EventDataFieldName = EventDataFieldName,
+            UserDataFieldName = UserDataFieldName
         };
 }

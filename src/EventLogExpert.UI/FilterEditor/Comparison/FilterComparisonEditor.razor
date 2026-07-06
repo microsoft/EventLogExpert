@@ -4,7 +4,7 @@
     CssClass="input filter-dropdown"
     T="EventProperty"
     ToStringFunc="x => x.ToFullString()">
-    @foreach (var item in Enum.GetValues<EventProperty>())
+    @foreach (var item in Enum.GetValues<EventProperty>().OrderBy(p => p.ToFullString(), StringComparer.CurrentCulture))
     {
         <ValueSelectItem T="EventProperty" Value="item" />
     }
@@ -21,6 +21,23 @@
         Value="Comparison.EventDataFieldName"
         ValueChanged="HandleEventDataFieldNameChanged">
         @foreach (var name in EventDataFieldNames)
+        {
+            <ValueSelectItem T="string" Value="name" />
+        }
+    </ValueSelect>
+}
+
+@if (IsUserDataProperty)
+{
+    <label class="visually-hidden" id="@($"{Id}_UserDataFieldName")">Field name</label>
+
+    <ValueSelect AriaLabelledBy="@($"{Id}_UserDataFieldName")"
+        CssClass="input filter-value-dropdown"
+        IsInput
+        T="string"
+        Value="Comparison.UserDataFieldName"
+        ValueChanged="HandleUserDataFieldNameChanged">
+        @foreach (var name in UserDataFieldNames)
         {
             <ValueSelectItem T="string" Value="name" />
         }

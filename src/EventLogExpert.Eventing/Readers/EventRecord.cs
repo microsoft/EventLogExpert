@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Structured;
 using System.Collections.Immutable;
 using System.Security.Principal;
 
@@ -46,6 +47,10 @@ public sealed record EventRecord
     public byte? Version { get; set; }
 
     public string? Xml { get; set; }
+
+    public ImmutableArray<UserDataField> UserData { get; set; }
+
+    public bool UserDataIncomplete { get; set; }
 
     public string? Error { get; init; }
 

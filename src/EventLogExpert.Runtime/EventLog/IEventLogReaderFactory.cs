@@ -8,5 +8,9 @@ namespace EventLogExpert.Runtime.EventLog;
 
 internal interface IEventLogReaderFactory
 {
-    IEventLogReader CreateReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false);
+    IEventLogReader CreateReader(
+        string path,
+        LogPathType pathType,
+        bool renderXml = false,
+        bool reverseDirection = false);
 }

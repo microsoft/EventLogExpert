@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Eventing.Structured;
 using EventLogExpert.Filtering.Persistence;
 
 namespace EventLogExpert.Filtering.Evaluation;
@@ -19,13 +20,25 @@ internal static class ResolvedEventExtensions
 
             foreach (var filter in filters)
             {
-                if (filter.Compiled is null) { continue; }
+                var compiled = filter.Compiled;
 
-                if (filter.IsExcluded && filter.Compiled.Predicate(@event)) { return false; }
+                if (compiled is null) { continue; }
 
-                if (!filter.IsExcluded) { isEmpty = false; }
+                FilterMatch match = compiled.Evaluate?.Invoke(@event) ??
+                    (compiled.Predicate(@event) ? FilterMatch.Match : FilterMatch.NoMatch);
 
-                if (!filter.IsExcluded && filter.Compiled.Predicate(@event)) { isFiltered = true; }
+                if (filter.IsExcluded)
+                {
+                    // Exclude hides only on a decisive Match; Unknown and NoMatch keep the row visible.
+                    if (match == FilterMatch.Match) { return false; }
+
+                    continue;
+                }
+
+                isEmpty = false;
+
+                // Include keeps the row on a Match OR an Unknown; only a decisive NoMatch fails to satisfy it.
+                if (match != FilterMatch.NoMatch) { isFiltered = true; }
             }
 
             return isEmpty || isFiltered;

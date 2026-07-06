@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Interop;
+using EventLogExpert.Eventing.Structured;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 
@@ -40,7 +41,8 @@ public sealed class EventLogWatcher : IDisposable
         NativeMethods.ThrowEventLogException(error);
     }
 
-    public EventLogWatcher(string path, bool renderXml = false) : this(path, null, renderXml) { }
+    public EventLogWatcher(string path, bool renderXml = false)
+        : this(path, null, renderXml) { }
 
     ~EventLogWatcher()
     {
@@ -161,9 +163,20 @@ public sealed class EventLogWatcher : IDisposable
                         @event = NativeMethods.RenderEvent(eventHandle);
                         @event.Properties = NativeMethods.RenderEventProperties(eventHandle);
 
-                        if (_renderXml)
+                        bool needsUserData = @event.Properties.Length == 0;
+
+                        if (_renderXml || needsUserData)
                         {
-                            @event.Xml = NativeMethods.RenderEventXml(eventHandle);
+                            var xml = NativeMethods.RenderEventXml(eventHandle);
+
+                            if (_renderXml) { @event.Xml = xml; }
+
+                            if (needsUserData)
+                            {
+                                var (fields, incomplete) = UserDataValueExtractor.Extract(xml);
+                                @event.UserData = fields;
+                                @event.UserDataIncomplete = incomplete;
+                            }
                         }
                     }
                     catch (Exception ex)

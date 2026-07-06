@@ -56,9 +56,14 @@ public sealed partial class FilterComparisonEditor : ComponentBase
 
     private bool IsEventDataProperty => Comparison.Property is EventProperty.EventData;
 
-    private ImmutableArray<string> Items => Comparison.Property is EventProperty.EventData
-        ? EventLogQueries.GetEventDataFieldValues(Comparison.EventDataFieldName ?? string.Empty)
-        : EventLogQueries.GetPropertyValues(Comparison.Property);
+    private bool IsUserDataProperty => Comparison.Property is EventProperty.UserData;
+
+    private ImmutableArray<string> Items => Comparison.Property switch
+    {
+        EventProperty.EventData => EventLogQueries.GetEventDataFieldValues(Comparison.EventDataFieldName ?? string.Empty),
+        EventProperty.UserData => EventLogQueries.GetUserDataFieldValues(Comparison.UserDataFieldName ?? string.Empty),
+        _ => EventLogQueries.GetPropertyValues(Comparison.Property)
+    };
 
     private EventProperty PropertyBinding
     {
@@ -77,6 +82,8 @@ public sealed partial class FilterComparisonEditor : ComponentBase
         }
     }
 
+    private ImmutableArray<string> UserDataFieldNames => EventLogQueries.GetUserDataFieldNames();
+
     private static bool IsTextOnlyProperty(EventProperty property) => FilterPropertyConstraints.IsTextOnly(property);
 
     private async Task HandleEventDataFieldNameChanged(string? fieldName)
@@ -93,6 +100,16 @@ public sealed partial class FilterComparisonEditor : ComponentBase
     {
         Comparison.Operator = value.Op;
         Comparison.MatchMode = value.Mode;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task HandleUserDataFieldNameChanged(string? fieldName)
+    {
+        Comparison.UserDataFieldName = fieldName;
+
+        // The available value space is field-specific, so a field-name change invalidates the current value(s).
+        Comparison.Value = null;
+        Comparison.Values.Clear();
         await OnChanged.InvokeAsync();
     }
 

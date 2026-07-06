@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Structured;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Resolution;
 using System.Collections.Concurrent;
@@ -159,7 +160,33 @@ public class EventResolverBase : IDisposable
             ThreadId = eventRecord.ThreadId,
             TimeCreated = eventRecord.TimeCreated,
             UserId = _cache?.GetOrAddSid(eventRecord.UserId) ?? eventRecord.UserId,
-            Xml = eventRecord.Xml ?? string.Empty
+            Xml = eventRecord.Xml ?? string.Empty,
+            UserData = InternUserData(eventRecord.UserData),
+            UserDataIncomplete = eventRecord.UserDataIncomplete
         };
+    }
+
+    private ImmutableArray<UserDataField> InternUserData(ImmutableArray<UserDataField> fields)
+    {
+        if (_cache is null || fields.IsDefaultOrEmpty) { return fields; }
+
+        var builder = ImmutableArray.CreateBuilder<UserDataField>(fields.Length);
+
+        foreach (UserDataField field in fields)
+        {
+            var values = ImmutableArray.CreateBuilder<string>(field.Values.Length);
+
+            foreach (string value in field.Values)
+            {
+                values.Add(_cache.GetOrAddUserDataString(value));
+            }
+
+            builder.Add(new UserDataField(
+                _cache.GetOrAddUserDataString(field.Path),
+                values.MoveToImmutable(),
+                field.IsTruncated));
+        }
+
+        return builder.MoveToImmutable();
     }
 }

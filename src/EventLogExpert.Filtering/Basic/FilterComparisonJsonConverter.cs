@@ -24,6 +24,7 @@ internal sealed class FilterComparisonJsonConverter : JsonConverter<FilterCompar
         bool matchModeSet = false;
         string? value = null;
         string? eventDataFieldName = null;
+        string? userDataFieldName = null;
         ImmutableList<string> values = [];
 
         while (reader.Read())
@@ -70,6 +71,9 @@ internal sealed class FilterComparisonJsonConverter : JsonConverter<FilterCompar
                 case "EventDataFieldName":
                     eventDataFieldName = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
                     break;
+                case "UserDataFieldName":
+                    userDataFieldName = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
+                    break;
                 case "Values":
                     values = ReadStringList(ref reader);
                     break;
@@ -88,6 +92,9 @@ internal sealed class FilterComparisonJsonConverter : JsonConverter<FilterCompar
             Values = values,
             EventDataFieldName = property is EventProperty.EventData && !string.IsNullOrWhiteSpace(eventDataFieldName)
                 ? eventDataFieldName
+                : null,
+            UserDataFieldName = property is EventProperty.UserData && !string.IsNullOrWhiteSpace(userDataFieldName)
+                ? userDataFieldName
                 : null
         };
     }
@@ -114,6 +121,11 @@ internal sealed class FilterComparisonJsonConverter : JsonConverter<FilterCompar
         if (value.Property is EventProperty.EventData && !string.IsNullOrWhiteSpace(value.EventDataFieldName))
         {
             writer.WriteString("EventDataFieldName", value.EventDataFieldName);
+        }
+
+        if (value.Property is EventProperty.UserData && !string.IsNullOrWhiteSpace(value.UserDataFieldName))
+        {
+            writer.WriteString("UserDataFieldName", value.UserDataFieldName);
         }
 
         writer.WriteEndObject();

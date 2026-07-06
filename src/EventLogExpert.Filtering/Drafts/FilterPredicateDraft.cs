@@ -22,6 +22,10 @@ public sealed class FilterPredicateDraft
     ///             An <see cref="EventProperty.EventData" /> row additionally requires a non-whitespace
     ///             <see cref="FilterComparisonDraft.EventDataFieldName" />.
     ///         </item>
+    ///         <item>
+    ///             A <see cref="EventProperty.UserData" /> row additionally requires a non-whitespace
+    ///             <see cref="FilterComparisonDraft.UserDataFieldName" />.
+    ///         </item>
     ///     </list>
     ///     Mirrors the formatter's strict-mode validation so the in-flight UI state matches the eventual save guard.
     /// </summary>
@@ -31,6 +35,12 @@ public sealed class FilterPredicateDraft
         {
             if (Comparison.Property is EventProperty.EventData
                 && string.IsNullOrWhiteSpace(Comparison.EventDataFieldName))
+            {
+                return false;
+            }
+
+            if (Comparison.Property is EventProperty.UserData
+                && string.IsNullOrWhiteSpace(Comparison.UserDataFieldName))
             {
                 return false;
             }

@@ -84,6 +84,8 @@ internal sealed class FilteringEffects(
 
         bool newRequiresXml = action.Filter.RequiresXml;
 
+        // Reopen a log only when it lacks the XML the new filter needs; UserData resolves from stored fields at resolve
+        // time, so a UserData filter change never forces a reload.
         var logsNeedingReload = newRequiresXml && !_eventLogState.Value.OpenLogs.IsEmpty
             ? _eventLogState.Value.OpenLogs
                 .Where(kvp => !_concurrencyState.IsLoadedWithXml(kvp.Value.Id))

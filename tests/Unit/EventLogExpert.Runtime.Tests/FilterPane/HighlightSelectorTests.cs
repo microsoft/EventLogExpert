@@ -14,6 +14,26 @@ public sealed class HighlightSelectorTests
     private static readonly HighlightSelector s_selector = new();
 
     [Fact]
+    public void ComputeHighlightKey_TreatsUserDataFilterAsEligible()
+    {
+        // Arrange
+        var userData = FilterBuilder.CreateTestFilter(
+            "UserData[\"Foo\"] == \"x\"",
+            HighlightColor.Red,
+            true);
+
+        var scalar = FilterBuilder.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
+            HighlightColor.Blue,
+            true);
+
+        // Act + Assert: an eligible UserData filter contributes to the key, so adding it changes the key.
+        Assert.NotEqual(
+            s_selector.ComputeHighlightKey(ImmutableList.Create(scalar)),
+            s_selector.ComputeHighlightKey(ImmutableList.Create(scalar, userData)));
+    }
+
+    [Fact]
     public void ComputeHighlightKey_WhenCandidateAdded_ReturnsDifferentKey()
     {
         // Arrange
@@ -257,6 +277,32 @@ public sealed class HighlightSelectorTests
         {
             Assert.Same(fromEnabled[i], fromDisabled[i]);
         }
+    }
+
+    [Fact]
+    public void Select_ShouldIncludeUserDataFilters()
+    {
+        // A colored, enabled, non-excluded UserData filter is highlight-eligible and flows through Select like any other;
+        // its tri-state Evaluate drives the highlight (an absent / Unknown result just leaves the row visible-but-uncolored).
+        var userData = FilterBuilder.CreateTestFilter(
+            "UserData[\"Foo\"] == \"x\"",
+            HighlightColor.Red,
+            true);
+
+        var scalar = FilterBuilder.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
+            HighlightColor.Blue,
+            true);
+
+        var state = new FilterPaneState { Filters = ImmutableList.Create(userData, scalar) };
+
+        // Act
+        var result = s_selector.Select(state.Filters);
+
+        // Assert: both filters are highlight-eligible; the UserData filter is no longer gated out.
+        Assert.Equal(2, result.Length);
+        Assert.Same(userData, result[0]);
+        Assert.Same(scalar, result[1]);
     }
 
     [Fact]

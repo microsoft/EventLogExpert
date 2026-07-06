@@ -15,4 +15,10 @@ public readonly struct StructuredFieldResult(EventFieldValue value, bool isTrunc
     public EventFieldValue Value { get; } = value;
 
     public bool IsTruncated { get; } = isTruncated;
+
+    /// <summary><c>true</c> when the path matched no element on the event (zero present values).</summary>
+    public bool IsAbsent => !Value.TryGetStringArray(out _);
+
+    /// <summary>The present values of the field (empty when absent), read without allocating.</summary>
+    public ReadOnlySpan<string> PresentValues => Value.TryGetStringArray(out string[]? values) ? values : null;
 }
