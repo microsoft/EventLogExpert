@@ -19,5 +19,6 @@ public enum EventProperty
     Description,
     Xml,
     [EnumMember(Value = "Log Name")] LogName,
-    [EnumMember(Value = "Event Data")] EventData
+    [EnumMember(Value = "Event Data")] EventData,
+    [EnumMember(Value = "User Data")] UserData
 }

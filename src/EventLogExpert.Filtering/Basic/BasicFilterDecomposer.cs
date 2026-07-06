@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Structured;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Lowering;
 using EventLogExpert.Filtering.Parsing;
@@ -400,6 +401,15 @@ internal static class BasicFilterDecomposer
             case EventDataMultiEqualsNode eventDataMulti:
                 return TryMapEventDataMultiEquals(eventDataMulti, out comparison);
 
+            case UserDataComparisonNode userDataComparison:
+                return TryMapUserDataComparison(userDataComparison, out comparison);
+
+            case UserDataContainsNode userDataContains:
+                return TryMapUserDataContains(userDataContains, out comparison);
+
+            case UserDataMultiEqualsNode userDataMulti:
+                return TryMapUserDataMultiEquals(userDataMulti, out comparison);
+
             case NotNode not:
                 return TryMapNegatedLeaf(not, out comparison);
 
@@ -470,5 +480,77 @@ internal static class BasicFilterDecomposer
             default:
                 return false;
         }
+    }
+
+    private static bool TryMapUserDataComparison(
+        UserDataComparisonNode node,
+        [NotNullWhen(true)] out FilterComparison? comparison)
+    {
+        comparison = null;
+
+        if (string.IsNullOrWhiteSpace(node.CanonicalPath) || string.IsNullOrWhiteSpace(node.Literal))
+        {
+            return false;
+        }
+
+        comparison = new FilterComparison
+        {
+            Property = EventProperty.UserData,
+            UserDataFieldName = UserDataFieldPath.ToStorageKey(node.CanonicalPath),
+            Operator = node.Op == FilterBinaryOperator.Equal
+                ? ComparisonOperator.Equals
+                : ComparisonOperator.NotEqual,
+            MatchMode = MatchMode.Single,
+            Value = node.Literal
+        };
+
+        return true;
+    }
+
+    private static bool TryMapUserDataContains(
+        UserDataContainsNode node,
+        [NotNullWhen(true)] out FilterComparison? comparison)
+    {
+        comparison = null;
+
+        // A case-sensitive contains is not Basic vocabulary (Basic is always OrdinalIgnoreCase); leave it Advanced-only.
+        if (!node.IgnoreCase || string.IsNullOrWhiteSpace(node.CanonicalPath) || string.IsNullOrWhiteSpace(node.Needle))
+        {
+            return false;
+        }
+
+        comparison = new FilterComparison
+        {
+            Property = EventProperty.UserData,
+            UserDataFieldName = UserDataFieldPath.ToStorageKey(node.CanonicalPath),
+            Operator = node.Negated ? ComparisonOperator.NotContains : ComparisonOperator.Contains,
+            MatchMode = MatchMode.Single,
+            Value = node.Needle
+        };
+
+        return true;
+    }
+
+    private static bool TryMapUserDataMultiEquals(
+        UserDataMultiEqualsNode node,
+        [NotNullWhen(true)] out FilterComparison? comparison)
+    {
+        comparison = null;
+
+        if (node.Literals.Count == 0 || string.IsNullOrWhiteSpace(node.CanonicalPath))
+        {
+            return false;
+        }
+
+        comparison = new FilterComparison
+        {
+            Property = EventProperty.UserData,
+            UserDataFieldName = UserDataFieldPath.ToStorageKey(node.CanonicalPath),
+            Operator = ComparisonOperator.Equals,
+            MatchMode = MatchMode.Many,
+            Values = [.. node.Literals]
+        };
+
+        return true;
     }
 }

@@ -38,4 +38,16 @@ public interface IEventLogQueries
     ///     from event data.
     /// </summary>
     ImmutableArray<string> GetPropertyValues(EventProperty property);
+
+    /// <summary>
+    ///     Distinct, sorted structured &lt;UserData&gt; field paths (storage keys) across all open raw events, for the
+    ///     Basic editor's UserData field-name picker.
+    /// </summary>
+    ImmutableArray<string> GetUserDataFieldNames();
+
+    /// <summary>
+    ///     Distinct, sorted values of the structured UserData field <paramref name="fieldName" /> (a storage key) across
+    ///     all open raw events, for the value picker of a UserData filter row.
+    /// </summary>
+    ImmutableArray<string> GetUserDataFieldValues(string fieldName);
 }

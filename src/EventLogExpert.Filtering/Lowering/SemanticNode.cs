@@ -135,3 +135,46 @@ internal sealed class EventDataMultiEqualsNode(string fieldName, IReadOnlyList<E
 
     public IReadOnlyList<EventDataLiteral> Literals { get; } = literals;
 }
+
+/// <summary>
+///     <c>UserData["Event/UserData/..."] == v</c> / <c>!= v</c>: ordinal all-string equality on a structured UserData
+///     path, presence-required (an absent path never matches, positive or negative). Evaluated to a tri-state so a
+///     truncated field surfaces <c>Unknown</c>; negation flips <see cref="Op" /> in the Lowerer, so no NotNode wraps it.
+/// </summary>
+internal sealed class UserDataComparisonNode(string canonicalPath, FilterBinaryOperator op, string literal)
+    : SemanticNode
+{
+    public string CanonicalPath { get; } = canonicalPath;
+
+    public string Literal { get; } = literal;
+
+    public FilterBinaryOperator Op { get; } = op;
+}
+
+/// <summary>
+///     <c>UserData["Event/UserData/..."].Contains(Needle, OIC)</c> on a structured UserData path, ordinal over each
+///     present value. <see cref="Negated" /> is the <c>!...Contains(...)</c> (Basic <c>NotContains</c>) form;
+///     presence-required.
+/// </summary>
+internal sealed class UserDataContainsNode(string canonicalPath, string needle, bool ignoreCase, bool negated)
+    : SemanticNode
+{
+    public string CanonicalPath { get; } = canonicalPath;
+
+    public bool IgnoreCase { get; } = ignoreCase;
+
+    public string Needle { get; } = needle;
+
+    public bool Negated { get; } = negated;
+}
+
+/// <summary>
+///     <c>(new[] {...}).Contains(UserData["Event/UserData/..."])</c>: any-of ordinal equality on a structured
+///     UserData path, presence-required. Positive only; <c>!(any-of)</c> has no Basic form and is rejected by the Lowerer.
+/// </summary>
+internal sealed class UserDataMultiEqualsNode(string canonicalPath, IReadOnlyList<string> literals) : SemanticNode
+{
+    public string CanonicalPath { get; } = canonicalPath;
+
+    public IReadOnlyList<string> Literals { get; } = literals;
+}

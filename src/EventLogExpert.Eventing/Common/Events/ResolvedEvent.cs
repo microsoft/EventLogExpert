@@ -4,7 +4,9 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.Eventing.Structured;
 using System.Collections.Immutable;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Common.Events;
@@ -13,6 +15,9 @@ public sealed record ResolvedEvent(
     string OwningLog /*This is the name of the log file or the live log, which we use internally*/,
     LogPathType LogPathType)
 {
+    private static readonly StructuredFieldResult s_absentUserData =
+        new(EventFieldValue.FromProperty(EventProperty.FromReference(null)), false);
+
     public Guid? ActivityId { get; init; }
 
     public string ComputerName { get; init; } = string.Empty;
@@ -57,10 +62,55 @@ public sealed record ResolvedEvent(
     internal TemplateFieldSchema? EventDataSchema { get; init; }
 
     /// <summary>
+    ///     Deduped nested-UserData fields extracted once at resolve time (flat UserData surfaces as
+    ///     <see cref="EventData" /> instead). Each field's <see cref="UserDataField.Path" /> is a storage key; repeats
+    ///     collapse into one multi-value field. <c>default</c> / empty when the event has no nested UserData.
+    /// </summary>
+    public ImmutableArray<UserDataField> UserData { get; init; }
+
+    /// <summary>
+    ///     <c>true</c> when extraction hit the per-event distinct-path cap, so a path absent from <see cref="UserData" />
+    ///     may still have existed. <see cref="TryGetUserDataValues" /> then returns a keep-visible (truncated) result rather
+    ///     than a decisive no-match.
+    /// </summary>
+    public bool UserDataIncomplete { get; init; }
+
+    /// <summary>
     ///     Named &lt;EventData&gt; fields for this event, or <see cref="EventDataKind.None" /> for legacy / template-less
     ///     events. The underlying values also remain reachable positionally through the description and XML.
     /// </summary>
     public EventDataView EventData => EventDataValues.IsDefaultOrEmpty
         ? EventDataView.Empty
         : new(EventDataValues, EventDataSchema);
+
+    /// <summary>
+    ///     Looks up a stored UserData field by its <paramref name="storageKey" /> and returns its values, or an absent
+    ///     result when none was stored. When <see cref="UserDataIncomplete" /> is set, an absent field instead yields a
+    ///     present-but-empty truncated result so a filter keeps the row visible (Unknown) rather than a wrong no-match.
+    /// </summary>
+    public StructuredFieldResult TryGetUserDataValues(string storageKey)
+    {
+        if (!UserData.IsDefaultOrEmpty)
+        {
+            foreach (UserDataField field in UserData)
+            {
+                if (!string.Equals(field.Path, storageKey, StringComparison.Ordinal)) { continue; }
+
+                string[] values = ImmutableCollectionsMarshal.AsArray(field.Values) ?? [];
+
+                return new StructuredFieldResult(
+                    EventFieldValue.FromProperty(EventProperty.FromReference(values)),
+                    field.IsTruncated || UserDataIncomplete);
+            }
+        }
+
+        if (!UserDataIncomplete) { return s_absentUserData; }
+
+        string[] empty = [];
+
+        return new StructuredFieldResult(
+            EventFieldValue.FromProperty(EventProperty.FromReference(empty)),
+            isTruncated: true);
+
+    }
 }

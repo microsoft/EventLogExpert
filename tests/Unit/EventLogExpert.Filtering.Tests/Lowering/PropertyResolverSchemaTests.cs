@@ -18,7 +18,9 @@ public sealed class PropertyResolverSchemaTests
         "OwningLog", // Internal: identifies the log file/live channel; not user-visible filter target.
         "LogPathType", // Enum discriminator paired with OwningLog; not a user-facing filter target.
         "KeywordsDisplayName", // Computed convenience accessor; users filter via Keywords directly.
-        "EventData" // Structured field accessor; named-field filtering arrives with the filter DSL, not as a scalar column.
+        "EventData", // Structured field accessor; named-field filtering arrives with the filter DSL, not as a scalar column.
+        "UserData", // Resolve-time stored nested-UserData leaves; UserData filtering uses the UserData[...] DSL, not a scalar column.
+        "UserDataIncomplete" // Extraction-cap flag paired with UserData; surfaced through the UserData[...] tri-state, not as a scalar column.
     ];
 
     [Fact]

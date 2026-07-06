@@ -3,16 +3,22 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Interop;
+using EventLogExpert.Eventing.Structured;
 using System.Buffers;
 using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
 
-public sealed class EventLogReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false) : IEventLogReader
+public sealed class EventLogReader(
+    string path,
+    LogPathType pathType,
+    bool renderXml = false,
+    bool reverseDirection = false) : IEventLogReader
 {
     private const int EvtQueryReverseDirection = 0x200;
 
     private readonly Lock _eventLock = new();
+
     private readonly EvtHandle _handle = reverseDirection
         ? NativeMethods.EvtQueryWithFlags(EventLogSession.GlobalSession.Handle, path, null,
             (int)pathType | EvtQueryReverseDirection)
@@ -133,9 +139,20 @@ public sealed class EventLogReader(string path, LogPathType pathType, bool rende
                     events[i] = NativeMethods.RenderEvent(eventHandle);
                     events[i].Properties = NativeMethods.RenderEventProperties(eventHandle);
 
-                    if (renderXml)
+                    bool needsUserData = events[i].Properties.Length == 0;
+
+                    if (renderXml || needsUserData)
                     {
-                        events[i].Xml = NativeMethods.RenderEventXml(eventHandle);
+                        var xml = NativeMethods.RenderEventXml(eventHandle);
+
+                        if (renderXml) { events[i].Xml = xml; }
+
+                        if (needsUserData)
+                        {
+                            var (fields, incomplete) = UserDataValueExtractor.Extract(xml);
+                            events[i].UserData = fields;
+                            events[i].UserDataIncomplete = incomplete;
+                        }
                     }
                 }
                 catch (Exception ex)

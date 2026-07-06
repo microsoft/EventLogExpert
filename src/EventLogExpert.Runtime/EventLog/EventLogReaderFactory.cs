@@ -8,6 +8,10 @@ namespace EventLogExpert.Runtime.EventLog;
 
 internal sealed class EventLogReaderFactory : IEventLogReaderFactory
 {
-    public IEventLogReader CreateReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false) =>
+    public IEventLogReader CreateReader(
+        string path,
+        LogPathType pathType,
+        bool renderXml = false,
+        bool reverseDirection = false) =>
         new EventLogReader(path, pathType, renderXml, reverseDirection);
 }

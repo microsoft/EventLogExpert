@@ -59,5 +59,49 @@ internal static class EventLogDataQueryExtensions
                 EventProperty.LogName => events.Select(e => e.LogName).Distinct(),
                 _ => [],
             };
+
+        /// <summary>
+        ///     Distinct structured &lt;UserData&gt; field paths (storage keys) across <paramref name="events" />, for the
+        ///     Basic editor's UserData field-name picker. Compared Ordinal, matching the storage-key lookup.
+        /// </summary>
+        public IEnumerable<string> GetUserDataFieldNames()
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var resolvedEvent in events)
+            {
+                if (resolvedEvent.UserData.IsDefaultOrEmpty) { continue; }
+
+                foreach (var field in resolvedEvent.UserData)
+                {
+                    if (seen.Add(field.Path)) { yield return field.Path; }
+                }
+            }
+        }
+
+        /// <summary>
+        ///     Values of the structured UserData field <paramref name="fieldName" /> (a storage key) across every event that
+        ///     has it; a repeating field contributes each collapsed value. The caller de-duplicates and sorts.
+        /// </summary>
+        public IEnumerable<string> GetUserDataFieldValues(string fieldName)
+        {
+            foreach (var resolvedEvent in events)
+            {
+                if (resolvedEvent.UserData.IsDefaultOrEmpty) { continue; }
+
+                foreach (var field in resolvedEvent.UserData)
+                {
+                    if (!string.Equals(field.Path, fieldName, StringComparison.Ordinal) || field.Values.IsDefaultOrEmpty)
+                    {
+                        continue;
+                    }
+
+                    foreach (var value in field.Values)
+                    {
+                        yield return value;
+                    }
+                }
+            }
+        }
     }
 }

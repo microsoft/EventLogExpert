@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Eventing.Structured;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Lowering;
 using System.Diagnostics.CodeAnalysis;
@@ -22,6 +23,19 @@ internal static class Emitter
         try
         {
             var requiresXml = ContainsXmlReference(root);
+
+            if (ContainsUserDataNode(root))
+            {
+                var evaluate = EmitTriState(root);
+
+                compiled = new CompiledFilter(e => evaluate(e) == FilterMatch.Match, requiresXml)
+                {
+                    Evaluate = evaluate
+                };
+
+                return true;
+            }
+
             var predicate = EmitNode(root);
             compiled = new CompiledFilter(predicate, requiresXml);
 
@@ -34,6 +48,16 @@ internal static class Emitter
             return false;
         }
     }
+
+    private static bool ContainsUserDataNode(SemanticNode node) =>
+        node switch
+        {
+            UserDataComparisonNode or UserDataContainsNode or UserDataMultiEqualsNode => true,
+            AndNode and => ContainsUserDataNode(and.Left) || ContainsUserDataNode(and.Right),
+            OrNode or => ContainsUserDataNode(or.Left) || ContainsUserDataNode(or.Right),
+            NotNode not => ContainsUserDataNode(not.Operand),
+            _ => false
+        };
 
     private static bool ContainsXmlReference(SemanticNode node) =>
         node switch
@@ -641,6 +665,143 @@ internal static class Emitter
             _ => throw new EmitException($"Unsupported field '{field}' for string comparison.")
         };
 
+    // A UserData-bearing filter compiles to a Kleene three-valued predicate: non-UserData subtrees (never a NotNode over
+    // UserData, per LowerNegation) reuse the bool emitter lifted to Match|NoMatch, And/Or combine tri-state, and a
+    // UserData term reads its stored values from ResolvedEvent.UserData by storage key.
+    private static Func<ResolvedEvent, FilterMatch> EmitTriState(SemanticNode node)
+    {
+        if (!ContainsUserDataNode(node))
+        {
+            var boolPredicate = EmitNode(node);
+
+            return e => boolPredicate(e) ? FilterMatch.Match : FilterMatch.NoMatch;
+        }
+
+        switch (node)
+        {
+            case AndNode and:
+            {
+                var parts = FlattenAndChain(and).Select(EmitTriState).ToArray();
+
+                return e => EvaluateKleeneAnd(parts, e);
+            }
+            case OrNode or:
+            {
+                var parts = FlattenOrChain(or).Select(EmitTriState).ToArray();
+
+                return e => EvaluateKleeneOr(parts, e);
+            }
+            case UserDataComparisonNode comparison:
+                return EmitUserDataFieldMatcher(comparison.CanonicalPath, EmitUserDataComparison(comparison));
+            case UserDataContainsNode contains:
+                return EmitUserDataFieldMatcher(contains.CanonicalPath, EmitUserDataContains(contains));
+            case UserDataMultiEqualsNode multi:
+                return EmitUserDataFieldMatcher(multi.CanonicalPath, EmitUserDataMultiEquals(multi));
+            default:
+                throw new EmitException($"Unsupported UserData-bearing node {node.GetType().Name}.");
+        }
+    }
+
+    private static Func<StructuredFieldResult, FilterMatch> EmitUserDataComparison(UserDataComparisonNode node)
+    {
+        var literal = node.Literal;
+
+        if (node.Op == FilterBinaryOperator.Equal)
+        {
+            return result =>
+            {
+                var values = result.PresentValues;
+
+                for (var i = 0; i < values.Length; i++)
+                {
+                    if (string.Equals(values[i], literal, StringComparison.Ordinal)) { return FilterMatch.Match; }
+                }
+
+                return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.NoMatch;
+            };
+        }
+
+        return result =>
+        {
+            var values = result.PresentValues;
+
+            if (values.Length == 0) { return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.NoMatch; }
+
+            for (var i = 0; i < values.Length; i++)
+            {
+                if (string.Equals(values[i], literal, StringComparison.Ordinal)) { return FilterMatch.NoMatch; }
+            }
+
+            return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.Match;
+        };
+    }
+
+    private static Func<StructuredFieldResult, FilterMatch> EmitUserDataContains(UserDataContainsNode node)
+    {
+        var needle = node.Needle;
+        var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+        if (!node.Negated)
+        {
+            return result =>
+            {
+                var values = result.PresentValues;
+
+                for (var i = 0; i < values.Length; i++)
+                {
+                    if (values[i].Contains(needle, comparison)) { return FilterMatch.Match; }
+                }
+
+                return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.NoMatch;
+            };
+        }
+
+        return result =>
+        {
+            var values = result.PresentValues;
+
+            if (values.Length == 0) { return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.NoMatch; }
+
+            for (var i = 0; i < values.Length; i++)
+            {
+                if (values[i].Contains(needle, comparison)) { return FilterMatch.NoMatch; }
+            }
+
+            return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.Match;
+        };
+    }
+
+    private static Func<StructuredFieldResult, FilterMatch> EmitUserDataMultiEquals(UserDataMultiEqualsNode node)
+    {
+        var literals = node.Literals;
+
+        return result =>
+        {
+            var values = result.PresentValues;
+
+            for (var i = 0; i < values.Length; i++)
+            {
+                var value = values[i];
+
+                for (var j = 0; j < literals.Count; j++)
+                {
+                    if (string.Equals(value, literals[j], StringComparison.Ordinal)) { return FilterMatch.Match; }
+                }
+            }
+
+            return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.NoMatch;
+        };
+    }
+
+    private static Func<ResolvedEvent, FilterMatch> EmitUserDataFieldMatcher(
+        string canonicalPath,
+        Func<StructuredFieldResult, FilterMatch> evaluate)
+    {
+        var storageKey = UserDataFieldPath.ToStorageKey(canonicalPath);
+
+        return e => evaluate(e.TryGetUserDataValues(storageKey));
+    }
+
     private static Func<ResolvedEvent, bool> EmitUserIdStringCompare(FilterBinaryOperator op, string value) =>
         op switch
         {
@@ -651,6 +812,38 @@ internal static class Emitter
                 e.UserId is not null && !string.Equals(e.UserId.Value, value, StringComparison.Ordinal),
             _ => throw new EmitException($"Operator '{op}' is not supported on UserId.")
         };
+
+    private static FilterMatch EvaluateKleeneAnd(Func<ResolvedEvent, FilterMatch>[] parts, ResolvedEvent @event)
+    {
+        var result = FilterMatch.Match;
+
+        foreach (var part in parts)
+        {
+            var match = part(@event);
+
+            if (match == FilterMatch.NoMatch) { return FilterMatch.NoMatch; }
+
+            if (match == FilterMatch.Unknown) { result = FilterMatch.Unknown; }
+        }
+
+        return result;
+    }
+
+    private static FilterMatch EvaluateKleeneOr(Func<ResolvedEvent, FilterMatch>[] parts, ResolvedEvent @event)
+    {
+        var result = FilterMatch.NoMatch;
+
+        foreach (var part in parts)
+        {
+            var match = part(@event);
+
+            if (match == FilterMatch.Match) { return FilterMatch.Match; }
+
+            if (match == FilterMatch.Unknown) { result = FilterMatch.Unknown; }
+        }
+
+        return result;
+    }
 
     private static List<SemanticNode> FlattenAndChain(SemanticNode node)
     {

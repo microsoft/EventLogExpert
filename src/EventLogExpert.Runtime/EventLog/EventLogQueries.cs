@@ -52,4 +52,21 @@ internal sealed class EventLogQueries(
 
         return EventPropertyValuesCache.GetValues(byLog, byLog.Values.SelectMany(events => events), property);
     }
+
+    public ImmutableArray<string> GetUserDataFieldNames()
+    {
+        var byLog = _rawEventStore.Value.ByLog;
+
+        return EventPropertyValuesCache.GetUserDataFieldNames(byLog, byLog.Values.SelectMany(events => events));
+    }
+
+    public ImmutableArray<string> GetUserDataFieldValues(string fieldName)
+    {
+        var byLog = _rawEventStore.Value.ByLog;
+
+        return EventPropertyValuesCache.GetUserDataFieldValues(
+            byLog,
+            byLog.Values.SelectMany(events => events),
+            fieldName);
+    }
 }

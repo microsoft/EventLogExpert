@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Structured;
 using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Parsing;
 using System.Diagnostics.CodeAnalysis;
@@ -98,6 +99,16 @@ internal static class Lowerer
             _ => false
         };
 
+    private static bool ContainsUserDataNode(SemanticNode node) =>
+        node switch
+        {
+            UserDataComparisonNode or UserDataContainsNode or UserDataMultiEqualsNode => true,
+            AndNode and => ContainsUserDataNode(and.Left) || ContainsUserDataNode(and.Right),
+            OrNode or => ContainsUserDataNode(or.Left) || ContainsUserDataNode(or.Right),
+            NotNode not => ContainsUserDataNode(not.Operand),
+            _ => false
+        };
+
     private static IReadOnlyList<string> ExtractStringArray(ArrayCreationSyntax array, int position)
     {
         if (array.Elements.Count == 0)
@@ -141,6 +152,15 @@ internal static class Lowerer
             LiteralKind.Int => literal.Text,
             _ => throw new LowerException(
                 $"EventData comparison value must be a string or integer literal (position {literal.Position}).")
+        };
+
+    private static string GetUserDataLiteralText(LiteralSyntax literal) =>
+        literal.Kind switch
+        {
+            LiteralKind.String => literal.Text,
+            LiteralKind.Int => literal.Text,
+            _ => throw new LowerException(
+                $"UserData comparison value must be a string or integer literal (position {literal.Position}).")
         };
 
     private static bool IsCaseInsensitiveMatch(string left, string right) =>
@@ -258,6 +278,11 @@ internal static class Lowerer
             return LowerEventDataComparison(eventDataFieldName, bin);
         }
 
+        if (TryResolveUserDataField(bin.Left, out var userDataPath))
+        {
+            return LowerUserDataComparison(userDataPath, bin);
+        }
+
         // Property <op> Literal  -or-  Property.ToString() <op> Literal (formatter shape, normalized away)
         var (field, fieldExpression) = ResolveFieldOrToString(bin.Left, bin.Position);
 
@@ -351,6 +376,12 @@ internal static class Lowerer
                     [.. elements.Select(EventDataLiteral.Parse)]);
             }
 
+            // UserData any-of, recognized before ResolveFieldOrToString for the same reason.
+            if (TryResolveUserDataField(call.Arguments[0], out var userDataAnyOfPath))
+            {
+                return new UserDataMultiEqualsNode(userDataAnyOfPath, elements);
+            }
+
             var argField = ResolveFieldOrToString(call.Arguments[0], call.Arguments[0].Position).Field;
 
             return new MultiEqualsNode(argField, elements);
@@ -363,6 +394,15 @@ internal static class Lowerer
             var (needle, ignoreCase) = ParseContainsArgs(call.Arguments, call.Position);
 
             return new EventDataContainsNode(eventDataContainsName, needle, ignoreCase, negated: false);
+        }
+
+        // UserData["Event/UserData/..."].Contains(needle, OIC)
+        if (IsCaseInsensitiveMatch(call.Name, "Contains")
+            && TryResolveUserDataField(call.Target, out var userDataContainsPath))
+        {
+            var (needle, ignoreCase) = ParseContainsArgs(call.Arguments, call.Position);
+
+            return new UserDataContainsNode(userDataContainsPath, needle, ignoreCase, negated: false);
         }
 
         // P.Contains(needle, StringComparison.OrdinalIgnoreCase) for any Contains-supported field. Denylist
@@ -432,6 +472,21 @@ internal static class Lowerer
             case EventDataMultiEqualsNode:
                 throw new LowerException(
                     $"Negating an EventData any-of match is not supported; use separate '!=' conditions (position {neg.Position}).");
+            case UserDataComparisonNode userComparison:
+                var userFlipped = userComparison.Op == FilterBinaryOperator.Equal
+                    ? FilterBinaryOperator.NotEqual
+                    : FilterBinaryOperator.Equal;
+
+                return new UserDataComparisonNode(userComparison.CanonicalPath, userFlipped, userComparison.Literal);
+            case UserDataContainsNode userContains:
+                return new UserDataContainsNode(
+                    userContains.CanonicalPath,
+                    userContains.Needle,
+                    userContains.IgnoreCase,
+                    !userContains.Negated);
+            case UserDataMultiEqualsNode:
+                throw new LowerException(
+                    $"Negating a UserData any-of match is not supported; use separate '!=' conditions (position {neg.Position}).");
             default:
                 if (ContainsEventDataNode(inner))
                 {
@@ -439,8 +494,33 @@ internal static class Lowerer
                         $"Negating a group that contains EventData conditions is not supported; negate each EventData condition individually (position {neg.Position}).");
                 }
 
+                if (ContainsUserDataNode(inner))
+                {
+                    throw new LowerException(
+                        $"Negating a group that contains UserData conditions is not supported; negate each UserData condition individually (position {neg.Position}).");
+                }
+
                 return new NotNode(inner);
         }
+    }
+
+    private static SemanticNode LowerUserDataComparison(string canonicalPath, BinarySyntax bin)
+    {
+        if (bin.Op is not (TokenKind.EqEq or TokenKind.NotEq))
+        {
+            throw new LowerException(
+                $"Operator '{bin.Op}' is not supported on UserData paths; use '==' or '!=' (position {bin.Position}).");
+        }
+
+        if (bin.Right is not LiteralSyntax literal)
+        {
+            throw new LowerException(
+                $"Right-hand side of a UserData comparison must be a literal (position {bin.Right.Position}).");
+        }
+
+        var op = bin.Op == TokenKind.EqEq ? FilterBinaryOperator.Equal : FilterBinaryOperator.NotEqual;
+
+        return new UserDataComparisonNode(canonicalPath, op, GetUserDataLiteralText(literal));
     }
 
     private static FilterBinaryOperator MapBinaryOp(TokenKind op) =>
@@ -585,6 +665,35 @@ internal static class Lowerer
         }
 
         fieldName = key.Text;
+
+        return true;
+    }
+
+    // True for a well-formed `UserData["path"]` access (normalizing/validating the canonical path); throws a
+    // descriptive LowerException for a malformed UserData index; false for any non-UserData expression.
+    private static bool TryResolveUserDataField(SyntaxNode expr, [NotNullWhen(true)] out string? canonicalPath)
+    {
+        canonicalPath = null;
+
+        if (expr is not IndexAccessSyntax index
+            || index.Target is not IdentifierSyntax id
+            || !IsCaseInsensitiveMatch(id.Name, "UserData"))
+        {
+            return false;
+        }
+
+        if (index.Argument is not LiteralSyntax { Kind: LiteralKind.String } key)
+        {
+            throw new LowerException(
+                $"UserData path must be a string literal (position {index.Argument.Position}).");
+        }
+
+        if (!UserDataFieldPath.TryNormalize(key.Text, out var normalized, out var pathError))
+        {
+            throw new LowerException($"{pathError} (position {key.Position}).");
+        }
+
+        canonicalPath = normalized;
 
         return true;
     }

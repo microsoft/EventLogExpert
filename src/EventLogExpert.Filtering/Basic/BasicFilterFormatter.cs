@@ -64,6 +64,11 @@ public static class BasicFilterFormatter
             return false;
         }
 
+        if (comparison.Property is EventProperty.UserData && string.IsNullOrWhiteSpace(comparison.UserDataFieldName))
+        {
+            return false;
+        }
+
         var propertyExpression = FormatPropertyExpression(comparison);
 
         StringBuilder stringBuilder = new(joinPrefix ?? string.Empty);
@@ -171,12 +176,15 @@ public static class BasicFilterFormatter
         return builder.ToString();
     }
 
-    // The Advanced-text reference for a comparison's property: `EventData["escaped field name"]` for an EventData
-    // row, otherwise the bare property name (which the tokenizer reads as an identifier).
+    // The Advanced-text reference for a comparison's property: `EventData["field"]` for an EventData row,
+    // `UserData["storage-key path"]` for a UserData row, otherwise the bare property name.
     private static string FormatPropertyExpression(FilterComparison comparison) =>
-        comparison.Property is EventProperty.EventData
-            ? $"EventData[\"{EscapeStringLiteral(comparison.EventDataFieldName)}\"]"
-            : comparison.Property.ToString();
+        comparison.Property switch
+        {
+            EventProperty.EventData => $"EventData[\"{EscapeStringLiteral(comparison.EventDataFieldName)}\"]",
+            EventProperty.UserData => $"UserData[\"{EscapeStringLiteral(comparison.UserDataFieldName)}\"]",
+            _ => comparison.Property.ToString()
+        };
 
     private static string GetComparisonString(
         EventProperty property,
