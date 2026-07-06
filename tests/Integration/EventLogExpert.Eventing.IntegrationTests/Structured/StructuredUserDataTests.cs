@@ -61,7 +61,15 @@ public sealed class StructuredUserDataTests
 
                     string? xml = NativeMethods.RenderEventXml(handle);
 
-                    if (xml is not null && xml.Contains("<UserData", StringComparison.Ordinal)) { return xml; }
+                    if (xml is not null && xml.Contains("<UserData", StringComparison.Ordinal))
+                    {
+                        for (int remaining = index + 1; remaining < returned; remaining++)
+                        {
+                            new EvtHandle(batch[remaining]).Dispose();
+                        }
+
+                        return xml;
+                    }
                 }
             }
         }
