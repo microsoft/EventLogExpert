@@ -17,6 +17,8 @@ If EventLogExpert is installed as the packaged (MSIX) app, two right-click conte
 
 `File` → `Open` → `File` (`Ctrl+O`) opens the system file picker filtered to `.evtx`. Pick one file or many — each selected `.evtx` is enqueued as a separate log in order; the actual load work then runs in parallel under a per-machine throttle (roughly your CPU count), so multiple logs can be loading at once. The same applies for `File` → `Combine` → `File`, which adds the picked files to the existing log set.
 
+The newest events paint first (usually within about a second) while the rest stream in behind them; see [Performance](Performance.md) for how the parallel throttle and eager first paint work.
+
 ### Folder
 
 `File` → `Open` → `Folder` opens a folder picker. Every `.evtx` in the picked folder (top-level only, no recursion) is loaded as a separate log.
