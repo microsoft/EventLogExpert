@@ -21,6 +21,7 @@ public sealed class EventDataRoundTripTests
     [InlineData("with]bracket")]
     [InlineData("with\\backslash")]
     [InlineData("with\ttab")]
+    [InlineData("*cert*")]
     public void FieldNameWithSpecialCharacters_RoundTrips(string fieldName) =>
         AssertSingleRoundTrips(ComparisonOperator.Equals, fieldName, "value");
 

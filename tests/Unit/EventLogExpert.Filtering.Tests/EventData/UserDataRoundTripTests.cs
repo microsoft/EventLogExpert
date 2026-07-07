@@ -150,6 +150,8 @@ public sealed class UserDataRoundTripTests
     [InlineData("Foo/Bar")]
     [InlineData("X509Objects/Certificate/SubjectName")]
     [InlineData("X509Objects/Certificate/@subjectName")]
+    [InlineData("*cert*")]
+    [InlineData("X509Objects/*/@subjectName")]
     public void StorageKey_RoundTripsThroughCanonicalAndCompiles(string storageKey)
     {
         // Direct invariant: rooting then re-keying is identity on a storage key.

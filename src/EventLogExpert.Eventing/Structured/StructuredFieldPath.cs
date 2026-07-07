@@ -89,7 +89,7 @@ internal static class StructuredFieldPath
 
             if (index == segments.Length - 1 && segment.StartsWith('@'))
             {
-                if (index == 0 || !IsValidName(segment[1..])) { return false; }
+                if (index == 0 || !IsValidNameOrGlob(segment[1..])) { return false; }
 
                 continue;
             }
@@ -97,7 +97,7 @@ internal static class StructuredFieldPath
             string name = segment.EndsWith(WildcardMarker, StringComparison.Ordinal) ?
                 segment[..^WildcardMarker.Length] : segment;
 
-            if (!IsValidName(name)) { return false; }
+            if (!IsValidNameOrGlob(name)) { return false; }
         }
 
         return true;
@@ -155,13 +155,17 @@ internal static class StructuredFieldPath
         return builder.ToString();
     }
 
-    private static bool IsValidName(string name)
+    // A canonical name segment (or attribute) or a wildcard glob of one: the exact-name characters plus '*', which
+    // matches any run of characters. Allowing '*' lets a field-name glob such as *cert* validate and lower; a path that
+    // contains '*' is treated as a glob at emit time (detection is on the storage-key form, so the [*] repeating-element
+    // marker - stripped by ToStorageKey - is never mistaken for a name glob).
+    private static bool IsValidNameOrGlob(string name)
     {
-        if (name.Length == 0 || !(char.IsLetter(name[0]) || name[0] == '_')) { return false; }
+        if (name.Length == 0 || !(char.IsLetter(name[0]) || name[0] is '_' or '*')) { return false; }
 
         foreach (char character in name)
         {
-            if (!(char.IsLetterOrDigit(character) || character is '_' or '-' or '.')) { return false; }
+            if (!(char.IsLetterOrDigit(character) || character is '_' or '-' or '.' or '*')) { return false; }
         }
 
         return true;
