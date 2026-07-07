@@ -165,6 +165,21 @@ public sealed class StructuredFieldPathTests
         Assert.True(StructuredFieldPath.IsValidCanonical(path));
 
     [Theory]
+    [InlineData("Event/UserData/*cert*")]
+    [InlineData("Event/UserData/X509Objects/*/@subjectName")]
+    [InlineData("Event/UserData/*/@*Name")]
+    [InlineData("Event/UserData/X509*")]
+    [InlineData("Event/UserData/*")]
+    public void IsValidCanonical_AcceptsWildcardGlobs(string path) =>
+        Assert.True(StructuredFieldPath.IsValidCanonical(path));
+
+    [Theory]
+    [InlineData("Event/UserData/*@subjectName")] // '@' is valid only as an attribute-segment lead, not mid-name
+    [InlineData("Event/UserData/ce rt*")] // a space is still invalid inside a glob
+    public void IsValidCanonical_RejectsMalformedGlobs(string path) =>
+        Assert.False(StructuredFieldPath.IsValidCanonical(path));
+
+    [Theory]
     [InlineData("")]
     [InlineData("Event//EventID")]
     [InlineData("Event/Sys tem/EventID")]

@@ -20,5 +20,5 @@ public readonly struct StructuredFieldResult(EventFieldValue value, bool isTrunc
     public bool IsAbsent => !Value.TryGetStringArray(out _);
 
     /// <summary>The present values of the field (empty when absent), read without allocating.</summary>
-    public ReadOnlySpan<string> PresentValues => Value.TryGetStringArray(out string[]? values) ? values : null;
+    public ReadOnlySpan<string> PresentValues => Value.TryGetStringArray(out string[]? values) ? values : [];
 }

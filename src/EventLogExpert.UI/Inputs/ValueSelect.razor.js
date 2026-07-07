@@ -76,10 +76,12 @@ export function registerDropdown(root, dotNetRef) {
     // Native title tooltip, only when the text is actually clipped (scrollWidth > clientWidth): recovers a long
     // selected value or option that overflows the fixed dropdown width, and stays silent when it already fits.
     root.addEventListener("mouseover", (e) => {
-        const el = e.target.closest("input, [role='option']");
+        // e.target is an Element for mouseover in practice, but normalize defensively (a Text node has no closest).
+        const target = e.target instanceof Element ? e.target : e.target?.parentElement;
+        const el = target?.closest("input, [role='option']");
         if (!el || !root.contains(el)) { return; }
 
-        const text = el.tagName === "INPUT" ? el.value : el.textContent.trim();
+        const text = el.tagName === "INPUT" ? el.value : (el.textContent ?? "").trim();
 
         if (text && el.scrollWidth > el.clientWidth) {
             el.title = text;

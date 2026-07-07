@@ -205,8 +205,24 @@ internal static class Emitter
     {
         var name = node.FieldName;
         var literal = node.Literal;
+        var equal = node.Op == FilterBinaryOperator.Equal;
 
-        if (node.Op == FilterBinaryOperator.Equal)
+        if (WildcardMatcher.ContainsWildcard(name))
+        {
+            var matchesName = WildcardMatcher.Compile(name);
+
+            return e =>
+            {
+                foreach (var field in e.EventData)
+                {
+                    if (matchesName(field.Name) && literal.MatchesValue(field.Value) == equal) { return true; }
+                }
+
+                return false;
+            };
+        }
+
+        if (equal)
         {
             return e => e.EventData.TryGetValue(name, out var value) && literal.MatchesValue(value);
         }
@@ -219,8 +235,27 @@ internal static class Emitter
         var name = node.FieldName;
         var needle = node.Needle;
         var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var negated = node.Negated;
 
-        if (node.Negated)
+        if (WildcardMatcher.ContainsWildcard(name))
+        {
+            var matchesName = WildcardMatcher.Compile(name);
+
+            return e =>
+            {
+                foreach (var field in e.EventData)
+                {
+                    if (matchesName(field.Name) && field.Value.AsString().Contains(needle, comparison) != negated)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            };
+        }
+
+        if (negated)
         {
             return e => e.EventData.TryGetValue(name, out var value)
                 && !value.AsString().Contains(needle, comparison);
@@ -234,6 +269,26 @@ internal static class Emitter
     {
         var name = node.FieldName;
         var literals = node.Literals;
+
+        if (WildcardMatcher.ContainsWildcard(name))
+        {
+            var matchesName = WildcardMatcher.Compile(name);
+
+            return e =>
+            {
+                foreach (var field in e.EventData)
+                {
+                    if (!matchesName(field.Name)) { continue; }
+
+                    for (var i = 0; i < literals.Count; i++)
+                    {
+                        if (literals[i].MatchesValue(field.Value)) { return true; }
+                    }
+                }
+
+                return false;
+            };
+        }
 
         return e =>
         {
@@ -771,6 +826,25 @@ internal static class Emitter
         };
     }
 
+    private static Func<ResolvedEvent, FilterMatch> EmitUserDataFieldMatcher(
+        string canonicalPath,
+        Func<StructuredFieldResult, FilterMatch> evaluate)
+    {
+        var storageKey = UserDataFieldPath.ToStorageKey(canonicalPath);
+
+        // A '*' in the storage key marks a field-name glob (ToStorageKey has already stripped the [*] repeating-element
+        // marker, so only a genuine name glob survives). Evaluate the term as if each matching stored path were its own
+        // OR'd filter row.
+        if (WildcardMatcher.ContainsWildcard(storageKey))
+        {
+            var matchesPath = WildcardMatcher.Compile(storageKey);
+
+            return e => EvaluateUserDataGlob(e, matchesPath, evaluate);
+        }
+
+        return e => evaluate(e.TryGetUserDataValues(storageKey));
+    }
+
     private static Func<StructuredFieldResult, FilterMatch> EmitUserDataMultiEquals(UserDataMultiEqualsNode node)
     {
         var literals = node.Literals;
@@ -791,15 +865,6 @@ internal static class Emitter
 
             return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.NoMatch;
         };
-    }
-
-    private static Func<ResolvedEvent, FilterMatch> EmitUserDataFieldMatcher(
-        string canonicalPath,
-        Func<StructuredFieldResult, FilterMatch> evaluate)
-    {
-        var storageKey = UserDataFieldPath.ToStorageKey(canonicalPath);
-
-        return e => evaluate(e.TryGetUserDataValues(storageKey));
     }
 
     private static Func<ResolvedEvent, bool> EmitUserIdStringCompare(FilterBinaryOperator op, string value) =>
@@ -843,6 +908,36 @@ internal static class Emitter
         }
 
         return result;
+    }
+
+    private static FilterMatch EvaluateUserDataGlob(
+        ResolvedEvent @event,
+        Func<string, bool> matchesPath,
+        Func<StructuredFieldResult, FilterMatch> evaluate)
+    {
+        // UserData is a default array for every flat-EventData / error event; guard before iterating, mirroring
+        // ResolvedEvent.TryGetUserDataValues (an absent field set is NoMatch, or Unknown when the extraction was capped).
+        if (@event.UserData.IsDefaultOrEmpty)
+        {
+            return @event.UserDataIncomplete ? FilterMatch.Unknown : FilterMatch.NoMatch;
+        }
+
+        var result = FilterMatch.NoMatch;
+
+        foreach (var field in @event.UserData)
+        {
+            if (!matchesPath(field.Path)) { continue; }
+
+            var fieldMatch = evaluate(field.ToFieldResult(@event.UserDataIncomplete));
+
+            if (fieldMatch == FilterMatch.Match) { return FilterMatch.Match; }
+
+            if (fieldMatch == FilterMatch.Unknown) { result = FilterMatch.Unknown; }
+        }
+
+        // A capped field set may also have dropped a whole matching path, so a would-be decisive NoMatch (no path matched
+        // the glob at all) becomes keep-visible Unknown.
+        return result == FilterMatch.NoMatch && @event.UserDataIncomplete ? FilterMatch.Unknown : result;
     }
 
     private static List<SemanticNode> FlattenAndChain(SemanticNode node)
