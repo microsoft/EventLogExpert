@@ -328,13 +328,29 @@ internal static partial class ScenarioCatalogLoader
 
         if (!propertyOk) { return false; }
 
+        if (property == EventProperty.EventData && string.IsNullOrWhiteSpace(dto.EventDataFieldName))
+        {
+            errors.Add($"{context}: an EventData comparison requires a non-empty eventDataFieldName.");
+
+            return false;
+        }
+
+        if (property == EventProperty.UserData && string.IsNullOrWhiteSpace(dto.UserDataFieldName))
+        {
+            errors.Add($"{context}: a UserData comparison requires a non-empty userDataFieldName.");
+
+            return false;
+        }
+
         comparison = new FilterComparison
         {
             Property = property,
             Operator = op,
             MatchMode = matchMode,
             Value = dto.Value,
-            Values = dto.Values is null ? [] : [.. dto.Values]
+            Values = dto.Values is null ? [] : [.. dto.Values],
+            EventDataFieldName = property == EventProperty.EventData ? dto.EventDataFieldName : null,
+            UserDataFieldName = property == EventProperty.UserData ? dto.UserDataFieldName : null
         };
 
         return true;
