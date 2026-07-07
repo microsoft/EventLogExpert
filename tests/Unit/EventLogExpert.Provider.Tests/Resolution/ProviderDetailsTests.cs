@@ -85,6 +85,21 @@ public sealed class ProviderDetailsTests
         Assert.Contains(result, e => e.Version == 1);
     }
 
+    // CompactMessageStore memoizes each id's result, so a repeated lookup returns the same instance rather than
+    // re-materializing - the property that lets the resolver hit the message store per event without re-parsing.
+    [Fact]
+    public void GetMessagesByShortId_RepeatedLookup_ReturnsCachedInstance()
+    {
+        var details = EventUtils.CreateProvider(
+            Constants.TestProviderLongName,
+            [
+                new MessageModel { ShortId = 7, RawId = 0x00010007, Text = "first" },
+                new MessageModel { ShortId = 7, RawId = 0x00020007, Text = "second" }
+            ]);
+
+        Assert.Same(details.GetMessagesByShortId(7), details.GetMessagesByShortId(7));
+    }
+
     [Fact]
     public void GetMessagesByShortId_WhenIdDoesNotExist_ReturnsEmptyList()
     {
@@ -169,6 +184,15 @@ public sealed class ProviderDetailsTests
         // Assert
         Assert.Single(result);
         Assert.Equal("positive", result[0].Text);
+    }
+
+    [Fact]
+    public void GetParameterByRawId_RepeatedLookup_ReturnsCachedInstance()
+    {
+        var details = EventUtils.CreateProvider(Constants.TestProviderLongName);
+        details.Parameters = [new MessageModel { RawId = 42, Text = "only" }];
+
+        Assert.Same(details.GetParameterByRawId(42), details.GetParameterByRawId(42));
     }
 
     [Fact]
@@ -347,5 +371,97 @@ public sealed class ProviderDetailsTests
         var replaced = details.GetParameterByRawId(2);
         Assert.NotNull(replaced);
         Assert.Equal("replaced", replaced.Text);
+    }
+
+    // A lazy source is consulted per id and its view is materialized on demand; setting it and doing point lookups must
+    // never force a full MaterializeAll (which would defeat the lazy message loading the source exists to provide).
+    [Fact]
+    public void SetLazyMessageSource_LooksUpPerIdWithoutMaterializingEverything()
+    {
+        var details = EventUtils.CreateProvider(Constants.TestProviderLongName);
+        var source = new CountingLazySource(
+            byShortId: new Dictionary<int, IReadOnlyList<MessageModel>>
+            {
+                [7] = [new MessageModel { ShortId = 7, RawId = 7, Text = "a" }]
+            },
+            byRawId: new Dictionary<long, MessageModel>());
+
+        details.SetLazyMessageSource(source);
+        _ = details.GetMessagesByShortId(7);
+        _ = details.GetMessagesByShortId(8);
+
+        Assert.Equal(0, source.MaterializeAllCalls);
+    }
+
+    // SetLazyMessageSource swaps in an external lazy source (used by the offline/WEVT readers) so message lookups and
+    // the Messages view route through it instead of a built-in CompactMessageStore.
+    [Fact]
+    public void SetLazyMessageSource_RoutesMessageLookupsAndViewToTheSource()
+    {
+        var details = EventUtils.CreateProvider(Constants.TestProviderLongName);
+        var message = new MessageModel { ShortId = 7, RawId = 7, Text = "lazy", ProviderName = Constants.TestProviderLongName };
+        var source = new CountingLazySource(
+            byShortId: new Dictionary<int, IReadOnlyList<MessageModel>> { [7] = [message] },
+            byRawId: new Dictionary<long, MessageModel>());
+
+        details.SetLazyMessageSource(source);
+
+        Assert.Same(source, details.MessageSource);
+        Assert.Equal([message], details.GetMessagesByShortId(7));
+        Assert.Equal(1, source.ShortIdCalls);
+        Assert.Equal(["lazy"], details.Messages.Select(m => m.Text));
+    }
+
+    [Fact]
+    public void SetLazyParameterSource_RoutesParameterLookupsToTheSource()
+    {
+        var details = EventUtils.CreateProvider(Constants.TestProviderLongName);
+        var parameter = new MessageModel { RawId = 42, Text = "lazy-param", ProviderName = Constants.TestProviderLongName };
+        var source = new CountingLazySource(
+            byShortId: new Dictionary<int, IReadOnlyList<MessageModel>>(),
+            byRawId: new Dictionary<long, MessageModel> { [42] = parameter });
+
+        details.SetLazyParameterSource(source);
+
+        Assert.Same(source, details.ParameterSource);
+        Assert.Same(parameter, details.GetParameterByRawId(42));
+        Assert.Null(details.GetParameterByRawId(999));
+        Assert.Equal(2, source.RawIdCalls);
+    }
+
+    private sealed class CountingLazySource(
+        IReadOnlyDictionary<int, IReadOnlyList<MessageModel>> byShortId,
+        IReadOnlyDictionary<long, MessageModel> byRawId) : ILazyMessageSource
+    {
+        public int Count => byShortId.Values.Sum(list => list.Count);
+
+        public int MaterializeAllCalls { get; private set; }
+
+        public int RawIdCalls { get; private set; }
+
+        public int ShortIdCalls { get; private set; }
+
+        public IReadOnlyList<MessageModel> AsView() => [.. byShortId.Values.SelectMany(list => list)];
+
+        public MessageModel? GetByRawIdFirst(long rawId)
+        {
+            RawIdCalls++;
+
+            return byRawId.GetValueOrDefault(rawId);
+        }
+
+        public IReadOnlyList<MessageModel> GetByShortId(int shortId)
+        {
+            ShortIdCalls++;
+
+            return byShortId.TryGetValue(shortId, out var list) ? list : [];
+        }
+
+        public IReadOnlyList<MessageModel> MaterializeAll()
+        {
+            MaterializeAllCalls++;
+
+            return AsView();
+        }
     }
 }

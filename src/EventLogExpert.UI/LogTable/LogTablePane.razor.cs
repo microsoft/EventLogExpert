@@ -115,6 +115,22 @@ public sealed partial class LogTablePane
         }
     }
 
+    // Extracted from the ItemsProvider so the viewport clamp - an empty list, a start past the end, and a window that
+    // overruns the tail - is unit-testable without driving the Virtualize component.
+    internal static ItemsProviderResult<ResolvedEvent> ComputeEventViewport(
+        IReadOnlyList<ResolvedEvent> displayedEvents,
+        ItemsProviderRequest request)
+    {
+        int totalCount = displayedEvents.Count;
+        int start = Math.Min(request.StartIndex, totalCount);
+        int count = Math.Min(request.Count, totalCount - start);
+
+        IReadOnlyList<ResolvedEvent> window =
+            count <= 0 ? [] : ResolvedEventIndex.Slice(displayedEvents, start, count);
+
+        return new ItemsProviderResult<ResolvedEvent>(window, totalCount);
+    }
+
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
         if (disposing)
@@ -790,18 +806,8 @@ public sealed partial class LogTablePane
         return false;
     }
 
-    private ValueTask<ItemsProviderResult<ResolvedEvent>> LoadEventViewport(ItemsProviderRequest request)
-    {
-        var displayedEvents = _activeDisplayedEvents;
-        int totalCount = displayedEvents.Count;
-        int start = Math.Min(request.StartIndex, totalCount);
-        int count = Math.Min(request.Count, totalCount - start);
-
-        IReadOnlyList<ResolvedEvent> window =
-            count <= 0 ? [] : ResolvedEventIndex.Slice(displayedEvents, start, count);
-
-        return ValueTask.FromResult(new ItemsProviderResult<ResolvedEvent>(window, totalCount));
-    }
+    private ValueTask<ItemsProviderResult<ResolvedEvent>> LoadEventViewport(ItemsProviderRequest request) =>
+        ValueTask.FromResult(ComputeEventViewport(_activeDisplayedEvents, request));
 
     private void NavigateGroupedTo(
         IReadOnlyList<ResolvedEvent> displayedEvents,
