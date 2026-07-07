@@ -103,6 +103,8 @@ public static class ScenarioExporter
         return new ComparisonDto
         {
             Property = comparison.Property.ToString(),
+            EventDataFieldName = comparison.Property == EventProperty.EventData ? comparison.EventDataFieldName : null,
+            UserDataFieldName = comparison.Property == EventProperty.UserData ? comparison.UserDataFieldName : null,
             Operator = isMany || comparison.Operator == ComparisonOperator.Equals ? null : comparison.Operator.ToString(),
             MatchMode = isMany ? comparison.MatchMode.ToString() : null,
             Value = isMany ? null : comparison.Value,

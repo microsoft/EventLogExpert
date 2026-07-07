@@ -541,6 +541,104 @@
         { "comparison": { "property": "LogName", "value": "Microsoft-Windows-TaskScheduler/Operational" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "106", "140", "141" ] } } ] },
         { "comparison": { "property": "LogName", "value": "Microsoft-Windows-PowerShell/Operational" }, "predicates": [ { "comparison": { "property": "Id", "value": "4104" } } ] }
       ]
+    },
+    {
+      "id": "lolbin-process-creation-by-name",
+      "name": "LOLBin process creation (NewProcessName field)",
+      "purpose": "4688 process-creation events filtered on the NewProcessName EventData field, eliminating false positives from description-text matching. Color-coded by risk tier: scripting hosts with no legitimate standalone-execution use (DarkRed), binary-proxy loaders (Red), and download or indirect-execution utilities (Orange). Requires Audit Process Creation. ATT&CK T1218, T1202.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 37,
+      "version": 1,
+      "filters": [
+        { "color": "DarkRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "mshta.exe" } } ] },
+        { "color": "DarkRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "wscript.exe" } } ] },
+        { "color": "DarkRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "cscript.exe" } } ] },
+        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "rundll32.exe" } } ] },
+        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "regsvr32.exe" } } ] },
+        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "installutil.exe" } } ] },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "certutil.exe" } } ] },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "bitsadmin.exe" } } ] }
+      ]
+    },
+    {
+      "id": "office-spawned-process",
+      "name": "Office application spawned a child process",
+      "purpose": "4688 process-creation events where ParentProcessName is a Microsoft Office application (Word, Excel, PowerPoint, Outlook, OneNote), the primary indicator of a weaponised document executing a payload. Requires Audit Process Creation and Windows 10 or Server 2016 or later (ParentProcessName was added in event version 2). ATT&CK T1566.001, T1059, T1204.002.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 38,
+      "version": 1,
+      "filters": [
+        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "winword.exe" } } ] },
+        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "excel.exe" } } ] },
+        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "powerpnt.exe" } } ] },
+        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "outlook.exe" } } ] },
+        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "onenote.exe" } } ] }
+      ]
+    },
+    {
+      "id": "encoded-powershell-commandline-field",
+      "name": "Encoded / hidden PowerShell (CommandLine field)",
+      "purpose": "4688 process-creation events where the CommandLine EventData field contains encoded or obfuscated PowerShell indicators. More precise than description-text matching: targets only the command-line field, avoiding false positives from document paths and parent arguments. Requires Audit Process Creation and the 'Include command line in process creation events' policy. ATT&CK T1059.001, T1027.010, T1140.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 39,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "value": "-EncodedCommand" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "value": "FromBase64String" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "value": "IEX" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "value": "DownloadString" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "value": "-w hidden" } } ] },
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "value": "-nop" } } ] }
+      ]
+    },
+    {
+      "id": "suspicious-ps-scriptblock-ioc-triage",
+      "name": "PowerShell script block - IOC content triage",
+      "purpose": "Color-coded 4104 script-block triage: Red rows match ScriptBlockText containing in-memory decode-and-execute constructs (FromBase64String, Invoke-Expression); Orange rows match download cradles and in-memory assembly loading; the Blue row catches blocks flagged at Warning level by PowerShell's AMSI integration. Combines content-based field filtering with AMSI auto-flagging in one view. Requires PowerShell Script Block Logging. ATT&CK T1059.001, T1027.010, T1140, T1071.001.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-PowerShell/Operational" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 40,
+      "version": 1,
+      "filters": [
+        { "color": "Red", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "value": "FromBase64String" } } ] },
+        { "color": "Red", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "value": "Invoke-Expression" } } ] },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "value": "DownloadString" } } ] },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "value": "New-Object Net.WebClient" } } ] },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "value": "Reflection.Assembly]::Load" } } ] },
+        { "color": "Blue", "comparison": { "property": "Level", "value": "Warning" }, "predicates": [ { "comparison": { "property": "Id", "value": "4104" } } ] }
+      ]
+    },
+    {
+      "id": "sysmon-lolbin-initiated-network",
+      "name": "Sysmon - LOLBin & script engine network connection",
+      "purpose": "Sysmon Event 3 network-connect events filtered to connections initiated by scripting hosts and Living-off-the-Land binaries. Color-coded by tier: scripting hosts with no legitimate outbound use (DarkRed), PowerShell variants (Red), and binary-proxy loaders (Orange). Requires Sysmon with NetworkConnect logging enabled. ATT&CK T1071.001, T1218, T1059.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Microsoft-Windows-Sysmon/Operational" ],
+      "requiresAdmin": false,
+      "priority": 1,
+      "order": 41,
+      "version": 1,
+      "filters": [
+        { "color": "DarkRed", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "mshta.exe" } } ] },
+        { "color": "DarkRed", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "wscript.exe" } } ] },
+        { "color": "DarkRed", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "cscript.exe" } } ] },
+        { "color": "Red", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "powershell.exe" } } ] },
+        { "color": "Red", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "pwsh.exe" } } ] },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "rundll32.exe" } } ] },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "regsvr32.exe" } } ] },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "certutil.exe" } } ] }
+      ]
     }
   ]
 }

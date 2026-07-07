@@ -152,6 +152,32 @@ public sealed class ScenarioCatalogLoaderTests
     }
 
     [Fact]
+    public void Load_EventDataComparisonWithoutFieldName_IsError()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "Security", "requiresAdmin": true,
+              "channels": [ "Security" ],
+              "filters": [ { "comparison": { "property": "EventData", "value": "3" } } ] }
+            """));
+
+        Assert.Contains(result.Errors, error => error.Contains("eventDataFieldName"));
+    }
+
+    [Fact]
+    public void Load_EventDataFieldComparison_Succeeds()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "Security", "requiresAdmin": true,
+              "channels": [ "Security" ],
+              "filters": [ { "comparison": { "property": "EventData", "eventDataFieldName": "LogonType", "value": "3" } } ] }
+            """));
+
+        Assert.Empty(result.Errors);
+        var scenario = Assert.Single(result.Scenarios);
+        Assert.Equal("LogonType", scenario.Filters[0].Filter.Comparison.EventDataFieldName);
+    }
+
+    [Fact]
     public void Load_ExcludedRowWithColor_IsError()
     {
         var result = Load(Wrap("""
@@ -295,6 +321,32 @@ public sealed class ScenarioCatalogLoaderTests
 
         Assert.Empty(result.Scenarios);
         Assert.Contains(result.Errors, error => error.Contains("schemaVersion"));
+    }
+
+    [Fact]
+    public void Load_UserDataComparisonWithoutFieldName_IsError()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "Security", "requiresAdmin": true,
+              "channels": [ "Security" ],
+              "filters": [ { "comparison": { "property": "UserData", "value": "x" } } ] }
+            """));
+
+        Assert.Contains(result.Errors, error => error.Contains("userDataFieldName"));
+    }
+
+    [Fact]
+    public void Load_UserDataFieldComparison_Succeeds()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "Security", "requiresAdmin": true,
+              "channels": [ "Security" ],
+              "filters": [ { "comparison": { "property": "UserData", "userDataFieldName": "X509Objects/Certificate/@subjectName", "value": "CN=Test" } } ] }
+            """));
+
+        Assert.Empty(result.Errors);
+        var scenario = Assert.Single(result.Scenarios);
+        Assert.Equal("X509Objects/Certificate/@subjectName", scenario.Filters[0].Filter.Comparison.UserDataFieldName);
     }
 
     [Fact]
