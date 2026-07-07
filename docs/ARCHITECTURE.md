@@ -65,3 +65,13 @@ project references.
   needs to perform a database operation that requires Administrator rights. Communicates
   with the host over a named pipe. Depends on `Runtime` so it can reuse the shared
   Fluxor-free service surface for filter / database helpers.
+
+## Event Log Performance
+
+The log-loading pipeline (`Runtime/EventLog/` plus the `Eventing` reader and `Runtime/LogTable/`
+store) is tuned to open very large logs with a fast first paint, bounded memory, and smooth
+scrolling. The design intent behind each mechanism - eager first paint, reverse-read batching,
+non-boxing property marshalling, bounded-parallel resolution, the segmented sorted store and
+combined merge view, viewport virtualization, render-buffer reuse, and the retained
+structured-field filtering model - is documented, with its owning code and its guarding tests,
+in [Performance](Performance.md).

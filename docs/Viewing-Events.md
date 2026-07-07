@@ -17,6 +17,8 @@ The main view has three regions: the **tab strip** (one tab per open log, plus a
 
 The table is virtualized — only the rows currently in view are rendered, so loading large `.evtx` files stays responsive.
 
+See [Performance](Performance.md) for how the virtualized table, the segmented sorted store, and streaming resolution keep very large logs fast to open and scroll.
+
 **Configurable columns.** Right-click a column header to open the column menu:
 
 - A toggle per column (checked = visible). The available columns are `Level`, `Date and Time`, `Activity ID`, `Log`, `Computer Name`, `Source`, `Event ID`, `Task Category`, `Keywords`, `Process ID`, `Thread ID`, and `User`. The `Description` column is fixed and always rightmost.
