@@ -1,8 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.Eventing.Structured;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Common.Events;
 
@@ -167,6 +172,36 @@ internal sealed class EventColumnStore
 
         return new EventColumnStore(chunks, pending, pool, schemas, sealedCount, Generation, ContentVersion + 1);
     }
+
+    /// <summary>
+    ///     Reconstructs a byte-faithful <see cref="ResolvedEvent" /> for the row at <paramref name="index" />,
+    ///     reproducing every field's observable value. A pending row is returned as-is (perfect fidelity, zero work); a sealed
+    ///     row is rebuilt from its columnar representation, re-hydrating pooled strings and unpacking each &lt;EventData&gt;
+    ///     field.
+    /// </summary>
+    internal ResolvedEvent GetDetail(int index)
+    {
+        if (IsPending(index)) { return GetPendingEvent(index); }
+
+        return ReconstructLeanEvent(index) with
+        {
+            Xml = PoolGet(RawPoolIndex(EventColumnField.Xml, index)) ?? string.Empty,
+            UserData = ReconstructUserData(index),
+            EventDataValues = ReconstructEventDataValues(index),
+            EventDataSchema = ReconstructSchema(index)
+        };
+    }
+
+    /// <summary>
+    ///     The viewport variant of <see cref="GetDetail" />: reconstructs the grid fields (all scalars incl.
+    ///     <see cref="ResolvedEvent.Description" />, <see cref="ResolvedEvent.Keywords" />, and
+    ///     <see cref="ResolvedEvent.UserId" />) but leaves the detail-only <see cref="ResolvedEvent.UserData" />,
+    ///     <see cref="ResolvedEvent.Xml" />, and &lt;EventData&gt; empty. A pending row is returned as-is with its detail
+    ///     fields intact (best-effort); a sealed reconstruction leaves them empty until <see cref="GetDetail" /> materializes
+    ///     them.
+    /// </summary>
+    internal ResolvedEvent GetDetailLean(int index) =>
+        IsPending(index) ? GetPendingEvent(index) : ReconstructLeanEvent(index);
 
     /// <summary>
     ///     The pending-tail <see cref="ResolvedEvent" /> at <paramref name="index" />. Only sealed rows have a columnar
@@ -407,6 +442,24 @@ internal sealed class EventColumnStore
         return low;
     }
 
+    private static EventPropertyKind MapBackPackedKind(StoredFieldKind kind) => kind switch
+    {
+        StoredFieldKind.SByte => EventPropertyKind.SByte,
+        StoredFieldKind.Byte => EventPropertyKind.Byte,
+        StoredFieldKind.Int16 => EventPropertyKind.Int16,
+        StoredFieldKind.UInt16 => EventPropertyKind.UInt16,
+        StoredFieldKind.Int32 => EventPropertyKind.Int32,
+        StoredFieldKind.UInt32 => EventPropertyKind.UInt32,
+        StoredFieldKind.Int64 => EventPropertyKind.Int64,
+        StoredFieldKind.UInt64 => EventPropertyKind.UInt64,
+        StoredFieldKind.Single => EventPropertyKind.Single,
+        StoredFieldKind.Double => EventPropertyKind.Double,
+        StoredFieldKind.Boolean => EventPropertyKind.Boolean,
+        StoredFieldKind.DateTime => EventPropertyKind.DateTime,
+        StoredFieldKind.SizeT => EventPropertyKind.SizeT,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Not a packed StoredFieldKind.")
+    };
+
     private (EventColumnChunk Chunk, int Row) Locate(int index)
     {
         int[] prefix = SealedPrefix();
@@ -421,6 +474,160 @@ internal sealed class EventColumnStore
         Locate(index);
 
     private ResolvedEvent Pending(int index) => _pendingTail[index - _sealedCount];
+
+    private ImmutableArray<EventProperty> ReconstructEventDataValues(int index)
+    {
+        int fieldCount = RawEventDataCount(index);
+
+        if (fieldCount == 0) { return default; }
+
+        ImmutableArray<EventProperty>.Builder values = ImmutableArray.CreateBuilder<EventProperty>(fieldCount);
+
+        for (int field = 0; field < fieldCount; field++)
+        {
+            values.Add(ReconstructEventProperty(RawEventDataField(index, field)));
+        }
+
+        return values.MoveToImmutable();
+    }
+
+    private EventProperty ReconstructEventProperty(RawEventDataField field)
+    {
+        switch (field.Kind)
+        {
+            case StoredFieldKind.SByte:
+            case StoredFieldKind.Byte:
+            case StoredFieldKind.Int16:
+            case StoredFieldKind.UInt16:
+            case StoredFieldKind.Int32:
+            case StoredFieldKind.UInt32:
+            case StoredFieldKind.Int64:
+            case StoredFieldKind.UInt64:
+            case StoredFieldKind.Single:
+            case StoredFieldKind.Double:
+            case StoredFieldKind.Boolean:
+            case StoredFieldKind.DateTime:
+            case StoredFieldKind.SizeT:
+                return EventProperty.FromPacked(MapBackPackedKind(field.Kind), field.Bits);
+            case StoredFieldKind.String:
+            case StoredFieldKind.StringForm:
+                return EventProperty.FromReference(PoolGet(field.RefIndex));
+            case StoredFieldKind.Sid:
+                return EventProperty.FromReference(new SecurityIdentifier(PoolGet(field.RefIndex)!));
+            case StoredFieldKind.Guid:
+                return EventProperty.FromReference(new Guid(field.Bytes));
+            case StoredFieldKind.Bytes:
+                return EventProperty.FromReference(field.Bytes.ToArray());
+            case StoredFieldKind.UInt16Array:
+                return EventProperty.FromReference(MemoryMarshal.Cast<byte, ushort>(field.Bytes).ToArray());
+            case StoredFieldKind.UInt32Array:
+                return EventProperty.FromReference(MemoryMarshal.Cast<byte, uint>(field.Bytes).ToArray());
+            case StoredFieldKind.Int32Array:
+                return EventProperty.FromReference(MemoryMarshal.Cast<byte, int>(field.Bytes).ToArray());
+            case StoredFieldKind.StringArray:
+                return EventProperty.FromReference(ReconstructStringArray(field.ValueIndices));
+            case StoredFieldKind.Null:
+                return EventProperty.FromReference(null);
+            default:
+                throw new ArgumentOutOfRangeException(nameof(field), field.Kind, "Unknown stored field kind.");
+        }
+    }
+
+    private string[] ReconstructKeywords(int index)
+    {
+        ReadOnlySpan<int> keywordIndices = RawKeywords(index);
+
+        if (keywordIndices.Length == 0) { return []; }
+
+        string[] keywords = new string[keywordIndices.Length];
+
+        for (int i = 0; i < keywordIndices.Length; i++) { keywords[i] = PoolGet(keywordIndices[i])!; }
+
+        return keywords;
+    }
+
+    private ResolvedEvent ReconstructLeanEvent(int index)
+    {
+        int userIdPoolIndex = RawPoolIndex(EventColumnField.UserId, index);
+        long recordId = RawRecordId(index, out bool hasRecordId);
+        Guid activityId = RawActivityId(index, out bool hasActivityId);
+        int processId = RawProcessId(index, out bool hasProcessId);
+        int threadId = RawThreadId(index, out bool hasThreadId);
+
+        return new ResolvedEvent(
+            PoolGet(RawPoolIndex(EventColumnField.OwningLog, index))!,
+            (LogPathType)RawLogPathType(index))
+        {
+            Id = RawId(index),
+            TimeCreated = new DateTime(RawTimeTicks(index), DateTimeKind.Utc),
+            ComputerName = PoolGet(RawPoolIndex(EventColumnField.ComputerName, index)) ?? string.Empty,
+            Description = PoolGet(RawPoolIndex(EventColumnField.Description, index)) ?? string.Empty,
+            Level = PoolGet(RawPoolIndex(EventColumnField.Level, index)) ?? string.Empty,
+            LogName = PoolGet(RawPoolIndex(EventColumnField.LogName, index)) ?? string.Empty,
+            Source = PoolGet(RawPoolIndex(EventColumnField.Source, index)) ?? string.Empty,
+            TaskCategory = PoolGet(RawPoolIndex(EventColumnField.TaskCategory, index)) ?? string.Empty,
+            UserId = userIdPoolIndex < 0 ? null : new SecurityIdentifier(PoolGet(userIdPoolIndex)!),
+            RecordId = hasRecordId ? recordId : null,
+            ActivityId = hasActivityId ? activityId : null,
+            ProcessId = hasProcessId ? processId : null,
+            ThreadId = hasThreadId ? threadId : null,
+            UserDataIncomplete = RawUserDataIncomplete(index),
+            Keywords = ReconstructKeywords(index)
+        };
+    }
+
+    private TemplateFieldSchema? ReconstructSchema(int index)
+    {
+        int schemaId = RawEventDataSchemaId(index);
+
+        if (schemaId < 0) { return null; }
+
+        ReadOnlySpan<int> nameIndices = SchemaFieldNameIndices(schemaId);
+        ImmutableArray<string>.Builder names = ImmutableArray.CreateBuilder<string>(nameIndices.Length);
+
+        foreach (int nameIndex in nameIndices) { names.Add(PoolGet(nameIndex)!); }
+
+        // Both orderings resolve to the single stored matched-ordering names, so named access reproduces the original
+        // regardless of whether the source matched its Visible or All ordering (P2-2 design, §3).
+        ImmutableArray<string> matchedNames = names.MoveToImmutable();
+
+        return new TemplateFieldSchema(matchedNames, matchedNames);
+    }
+
+    private string[] ReconstructStringArray(ReadOnlySpan<int> valueIndices)
+    {
+        if (valueIndices.Length == 0) { return []; }
+
+        string[] values = new string[valueIndices.Length];
+
+        for (int i = 0; i < valueIndices.Length; i++) { values[i] = PoolGet(valueIndices[i])!; }
+
+        return values;
+    }
+
+    private ImmutableArray<UserDataField> ReconstructUserData(int index)
+    {
+        int fieldCount = RawUserDataCount(index);
+
+        if (fieldCount == 0) { return default; }
+
+        ImmutableArray<UserDataField>.Builder fields = ImmutableArray.CreateBuilder<UserDataField>(fieldCount);
+
+        for (int field = 0; field < fieldCount; field++)
+        {
+            ReadOnlySpan<int> valueIndices = RawUserDataValues(index, field);
+            ImmutableArray<string>.Builder values = ImmutableArray.CreateBuilder<string>(valueIndices.Length);
+
+            foreach (int valueIndex in valueIndices) { values.Add(PoolGet(valueIndex)!); }
+
+            fields.Add(new UserDataField(
+                PoolGet(RawUserDataPathIndex(index, field))!,
+                values.MoveToImmutable(),
+                RawUserDataTruncated(index, field)));
+        }
+
+        return fields.MoveToImmutable();
+    }
 
     private int[] SealedPrefix()
     {

@@ -160,6 +160,8 @@ internal readonly struct EventProperty : IEquatable<EventProperty>
         }
     }
 
+    internal static EventProperty FromPacked(EventPropertyKind kind, long bits) => new(kind, bits);
+
     internal static EventProperty FromReference(object? reference) => new(reference);
 
     private sealed class NumericKind(EventPropertyKind kind)
