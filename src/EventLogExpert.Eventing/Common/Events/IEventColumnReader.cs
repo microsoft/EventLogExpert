@@ -16,11 +16,11 @@ public interface IEventColumnReader
 
     EventLogId LogId { get; }
 
-    EventFieldValue GetField(EventHandle handle, EventFieldId field);
+    EventFieldValue GetField(EventLocator locator, EventFieldId field);
 
-    StructuredFieldResult GetUserData(EventHandle handle, string storageKey);
+    StructuredFieldResult GetUserData(EventLocator locator, string storageKey);
 
-    EventHandle HandleAt(int index);
+    EventLocator LocatorAt(int index);
 
-    bool TryGetEventData(EventHandle handle, string fieldName, out EventFieldValue value);
+    bool TryGetEventData(EventLocator locator, string fieldName, out EventFieldValue value);
 }

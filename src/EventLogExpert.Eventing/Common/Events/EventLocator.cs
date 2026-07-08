@@ -5,4 +5,4 @@ using EventLogExpert.Eventing.Common.EventLogs;
 
 namespace EventLogExpert.Eventing.Common.Events;
 
-public readonly record struct EventHandle(EventLogId LogId, int Generation, int Index);
+public readonly record struct EventLocator(EventLogId LogId, int Generation, int Index);

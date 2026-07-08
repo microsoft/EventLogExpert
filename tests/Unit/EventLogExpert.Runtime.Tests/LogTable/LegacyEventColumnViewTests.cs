@@ -21,21 +21,21 @@ public sealed class LegacyEventColumnViewTests
     }
 
     [Fact]
-    public void GetDetail_HandleFromDifferentGeneration_Throws()
+    public void GetDetail_LocatorFromDifferentGeneration_Throws()
     {
         var view = CreateView(Event(1, 1));
-        var stale = new EventHandle(s_logId, 999, 0);
+        var stale = new EventLocator(s_logId, 999, 0);
 
         Assert.Throws<ArgumentException>(() => view.GetDetail(stale));
     }
 
     [Fact]
-    public void GetDetail_ReturnsEventAtHandle()
+    public void GetDetail_ReturnsEventAtLocator()
     {
         var second = Event(20, 2);
         var view = CreateView(Event(10, 1), second, Event(30, 3));
 
-        Assert.Same(second, view.GetDetail(view.HandleAt(1)));
+        Assert.Same(second, view.GetDetail(view.LocatorAt(1)));
     }
 
     [Fact]

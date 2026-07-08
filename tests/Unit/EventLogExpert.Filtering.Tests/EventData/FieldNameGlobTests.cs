@@ -13,7 +13,7 @@ namespace EventLogExpert.Filtering.Tests.EventData;
 ///     Behavioral coverage for EventData / UserData field-name wildcard globs. A glob (<c>EventData["*cert*"]</c> /
 ///     <c>UserData["*cert*"]</c>) is evaluated as if each field whose name/path matches the glob were its own OR'd filter
 ///     row, using the existing single-field per-value semantics. EventData is boolean (fully enumerated); UserData is the
-///     Kleene tri-state, keep-visible on per-field truncation and on a capped (incomplete) field set.
+///     tri-state, keep-visible on per-field truncation and on a capped (incomplete) field set.
 /// </summary>
 public sealed class FieldNameGlobTests
 {
@@ -133,7 +133,7 @@ public sealed class FieldNameGlobTests
             new ResolvedEvent("TestLog", LogPathType.Channel) { UserDataIncomplete = true }));
     }
 
-    // --- UserData glob (Kleene tri-state, OR across matching stored paths). ---
+    // --- UserData glob (tri-state, OR across matching stored paths). ---
 
     [Fact]
     public void UserDataGlob_Equal_OrsAcrossMatchingPaths()

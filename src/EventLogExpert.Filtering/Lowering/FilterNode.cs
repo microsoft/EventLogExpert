@@ -7,25 +7,25 @@ namespace EventLogExpert.Filtering.Lowering;
 ///     Domain-shaped AST consumed by the binder/emitter (N2) and the decomposer (L2). Each leaf node carries enough
 ///     pre-resolved type information for the emitter to produce a closure that does no per-event coercion.
 /// </summary>
-internal abstract class SemanticNode;
+internal abstract class FilterNode;
 
-internal sealed class AndNode(SemanticNode left, SemanticNode right) : SemanticNode
+internal sealed class AndNode(FilterNode left, FilterNode right) : FilterNode
 {
-    public SemanticNode Left { get; } = left;
+    public FilterNode Left { get; } = left;
 
-    public SemanticNode Right { get; } = right;
+    public FilterNode Right { get; } = right;
 }
 
-internal sealed class OrNode(SemanticNode left, SemanticNode right) : SemanticNode
+internal sealed class OrNode(FilterNode left, FilterNode right) : FilterNode
 {
-    public SemanticNode Left { get; } = left;
+    public FilterNode Left { get; } = left;
 
-    public SemanticNode Right { get; } = right;
+    public FilterNode Right { get; } = right;
 }
 
-internal sealed class NotNode(SemanticNode operand) : SemanticNode
+internal sealed class NotNode(FilterNode operand) : FilterNode
 {
-    public SemanticNode Operand { get; } = operand;
+    public FilterNode Operand { get; } = operand;
 }
 
 /// <summary>
@@ -35,7 +35,7 @@ internal sealed class NotNode(SemanticNode operand) : SemanticNode
 internal sealed class ComparisonNode(
     ResolvedEventField field,
     FilterBinaryOperator op,
-    TypedLiteral literal) : SemanticNode
+    TypedLiteral literal) : FilterNode
 {
     public ResolvedEventField Field { get; } = field;
 
@@ -48,7 +48,7 @@ internal sealed class ComparisonNode(
 ///     <c>{Field}.Contains(Needle, OIC)</c> — or for Id / ActivityId the formatter shape
 ///     <c>{Field}.ToString().Contains(Needle, OIC)</c>. UserId resolves to the underlying SDDL string.
 /// </summary>
-internal sealed class ContainsNode(ResolvedEventField field, string needle, bool ignoreCase) : SemanticNode
+internal sealed class ContainsNode(ResolvedEventField field, string needle, bool ignoreCase) : FilterNode
 {
     public ResolvedEventField Field { get; } = field;
 
@@ -58,7 +58,7 @@ internal sealed class ContainsNode(ResolvedEventField field, string needle, bool
 }
 
 /// <summary><c>Keywords.Any(e =&gt; string.Equals(e, Needle, OIC))</c>.</summary>
-internal sealed class KeywordsAnyEqualsNode(string needle, bool ignoreCase) : SemanticNode
+internal sealed class KeywordsAnyEqualsNode(string needle, bool ignoreCase) : FilterNode
 {
     public bool IgnoreCase { get; } = ignoreCase;
 
@@ -66,7 +66,7 @@ internal sealed class KeywordsAnyEqualsNode(string needle, bool ignoreCase) : Se
 }
 
 /// <summary><c>Keywords.Any(e =&gt; e.Contains(Needle, OIC))</c>.</summary>
-internal sealed class KeywordsAnyContainsNode(string needle, bool ignoreCase) : SemanticNode
+internal sealed class KeywordsAnyContainsNode(string needle, bool ignoreCase) : FilterNode
 {
     public bool IgnoreCase { get; } = ignoreCase;
 
@@ -74,7 +74,7 @@ internal sealed class KeywordsAnyContainsNode(string needle, bool ignoreCase) : 
 }
 
 /// <summary><c>Keywords.Any(e =&gt; (new[] {...}).Contains(e))</c>.</summary>
-internal sealed class KeywordsMatchAnyOfNode(IReadOnlyList<string> needles) : SemanticNode
+internal sealed class KeywordsMatchAnyOfNode(IReadOnlyList<string> needles) : FilterNode
 {
     public IReadOnlyList<string> Needles { get; } = needles;
 }
@@ -83,7 +83,7 @@ internal sealed class KeywordsMatchAnyOfNode(IReadOnlyList<string> needles) : Se
 ///     <c>(new[] {...}).Contains({Field})</c> — and the int variant <c>(new[] {...}).Contains({Field}.ToString())</c>
 ///     for Id and Level.
 /// </summary>
-internal sealed class MultiEqualsNode(ResolvedEventField field, IReadOnlyList<string> values) : SemanticNode
+internal sealed class MultiEqualsNode(ResolvedEventField field, IReadOnlyList<string> values) : FilterNode
 {
     public ResolvedEventField Field { get; } = field;
 
@@ -97,7 +97,7 @@ internal sealed class MultiEqualsNode(ResolvedEventField field, IReadOnlyList<st
 ///     decomposer maps <see cref="Op" /> directly with no ambiguity.
 /// </summary>
 internal sealed class EventDataComparisonNode(string fieldName, FilterBinaryOperator op, EventDataLiteral literal)
-    : SemanticNode
+    : FilterNode
 {
     public string FieldName { get; } = fieldName;
 
@@ -112,7 +112,7 @@ internal sealed class EventDataComparisonNode(string fieldName, FilterBinaryOper
 ///     <c>!…Contains(…)</c> form (Basic's <c>NotContains</c>); presence-required either way.
 /// </summary>
 internal sealed class EventDataContainsNode(string fieldName, string needle, bool ignoreCase, bool negated)
-    : SemanticNode
+    : FilterNode
 {
     public string FieldName { get; } = fieldName;
 
@@ -129,7 +129,7 @@ internal sealed class EventDataContainsNode(string fieldName, string needle, boo
 ///     rejected by the Lowerer.
 /// </summary>
 internal sealed class EventDataMultiEqualsNode(string fieldName, IReadOnlyList<EventDataLiteral> literals)
-    : SemanticNode
+    : FilterNode
 {
     public string FieldName { get; } = fieldName;
 
@@ -142,7 +142,7 @@ internal sealed class EventDataMultiEqualsNode(string fieldName, IReadOnlyList<E
 ///     truncated field surfaces <c>Unknown</c>; negation flips <see cref="Op" /> in the Lowerer, so no NotNode wraps it.
 /// </summary>
 internal sealed class UserDataComparisonNode(string canonicalPath, FilterBinaryOperator op, string literal)
-    : SemanticNode
+    : FilterNode
 {
     public string CanonicalPath { get; } = canonicalPath;
 
@@ -157,7 +157,7 @@ internal sealed class UserDataComparisonNode(string canonicalPath, FilterBinaryO
 ///     presence-required.
 /// </summary>
 internal sealed class UserDataContainsNode(string canonicalPath, string needle, bool ignoreCase, bool negated)
-    : SemanticNode
+    : FilterNode
 {
     public string CanonicalPath { get; } = canonicalPath;
 
@@ -172,7 +172,7 @@ internal sealed class UserDataContainsNode(string canonicalPath, string needle, 
 ///     <c>(new[] {...}).Contains(UserData["Event/UserData/..."])</c>: any-of ordinal equality on a structured
 ///     UserData path, presence-required. Positive only; <c>!(any-of)</c> has no Basic form and is rejected by the Lowerer.
 /// </summary>
-internal sealed class UserDataMultiEqualsNode(string canonicalPath, IReadOnlyList<string> literals) : SemanticNode
+internal sealed class UserDataMultiEqualsNode(string canonicalPath, IReadOnlyList<string> literals) : FilterNode
 {
     public string CanonicalPath { get; } = canonicalPath;
 

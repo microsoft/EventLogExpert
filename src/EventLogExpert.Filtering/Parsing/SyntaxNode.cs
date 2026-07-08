@@ -5,7 +5,7 @@ namespace EventLogExpert.Filtering.Parsing;
 
 /// <summary>
 ///     Common base for the small expression-shaped syntax tree the <see cref="Parser" /> produces. The
-///     <see cref="Lowerer" /> walks this tree and emits a domain-shaped <see cref="Semantic.SemanticNode" />.
+///     <see cref="Lowerer" /> walks this tree and emits a domain-shaped <see cref="Lowering.FilterNode" />.
 /// </summary>
 internal abstract class SyntaxNode
 {

@@ -34,12 +34,51 @@ internal static class FilterParser
             return false;
         }
 
-        if (!Lowerer.TryLower(syntax!, out var semantic, out error))
+        if (!Lowerer.TryLower(syntax!, out var filterNode, out error))
         {
             return false;
         }
 
-        if (!Emitter.TryEmit(semantic!, out compiled, out error))
+        if (!Emitter.TryEmit(filterNode!, out compiled, out error))
+        {
+            return false;
+        }
+
+        error = null;
+
+        return true;
+    }
+
+    public static bool TryCompileColumn(
+        string? filterText,
+        [NotNullWhen(true)] out ColumnCompiledFilter? compiled,
+        [NotNullWhen(false)] out string? error)
+    {
+        compiled = null;
+
+        if (string.IsNullOrWhiteSpace(filterText))
+        {
+            error = "Expression is empty.";
+
+            return false;
+        }
+
+        if (!Tokenizer.TryTokenize(filterText, out var tokens, out error))
+        {
+            return false;
+        }
+
+        if (!Parser.TryParse(tokens, out var syntax, out error))
+        {
+            return false;
+        }
+
+        if (!Lowerer.TryLower(syntax!, out var filterNode, out error))
+        {
+            return false;
+        }
+
+        if (!ColumnEmitter.TryEmit(filterNode!, out compiled, out error))
         {
             return false;
         }

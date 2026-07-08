@@ -16,21 +16,21 @@ public sealed class LegacyEventColumnReaderTests
     private static readonly EventLogId s_logId = EventLogId.Create();
 
     [Fact]
-    public void GetField_HandleFromDifferentGeneration_Throws()
+    public void GetField_LocatorFromDifferentGeneration_Throws()
     {
         var reader = CreateReader(new ResolvedEvent("live", LogPathType.Channel));
-        var staleHandle = new EventHandle(s_logId, 999, 0);
+        var staleLocator = new EventLocator(s_logId, 999, 0);
 
-        Assert.Throws<ArgumentException>(() => reader.GetField(staleHandle, EventFieldId.Id));
+        Assert.Throws<ArgumentException>(() => reader.GetField(staleLocator, EventFieldId.Id));
     }
 
     [Fact]
-    public void GetField_HandleFromDifferentLog_Throws()
+    public void GetField_LocatorFromDifferentLog_Throws()
     {
         var reader = CreateReader(new ResolvedEvent("live", LogPathType.Channel));
-        var foreignHandle = new EventHandle(EventLogId.Create(), 3, 0);
+        var foreignLocator = new EventLocator(EventLogId.Create(), 3, 0);
 
-        Assert.Throws<ArgumentException>(() => reader.GetField(foreignHandle, EventFieldId.Id));
+        Assert.Throws<ArgumentException>(() => reader.GetField(foreignLocator, EventFieldId.Id));
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public sealed class LegacyEventColumnReaderTests
     {
         var reader = CreateReader(new ResolvedEvent("live", LogPathType.Channel) { RecordId = null });
 
-        Assert.Equal(EventFieldValueKind.Null, reader.GetField(reader.HandleAt(0), EventFieldId.RecordId).Kind);
+        Assert.Equal(EventFieldValueKind.Null, reader.GetField(reader.LocatorAt(0), EventFieldId.RecordId).Kind);
     }
 
     [Fact]
@@ -52,13 +52,13 @@ public sealed class LegacyEventColumnReaderTests
             RecordId = 7
         });
 
-        EventHandle handle = reader.HandleAt(0);
+        EventLocator locator = reader.LocatorAt(0);
 
-        Assert.True(reader.GetField(handle, EventFieldId.Id).TryGetInt64(out long id));
+        Assert.True(reader.GetField(locator, EventFieldId.Id).TryGetInt64(out long id));
         Assert.Equal(4624L, id);
-        Assert.Equal("Information", reader.GetField(handle, EventFieldId.Level).AsString());
-        Assert.Equal("Microsoft-Windows-Security-Auditing", reader.GetField(handle, EventFieldId.Source).AsString());
-        Assert.True(reader.GetField(handle, EventFieldId.RecordId).TryGetInt64(out long recordId));
+        Assert.Equal("Information", reader.GetField(locator, EventFieldId.Level).AsString());
+        Assert.Equal("Microsoft-Windows-Security-Auditing", reader.GetField(locator, EventFieldId.Source).AsString());
+        Assert.True(reader.GetField(locator, EventFieldId.RecordId).TryGetInt64(out long recordId));
         Assert.Equal(7L, recordId);
     }
 
@@ -67,7 +67,7 @@ public sealed class LegacyEventColumnReaderTests
     {
         var reader = CreateReader(new ResolvedEvent("live", LogPathType.Channel) { UserId = new SecurityIdentifier("S-1-5-18") });
 
-        Assert.Equal("S-1-5-18", reader.GetField(reader.HandleAt(0), EventFieldId.UserId).AsString());
+        Assert.Equal("S-1-5-18", reader.GetField(reader.LocatorAt(0), EventFieldId.UserId).AsString());
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public sealed class LegacyEventColumnReaderTests
             UserData = ImmutableArray.Create(new UserDataField("Result/@value", ImmutableArray.Create("ok"), IsTruncated: false))
         });
 
-        Assert.True(reader.GetUserData(reader.HandleAt(0), "Missing/@value").IsAbsent);
+        Assert.True(reader.GetUserData(reader.LocatorAt(0), "Missing/@value").IsAbsent);
     }
 
     [Fact]
@@ -89,18 +89,18 @@ public sealed class LegacyEventColumnReaderTests
             UserData = ImmutableArray.Create(new UserDataField("Result/@value", ImmutableArray.Create("ok"), IsTruncated: false))
         });
 
-        StructuredFieldResult result = reader.GetUserData(reader.HandleAt(0), "Result/@value");
+        StructuredFieldResult result = reader.GetUserData(reader.LocatorAt(0), "Result/@value");
 
         Assert.False(result.IsAbsent);
         Assert.Equal(["ok"], result.PresentValues.ToArray());
     }
 
     [Fact]
-    public void HandleAt_CarriesReaderLogAndGeneration()
+    public void LocatorAt_CarriesReaderLogAndGeneration()
     {
         var reader = CreateReader(new ResolvedEvent("live", LogPathType.Channel));
 
-        Assert.Equal(new EventHandle(s_logId, 3, 0), reader.HandleAt(0));
+        Assert.Equal(new EventLocator(s_logId, 3, 0), reader.LocatorAt(0));
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public sealed class LegacyEventColumnReaderTests
     {
         var reader = CreateReader(new ResolvedEvent("live", LogPathType.Channel).WithEventData(("TargetUserName", "alice")));
 
-        Assert.False(reader.TryGetEventData(reader.HandleAt(0), "NonExistent", out _));
+        Assert.False(reader.TryGetEventData(reader.LocatorAt(0), "NonExistent", out _));
     }
 
     [Fact]
@@ -116,7 +116,7 @@ public sealed class LegacyEventColumnReaderTests
     {
         var reader = CreateReader(new ResolvedEvent("live", LogPathType.Channel).WithEventData(("TargetUserName", "alice")));
 
-        Assert.True(reader.TryGetEventData(reader.HandleAt(0), "TargetUserName", out EventFieldValue value));
+        Assert.True(reader.TryGetEventData(reader.LocatorAt(0), "TargetUserName", out EventFieldValue value));
         Assert.Equal("alice", value.AsString());
     }
 

@@ -34,4 +34,17 @@ internal static class FilterCompiler
         [NotNullWhen(true)] out CompiledFilter? compiled,
         [NotNullWhen(false)] out string? error) =>
         FilterParser.TryCompile(expression, out compiled, out error);
+
+    /// <summary>
+    ///     Attempts to compile the supplied filter expression into a column-direct <see cref="ColumnCompiledFilter" />
+    ///     that evaluates over an <c>IEventColumnReader</c> instead of a materialized <c>ResolvedEvent</c>. Returns
+    ///     <c>true</c> with <paramref name="compiled" /> populated on success; <c>false</c> with a diagnostic
+    ///     <paramref name="error" /> on failure (including arms the column backend does not yet support). Delegates to
+    ///     <see cref="FilterParser.TryCompileColumn" />.
+    /// </summary>
+    public static bool TryCompileColumn(
+        string? expression,
+        [NotNullWhen(true)] out ColumnCompiledFilter? compiled,
+        [NotNullWhen(false)] out string? error) =>
+        FilterParser.TryCompileColumn(expression, out compiled, out error);
 }

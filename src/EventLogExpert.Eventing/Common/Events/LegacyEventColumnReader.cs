@@ -30,26 +30,26 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
 
     public EventLogId LogId { get; }
 
-    // Legacy-adapter convenience: the current store keeps whole ResolvedEvent objects, so a handle resolves directly to
+    // Legacy-adapter convenience: the current store keeps whole ResolvedEvent objects, so a locator resolves directly to
     // one. The real column store will not retain events; its view rehydrates from columns instead.
-    public ResolvedEvent GetEvent(EventHandle handle)
+    public ResolvedEvent GetEvent(EventLocator locator)
     {
-        if (handle.LogId != LogId || handle.Generation != Generation)
+        if (locator.LogId != LogId || locator.Generation != Generation)
         {
-            throw new ArgumentException("Handle does not belong to this reader's log/generation.", nameof(handle));
+            throw new ArgumentException("Locator does not belong to this reader's log/generation.", nameof(locator));
         }
 
-        return _events[handle.Index];
+        return _events[locator.Index];
     }
 
-    public EventFieldValue GetField(EventHandle handle, EventFieldId field) =>
-        ResolvedEventFieldReader.GetField(GetEvent(handle), field);
+    public EventFieldValue GetField(EventLocator locator, EventFieldId field) =>
+        ResolvedEventFieldReader.GetField(GetEvent(locator), field);
 
-    public StructuredFieldResult GetUserData(EventHandle handle, string storageKey) =>
-        GetEvent(handle).TryGetUserDataValues(storageKey);
+    public StructuredFieldResult GetUserData(EventLocator locator, string storageKey) =>
+        GetEvent(locator).TryGetUserDataValues(storageKey);
 
-    public EventHandle HandleAt(int index) => new(LogId, Generation, index);
+    public EventLocator LocatorAt(int index) => new(LogId, Generation, index);
 
-    public bool TryGetEventData(EventHandle handle, string fieldName, out EventFieldValue value) =>
-        GetEvent(handle).EventData.TryGetValue(fieldName, out value);
+    public bool TryGetEventData(EventLocator locator, string fieldName, out EventFieldValue value) =>
+        GetEvent(locator).EventData.TryGetValue(fieldName, out value);
 }

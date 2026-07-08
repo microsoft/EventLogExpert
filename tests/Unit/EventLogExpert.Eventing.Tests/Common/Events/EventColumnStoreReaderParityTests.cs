@@ -27,10 +27,10 @@ public sealed class EventColumnStoreReaderParityTests
     private static readonly DateTime s_time = new(2021, 6, 15, 10, 20, 30, DateTimeKind.Utc);
 
     [Fact]
-    public void GetField_ForeignLogIdHandle_ThrowsArgumentException()
+    public void GetField_ForeignLogIdLocator_ThrowsArgumentException()
     {
         (IEventColumnReader legacy, IEventColumnReader column, _) = BuildSealed();
-        EventHandle foreign = new(EventLogId.Create(), column.Generation, 0);
+        EventLocator foreign = new(EventLogId.Create(), column.Generation, 0);
 
         Assert.Throws<ArgumentException>(() => column.GetField(foreign, EventFieldId.Id));
         Assert.Throws<ArgumentException>(() => legacy.GetField(foreign, EventFieldId.Id));
@@ -53,10 +53,10 @@ public sealed class EventColumnStoreReaderParityTests
     }
 
     [Fact]
-    public void GetField_StaleGenerationHandle_ThrowsArgumentException()
+    public void GetField_StaleGenerationLocator_ThrowsArgumentException()
     {
         (IEventColumnReader legacy, IEventColumnReader column, _) = BuildSealed();
-        EventHandle stale = new(column.LogId, column.Generation + 1, 0);
+        EventLocator stale = new(column.LogId, column.Generation + 1, 0);
 
         Assert.Throws<ArgumentException>(() => column.GetField(stale, EventFieldId.Id));
         Assert.Throws<ArgumentException>(() => legacy.GetField(stale, EventFieldId.Id));
@@ -118,8 +118,8 @@ public sealed class EventColumnStoreReaderParityTests
         {
             foreach (string name in probeNames)
             {
-                bool expectedFound = legacy.TryGetEventData(legacy.HandleAt(index), name, out EventFieldValue expected);
-                bool actualFound = column.TryGetEventData(column.HandleAt(index), name, out EventFieldValue actual);
+                bool expectedFound = legacy.TryGetEventData(legacy.LocatorAt(index), name, out EventFieldValue expected);
+                bool actualFound = column.TryGetEventData(column.LocatorAt(index), name, out EventFieldValue actual);
 
                 Assert.Equal(expectedFound, actualFound);
                 Assert.Equal(expected.Kind, actual.Kind);
@@ -134,8 +134,8 @@ public sealed class EventColumnStoreReaderParityTests
         {
             for (int index = 0; index < count; index++)
             {
-                EventFieldValue expected = legacy.GetField(legacy.HandleAt(index), field);
-                EventFieldValue actual = column.GetField(column.HandleAt(index), field);
+                EventFieldValue expected = legacy.GetField(legacy.LocatorAt(index), field);
+                EventFieldValue actual = column.GetField(column.LocatorAt(index), field);
 
                 Assert.Equal(expected.Kind, actual.Kind);
                 Assert.Equal(expected.AsString(), actual.AsString());
@@ -159,8 +159,8 @@ public sealed class EventColumnStoreReaderParityTests
         {
             foreach (string key in probeKeys)
             {
-                StructuredFieldResult expected = legacy.GetUserData(legacy.HandleAt(index), key);
-                StructuredFieldResult actual = column.GetUserData(column.HandleAt(index), key);
+                StructuredFieldResult expected = legacy.GetUserData(legacy.LocatorAt(index), key);
+                StructuredFieldResult actual = column.GetUserData(column.LocatorAt(index), key);
 
                 Assert.Equal(expected.IsAbsent, actual.IsAbsent);
                 Assert.Equal(expected.IsTruncated, actual.IsTruncated);

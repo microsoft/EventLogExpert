@@ -28,9 +28,9 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
 
     public EventLogId LogId { get; }
 
-    public EventFieldValue GetField(EventHandle handle, EventFieldId field)
+    public EventFieldValue GetField(EventLocator locator, EventFieldId field)
     {
-        int index = Resolve(handle);
+        int index = Resolve(locator);
 
         if (_store.IsPending(index))
         {
@@ -92,9 +92,9 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         }
     }
 
-    public StructuredFieldResult GetUserData(EventHandle handle, string storageKey)
+    public StructuredFieldResult GetUserData(EventLocator locator, string storageKey)
     {
-        int index = Resolve(handle);
+        int index = Resolve(locator);
 
         if (_store.IsPending(index))
         {
@@ -129,11 +129,11 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
             isTruncated: true);
     }
 
-    public EventHandle HandleAt(int index) => new(LogId, _store.Generation, index);
+    public EventLocator LocatorAt(int index) => new(LogId, _store.Generation, index);
 
-    public bool TryGetEventData(EventHandle handle, string fieldName, out EventFieldValue value)
+    public bool TryGetEventData(EventLocator locator, string fieldName, out EventFieldValue value)
     {
-        int index = Resolve(handle);
+        int index = Resolve(locator);
 
         if (_store.IsPending(index))
         {
@@ -174,14 +174,14 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
     private EventFieldValue PooledField(EventColumnField column, int index) =>
         EventFieldValue.FromProperty(_store.PoolGet(_store.RawPoolIndex(column, index)) ?? string.Empty);
 
-    private int Resolve(EventHandle handle)
+    private int Resolve(EventLocator locator)
     {
-        if (handle.LogId != LogId || handle.Generation != _store.Generation)
+        if (locator.LogId != LogId || locator.Generation != _store.Generation)
         {
-            throw new ArgumentException("Handle does not belong to this reader's log/generation.", nameof(handle));
+            throw new ArgumentException("Locator does not belong to this reader's log/generation.", nameof(locator));
         }
 
-        return handle.Index;
+        return locator.Index;
     }
 
     private bool TryResolveEventDataIndex(int schemaId, string fieldName, out int fieldIndex)

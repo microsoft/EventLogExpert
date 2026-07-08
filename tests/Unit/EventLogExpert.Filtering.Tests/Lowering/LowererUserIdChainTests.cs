@@ -122,12 +122,12 @@ public sealed class LowererUserIdChainTests
         Assert.Equal(ResolvedEventField.UserId, userIdCmp.Field);
     }
 
-    private static SemanticNode LowerOrThrow(string filter)
+    private static FilterNode LowerOrThrow(string filter)
     {
         Assert.True(Tokenizer.TryTokenize(filter, out var tokens, out var tokError), tokError);
         Assert.True(Parser.TryParse(tokens, out var syntax, out var parseError), parseError);
-        Assert.True(Lowerer.TryLower(syntax!, out var semantic, out var lowerError), lowerError);
+        Assert.True(Lowerer.TryLower(syntax!, out var filterNode, out var lowerError), lowerError);
 
-        return semantic!;
+        return filterNode!;
     }
 }
