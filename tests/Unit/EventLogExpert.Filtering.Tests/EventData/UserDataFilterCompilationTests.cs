@@ -11,8 +11,8 @@ namespace EventLogExpert.Filtering.Tests.EventData;
 /// <summary>
 ///     Compile coverage for UserData structured-path filtering: canonical-path normalization to a storage key, the
 ///     presence-required grammar mirror of EventData, negation folding (no NotNode wraps a UserData term), and the
-///     tri-state Kleene predicate over stored <see cref="ResolvedEvent.UserData" />. Events carry hand-built fields whose
-///     values and truncation flag drive each to Match / NoMatch / Unknown.
+///     tri-state predicate over stored <see cref="ResolvedEvent.UserData" />. Events carry hand-built fields whose values
+///     and truncation flag drive each to Match / NoMatch / Unknown.
 /// </summary>
 public sealed class UserDataFilterCompilationTests
 {
@@ -47,36 +47,6 @@ public sealed class UserDataFilterCompilationTests
 
         // An event with no stored UserData leaves (and not flagged incomplete) is decisively absent: NoMatch, never a throw.
         Assert.Equal(FilterMatch.NoMatch, compiled.Evaluate!(new ResolvedEvent("TestLog", LogPathType.Channel)));
-    }
-
-    [Theory]
-    [InlineData(FilterMatch.Match, FilterMatch.Match, FilterMatch.Match)]
-    [InlineData(FilterMatch.Match, FilterMatch.NoMatch, FilterMatch.NoMatch)]
-    [InlineData(FilterMatch.Match, FilterMatch.Unknown, FilterMatch.Unknown)]
-    [InlineData(FilterMatch.NoMatch, FilterMatch.Unknown, FilterMatch.NoMatch)] // U ∧ F = F
-    [InlineData(FilterMatch.Unknown, FilterMatch.Unknown, FilterMatch.Unknown)]
-    public void KleeneAnd(FilterMatch left, FilterMatch right, FilterMatch expected)
-    {
-        var compiled = Compile("UserData[\"A\"] == \"x\" && UserData[\"B\"] == \"y\"");
-
-        var @event = EventWith(Value("A", left, "x"), Value("B", right, "y"));
-
-        Assert.Equal(expected, compiled.Evaluate!(@event));
-    }
-
-    [Theory]
-    [InlineData(FilterMatch.NoMatch, FilterMatch.NoMatch, FilterMatch.NoMatch)]
-    [InlineData(FilterMatch.NoMatch, FilterMatch.Match, FilterMatch.Match)]
-    [InlineData(FilterMatch.NoMatch, FilterMatch.Unknown, FilterMatch.Unknown)]
-    [InlineData(FilterMatch.Match, FilterMatch.Unknown, FilterMatch.Match)] // U ∨ T = T
-    [InlineData(FilterMatch.Unknown, FilterMatch.Unknown, FilterMatch.Unknown)]
-    public void KleeneOr(FilterMatch left, FilterMatch right, FilterMatch expected)
-    {
-        var compiled = Compile("UserData[\"A\"] == \"x\" || UserData[\"B\"] == \"y\"");
-
-        var @event = EventWith(Value("A", left, "x"), Value("B", right, "y"));
-
-        Assert.Equal(expected, compiled.Evaluate!(@event));
     }
 
     [Fact]
@@ -136,6 +106,36 @@ public sealed class UserDataFilterCompilationTests
         Assert.False(compiled.Predicate(EventWith(Value("Foo", FilterMatch.Unknown, "x"))));
         Assert.False(compiled.Predicate(EventWith(Value("Foo", FilterMatch.NoMatch, "x"))));
         Assert.False(compiled.Predicate(new ResolvedEvent("TestLog", LogPathType.Channel)));
+    }
+
+    [Theory]
+    [InlineData(FilterMatch.Match, FilterMatch.Match, FilterMatch.Match)]
+    [InlineData(FilterMatch.Match, FilterMatch.NoMatch, FilterMatch.NoMatch)]
+    [InlineData(FilterMatch.Match, FilterMatch.Unknown, FilterMatch.Unknown)]
+    [InlineData(FilterMatch.NoMatch, FilterMatch.Unknown, FilterMatch.NoMatch)] // U ∧ F = F
+    [InlineData(FilterMatch.Unknown, FilterMatch.Unknown, FilterMatch.Unknown)]
+    public void TriStateAnd(FilterMatch left, FilterMatch right, FilterMatch expected)
+    {
+        var compiled = Compile("UserData[\"A\"] == \"x\" && UserData[\"B\"] == \"y\"");
+
+        var @event = EventWith(Value("A", left, "x"), Value("B", right, "y"));
+
+        Assert.Equal(expected, compiled.Evaluate!(@event));
+    }
+
+    [Theory]
+    [InlineData(FilterMatch.NoMatch, FilterMatch.NoMatch, FilterMatch.NoMatch)]
+    [InlineData(FilterMatch.NoMatch, FilterMatch.Match, FilterMatch.Match)]
+    [InlineData(FilterMatch.NoMatch, FilterMatch.Unknown, FilterMatch.Unknown)]
+    [InlineData(FilterMatch.Match, FilterMatch.Unknown, FilterMatch.Match)] // U ∨ T = T
+    [InlineData(FilterMatch.Unknown, FilterMatch.Unknown, FilterMatch.Unknown)]
+    public void TriStateOr(FilterMatch left, FilterMatch right, FilterMatch expected)
+    {
+        var compiled = Compile("UserData[\"A\"] == \"x\" || UserData[\"B\"] == \"y\"");
+
+        var @event = EventWith(Value("A", left, "x"), Value("B", right, "y"));
+
+        Assert.Equal(expected, compiled.Evaluate!(@event));
     }
 
     [Theory]

@@ -11,9 +11,9 @@ internal interface IEventColumnView
 
     IEventColumnReader Reader { get; }
 
-    ResolvedEvent GetDetail(EventHandle handle);
+    ResolvedEvent GetDetail(EventLocator locator);
 
-    EventHandle HandleAt(int index);
+    EventLocator LocatorAt(int index);
 
     IReadOnlyList<ResolvedEvent> Slice(int start, int count);
 }

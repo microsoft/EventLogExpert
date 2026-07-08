@@ -13,7 +13,7 @@ namespace EventLogExpert.Filtering.Emit;
 internal static class Emitter
 {
     public static bool TryEmit(
-        SemanticNode root,
+        FilterNode root,
         [NotNullWhen(true)] out CompiledFilter? compiled,
         [NotNullWhen(false)] out string? error)
     {
@@ -22,13 +22,13 @@ internal static class Emitter
 
         try
         {
-            var requiresXml = ContainsXmlReference(root);
+            var requiresXml = FilterNodeMetadata.ContainsXmlReference(root);
 
             if (ContainsUserDataNode(root))
             {
                 var evaluate = EmitTriState(root);
 
-                compiled = new CompiledFilter(e => evaluate(e) == FilterMatch.Match, requiresXml)
+                compiled = new CompiledFilter(resolvedEvent => evaluate(resolvedEvent) == FilterMatch.Match, requiresXml)
                 {
                     Evaluate = evaluate
                 };
@@ -49,7 +49,7 @@ internal static class Emitter
         }
     }
 
-    private static bool ContainsUserDataNode(SemanticNode node) =>
+    private static bool ContainsUserDataNode(FilterNode node) =>
         node switch
         {
             UserDataComparisonNode or UserDataContainsNode or UserDataMultiEqualsNode => true,
@@ -59,32 +59,20 @@ internal static class Emitter
             _ => false
         };
 
-    private static bool ContainsXmlReference(SemanticNode node) =>
-        node switch
-        {
-            AndNode and => ContainsXmlReference(and.Left) || ContainsXmlReference(and.Right),
-            OrNode or => ContainsXmlReference(or.Left) || ContainsXmlReference(or.Right),
-            NotNode not => ContainsXmlReference(not.Operand),
-            ComparisonNode cmp => cmp.Field == ResolvedEventField.Xml,
-            ContainsNode cn => cn.Field == ResolvedEventField.Xml,
-            MultiEqualsNode mn => mn.Field == ResolvedEventField.Xml,
-            _ => false
-        };
-
     private static Func<ResolvedEvent, bool> EmitAnd(AndNode node)
     {
-        var conditions = FlattenAndChain(node).Select(EmitNode).ToArray();
+        var conditions = FilterNodeMetadata.FlattenAndChain(node).Select(EmitNode).ToArray();
 
         // Specialize 2- and 3-condition chains: closure invocation plus inline short-circuit &&.
         return conditions.Length switch
         {
-            2 => e => conditions[0](e) && conditions[1](e),
-            3 => e => conditions[0](e) && conditions[1](e) && conditions[2](e),
-            _ => e =>
+            2 => resolvedEvent => conditions[0](resolvedEvent) && conditions[1](resolvedEvent),
+            3 => resolvedEvent => conditions[0](resolvedEvent) && conditions[1](resolvedEvent) && conditions[2](resolvedEvent),
+            _ => resolvedEvent =>
             {
                 for (var i = 0; i < conditions.Length; i++)
                 {
-                    if (!conditions[i](e)) { return false; }
+                    if (!conditions[i](resolvedEvent)) { return false; }
                 }
 
                 return true;
@@ -106,21 +94,21 @@ internal static class Emitter
 
         return node.Field switch
         {
-            ResolvedEventField.Id => EmitIntComparison(static e => e.Id, node.Op, node.Literal.IntValue),
+            ResolvedEventField.Id => EmitIntComparison(static resolvedEvent => resolvedEvent.Id, node.Op, node.Literal.IntValue),
             ResolvedEventField.ProcessId => EmitNullableIntComparison(
-                static e => e.ProcessId,
+                static resolvedEvent => resolvedEvent.ProcessId,
                 node.Op,
                 node.Literal.IntValue),
             ResolvedEventField.ThreadId => EmitNullableIntComparison(
-                static e => e.ThreadId,
+                static resolvedEvent => resolvedEvent.ThreadId,
                 node.Op,
                 node.Literal.IntValue),
             ResolvedEventField.RecordId => EmitNullableLongComparison(
-                static e => e.RecordId,
+                static resolvedEvent => resolvedEvent.RecordId,
                 node.Op,
                 node.Literal.Kind == TypedLiteralKind.Long ? node.Literal.LongValue : node.Literal.IntValue),
             ResolvedEventField.ActivityId => EmitNullableGuidComparison(
-                static e => e.ActivityId,
+                static resolvedEvent => resolvedEvent.ActivityId,
                 node.Op,
                 node.Literal.GuidValue),
             _ => throw new EmitException(
@@ -135,57 +123,57 @@ internal static class Emitter
 
         return node.Field switch
         {
-            ResolvedEventField.Id => e =>
+            ResolvedEventField.Id => resolvedEvent =>
             {
                 Span<char> buffer = stackalloc char[11];
 
-                return e.Id.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture)
+                return resolvedEvent.Id.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture)
                     && buffer[..written].Contains(needle, comparison);
             },
-            ResolvedEventField.ProcessId => e =>
+            ResolvedEventField.ProcessId => resolvedEvent =>
             {
-                if (!e.ProcessId.HasValue) { return false; }
+                if (!resolvedEvent.ProcessId.HasValue) { return false; }
 
                 Span<char> buffer = stackalloc char[11];
 
-                return e.ProcessId.Value.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture)
+                return resolvedEvent.ProcessId.Value.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture)
                     && buffer[..written].Contains(needle, comparison);
             },
-            ResolvedEventField.ThreadId => e =>
+            ResolvedEventField.ThreadId => resolvedEvent =>
             {
-                if (!e.ThreadId.HasValue) { return false; }
+                if (!resolvedEvent.ThreadId.HasValue) { return false; }
 
                 Span<char> buffer = stackalloc char[11];
 
-                return e.ThreadId.Value.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture)
+                return resolvedEvent.ThreadId.Value.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture)
                     && buffer[..written].Contains(needle, comparison);
             },
-            ResolvedEventField.RecordId => e =>
+            ResolvedEventField.RecordId => resolvedEvent =>
             {
-                if (!e.RecordId.HasValue) { return false; }
+                if (!resolvedEvent.RecordId.HasValue) { return false; }
 
                 Span<char> buffer = stackalloc char[20];
 
-                return e.RecordId.Value.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture)
+                return resolvedEvent.RecordId.Value.TryFormat(buffer, out var written, default, CultureInfo.InvariantCulture)
                     && buffer[..written].Contains(needle, comparison);
             },
-            ResolvedEventField.ActivityId => e =>
+            ResolvedEventField.ActivityId => resolvedEvent =>
             {
-                if (!e.ActivityId.HasValue) { return false; }
+                if (!resolvedEvent.ActivityId.HasValue) { return false; }
 
                 Span<char> buffer = stackalloc char[36];
 
-                return e.ActivityId.Value.TryFormat(buffer, out var written, "D")
+                return resolvedEvent.ActivityId.Value.TryFormat(buffer, out var written, "D")
                     && buffer[..written].Contains(needle, comparison);
             },
-            ResolvedEventField.UserId => e => e.UserId is not null && e.UserId.Value.Contains(needle, comparison),
-            ResolvedEventField.ComputerName => e => e.ComputerName.Contains(needle, comparison),
-            ResolvedEventField.Description => e => e.Description.Contains(needle, comparison),
-            ResolvedEventField.Level => e => e.Level.Contains(needle, comparison),
-            ResolvedEventField.LogName => e => e.LogName.Contains(needle, comparison),
-            ResolvedEventField.Source => e => e.Source.Contains(needle, comparison),
-            ResolvedEventField.TaskCategory => e => e.TaskCategory.Contains(needle, comparison),
-            ResolvedEventField.Xml => e => e.Xml.Contains(needle, comparison),
+            ResolvedEventField.UserId => resolvedEvent => resolvedEvent.UserId is not null && resolvedEvent.UserId.Value.Contains(needle, comparison),
+            ResolvedEventField.ComputerName => resolvedEvent => resolvedEvent.ComputerName.Contains(needle, comparison),
+            ResolvedEventField.Description => resolvedEvent => resolvedEvent.Description.Contains(needle, comparison),
+            ResolvedEventField.Level => resolvedEvent => resolvedEvent.Level.Contains(needle, comparison),
+            ResolvedEventField.LogName => resolvedEvent => resolvedEvent.LogName.Contains(needle, comparison),
+            ResolvedEventField.Source => resolvedEvent => resolvedEvent.Source.Contains(needle, comparison),
+            ResolvedEventField.TaskCategory => resolvedEvent => resolvedEvent.TaskCategory.Contains(needle, comparison),
+            ResolvedEventField.Xml => resolvedEvent => resolvedEvent.Xml.Contains(needle, comparison),
             _ => throw new EmitException($"Cannot emit Contains for field '{node.Field}'.")
         };
     }
@@ -196,8 +184,8 @@ internal static class Emitter
         string value) =>
         op switch
         {
-            FilterBinaryOperator.Equal => e => string.Equals(getter(e), value, StringComparison.Ordinal),
-            FilterBinaryOperator.NotEqual => e => !string.Equals(getter(e), value, StringComparison.Ordinal),
+            FilterBinaryOperator.Equal => resolvedEvent => string.Equals(getter(resolvedEvent), value, StringComparison.Ordinal),
+            FilterBinaryOperator.NotEqual => resolvedEvent => !string.Equals(getter(resolvedEvent), value, StringComparison.Ordinal),
             _ => throw new EmitException($"Operator '{op}' is not supported on string properties.")
         };
 
@@ -211,9 +199,9 @@ internal static class Emitter
         {
             var matchesName = WildcardMatcher.Compile(name);
 
-            return e =>
+            return resolvedEvent =>
             {
-                foreach (var field in e.EventData)
+                foreach (var field in resolvedEvent.EventData)
                 {
                     if (matchesName(field.Name) && literal.MatchesValue(field.Value) == equal) { return true; }
                 }
@@ -224,10 +212,10 @@ internal static class Emitter
 
         if (equal)
         {
-            return e => e.EventData.TryGetValue(name, out var value) && literal.MatchesValue(value);
+            return resolvedEvent => resolvedEvent.EventData.TryGetValue(name, out var value) && literal.MatchesValue(value);
         }
 
-        return e => e.EventData.TryGetValue(name, out var value) && !literal.MatchesValue(value);
+        return resolvedEvent => resolvedEvent.EventData.TryGetValue(name, out var value) && !literal.MatchesValue(value);
     }
 
     private static Func<ResolvedEvent, bool> EmitEventDataContains(EventDataContainsNode node)
@@ -241,9 +229,9 @@ internal static class Emitter
         {
             var matchesName = WildcardMatcher.Compile(name);
 
-            return e =>
+            return resolvedEvent =>
             {
-                foreach (var field in e.EventData)
+                foreach (var field in resolvedEvent.EventData)
                 {
                     if (matchesName(field.Name) && field.Value.AsString().Contains(needle, comparison) != negated)
                     {
@@ -257,11 +245,11 @@ internal static class Emitter
 
         if (negated)
         {
-            return e => e.EventData.TryGetValue(name, out var value)
+            return resolvedEvent => resolvedEvent.EventData.TryGetValue(name, out var value)
                 && !value.AsString().Contains(needle, comparison);
         }
 
-        return e => e.EventData.TryGetValue(name, out var value)
+        return resolvedEvent => resolvedEvent.EventData.TryGetValue(name, out var value)
             && value.AsString().Contains(needle, comparison);
     }
 
@@ -270,37 +258,38 @@ internal static class Emitter
         var name = node.FieldName;
         var literals = node.Literals;
 
-        if (WildcardMatcher.ContainsWildcard(name))
+        if (!WildcardMatcher.ContainsWildcard(name))
         {
-            var matchesName = WildcardMatcher.Compile(name);
-
-            return e =>
+            return resolvedEvent =>
             {
-                foreach (var field in e.EventData)
-                {
-                    if (!matchesName(field.Name)) { continue; }
+                if (!resolvedEvent.EventData.TryGetValue(name, out var value)) { return false; }
 
-                    for (var i = 0; i < literals.Count; i++)
-                    {
-                        if (literals[i].MatchesValue(field.Value)) { return true; }
-                    }
+                for (var i = 0; i < literals.Count; i++)
+                {
+                    if (literals[i].MatchesValue(value)) { return true; }
                 }
 
                 return false;
             };
         }
 
-        return e =>
-        {
-            if (!e.EventData.TryGetValue(name, out var value)) { return false; }
+        var matchesName = WildcardMatcher.Compile(name);
 
-            for (var i = 0; i < literals.Count; i++)
+        return resolvedEvent =>
+        {
+            foreach (var field in resolvedEvent.EventData)
             {
-                if (literals[i].MatchesValue(value)) { return true; }
+                if (!matchesName(field.Name)) { continue; }
+
+                for (var i = 0; i < literals.Count; i++)
+                {
+                    if (literals[i].MatchesValue(field.Value)) { return true; }
+                }
             }
 
             return false;
         };
+
     }
 
     private static Func<ResolvedEvent, bool> EmitIntComparison(
@@ -309,12 +298,12 @@ internal static class Emitter
         int value) =>
         op switch
         {
-            FilterBinaryOperator.Equal => e => getter(e) == value,
-            FilterBinaryOperator.NotEqual => e => getter(e) != value,
-            FilterBinaryOperator.GreaterThan => e => getter(e) > value,
-            FilterBinaryOperator.LessThan => e => getter(e) < value,
-            FilterBinaryOperator.GreaterThanOrEqual => e => getter(e) >= value,
-            FilterBinaryOperator.LessThanOrEqual => e => getter(e) <= value,
+            FilterBinaryOperator.Equal => resolvedEvent => getter(resolvedEvent) == value,
+            FilterBinaryOperator.NotEqual => resolvedEvent => getter(resolvedEvent) != value,
+            FilterBinaryOperator.GreaterThan => resolvedEvent => getter(resolvedEvent) > value,
+            FilterBinaryOperator.LessThan => resolvedEvent => getter(resolvedEvent) < value,
+            FilterBinaryOperator.GreaterThanOrEqual => resolvedEvent => getter(resolvedEvent) >= value,
+            FilterBinaryOperator.LessThanOrEqual => resolvedEvent => getter(resolvedEvent) <= value,
             _ => throw new EmitException($"Unsupported integer operator '{op}'.")
         };
 
@@ -324,8 +313,8 @@ internal static class Emitter
         string value) =>
         op switch
         {
-            FilterBinaryOperator.Equal => e => string.Equals(getter(e), value, StringComparison.Ordinal),
-            FilterBinaryOperator.NotEqual => e => !string.Equals(getter(e), value, StringComparison.Ordinal),
+            FilterBinaryOperator.Equal => resolvedEvent => string.Equals(getter(resolvedEvent), value, StringComparison.Ordinal),
+            FilterBinaryOperator.NotEqual => resolvedEvent => !string.Equals(getter(resolvedEvent), value, StringComparison.Ordinal),
             _ => throw new EmitException($"Operator '{op}' is not supported on string-form comparison.")
         };
 
@@ -334,9 +323,9 @@ internal static class Emitter
         var needle = node.Needle;
         var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
-        return e =>
+        return resolvedEvent =>
         {
-            var keywords = e.Keywords;
+            var keywords = resolvedEvent.Keywords;
 
             for (var i = 0; i < keywords.Count; i++)
             {
@@ -352,9 +341,9 @@ internal static class Emitter
         var needle = node.Needle;
         var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
-        return e =>
+        return resolvedEvent =>
         {
-            var keywords = e.Keywords;
+            var keywords = resolvedEvent.Keywords;
 
             for (var i = 0; i < keywords.Count; i++)
             {
@@ -369,9 +358,9 @@ internal static class Emitter
     {
         var needles = CompileTimeLiterals.Snapshot(node.Needles);
 
-        return e =>
+        return resolvedEvent =>
         {
-            var keywords = e.Keywords;
+            var keywords = resolvedEvent.Keywords;
 
             for (var i = 0; i < keywords.Count; i++)
             {
@@ -390,19 +379,19 @@ internal static class Emitter
     private static Func<ResolvedEvent, bool> EmitMultiEquals(MultiEqualsNode node) =>
         node.Field switch
         {
-            ResolvedEventField.Id => EmitMultiEqualsInt(static e => e.Id, node.Values),
-            ResolvedEventField.ProcessId => EmitMultiEqualsNullableInt(static e => e.ProcessId, node.Values),
-            ResolvedEventField.ThreadId => EmitMultiEqualsNullableInt(static e => e.ThreadId, node.Values),
-            ResolvedEventField.RecordId => EmitMultiEqualsNullableLong(static e => e.RecordId, node.Values),
-            ResolvedEventField.ActivityId => EmitMultiEqualsNullableGuid(static e => e.ActivityId, node.Values),
+            ResolvedEventField.Id => EmitMultiEqualsInt(static resolvedEvent => resolvedEvent.Id, node.Values),
+            ResolvedEventField.ProcessId => EmitMultiEqualsNullableInt(static resolvedEvent => resolvedEvent.ProcessId, node.Values),
+            ResolvedEventField.ThreadId => EmitMultiEqualsNullableInt(static resolvedEvent => resolvedEvent.ThreadId, node.Values),
+            ResolvedEventField.RecordId => EmitMultiEqualsNullableLong(static resolvedEvent => resolvedEvent.RecordId, node.Values),
+            ResolvedEventField.ActivityId => EmitMultiEqualsNullableGuid(static resolvedEvent => resolvedEvent.ActivityId, node.Values),
             ResolvedEventField.UserId => EmitMultiEqualsUserId(node.Values),
-            ResolvedEventField.ComputerName => EmitMultiEqualsString(static e => e.ComputerName, node.Values),
-            ResolvedEventField.Description => EmitMultiEqualsString(static e => e.Description, node.Values),
-            ResolvedEventField.Level => EmitMultiEqualsString(static e => e.Level, node.Values),
-            ResolvedEventField.LogName => EmitMultiEqualsString(static e => e.LogName, node.Values),
-            ResolvedEventField.Source => EmitMultiEqualsString(static e => e.Source, node.Values),
-            ResolvedEventField.TaskCategory => EmitMultiEqualsString(static e => e.TaskCategory, node.Values),
-            ResolvedEventField.Xml => EmitMultiEqualsString(static e => e.Xml, node.Values),
+            ResolvedEventField.ComputerName => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.ComputerName, node.Values),
+            ResolvedEventField.Description => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Description, node.Values),
+            ResolvedEventField.Level => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Level, node.Values),
+            ResolvedEventField.LogName => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.LogName, node.Values),
+            ResolvedEventField.Source => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Source, node.Values),
+            ResolvedEventField.TaskCategory => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.TaskCategory, node.Values),
+            ResolvedEventField.Xml => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Xml, node.Values),
             _ => throw new EmitException($"Cannot emit MultiEquals for field '{node.Field}'.")
         };
 
@@ -412,9 +401,9 @@ internal static class Emitter
     {
         var coerced = CompileTimeLiterals.CoerceToIntArray(values);
 
-        return e =>
+        return resolvedEvent =>
         {
-            var actual = getter(e);
+            var actual = getter(resolvedEvent);
 
             for (var i = 0; i < coerced.Length; i++)
             {
@@ -431,9 +420,9 @@ internal static class Emitter
     {
         var coerced = CompileTimeLiterals.CoerceToGuidArray(values);
 
-        return e =>
+        return resolvedEvent =>
         {
-            var actual = getter(e);
+            var actual = getter(resolvedEvent);
 
             if (!actual.HasValue) { return false; }
 
@@ -452,9 +441,9 @@ internal static class Emitter
     {
         var coerced = CompileTimeLiterals.CoerceToIntArray(values);
 
-        return e =>
+        return resolvedEvent =>
         {
-            var actual = getter(e);
+            var actual = getter(resolvedEvent);
 
             if (!actual.HasValue) { return false; }
 
@@ -473,9 +462,9 @@ internal static class Emitter
     {
         var coerced = CompileTimeLiterals.CoerceToLongArray(values);
 
-        return e =>
+        return resolvedEvent =>
         {
-            var actual = getter(e);
+            var actual = getter(resolvedEvent);
 
             if (!actual.HasValue) { return false; }
 
@@ -494,9 +483,9 @@ internal static class Emitter
     {
         var snapshot = CompileTimeLiterals.Snapshot(values);
 
-        return e =>
+        return resolvedEvent =>
         {
-            var actual = getter(e);
+            var actual = getter(resolvedEvent);
 
             for (var i = 0; i < snapshot.Length; i++)
             {
@@ -511,11 +500,11 @@ internal static class Emitter
     {
         var snapshot = CompileTimeLiterals.Snapshot(values);
 
-        return e =>
+        return resolvedEvent =>
         {
-            if (e.UserId is null) { return false; }
+            if (resolvedEvent.UserId is null) { return false; }
 
-            var sddl = e.UserId.Value;
+            var sddl = resolvedEvent.UserId.Value;
 
             for (var i = 0; i < snapshot.Length; i++)
             {
@@ -526,7 +515,7 @@ internal static class Emitter
         };
     }
 
-    private static Func<ResolvedEvent, bool> EmitNode(SemanticNode node) =>
+    private static Func<ResolvedEvent, bool> EmitNode(FilterNode node) =>
         node switch
         {
             AndNode and => EmitAnd(and),
@@ -541,7 +530,7 @@ internal static class Emitter
             KeywordsAnyContainsNode kn => EmitKeywordsAnyContains(kn),
             KeywordsMatchAnyOfNode kn => EmitKeywordsMatchAnyOf(kn),
             MultiEqualsNode mn => EmitMultiEquals(mn),
-            _ => throw new EmitException($"Unsupported semantic node {node.GetType().Name}.")
+            _ => throw new EmitException($"Unsupported filter node {node.GetType().Name}.")
         };
 
     private static Func<ResolvedEvent, bool> EmitNot(NotNode node)
@@ -554,12 +543,12 @@ internal static class Emitter
                 ? StringComparison.OrdinalIgnoreCase
                 : StringComparison.Ordinal;
 
-            return e => e.UserId is not null && !e.UserId.Value.Contains(needle, comparison);
+            return resolvedEvent => resolvedEvent.UserId is not null && !resolvedEvent.UserId.Value.Contains(needle, comparison);
         }
 
         var inner = EmitNode(node.Operand);
 
-        return e => !inner(e);
+        return resolvedEvent => !inner(resolvedEvent);
     }
 
     private static Func<ResolvedEvent, bool> EmitNullableGuidComparison(
@@ -568,8 +557,8 @@ internal static class Emitter
         Guid value) =>
         op switch
         {
-            FilterBinaryOperator.Equal => e => getter(e).HasValue && getter(e)!.Value == value,
-            FilterBinaryOperator.NotEqual => e => !getter(e).HasValue || getter(e)!.Value != value,
+            FilterBinaryOperator.Equal => resolvedEvent => getter(resolvedEvent).HasValue && getter(resolvedEvent)!.Value == value,
+            FilterBinaryOperator.NotEqual => resolvedEvent => !getter(resolvedEvent).HasValue || getter(resolvedEvent)!.Value != value,
             _ => throw new EmitException($"Operator '{op}' is not supported on Guid.")
         };
 
@@ -579,12 +568,12 @@ internal static class Emitter
         int value) =>
         op switch
         {
-            FilterBinaryOperator.Equal => e => getter(e).HasValue && getter(e)!.Value == value,
-            FilterBinaryOperator.NotEqual => e => !getter(e).HasValue || getter(e)!.Value != value,
-            FilterBinaryOperator.GreaterThan => e => getter(e).HasValue && getter(e)!.Value > value,
-            FilterBinaryOperator.LessThan => e => getter(e).HasValue && getter(e)!.Value < value,
-            FilterBinaryOperator.GreaterThanOrEqual => e => getter(e).HasValue && getter(e)!.Value >= value,
-            FilterBinaryOperator.LessThanOrEqual => e => getter(e).HasValue && getter(e)!.Value <= value,
+            FilterBinaryOperator.Equal => resolvedEvent => getter(resolvedEvent).HasValue && getter(resolvedEvent)!.Value == value,
+            FilterBinaryOperator.NotEqual => resolvedEvent => !getter(resolvedEvent).HasValue || getter(resolvedEvent)!.Value != value,
+            FilterBinaryOperator.GreaterThan => resolvedEvent => getter(resolvedEvent).HasValue && getter(resolvedEvent)!.Value > value,
+            FilterBinaryOperator.LessThan => resolvedEvent => getter(resolvedEvent).HasValue && getter(resolvedEvent)!.Value < value,
+            FilterBinaryOperator.GreaterThanOrEqual => resolvedEvent => getter(resolvedEvent).HasValue && getter(resolvedEvent)!.Value >= value,
+            FilterBinaryOperator.LessThanOrEqual => resolvedEvent => getter(resolvedEvent).HasValue && getter(resolvedEvent)!.Value <= value,
             _ => throw new EmitException($"Unsupported integer operator '{op}'.")
         };
 
@@ -594,12 +583,12 @@ internal static class Emitter
         long value) =>
         op switch
         {
-            FilterBinaryOperator.Equal => e => getter(e).HasValue && getter(e)!.Value == value,
-            FilterBinaryOperator.NotEqual => e => !getter(e).HasValue || getter(e)!.Value != value,
-            FilterBinaryOperator.GreaterThan => e => getter(e).HasValue && getter(e)!.Value > value,
-            FilterBinaryOperator.LessThan => e => getter(e).HasValue && getter(e)!.Value < value,
-            FilterBinaryOperator.GreaterThanOrEqual => e => getter(e).HasValue && getter(e)!.Value >= value,
-            FilterBinaryOperator.LessThanOrEqual => e => getter(e).HasValue && getter(e)!.Value <= value,
+            FilterBinaryOperator.Equal => resolvedEvent => getter(resolvedEvent).HasValue && getter(resolvedEvent)!.Value == value,
+            FilterBinaryOperator.NotEqual => resolvedEvent => !getter(resolvedEvent).HasValue || getter(resolvedEvent)!.Value != value,
+            FilterBinaryOperator.GreaterThan => resolvedEvent => getter(resolvedEvent).HasValue && getter(resolvedEvent)!.Value > value,
+            FilterBinaryOperator.LessThan => resolvedEvent => getter(resolvedEvent).HasValue && getter(resolvedEvent)!.Value < value,
+            FilterBinaryOperator.GreaterThanOrEqual => resolvedEvent => getter(resolvedEvent).HasValue && getter(resolvedEvent)!.Value >= value,
+            FilterBinaryOperator.LessThanOrEqual => resolvedEvent => getter(resolvedEvent).HasValue && getter(resolvedEvent)!.Value <= value,
             _ => throw new EmitException($"Unsupported long operator '{op}'.")
         };
 
@@ -608,8 +597,8 @@ internal static class Emitter
         FilterBinaryOperator op) =>
         op switch
         {
-            FilterBinaryOperator.Equal => e => !hasValue(e),
-            FilterBinaryOperator.NotEqual => e => hasValue(e),
+            FilterBinaryOperator.Equal => resolvedEvent => !hasValue(resolvedEvent),
+            FilterBinaryOperator.NotEqual => resolvedEvent => hasValue(resolvedEvent),
             _ => throw new EmitException($"Operator '{op}' is not supported against null.")
         };
 
@@ -618,15 +607,15 @@ internal static class Emitter
         switch (field)
         {
             case ResolvedEventField.ProcessId:
-                return EmitNullableNullCheck(static e => e.ProcessId.HasValue, op);
+                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.ProcessId.HasValue, op);
             case ResolvedEventField.ThreadId:
-                return EmitNullableNullCheck(static e => e.ThreadId.HasValue, op);
+                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.ThreadId.HasValue, op);
             case ResolvedEventField.RecordId:
-                return EmitNullableNullCheck(static e => e.RecordId.HasValue, op);
+                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.RecordId.HasValue, op);
             case ResolvedEventField.ActivityId:
-                return EmitNullableNullCheck(static e => e.ActivityId.HasValue, op);
+                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.ActivityId.HasValue, op);
             case ResolvedEventField.UserId:
-                return EmitNullableNullCheck(static e => e.UserId is not null, op);
+                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.UserId is not null, op);
             case ResolvedEventField.Id:
             case ResolvedEventField.TimeCreated:
                 return op switch
@@ -658,17 +647,17 @@ internal static class Emitter
 
     private static Func<ResolvedEvent, bool> EmitOr(OrNode node)
     {
-        var conditions = FlattenOrChain(node).Select(EmitNode).ToArray();
+        var conditions = FilterNodeMetadata.FlattenOrChain(node).Select(EmitNode).ToArray();
 
         return conditions.Length switch
         {
-            2 => e => conditions[0](e) || conditions[1](e),
-            3 => e => conditions[0](e) || conditions[1](e) || conditions[2](e),
-            _ => e =>
+            2 => resolvedEvent => conditions[0](resolvedEvent) || conditions[1](resolvedEvent),
+            3 => resolvedEvent => conditions[0](resolvedEvent) || conditions[1](resolvedEvent) || conditions[2](resolvedEvent),
+            _ => resolvedEvent =>
             {
                 for (var i = 0; i < conditions.Length; i++)
                 {
-                    if (conditions[i](e)) { return true; }
+                    if (conditions[i](resolvedEvent)) { return true; }
                 }
 
                 return false;
@@ -682,35 +671,35 @@ internal static class Emitter
         string value) =>
         field switch
         {
-            ResolvedEventField.ComputerName => EmitDirectStringCompare(static e => e.ComputerName, op, value),
-            ResolvedEventField.Description => EmitDirectStringCompare(static e => e.Description, op, value),
-            ResolvedEventField.Level => EmitDirectStringCompare(static e => e.Level, op, value),
-            ResolvedEventField.LogName => EmitDirectStringCompare(static e => e.LogName, op, value),
-            ResolvedEventField.Source => EmitDirectStringCompare(static e => e.Source, op, value),
-            ResolvedEventField.TaskCategory => EmitDirectStringCompare(static e => e.TaskCategory, op, value),
-            ResolvedEventField.Xml => EmitDirectStringCompare(static e => e.Xml, op, value),
+            ResolvedEventField.ComputerName => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.ComputerName, op, value),
+            ResolvedEventField.Description => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.Description, op, value),
+            ResolvedEventField.Level => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.Level, op, value),
+            ResolvedEventField.LogName => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.LogName, op, value),
+            ResolvedEventField.Source => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.Source, op, value),
+            ResolvedEventField.TaskCategory => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.TaskCategory, op, value),
+            ResolvedEventField.Xml => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.Xml, op, value),
             ResolvedEventField.UserId => EmitUserIdStringCompare(op, value),
             ResolvedEventField.Id => EmitIntegerStringCompare(
-                static e => e.Id.ToString(CultureInfo.InvariantCulture),
+                static resolvedEvent => resolvedEvent.Id.ToString(CultureInfo.InvariantCulture),
                 op,
                 value),
             ResolvedEventField.ProcessId => EmitIntegerStringCompare(
-                static e => e.ProcessId.HasValue ? e.ProcessId.Value.ToString(CultureInfo.InvariantCulture) :
+                static resolvedEvent => resolvedEvent.ProcessId.HasValue ? resolvedEvent.ProcessId.Value.ToString(CultureInfo.InvariantCulture) :
                     string.Empty,
                 op,
                 value),
             ResolvedEventField.ThreadId => EmitIntegerStringCompare(
-                static e => e.ThreadId.HasValue ? e.ThreadId.Value.ToString(CultureInfo.InvariantCulture) :
+                static resolvedEvent => resolvedEvent.ThreadId.HasValue ? resolvedEvent.ThreadId.Value.ToString(CultureInfo.InvariantCulture) :
                     string.Empty,
                 op,
                 value),
             ResolvedEventField.RecordId => EmitIntegerStringCompare(
-                static e => e.RecordId.HasValue ? e.RecordId.Value.ToString(CultureInfo.InvariantCulture) :
+                static resolvedEvent => resolvedEvent.RecordId.HasValue ? resolvedEvent.RecordId.Value.ToString(CultureInfo.InvariantCulture) :
                     string.Empty,
                 op,
                 value),
             ResolvedEventField.ActivityId => EmitIntegerStringCompare(
-                static e => e.ActivityId.HasValue ? e.ActivityId.Value.ToString() : string.Empty,
+                static resolvedEvent => resolvedEvent.ActivityId.HasValue ? resolvedEvent.ActivityId.Value.ToString() : string.Empty,
                 op,
                 value),
             ResolvedEventField.TimeCreated => throw new EmitException(
@@ -720,110 +709,44 @@ internal static class Emitter
             _ => throw new EmitException($"Unsupported field '{field}' for string comparison.")
         };
 
-    // A UserData-bearing filter compiles to a Kleene three-valued predicate: non-UserData subtrees (never a NotNode over
-    // UserData, per LowerNegation) reuse the bool emitter lifted to Match|NoMatch, And/Or combine tri-state, and a
-    // UserData term reads its stored values from ResolvedEvent.UserData by storage key.
-    private static Func<ResolvedEvent, FilterMatch> EmitTriState(SemanticNode node)
+    private static Func<ResolvedEvent, FilterMatch> EmitTriState(FilterNode node)
     {
         if (!ContainsUserDataNode(node))
         {
             var boolPredicate = EmitNode(node);
 
-            return e => boolPredicate(e) ? FilterMatch.Match : FilterMatch.NoMatch;
+            return resolvedEvent => boolPredicate(resolvedEvent) ? FilterMatch.Match : FilterMatch.NoMatch;
         }
 
         switch (node)
         {
             case AndNode and:
             {
-                var parts = FlattenAndChain(and).Select(EmitTriState).ToArray();
+                var parts = FilterNodeMetadata.FlattenAndChain(and).Select(EmitTriState).ToArray();
 
-                return e => EvaluateKleeneAnd(parts, e);
+                return resolvedEvent => FilterMatchCombiner.And(
+                    (parts, resolvedEvent),
+                    parts.Length,
+                    static (state, index) => state.parts[index](state.resolvedEvent));
             }
             case OrNode or:
             {
-                var parts = FlattenOrChain(or).Select(EmitTriState).ToArray();
+                var parts = FilterNodeMetadata.FlattenOrChain(or).Select(EmitTriState).ToArray();
 
-                return e => EvaluateKleeneOr(parts, e);
+                return resolvedEvent => FilterMatchCombiner.Or(
+                    (parts, resolvedEvent),
+                    parts.Length,
+                    static (state, index) => state.parts[index](state.resolvedEvent));
             }
             case UserDataComparisonNode comparison:
-                return EmitUserDataFieldMatcher(comparison.CanonicalPath, EmitUserDataComparison(comparison));
+                return EmitUserDataFieldMatcher(comparison.CanonicalPath, UserDataMatch.Comparison(comparison));
             case UserDataContainsNode contains:
-                return EmitUserDataFieldMatcher(contains.CanonicalPath, EmitUserDataContains(contains));
+                return EmitUserDataFieldMatcher(contains.CanonicalPath, UserDataMatch.Contains(contains));
             case UserDataMultiEqualsNode multi:
-                return EmitUserDataFieldMatcher(multi.CanonicalPath, EmitUserDataMultiEquals(multi));
+                return EmitUserDataFieldMatcher(multi.CanonicalPath, UserDataMatch.MultiEquals(multi));
             default:
                 throw new EmitException($"Unsupported UserData-bearing node {node.GetType().Name}.");
         }
-    }
-
-    private static Func<StructuredFieldResult, FilterMatch> EmitUserDataComparison(UserDataComparisonNode node)
-    {
-        var literal = node.Literal;
-
-        if (node.Op == FilterBinaryOperator.Equal)
-        {
-            return result =>
-            {
-                var values = result.PresentValues;
-
-                for (var i = 0; i < values.Length; i++)
-                {
-                    if (string.Equals(values[i], literal, StringComparison.Ordinal)) { return FilterMatch.Match; }
-                }
-
-                return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.NoMatch;
-            };
-        }
-
-        return result =>
-        {
-            var values = result.PresentValues;
-
-            if (values.Length == 0) { return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.NoMatch; }
-
-            for (var i = 0; i < values.Length; i++)
-            {
-                if (string.Equals(values[i], literal, StringComparison.Ordinal)) { return FilterMatch.NoMatch; }
-            }
-
-            return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.Match;
-        };
-    }
-
-    private static Func<StructuredFieldResult, FilterMatch> EmitUserDataContains(UserDataContainsNode node)
-    {
-        var needle = node.Needle;
-        var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-
-        if (!node.Negated)
-        {
-            return result =>
-            {
-                var values = result.PresentValues;
-
-                for (var i = 0; i < values.Length; i++)
-                {
-                    if (values[i].Contains(needle, comparison)) { return FilterMatch.Match; }
-                }
-
-                return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.NoMatch;
-            };
-        }
-
-        return result =>
-        {
-            var values = result.PresentValues;
-
-            if (values.Length == 0) { return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.NoMatch; }
-
-            for (var i = 0; i < values.Length; i++)
-            {
-                if (values[i].Contains(needle, comparison)) { return FilterMatch.NoMatch; }
-            }
-
-            return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.Match;
-        };
     }
 
     private static Func<ResolvedEvent, FilterMatch> EmitUserDataFieldMatcher(
@@ -835,80 +758,27 @@ internal static class Emitter
         // A '*' in the storage key marks a field-name glob (ToStorageKey has already stripped the [*] repeating-element
         // marker, so only a genuine name glob survives). Evaluate the term as if each matching stored path were its own
         // OR'd filter row.
-        if (WildcardMatcher.ContainsWildcard(storageKey))
+        if (!WildcardMatcher.ContainsWildcard(storageKey))
         {
-            var matchesPath = WildcardMatcher.Compile(storageKey);
-
-            return e => EvaluateUserDataGlob(e, matchesPath, evaluate);
+            return resolvedEvent => evaluate(resolvedEvent.TryGetUserDataValues(storageKey));
         }
 
-        return e => evaluate(e.TryGetUserDataValues(storageKey));
-    }
+        var matchesPath = WildcardMatcher.Compile(storageKey);
 
-    private static Func<StructuredFieldResult, FilterMatch> EmitUserDataMultiEquals(UserDataMultiEqualsNode node)
-    {
-        var literals = node.Literals;
+        return resolvedEvent => EvaluateUserDataGlob(resolvedEvent, matchesPath, evaluate);
 
-        return result =>
-        {
-            var values = result.PresentValues;
-
-            for (var i = 0; i < values.Length; i++)
-            {
-                var value = values[i];
-
-                for (var j = 0; j < literals.Count; j++)
-                {
-                    if (string.Equals(value, literals[j], StringComparison.Ordinal)) { return FilterMatch.Match; }
-                }
-            }
-
-            return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.NoMatch;
-        };
     }
 
     private static Func<ResolvedEvent, bool> EmitUserIdStringCompare(FilterBinaryOperator op, string value) =>
         op switch
         {
             // Lowerer-paired null guard: bare `UserId.Value` access would NRE without it.
-            FilterBinaryOperator.Equal => e =>
-                e.UserId is not null && string.Equals(e.UserId.Value, value, StringComparison.Ordinal),
-            FilterBinaryOperator.NotEqual => e =>
-                e.UserId is not null && !string.Equals(e.UserId.Value, value, StringComparison.Ordinal),
+            FilterBinaryOperator.Equal => resolvedEvent =>
+                resolvedEvent.UserId is not null && string.Equals(resolvedEvent.UserId.Value, value, StringComparison.Ordinal),
+            FilterBinaryOperator.NotEqual => resolvedEvent =>
+                resolvedEvent.UserId is not null && !string.Equals(resolvedEvent.UserId.Value, value, StringComparison.Ordinal),
             _ => throw new EmitException($"Operator '{op}' is not supported on UserId.")
         };
-
-    private static FilterMatch EvaluateKleeneAnd(Func<ResolvedEvent, FilterMatch>[] parts, ResolvedEvent @event)
-    {
-        var result = FilterMatch.Match;
-
-        foreach (var part in parts)
-        {
-            var match = part(@event);
-
-            if (match == FilterMatch.NoMatch) { return FilterMatch.NoMatch; }
-
-            if (match == FilterMatch.Unknown) { result = FilterMatch.Unknown; }
-        }
-
-        return result;
-    }
-
-    private static FilterMatch EvaluateKleeneOr(Func<ResolvedEvent, FilterMatch>[] parts, ResolvedEvent @event)
-    {
-        var result = FilterMatch.NoMatch;
-
-        foreach (var part in parts)
-        {
-            var match = part(@event);
-
-            if (match == FilterMatch.Match) { return FilterMatch.Match; }
-
-            if (match == FilterMatch.Unknown) { result = FilterMatch.Unknown; }
-        }
-
-        return result;
-    }
 
     private static FilterMatch EvaluateUserDataGlob(
         ResolvedEvent @event,
@@ -939,50 +809,4 @@ internal static class Emitter
         // the glob at all) becomes keep-visible Unknown.
         return result == FilterMatch.NoMatch && @event.UserDataIncomplete ? FilterMatch.Unknown : result;
     }
-
-    private static List<SemanticNode> FlattenAndChain(SemanticNode node)
-    {
-        var list = new List<SemanticNode>();
-
-        Flatten(node, list);
-
-        return list;
-
-        static void Flatten(SemanticNode current, List<SemanticNode> accumulator)
-        {
-            if (current is AndNode and)
-            {
-                Flatten(and.Left, accumulator);
-                Flatten(and.Right, accumulator);
-            }
-            else
-            {
-                accumulator.Add(current);
-            }
-        }
-    }
-
-    private static List<SemanticNode> FlattenOrChain(SemanticNode node)
-    {
-        var list = new List<SemanticNode>();
-
-        Flatten(node, list);
-
-        return list;
-
-        static void Flatten(SemanticNode current, List<SemanticNode> accumulator)
-        {
-            if (current is OrNode or)
-            {
-                Flatten(or.Left, accumulator);
-                Flatten(or.Right, accumulator);
-            }
-            else
-            {
-                accumulator.Add(current);
-            }
-        }
-    }
-
-    private sealed class EmitException(string message) : Exception(message);
 }

@@ -9,7 +9,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace EventLogExpert.Filtering.Lowering;
 
 /// <summary>
-///     Walks a <see cref="SyntaxNode" /> tree and emits a <see cref="SemanticNode" /> tree by recognizing the closed
+///     Walks a <see cref="SyntaxNode" /> tree and emits a <see cref="FilterNode" /> by recognizing the closed
 ///     vocabulary of templates that <see cref="BasicFilterFormatter" /> emits, plus the small extension surface used by
 ///     hand-written Advanced filters. Unknown shapes return a descriptive error rather than silently falling back.
 /// </summary>
@@ -21,14 +21,14 @@ internal static class Lowerer
         ToStringCall
     }
 
-    public static bool TryLower(SyntaxNode root, out SemanticNode? semantic, [NotNullWhen(false)] out string? error)
+    public static bool TryLower(SyntaxNode root, out FilterNode? filterNode, [NotNullWhen(false)] out string? error)
     {
-        semantic = null;
+        filterNode = null;
         error = null;
 
         try
         {
-            semantic = Lower(root);
+            filterNode = Lower(root);
 
             return true;
         }
@@ -89,7 +89,7 @@ internal static class Lowerer
         }
     }
 
-    private static bool ContainsEventDataNode(SemanticNode node) =>
+    private static bool ContainsEventDataNode(FilterNode node) =>
         node switch
         {
             EventDataComparisonNode or EventDataContainsNode or EventDataMultiEqualsNode => true,
@@ -99,7 +99,7 @@ internal static class Lowerer
             _ => false
         };
 
-    private static bool ContainsUserDataNode(SemanticNode node) =>
+    private static bool ContainsUserDataNode(FilterNode node) =>
         node switch
         {
             UserDataComparisonNode or UserDataContainsNode or UserDataMultiEqualsNode => true,
@@ -207,7 +207,7 @@ internal static class Lowerer
         && mem.Target is IdentifierSyntax id
         && IsCaseInsensitiveMatch(id.Name, "UserId");
 
-    private static SemanticNode Lower(SyntaxNode node)
+    private static FilterNode Lower(SyntaxNode node)
     {
         switch (node)
         {
@@ -228,12 +228,12 @@ internal static class Lowerer
         }
     }
 
-    private static SemanticNode LowerAndChain(BinarySyntax andNode)
+    private static FilterNode LowerAndChain(BinarySyntax andNode)
     {
         var flat = new List<SyntaxNode>();
         FlattenAnd(andNode, flat);
 
-        var lowered = new List<SemanticNode>(flat.Count);
+        var lowered = new List<FilterNode>(flat.Count);
         var i = 0;
 
         while (i < flat.Count)
@@ -271,7 +271,7 @@ internal static class Lowerer
         return result;
     }
 
-    private static SemanticNode LowerComparison(BinarySyntax bin)
+    private static FilterNode LowerComparison(BinarySyntax bin)
     {
         if (TryResolveEventDataField(bin.Left, out var eventDataFieldName))
         {
@@ -298,7 +298,7 @@ internal static class Lowerer
         return new ComparisonNode(field, MapBinaryOp(bin.Op), typed);
     }
 
-    private static SemanticNode LowerEventDataComparison(string fieldName, BinarySyntax bin)
+    private static FilterNode LowerEventDataComparison(string fieldName, BinarySyntax bin)
     {
         if (bin.Op is not (TokenKind.EqEq or TokenKind.NotEq))
         {
@@ -317,7 +317,7 @@ internal static class Lowerer
         return new EventDataComparisonNode(fieldName, op, EventDataLiteral.Parse(GetEventDataLiteralText(literal)));
     }
 
-    private static SemanticNode LowerKeywordsAnyLambda(LambdaSyntax lambda)
+    private static FilterNode LowerKeywordsAnyLambda(LambdaSyntax lambda)
     {
         var p = lambda.ParameterName;
         var body = lambda.Body;
@@ -360,7 +360,7 @@ internal static class Lowerer
             $"Unsupported Keywords.Any lambda body (position {body.Position}).");
     }
 
-    private static SemanticNode LowerMethodCall(MethodCallSyntax call)
+    private static FilterNode LowerMethodCall(MethodCallSyntax call)
     {
         // (new[] {...}).Contains(P)  -or-  (new[] {...}).Contains(P.ToString())
         if (IsCaseInsensitiveMatch(call.Name, "Contains")
@@ -451,7 +451,7 @@ internal static class Lowerer
     // Normalizes `!` over EventData so a NotNode never wraps an EventData node (presence-required must hold at any
     // depth): comparison flips Equal<->NotEqual, Contains toggles Negated; the unrepresentable none-of and any group
     // that contains an EventData node are rejected. Non-EventData operands wrap in NotNode as before.
-    private static SemanticNode LowerNegation(UnarySyntax neg)
+    private static FilterNode LowerNegation(UnarySyntax neg)
     {
         var inner = Lower(neg.Operand);
 
@@ -504,7 +504,7 @@ internal static class Lowerer
         }
     }
 
-    private static SemanticNode LowerUserDataComparison(string canonicalPath, BinarySyntax bin)
+    private static FilterNode LowerUserDataComparison(string canonicalPath, BinarySyntax bin)
     {
         if (bin.Op is not (TokenKind.EqEq or TokenKind.NotEq))
         {
@@ -596,7 +596,7 @@ internal static class Lowerer
         }
     }
 
-    private static bool TryLowerUserIdRhs(SyntaxNode rhs, out SemanticNode lowered)
+    private static bool TryLowerUserIdRhs(SyntaxNode rhs, out FilterNode lowered)
     {
         lowered = null!;
 
@@ -646,8 +646,7 @@ internal static class Lowerer
     {
         fieldName = null;
 
-        if (expr is not IndexAccessSyntax index
-            || index.Target is not IdentifierSyntax id
+        if (expr is not IndexAccessSyntax { Target: IdentifierSyntax id } index
             || !IsCaseInsensitiveMatch(id.Name, "EventData"))
         {
             return false;
@@ -675,8 +674,7 @@ internal static class Lowerer
     {
         canonicalPath = null;
 
-        if (expr is not IndexAccessSyntax index
-            || index.Target is not IdentifierSyntax id
+        if (expr is not IndexAccessSyntax { Target: IdentifierSyntax id } index
             || !IsCaseInsensitiveMatch(id.Name, "UserData"))
         {
             return false;

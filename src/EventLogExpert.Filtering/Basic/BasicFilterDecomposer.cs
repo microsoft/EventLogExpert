@@ -24,15 +24,15 @@ internal static class BasicFilterDecomposer
 
         if (!Tokenizer.TryTokenize(filterText, out var tokens, out _)
             || !Parser.TryParse(tokens, out var syntax, out _)
-            || !Lowerer.TryLower(syntax!, out var semantic, out _))
+            || !Lowerer.TryLower(syntax!, out var filterNode, out _))
         {
             return false;
         }
 
-        return TryDecomposeRoot(semantic!, out structured);
+        return TryDecomposeRoot(filterNode!, out structured);
     }
 
-    private static void FlattenAnd(SemanticNode node, List<SemanticNode> acc)
+    private static void FlattenAnd(FilterNode node, List<FilterNode> acc)
     {
         if (node is AndNode and)
         {
@@ -45,7 +45,7 @@ internal static class BasicFilterDecomposer
         }
     }
 
-    private static void FlattenOr(SemanticNode node, List<SemanticNode> acc)
+    private static void FlattenOr(FilterNode node, List<FilterNode> acc)
     {
         if (node is OrNode or)
         {
@@ -58,17 +58,17 @@ internal static class BasicFilterDecomposer
         }
     }
 
-    private static bool TryDecomposeRoot(SemanticNode root, [NotNullWhen(true)] out BasicFilter? structured)
+    private static bool TryDecomposeRoot(FilterNode root, [NotNullWhen(true)] out BasicFilter? structured)
     {
         structured = null;
 
-        var orClauses = new List<List<SemanticNode>>();
-        var orFlat = new List<SemanticNode>();
+        var orClauses = new List<List<FilterNode>>();
+        var orFlat = new List<FilterNode>();
         FlattenOr(root, orFlat);
 
         foreach (var orClause in orFlat)
         {
-            var andFlat = new List<SemanticNode>();
+            var andFlat = new List<FilterNode>();
             FlattenAnd(orClause, andFlat);
             orClauses.Add(andFlat);
         }
@@ -298,7 +298,7 @@ internal static class BasicFilterDecomposer
         }
     }
 
-    private static bool TryMapLeaf(SemanticNode node, [NotNullWhen(true)] out FilterComparison? comparison)
+    private static bool TryMapLeaf(FilterNode node, [NotNullWhen(true)] out FilterComparison? comparison)
     {
         comparison = null;
 

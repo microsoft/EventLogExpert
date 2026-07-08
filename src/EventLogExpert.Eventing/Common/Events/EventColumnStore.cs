@@ -599,7 +599,7 @@ internal sealed class EventColumnStore
         foreach (int nameIndex in nameIndices) { names.Add(PoolGet(nameIndex)!); }
 
         // Both orderings resolve to the single stored matched-ordering names, so named access reproduces the original
-        // regardless of whether the source matched its Visible or All ordering (P2-2 design, §3).
+        // regardless of whether the source matched its Visible or All ordering.
         ImmutableArray<string> matchedNames = names.MoveToImmutable();
 
         return new TemplateFieldSchema(matchedNames, matchedNames);

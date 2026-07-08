@@ -19,9 +19,9 @@ internal sealed class LegacyEventColumnView(
 
     public IEventColumnReader Reader => _reader;
 
-    public ResolvedEvent GetDetail(EventHandle handle) => _reader.GetEvent(handle);
+    public ResolvedEvent GetDetail(EventLocator locator) => _reader.GetEvent(locator);
 
-    public EventHandle HandleAt(int index) => _reader.HandleAt(index);
+    public EventLocator LocatorAt(int index) => _reader.LocatorAt(index);
 
     public IReadOnlyList<ResolvedEvent> Slice(int start, int count) =>
         ResolvedEventIndex.Slice(_reader.Events, start, count);
