@@ -402,6 +402,59 @@ internal sealed class EventColumnStore
         return chunk.RowUserDataValues(row, field);
     }
 
+    internal EventProperty ReconstructEventProperty(RawEventDataField field)
+    {
+        switch (field.Kind)
+        {
+            case StoredFieldKind.SByte:
+            case StoredFieldKind.Byte:
+            case StoredFieldKind.Int16:
+            case StoredFieldKind.UInt16:
+            case StoredFieldKind.Int32:
+            case StoredFieldKind.UInt32:
+            case StoredFieldKind.Int64:
+            case StoredFieldKind.UInt64:
+            case StoredFieldKind.Single:
+            case StoredFieldKind.Double:
+            case StoredFieldKind.Boolean:
+            case StoredFieldKind.DateTime:
+            case StoredFieldKind.SizeT:
+                return EventProperty.FromPacked(MapBackPackedKind(field.Kind), field.Bits);
+            case StoredFieldKind.String:
+            case StoredFieldKind.StringForm:
+                return EventProperty.FromReference(PoolGet(field.RefIndex));
+            case StoredFieldKind.Sid:
+                return EventProperty.FromReference(new SecurityIdentifier(PoolGet(field.RefIndex)!));
+            case StoredFieldKind.Guid:
+                return EventProperty.FromReference(new Guid(field.Bytes));
+            case StoredFieldKind.Bytes:
+                return EventProperty.FromReference(field.Bytes.ToArray());
+            case StoredFieldKind.UInt16Array:
+                return EventProperty.FromReference(MemoryMarshal.Cast<byte, ushort>(field.Bytes).ToArray());
+            case StoredFieldKind.UInt32Array:
+                return EventProperty.FromReference(MemoryMarshal.Cast<byte, uint>(field.Bytes).ToArray());
+            case StoredFieldKind.Int32Array:
+                return EventProperty.FromReference(MemoryMarshal.Cast<byte, int>(field.Bytes).ToArray());
+            case StoredFieldKind.StringArray:
+                return EventProperty.FromReference(ReconstructStringArray(field.ValueIndices));
+            case StoredFieldKind.Null:
+                return EventProperty.FromReference(null);
+            default:
+                throw new ArgumentOutOfRangeException(nameof(field), field.Kind, "Unknown stored field kind.");
+        }
+    }
+
+    internal string[] ReconstructStringArray(ReadOnlySpan<int> valueIndices)
+    {
+        if (valueIndices.Length == 0) { return []; }
+
+        string[] values = new string[valueIndices.Length];
+
+        for (int i = 0; i < valueIndices.Length; i++) { values[i] = PoolGet(valueIndices[i])!; }
+
+        return values;
+    }
+
     /// <summary>The field-name pool indices backing the deduped schema at <paramref name="schemaId" />.</summary>
     internal ReadOnlySpan<int> SchemaFieldNameIndices(int schemaId) => _schemas[schemaId];
 
@@ -491,48 +544,6 @@ internal sealed class EventColumnStore
         return values.MoveToImmutable();
     }
 
-    private EventProperty ReconstructEventProperty(RawEventDataField field)
-    {
-        switch (field.Kind)
-        {
-            case StoredFieldKind.SByte:
-            case StoredFieldKind.Byte:
-            case StoredFieldKind.Int16:
-            case StoredFieldKind.UInt16:
-            case StoredFieldKind.Int32:
-            case StoredFieldKind.UInt32:
-            case StoredFieldKind.Int64:
-            case StoredFieldKind.UInt64:
-            case StoredFieldKind.Single:
-            case StoredFieldKind.Double:
-            case StoredFieldKind.Boolean:
-            case StoredFieldKind.DateTime:
-            case StoredFieldKind.SizeT:
-                return EventProperty.FromPacked(MapBackPackedKind(field.Kind), field.Bits);
-            case StoredFieldKind.String:
-            case StoredFieldKind.StringForm:
-                return EventProperty.FromReference(PoolGet(field.RefIndex));
-            case StoredFieldKind.Sid:
-                return EventProperty.FromReference(new SecurityIdentifier(PoolGet(field.RefIndex)!));
-            case StoredFieldKind.Guid:
-                return EventProperty.FromReference(new Guid(field.Bytes));
-            case StoredFieldKind.Bytes:
-                return EventProperty.FromReference(field.Bytes.ToArray());
-            case StoredFieldKind.UInt16Array:
-                return EventProperty.FromReference(MemoryMarshal.Cast<byte, ushort>(field.Bytes).ToArray());
-            case StoredFieldKind.UInt32Array:
-                return EventProperty.FromReference(MemoryMarshal.Cast<byte, uint>(field.Bytes).ToArray());
-            case StoredFieldKind.Int32Array:
-                return EventProperty.FromReference(MemoryMarshal.Cast<byte, int>(field.Bytes).ToArray());
-            case StoredFieldKind.StringArray:
-                return EventProperty.FromReference(ReconstructStringArray(field.ValueIndices));
-            case StoredFieldKind.Null:
-                return EventProperty.FromReference(null);
-            default:
-                throw new ArgumentOutOfRangeException(nameof(field), field.Kind, "Unknown stored field kind.");
-        }
-    }
-
     private string[] ReconstructKeywords(int index)
     {
         ReadOnlySpan<int> keywordIndices = RawKeywords(index);
@@ -592,17 +603,6 @@ internal sealed class EventColumnStore
         ImmutableArray<string> matchedNames = names.MoveToImmutable();
 
         return new TemplateFieldSchema(matchedNames, matchedNames);
-    }
-
-    private string[] ReconstructStringArray(ReadOnlySpan<int> valueIndices)
-    {
-        if (valueIndices.Length == 0) { return []; }
-
-        string[] values = new string[valueIndices.Length];
-
-        for (int i = 0; i < valueIndices.Length; i++) { values[i] = PoolGet(valueIndices[i])!; }
-
-        return values;
     }
 
     private ImmutableArray<UserDataField> ReconstructUserData(int index)
