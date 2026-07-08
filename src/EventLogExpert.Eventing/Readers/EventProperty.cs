@@ -66,6 +66,8 @@ internal readonly struct EventProperty : IEquatable<EventProperty>
 
     internal object? Reference => _tagOrRef is NumericKind ? null : _tagOrRef;
 
+    internal long PackedBits => _bits;
+
     internal bool AsBoolean => _bits != 0;
 
     internal sbyte AsSByte => (sbyte)_bits;
