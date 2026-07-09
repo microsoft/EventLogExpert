@@ -190,6 +190,14 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
 
                     newLookups.Add(lookup);
                 }
+                catch (SchemaLockTimeoutException ex)
+                {
+                    // Another process is mid-upgrade on this database; skip it this pass rather than misclassifying it
+                    // as unknown or failing the whole resolution. A later load picks it up once the upgrade completes.
+                    Logger?.Warning($"Skipping provider database '{file}' for this resolve: {ex.Message}");
+
+                    lookup.Dispose();
+                }
                 catch
                 {
                     lookup.Dispose();

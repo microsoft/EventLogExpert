@@ -11,34 +11,24 @@ namespace EventLogExpert.WinUI;
 
 /// <summary>
 ///     Handwritten WinUI entry point. Replaces MAUI's source-generated <c>Main</c> (suppressed via
-///     <c>DISABLE_XAML_GENERATED_MAIN</c> in the csproj's Windows TFM) so activation interception can run BEFORE
-///     <see cref="Application.Start(Microsoft.UI.Xaml.ApplicationInitializationCallback)" /> — the only place the
-///     <see cref="AppInstance.FindOrRegisterForKey(string)" /> single-instance contract permits.
+///     <c>DISABLE_XAML_GENERATED_MAIN</c> in the csproj's Windows TFM) so the shell activation args (cold launch, file, or
+///     command line) can be captured via <see cref="AppInstance.GetCurrent" /> and seeded into
+///     <see cref="ActivationBootstrap" /> BEFORE
+///     <see cref="Application.Start(Microsoft.UI.Xaml.ApplicationInitializationCallback)" /> builds the app. Each launch
+///     runs as its own instance and window; the app is intentionally not single-instanced, so a separate open (context
+///     menu, double-click, Open With) always creates a new window while only drag-and-drop adds logs to an existing one.
 /// </summary>
 internal static class Program
 {
     [STAThread]
     private static int Main(string[] args)
     {
-        // Activation args are re-fetched from AppInstance below; the entry-point parameter is unused.
+        // Activation args are fetched from AppInstance below; the entry-point parameter is unused.
         _ = args;
         XamlCheckProcessRequirements();
         ComWrappersSupport.InitializeComWrappers();
 
         var activationArgs = AppInstance.GetCurrent().GetActivatedEventArgs();
-        var keyInstance = AppInstance.FindOrRegisterForKey("eventlogexpert-main");
-
-        if (!keyInstance.IsCurrent)
-        {
-            keyInstance.RedirectActivationToAsync(activationArgs).AsTask().GetAwaiter().GetResult();
-
-            return 0;
-        }
-
-        // Subscribe BEFORE SeedColdLaunch so the gap between FindOrRegisterForKey returning and the
-        // Activated handler being attached is a single statement wide. AppInstance.Activated does
-        // not buffer; redirects landing in the gap would be silently dropped.
-        keyInstance.Activated += (_, eventArgs) => ActivationBootstrap.EnqueueRedirected(eventArgs);
         ActivationBootstrap.SeedColdLaunch(activationArgs);
 
         // Non-static lambda: avoids the static-anonymous-function-cannot-reference-discard

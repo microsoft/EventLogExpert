@@ -8,10 +8,10 @@ using System.Collections.Concurrent;
 namespace EventLogExpert.Platforms.Windows.Activation;
 
 /// <summary>
-///     Bridges <c>Program.Main</c> (sees cold-launch + <see cref="AppInstance.Activated" /> before DI is built) and
-///     the <see cref="IActivationDispatcher" /> singleton (constructed by MAUI DI). Buffered args live in a thread-safe
-///     queue because <see cref="AppInstance.Activated" /> fires on a background thread while
-///     <see cref="AttachDispatcher" /> runs on the DI construction thread.
+///     Bridges <c>Program.Main</c> (captures the cold-launch activation args before DI is built) and the
+///     <see cref="IActivationDispatcher" /> singleton (constructed by MAUI DI). Seeded args are buffered until
+///     <see cref="AttachDispatcher" /> runs on the DI construction thread and drains them, so args delivered before the UI
+///     consumer exists are not lost.
 /// </summary>
 internal static class ActivationBootstrap
 {
@@ -33,11 +33,6 @@ internal static class ActivationBootstrap
                 dispatcher.Enqueue(args);
             }
         }
-    }
-
-    internal static void EnqueueRedirected(AppActivationArguments? redirected)
-    {
-        EnqueueArgs(ActivationArgsExtractor.Extract(redirected));
     }
 
     internal static void SeedColdLaunch(AppActivationArguments? coldLaunch)

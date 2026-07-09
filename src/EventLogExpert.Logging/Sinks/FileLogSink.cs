@@ -2,11 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Concurrency;
 using EventLogExpert.Logging.Routing;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace EventLogExpert.Logging.Sinks;
 
@@ -22,7 +21,7 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
     private static readonly TimeSpan s_interprocessLockTimeout = TimeSpan.FromSeconds(2);
 
     private readonly Func<LogRecord, string> _formatter;
-    private readonly Mutex _interprocessMutex;
+    private readonly InterProcessMutex _interprocessMutex;
     private readonly string _path;
     private readonly LogRoutingPolicy _routingPolicy;
     private readonly Lock _writeLock = new();
@@ -39,7 +38,7 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
         _path = path;
         _routingPolicy = routingPolicy;
         _formatter = formatter;
-        _interprocessMutex = new Mutex(false, DeriveMutexName(path));
+        _interprocessMutex = new InterProcessMutex("DebugLog", path);
 
         InitTracing();
     }
@@ -52,7 +51,8 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
 
             CloseWriter();
 
-            WithInterprocessLock(
+            _interprocessMutex.Run(
+                s_interprocessLockTimeout,
                 () =>
                 {
                     // Share with concurrent writers; SetLength(0) truncates without closing them.
@@ -63,8 +63,7 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
                         FileShare.ReadWrite | FileShare.Delete);
 
                     stream.SetLength(0);
-                },
-                throwOnTimeout: true);
+                });
         }
 
         return Task.CompletedTask;
@@ -142,17 +141,6 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
 
     public LogLevel MinimumLevelFor(string category) => _routingPolicy.FileMinimumFor(category);
 
-    private static string DeriveMutexName(string path)
-    {
-        // Canonicalize: equivalent paths (relative, separator drift) must hash identically.
-        var canonical = Path.GetFullPath(path)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var bytes = Encoding.UTF8.GetBytes(canonical.ToUpperInvariant());
-        var hash = SHA256.HashData(bytes);
-
-        return $"Local\\EventLogExpert.DebugLog.{Convert.ToHexString(hash, 0, 8)}";
-    }
-
     private void CloseWriter()
     {
         _writer?.Dispose();
@@ -178,7 +166,8 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
     {
         // Rotate under the interprocess lock (throwOnTimeout: false so transient contention skips rotation rather than
         // failing sink construction) and truncate instead of deleting so a concurrent opener never loses the file.
-        WithInterprocessLock(
+        _interprocessMutex.TryRun(
+            s_interprocessLockTimeout,
             () =>
             {
                 var fileInfo = new FileInfo(_path);
@@ -199,44 +188,7 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
                 {
                     // The file was deleted, locked, or read-only between the size check and the open; skip rotation (best-effort).
                 }
-            },
-            throwOnTimeout: false);
-    }
-
-    private void WithInterprocessLock(Action action, bool throwOnTimeout)
-    {
-        bool acquired;
-
-        try
-        {
-            acquired = _interprocessMutex.WaitOne(s_interprocessLockTimeout);
-        }
-        catch (AbandonedMutexException)
-        {
-            // Prior owner crashed without releasing; we now hold it and proceed.
-            acquired = true;
-        }
-
-        if (!acquired)
-        {
-            if (throwOnTimeout)
-            {
-                throw new TimeoutException(
-                    $"Timed out acquiring debug-log interprocess lock after {s_interprocessLockTimeout.TotalSeconds:F0}s.");
-            }
-
-            // Hot path: drop this trace rather than risk interleaved/corrupted writes.
-            return;
-        }
-
-        try
-        {
-            action();
-        }
-        finally
-        {
-            _interprocessMutex.ReleaseMutex();
-        }
+            });
     }
 
     private void WriteOutput(string output)
@@ -248,7 +200,8 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
             EnsureWriter();
 
             // Mutex serializes line writes so concurrent instances don't interleave.
-            WithInterprocessLock(
+            _interprocessMutex.TryRun(
+                s_interprocessLockTimeout,
                 () =>
                 {
                     if (_writer is null) { return; }
@@ -256,8 +209,7 @@ public sealed class FileLogSink : ILogSink, IDisposable, IAsyncDisposable
                     // Re-seek to EOF: another instance may have written or truncated the file.
                     _writer.BaseStream.Seek(0, SeekOrigin.End);
                     _writer.WriteLine(output);
-                },
-                throwOnTimeout: false);
+                });
 
 #if DEBUG
             Debug.WriteLine(output);

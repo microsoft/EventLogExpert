@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Concurrency;
 using EventLogExpert.Runtime.Banner;
 using Microsoft.Data.Sqlite;
 using System.Collections.Immutable;
@@ -104,11 +105,14 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         ("tags", "TEXT NULL"),
     ];
 
+    private static readonly TimeSpan s_schemaLockTimeout = TimeSpan.FromSeconds(30);
+
     private readonly string _connectionString;
     private readonly string _dbPath;
     private readonly IErrorBannerService? _errorBannerService;
     private readonly ITraceLogger _logger;
 
+    private int _schemaInitialized;
     private int _systemicUnloadableReported;
 
     public FilterLibrarySqliteStore(string dbPath, ITraceLogger logger, IErrorBannerService? errorBannerService = null)
@@ -494,16 +498,16 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         };
     }
 
-    private static async Task EnsureSchemaColumnsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    private static void EnsureSchemaColumns(SqliteConnection connection)
     {
         var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        await using (var probe = connection.CreateCommand())
+        using (var probe = connection.CreateCommand())
         {
             probe.CommandText = "PRAGMA table_info(library_entries);";
-            await using var reader = await probe.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            using var reader = probe.ExecuteReader();
 
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            while (reader.Read())
             {
                 existing.Add(reader.GetString(1));
             }
@@ -513,15 +517,41 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         {
             if (existing.Contains(column)) { continue; }
 
-            await using var alter = connection.CreateCommand();
+            using var alter = connection.CreateCommand();
             alter.CommandText = $"ALTER TABLE library_entries ADD COLUMN {column} {definition};";
-            await alter.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+
+            try
+            {
+                alter.ExecuteNonQuery();
+            }
+            catch (SqliteException ex) when (IsDuplicateColumn(ex))
+            {
+                // Another instance added this column between the probe and the ALTER (reachable only when the
+                // interprocess mutex is degraded); the column now exists, which is the intended end state.
+            }
         }
 
-        await using var indexCmd = connection.CreateCommand();
+        using var indexCmd = connection.CreateCommand();
         indexCmd.CommandText = CreateUniqueIndexSql;
-        await indexCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        indexCmd.ExecuteNonQuery();
     }
+
+    private static void InitializeSchema(SqliteConnection connection)
+    {
+        using (var schemaCmd = connection.CreateCommand())
+        {
+            schemaCmd.CommandText = CreateTableSql;
+            schemaCmd.ExecuteNonQuery();
+        }
+
+        EnsureSchemaColumns(connection);
+    }
+
+    // SQLITE_ERROR (1) with this message text is the only duplicate-column signal; matching narrowly so real
+    // schema faults (disk full, corruption, locked) still propagate.
+    private static bool IsDuplicateColumn(SqliteException ex) =>
+        ex.SqliteErrorCode == 1 &&
+        ex.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase);
 
     private static LibraryEntryOrigin ParseOrigin(string raw) =>
         Enum.TryParse<LibraryEntryOrigin>(raw, ignoreCase: false, out var parsed)
@@ -582,6 +612,31 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         }
     }
 
+    private void EnsureSchemaInitialized(SqliteConnection connection)
+    {
+        if (Volatile.Read(ref _schemaInitialized) != 0) { return; }
+
+        // Local, once-per-process: the mutex is only contended during the first-open race after an app update adds a
+        // column; every later open short-circuits on the flag without touching the mutex.
+        using var schemaMutex = new InterProcessMutex("FilterLibrarySchema", _dbPath);
+
+        // Prefer the cross-process lock, but the schema DDL is idempotent (CREATE ... IF NOT EXISTS + duplicate-column
+        // tolerance), so if the mutex is unavailable or contended we still initialize - unguarded execution is safe here.
+        var ranUnderLock = schemaMutex.TryRun(s_schemaLockTimeout, () =>
+        {
+            if (Volatile.Read(ref _schemaInitialized) != 0) { return; }
+
+            InitializeSchema(connection);
+        });
+
+        if (!ranUnderLock)
+        {
+            InitializeSchema(connection);
+        }
+
+        Volatile.Write(ref _schemaInitialized, 1);
+    }
+
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
         var dir = Path.GetDirectoryName(_dbPath);
@@ -595,13 +650,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
             connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using (var schemaCmd = connection.CreateCommand())
-            {
-                schemaCmd.CommandText = CreateTableSql;
-                await schemaCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            await EnsureSchemaColumnsAsync(connection, cancellationToken).ConfigureAwait(false);
+            EnsureSchemaInitialized(connection);
 
             var result = connection;
             connection = null;

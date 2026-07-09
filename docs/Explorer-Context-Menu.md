@@ -8,7 +8,7 @@ EventLogExpert's MSIX package registers three Windows Explorer right-click conte
 | Folder icon | **Open with EventLogExpert** | Top-level Win11 modern menu (via `desktop5:ItemType Type="Directory"`) | Same native DLL filters `Directory` items + spawns the main exe with the folder path |
 | Empty space inside an open folder | **Open with EventLogExpert** | Top-level Win11 modern menu (via `desktop5:ItemType Type="Directory\Background"`) | Same native DLL, same handler |
 
-Single-instance activation is handled by `Microsoft.Windows.AppLifecycle.AppInstance.FindOrRegisterForKey`, wired in a handwritten WinUI `Main` (`src/EventLogExpert/Platforms/Windows/Program.cs`) so secondary launches route activation args to the running primary instance via the `ActivationDispatcher` channel. Multi-select fans into a single combined view.
+Each launch runs as its own instance and window (the app is intentionally not single-instanced), wired in a handwritten WinUI `Main` (`src/EventLogExpert/Platforms/Windows/Program.cs`) that captures the shell activation args via `AppInstance.GetCurrent().GetActivatedEventArgs()` and seeds them into the `ActivationDispatcher` channel before the app starts. A multi-select right-click fans into a single activation, so the selected files open together in one new window; a separate open launches a new window. Drag-and-drop is the only path that adds logs to an existing window.
 
 ## Architecture
 
@@ -22,9 +22,9 @@ The `IExplorerCommand` implementation:
 - `IObjectWithSite::SetSite` → stores the shell-supplied site so the `Directory\Background` surface (right-click inside an open folder's empty space) can resolve the current folder via `QueryService(SID_SFolderView, IFolderView)` → `IPersistFolder2::GetCurFolder` → `SHGetPathFromIDListEx` (32K wstring buffer + `GPFIDL_DEFAULT`, long-path-safe — the legacy `SHGetPathFromIDListW` caps at `MAX_PATH` regardless of process long-path awareness). Required because the shell passes `items == null` for that surface.
 
 The MAUI receiving side:
-- `Program.Main` runs before `Application.Start`, calls `AppInstance.FindOrRegisterForKey("eventlogexpert-main")`. Secondary instances redirect their activation args to the primary and exit.
+- `Program.Main` runs before `Application.Start`, captures the shell activation args via `AppInstance.GetCurrent().GetActivatedEventArgs()`, and seeds them into `ActivationBootstrap`. Each launch is its own process/window; the app is not single-instanced.
 - `ActivationBootstrap` (thread-safe static buffer) seeds cold-launch args BEFORE MAUI DI is built, so they're not lost when `MainPage` is constructed.
-- `ActivationDispatcher` (channel + `Interlocked` idempotent start) drains the buffer + listens for redirected `AppInstance.Activated` events. UI work is marshaled via `MainThread.InvokeOnMainThreadAsync`.
+- `ActivationDispatcher` (channel + `Interlocked` idempotent start) drains the buffer. UI work is marshaled via `MainThread.InvokeOnMainThreadAsync`.
 - `ActivationArgsExtractor` discriminates per `ExtendedActivationKind`: `File` → `IFileActivatedEventArgs.Files`, `Launch` → `ILaunchActivatedEventArgs.Arguments` parsed via `CommandLineToArgvW`, `CommandLineLaunch` → `ICommandLineActivatedEventArgs.Operation.Arguments`. Tokens are classified via `ActivationTokenClassifier` (in `EventLogExpert.WindowsPlatform`) — only `.evtx`-extension files and existing directories are accepted, so the launching exe path (`argv[0]` from the shell extension's `CreateProcess` spawn) is silently dropped instead of being treated as a log to open.
 
 ## Build prerequisites
@@ -94,7 +94,7 @@ Run after any change touching the manifest, the activation pipeline, the native 
 1. **FTA single-file double-click (regression gate)** — Double-click a `.evtx` in Explorer. EventLogExpert launches and loads the file. **Required to pass** — the activation refactor changes how all FTA opens flow.
 2. **Single-file right-click** — Right-click one `.evtx` → "Open with EventLogExpert" at top level → app opens with the file.
 3. **Multi-file right-click** — Select 3–5 `.evtx` files → "Open with EventLogExpert" → **one** app instance opens with all files combined.
-4. **Secondary activation redirect** — With app already running, right-click another `.evtx` → existing window receives the file (no new window).
+4. **Separate open launches a new window** - With the app already running, right-click another `.evtx` -> "Open with EventLogExpert" -> a **new** app window opens for that file. The app is multi-instance; only drag-and-drop adds a log to an existing window.
 5. **Folder icon right-click** — Folder with `.evtx` files → "Open with EventLogExpert" → all top-level `.evtx` open in one app instance.
 6. **Folder background right-click** — Open a folder containing `.evtx` files, right-click in the empty space inside it → "Open with EventLogExpert" → all top-level `.evtx` open in one app instance. This surface relies on `IObjectWithSite` recovering the folder from the shell view; if it fails, the verb is silently absent.
 7. **Empty folder right-click** — Folder with no `.evtx` → verb still appears (filtering happens lazily) → click → silent no-op (native DLL pre-filters via `Directory.EnumerateFiles(*.evtx).Any()` before spawning).
