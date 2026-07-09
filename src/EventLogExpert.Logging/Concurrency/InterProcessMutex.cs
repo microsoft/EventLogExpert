@@ -44,7 +44,7 @@ public sealed class InterProcessMutex : IDisposable
         if (!TryRun(timeout, action))
         {
             throw new TimeoutException(
-                $"Timed out after {timeout.TotalSeconds:F0}s acquiring interprocess mutex '{_name}'.");
+                $"Timed out after {timeout.TotalSeconds:0.###}s acquiring interprocess mutex '{_name}'.");
         }
     }
 

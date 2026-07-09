@@ -37,7 +37,7 @@ public sealed class InterProcessFileLock
         if (!TryRun(timeout, action))
         {
             throw new TimeoutException(
-                $"Timed out after {timeout.TotalSeconds:F0}s acquiring interprocess file lock '{_lockPath}' (scope '{_scope}').");
+                $"Timed out after {timeout.TotalSeconds:0.###}s acquiring interprocess file lock '{_lockPath}' (scope '{_scope}').");
         }
     }
 

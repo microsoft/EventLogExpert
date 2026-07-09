@@ -612,9 +612,11 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         }
     }
 
-    private void EnsureSchemaInitialized(SqliteConnection connection)
+    private void EnsureSchemaInitialized(SqliteConnection connection, CancellationToken cancellationToken)
     {
         if (Volatile.Read(ref _schemaInitialized) != 0) { return; }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Local, once-per-process: the mutex is only contended during the first-open race after an app update adds a
         // column; every later open short-circuits on the flag without touching the mutex.
@@ -626,11 +628,13 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
         {
             if (Volatile.Read(ref _schemaInitialized) != 0) { return; }
 
+            cancellationToken.ThrowIfCancellationRequested();
             InitializeSchema(connection);
         });
 
         if (!ranUnderLock)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             InitializeSchema(connection);
         }
 
@@ -650,7 +654,7 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
             connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            EnsureSchemaInitialized(connection);
+            EnsureSchemaInitialized(connection, cancellationToken);
 
             var result = connection;
             connection = null;
