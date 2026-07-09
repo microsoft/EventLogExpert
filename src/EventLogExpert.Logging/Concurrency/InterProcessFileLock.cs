@@ -45,7 +45,15 @@ public sealed class InterProcessFileLock
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        var deadline = Environment.TickCount64 + (long)timeout.TotalMilliseconds;
+        if (timeout != Timeout.InfiniteTimeSpan && timeout < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(timeout), timeout, "Timeout must be non-negative or Timeout.InfiniteTimeSpan.");
+        }
+
+        var infinite = timeout == Timeout.InfiniteTimeSpan;
+        var timeoutMs = (long)timeout.TotalMilliseconds;
+        var deadline = Environment.TickCount64 + timeoutMs;
         var backoff = s_minBackoff;
 
         while (true)
@@ -58,8 +66,9 @@ public sealed class InterProcessFileLock
             }
             catch (IOException ex) when (IsContention(ex))
             {
-                // Held by another process. Retry with capped exponential backoff + jitter until the deadline.
-                if (Environment.TickCount64 >= deadline) { return false; }
+                // Held by another process. Retry with capped exponential backoff + jitter until the deadline;
+                // Timeout.InfiniteTimeSpan waits indefinitely.
+                if (!infinite && Environment.TickCount64 >= deadline) { return false; }
 
                 Thread.Sleep(NextBackoff(ref backoff));
 
