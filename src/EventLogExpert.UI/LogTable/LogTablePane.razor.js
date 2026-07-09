@@ -412,14 +412,18 @@ export function scrollToRow(offset) {
         return;
     }
 
-    const row = table.getElementsByTagName("tr")[0];
+    // Sample a body row's height (as computePageSize does) instead of
+    // getElementsByTagName("tr")[0] - that first row is the <thead> header,
+    // whose height can diverge from the 22px data rows and would skew the
+    // scroll target, magnified by a deep offset.
+    const bodyRow = table.querySelector("tbody tr");
 
-    if (!row) {
+    if (!bodyRow) {
         return;
     }
 
     table.parentNode.scrollTo({
-        top: row.offsetHeight * offset - (table.parentNode.offsetHeight / 3),
+        top: bodyRow.offsetHeight * offset - (table.parentNode.offsetHeight / 3),
         behavior: "smooth"
     });
 }

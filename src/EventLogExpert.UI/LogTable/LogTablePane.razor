@@ -83,7 +83,11 @@
                 </th>
             }
 
-            <th aria-colindex="@(_enabledColumns.Length + 1)" class="description" role="columnheader">@EventTableColumnFormatter.DescriptionColumnHeader</th>
+            <th aria-colindex="@(_enabledColumns.Length + 1)"
+                class="description"
+                role="columnheader">
+                @EventTableColumnFormatter.DescriptionColumnHeader
+            </th>
         </tr>
         </thead>
         <tbody @oncontextmenu="InvokeContextMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
@@ -93,7 +97,7 @@
             {
                 @* Ungrouped: ItemsProvider fetches one Slice per viewport window (a single cursor walk),
                    avoiding the Items= binding's per-row this[i] re-seek over the K-way merge. *@
-                <Virtualize Context="evt" ItemsProvider="LoadEventViewport" @ref="_eventVirtualize">
+                <Virtualize Context="evt" ItemSize="@EventRowHeightPixels" ItemsProvider="LoadEventViewport" @ref="_eventVirtualize">
                     @RenderEventRow(evt)
                 </Virtualize>
             }
@@ -101,7 +105,7 @@
             {
                 var view = _rowView;
 
-                <Virtualize Context="row" Items="view">
+                <Virtualize Context="row" Items="view" ItemSize="@EventRowHeightPixels">
                     @if (row.Kind == TableRowKind.Header)
                     {
                         var group = view.GroupAt(row);

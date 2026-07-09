@@ -29,6 +29,12 @@ namespace EventLogExpert.UI.LogTable;
 public sealed partial class LogTablePane
 {
     private const int DefaultPageSize = 20;
+    // Must match the CSS `tr { height: 22px }` (LogTablePane.razor.css). Virtualize defaults ItemSize to 50px; without
+    // this the scroll model (ScrollToSelectedEvent -> JS scrollToRow, which scrolls by the real 22px row height) is
+    // computed against a 50px-per-row spacer model, so jump-to-selected lands at the wrong position - worse the deeper
+    // the target. Set explicitly so the model matches from the first render instead of relying on Virtualize's async
+    // size self-correction (which the ungrouped ItemsProvider path does not settle before the scroll fires).
+    private const float EventRowHeightPixels = 22f;
     private const int MenuValueMaxLength = 40;
     private const string NoCellValueReason = "No value in this cell to filter on";
 
