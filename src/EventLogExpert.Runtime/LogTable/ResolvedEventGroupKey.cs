@@ -27,4 +27,21 @@ public static class ResolvedEventGroupKey
             ColumnName.User => @event.UserId?.Value ?? string.Empty,
             _ => string.Empty
         };
+
+    /// <summary>
+    ///     Column-direct twin of <see cref="For(ColumnName, ResolvedEvent)" />: reads the bucket field through the
+    ///     reader. DateAndTime uses invariant Ticks (not the "O" string <c>AsString()</c> renders); every other column uses
+    ///     <c>AsString()</c>, which matches the array-of-structs projection for each kind.
+    /// </summary>
+    public static string For(IEventColumnReader reader, EventLocator locator, ColumnName column)
+    {
+        if (column != ColumnName.DateAndTime)
+        {
+            return reader.GetField(locator, ColumnFieldMap.ToFieldId(column)).AsString();
+        }
+
+        return reader.GetField(locator, EventFieldId.TimeCreated).TryGetDateTime(out DateTime timeCreated)
+            ? timeCreated.Ticks.ToString(CultureInfo.InvariantCulture)
+            : string.Empty;
+    }
 }

@@ -63,7 +63,10 @@ internal static class ResolvedEventOrdering
     private static readonly Comparison<ResolvedEvent> s_descByThreadId = (a, b) => s_ascByThreadId(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByUser = (a, b) => s_ascByUser(b, a);
 
-    /// <summary>Returns a new sorted list. With no order specified, ungrouped events fall back to RecordId then timestamp; grouped events sort by timestamp within each group.</summary>
+    /// <summary>
+    ///     Returns a new sorted list. With no order specified, ungrouped events fall back to RecordId then timestamp;
+    ///     grouped events sort by timestamp within each group.
+    /// </summary>
     public static IReadOnlyList<ResolvedEvent> SortEvents(
         this IEnumerable<ResolvedEvent> events,
         ColumnName? orderBy = null,
@@ -90,6 +93,26 @@ internal static class ResolvedEventOrdering
             ColumnName.User => string.Compare(a.UserId?.Value ?? string.Empty, b.UserId?.Value ?? string.Empty, StringComparison.Ordinal),
             _ => 0
         };
+
+    /// <summary>
+    ///     Column-direct twin of <see cref="CompareColumn" />: reads both fields via the reader and compares them typed
+    ///     (not via <c>AsString()</c>), reproducing the per-column primary order exactly.
+    /// </summary>
+    internal static int CompareColumnDirect(IEventColumnReader reader, EventLocator a, EventLocator b, ColumnName column)
+    {
+        EventFieldId field = ColumnFieldMap.ToFieldId(column);
+        EventFieldValue left = reader.GetField(a, field);
+        EventFieldValue right = reader.GetField(b, field);
+
+        return column switch
+        {
+            ColumnName.RecordId or ColumnName.ProcessId or ColumnName.ThreadId => CompareInt64Nullable(left, right),
+            ColumnName.EventId => CompareInt64(left, right),
+            ColumnName.DateAndTime => CompareDateTime(left, right),
+            ColumnName.ActivityId => CompareGuidNullable(left, right),
+            _ => string.Compare(left.AsString(), right.AsString(), StringComparison.Ordinal)
+        };
+    }
 
     internal static Comparison<ResolvedEvent> GetComparer(ColumnName? orderBy, bool isDescending) =>
         isDescending
@@ -190,6 +213,72 @@ internal static class ResolvedEventOrdering
         return logCount > 1 ? ColumnName.DateAndTime : null;
     }
 
+    /// <summary>
+    ///     Column-direct twin of <see cref="SelectComparer" />: returns a <see cref="Comparison{EventLocator}" /> that
+    ///     reads fields through <paramref name="reader" /> and reproduces the selected ungrouped, no-order-by-default, or
+    ///     grouped chain exactly.
+    /// </summary>
+    internal static Comparison<EventLocator> SelectColumnComparer(
+        IEventColumnReader reader,
+        ColumnName? orderBy,
+        bool isDescending,
+        ColumnName? groupBy,
+        bool isGroupDescending)
+    {
+        if (groupBy is not null)
+        {
+            ColumnName groupColumn = groupBy.Value;
+            ColumnName withinColumn = orderBy ?? ColumnName.DateAndTime;
+
+            return (a, b) =>
+            {
+                int group = CompareColumnDirect(reader, a, b, groupColumn);
+
+                if (group != 0) { return isGroupDescending ? -Math.Sign(group) : group; }
+
+                int within = CompareColumnDirect(reader, a, b, withinColumn);
+
+                if (within == 0 && withinColumn != ColumnName.DateAndTime)
+                {
+                    within = CompareColumnDirect(reader, a, b, ColumnName.DateAndTime);
+                }
+
+                if (within == 0)
+                {
+                    within = FallbackTieBreakerDirect(CompareRecordIdDirect(reader, a, b), reader, a, b);
+                }
+
+                return isDescending ? -Math.Sign(within) : within;
+            };
+        }
+
+        if (orderBy is null)
+        {
+            return isDescending ? (a, b) => AscendingDefault(b, a) : AscendingDefault;
+
+            int AscendingDefault(EventLocator a, EventLocator b)
+            {
+                int byRecordId = CompareRecordIdDirect(reader, a, b);
+
+                if (byRecordId != 0) { return byRecordId; }
+
+                // Fall back to timestamp then OwningLog for a total order.
+                int byTime = CompareColumnDirect(reader, a, b, ColumnName.DateAndTime);
+
+                return byTime != 0 ? byTime : string.Compare(reader.GetField(a, EventFieldId.OwningLog).AsString(),
+                    reader.GetField(b, EventFieldId.OwningLog).AsString(),
+                    StringComparison.Ordinal);
+            }
+        }
+
+        ColumnName orderColumn = orderBy.Value;
+
+        return isDescending ? (a, b) => AscendingColumn(b, a) : AscendingColumn;
+
+        int AscendingColumn(EventLocator a, EventLocator b) =>
+            WithTieBreakerDirect(CompareColumnDirect(reader, a, b, orderColumn), reader, a, b);
+    }
+
     internal static Comparison<ResolvedEvent> SelectComparer(
         ColumnName? orderBy,
         bool isDescending,
@@ -199,9 +288,80 @@ internal static class ResolvedEventOrdering
             ? GetComparer(orderBy, isDescending)
             : GetGroupedComparer(groupBy.Value, isGroupDescending, orderBy, isDescending);
 
+    /// <summary>
+    ///     Column-direct twin of <see cref="WithTieBreaker" />: applies the RecordId-then-OwningLog fallback when the
+    ///     primary compare ties.
+    /// </summary>
+    internal static int WithTieBreakerDirect(int primaryResult, IEventColumnReader reader, EventLocator a, EventLocator b) =>
+        primaryResult != 0
+            ? primaryResult
+            : FallbackTieBreakerDirect(CompareRecordIdDirect(reader, a, b), reader, a, b);
+
+    private static int CompareDateTime(EventFieldValue left, EventFieldValue right)
+    {
+        left.TryGetDateTime(out DateTime leftValue);
+        right.TryGetDateTime(out DateTime rightValue);
+
+        // Ticks, not AsString(): reproduces DateTime.CompareTo and stays kind-agnostic.
+        return leftValue.Ticks.CompareTo(rightValue.Ticks);
+    }
+
+    private static int CompareGuidNullable(EventFieldValue left, EventFieldValue right)
+    {
+        bool leftAbsent = left.Kind == EventFieldValueKind.Null;
+        bool rightAbsent = right.Kind == EventFieldValueKind.Null;
+
+        if (leftAbsent || rightAbsent)
+        {
+            return leftAbsent == rightAbsent ? 0 : (leftAbsent ? -1 : 1);
+        }
+
+        left.TryGetGuid(out Guid leftValue);
+        right.TryGetGuid(out Guid rightValue);
+
+        // Guid.CompareTo, not AsString(): reproduces Nullable.Compare(Guid?).
+        return leftValue.CompareTo(rightValue);
+    }
+
+    private static int CompareInt64(EventFieldValue left, EventFieldValue right)
+    {
+        left.TryGetInt64(out long leftValue);
+        right.TryGetInt64(out long rightValue);
+
+        return leftValue.CompareTo(rightValue);
+    }
+
+    private static int CompareInt64Nullable(EventFieldValue left, EventFieldValue right)
+    {
+        bool leftAbsent = left.Kind == EventFieldValueKind.Null;
+        bool rightAbsent = right.Kind == EventFieldValueKind.Null;
+
+        // Absent sorts first, reproducing Nullable.Compare's null-low ordering.
+        if (leftAbsent || rightAbsent)
+        {
+            return leftAbsent == rightAbsent ? 0 : (leftAbsent ? -1 : 1);
+        }
+
+        left.TryGetInt64(out long leftValue);
+        right.TryGetInt64(out long rightValue);
+
+        return leftValue.CompareTo(rightValue);
+    }
+
+    private static int CompareRecordIdDirect(IEventColumnReader reader, EventLocator a, EventLocator b) =>
+        CompareInt64Nullable(reader.GetField(a, EventFieldId.RecordId), reader.GetField(b, EventFieldId.RecordId));
+
     /// <summary>Falls back to RecordId, then OwningLog (for combined logs) to guarantee a total order for List.Sort stability.</summary>
     private static int FallbackTieBreaker(int recordIdResult, ResolvedEvent a, ResolvedEvent b) =>
         recordIdResult != 0 ? recordIdResult : string.Compare(a.OwningLog, b.OwningLog, StringComparison.Ordinal);
+
+    private static int FallbackTieBreakerDirect(int recordIdResult, IEventColumnReader reader, EventLocator a, EventLocator b) =>
+        recordIdResult != 0
+            ? recordIdResult
+            : string.Compare(
+                reader.GetField(a, EventFieldId.OwningLog).AsString(),
+                reader.GetField(b, EventFieldId.OwningLog).AsString(),
+                StringComparison.Ordinal);
 
     private static int WithTieBreaker(int primaryResult, ResolvedEvent a, ResolvedEvent b) =>
         primaryResult != 0 ? primaryResult : FallbackTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);

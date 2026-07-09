@@ -13,6 +13,8 @@ internal interface IEventColumnView
 
     ResolvedEvent GetDetail(EventLocator locator);
 
+    string GroupKeyAt(EventLocator locator, ColumnName column);
+
     EventLocator LocatorAt(int index);
 
     IReadOnlyList<ResolvedEvent> Slice(int start, int count);

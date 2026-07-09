@@ -21,6 +21,9 @@ internal sealed class LegacyEventColumnView(
 
     public ResolvedEvent GetDetail(EventLocator locator) => _reader.GetEvent(locator);
 
+    public string GroupKeyAt(EventLocator locator, ColumnName column) =>
+        ResolvedEventGroupKey.For(_reader, locator, column);
+
     public EventLocator LocatorAt(int index) => _reader.LocatorAt(index);
 
     public IReadOnlyList<ResolvedEvent> Slice(int start, int count) =>
