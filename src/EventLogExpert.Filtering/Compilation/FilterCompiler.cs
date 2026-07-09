@@ -39,7 +39,7 @@ internal static class FilterCompiler
     ///     Attempts to compile the supplied filter expression into a column-direct <see cref="ColumnCompiledFilter" />
     ///     that evaluates over an <c>IEventColumnReader</c> instead of a materialized <c>ResolvedEvent</c>. Returns
     ///     <c>true</c> with <paramref name="compiled" /> populated on success; <c>false</c> with a diagnostic
-    ///     <paramref name="error" /> on failure (including arms the column backend does not yet support). Delegates to
+    ///     <paramref name="error" /> on failure (a malformed expression, or an arm the emitter cannot represent). Delegates to
     ///     <see cref="FilterParser.TryCompileColumn" />.
     /// </summary>
     public static bool TryCompileColumn(

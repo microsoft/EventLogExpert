@@ -15,9 +15,9 @@ namespace EventLogExpert.Filtering.Emit;
 ///     <see cref="ResolvedEvent" /> properties. It emits one unified tri-state <see cref="FilterMatch" /> per node
 ///     (non-UserData arms return only Match / NoMatch; UserData arms carry the full tri-state), sharing the value-level
 ///     cores (<see cref="UserDataMatch" />, <see cref="FilterMatchCombiner" />, <see cref="FilterNodeMetadata" />) with
-///     the row emitter and the per-field null semantics with <see cref="FilterCompare" />. Arm families that need reader
-///     surface the interface does not yet expose (Keywords list, wildcard EventData names, glob UserData paths) throw
-///     <see cref="EmitException" />.
+///     the row emitter and the per-field null semantics with <see cref="FilterCompare" />. Keywords lists, wildcard
+///     EventData field names, and glob UserData paths are read column-direct through the enumerating
+///     <see cref="IEventColumnReader" /> accessors, so every row arm now has a column-direct counterpart.
 /// </summary>
 internal static class ColumnEmitter
 {
@@ -125,50 +125,136 @@ internal static class ColumnEmitter
 
     private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitEventDataComparison(EventDataComparisonNode node)
     {
-        var name = RequireExactEventDataName(node.FieldName);
+        var name = node.FieldName;
         var literal = node.Literal;
         var equal = node.Op == FilterBinaryOperator.Equal;
 
-        // Presence-required: an absent named field never matches (positive OR negative).
-        return (reader, locator) =>
+        if (!WildcardMatcher.ContainsWildcard(name))
         {
-            if (!reader.TryGetEventData(locator, name, out var value)) { return FilterMatch.NoMatch; }
-
-            return literal.MatchesValue(value) == equal ? FilterMatch.Match : FilterMatch.NoMatch;
-        };
-    }
-
-    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitEventDataContains(EventDataContainsNode node)
-    {
-        var name = RequireExactEventDataName(node.FieldName);
-        var needle = node.Needle;
-        var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        var negated = node.Negated;
-
-        return (reader, locator) =>
-        {
-            if (!reader.TryGetEventData(locator, name, out var value)) { return FilterMatch.NoMatch; }
-
-            return value.AsString().Contains(needle, comparison) != negated ? FilterMatch.Match : FilterMatch.NoMatch;
-        };
-    }
-
-    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitEventDataMultiEquals(EventDataMultiEqualsNode node)
-    {
-        var name = RequireExactEventDataName(node.FieldName);
-        var literals = node.Literals;
-
-        return (reader, locator) =>
-        {
-            if (!reader.TryGetEventData(locator, name, out var value)) { return FilterMatch.NoMatch; }
-
-            for (var i = 0; i < literals.Count; i++)
+            // Presence-required: an absent named field never matches (positive OR negative).
+            return (reader, locator) =>
             {
-                if (literals[i].MatchesValue(value)) { return FilterMatch.Match; }
+                if (!reader.TryGetEventData(locator, name, out var value)) { return FilterMatch.NoMatch; }
+
+                return literal.MatchesValue(value) == equal ? FilterMatch.Match : FilterMatch.NoMatch;
+            };
+        }
+
+        var matchesName = WildcardMatcher.Compile(name);
+
+        // Positional enumeration: every field (including duplicate names) is tested, so a non-first duplicate can
+        // satisfy the glob. Mirrors Emitter.EmitEventDataComparison's wildcard branch.
+        return (reader, locator) =>
+        {
+            foreach (var field in reader.EnumerateEventData(locator))
+            {
+                if (matchesName(field.Name) && literal.MatchesValue(field.Value) == equal) { return FilterMatch.Match; }
             }
 
             return FilterMatch.NoMatch;
         };
+
+    }
+
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitEventDataContains(EventDataContainsNode node)
+    {
+        var name = node.FieldName;
+        var needle = node.Needle;
+        var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var negated = node.Negated;
+
+        if (!WildcardMatcher.ContainsWildcard(name))
+        {
+            return (reader, locator) =>
+            {
+                if (!reader.TryGetEventData(locator, name, out var value)) { return FilterMatch.NoMatch; }
+
+                return value.AsString().Contains(needle, comparison) != negated ?
+                    FilterMatch.Match :
+                    FilterMatch.NoMatch;
+            };
+        }
+
+        var matchesName = WildcardMatcher.Compile(name);
+
+        return (reader, locator) =>
+        {
+            foreach (var field in reader.EnumerateEventData(locator))
+            {
+                if (matchesName(field.Name) && field.Value.AsString().Contains(needle, comparison) != negated)
+                {
+                    return FilterMatch.Match;
+                }
+            }
+
+            return FilterMatch.NoMatch;
+        };
+
+    }
+
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitEventDataMultiEquals(EventDataMultiEqualsNode node)
+    {
+        var name = node.FieldName;
+        var literals = node.Literals;
+
+        if (!WildcardMatcher.ContainsWildcard(name))
+        {
+            return (reader, locator) =>
+            {
+                if (!reader.TryGetEventData(locator, name, out var value)) { return FilterMatch.NoMatch; }
+
+                for (var i = 0; i < literals.Count; i++)
+                {
+                    if (literals[i].MatchesValue(value)) { return FilterMatch.Match; }
+                }
+
+                return FilterMatch.NoMatch;
+            };
+        }
+
+        var matchesName = WildcardMatcher.Compile(name);
+
+        return (reader, locator) =>
+        {
+            foreach (var field in reader.EnumerateEventData(locator))
+            {
+                if (!matchesName(field.Name)) { continue; }
+
+                for (var i = 0; i < literals.Count; i++)
+                {
+                    if (literals[i].MatchesValue(field.Value)) { return FilterMatch.Match; }
+                }
+            }
+
+            return FilterMatch.NoMatch;
+        };
+
+    }
+
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitKeywordsAnyContains(KeywordsAnyContainsNode node)
+    {
+        var needle = node.Needle;
+        var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+        return (reader, locator) =>
+            KeywordMatch.AnyContains(reader.GetKeywords(locator), needle, comparison) ? FilterMatch.Match : FilterMatch.NoMatch;
+    }
+
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitKeywordsAnyEquals(KeywordsAnyEqualsNode node)
+    {
+        var needle = node.Needle;
+        var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+        return (reader, locator) =>
+            KeywordMatch.AnyEquals(reader.GetKeywords(locator), needle, comparison) ? FilterMatch.Match : FilterMatch.NoMatch;
+    }
+
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitKeywordsMatchAnyOf(KeywordsMatchAnyOfNode node)
+    {
+        var needles = CompileTimeLiterals.Snapshot(node.Needles);
+
+        return (reader, locator) =>
+            KeywordMatch.MatchAnyOf(reader.GetKeywords(locator), needles) ? FilterMatch.Match : FilterMatch.NoMatch;
     }
 
     private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitMultiEquals(MultiEqualsNode node) =>
@@ -313,9 +399,9 @@ internal static class ColumnEmitter
             EventDataComparisonNode edCmp => EmitEventDataComparison(edCmp),
             EventDataContainsNode edContains => EmitEventDataContains(edContains),
             EventDataMultiEqualsNode edMulti => EmitEventDataMultiEquals(edMulti),
-            KeywordsAnyEqualsNode => throw new EmitException("column backend does not yet support Keywords.Any."),
-            KeywordsAnyContainsNode => throw new EmitException("column backend does not yet support Keywords.Any."),
-            KeywordsMatchAnyOfNode => throw new EmitException("column backend does not yet support Keywords.Any."),
+            KeywordsAnyEqualsNode kae => EmitKeywordsAnyEquals(kae),
+            KeywordsAnyContainsNode kac => EmitKeywordsAnyContains(kac),
+            KeywordsMatchAnyOfNode kma => EmitKeywordsMatchAnyOf(kma),
             MultiEqualsNode mn => EmitMultiEquals(mn),
             UserDataComparisonNode ud => EmitUserData(ud.CanonicalPath, UserDataMatch.Comparison(ud)),
             UserDataContainsNode ud => EmitUserData(ud.CanonicalPath, UserDataMatch.Contains(ud)),
@@ -443,11 +529,37 @@ internal static class ColumnEmitter
     {
         var storageKey = UserDataFieldPath.ToStorageKey(canonicalPath);
 
-        // A '*' surviving in the storage key is a genuine field-name glob, which the column backend does not yet
-        // support; only the exact-path arm is emitted. Mirrors Emitter.EmitUserDataFieldMatcher's glob branch.
-        return WildcardMatcher.ContainsWildcard(storageKey)
-            ? throw new EmitException("column backend does not yet support UserData path globs.")
-            : (reader, locator) => evaluate(reader.GetUserData(locator, storageKey));
+        // No wildcard: the exact stored path is a direct point lookup.
+        if (!WildcardMatcher.ContainsWildcard(storageKey))
+        {
+            return (reader, locator) => evaluate(reader.GetUserData(locator, storageKey));
+        }
+
+        // A '*' surviving in the storage key is a genuine field-name glob: evaluate the term as if each matching stored
+        // path were its own OR'd filter row, tri-state folded. Mirrors Emitter.EvaluateUserDataGlob (the explicit empty
+        // guard is redundant with the tail, so it is omitted: an empty enumeration falls straight through to the tail).
+        var matchesPath = WildcardMatcher.Compile(storageKey);
+
+        return (reader, locator) =>
+        {
+            var incomplete = reader.GetUserDataIncomplete(locator);
+            var result = FilterMatch.NoMatch;
+
+            foreach (var entry in reader.EnumerateUserData(locator))
+            {
+                if (!matchesPath(entry.Path)) { continue; }
+
+                var fieldMatch = evaluate(entry.Result);
+
+                if (fieldMatch == FilterMatch.Match) { return FilterMatch.Match; }
+
+                if (fieldMatch == FilterMatch.Unknown) { result = FilterMatch.Unknown; }
+            }
+
+            // A capped field set may also have dropped a whole matching path, so a would-be decisive NoMatch (no path
+            // matched the glob at all) becomes keep-visible Unknown.
+            return result == FilterMatch.NoMatch && incomplete ? FilterMatch.Unknown : result;
+        };
     }
 
     // Evaluates part[index] against the per-event reader and locator carried in a by-value named tuple, so the And/Or
@@ -464,9 +576,4 @@ internal static class ColumnEmitter
             FilterMatch.NoMatch => FilterMatch.Match,
             _ => FilterMatch.Unknown
         };
-
-    private static string RequireExactEventDataName(string name) =>
-        // The wildcard EventData enumeration is not yet supported; only the exact-name (TryGetEventData) path is emitted.
-        WildcardMatcher.ContainsWildcard(name) ?
-            throw new EmitException("column backend does not yet support wildcard EventData field names.") : name;
 }

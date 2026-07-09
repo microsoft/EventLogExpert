@@ -183,24 +183,31 @@ public sealed class ColumnEmitterParityTests
         // Mixed UserData + scalar: tri-state combine of a decisive scalar arm with a tri-state UserData arm.
         "Id == 100 && UserData[\"Foo\"] == \"adminvalue\"",
         "Id == 999 || UserData[\"Foo\"] == \"adminvalue\"",
-        "Id == 100 && Xml.Contains(\"data\")"
-    ];
+        "Id == 100 && Xml.Contains(\"data\")",
 
-    /// <summary>
-    ///     Arms not yet supported by the column backend: valid row filters it must reject with an EmitException-sourced
-    ///     error.
-    /// </summary>
-    public static TheoryData<string> RejectedByColumnBackend =>
-    [
-        // Wildcard EventData field name.
-        "EventData[\"*cert*\"] == \"x\"",
-
-        // Keywords.Any (three lowered shapes).
+        // P2-4b Keywords.Any (three lowered shapes): positive over corpus[0] (Keywords [Audit, System]), negative
+        // elsewhere. The ordinal MatchAnyOf shape with lowercase needles matches nothing; the "System" shape matches corpus[0].
         "Keywords.Any(e => string.Equals(e, \"Audit\", StringComparison.OrdinalIgnoreCase))",
         "Keywords.Any(e => e.Contains(\"audit\", StringComparison.OrdinalIgnoreCase))",
         "Keywords.Any(e => (new[] {\"audit\", \"system\"}).Contains(e))",
+        "Keywords.Any(e => (new[] {\"System\", \"Nope\"}).Contains(e))",
 
-        // Glob UserData path.
+        // P2-4b wildcard EventData field names (positional enumeration over corpus[6] rich EventData): exact-op equality
+        // AND inequality, Contains, MultiEquals, the non-first duplicate ("Du*" must reach the 2nd Dup -> "second"), and
+        // empty-match globs.
+        "EventData[\"Us*\"] == \"admin\"",
+        "EventData[\"Us*\"] != \"admin\"",
+        "EventData[\"Pat*\"].Contains(\"cmd\", StringComparison.OrdinalIgnoreCase)",
+        "(new[] {\"admin\", \"root\"}).Contains(EventData[\"Us*\"])",
+        "EventData[\"Du*\"] == \"second\"",
+        "EventData[\"*zzz*\"] == \"x\"",
+        "EventData[\"*cert*\"] == \"x\"",
+
+        // P2-4b glob UserData paths (tri-state): present match on corpus[8] Foo, truncated Trunc -> Unknown, and the
+        // incomplete-tail Unknown over corpus[9] (UserDataIncomplete, no path matches -> keep-visible Unknown).
+        "UserData[\"*oo\"] == \"adminvalue\"",
+        "UserData[\"Tr*\"].Contains(\"y\")",
+        "UserData[\"*nomatch*\"] == \"x\"",
         "UserData[\"*cert*\"] == \"x\""
     ];
 
@@ -226,22 +233,6 @@ public sealed class ColumnEmitterParityTests
                 expected == actual,
                 $"Divergence at corpus[{index}] for '{expression}': row={expected}, column={actual}.");
         }
-    }
-
-    [Theory]
-    [MemberData(nameof(RejectedByColumnBackend))]
-    public void ColumnBackend_RejectsP24bArms_WithError(string expression)
-    {
-        Assert.True(
-            FilterParser.TryCompile(expression, out CompiledFilter? row, out var rowError),
-            $"Expected '{expression}' to be a valid row filter: {rowError}");
-        Assert.NotNull(row);
-
-        Assert.False(
-            FilterParser.TryCompileColumn(expression, out ColumnCompiledFilter? column, out var columnError),
-            $"Expected the column backend to reject '{expression}' as not yet supported.");
-        Assert.Null(column);
-        Assert.False(string.IsNullOrEmpty(columnError));
     }
 
     // A nullable numeric '!=' on an absent field is Match (typed lift), unlike the presence-required UserId arms.

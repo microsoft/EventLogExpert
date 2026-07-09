@@ -323,17 +323,7 @@ internal static class Emitter
         var needle = node.Needle;
         var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
-        return resolvedEvent =>
-        {
-            var keywords = resolvedEvent.Keywords;
-
-            for (var i = 0; i < keywords.Count; i++)
-            {
-                if (keywords[i].Contains(needle, comparison)) { return true; }
-            }
-
-            return false;
-        };
+        return resolvedEvent => KeywordMatch.AnyContains(resolvedEvent.Keywords, needle, comparison);
     }
 
     private static Func<ResolvedEvent, bool> EmitKeywordsAnyEquals(KeywordsAnyEqualsNode node)
@@ -341,39 +331,14 @@ internal static class Emitter
         var needle = node.Needle;
         var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
-        return resolvedEvent =>
-        {
-            var keywords = resolvedEvent.Keywords;
-
-            for (var i = 0; i < keywords.Count; i++)
-            {
-                if (string.Equals(keywords[i], needle, comparison)) { return true; }
-            }
-
-            return false;
-        };
+        return resolvedEvent => KeywordMatch.AnyEquals(resolvedEvent.Keywords, needle, comparison);
     }
 
     private static Func<ResolvedEvent, bool> EmitKeywordsMatchAnyOf(KeywordsMatchAnyOfNode node)
     {
         var needles = CompileTimeLiterals.Snapshot(node.Needles);
 
-        return resolvedEvent =>
-        {
-            var keywords = resolvedEvent.Keywords;
-
-            for (var i = 0; i < keywords.Count; i++)
-            {
-                var keyword = keywords[i];
-
-                for (var j = 0; j < needles.Length; j++)
-                {
-                    if (string.Equals(keyword, needles[j], StringComparison.Ordinal)) { return true; }
-                }
-            }
-
-            return false;
-        };
+        return resolvedEvent => KeywordMatch.MatchAnyOf(resolvedEvent.Keywords, needles);
     }
 
     private static Func<ResolvedEvent, bool> EmitMultiEquals(MultiEqualsNode node) =>
