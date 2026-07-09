@@ -39,6 +39,40 @@ public sealed class LegacyEventColumnViewTests
     }
 
     [Fact]
+    public void GetDetailLean_ReturnsEventAtLocator()
+    {
+        var second = Event(20, 2);
+        var view = CreateView(Event(10, 1), second, Event(30, 3));
+
+        Assert.Same(second, view.GetDetailLean(view.LocatorAt(1)));
+    }
+
+    [Fact]
+    public void Rank_IndexPastEnd_ReturnsMinusOne()
+    {
+        var view = CreateView(Event(1, 1), Event(2, 2));
+
+        Assert.Equal(-1, view.Rank(new EventLocator(s_logId, 2, 5)));
+    }
+
+    [Fact]
+    public void Rank_LocatorFromDifferentGeneration_ReturnsMinusOne()
+    {
+        var view = CreateView(Event(1, 1));
+        var stale = new EventLocator(s_logId, 999, 0);
+
+        Assert.Equal(-1, view.Rank(stale));
+    }
+
+    [Fact]
+    public void Rank_LocatorInView_ReturnsPhysicalIndex()
+    {
+        var view = CreateView(Event(1, 1), Event(2, 2), Event(3, 3));
+
+        Assert.Equal(2, view.Rank(view.LocatorAt(2)));
+    }
+
+    [Fact]
     public void Reader_ExposesSameCount()
     {
         var view = CreateView(Event(1, 1), Event(2, 2));
@@ -62,8 +96,10 @@ public sealed class LegacyEventColumnViewTests
         var window = view.Slice(1, 2);
 
         Assert.Equal(2, window.Count);
-        Assert.Equal(2, window[0].Id);
-        Assert.Equal(3, window[1].Id);
+        Assert.Equal(2, window[0].Lean.Id);
+        Assert.Equal(3, window[1].Lean.Id);
+        Assert.Equal(view.LocatorAt(1), window[0].Loc);
+        Assert.Equal(view.LocatorAt(2), window[1].Loc);
     }
 
     private static LegacyEventColumnView CreateView(params ResolvedEvent[] events) =>

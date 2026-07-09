@@ -6,7 +6,7 @@ using System.Diagnostics;
 
 namespace EventLogExpert.Runtime.LogTable;
 
-internal static class ResolvedEventOrdering
+internal static partial class ResolvedEventOrdering
 {
     private static readonly Comparison<ResolvedEvent> s_ascByLevel =
         (a, b) => WithTieBreaker(string.Compare(a.Level, b.Level, StringComparison.Ordinal), a, b);

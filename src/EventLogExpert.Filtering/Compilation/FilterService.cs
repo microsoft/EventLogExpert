@@ -3,15 +3,56 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Eventing.Structured;
 using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Filtering.Persistence;
+using System.Collections.Immutable;
 using System.Runtime.ExceptionServices;
 
 namespace EventLogExpert.Filtering.Compilation;
 
-internal sealed class FilterService : IFilterService
+public sealed class FilterService : IFilterService
 {
     /// <summary>Outer parallelism only kicks in when the combined work justifies the scheduling overhead.</summary>
     private const int OuterParallelTotalEventThreshold = 10_000;
+
+    public static IReadOnlyList<int> GetSurvivingOrder(IEventColumnReader reader, Filter filter)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+
+        var count = reader.Count;
+
+        if (!filter.IsFilteringEnabled)
+        {
+            var all = new int[count];
+
+            for (var index = 0; index < count; index++) { all[index] = index; }
+
+            return all;
+        }
+
+        var compiledFilters = CompileColumnFilters(filter.Filters);
+
+        var dateFilter = filter.DateFilter;
+        var dateEnabled = dateFilter?.IsEnabled is true;
+        var after = dateFilter?.After;
+        var before = dateFilter?.Before;
+
+        var survivors = new List<int>();
+
+        for (var index = 0; index < count; index++)
+        {
+            var locator = reader.LocatorAt(index);
+
+            if (!MatchesCompiledFilters(reader, locator, compiledFilters)) { continue; }
+
+            if (dateEnabled && !MatchesDateRange(reader, locator, after, before)) { continue; }
+
+            survivors.Add(index);
+        }
+
+        return survivors;
+    }
 
     public IReadOnlyDictionary<EventLogId, IReadOnlyList<ResolvedEvent>> FilterActiveLogs(
         IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> logs,
@@ -78,6 +119,30 @@ internal sealed class FilterService : IFilterService
             .AsReadOnly();
     }
 
+    private static List<(ColumnCompiledFilter Compiled, bool IsExcluded)> CompileColumnFilters(
+        ImmutableList<SavedFilter> filters)
+    {
+        var compiledFilters = new List<(ColumnCompiledFilter Compiled, bool IsExcluded)>(filters.Count);
+
+        foreach (var savedFilter in filters)
+        {
+            // A null AoS Compiled is skipped without touching the isEmpty/isFiltered decision. Skipping at compile time
+            // is equivalent to the row oracle's per-event `continue` before the exclude/include arms.
+            if (savedFilter.Compiled is null) { continue; }
+
+            if (!FilterCompiler.TryCompileColumn(savedFilter.ComparisonText, out var columnCompiled, out var error))
+            {
+                throw new InvalidOperationException(
+                    $"Filter '{savedFilter.ComparisonText}' has a non-null AoS {nameof(SavedFilter.Compiled)} but failed " +
+                    $"column-direct compilation: {error}");
+            }
+
+            compiledFilters.Add((columnCompiled, savedFilter.IsExcluded));
+        }
+
+        return compiledFilters;
+    }
+
     private static IReadOnlyList<ResolvedEvent> FilterEventsSequential(
         IEnumerable<ResolvedEvent> events,
         Filter filter) =>
@@ -86,6 +151,47 @@ internal sealed class FilterService : IFilterService
                 e.MatchesFilters(filter.Filters))
             .ToList()
             .AsReadOnly();
+
+    private static bool MatchesCompiledFilters(
+        IEventColumnReader reader,
+        EventLocator locator,
+        List<(ColumnCompiledFilter Compiled, bool IsExcluded)> compiledFilters)
+    {
+        var isEmpty = true;
+        var isFiltered = false;
+
+        foreach (var (compiled, isExcluded) in compiledFilters)
+        {
+            FilterMatch match = compiled.Evaluate(reader, locator);
+
+            if (isExcluded)
+            {
+                // Exclude hides only on a decisive Match; Unknown and NoMatch keep the row visible.
+                if (match == FilterMatch.Match) { return false; }
+
+                continue;
+            }
+
+            isEmpty = false;
+
+            // Include keeps the row on a Match OR an Unknown; only a decisive NoMatch fails to satisfy it.
+            if (match != FilterMatch.NoMatch) { isFiltered = true; }
+        }
+
+        return isEmpty || isFiltered;
+    }
+
+    private static bool MatchesDateRange(
+        IEventColumnReader reader,
+        EventLocator locator,
+        DateTime? after,
+        DateTime? before)
+    {
+        reader.GetField(locator, EventFieldId.TimeCreated).TryGetDateTime(out var timeCreated);
+
+        // Lifted nullable comparison mirrors the row oracle: a null After or Before makes the arm false.
+        return timeCreated >= after && timeCreated <= before;
+    }
 
     private static bool ShouldParallelizeAcrossLogs(
         IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> logs)

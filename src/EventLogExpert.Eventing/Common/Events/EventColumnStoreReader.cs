@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Structured;
+using System.Collections;
 using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Common.Events;
@@ -11,6 +12,11 @@ namespace EventLogExpert.Eventing.Common.Events;
 internal sealed class EventColumnStoreReader : IEventColumnReader
 {
     private readonly EventColumnStore _store;
+
+    // Lazily built the first time a pooled column is materialized: interns any pending-tail pooled strings that the
+    // sealed pool has not, so Pool spans the whole physical range. The store snapshot is immutable, so a concurrent
+    // recompute is benign (mirrors EventColumnPool.Prefix).
+    private PendingPoolExtension? _pendingPool;
 
     internal EventColumnStoreReader(EventLogId logId, EventColumnStore store)
     {
@@ -27,6 +33,66 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
     public int Generation => _store.Generation;
 
     public EventLogId LogId { get; }
+
+    public IReadOnlyList<string?> Pool => new PoolView(_store, PendingPool());
+
+    public void CopyGuidColumn(EventFieldId field, Guid[] values, bool[] hasValue)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(hasValue);
+
+        if (field != EventFieldId.ActivityId)
+        {
+            throw new ArgumentOutOfRangeException(nameof(field), field, "Not a Guid column.");
+        }
+
+        _store.CopyActivityId(values, hasValue);
+    }
+
+    public void CopyInt64Column(EventFieldId field, long[] values, bool[] hasValue)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(hasValue);
+
+        switch (field)
+        {
+            case EventFieldId.Id:
+                _store.CopyId(values, hasValue);
+                break;
+            case EventFieldId.RecordId:
+                _store.CopyRecordId(values, hasValue);
+                break;
+            case EventFieldId.ProcessId:
+                _store.CopyProcessId(values, hasValue);
+                break;
+            case EventFieldId.ThreadId:
+                _store.CopyThreadId(values, hasValue);
+                break;
+            case EventFieldId.TimeCreated:
+                _store.CopyTimeTicks(values, hasValue);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(field), field, "Not an integral column.");
+        }
+    }
+
+    public void CopyPoolIndexColumn(EventFieldId field, int[] poolIndices)
+    {
+        ArgumentNullException.ThrowIfNull(poolIndices);
+
+        EventColumnField column = ToColumnField(field);
+        _store.CopySealedPoolIndex(column, poolIndices);
+
+        if (_store.SealedCount >= _store.Count) { return; }
+
+        PendingPoolExtension extension = PendingPool();
+
+        for (int index = _store.SealedCount; index < _store.Count; index++)
+        {
+            string? value = PendingPoolString(_store.GetPendingEvent(index), column);
+            poolIndices[index] = value is null ? -1 : extension.StorePoolCount + extension.IndexOf(value);
+        }
+    }
 
     public EventDataFieldEnumerator EnumerateEventData(EventLocator locator)
     {
@@ -51,6 +117,10 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         return new UserDataFieldEnumerator(pending.UserData, pending.UserDataIncomplete);
 
     }
+
+    public ResolvedEvent GetDetail(EventLocator locator) => _store.GetDetail(Resolve(locator));
+
+    public ResolvedEvent GetDetailLean(EventLocator locator) => _store.GetDetailLean(Resolve(locator));
 
     public EventFieldValue GetField(EventLocator locator, EventFieldId field)
     {
@@ -197,6 +267,64 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         return false;
     }
 
+    private static string? PendingPoolString(ResolvedEvent pending, EventColumnField column) => column switch
+    {
+        EventColumnField.OwningLog => pending.OwningLog,
+        EventColumnField.ComputerName => pending.ComputerName,
+        EventColumnField.Description => pending.Description,
+        EventColumnField.Level => pending.Level,
+        EventColumnField.LogName => pending.LogName,
+        EventColumnField.Source => pending.Source,
+        EventColumnField.TaskCategory => pending.TaskCategory,
+        EventColumnField.Xml => pending.Xml,
+        EventColumnField.UserId => pending.UserId?.Value,
+        _ => throw new ArgumentOutOfRangeException(nameof(column), column, null)
+    };
+
+    private static EventColumnField ToColumnField(EventFieldId field) => field switch
+    {
+        EventFieldId.Level => EventColumnField.Level,
+        EventFieldId.LogName => EventColumnField.LogName,
+        EventFieldId.ComputerName => EventColumnField.ComputerName,
+        EventFieldId.Source => EventColumnField.Source,
+        EventFieldId.TaskCategory => EventColumnField.TaskCategory,
+        EventFieldId.UserId => EventColumnField.UserId,
+        EventFieldId.Description => EventColumnField.Description,
+        EventFieldId.Xml => EventColumnField.Xml,
+        EventFieldId.OwningLog => EventColumnField.OwningLog,
+        _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Not a single pooled string column.")
+    };
+
+    private PendingPoolExtension BuildPendingPool()
+    {
+        var indexByValue = new Dictionary<string, int>(StringComparer.Ordinal);
+        var extras = new List<string>();
+
+        for (int index = _store.SealedCount; index < _store.Count; index++)
+        {
+            ResolvedEvent pending = _store.GetPendingEvent(index);
+            AddPendingValue(pending.OwningLog, indexByValue, extras);
+            AddPendingValue(pending.ComputerName, indexByValue, extras);
+            AddPendingValue(pending.Description, indexByValue, extras);
+            AddPendingValue(pending.Level, indexByValue, extras);
+            AddPendingValue(pending.LogName, indexByValue, extras);
+            AddPendingValue(pending.Source, indexByValue, extras);
+            AddPendingValue(pending.TaskCategory, indexByValue, extras);
+            AddPendingValue(pending.Xml, indexByValue, extras);
+            AddPendingValue(pending.UserId?.Value, indexByValue, extras);
+        }
+
+        return new PendingPoolExtension(_store.PoolDistinctCount, [.. extras], indexByValue);
+
+        static void AddPendingValue(string? value, Dictionary<string, int> indexByValue, List<string> extras)
+        {
+            if (value is null || indexByValue.ContainsKey(value)) { return; }
+
+            indexByValue[value] = extras.Count;
+            extras.Add(value);
+        }
+    }
+
     private string JoinKeywords(int index)
     {
         ReadOnlySpan<int> keywordIndices = _store.RawKeywords(index);
@@ -204,6 +332,18 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         return keywordIndices.Length == 0 ?
             string.Empty :
             string.Join(", ", _store.ReconstructStringArray(keywordIndices));
+    }
+
+    private PendingPoolExtension PendingPool()
+    {
+        PendingPoolExtension? existing = Volatile.Read(ref _pendingPool);
+
+        if (existing is not null) { return existing; }
+
+        PendingPoolExtension built = BuildPendingPool();
+        Volatile.Write(ref _pendingPool, built);
+
+        return built;
     }
 
     private EventFieldValue PooledField(EventColumnField column, int index) =>
@@ -248,5 +388,51 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         SecurityIdentifier? userId = poolIndex < 0 ? null : new SecurityIdentifier(_store.PoolGet(poolIndex)!);
 
         return EventFieldValue.FromProperty(userId);
+    }
+
+    // The pending-tail pooled strings that the sealed pool does not already index, addressed as
+    // (StorePoolCount + extra-index). Extra values may duplicate sealed pool values; that is harmless because callers
+    // rank pool strings by value, not by index.
+    private sealed class PendingPoolExtension
+    {
+        private readonly Dictionary<string, int> _indexByValue;
+
+        internal PendingPoolExtension(int storePoolCount, string[] extras, Dictionary<string, int> indexByValue)
+        {
+            StorePoolCount = storePoolCount;
+            Extras = extras;
+            _indexByValue = indexByValue;
+        }
+
+        internal string[] Extras { get; }
+
+        internal int StorePoolCount { get; }
+
+        internal int IndexOf(string value) => _indexByValue[value];
+    }
+
+    private sealed class PoolView : IReadOnlyList<string?>
+    {
+        private readonly PendingPoolExtension _extension;
+        private readonly EventColumnStore _store;
+
+        internal PoolView(EventColumnStore store, PendingPoolExtension extension)
+        {
+            _store = store;
+            _extension = extension;
+        }
+
+        public int Count => _extension.StorePoolCount + _extension.Extras.Length;
+
+        public string? this[int index] => index < _extension.StorePoolCount
+            ? _store.PoolGet(index)
+            : _extension.Extras[index - _extension.StorePoolCount];
+
+        public IEnumerator<string?> GetEnumerator()
+        {
+            for (int index = 0; index < Count; index++) { yield return this[index]; }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

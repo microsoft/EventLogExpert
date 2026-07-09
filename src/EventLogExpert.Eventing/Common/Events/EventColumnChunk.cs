@@ -167,7 +167,29 @@ internal sealed class EventColumnChunk
         _fieldValue = [.. builder.FieldValue];
     }
 
+    // Read-only views over the row-aligned scalar columns, for bulk column-scan materialization (a whole column copied
+    // once per chunk rather than a per-row accessor call). The span is valid only while this immutable chunk is reachable.
+    internal ReadOnlySpan<Guid> ActivityIdColumn => _activityId;
+
+    internal ReadOnlySpan<bool> ActivityIdHasColumn => _activityIdHas;
+
+    internal ReadOnlySpan<int> IdColumn => _id;
+
+    internal ReadOnlySpan<int> ProcessIdColumn => _processId;
+
+    internal ReadOnlySpan<bool> ProcessIdHasColumn => _processIdHas;
+
+    internal ReadOnlySpan<long> RecordIdColumn => _recordId;
+
+    internal ReadOnlySpan<bool> RecordIdHasColumn => _recordIdHas;
+
     internal int RowCount { get; }
+
+    internal ReadOnlySpan<int> ThreadIdColumn => _threadId;
+
+    internal ReadOnlySpan<bool> ThreadIdHasColumn => _threadIdHas;
+
+    internal ReadOnlySpan<long> TimeTicksColumn => _timeTicks;
 
     internal static EventColumnChunk Build(
         IReadOnlyList<ResolvedEvent> events,
@@ -185,6 +207,21 @@ internal sealed class EventColumnChunk
 
         return new EventColumnChunk(builder);
     }
+
+    /// <summary>The raw pool-index column for <paramref name="column" />, one entry per row (-1 = null).</summary>
+    internal ReadOnlySpan<int> PoolIndexColumn(EventColumnField column) => column switch
+    {
+        EventColumnField.OwningLog => _owningLog,
+        EventColumnField.ComputerName => _computerName,
+        EventColumnField.Description => _description,
+        EventColumnField.Level => _level,
+        EventColumnField.LogName => _logName,
+        EventColumnField.Source => _source,
+        EventColumnField.TaskCategory => _taskCategory,
+        EventColumnField.Xml => _xml,
+        EventColumnField.UserId => _userId,
+        _ => throw new ArgumentOutOfRangeException(nameof(column), column, null)
+    };
 
     internal Guid RowActivityId(int row, out bool hasValue)
     {

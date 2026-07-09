@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
@@ -73,6 +74,44 @@ public sealed class EventColumnStoreTests
         Assert.Same(store, appended);
         Assert.Equal(3, appended.ContentVersion);
         Assert.Equal(1, appended.Count);
+    }
+
+    [Fact]
+    public void Append_ToEmptyStore_InitializesMinMaxFromBatch()
+    {
+        long a = new DateTime(2020, 5, 5, 0, 0, 0, DateTimeKind.Utc).Ticks;
+        long b = new DateTime(2020, 5, 6, 0, 0, 0, DateTimeKind.Utc).Ticks;
+
+        EventColumnStore store = EventColumnStore.Build([], generation: 0, contentVersion: 0)
+            .Append([EventAt(0, b), EventAt(1, a)]);
+
+        Assert.True(store.TryGetTimeRange(out long minTicks, out long maxTicks));
+        Assert.Equal(a, minTicks);
+        Assert.Equal(b, maxTicks);
+    }
+
+    [Fact]
+    public void Append_WidensMinMaxForOutOfRangeEventsAndLeavesInRangeUnchanged()
+    {
+        long earlier = new DateTime(2019, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+        long early = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+        long within = new DateTime(2021, 6, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+        long late = new DateTime(2022, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+        long later = new DateTime(2023, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+
+        EventColumnStore seed = EventColumnStore.Build([EventAt(0, early), EventAt(1, late)], generation: 1, contentVersion: 1);
+        Assert.Equal(early, seed.MinTimeTicks);
+        Assert.Equal(late, seed.MaxTimeTicks);
+
+        // Appending an older AND a newer event widens both ends.
+        EventColumnStore widened = seed.Append([EventAt(2, earlier), EventAt(3, later)]);
+        Assert.Equal(earlier, widened.MinTimeTicks);
+        Assert.Equal(later, widened.MaxTimeTicks);
+
+        // Appending an in-range event leaves the span unchanged.
+        EventColumnStore unchanged = widened.Append([EventAt(4, within)]);
+        Assert.Equal(earlier, unchanged.MinTimeTicks);
+        Assert.Equal(later, unchanged.MaxTimeTicks);
     }
 
     [Fact]
@@ -318,6 +357,24 @@ public sealed class EventColumnStoreTests
     }
 
     [Fact]
+    public void Build_MinMax_SpanTheBatchTickRange()
+    {
+        long early = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+        long middle = new DateTime(2021, 6, 15, 12, 0, 0, DateTimeKind.Utc).Ticks;
+        long late = new DateTime(2022, 12, 31, 23, 59, 59, DateTimeKind.Utc).Ticks;
+
+        // Deliberately unsorted so the range cannot be read off the first or last physical row.
+        EventColumnStore store = EventColumnStore.Build(
+            [EventAt(0, middle), EventAt(1, late), EventAt(2, early)], generation: 1, contentVersion: 1);
+
+        Assert.True(store.TryGetTimeRange(out long minTicks, out long maxTicks));
+        Assert.Equal(early, minTicks);
+        Assert.Equal(late, maxTicks);
+        Assert.Equal(early, store.MinTimeTicks);
+        Assert.Equal(late, store.MaxTimeTicks);
+    }
+
+    [Fact]
     public void Build_SameFieldNames_ShareSchemaId()
     {
         ResolvedEvent first = new ResolvedEvent("live", LogPathType.Channel).WithEventData(("A", "x"), ("B", "y"));
@@ -393,6 +450,19 @@ public sealed class EventColumnStoreTests
     }
 
     [Fact]
+    public void Build_SingleEvent_MinEqualsMax()
+    {
+        long ticks = new DateTime(2023, 3, 3, 3, 3, 3, DateTimeKind.Utc).Ticks;
+
+        EventColumnStore store = EventColumnStore.Build([EventAt(0, ticks)], generation: 0, contentVersion: 0);
+
+        Assert.True(store.TryGetTimeRange(out long minTicks, out long maxTicks));
+        Assert.Equal(ticks, minTicks);
+        Assert.Equal(ticks, maxTicks);
+        Assert.Equal(store.MinTimeTicks, store.MaxTimeTicks);
+    }
+
+    [Fact]
     public void Build_UserData_RoundTripsPathValuesTruncatedAndIncomplete()
     {
         ResolvedEvent resolvedEvent = new("live", LogPathType.Channel)
@@ -450,6 +520,38 @@ public sealed class EventColumnStoreTests
     }
 
     [Fact]
+    public void BuildMultiChunkThenAppend_MinMaxSpanSealedChunksAndPendingTail()
+    {
+        // Build columnarizes the whole batch into sealed chunks (empty tail); a short Append then stays in the pending
+        // tail, so the global min sits in a sealed chunk and the global max in the pending tail.
+        const int SealedRows = 4096 * 2; // Two full sealed chunks.
+        const int TailRows = 37;         // Below the reseal threshold, so it remains pending.
+
+        long baseTicks = new DateTime(2021, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+
+        ResolvedEvent[] sealedBatch = new ResolvedEvent[SealedRows];
+        for (int i = 0; i < SealedRows; i++) { sealedBatch[i] = EventAt(i, baseTicks + 1000 + i); }
+
+        long expectedMin = baseTicks; // Below every other value; placed in the second sealed chunk, not at a physical end.
+        sealedBatch[SealedRows - 100] = EventAt(SealedRows - 100, expectedMin);
+
+        ResolvedEvent[] tailBatch = new ResolvedEvent[TailRows];
+        for (int i = 0; i < TailRows; i++) { tailBatch[i] = EventAt(SealedRows + i, baseTicks + 2000 + i); }
+
+        long expectedMax = baseTicks + 10_000_000; // Above every other value; placed in the pending tail, not the last row.
+        tailBatch[TailRows - 5] = EventAt(SealedRows + TailRows - 5, expectedMax);
+
+        EventColumnStore store = EventColumnStore.Build(sealedBatch, generation: 1, contentVersion: 1).Append(tailBatch);
+
+        Assert.Equal(2, store.SealedChunkCount);
+        Assert.Equal(SealedRows, store.SealedCount);
+        Assert.Equal(TailRows, store.Count - store.SealedCount);
+        Assert.True(store.TryGetTimeRange(out long minTicks, out long maxTicks));
+        Assert.Equal(expectedMin, minTicks);
+        Assert.Equal(expectedMax, maxTicks);
+    }
+
+    [Fact]
     public void ColumnAccessors_PendingRow_Throw()
     {
         EventColumnStore store = EventColumnStore.Build([], generation: 1, contentVersion: 1).Append([Event(0)]);
@@ -461,6 +563,54 @@ public sealed class EventColumnStoreTests
     }
 
     [Fact]
+    public void CreateReader_GetDetailAndLean_RoundTripEveryRowAcrossSealedAndPending()
+    {
+        // Build columnarizes the whole batch into sealed chunks; the short Append leaves a pending tail, so the loop
+        // drives both the sealed-row reconstruction path and the pending-row passthrough through the public reader.
+        const int SealedRows = 4096 + 10; // Build => two sealed chunks.
+        const int TailRows = 15;          // Append keeps these in the pending tail.
+
+        long baseTicks = new DateTime(2021, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+
+        // Row j carries Id j and tick baseTicks + j, so a locator that resolves to the wrong row is caught immediately.
+        ResolvedEvent[] sealedBatch = new ResolvedEvent[SealedRows];
+        for (int i = 0; i < SealedRows; i++) { sealedBatch[i] = EventAt(i, baseTicks + i); }
+
+        ResolvedEvent[] tailBatch = new ResolvedEvent[TailRows];
+        for (int i = 0; i < TailRows; i++) { tailBatch[i] = EventAt(SealedRows + i, baseTicks + SealedRows + i); }
+
+        EventColumnStore store = EventColumnStore.Build(sealedBatch, generation: 3, contentVersion: 9).Append(tailBatch);
+
+        EventLogId logId = new(Guid.NewGuid());
+        IEventColumnReader reader = store.CreateReader(logId);
+
+        Assert.Equal(store.Count, reader.Count);
+        Assert.Equal(store.Generation, reader.Generation);
+        Assert.Equal(logId, reader.LogId);
+        Assert.True(store.SealedCount > 0 && store.Count - store.SealedCount == TailRows);
+
+        for (int i = 0; i < store.Count; i++)
+        {
+            EventLocator locator = reader.LocatorAt(i);
+
+            ResolvedEvent full = reader.GetDetail(locator);
+            ResolvedEvent lean = reader.GetDetailLean(locator);
+
+            Assert.Equal(i, full.Id);
+            Assert.Equal(baseTicks + i, full.TimeCreated.Ticks);
+            Assert.Equal(i, lean.Id);
+            Assert.Equal(baseTicks + i, lean.TimeCreated.Ticks);
+        }
+    }
+
+    [Fact]
+    public void Empty_HasNoRowsAndReportsNoTimeRange()
+    {
+        Assert.Equal(0, EventColumnStore.Empty.Count);
+        Assert.False(EventColumnStore.Empty.TryGetTimeRange(out _, out _));
+    }
+
+    [Fact]
     public void GetPendingEvent_PendingRow_ReturnsEventAndThrowsForSealed()
     {
         ResolvedEvent pending = new("live", LogPathType.Channel) { LogName = "Security", Keywords = ["Audit Success"] };
@@ -469,6 +619,42 @@ public sealed class EventColumnStoreTests
         Assert.True(store.IsPending(1));
         Assert.Same(pending, store.GetPendingEvent(1));
         Assert.Throws<ArgumentOutOfRangeException>(() => store.GetPendingEvent(0));
+    }
+
+    [Fact]
+    public void TryGetTimeRange_MatchesTimeColumnAcrossSealedAndPendingRows()
+    {
+        const int SealedRows = 4096 + 250; // Build => two sealed chunks.
+        const int TailRows = 300;          // Append keeps 300 rows in the pending tail.
+
+        long baseTicks = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+
+        // A deterministic non-monotonic spread so neither physical end is an extreme.
+        ResolvedEvent[] sealedBatch = new ResolvedEvent[SealedRows];
+        for (int i = 0; i < SealedRows; i++) { sealedBatch[i] = EventAt(i, baseTicks + ((i * 2654435761L) % 1_000_003L)); }
+
+        ResolvedEvent[] tailBatch = new ResolvedEvent[TailRows];
+        for (int i = 0; i < TailRows; i++) { tailBatch[i] = EventAt(SealedRows + i, baseTicks + (((i + 7) * 40503L) % 999_983L)); }
+
+        EventColumnStore store = EventColumnStore.Build(sealedBatch, generation: 1, contentVersion: 1).Append(tailBatch);
+
+        Assert.True(store.SealedCount > 0);
+        Assert.True(store.Count - store.SealedCount > 0);
+
+        // Cross-check the O(1) range against a full scan of the store's time column (sealed rows + pending tail).
+        long expectedMin = long.MaxValue;
+        long expectedMax = long.MinValue;
+
+        for (int i = 0; i < store.Count; i++)
+        {
+            long ticks = store.RawTimeTicks(i);
+            expectedMin = Math.Min(expectedMin, ticks);
+            expectedMax = Math.Max(expectedMax, ticks);
+        }
+
+        Assert.True(store.TryGetTimeRange(out long minTicks, out long maxTicks));
+        Assert.Equal(expectedMin, minTicks);
+        Assert.Equal(expectedMax, maxTicks);
     }
 
     [Fact]
@@ -488,6 +674,9 @@ public sealed class EventColumnStoreTests
         Assert.Equal(expected, store.RawEventDataField(0, field).Kind);
 
     private static ResolvedEvent Event(int id) => new("live", LogPathType.Channel) { Id = id };
+
+    private static ResolvedEvent EventAt(int id, long ticks) =>
+        new("live", LogPathType.Channel) { Id = id, TimeCreated = new DateTime(ticks, DateTimeKind.Utc) };
 
     private static ResolvedEvent EventWithProperties(params (string Name, EventProperty Value)[] fields)
     {
