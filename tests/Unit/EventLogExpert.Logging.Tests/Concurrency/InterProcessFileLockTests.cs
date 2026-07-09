@@ -70,6 +70,49 @@ public sealed class InterProcessFileLockTests : IDisposable
     }
 
     [Fact]
+    public void TryRun_InfiniteTimeout_WaitsForHeldLockThenAcquires()
+    {
+        var target = TargetPath();
+        var first = new InterProcessFileLock("ProviderDbSchema", target);
+        var second = new InterProcessFileLock("ProviderDbSchema", target);
+
+        using var acquired = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
+
+        var holder = StartHolder(first, acquired, release, TestContext.Current.CancellationToken);
+
+        Assert.True(acquired.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+
+        // Release the holder shortly after; an infinite-timeout acquire must WAIT for the release rather than
+        // treating the -1ms TimeSpan as an already-expired deadline and returning false.
+        var releaser = new Thread(() =>
+        {
+            Thread.Sleep(300);
+            release.Set();
+        });
+        releaser.Start();
+
+        var ranAgain = false;
+        Assert.True(second.TryRun(Timeout.InfiniteTimeSpan, () => ranAgain = true));
+        Assert.True(ranAgain);
+
+        holder.Join();
+        releaser.Join();
+    }
+
+    [Theory]
+    [InlineData(-20000)] // -2ms
+    [InlineData(-15000)] // -1.5ms: a naive (long)TotalMilliseconds cast truncates to -1 (== infinite) and slips through.
+    [InlineData(-1)]     // -1 tick: a naive cast truncates to 0 (== try-once) and slips through.
+    public void TryRun_NegativeTimeoutBelowInfinite_ThrowsArgumentOutOfRange(long ticks)
+    {
+        var fileLock = new InterProcessFileLock("ProviderDbSchema", TargetPath());
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => fileLock.TryRun(TimeSpan.FromTicks(ticks), static () => { }));
+    }
+
+    [Fact]
     public void TryRun_TwoInstancesSamePath_SecondBlockedWhileFirstHolds_ThenSucceeds()
     {
         var target = TargetPath();
