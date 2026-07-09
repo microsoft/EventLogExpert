@@ -40,6 +40,12 @@ internal sealed class UpgradeDatabaseOperation(UpgradeDatabaseRequest request) :
 
             return DatabaseToolsOutcome.Failed;
         }
+        catch (SchemaLockTimeoutException ex)
+        {
+            logger.Error($"Cannot upgrade '{request.DatabasePath}': {ex.Message}");
+
+            return DatabaseToolsOutcome.Failed;
+        }
 
         if (!state.NeedsUpgrade)
         {
@@ -66,7 +72,7 @@ internal sealed class UpgradeDatabaseOperation(UpgradeDatabaseRequest request) :
 
         try
         {
-            await using var upgradeContext = new ProviderDbContext(request.DatabasePath, false, logger);
+            await using var upgradeContext = new ProviderDbContext(request.DatabasePath, false, false, logger);
 
             upgradeContext.PerformUpgradeIfNeeded();
 
@@ -79,6 +85,12 @@ internal sealed class UpgradeDatabaseOperation(UpgradeDatabaseRequest request) :
         catch (DatabaseUpgradeException ex)
         {
             logger.Error($"{ex.Message}");
+
+            return DatabaseToolsOutcome.Failed;
+        }
+        catch (SchemaLockTimeoutException ex)
+        {
+            logger.Error($"Cannot upgrade '{request.DatabasePath}': {ex.Message}");
 
             return DatabaseToolsOutcome.Failed;
         }

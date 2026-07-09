@@ -59,9 +59,10 @@
               <!-- FTA "Open with EventLogExpert" verb. Surfaces in the Open With submenu; the
                    top-level right-click entry comes from the desktop4:fileExplorerContextMenus
                    block below, not from this verb.
-                   MultiSelectModel="Player" fans a multi-select into one activation — combined
-                   with AppInstance single-instancing in Platforms\Windows\Program.cs, N selected
-                   .evtx files open in one window.
+                   MultiSelectModel="Player" fans a multi-select into a single activation carrying all
+                   selected files, so N selected .evtx files open together in one new window. This is
+                   independent of process instancing (the app is multi-instance): a separate open
+                   launches its own window; only drag-and-drop adds logs to an existing one.
                    MultiSelectModel is unprefixed because the namespaced uap3:MultiSelectModel
                    form fails MSIX deployment schema validation (DEP0700 / 0xC00CE015). -->
               <uap3:Verb Id="open" MultiSelectModel="Player">Open with EventLogExpert</uap3:Verb>

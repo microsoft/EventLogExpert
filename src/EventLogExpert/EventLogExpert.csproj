@@ -28,9 +28,9 @@
     </PropertyGroup>
 
     <!-- Suppress MAUI's source-generated Windows Main on the Windows TFM so our handwritten
-         Platforms\Windows\Program.cs takes over. Required to intercept activation BEFORE
-         Application.Start() runs (AppInstance single-instance contract). Also embed app.manifest
-         so the exe is long-path-aware (filesystem operations against >MAX_PATH paths). -->
+         Platforms\Windows\Program.cs takes over. Required to capture the shell activation args and
+         seed them BEFORE Application.Start() builds the app. Also embed app.manifest so the exe is
+         long-path-aware (filesystem operations against >MAX_PATH paths). -->
     <PropertyGroup Condition="$(TargetFramework.Contains('-windows'))">
         <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
         <ApplicationManifest>app.manifest</ApplicationManifest>

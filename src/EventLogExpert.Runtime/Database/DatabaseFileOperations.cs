@@ -96,6 +96,16 @@ internal static class DatabaseFileOperations
         {
             return !maintenance.CheckSchemaState(fullPath, readOnly: true).NeedsUpgrade;
         }
+        catch (SchemaLockTimeoutException ex)
+        {
+            // Inconclusive, not a failure: a concurrent process holds the schema lock, so the state can't be re-probed
+            // right now. The sole caller is the post-upgrade verify, where treating this as not-ready would roll back a
+            // just-completed upgrade; the entry is re-classified on the next pass instead.
+            SafeLog(() => traceLogger.Warning(
+                $"{nameof(DatabaseFileOperations)}.{nameof(VerifyEntryReady)}: '{fullPath}' schema lock busy during verify: {ex.Message}"));
+
+            return true;
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             SafeLog(() => traceLogger.Warning(

@@ -223,7 +223,18 @@ internal static class ProviderSource
 
     private static bool IsSourceSchemaCurrent(ProviderDbContext context, string file, ITraceLogger logger)
     {
-        var state = context.IsUpgradeNeeded();
+        DatabaseSchemaState state;
+
+        try
+        {
+            state = context.IsUpgradeNeeded();
+        }
+        catch (SchemaLockTimeoutException ex)
+        {
+            logger.Error($"Cannot read source database '{file}': {ex.Message}");
+
+            return false;
+        }
 
         if (!state.NeedsUpgrade) { return true; }
 

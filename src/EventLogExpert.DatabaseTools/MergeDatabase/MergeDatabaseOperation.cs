@@ -62,6 +62,12 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
 
             return DatabaseToolsOutcome.Failed;
         }
+        catch (SchemaLockTimeoutException ex)
+        {
+            logger.Error($"Cannot merge into '{request.TargetDatabasePath}': {ex.Message}");
+
+            return DatabaseToolsOutcome.Failed;
+        }
 
         if (targetState.CurrentVersion == DatabaseSchemaVersion.Unknown)
         {
@@ -79,7 +85,7 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
 
         try
         {
-            await using var targetContext = new ProviderDbContext(request.TargetDatabasePath, false, logger);
+            await using var targetContext = new ProviderDbContext(request.TargetDatabasePath, false, false, logger);
 
             // SQLite cannot translate composite IN, so query by name and narrow exact identities in memory.
             var identitiesAlreadyInTarget = new HashSet<ProviderIdentity>();
