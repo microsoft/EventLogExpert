@@ -27,6 +27,38 @@ public sealed class EventColumnStoreReaderParityTests
     private static readonly DateTime s_time = new(2021, 6, 15, 10, 20, 30, DateTimeKind.Utc);
 
     [Fact]
+    public void EnumerateEventData_PendingRows_MatchLegacyReader()
+    {
+        (IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus) = BuildPending();
+
+        AssertEventDataEnumerationParity(legacy, column, corpus.Length);
+    }
+
+    [Fact]
+    public void EnumerateEventData_SealedRows_MatchLegacyReader()
+    {
+        (IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus) = BuildSealed();
+
+        AssertEventDataEnumerationParity(legacy, column, corpus.Length);
+    }
+
+    [Fact]
+    public void EnumerateUserData_PendingRows_MatchLegacyReader()
+    {
+        (IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus) = BuildPending();
+
+        AssertUserDataEnumerationParity(legacy, column, corpus.Length);
+    }
+
+    [Fact]
+    public void EnumerateUserData_SealedRows_MatchLegacyReader()
+    {
+        (IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus) = BuildSealed();
+
+        AssertUserDataEnumerationParity(legacy, column, corpus.Length);
+    }
+
+    [Fact]
     public void GetField_ForeignLogIdLocator_ThrowsArgumentException()
     {
         (IEventColumnReader legacy, IEventColumnReader column, _) = BuildSealed();
@@ -63,6 +95,22 @@ public sealed class EventColumnStoreReaderParityTests
     }
 
     [Fact]
+    public void GetKeywords_PendingRows_MatchLegacyReader()
+    {
+        (IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus) = BuildPending();
+
+        AssertKeywordsParity(legacy, column, corpus.Length);
+    }
+
+    [Fact]
+    public void GetKeywords_SealedRows_MatchLegacyReader()
+    {
+        (IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus) = BuildSealed();
+
+        AssertKeywordsParity(legacy, column, corpus.Length);
+    }
+
+    [Fact]
     public void GetUserData_PendingRowsForEveryProbeKey_MatchLegacyReader()
     {
         (IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus) = BuildPending();
@@ -76,6 +124,22 @@ public sealed class EventColumnStoreReaderParityTests
         (IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus) = BuildSealed();
 
         AssertUserDataParity(legacy, column, corpus);
+    }
+
+    [Fact]
+    public void GetUserDataIncomplete_PendingRows_MatchLegacyReader()
+    {
+        (IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus) = BuildPending();
+
+        AssertUserDataIncompleteParity(legacy, column, corpus.Length);
+    }
+
+    [Fact]
+    public void GetUserDataIncomplete_SealedRows_MatchLegacyReader()
+    {
+        (IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus) = BuildSealed();
+
+        AssertUserDataIncompleteParity(legacy, column, corpus.Length);
     }
 
     [Fact]
@@ -108,6 +172,17 @@ public sealed class EventColumnStoreReaderParityTests
         (IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus) = BuildSealed();
 
         AssertEventDataParity(legacy, column, corpus);
+    }
+
+    private static void AssertEventDataEnumerationParity(IEventColumnReader legacy, IEventColumnReader column, int count)
+    {
+        for (int index = 0; index < count; index++)
+        {
+            List<(string Name, EventFieldValueKind Kind, string Value)> expected = MaterializeEventData(legacy, legacy.LocatorAt(index));
+            List<(string Name, EventFieldValueKind Kind, string Value)> actual = MaterializeEventData(column, column.LocatorAt(index));
+
+            Assert.Equal(expected, actual);
+        }
     }
 
     private static void AssertEventDataParity(IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus)
@@ -143,12 +218,46 @@ public sealed class EventColumnStoreReaderParityTests
         }
     }
 
+    private static void AssertKeywordsParity(IEventColumnReader legacy, IEventColumnReader column, int count)
+    {
+        for (int index = 0; index < count; index++)
+        {
+            IReadOnlyList<string> expected = legacy.GetKeywords(legacy.LocatorAt(index));
+            IReadOnlyList<string> actual = column.GetKeywords(column.LocatorAt(index));
+
+            Assert.Equal(expected, actual);
+        }
+    }
+
     private static void AssertSurfaceParity(IEventColumnReader legacy, IEventColumnReader column)
     {
         Assert.Equal(legacy.LogId, column.LogId);
         Assert.Equal(legacy.Generation, column.Generation);
         Assert.Equal(legacy.ContentVersion, column.ContentVersion);
         Assert.Equal(legacy.Count, column.Count);
+    }
+
+    private static void AssertUserDataEnumerationParity(IEventColumnReader legacy, IEventColumnReader column, int count)
+    {
+        for (int index = 0; index < count; index++)
+        {
+            List<(string Path, EventFieldValueKind Kind, string Value, bool Truncated, bool Absent)> expected =
+                MaterializeUserData(legacy, legacy.LocatorAt(index));
+            List<(string Path, EventFieldValueKind Kind, string Value, bool Truncated, bool Absent)> actual =
+                MaterializeUserData(column, column.LocatorAt(index));
+
+            Assert.Equal(expected, actual);
+        }
+    }
+
+    private static void AssertUserDataIncompleteParity(IEventColumnReader legacy, IEventColumnReader column, int count)
+    {
+        for (int index = 0; index < count; index++)
+        {
+            Assert.Equal(
+                legacy.GetUserDataIncomplete(legacy.LocatorAt(index)),
+                column.GetUserDataIncomplete(column.LocatorAt(index)));
+        }
     }
 
     private static void AssertUserDataParity(IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus)
@@ -286,7 +395,14 @@ public sealed class EventColumnStoreReaderParityTests
         WithRawSchema(
             new ResolvedEvent("live", LogPathType.Channel) { Id = 51, TimeCreated = s_time },
             new TemplateFieldSchema(["visA", "visB", "LengthProvider"], ["visA", "visB"]),
-            "a", "b")
+            "a", "b"),
+
+        // Positional-empty EventData field NAME at a middle position (design-required "positional-empty node" edge): both
+        // readers must yield the ("", value) pair at that position, keeping the enumerated name sequence at parity.
+        WithRawSchema(
+            new ResolvedEvent("live", LogPathType.Channel) { Id = 60, TimeCreated = s_time },
+            new TemplateFieldSchema(["a", "", "c"], ["a", "", "c"]),
+            "v0", "v1", "v2")
     ];
 
     private static (IEventColumnReader Legacy, IEventColumnReader Column, ResolvedEvent[] Corpus) BuildPending()
@@ -351,6 +467,39 @@ public sealed class EventColumnStoreReaderParityTests
         keys.Add("NoSuchKey");
 
         return [.. keys];
+    }
+
+    private static List<(string Name, EventFieldValueKind Kind, string Value)> MaterializeEventData(
+        IEventColumnReader reader,
+        EventLocator locator)
+    {
+        List<(string Name, EventFieldValueKind Kind, string Value)> fields = [];
+
+        foreach (EventDataView.Field field in reader.EnumerateEventData(locator))
+        {
+            fields.Add((field.Name, field.Value.Kind, field.Value.AsString()));
+        }
+
+        return fields;
+    }
+
+    private static List<(string Path, EventFieldValueKind Kind, string Value, bool Truncated, bool Absent)> MaterializeUserData(
+        IEventColumnReader reader,
+        EventLocator locator)
+    {
+        List<(string Path, EventFieldValueKind Kind, string Value, bool Truncated, bool Absent)> fields = [];
+
+        foreach (UserDataFieldEntry entry in reader.EnumerateUserData(locator))
+        {
+            fields.Add((
+                entry.Path,
+                entry.Result.Value.Kind,
+                entry.Result.Value.AsString(),
+                entry.Result.IsTruncated,
+                entry.Result.IsAbsent));
+        }
+
+        return fields;
     }
 
     private static ResolvedEvent WithNamedProperties(ResolvedEvent source, params (string Name, EventProperty Value)[] fields)

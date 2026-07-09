@@ -28,6 +28,30 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
 
     public EventLogId LogId { get; }
 
+    public EventDataFieldEnumerator EnumerateEventData(EventLocator locator)
+    {
+        int index = Resolve(locator);
+
+        return _store.IsPending(index)
+            ? new EventDataFieldEnumerator(_store.GetPendingEvent(index).EventData)
+            : new EventDataFieldEnumerator(_store, index);
+    }
+
+    public UserDataFieldEnumerator EnumerateUserData(EventLocator locator)
+    {
+        int index = Resolve(locator);
+
+        if (!_store.IsPending(index))
+        {
+            return new UserDataFieldEnumerator(_store, index);
+        }
+
+        ResolvedEvent pending = _store.GetPendingEvent(index);
+
+        return new UserDataFieldEnumerator(pending.UserData, pending.UserDataIncomplete);
+
+    }
+
     public EventFieldValue GetField(EventLocator locator, EventFieldId field)
     {
         int index = Resolve(locator);
@@ -92,6 +116,15 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         }
     }
 
+    public IReadOnlyList<string> GetKeywords(EventLocator locator)
+    {
+        int index = Resolve(locator);
+
+        return _store.IsPending(index)
+            ? _store.GetPendingEvent(index).Keywords
+            : _store.ReconstructStringArray(_store.RawKeywords(index));
+    }
+
     public StructuredFieldResult GetUserData(EventLocator locator, string storageKey)
     {
         int index = Resolve(locator);
@@ -128,6 +161,8 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
             EventFieldValue.FromProperty(EventProperty.FromReference(empty)),
             isTruncated: true);
     }
+
+    public bool GetUserDataIncomplete(EventLocator locator) => _store.RawUserDataIncomplete(Resolve(locator));
 
     public EventLocator LocatorAt(int index) => new(LogId, _store.Generation, index);
 

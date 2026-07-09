@@ -16,9 +16,17 @@ public interface IEventColumnReader
 
     EventLogId LogId { get; }
 
+    EventDataFieldEnumerator EnumerateEventData(EventLocator locator);
+
+    UserDataFieldEnumerator EnumerateUserData(EventLocator locator);
+
     EventFieldValue GetField(EventLocator locator, EventFieldId field);
 
+    IReadOnlyList<string> GetKeywords(EventLocator locator);
+
     StructuredFieldResult GetUserData(EventLocator locator, string storageKey);
+
+    bool GetUserDataIncomplete(EventLocator locator);
 
     EventLocator LocatorAt(int index);
 
