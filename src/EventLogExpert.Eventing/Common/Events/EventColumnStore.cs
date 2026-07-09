@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Eventing.Structured;
@@ -72,7 +73,7 @@ internal sealed class EventDataSchemaBuilder
 ///     functions returning a new snapshot that reference-shares prior chunks, the interned pool, and the schema table, so
 ///     a published snapshot is safe to read while a later ingest builds the next one.
 /// </summary>
-internal sealed class EventColumnStore
+public sealed class EventColumnStore
 {
     // Target sealed-chunk size. The pending tail columnarizes into one new chunk each time it reaches this many rows,
     // giving amortized O(1) append with no partially filled columnar chunks.
@@ -95,7 +96,9 @@ internal sealed class EventColumnStore
         ImmutableArray<int[]> schemas,
         int sealedCount,
         int generation,
-        long contentVersion)
+        long contentVersion,
+        long minTimeTicks,
+        long maxTimeTicks)
     {
         _sealedChunks = sealedChunks;
         _pendingTail = pendingTail;
@@ -104,15 +107,35 @@ internal sealed class EventColumnStore
         _sealedCount = sealedCount;
         Generation = generation;
         ContentVersion = contentVersion;
+        MinTimeTicks = minTimeTicks;
+        MaxTimeTicks = maxTimeTicks;
     }
 
-    /// <summary>Log-lifetime-monotonic ingest counter, bumped on every append and never reset across generations.</summary>
-    internal long ContentVersion { get; }
+    /// <summary>An empty snapshot (generation 0, no rows) that seeds a newly opened log before its first ingest.</summary>
+    public static EventColumnStore Empty { get; } = Build([], generation: 0, contentVersion: 0);
 
-    internal int Count => _sealedCount + _pendingTail.Count;
+    /// <summary>Log-lifetime-monotonic ingest counter, bumped on every append and never reset across generations.</summary>
+    public long ContentVersion { get; }
+
+    /// <summary>The total row count: the sealed columnar rows plus the pending array-of-structs tail.</summary>
+    public int Count => _sealedCount + _pendingTail.Count;
 
     /// <summary>Per-log reload counter, stable across appends and bumped only by a new-generation build.</summary>
-    internal int Generation { get; }
+    public int Generation { get; }
+
+    /// <summary>
+    ///     The largest <see cref="ResolvedEvent.TimeCreated" /> UTC-tick value across every row, maintained O(1) at build
+    ///     and append. An empty store (<see cref="Count" /> 0) reports <c>long.MinValue</c> (no range); read the span through
+    ///     <see cref="TryGetTimeRange" />.
+    /// </summary>
+    internal long MaxTimeTicks { get; }
+
+    /// <summary>
+    ///     The smallest <see cref="ResolvedEvent.TimeCreated" /> UTC-tick value across every row, maintained O(1) at
+    ///     build and append. An empty store (<see cref="Count" /> 0) reports <c>long.MaxValue</c> (no range); read the span
+    ///     through <see cref="TryGetTimeRange" />.
+    /// </summary>
+    internal long MinTimeTicks { get; }
 
     internal int PoolDistinctCount => _pool.DistinctCount;
 
@@ -126,7 +149,7 @@ internal sealed class EventColumnStore
     ///     Columnarizes an initial batch into ceil(n / <see cref="TargetChunkSize" />) sealed chunks (empty pending
     ///     tail), stamping the snapshot with <paramref name="generation" /> and <paramref name="contentVersion" />.
     /// </summary>
-    internal static EventColumnStore Build(IReadOnlyList<ResolvedEvent> batch, int generation, long contentVersion)
+    public static EventColumnStore Build(IReadOnlyList<ResolvedEvent> batch, int generation, long contentVersion)
     {
         ArgumentNullException.ThrowIfNull(batch);
 
@@ -141,7 +164,10 @@ internal sealed class EventColumnStore
             chunks = chunks.Add(chunk);
         }
 
-        return new EventColumnStore(chunks, ImmutableList<ResolvedEvent>.Empty, pool, schemas, batch.Count, generation, contentVersion);
+        (long minTimeTicks, long maxTimeTicks) = ComputeTimeRange(batch);
+
+        return new EventColumnStore(
+            chunks, ImmutableList<ResolvedEvent>.Empty, pool, schemas, batch.Count, generation, contentVersion, minTimeTicks, maxTimeTicks);
     }
 
     /// <summary>
@@ -150,7 +176,7 @@ internal sealed class EventColumnStore
     ///     schema table). Bumps <see cref="ContentVersion" />, leaves <see cref="Generation" /> unchanged, and preserves every
     ///     prior global index. An empty batch is a no-op that returns the same instance.
     /// </summary>
-    internal EventColumnStore Append(IReadOnlyList<ResolvedEvent> batch)
+    public EventColumnStore Append(IReadOnlyList<ResolvedEvent> batch)
     {
         ArgumentNullException.ThrowIfNull(batch);
 
@@ -170,7 +196,182 @@ internal sealed class EventColumnStore
             sealedCount += TargetChunkSize;
         }
 
-        return new EventColumnStore(chunks, pending, pool, schemas, sealedCount, Generation, ContentVersion + 1);
+        // Non-empty batch (the empty case returned above), so combine its range with the prior snapshot's to widen O(1).
+        (long batchMinTimeTicks, long batchMaxTimeTicks) = ComputeTimeRange(batch);
+        long minTimeTicks = Math.Min(MinTimeTicks, batchMinTimeTicks);
+        long maxTimeTicks = Math.Max(MaxTimeTicks, batchMaxTimeTicks);
+
+        return new EventColumnStore(
+            chunks, pending, pool, schemas, sealedCount, Generation, ContentVersion + 1, minTimeTicks, maxTimeTicks);
+    }
+
+    /// <summary>
+    ///     Creates a read-only <see cref="IEventColumnReader" /> over this snapshot, stamping every
+    ///     <see cref="EventLocator" /> it mints with <paramref name="logId" />. The concrete reader type stays internal, so
+    ///     callers depend only on the public reader contract.
+    /// </summary>
+    /// <param name="logId">The log identity the returned reader records on the locators it produces.</param>
+    /// <returns>A reader bound to this immutable snapshot and <paramref name="logId" />.</returns>
+    public IEventColumnReader CreateReader(EventLogId logId) => new EventColumnStoreReader(logId, this);
+
+    /// <summary>
+    ///     The <see cref="ResolvedEvent.TimeCreated" /> UTC-tick span across every row: <c>true</c> with [
+    ///     <paramref name="minTicks" />, <paramref name="maxTicks" />] set, or <c>false</c> when the store holds no rows (no
+    ///     range). The ticks share the time column's basis, so the span matches it exactly.
+    /// </summary>
+    public bool TryGetTimeRange(out long minTicks, out long maxTicks)
+    {
+        minTicks = MinTimeTicks;
+        maxTicks = MaxTimeTicks;
+
+        return Count > 0;
+    }
+
+    /// <summary>
+    ///     Bulk-copies the <see cref="ResolvedEvent.ActivityId" /> column into caller-owned flat arrays over the whole
+    ///     physical range [0, <see cref="Count" />): sealed rows are copied a chunk at a time (no per-row search), the bounded
+    ///     pending tail row by row. <paramref name="hasValue" /> is false for an absent (null) ActivityId.
+    /// </summary>
+    internal void CopyActivityId(Guid[] values, bool[] hasValue)
+    {
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            chunk.ActivityIdColumn.CopyTo(values.AsSpan(offset));
+            chunk.ActivityIdHasColumn.CopyTo(hasValue.AsSpan(offset));
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            Guid? value = Pending(index).ActivityId;
+            values[index] = value ?? Guid.Empty;
+            hasValue[index] = value.HasValue;
+        }
+    }
+
+    /// <summary>Bulk-copies the always-present <see cref="ResolvedEvent.Id" /> column, widened to <see cref="long" />.</summary>
+    internal void CopyId(long[] values, bool[] hasValue)
+    {
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            ReadOnlySpan<int> column = chunk.IdColumn;
+
+            for (int row = 0; row < column.Length; row++)
+            {
+                values[offset + row] = column[row];
+                hasValue[offset + row] = true;
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            values[index] = Pending(index).Id;
+            hasValue[index] = true;
+        }
+    }
+
+    /// <summary>Bulk-copies the nullable <see cref="ResolvedEvent.ProcessId" /> column, widened to <see cref="long" />.</summary>
+    internal void CopyProcessId(long[] values, bool[] hasValue)
+    {
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            ReadOnlySpan<int> column = chunk.ProcessIdColumn;
+            chunk.ProcessIdHasColumn.CopyTo(hasValue.AsSpan(offset));
+
+            for (int row = 0; row < column.Length; row++) { values[offset + row] = column[row]; }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            int? value = Pending(index).ProcessId;
+            values[index] = value ?? 0;
+            hasValue[index] = value.HasValue;
+        }
+    }
+
+    /// <summary>Bulk-copies the nullable <see cref="ResolvedEvent.RecordId" /> column.</summary>
+    internal void CopyRecordId(long[] values, bool[] hasValue)
+    {
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            chunk.RecordIdColumn.CopyTo(values.AsSpan(offset));
+            chunk.RecordIdHasColumn.CopyTo(hasValue.AsSpan(offset));
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            long? value = Pending(index).RecordId;
+            values[index] = value ?? 0;
+            hasValue[index] = value.HasValue;
+        }
+    }
+
+    /// <summary>Bulk-copies the sealed rows' pool-index column for <paramref name="column" /> (pending rows unset).</summary>
+    internal void CopySealedPoolIndex(EventColumnField column, int[] poolIndices)
+    {
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            chunk.PoolIndexColumn(column).CopyTo(poolIndices.AsSpan(offset));
+            offset += chunk.RowCount;
+        }
+    }
+
+    /// <summary>Bulk-copies the nullable <see cref="ResolvedEvent.ThreadId" /> column, widened to <see cref="long" />.</summary>
+    internal void CopyThreadId(long[] values, bool[] hasValue)
+    {
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            ReadOnlySpan<int> column = chunk.ThreadIdColumn;
+            chunk.ThreadIdHasColumn.CopyTo(hasValue.AsSpan(offset));
+
+            for (int row = 0; row < column.Length; row++) { values[offset + row] = column[row]; }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            int? value = Pending(index).ThreadId;
+            values[index] = value ?? 0;
+            hasValue[index] = value.HasValue;
+        }
+    }
+
+    /// <summary>Bulk-copies the always-present <see cref="ResolvedEvent.TimeCreated" /> column as raw UTC ticks.</summary>
+    internal void CopyTimeTicks(long[] values, bool[] hasValue)
+    {
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            ReadOnlySpan<long> column = chunk.TimeTicksColumn;
+            column.CopyTo(values.AsSpan(offset));
+            hasValue.AsSpan(offset, column.Length).Fill(true);
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            values[index] = Pending(index).TimeCreated.Ticks;
+            hasValue[index] = true;
+        }
     }
 
     /// <summary>
@@ -477,6 +678,25 @@ internal sealed class EventColumnStore
         EventColumnChunk chunk = EventColumnChunk.Build(events, start, count, poolBuilder, schemaBuilder);
 
         return (chunk, poolBuilder.ToPool(), schemaBuilder.ToTable());
+    }
+
+    // Min/max of the batch's TimeCreated ticks (the same UTC basis the time column stores). An empty batch yields the
+    // (long.MaxValue, long.MinValue) sentinel so a row-less store reports "no range" and an append widens correctly.
+    private static (long Min, long Max) ComputeTimeRange(IReadOnlyList<ResolvedEvent> batch)
+    {
+        long min = long.MaxValue;
+        long max = long.MinValue;
+
+        for (int index = 0; index < batch.Count; index++)
+        {
+            long ticks = batch[index].TimeCreated.Ticks;
+
+            if (ticks < min) { min = ticks; }
+
+            if (ticks > max) { max = ticks; }
+        }
+
+        return (min, max);
     }
 
     private static int FindChunk(int[] prefix, int index)
