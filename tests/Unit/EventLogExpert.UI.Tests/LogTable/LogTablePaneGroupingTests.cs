@@ -12,9 +12,11 @@ using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.LogTable;
+using EventLogExpert.UI.LogTable.Grouping;
 using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.Web.Virtualization;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -407,6 +409,29 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     }
 
     [Fact]
+    public async Task Grouped_ReactiveScroll_WhenSelectedEventGroupCollapsed_TargetsGroupHeaderRow()
+    {
+        // beta2 lives in the collapsed "Beta" group, so its event row is hidden. A reactive scroll must target the
+        // Beta header (visible row 2) - the collapsed group the selection lives in - not the hidden event row.
+        var alpha1 = Event(1, "Alpha");
+        var beta2 = Event(2, "Beta");
+        _selectedEvent.Value.Returns(beta2);
+        _logTableState.Value.Returns(BuildState(ColumnName.Source, Collapsed("Beta"), alpha1, beta2));
+
+        var cut = Render<LogTablePane>();
+        await cut.InvokeAsync(() => Services.GetRequiredService<IStore>().InitializeAsync());
+        await cut.InvokeAsync(() =>
+            Services.GetRequiredService<IDispatcher>().Dispatch(new SetActiveTableAction(EventLogId.Create())));
+
+        cut.WaitForAssertion(() =>
+        {
+            var scrolls = _jsModule.Invocations["scrollToRow"];
+            Assert.NotEmpty(scrolls);
+            Assert.Equal(2, (int)scrolls.Last().Arguments[0]!);
+        });
+    }
+
+    [Fact]
     public void Grouped_RendersOneHeaderRowPerGroup()
     {
         var cut = RenderGrouped(
@@ -592,6 +617,22 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     }
 
     [Fact]
+    public async Task GroupedVirtualize_SetsRowHeightItemSize_SoScrollModelMatchesCss()
+    {
+        // ItemSize must equal the CSS `tr { height: 22px }`; without it Virtualize defaults to 50px and the
+        // row-height-based scrollToRow lands jump-to-selected at the wrong position.
+        _logTableState.Value.Returns(BuildState(ColumnName.Source, Collapsed(), Event(1, "Alpha")));
+
+        var cut = Render<LogTablePane>();
+        await cut.InvokeAsync(() => Services.GetRequiredService<IStore>().InitializeAsync());
+        await cut.InvokeAsync(() =>
+            Services.GetRequiredService<IDispatcher>().Dispatch(new SetActiveTableAction(EventLogId.Create())));
+
+        cut.WaitForAssertion(() =>
+            Assert.Equal(22f, cut.FindComponent<Virtualize<TableRow>>().Instance.ItemSize));
+    }
+
+    [Fact]
     public void Ungrouped_ArrowDown_SelectsNextEvent()
     {
         _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), Event(1, "Alpha"), Event(2, "Beta")));
@@ -627,6 +668,21 @@ public sealed class LogTablePaneGroupingTests : BunitContext
 
         Assert.Equal("grid", cut.Find("table#eventTable").GetAttribute("role"));
         Assert.False(cut.Find("tbody tr.table-row").HasAttribute("aria-level"));
+    }
+
+    [Fact]
+    public async Task UngroupedVirtualize_SetsRowHeightItemSize_SoScrollModelMatchesCss()
+    {
+        // Same 22px scroll-model requirement for the ungrouped ItemsProvider path (the one the redesign regressed).
+        _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), Event(1, "Alpha")));
+
+        var cut = Render<LogTablePane>();
+        await cut.InvokeAsync(() => Services.GetRequiredService<IStore>().InitializeAsync());
+        await cut.InvokeAsync(() =>
+            Services.GetRequiredService<IDispatcher>().Dispatch(new SetActiveTableAction(EventLogId.Create())));
+
+        cut.WaitForAssertion(() =>
+            Assert.Equal(22f, cut.FindComponent<Virtualize<ResolvedEvent>>().Instance.ItemSize));
     }
 
     private static LogTableState BuildState(
