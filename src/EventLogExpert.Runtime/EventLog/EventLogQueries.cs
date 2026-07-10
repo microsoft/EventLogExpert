@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.EventData;
 using EventLogExpert.Runtime.LogTable;
@@ -30,17 +31,14 @@ internal sealed class EventLogQueries(
     {
         var byLog = _rawEventStore.Value.ByLog;
 
-        return EventPropertyValuesCache.GetEventDataFieldNames(byLog, byLog.Values.SelectMany(events => events));
+        return EventPropertyValuesCache.GetEventDataFieldNames(byLog, EnumerateAll(byLog));
     }
 
     public ImmutableArray<string> GetEventDataFieldValues(string fieldName)
     {
         var byLog = _rawEventStore.Value.ByLog;
 
-        return EventPropertyValuesCache.GetEventDataFieldValues(
-            byLog,
-            byLog.Values.SelectMany(events => events),
-            fieldName);
+        return EventPropertyValuesCache.GetEventDataFieldValues(byLog, EnumerateAll(byLog), fieldName);
     }
 
     public (DateTime After, DateTime Before) GetEventDateRange(DateTime fallbackUtcNow) =>
@@ -50,23 +48,34 @@ internal sealed class EventLogQueries(
     {
         var byLog = _rawEventStore.Value.ByLog;
 
-        return EventPropertyValuesCache.GetValues(byLog, byLog.Values.SelectMany(events => events), property);
+        return EventPropertyValuesCache.GetValues(byLog, EnumerateAll(byLog), property);
     }
 
     public ImmutableArray<string> GetUserDataFieldNames()
     {
         var byLog = _rawEventStore.Value.ByLog;
 
-        return EventPropertyValuesCache.GetUserDataFieldNames(byLog, byLog.Values.SelectMany(events => events));
+        return EventPropertyValuesCache.GetUserDataFieldNames(byLog, EnumerateAll(byLog));
     }
 
     public ImmutableArray<string> GetUserDataFieldValues(string fieldName)
     {
         var byLog = _rawEventStore.Value.ByLog;
 
-        return EventPropertyValuesCache.GetUserDataFieldValues(
-            byLog,
-            byLog.Values.SelectMany(events => events),
-            fieldName);
+        return EventPropertyValuesCache.GetUserDataFieldValues(byLog, EnumerateAll(byLog), fieldName);
+    }
+
+    private static IEnumerable<ResolvedEvent> EnumerateAll(
+        ImmutableDictionary<EventLogId, EventColumnStore> byLog)
+    {
+        foreach (var (logId, store) in byLog)
+        {
+            var reader = store.CreateReader(logId);
+
+            for (int physical = 0; physical < reader.Count; physical++)
+            {
+                yield return reader.GetDetail(reader.LocatorAt(physical));
+            }
+        }
     }
 }

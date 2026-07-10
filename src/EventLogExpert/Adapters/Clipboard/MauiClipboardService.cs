@@ -22,8 +22,9 @@ public sealed class MauiClipboardService : IClipboardService
 {
     private readonly IStateSelection<LogTableState, ImmutableList<ColumnName>> _columnOrder;
     private readonly IStateSelection<LogTableState, ImmutableDictionary<ColumnName, bool>> _eventTableColumns;
-    private readonly IStateSelection<EventLogState, ResolvedEvent?> _selectedEvent;
-    private readonly IStateSelection<EventLogState, ImmutableList<ResolvedEvent>> _selectedEvents;
+    private readonly IStateSelection<EventLogState, SelectionEntry?> _focus;
+    private readonly IState<LogTableState> _logTableState;
+    private readonly IStateSelection<EventLogState, ImmutableList<SelectionEntry>> _selection;
     private readonly ISettingsService _settings;
     private readonly ITraceLogger _traceLogger;
     private readonly IEventXmlResolver _xmlResolver;
@@ -31,31 +32,32 @@ public sealed class MauiClipboardService : IClipboardService
     public MauiClipboardService(
         IStateSelection<LogTableState, ImmutableDictionary<ColumnName, bool>> eventTableColumns,
         IStateSelection<LogTableState, ImmutableList<ColumnName>> columnOrder,
-        IStateSelection<EventLogState, ImmutableList<ResolvedEvent>> selectedEvents,
-        IStateSelection<EventLogState, ResolvedEvent?> selectedEvent,
+        IStateSelection<EventLogState, ImmutableList<SelectionEntry>> selection,
+        IStateSelection<EventLogState, SelectionEntry?> focus,
+        IState<LogTableState> logTableState,
         ISettingsService settings,
         IEventXmlResolver xmlResolver,
         ITraceLogger traceLogger)
     {
         _eventTableColumns = eventTableColumns;
         _columnOrder = columnOrder;
-        _selectedEvents = selectedEvents;
-        _selectedEvent = selectedEvent;
+        _selection = selection;
+        _focus = focus;
+        _logTableState = logTableState;
         _settings = settings;
         _xmlResolver = xmlResolver;
         _traceLogger = traceLogger;
 
         _eventTableColumns.Select(s => s.Columns);
         _columnOrder.Select(s => s.ColumnOrder);
-        _selectedEvents.Select(s => s.SelectedEvents);
-        _selectedEvent.Select(s => s.SelectedEvent);
+        _selection.Select(s => s.Selection);
+        _focus.Select(s => s.Focus);
     }
 
     public async Task CopySelectedEvent(EventCopyFormat? format = null)
     {
-        // Copy is best-effort: most callers are Blazor event handlers that don't catch, so any
-        // failure (clipboard unavailable, XML parse, resolver fault) would surface as an
-        // unhandled UI exception. Log and swallow to preserve previous fire-and-forget behavior.
+        // Copy is best-effort: callers are typically Blazor handlers that don't catch, so a failure would surface as an
+        // unhandled UI exception. Log and swallow to preserve fire-and-forget behavior.
         try
         {
             string stringToCopy = await GetFormattedEvent(format).ConfigureAwait(false);
@@ -70,8 +72,7 @@ public sealed class MauiClipboardService : IClipboardService
 
     public async Task CopyTextAsync(string text)
     {
-        // Same best-effort contract as CopySelectedEvent: callers (banner copy-details, filter
-        // export, future surfaces) are typically fire-and-forget UI handlers.
+        // Same best-effort contract as CopySelectedEvent: callers are typically fire-and-forget UI handlers.
         try
         {
             await MauiClipboard.SetTextAsync(text).ConfigureAwait(false);
@@ -103,6 +104,13 @@ public sealed class MauiClipboardService : IClipboardService
 
     private static string GetLogShortName(string owningLog) =>
         owningLog[(owningLog.LastIndexOf('\\') + 1)..];
+
+    private static ResolvedEvent? ResolveEntry(SelectionEntry? entry, LogTableState logTable)
+    {
+        if (entry?.CurrentHandle is not { } handle) { return null; }
+
+        return logTable.EventsForLog(handle.LogId).TryGetDetail(handle, out var detail) ? detail : null;
+    }
 
     private void AppendFormattedEvent(
         StringBuilder builder,
@@ -247,29 +255,27 @@ public sealed class MauiClipboardService : IClipboardService
 
     private async Task<string> GetFormattedEvent(EventCopyFormat? format)
     {
-        // Snapshot the selection once. Re-reading _selectedEvents.Value across awaits could see
-        // a different (or empty) list if selection changes mid-resolve, leading to copying the
-        // wrong event or an IndexOutOfRangeException.
-        var events = _selectedEvents.Value;
-        var selected = _selectedEvent.Value;
+        // Snapshot the selection once: re-reading across awaits could see a changed or empty list mid-resolve, copying
+        // the wrong event or throwing. Entries that no longer resolve are dropped.
+        var logTable = _logTableState.Value;
+        var events = ResolveSelection(_selection.Value, logTable);
+        var selected = ResolveEntry(_focus.Value, logTable);
 
         var resolvedFormat = format ?? _settings.CopyFormat;
 
         if (resolvedFormat == EventCopyFormat.Markdown)
         {
             IReadOnlyList<ResolvedEvent> markdownEvents =
-                events.IsEmpty ? (selected is null ? [] : [selected]) : events;
+                events.Count == 0 ? (selected is null ? [] : [selected]) : events;
 
             return markdownEvents.Count == 0 ? string.Empty : BuildMarkdownTable(markdownEvents);
         }
 
         bool needsXml = resolvedFormat is EventCopyFormat.Xml or EventCopyFormat.Full;
 
-        // Single-event copy: prefer the selected (focused) row so right-click → copy
-        // targets the focused event. Fall back to the only selected event when selected
-        // is null (e.g., right-click that didn't reach the table). When selection is
-        // empty but selected is set, copy selected so the context menu still works.
-        if (events.IsEmpty)
+        // Selection empty: fall back to the focused entry so a right-click that didn't reach the table still copies the
+        // focused event.
+        if (events.Count == 0)
         {
             if (selected is null) { return string.Empty; }
 
@@ -280,12 +286,8 @@ public sealed class MauiClipboardService : IClipboardService
 
         if (events.Count == 1)
         {
-            // Use the actual selected entry — not the focused row — so keyboard
-            // Ctrl+C copies what's selected, even when the focus cursor has
-            // moved off (e.g., Ctrl+click toggled the only selected row off
-            // but left focus on it). The context-menu/right-click flow keeps
-            // SelectedEvents in sync with the right-clicked row, so this still
-            // copies the focused row in that path.
+            // Copy the single selected entry (events[0]), not the focused row, so Ctrl+C copies what's selected even
+            // when the focus cursor moved off (e.g., Ctrl+click toggled the only selected row off but left focus on it).
             string xml = needsXml ? await _xmlResolver.GetXmlAsync(events[0]) : string.Empty;
 
             return FormatEventForCopy(resolvedFormat, events[0], xml);
@@ -325,6 +327,20 @@ public sealed class MauiClipboardService : IClipboardService
         }
 
         return stringToCopy.ToString();
+    }
+
+    private IReadOnlyList<ResolvedEvent> ResolveSelection(ImmutableList<SelectionEntry> selection, LogTableState logTable)
+    {
+        if (selection.Count == 0) { return []; }
+
+        var resolved = new List<ResolvedEvent>(selection.Count);
+
+        foreach (var entry in selection)
+        {
+            if (ResolveEntry(entry, logTable) is { } detail) { resolved.Add(detail); }
+        }
+
+        return resolved;
     }
 
     private async Task<string> ResolveXmlAsync(ResolvedEvent evt, SemaphoreSlim resolverLock)

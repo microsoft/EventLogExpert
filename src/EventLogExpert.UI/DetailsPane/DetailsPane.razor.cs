@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common.Interop;
 using Fluxor;
@@ -23,25 +24,27 @@ public sealed partial class DetailsPane
     private bool _hasOpened;
     private bool _isVisible;
     private bool _isXmlVisible;
-    /// <summary>
-    ///     Resolved XML for the currently selected event. <c>null</c> means a fetch is in flight (show "Resolving
-    ///     XML..."); empty string means resolved-with-no-content (e.g. live-watcher event without a record id, or render
-    ///     failure); any other value is the rendered XML.
-    /// </summary>
     private string? _resolvedXml;
     private ResolvedEvent? _selectedEvent;
+    /// <summary>
+    ///     Locator of the current focus, used to detect a stale async XML resolution: a re-resolve mid-fetch mints a new
+    ///     <see cref="ResolvedEvent" />, so reference identity can't gate the result but the locator can.
+    /// </summary>
+    private EventLocator? _selectedHandle;
     /// <summary>Cancels any in-flight XML resolution when the selection changes again before completion.</summary>
     private CancellationTokenSource? _xmlResolveCts;
 
     [Inject] private IEventXmlResolver EventXmlResolver { get; init; } = null!;
 
+    [Inject] private IStateSelection<EventLogState, SelectionEntry?> Focus { get; init; } = null!;
+
     private string IsVisible => (_selectedEvent is not null && _isVisible).ToString().ToLower();
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
-    [Inject] private IDetailsPanePreferencesProvider PreferencesProvider { get; init; } = null!;
+    [Inject] private IState<LogTableState> LogTableState { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, ResolvedEvent?> SelectedEvent { get; init; } = null!;
+    [Inject] private IDetailsPanePreferencesProvider PreferencesProvider { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -60,7 +63,7 @@ public sealed partial class DetailsPane
     {
         if (disposing)
         {
-            SelectedEvent.SelectedValueChanged -= OnSelectedEventChanged;
+            Focus.SelectedValueChanged -= OnFocusChanged;
 
             try { _xmlResolveCts?.Cancel(); } catch (ObjectDisposedException) { /* CTS already disposed; cancel is moot. */ }
 
@@ -99,17 +102,15 @@ public sealed partial class DetailsPane
 
     protected override void OnInitialized()
     {
-        SelectedEvent.Select(s => s.SelectedEvent);
+        Focus.Select(s => s.Focus);
 
-        SelectedEvent.SelectedValueChanged += OnSelectedEventChanged;
+        Focus.SelectedValueChanged += OnFocusChanged;
 
-        // Seed from the current store value so the pane reflects an existing
-        // focus (e.g., after a restore path that completes before this
-        // component subscribes) instead of staying hidden until the next
-        // change event.
-        if (SelectedEvent.Value is not null)
+        // Seed from the current store value so the pane reflects an existing focus (e.g., a restore that completed
+        // before this component subscribed) instead of staying hidden until the next change event.
+        if (Focus.Value is not null)
         {
-            OnSelectedEventChanged(this, SelectedEvent.Value);
+            OnFocusChanged(this, Focus.Value);
         }
 
         base.OnInitialized();
@@ -131,10 +132,23 @@ public sealed partial class DetailsPane
         }
     }
 
-    private async void OnSelectedEventChanged(object? sender, ResolvedEvent? selectedEvent)
+    private async void OnFocusChanged(object? sender, SelectionEntry? focus)
     {
         try
         {
+            var handle = focus?.CurrentHandle;
+            _selectedHandle = handle;
+
+            // A null CurrentHandle (a selection whose row could not be re-resolved after a reload) resolves to nothing
+            // and hides the pane.
+            ResolvedEvent? selectedEvent = null;
+
+            if (handle is { } locator
+                && LogTableState.Value.EventsForLog(locator.LogId).TryGetDetail(locator, out var detail))
+            {
+                selectedEvent = detail;
+            }
+
             _selectedEvent = selectedEvent;
 
             // Cancel any in-flight resolution from a prior selection so a stale fetch
@@ -190,9 +204,9 @@ public sealed partial class DetailsPane
                 {
                     TraceLogger.Error($"DetailsPane: XML resolution failed for selected event: {ex}");
 
-                    // Only surface the failure if we're still the current selection - otherwise
-                    // a newer selection has taken over and owns _resolvedXml.
-                    if (ReferenceEquals(_selectedEvent, selectedEvent) && ReferenceEquals(_xmlResolveCts, cts))
+                    // Only surface the failure if we're still the current selection; otherwise a newer selection owns
+                    // _resolvedXml. A re-resolve mints a new event instance, so compare the stable locator, not object identity.
+                    if (_selectedHandle == handle && ReferenceEquals(_xmlResolveCts, cts))
                     {
                         _resolvedXml = string.Empty;
                     }
@@ -200,8 +214,8 @@ public sealed partial class DetailsPane
                     return;
                 }
 
-                // Selection changed while the fetch was in flight - discard the stale result.
-                if (cts.IsCancellationRequested || !ReferenceEquals(_selectedEvent, selectedEvent))
+                // Selection changed while the fetch was in flight; discard the stale result.
+                if (cts.IsCancellationRequested || _selectedHandle != handle)
                 {
                     return;
                 }
@@ -210,9 +224,8 @@ public sealed partial class DetailsPane
             }
             finally
             {
-                // Always release the per-selection CTS regardless of success / cancel / failure.
-                // Guard against clobbering a newer CTS that a subsequent OnSelectedEventChanged
-                // call may have already installed during our await.
+                // Always release the per-selection CTS (success, cancel, or failure), but guard against clobbering a
+                // newer CTS installed by a subsequent OnFocusChanged during our await.
                 if (ReferenceEquals(_xmlResolveCts, cts))
                 {
                     _xmlResolveCts = null;

@@ -5,11 +5,14 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.TestUtils;
 using Reducers = EventLogExpert.Runtime.LogTable.Reducers;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
 
-// Randomized reducer ops checked against a naive re-sorted oracle by reference.
+// Randomized reducer ops checked against the array-of-structs oracle. The live path is now the columnar view, so the
+// oracle is the retained AoS sort and parity is asserted by VALUE identity (the view rehydrates fresh objects from
+// columns) over count, display order, Rank, Slice, and ResolveByKey.
 public sealed class LogTableReducerDifferentialTests
 {
     [Fact]
@@ -56,17 +59,19 @@ public sealed class LogTableReducerDifferentialTests
 
     private static LogTableState Settle(LogTableState state)
     {
+        // The off-thread rebuild re-sorts every per-log view to the requested context and republishes; mirror that by
+        // healing the stored views to the requested context and dispatching DisplayReady.
         var context = state.SortContext;
-        var lists = new Dictionary<EventLogId, SegmentedSortedList>(state.PerLogEvents.Count);
+        var views = new Dictionary<EventLogId, EventColumnView>(state.PerLogEvents.Count);
 
-        foreach (var (logId, list) in state.PerLogEvents)
+        foreach (var (logId, view) in state.PerLogEvents)
         {
-            lists[logId] = SegmentedSortedList.CreateSorted(list, context);
+            views[logId] = view.WithContext(context);
         }
 
         return Reducers.ReduceDisplayReady(
             state,
-            new DisplayReadyAction { Lists = lists, Version = state.DisplayListVersion });
+            new DisplayReadyAction { Views = views, Version = state.DisplayListVersion });
     }
 
     private sealed class Harness
@@ -107,6 +112,16 @@ public sealed class LogTableReducerDifferentialTests
             }
         }
 
+        private static bool SameEvent(ResolvedEvent expected, ResolvedEvent actual) =>
+            expected.RecordId == actual.RecordId
+            && expected.Id == actual.Id
+            && expected.TimeCreated == actual.TimeCreated
+            && expected.LogPathType == actual.LogPathType
+            && string.Equals(expected.OwningLog, actual.OwningLog, StringComparison.Ordinal)
+            && string.Equals(expected.Level, actual.Level, StringComparison.Ordinal)
+            && string.Equals(expected.Source, actual.Source, StringComparison.Ordinal)
+            && string.Equals(expected.TaskCategory, actual.TaskCategory, StringComparison.Ordinal);
+
         private LogModel AddLog()
         {
             var data = new EventLogData($"Log{_logs.Count}", LogPathType.Channel);
@@ -119,15 +134,17 @@ public sealed class LogTableReducerDifferentialTests
 
         private void AppendBatch(IReadOnlyList<(LogModel Log, IReadOnlyList<ResolvedEvent> Events)> batch)
         {
-            var byLog = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>(batch.Count);
+            var byLog = new Dictionary<EventLogId, EventColumnView>(batch.Count);
 
             foreach (var (log, events) in batch)
             {
-                byLog[log.Id] = events;
                 log.Events.AddRange(events);
+
+                // Production rebuilds the full view over the whole raw store per append; mirror that with the full model.
+                byLog[log.Id] = DisplayViewTestFactory.Build(log.Id, log.Events);
             }
 
-            State = Reducers.ReduceAppendTableEventsBatch(State, new AppendTableEventsBatchAction(byLog));
+            State = Reducers.ReduceAppendTableEventsBatch(State, new AppendTableEventsBatchAction { ViewsByLog = byLog });
         }
 
         private void AppendSingle(LogModel log)
@@ -135,7 +152,9 @@ public sealed class LogTableReducerDifferentialTests
             var events = GenerateBatch(log, 1 + _rng.Next(20));
             log.Events.AddRange(events);
 
-            State = Reducers.ReduceAppendTableEvents(State, new AppendTableEventsAction(log.Id, events));
+            State = Reducers.ReduceAppendTableEvents(
+                State,
+                new AppendTableEventsAction(log.Id) { View = DisplayViewTestFactory.Build(log.Id, log.Events) });
         }
 
         private void ApplyRandomOperation()
@@ -209,10 +228,12 @@ public sealed class LogTableReducerDifferentialTests
                 oracle.Count == displayed.Count,
                 $"Displayed count mismatch at step {step}: oracle={oracle.Count} displayed={displayed.Count} ({Describe()}).");
 
+            var rows = displayed.Slice(0, displayed.Count);
+
             for (int i = 0; i < oracle.Count; i++)
             {
                 Assert.True(
-                    ReferenceEquals(oracle[i], displayed[i]),
+                    SameEvent(oracle[i], rows[i].Lean),
                     $"Displayed order mismatch at step {step}, index {i} ({Describe()}).");
             }
         }
@@ -229,10 +250,12 @@ public sealed class LogTableReducerDifferentialTests
                     oracle.Count == view.Count,
                     $"Per-log count mismatch at step {step} for {log.Name}: oracle={oracle.Count} view={view.Count}.");
 
+                var rows = view.Slice(0, view.Count);
+
                 for (int i = 0; i < oracle.Count; i++)
                 {
                     Assert.True(
-                        ReferenceEquals(oracle[i], view[i]),
+                        SameEvent(oracle[i], rows[i].Lean),
                         $"Per-log order mismatch at step {step}, {log.Name}[{i}] ({Describe()}).");
                 }
             }
@@ -244,10 +267,11 @@ public sealed class LogTableReducerDifferentialTests
 
             if (displayed.Count == 0) { return; }
 
+            var rows = displayed.Slice(0, displayed.Count);
+
             foreach (int index in SampleIndices(displayed.Count))
             {
-                int rank = ResolvedEventIndex.IndexOf(
-                    displayed, displayed[index], State.OrderBy, State.IsDescending, State.GroupBy, State.IsGroupDescending);
+                int rank = displayed.Rank(rows[index].Loc);
 
                 Assert.True(rank == index, $"Rank mismatch at step {step}: expected {index} got {rank} ({Describe()}).");
             }
@@ -259,14 +283,16 @@ public sealed class LogTableReducerDifferentialTests
 
             if (displayed.Count == 0) { return; }
 
+            var rows = displayed.Slice(0, displayed.Count);
+
             foreach (int index in SampleIndices(displayed.Count))
             {
-                var original = displayed[index];
+                var row = rows[index];
 
-                Assert.Same(original, ResolvedEventIndex.ResolveByKey(displayed, original));
-
-                // Key path: a stale clone resolves to the live instance.
-                Assert.Same(original, ResolvedEventIndex.ResolveByKey(displayed, original with { }));
+                // The corpus uses non-null RecordIds, so every row carries a stable key that must re-resolve to its
+                // own locator, the value-key restore path across a reload.
+                Assert.True(ValueKey.TryCreate(row.Lean, out var key), $"Row missing a key at step {step}, index {index}.");
+                Assert.Equal(row.Loc, displayed.ResolveByKey(key));
             }
         }
 
@@ -277,7 +303,7 @@ public sealed class LogTableReducerDifferentialTests
 
             foreach (var (start, count) in SampleWindows(oracle.Count))
             {
-                var slice = ResolvedEventIndex.Slice(displayed, start, count);
+                var slice = displayed.Slice(start, count);
                 int expected = start >= oracle.Count ? 0 : Math.Min(count, oracle.Count - start);
 
                 Assert.True(
@@ -287,7 +313,7 @@ public sealed class LogTableReducerDifferentialTests
                 for (int i = 0; i < slice.Count; i++)
                 {
                     Assert.True(
-                        ReferenceEquals(slice[i], oracle[start + i]),
+                        SameEvent(oracle[start + i], slice[i].Lean),
                         $"Slice element mismatch at step {step}, window ({start},{count})[{i}] ({Describe()}).");
                 }
             }
@@ -308,7 +334,13 @@ public sealed class LogTableReducerDifferentialTests
             log.Events.Clear();
             log.Events.AddRange(GenerateBatch(log, 1 + _rng.Next(60)));
 
-            State = Reducers.ReduceUpdateTable(State, new UpdateTableAction(log.Id, [.. log.Events]));
+            State = Reducers.ReduceUpdateTable(
+                State,
+                new UpdateTableAction(log.Id)
+                {
+                    View = DisplayViewTestFactory.Build(log.Id, log.Events),
+                    Version = State.DisplayListVersion
+                });
         }
 
         private List<ResolvedEvent> GenerateBatch(LogModel log, int count)
@@ -356,16 +388,16 @@ public sealed class LogTableReducerDifferentialTests
             }
 
             var context = State.SortContext;
-            var lists = new Dictionary<EventLogId, SegmentedSortedList>(activeLogs.Count);
+            var views = new Dictionary<EventLogId, EventColumnView>(activeLogs.Count);
 
             foreach (var (logId, events) in activeLogs)
             {
-                lists[logId] = SegmentedSortedList.CreateSorted(events, context);
+                views[logId] = DisplayViewTestFactory.Build(logId, events, context);
             }
 
             State = Reducers.ReduceDisplayReady(
                 State,
-                new DisplayReadyAction { Lists = lists, Version = State.DisplayListVersion });
+                new DisplayReadyAction { Views = views, Version = State.DisplayListVersion });
         }
 
         private IEnumerable<int> SampleIndices(int count)
@@ -409,8 +441,13 @@ public sealed class LogTableReducerDifferentialTests
             var target = closed[_rng.Next(closed.Count)];
             var ghosts = GenerateBatch(target, 1 + _rng.Next(10));
 
-            State = Reducers.ReduceAppendTableEventsBatch(State, new AppendTableEventsBatchAction(
-                new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [target.Id] = ghosts }));
+            State = Reducers.ReduceAppendTableEventsBatch(State, new AppendTableEventsBatchAction
+            {
+                ViewsByLog = new Dictionary<EventLogId, EventColumnView>
+                {
+                    [target.Id] = DisplayViewTestFactory.Build(target.Id, ghosts)
+                }
+            });
         }
 
         private sealed class LogModel(EventLogId id, string name, DateTime startTime)

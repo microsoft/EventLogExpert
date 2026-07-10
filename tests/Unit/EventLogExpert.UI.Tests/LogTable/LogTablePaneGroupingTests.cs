@@ -33,11 +33,12 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     private readonly IState<FilterPaneState> _filterPaneState = Substitute.For<IState<FilterPaneState>>();
     private readonly IHighlightSelector _highlightSelector = Substitute.For<IHighlightSelector>();
     private readonly BunitJSModuleInterop _jsModule;
+    private readonly EventLogId _logId = EventLogId.Create();
     private readonly ILogTableCommands _logTableCommands = Substitute.For<ILogTableCommands>();
     private readonly IState<LogTableState> _logTableState = Substitute.For<IState<LogTableState>>();
     private readonly IMenuService _menuService = Substitute.For<IMenuService>();
-    private readonly IStateSelection<EventLogState, ResolvedEvent?> _selectedEvent = Substitute.For<IStateSelection<EventLogState, ResolvedEvent?>>();
-    private readonly IStateSelection<EventLogState, ImmutableList<ResolvedEvent>> _selectedEvents = Substitute.For<IStateSelection<EventLogState, ImmutableList<ResolvedEvent>>>();
+    private readonly IStateSelection<EventLogState, SelectionEntry?> _selectedEvent = Substitute.For<IStateSelection<EventLogState, SelectionEntry?>>();
+    private readonly IStateSelection<EventLogState, ImmutableList<SelectionEntry>> _selectedEvents = Substitute.For<IStateSelection<EventLogState, ImmutableList<SelectionEntry>>>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
 
     public LogTablePaneGroupingTests()
@@ -51,8 +52,8 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         _highlightSelector.Select(Arg.Any<ImmutableList<SavedFilter>>()).Returns([]);
         _highlightSelector.ComputeHighlightKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(0);
         _settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
-        _selectedEvent.Value.Returns((ResolvedEvent?)null);
-        _selectedEvents.Value.Returns(ImmutableList<ResolvedEvent>.Empty);
+        _selectedEvent.Value.Returns((SelectionEntry?)null);
+        _selectedEvents.Value.Returns(ImmutableList<SelectionEntry>.Empty);
 
         Services.AddLogTablePaneDependencies();
         Services.AddSingleton(_columnDefaults);
@@ -76,10 +77,10 @@ public sealed class LogTablePaneGroupingTests : BunitContext
 
         Press(cut, "Home"); // header Alpha
         _eventLogCommands.ClearReceivedCalls();
-        Press(cut, "ArrowDown"); // header Beta (visible row 1) - focus only
+        Press(cut, "ArrowDown"); // header Beta (visible row 1), focus only
 
         _eventLogCommands.DidNotReceive().SetSelectedEvents(
-            Arg.Any<IReadOnlyCollection<ResolvedEvent>>(), Arg.Any<ResolvedEvent?>());
+            Arg.Any<IReadOnlyCollection<SelectionEntry>>(), Arg.Any<SelectionEntry?>());
         _logTableCommands.DidNotReceive().ToggleGroupCollapsed(Arg.Any<string>());
         Assert.Equal(1, LastFocusedRow());
     }
@@ -94,7 +95,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowDown", shift: true); // no event to extend to
 
         _eventLogCommands.DidNotReceive().SetSelectedEvents(
-            Arg.Any<IReadOnlyCollection<ResolvedEvent>>(), Arg.Any<ResolvedEvent?>());
+            Arg.Any<IReadOnlyCollection<SelectionEntry>>(), Arg.Any<SelectionEntry?>());
     }
 
     [Fact]
@@ -125,9 +126,9 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     public void Grouped_EventCursorInCollapsedGroup_ReconcilesToHeader()
     {
         // The selected event sits in a collapsed group, so the cursor must retype to its
-        // header on build - proven by Right expanding the group.
+        // header on build, proven by Right expanding the group.
         var alpha1 = Event(1, "Alpha");
-        _selectedEvent.Value.Returns(alpha1);
+        _selectedEvent.Value.Returns(Focus(alpha1, 0));
         _logTableState.Value.Returns(
             BuildState(ColumnName.Source, Collapsed("Alpha"), alpha1, Event(2, "Beta")));
 
@@ -157,7 +158,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
 
         var cut = Render<LogTablePane>();
 
-        _selectedEvent.Value.Returns(alpha1);
+        _selectedEvent.Value.Returns(Focus(alpha1, 0));
         RaiseStateChanged(cut);
 
         Press(cut, "ArrowRight");
@@ -199,8 +200,8 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         await items!.First(item => item.Label == "Select Group").OnClickAsync!();
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<ResolvedEvent>>(c => c.Count == 2),
-            Arg.Any<ResolvedEvent?>());
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 2),
+            Arg.Any<SelectionEntry?>());
     }
 
     [Fact]
@@ -254,7 +255,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
 
         _logTableCommands.Received(1).ToggleGroupCollapsed("Alpha");
         _eventLogCommands.DidNotReceive()
-            .SetSelectedEvents(Arg.Any<IReadOnlyCollection<ResolvedEvent>>(), Arg.Any<ResolvedEvent?>());
+            .SetSelectedEvents(Arg.Any<IReadOnlyCollection<SelectionEntry>>(), Arg.Any<SelectionEntry?>());
     }
 
     [Fact]
@@ -273,7 +274,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs());
 
         _eventLogCommands.DidNotReceive()
-            .SetSelectedEvents(Arg.Any<IReadOnlyCollection<ResolvedEvent>>(), Arg.Any<ResolvedEvent?>());
+            .SetSelectedEvents(Arg.Any<IReadOnlyCollection<SelectionEntry>>(), Arg.Any<SelectionEntry?>());
     }
 
     [Fact]
@@ -297,10 +298,10 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         var cut = RenderGrouped(Collapsed(), Event(1, "Alpha"), Event(2, "Alpha"));
 
         _eventLogCommands.ClearReceivedCalls();
-        Press(cut, "Home"); // first visible row is a header - focus only
+        Press(cut, "Home"); // first visible row is a header, focus only
 
         _eventLogCommands.DidNotReceive().SetSelectedEvents(
-            Arg.Any<IReadOnlyCollection<ResolvedEvent>>(), Arg.Any<ResolvedEvent?>());
+            Arg.Any<IReadOnlyCollection<SelectionEntry>>(), Arg.Any<SelectionEntry?>());
         Assert.Equal(0, LastFocusedRow());
     }
 
@@ -326,7 +327,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowLeft"); // focus parent header (visible row 0); selection unchanged
 
         _eventLogCommands.DidNotReceive().SetSelectedEvents(
-            Arg.Any<IReadOnlyCollection<ResolvedEvent>>(), Arg.Any<ResolvedEvent?>());
+            Arg.Any<IReadOnlyCollection<SelectionEntry>>(), Arg.Any<SelectionEntry?>());
         _logTableCommands.DidNotReceive().ToggleGroupCollapsed(Arg.Any<string>());
         Assert.Equal(0, LastFocusedRow());
     }
@@ -352,8 +353,8 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "PageDown"); // clamps to the last visible row (event 2)
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<ResolvedEvent>>(c => c.Count == 1),
-            Arg.Any<ResolvedEvent?>());
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 1),
+            Arg.Any<SelectionEntry?>());
         Assert.Equal(3, LastFocusedRow());
     }
 
@@ -367,8 +368,8 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowDown"); // land on the first event
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<ResolvedEvent>>(c => c.Count == 1),
-            Arg.Any<ResolvedEvent?>());
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 1),
+            Arg.Any<SelectionEntry?>());
     }
 
     [Fact]
@@ -379,10 +380,10 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "Home");      // header Alpha
         Press(cut, "ArrowDown"); // event 1 (selects it)
         _eventLogCommands.ClearReceivedCalls();
-        Press(cut, "ArrowDown"); // header Beta (visible row 2) - focus only
+        Press(cut, "ArrowDown"); // header Beta (visible row 2), focus only
 
         _eventLogCommands.DidNotReceive().SetSelectedEvents(
-            Arg.Any<IReadOnlyCollection<ResolvedEvent>>(), Arg.Any<ResolvedEvent?>());
+            Arg.Any<IReadOnlyCollection<SelectionEntry>>(), Arg.Any<SelectionEntry?>());
         Assert.Equal(2, LastFocusedRow());
     }
 
@@ -392,7 +393,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         // Event 2 is at event index 1 but visible row 3, so a reactive scroll must target 3.
         var alpha1 = Event(1, "Alpha");
         var beta2 = Event(2, "Beta");
-        _selectedEvent.Value.Returns(beta2);
+        _selectedEvent.Value.Returns(Focus(beta2, 1));
         _logTableState.Value.Returns(BuildState(ColumnName.Source, Collapsed(), alpha1, beta2));
 
         var cut = Render<LogTablePane>();
@@ -412,10 +413,10 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     public async Task Grouped_ReactiveScroll_WhenSelectedEventGroupCollapsed_TargetsGroupHeaderRow()
     {
         // beta2 lives in the collapsed "Beta" group, so its event row is hidden. A reactive scroll must target the
-        // Beta header (visible row 2) - the collapsed group the selection lives in - not the hidden event row.
+        // Beta header (visible row 2), the collapsed group the selection lives in, not the hidden event row.
         var alpha1 = Event(1, "Alpha");
         var beta2 = Event(2, "Beta");
-        _selectedEvent.Value.Returns(beta2);
+        _selectedEvent.Value.Returns(Focus(beta2, 1));
         _logTableState.Value.Returns(BuildState(ColumnName.Source, Collapsed("Beta"), alpha1, beta2));
 
         var cut = Render<LogTablePane>();
@@ -484,8 +485,8 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowRight"); // focus + select first child
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<ResolvedEvent>>(c => c.Count == 1),
-            Arg.Any<ResolvedEvent?>());
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 1),
+            Arg.Any<SelectionEntry?>());
         _logTableCommands.DidNotReceive().ToggleGroupCollapsed(Arg.Any<string>());
     }
 
@@ -502,8 +503,8 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowDown", shift: true); // skips the collapsed Beta header to event 4
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<ResolvedEvent>>(c => c.Count == 4),
-            Arg.Any<ResolvedEvent?>());
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 4),
+            Arg.Any<SelectionEntry?>());
     }
 
     [Fact]
@@ -518,8 +519,8 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowUp", shift: true); // skips the collapsed Beta header to event 1
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<ResolvedEvent>>(c => c.Count == 4),
-            Arg.Any<ResolvedEvent?>());
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 4),
+            Arg.Any<SelectionEntry?>());
     }
 
     [Fact]
@@ -545,8 +546,11 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowDown"); // event Alpha
         Press(cut, "ArrowDown"); // header Beta (cursor on a non-first header)
 
-        // Ungroup resorts the list; a stale index would mispoint.
-        _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), beta, alpha));
+        // Ungroup resorts the DISPLAY order (by time) while the underlying columnar store, and therefore every
+        // event's physical locator, is unchanged: production reuses the same store across a group-by change and only
+        // rebuilds the view's order. Keep the same ingestion order as the grouped state so locators stay stable across
+        // the transition; a stale index (physical treated as display position) would still mispoint.
+        _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), alpha, beta));
         RaiseStateChanged(cut);
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("tr.group-header-row")));
 
@@ -554,8 +558,8 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowDown");
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<ResolvedEvent>>(c => c.Count == 1 && c.Contains(alpha)),
-            Arg.Any<ResolvedEvent?>());
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 1 && c.Any(entry => entry.ReloadKey!.Value.RecordId == alpha.RecordId)),
+            Arg.Any<SelectionEntry?>());
     }
 
     [Fact]
@@ -644,8 +648,8 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowDown"); // selects the next event
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<ResolvedEvent>>(c => c.Count == 1),
-            Arg.Any<ResolvedEvent?>());
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 1),
+            Arg.Any<SelectionEntry?>());
     }
 
     [Fact]
@@ -682,27 +686,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
             Services.GetRequiredService<IDispatcher>().Dispatch(new SetActiveTableAction(EventLogId.Create())));
 
         cut.WaitForAssertion(() =>
-            Assert.Equal(22f, cut.FindComponent<Virtualize<ResolvedEvent>>().Instance.ItemSize));
-    }
-
-    private static LogTableState BuildState(
-        ColumnName? groupBy,
-        ImmutableHashSet<string> collapsed,
-        params ResolvedEvent[] events)
-    {
-        var logId = EventLogId.Create();
-
-        return new LogTableState
-        {
-            ActiveEventLogId = logId,
-            EventTables = ImmutableList.Create(new LogView(logId) { LogName = LogName }),
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(logId, events.Length),
-            Columns = ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.Source, true),
-            ColumnOrder = ImmutableList.Create(ColumnName.Source),
-            IsDescending = false,
-            GroupBy = groupBy,
-            GroupCollapseOverrides = collapsed
-        }.WithLogEvents(logId, events);
+            Assert.Equal(22f, cut.FindComponent<Virtualize<DisplayRow>>().Instance.ItemSize));
     }
 
     private static ImmutableHashSet<string> Collapsed(params string[] keys) =>
@@ -730,6 +714,31 @@ public sealed class LogTablePaneGroupingTests : BunitContext
 
     private static void Press(IRenderedComponent<LogTablePane> cut, string code, bool shift = false) =>
         cut.Find(".table-container").KeyDown(new KeyboardEventArgs { Code = code, Key = code, ShiftKey = shift });
+
+    private LogTableState BuildState(
+        ColumnName? groupBy,
+        ImmutableHashSet<string> collapsed,
+        params ResolvedEvent[] events)
+    {
+        return new LogTableState
+        {
+            ActiveEventLogId = _logId,
+            EventTables = ImmutableList.Create(new LogView(_logId) { LogName = LogName }),
+            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(_logId, events.Length),
+            Columns = ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.Source, true),
+            ColumnOrder = ImmutableList.Create(ColumnName.Source),
+            IsDescending = false,
+            GroupBy = groupBy,
+            GroupCollapseOverrides = collapsed
+        }.WithLogEvents(_logId, events);
+    }
+
+    private SelectionEntry Focus(ResolvedEvent evt, int physicalIndex)
+    {
+        var handle = new EventLocator(_logId, 0, physicalIndex);
+        ValueKey.TryCreate(evt, out var reloadKey);
+        return new SelectionEntry(handle, handle, reloadKey);
+    }
 
     // Visible-row index of the most recent programmatic focus (proves DOM focus moved).
     private int LastFocusedRow()

@@ -13,7 +13,7 @@ public sealed class LogTableStateExportTests
     {
         var state = new LogTableState();
 
-        Assert.Empty(state.GetActiveDisplayedEvents());
+        Assert.Equal(0, state.GetActiveDisplayedEvents().Count);
     }
 
     [Fact]

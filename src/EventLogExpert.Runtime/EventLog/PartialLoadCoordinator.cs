@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
-using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
+using Fluxor;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Runtime.EventLog;
@@ -12,21 +12,37 @@ internal sealed class PartialLoadCoordinator : IDisposable
 {
     private static readonly TimeSpan s_flushWindow = TimeSpan.FromMilliseconds(1000);
 
-    private readonly Dictionary<EventLogId, List<ResolvedEvent>> _buffers = [];
+    private readonly HashSet<EventLogId> _dirty = [];
     private readonly IDispatcher _dispatcher;
+    private readonly IState<EventLogState> _eventLogState;
     private readonly HashSet<EventLogId> _finalized = [];
     private readonly Lock _gate = new();
+    private readonly IState<LogTableState> _logTableState;
+    private readonly IState<RawEventStoreState> _rawEventStore;
     private readonly HashSet<EventLogId> _seen = [];
     private readonly Timer _timer;
     private readonly Dictionary<EventLogId, int> _versions = [];
 
     private bool _disposed;
 
-    public PartialLoadCoordinator(IDispatcher dispatcher) : this(dispatcher, s_flushWindow) { }
+    public PartialLoadCoordinator(
+        IDispatcher dispatcher,
+        IState<RawEventStoreState> rawEventStore,
+        IState<EventLogState> eventLogState,
+        IState<LogTableState> logTableState)
+        : this(dispatcher, rawEventStore, eventLogState, logTableState, s_flushWindow) { }
 
-    internal PartialLoadCoordinator(IDispatcher dispatcher, TimeSpan flushInterval)
+    internal PartialLoadCoordinator(
+        IDispatcher dispatcher,
+        IState<RawEventStoreState> rawEventStore,
+        IState<EventLogState> eventLogState,
+        IState<LogTableState> logTableState,
+        TimeSpan flushInterval)
     {
         _dispatcher = dispatcher;
+        _rawEventStore = rawEventStore;
+        _eventLogState = eventLogState;
+        _logTableState = logTableState;
         _timer = new Timer(_ => Flush(), null, flushInterval, flushInterval);
     }
 
@@ -34,7 +50,7 @@ internal sealed class PartialLoadCoordinator : IDisposable
     {
         lock (_gate)
         {
-            _buffers.Remove(logId);
+            _dirty.Remove(logId);
             _versions.Remove(logId);
             _finalized.Remove(logId);
             _seen.Remove(logId);
@@ -45,7 +61,7 @@ internal sealed class PartialLoadCoordinator : IDisposable
     {
         lock (_gate)
         {
-            _buffers.Clear();
+            _dirty.Clear();
             _versions.Clear();
             _finalized.Clear();
             _seen.Clear();
@@ -57,7 +73,7 @@ internal sealed class PartialLoadCoordinator : IDisposable
         lock (_gate)
         {
             _disposed = true;
-            _buffers.Clear();
+            _dirty.Clear();
             _versions.Clear();
             _finalized.Clear();
             _seen.Clear();
@@ -66,22 +82,14 @@ internal sealed class PartialLoadCoordinator : IDisposable
         _timer.Dispose();
     }
 
-    public void Enqueue(EventLogId logId, IReadOnlyList<ResolvedEvent> filteredEvents, int version)
+    public void Enqueue(EventLogId logId, int version)
     {
-        if (filteredEvents.Count == 0) { return; }
-
         lock (_gate)
         {
-            // A straggler partial delta can arrive after the final LoadEvents (effects are fire-and-forget); dropping finalized logs prevents duplicate rows.
+            // A straggler partial delta can arrive after the final LoadEvents (effects are fire-and-forget); dropping finalized logs prevents rebuilding a view the finalize already published.
             if (_disposed || _finalized.Contains(logId)) { return; }
 
-            if (!_buffers.TryGetValue(logId, out var buffer))
-            {
-                buffer = new List<ResolvedEvent>(filteredEvents.Count);
-                _buffers[logId] = buffer;
-            }
-
-            buffer.AddRange(filteredEvents);
+            _dirty.Add(logId);
 
             // Use Math.Min so a buffer straddling a filter change adopts the older version, forcing a safe re-sort at finalize.
             _versions[logId] = _versions.TryGetValue(logId, out var existingVersion)
@@ -97,7 +105,7 @@ internal sealed class PartialLoadCoordinator : IDisposable
         lock (_gate)
         {
             _finalized.Add(logId);
-            _buffers.Remove(logId);
+            _dirty.Remove(logId);
             _versions.Remove(logId);
         }
     }
@@ -109,26 +117,30 @@ internal sealed class PartialLoadCoordinator : IDisposable
 
     private void FlushLocked()
     {
-        if (_disposed || _buffers.Count == 0) { return; }
+        if (_disposed || _dirty.Count == 0) { return; }
 
-        var batch = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>(_buffers.Count);
-        var versionByLog = new Dictionary<EventLogId, int>(_buffers.Count);
+        var raw = _rawEventStore.Value.ByLog;
+        var filter = _eventLogState.Value.AppliedFilter;
+        var context = _logTableState.Value.SortContext;
 
-        foreach (var (logId, buffer) in _buffers)
+        var viewsByLog = new Dictionary<EventLogId, EventColumnView>(_dirty.Count);
+        var versionByLog = new Dictionary<EventLogId, int>(_dirty.Count);
+
+        foreach (var logId in _dirty)
         {
-            if (buffer.Count <= 0) { continue; }
+            if (!raw.TryGetValue(logId, out var store)) { continue; }
 
-            batch[logId] = buffer.AsReadOnly();
+            viewsByLog[logId] = DisplayViewBuilder.Build(store, logId, filter, context);
 
             if (_versions.TryGetValue(logId, out var version)) { versionByLog[logId] = version; }
         }
 
-        _buffers.Clear();
+        _dirty.Clear();
         _versions.Clear();
 
-        if (batch.Count == 0) { return; }
+        if (viewsByLog.Count == 0) { return; }
 
         // Dispatch under the lock so batches and the final UpdateTable keep FIFO order in Fluxor's queue.
-        _dispatcher.Dispatch(new AppendTableEventsBatchAction(batch) { VersionByLog = versionByLog });
+        _dispatcher.Dispatch(new AppendTableEventsBatchAction { ViewsByLog = viewsByLog, VersionByLog = versionByLog });
     }
 }

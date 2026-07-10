@@ -2,20 +2,27 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Runtime.LogTable;
 
-internal interface IEventColumnView
+/// <summary>
+///     The live display facade: a filter-surviving, sorted view over one or more column-backed logs. The viewport
+///     reads rows by display position through <see cref="Slice" />; selection, highlight, and scroll resolve by
+///     <see cref="EventLocator" /> through <see cref="Rank" /> and <see cref="ResolveByKey" />.
+/// </summary>
+public interface IEventColumnView
 {
     int Count { get; }
 
-    IEventColumnReader Reader { get; }
+    /// <summary>Full-detail rehydrate of every display row, in display order, for export and clipboard.</summary>
+    IEnumerable<ResolvedEvent> EnumerateDetail();
 
     ResolvedEvent GetDetail(EventLocator locator);
 
     /// <summary>
-    ///     Full-lean single-row rehydrate (grid scalars plus Description) for the row addressed by
-    ///     <paramref name="locator" />, used off the viewport slice path (for example a group header row).
+    ///     Lean single-row rehydrate (grid scalars plus Description) for the row addressed by <paramref name="locator" />
+    ///     .
     /// </summary>
     ResolvedEvent GetDetailLean(EventLocator locator);
 
@@ -29,5 +36,20 @@ internal interface IEventColumnView
     /// </summary>
     int Rank(EventLocator locator);
 
+    /// <summary>
+    ///     Re-resolves a stable <see cref="ValueKey" /> to the locator that currently carries it, or <c>null</c> when no
+    ///     surviving row matches (a null-RecordId event never produces a key; a filtered-out row is absent). Drives selection
+    ///     restore across a reload.
+    /// </summary>
+    EventLocator? ResolveByKey(ValueKey key);
+
     IReadOnlyList<DisplayRow> Slice(int start, int count);
+
+    /// <summary>
+    ///     Exception-free resolve of <paramref name="locator" /> to its full <see cref="ResolvedEvent" />: <c>false</c>
+    ///     when the locator no longer addresses a live physical row (the log closed, the store rebuilt to a newer generation,
+    ///     or the index is out of range). A valid but filtered-out row still resolves, so a focused selection stays
+    ///     inspectable after a filter hides it.
+    /// </summary>
+    bool TryGetDetail(EventLocator locator, [NotNullWhen(true)] out ResolvedEvent? detail);
 }

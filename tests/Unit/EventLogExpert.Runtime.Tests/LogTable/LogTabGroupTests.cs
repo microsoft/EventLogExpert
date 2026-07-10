@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.TestUtils;
 using System.Collections.Immutable;
 using Reducers = EventLogExpert.Runtime.LogTable.Reducers;
 
@@ -32,7 +33,7 @@ public sealed class LogTabGroupTests
             EventTables = ImmutableList.Create(header)
         };
 
-        Assert.Empty(state.DisplayedEventsForTab(header));
+        Assert.Equal(0, state.DisplayedEventsForTab(header).Count);
     }
 
     [Fact]
@@ -103,9 +104,11 @@ public sealed class LogTabGroupTests
 
         AssertViewExactly(state, view, [.. log0, .. log2]);
 
+        var displayed = view.Slice(0, view.Count);
+
         foreach (var excluded in log1)
         {
-            Assert.DoesNotContain(excluded, view);
+            Assert.DoesNotContain(displayed, row => SameEvent(excluded, row.Lean));
         }
     }
 
@@ -499,11 +502,16 @@ public sealed class LogTabGroupTests
     }
 
     private static LogTableState AppendBatch(LogTableState state, EventLogId logId, params ResolvedEvent[] events) =>
-        Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction(
-            new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [logId] = events }));
+        Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction
+        {
+            ViewsByLog = new Dictionary<EventLogId, EventColumnView>
+            {
+                [logId] = DisplayViewTestFactory.Build(logId, events)
+            }
+        });
 
     private static void AssertViewExactly(
-        LogTableState state, IReadOnlyList<ResolvedEvent> view, IReadOnlyList<ResolvedEvent> expected)
+        LogTableState state, IEventColumnView view, IReadOnlyList<ResolvedEvent> expected)
     {
         var oracle = expected.SortEvents(
             ResolvedEventOrdering.ResolveDefaultOrderBy(state.OrderBy, state.GroupBy, state.PerLogEvents.Count),
@@ -513,9 +521,13 @@ public sealed class LogTabGroupTests
 
         Assert.Equal(oracle.Count, view.Count);
 
+        // The view rehydrates fresh ResolvedEvent objects from columns, so compare by value identity rather than
+        // reference (the AoS oracle holds the original object graph).
+        var displayed = view.Slice(0, view.Count);
+
         for (int i = 0; i < oracle.Count; i++)
         {
-            Assert.True(ReferenceEquals(oracle[i], view[i]), $"Order mismatch at index {i}.");
+            Assert.True(SameEvent(oracle[i], displayed[i].Lean), $"Order mismatch at index {i}.");
         }
     }
 
@@ -529,21 +541,27 @@ public sealed class LogTabGroupTests
         return state.Groups.Single(group => group.MemberIds.Contains(tabId)).Id;
     }
 
+    private static bool SameEvent(ResolvedEvent expected, ResolvedEvent actual) =>
+        expected.RecordId == actual.RecordId
+        && expected.Id == actual.Id
+        && expected.TimeCreated == actual.TimeCreated
+        && string.Equals(expected.Level, actual.Level, StringComparison.Ordinal);
+
     private static (LogTableState State, EventLogId[] Ids) SeedLogs(params IReadOnlyList<ResolvedEvent>[] perLog)
     {
         var state = new LogTableState();
         var ids = new EventLogId[perLog.Length];
-        var batch = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>(perLog.Length);
+        var batch = new Dictionary<EventLogId, EventColumnView>(perLog.Length);
 
         for (int i = 0; i < perLog.Length; i++)
         {
             var data = new EventLogData($"Log{i}", LogPathType.Channel);
             ids[i] = data.Id;
             state = Reducers.ReduceAddTable(state, new AddTableAction(data));
-            batch[data.Id] = perLog[i];
+            batch[data.Id] = DisplayViewTestFactory.Build(data.Id, perLog[i]);
         }
 
-        state = Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction(batch));
+        state = Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction { ViewsByLog = batch });
 
         return (state, ids);
     }

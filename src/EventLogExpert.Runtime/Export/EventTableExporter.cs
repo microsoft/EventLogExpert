@@ -17,7 +17,7 @@ internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTa
     public async Task ExportAsync(
         Stream destination,
         ExportFormat format,
-        IReadOnlyList<ResolvedEvent> events,
+        IEventColumnView events,
         IReadOnlyList<ColumnName> columns,
         TimeZoneInfo timeZone,
         bool includeDescription,
@@ -70,23 +70,22 @@ internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTa
     }
 
     private static async IAsyncEnumerable<IReadOnlyList<string?>> ProjectRows(
-        IReadOnlyList<ResolvedEvent> events,
+        IEventColumnView events,
         IReadOnlyList<ColumnName> columns,
         TimeZoneInfo timeZone,
         ExportFormat format,
         bool includeDescription,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        // The projection is synchronous over a materialized list; this await only satisfies the async-iterator
-        // contract (no per-row scheduling overhead). The sink applies backpressure on the write side.
+        // This await only satisfies the async-iterator contract; the projection itself is synchronous over the view's
+        // on-demand rehydrate.
         await Task.CompletedTask.ConfigureAwait(false);
 
         bool neutralizeCsvFormula = format == ExportFormat.Csv;
         int cellCount = columns.Count + (includeDescription ? 1 : 0);
 
-        // Enumerate, never index: events may be a CombinedEventView whose indexer is O(n) per access (it merge-walks
-        // from a seek point), so indexed iteration would be O(n^2). foreach is the O(n) designed access path.
-        foreach (ResolvedEvent @event in events)
+        // Enumerate, never index: EnumerateDetail is an O(n) single-cursor rehydrate, so indexed access would be O(n^2).
+        foreach (ResolvedEvent @event in events.EnumerateDetail())
         {
             cancellationToken.ThrowIfCancellationRequested();
 

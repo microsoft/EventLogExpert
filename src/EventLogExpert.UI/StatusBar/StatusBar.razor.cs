@@ -27,7 +27,7 @@ public sealed partial class StatusBar
     private IStateSelection<LogTableState, (
         EventLogId? ActiveEventLogId,
         ImmutableList<LogView> EventTables,
-        IReadOnlyList<ResolvedEvent> ActiveFilteredView,
+        int ActiveFilteredViewCount,
         ImmutableDictionary<EventLogId, int> EventCountByLog,
         ImmutableList<LogTabGroup> Groups)> LogTableSelection
     { get; init; } = null!;
@@ -56,7 +56,7 @@ public sealed partial class StatusBar
             return (
                 s.ActiveEventLogId,
                 s.EventTables,
-                activeTable is null ? (IReadOnlyList<ResolvedEvent>)[] : s.DisplayedEventsForTab(activeTable),
+                activeTable is null ? 0 : s.DisplayedEventsForTab(activeTable).Count,
                 s.EventCountByLog,
                 s.Groups);
         });

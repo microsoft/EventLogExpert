@@ -34,13 +34,14 @@ public sealed class LogTablePaneSelectionTests : BunitContext
     private readonly IEventLogCommands _eventLogCommands = Substitute.For<IEventLogCommands>();
     private readonly IState<FilterPaneState> _filterPaneState = Substitute.For<IState<FilterPaneState>>();
     private readonly IHighlightSelector _highlightSelector = Substitute.For<IHighlightSelector>();
+    private readonly EventLogId _logId = EventLogId.Create();
     private readonly IState<LogTableState> _logTableState = Substitute.For<IState<LogTableState>>();
-    private readonly IStateSelection<EventLogState, ResolvedEvent?> _selectedEvent = Substitute.For<IStateSelection<EventLogState, ResolvedEvent?>>();
-    private readonly IStateSelection<EventLogState, ImmutableList<ResolvedEvent>> _selectedEvents = Substitute.For<IStateSelection<EventLogState, ImmutableList<ResolvedEvent>>>();
+    private readonly IStateSelection<EventLogState, SelectionEntry?> _selectedEvent = Substitute.For<IStateSelection<EventLogState, SelectionEntry?>>();
+    private readonly IStateSelection<EventLogState, ImmutableList<SelectionEntry>> _selectedEvents = Substitute.For<IStateSelection<EventLogState, ImmutableList<SelectionEntry>>>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
 
-    private ResolvedEvent? _dispatchedActive;
-    private IReadOnlyCollection<ResolvedEvent>? _dispatchedEvents;
+    private SelectionEntry? _dispatchedActive;
+    private IReadOnlyCollection<SelectionEntry>? _dispatchedEvents;
 
     public LogTablePaneSelectionTests()
     {
@@ -55,15 +56,15 @@ public sealed class LogTablePaneSelectionTests : BunitContext
         _highlightSelector.ComputeHighlightKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(0);
         _settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
 
-        _selectedEvent.Value.Returns((ResolvedEvent?)null);
+        _selectedEvent.Value.Returns((SelectionEntry?)null);
         SetSelection();
 
         _eventLogCommands
-            .When(c => c.SetSelectedEvents(Arg.Any<IReadOnlyCollection<ResolvedEvent>>(), Arg.Any<ResolvedEvent?>()))
+            .When(c => c.SetSelectedEvents(Arg.Any<IReadOnlyCollection<SelectionEntry>>(), Arg.Any<SelectionEntry?>()))
             .Do(callInfo =>
             {
-                _dispatchedEvents = callInfo.Arg<IReadOnlyCollection<ResolvedEvent>>();
-                _dispatchedActive = callInfo.Arg<ResolvedEvent?>();
+                _dispatchedEvents = callInfo.Arg<IReadOnlyCollection<SelectionEntry>>();
+                _dispatchedActive = callInfo.Arg<SelectionEntry?>();
             });
 
         Services.AddLogTablePaneDependencies();
@@ -251,14 +252,22 @@ public sealed class LogTablePaneSelectionTests : BunitContext
     private void AssertDispatched(ResolvedEvent[] expectedEvents, ResolvedEvent? expectedActive)
     {
         Assert.NotNull(_dispatchedEvents);
-        Assert.Equal(expectedEvents, _dispatchedEvents);
-        Assert.Same(expectedActive, _dispatchedActive);
+        Assert.Equal(
+            expectedEvents.Select(testEvent => testEvent.RecordId!.Value).ToArray(),
+            _dispatchedEvents!.Select(entry => entry.ReloadKey!.Value.RecordId).ToArray());
+        Assert.Equal(expectedActive?.RecordId, _dispatchedActive?.ReloadKey?.RecordId);
+    }
+
+    private SelectionEntry EntryFor(ResolvedEvent evt)
+    {
+        var handle = new EventLocator(_logId, 0, (int)(evt.RecordId!.Value - 1));
+        ValueKey.TryCreate(evt, out var reloadKey);
+        return new SelectionEntry(handle, handle, reloadKey);
     }
 
     private IRenderedComponent<LogTablePane> RenderAllColumns(
         ResolvedEvent displayedEvent, ColumnName? orderBy = null, bool isDescending = false)
     {
-        var logId = EventLogId.Create();
         ColumnName[] allColumns =
         [
             ColumnName.Level, ColumnName.DateAndTime, ColumnName.ActivityId, ColumnName.Log,
@@ -268,31 +277,29 @@ public sealed class LogTablePaneSelectionTests : BunitContext
 
         _logTableState.Value.Returns(new LogTableState
         {
-            ActiveEventLogId = logId,
-            EventTables = ImmutableList.Create(new LogView(logId) { LogName = LogName }),
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(logId, 1),
+            ActiveEventLogId = _logId,
+            EventTables = ImmutableList.Create(new LogView(_logId) { LogName = LogName }),
+            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(_logId, 1),
             Columns = allColumns.ToImmutableDictionary(column => column, _ => true),
             ColumnOrder = [.. allColumns],
             OrderBy = orderBy,
             IsDescending = isDescending
-        }.WithLogEvents(logId, displayedEvent));
+        }.WithLogEvents(_logId, displayedEvent));
 
         return Render<LogTablePane>();
     }
 
     private IReadOnlyList<IElement> RenderRows()
     {
-        var logId = EventLogId.Create();
-
         _logTableState.Value.Returns(new LogTableState
         {
-            ActiveEventLogId = logId,
-            EventTables = ImmutableList.Create(new LogView(logId) { LogName = LogName }),
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(logId, 3),
+            ActiveEventLogId = _logId,
+            EventTables = ImmutableList.Create(new LogView(_logId) { LogName = LogName }),
+            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(_logId, 3),
             Columns = ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.Level, true),
             ColumnOrder = ImmutableList.Create(ColumnName.Level),
             IsDescending = false
-        }.WithLogEvents(logId, _event1, _event2, _event3));
+        }.WithLogEvents(_logId, _event1, _event2, _event3));
 
         var cut = Render<LogTablePane>();
 
@@ -300,5 +307,5 @@ public sealed class LogTablePaneSelectionTests : BunitContext
     }
 
     private void SetSelection(params ResolvedEvent[] selection) =>
-        _selectedEvents.Value.Returns(ImmutableList.Create(selection));
+        _selectedEvents.Value.Returns(selection.Select(EntryFor).ToImmutableList());
 }

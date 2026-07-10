@@ -29,31 +29,34 @@ namespace EventLogExpert.UI.LogTable;
 public sealed partial class LogTablePane
 {
     private const int DefaultPageSize = 20;
-    // Must match the CSS `tr { height: 22px }` (LogTablePane.razor.css). Virtualize defaults ItemSize to 50px; without
-    // this the scroll model (ScrollToSelectedEvent -> JS scrollToRow, which scrolls by the real 22px row height) is
-    // computed against a 50px-per-row spacer model, so jump-to-selected lands at the wrong position - worse the deeper
-    // the target. Set explicitly so the model matches from the first render instead of relying on Virtualize's async
-    // size self-correction (which the ungrouped ItemsProvider path does not settle before the scroll fires).
+    // Must match the CSS `tr { height: 22px }`; Virtualize defaults ItemSize to 50px, so leaving it unset computes the
+    // scroll model against a 50px spacer and jump-to-selected lands at the wrong position. Set explicitly so the model
+    // matches from the first render.
     private const float EventRowHeightPixels = 22f;
     private const int MenuValueMaxLength = 40;
     private const string NoCellValueReason = "No value in this cell to filter on";
 
+    private static readonly IEventColumnView s_emptyView = Runtime.LogTable.LogTableState.EmptyView;
     private static readonly HashSet<int> s_warnedUnknownColors = [];
 
-    private readonly Dictionary<ResolvedEvent, string?> _highlightCache = new(ReferenceEqualityComparer.Instance);
+    // Keyed on EventLocator (physical, generation-stamped) so the cache survives a re-sort within a generation; default
+    // value equality (a ReferenceEqualityComparer would box every struct key and never match).
+    private readonly Dictionary<EventLocator, string?> _highlightCache = [];
 
-    private IReadOnlyList<ResolvedEvent> _activeDisplayedEvents = [];
+    private IEventColumnView _activeDisplayedEvents = s_emptyView;
     private SavedFilter[] _activeHighlightFilters = [];
     private LogView? _currentTable;
     private TableCursor? _cursor;
     private DotNetObjectReference<LogTablePane>? _dotNetRef;
     private ColumnName[] _enabledColumns = null!;
-    private Virtualize<ResolvedEvent>? _eventVirtualize;
+    private Virtualize<DisplayRow>? _eventVirtualize;
     private ImmutableList<SavedFilter> _filters = [];
     private int _filtersHighlightKey;
+    private SelectionEntry? _focus;
     private bool _focusActiveOnNextRender;
     private string _headerName = string.Empty;
-    private IReadOnlyList<ResolvedEvent>? _lastIndexedDisplayedEvents;
+    private EventLogId? _highlightCacheTableId;
+    private IEventColumnView? _lastIndexedDisplayedEvents;
     private LogTableState _logTableState = null!;
     private int _pageSize = DefaultPageSize;
     private ColumnName[] _previousEnabledColumns = [];
@@ -61,16 +64,15 @@ public sealed partial class LogTablePane
     private bool _repaintViewportOnNextRender;
     private bool _resortSelectionOnNextRender;
     private GroupedRowView? _rowView;
-    private (IReadOnlyList<ResolvedEvent> Events, EventLogId? TableId, ColumnName? GroupBy, bool GroupDescending, bool CollapsedDefault, ImmutableHashSet<string>? Overrides) _rowViewSnapshot;
-    private ResolvedEvent? _selectedEvent;
-    private ImmutableList<ResolvedEvent> _selectedEvents = [];
-    private HashSet<ResolvedEvent> _selectedSet = new(ReferenceEqualityComparer.Instance);
-    private ResolvedEvent? _selectionAnchor;
+    private (IEventColumnView View, EventLogId? TableId, ColumnName? GroupBy, bool GroupDescending, bool CollapsedDefault, ImmutableHashSet<string>? Overrides) _rowViewSnapshot;
+    private HashSet<EventLocator> _selectedSet = [];
+    private ImmutableList<SelectionEntry> _selection = [];
+    private EventLocator? _selectionAnchor;
     private IJSObjectReference? _tableModule;
     private TimeZoneInfo _timeZoneSettings = null!;
 
-    private ResolvedEvent? ActiveEvent =>
-        _cursor is { Kind: TableRowKind.Event, Event: { } @event } ? @event : null;
+    private EventLocator? ActiveHandle =>
+        _cursor is { Kind: TableRowKind.Event, Handle: { } handle } ? handle : null;
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
@@ -84,6 +86,8 @@ public sealed partial class LogTablePane
 
     [Inject] private IFilterService FilterService { get; init; } = null!;
 
+    [Inject] private IStateSelection<EventLogState, SelectionEntry?> Focus { get; init; } = null!;
+
     [Inject] private IHighlightSelector HighlightSelector { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
@@ -94,9 +98,7 @@ public sealed partial class LogTablePane
 
     [Inject] private IMenuService MenuService { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, ResolvedEvent?> SelectedEvent { get; init; } = null!;
-
-    [Inject] private IStateSelection<EventLogState, ImmutableList<ResolvedEvent>> SelectedEvents { get; init; } = null!;
+    [Inject] private IStateSelection<EventLogState, ImmutableList<SelectionEntry>> Selection { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -121,20 +123,20 @@ public sealed partial class LogTablePane
         }
     }
 
-    // Extracted from the ItemsProvider so the viewport clamp - an empty list, a start past the end, and a window that
-    // overruns the tail - is unit-testable without driving the Virtualize component.
-    internal static ItemsProviderResult<ResolvedEvent> ComputeEventViewport(
-        IReadOnlyList<ResolvedEvent> displayedEvents,
+    // Extracted from the ItemsProvider so the viewport clamp (empty view, start past the end, window overrunning the
+    // tail) is unit-testable without driving the Virtualize component.
+    internal static ItemsProviderResult<DisplayRow> ComputeEventViewport(
+        IEventColumnView displayedEvents,
         ItemsProviderRequest request)
     {
         int totalCount = displayedEvents.Count;
         int start = Math.Min(request.StartIndex, totalCount);
         int count = Math.Min(request.Count, totalCount - start);
 
-        IReadOnlyList<ResolvedEvent> window =
-            count <= 0 ? [] : ResolvedEventIndex.Slice(displayedEvents, start, count);
+        IReadOnlyList<DisplayRow> window =
+            count <= 0 ? [] : displayedEvents.Slice(start, count);
 
-        return new ItemsProviderResult<ResolvedEvent>(window, totalCount);
+        return new ItemsProviderResult<DisplayRow>(window, totalCount);
     }
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
@@ -177,7 +179,7 @@ public sealed partial class LogTablePane
 
                 if (measured > 0) { _pageSize = measured; }
             }
-            catch (JSDisconnectedException) { /* Circuit gone - fall back to default page size. */ }
+            catch (JSDisconnectedException) { /* Circuit gone; fall back to default page size. */ }
             catch (Exception e)
             {
                 TraceLogger.Warning($"Failed to measure table page size, using default {DefaultPageSize}: {e}");
@@ -208,7 +210,7 @@ public sealed partial class LogTablePane
                     _repaintViewportOnNextRender = true;
                     StateHasChanged();
                 }
-                catch (JSDisconnectedException) { /* Circuit gone - nothing to refresh. */ }
+                catch (JSDisconnectedException) { /* Circuit gone; nothing to refresh. */ }
                 catch (Exception e)
                 {
                     TraceLogger.Error($"Failed to refresh the event viewport: {e}");
@@ -221,8 +223,8 @@ public sealed partial class LogTablePane
 
     protected override async Task OnInitializedAsync()
     {
-        SelectedEvent.Select(s => s.SelectedEvent);
-        SelectedEvents.Select(s => s.SelectedEvents);
+        Focus.Select(s => s.Focus);
+        Selection.Select(s => s.Selection);
 
         SubscribeToAction<SetActiveTableAction>(OnSetActiveTable);
         SubscribeToAction<DisplayReadyAction>(_ => RescrollToSelected());
@@ -234,10 +236,10 @@ public sealed partial class LogTablePane
 
         _currentTable = _logTableState.EventTables.FirstOrDefault(x => x.Id == _logTableState.ActiveEventLogId);
         _enabledColumns = GetOrderedEnabledColumns();
-        _selectedEvent = SelectedEvent.Value;
-        SetCursorEvent(_selectedEvent);
-        _selectedEvents = SelectedEvents.Value;
-        _selectedSet = new HashSet<ResolvedEvent>(_selectedEvents, ReferenceEqualityComparer.Instance);
+        _focus = Focus.Value;
+        SetCursorEvent(_focus?.CurrentHandle);
+        _selection = Selection.Value;
+        _selectedSet = BuildSelectedSet(_selection);
         var initialPaneState = FilterPaneState.Value;
         _filters = initialPaneState.Filters;
         _activeHighlightFilters = HighlightSelector.Select(initialPaneState.Filters);
@@ -256,20 +258,22 @@ public sealed partial class LogTablePane
         var currentPaneState = FilterPaneState.Value;
         var currentFilters = currentPaneState.Filters;
         bool filtersChanged = !ReferenceEquals(currentFilters, _filters);
-        bool selectedEventChanged = !ReferenceEquals(SelectedEvent.Value, _selectedEvent);
+        // The focus is now a value-type SelectionEntry?; compare by OriginHandle (its stable identity). Reference
+        // equality would box and always differ, and full-value equality would re-render on a CurrentHandle re-point.
+        bool focusChanged = Focus.Value?.OriginHandle != _focus?.OriginHandle;
 
         // Also render for a pending focus move or a post-refresh viewport repaint, neither of which changes Fluxor state.
         if (!_focusActiveOnNextRender &&
             !_repaintViewportOnNextRender &&
             ReferenceEquals(LogTableState.Value, _logTableState) &&
-            ReferenceEquals(SelectedEvents.Value, _selectedEvents) &&
-            !selectedEventChanged &&
+            ReferenceEquals(Selection.Value, _selection) &&
+            !focusChanged &&
             !filtersChanged &&
             Settings.TimeZoneInfo.Equals(_timeZoneSettings)) { return false; }
 
         _repaintViewportOnNextRender = false;
 
-        bool selectionChanged = !ReferenceEquals(SelectedEvents.Value, _selectedEvents);
+        bool selectionChanged = !ReferenceEquals(Selection.Value, _selection);
 
         _logTableState = LogTableState.Value;
 
@@ -278,15 +282,14 @@ public sealed partial class LogTablePane
 
         if (selectionChanged)
         {
-            _selectedEvents = SelectedEvents.Value;
-            // Reference equality, not value: value-equality would hash strings per change.
-            _selectedSet = new HashSet<ResolvedEvent>(_selectedEvents, ReferenceEqualityComparer.Instance);
+            _selection = Selection.Value;
+            _selectedSet = BuildSelectedSet(_selection);
         }
 
-        if (selectedEventChanged)
+        if (focusChanged)
         {
-            _selectedEvent = SelectedEvent.Value;
-            SetCursorEvent(_selectedEvent);
+            _focus = Focus.Value;
+            SetCursorEvent(_focus?.CurrentHandle);
         }
 
         if (filtersChanged)
@@ -310,6 +313,25 @@ public sealed partial class LogTablePane
         return true;
     }
 
+    private static HashSet<EventLocator> BuildSelectedSet(ImmutableList<SelectionEntry> selection)
+    {
+        // Membership tests a rendered row's live locator, so key on CurrentHandle (where the selection currently
+        // resolves), not OriginHandle; entries absent from the live generation carry a null CurrentHandle.
+        var set = new HashSet<EventLocator>(selection.Count);
+
+        foreach (var entry in selection)
+        {
+            if (entry.CurrentHandle is { } handle) { set.Add(handle); }
+        }
+
+        return set;
+    }
+
+    // OriginHandle and CurrentHandle are the same live locator at selection time; ReloadKey re-points the selection
+    // after a reload (null for a null-RecordId row, which cannot be re-resolved).
+    private static SelectionEntry EntryFor(DisplayRow row) =>
+        new(row.Loc, row.Loc, ValueKey.TryCreate(row.Lean, out var key) ? key : null);
+
     private static string GetLevelClass(string level) =>
         level switch
         {
@@ -318,11 +340,6 @@ public sealed partial class LogTablePane
             nameof(SeverityLevel.Information) => "bi bi-info-circle",
             _ => string.Empty,
         };
-
-    private static ResolvedEvent? ResolveByKey(
-        IReadOnlyList<ResolvedEvent> displayedEvents,
-        ResolvedEvent? candidate) =>
-        ResolvedEventIndex.ResolveByKey(displayedEvents, candidate);
 
     private static string TruncateForMenu(string value)
     {
@@ -374,19 +391,19 @@ public sealed partial class LogTablePane
         items.Add(MenuItem.Separator());
     }
 
-    private void ApplyNavSelection(IReadOnlyList<ResolvedEvent> displayedEvents, ResolvedEvent targetEvent, bool shift)
+    private void ApplyNavSelection(EventLocator target, bool shift)
     {
         if (shift)
         {
-            _selectionAnchor ??= ActiveEvent ?? targetEvent;
-            SetCursorEvent(targetEvent);
-            DispatchSetSelection(BuildRange(displayedEvents, _selectionAnchor, targetEvent), targetEvent, alreadyOrdered: true);
+            _selectionAnchor ??= ActiveHandle ?? target;
+            SetCursorEvent(target);
+            DispatchSetSelection(BuildRange(_selectionAnchor.Value, target), target, alreadyOrdered: true);
         }
         else
         {
-            _selectionAnchor = targetEvent;
-            SetCursorEvent(targetEvent);
-            DispatchSetSelection([targetEvent], targetEvent);
+            _selectionAnchor = target;
+            SetCursorEvent(target);
+            DispatchSetSelection([EntryFor(target)], target);
         }
     }
 
@@ -398,62 +415,74 @@ public sealed partial class LogTablePane
         }
     }
 
-    private IReadOnlyList<ResolvedEvent> BuildRange(
-        IReadOnlyList<ResolvedEvent> displayedEvents,
-        ResolvedEvent anchor,
-        ResolvedEvent selected)
+    private IReadOnlyList<SelectionEntry> BuildRange(EventLocator anchor, EventLocator selected)
     {
         int anchorIndex = RowIndexOf(anchor);
         int activeIndex = RowIndexOf(selected);
 
-        if (anchorIndex < 0 || activeIndex < 0) { return [selected]; }
+        if (anchorIndex < 0 || activeIndex < 0) { return [EntryFor(selected)]; }
 
         int start = Math.Min(anchorIndex, activeIndex);
         int end = Math.Max(anchorIndex, activeIndex);
 
-        return ResolvedEventIndex.Slice(displayedEvents, start, end - start + 1);
+        var slice = _activeDisplayedEvents.Slice(start, end - start + 1);
+        var range = new List<SelectionEntry>(slice.Count);
+
+        foreach (var row in slice) { range.Add(EntryFor(row)); }
+
+        return range;
     }
 
-    private void DispatchSetSelection(IReadOnlyList<ResolvedEvent> events, ResolvedEvent? selected, bool alreadyOrdered = false)
+    private void DispatchSetSelection(IReadOnlyList<SelectionEntry> entries, EventLocator? focus, bool alreadyOrdered = false)
     {
-        // These callers pass ordered, unique events; skip rank + sort.
+        SelectionEntry? focusEntry = focus is { } focusLocator ? EntryFor(focusLocator) : null;
+
+        // These callers pass ordered, unique entries; skip rank + sort.
         if (alreadyOrdered)
         {
-            EventLogCommands.SetSelectedEvents(events, selected);
+            EventLogCommands.SetSelectedEvents(entries, focusEntry);
 
             return;
         }
 
-        var seen = new HashSet<ResolvedEvent>(ReferenceEqualityComparer.Instance);
-        List<(ResolvedEvent Event, int Index)> inTable = new(events.Count);
-        List<ResolvedEvent> outOfTable = [];
+        var seen = new HashSet<EventLocator>();
+        List<(SelectionEntry Entry, int Index)> inTable = new(entries.Count);
+        List<SelectionEntry> outOfTable = [];
 
-        foreach (var selectedEvent in events)
+        foreach (var entry in entries)
         {
-            if (!seen.Add(selectedEvent)) { continue; }
+            // Dedupe by OriginHandle (the selection's stable identity); order by the live CurrentHandle position.
+            if (!seen.Add(entry.OriginHandle)) { continue; }
 
-            int index = RowIndexOf(selectedEvent);
+            int index = entry.CurrentHandle is { } handle ? RowIndexOf(handle) : -1;
 
             if (index >= 0)
             {
-                inTable.Add((selectedEvent, index));
+                inTable.Add((entry, index));
             }
             else
             {
-                outOfTable.Add(selectedEvent);
+                outOfTable.Add(entry);
             }
         }
 
         inTable.Sort(static (left, right) => left.Index.CompareTo(right.Index));
 
-        var ordered = new List<ResolvedEvent>(inTable.Count + outOfTable.Count);
+        var ordered = new List<SelectionEntry>(inTable.Count + outOfTable.Count);
 
-        foreach (var entry in inTable) { ordered.Add(entry.Event); }
+        foreach (var entry in inTable) { ordered.Add(entry.Entry); }
 
         ordered.AddRange(outOfTable);
 
-        EventLogCommands.SetSelectedEvents(ordered, selected);
+        EventLogCommands.SetSelectedEvents(ordered, focusEntry);
     }
+
+    // Builds a selection entry from a bare locator; rehydrates the lean row to mint the ReloadKey.
+    private SelectionEntry EntryFor(EventLocator locator) =>
+        new(
+            locator,
+            locator,
+            ValueKey.TryCreate(_activeDisplayedEvents.GetDetailLean(locator), out var key) ? key : null);
 
     private async Task FocusActiveRow()
     {
@@ -466,7 +495,7 @@ public sealed partial class LogTablePane
         {
             if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("focusEventTableRow", visibleRow); }
         }
-        catch (JSDisconnectedException) { /* Circuit gone - focus best-effort during teardown. */ }
+        catch (JSDisconnectedException) { /* Circuit gone; focus best-effort during teardown. */ }
         catch (Exception e)
         {
             TraceLogger.Warning($"Failed to focus active table row: {e}");
@@ -478,18 +507,16 @@ public sealed partial class LogTablePane
     private int GetColumnWidth(ColumnName column) =>
         _logTableState.ColumnWidths.TryGetValue(column, out int width) ? width : ColumnDefaults.GetColumnWidth(column);
 
-    private string GetCss(ResolvedEvent @event) =>
-        _selectedSet.Contains(@event) ? "table-row selected" : "table-row";
+    private string GetCss(EventLocator loc) =>
+        _selectedSet.Contains(loc) ? "table-row selected" : "table-row";
 
-    private int GetCurrentVisibleRow(IReadOnlyList<ResolvedEvent> displayedEvents)
+    private int GetCurrentVisibleRow(IEventColumnView displayedEvents)
     {
         int cursorRow = ResolveCursorVisibleRow();
 
         if (cursorRow >= 0) { return cursorRow; }
 
-        var fallback = _selectedEvents.LastOrDefault();
-
-        if (fallback is not null)
+        if (_selection.Count > 0 && _selection[^1].CurrentHandle is { } fallback)
         {
             int fallbackIndex = RowIndexOf(fallback);
 
@@ -513,7 +540,9 @@ public sealed partial class LogTablePane
     {
         if (group.EventCount == 0) { return "(none)"; }
 
-        var representative = _activeDisplayedEvents[group.StartIndex];
+        // M2: rehydrate the representative row (lean suffices for these header columns) and run the timezone/culture
+        // switch. Do NOT read GroupKeyAt here: its canonical key text is not the display header text.
+        var representative = _activeDisplayedEvents.GetDetailLean(_activeDisplayedEvents.LocatorAt(group.StartIndex));
 
         string? value = _logTableState.GroupBy switch
         {
@@ -536,24 +565,34 @@ public sealed partial class LogTablePane
         return string.IsNullOrEmpty(value) ? "(none)" : value;
     }
 
-    private string? GetHighlight(ResolvedEvent @event)
+    private string? GetHighlight(DisplayRow row)
     {
-        if (_selectedSet.Contains(@event)) { return null; }
+        if (_selectedSet.Contains(row.Loc)) { return null; }
 
-        if (_highlightCache.TryGetValue(@event, out var cached)) { return cached; }
+        if (_highlightCache.TryGetValue(row.Loc, out var cached)) { return cached; }
+
+        if (_activeHighlightFilters.Length == 0)
+        {
+            _highlightCache[row.Loc] = null;
+
+            return null;
+        }
 
         string? color = null;
+        // Highlight filters can reference EventData, so evaluate against the full rehydrated event; the result is
+        // cached per locator (stable within a generation) so the rehydrate happens at most once per physical row.
+        var detail = _activeDisplayedEvents.GetDetail(row.Loc);
 
         foreach (var filter in _activeHighlightFilters)
         {
-            if (!filter.Compiled!.Predicate(@event)) { continue; }
+            if (!filter.Compiled!.Predicate(detail)) { continue; }
 
             color = filter.Color.ToCssName();
 
             break;
         }
 
-        _highlightCache[@event] = color;
+        _highlightCache[row.Loc] = color;
 
         return color;
     }
@@ -561,18 +600,18 @@ public sealed partial class LogTablePane
     private ColumnName[] GetOrderedEnabledColumns() =>
         [.. _logTableState.GetOrderedEnabledColumns(ColumnDefaults)];
 
-    private int GetRowIndex(ResolvedEvent evt)
+    private int GetRowIndex(EventLocator loc)
     {
-        int index = RowIndexOf(evt);
+        int index = RowIndexOf(loc);
 
         if (index < 0) { return 2; }
 
         return (_rowView?.VisibleRowForEvent(index) ?? index) + 2;
     }
 
-    private int GetRowStripe(ResolvedEvent evt)
+    private int GetRowStripe(EventLocator loc)
     {
-        int index = RowIndexOf(evt);
+        int index = RowIndexOf(loc);
 
         if (index < 0) { return 0; }
 
@@ -596,10 +635,17 @@ public sealed partial class LogTablePane
 
         if (args is { CtrlKey: true, Code: "KeyA" })
         {
-            var last = displayedEvents[^1];
-            _selectionAnchor = displayedEvents[0];
-            SetCursorEvent(last);
-            DispatchSetSelection(displayedEvents, last, alreadyOrdered: true);
+            int total = displayedEvents.Count;
+            var lastLocator = displayedEvents.LocatorAt(total - 1);
+            _selectionAnchor = displayedEvents.LocatorAt(0);
+            SetCursorEvent(lastLocator);
+
+            var allRows = displayedEvents.Slice(0, total);
+            var allEntries = new List<SelectionEntry>(allRows.Count);
+
+            foreach (var row in allRows) { allEntries.Add(EntryFor(row)); }
+
+            DispatchSetSelection(allEntries, lastLocator, alreadyOrdered: true);
 
             return;
         }
@@ -689,13 +735,13 @@ public sealed partial class LogTablePane
 
         if (_rowView is null)
         {
-            ApplyNavSelection(displayedEvents, displayedEvents[targetRow], args.ShiftKey);
+            ApplyNavSelection(displayedEvents.LocatorAt(targetRow), args.ShiftKey);
             _focusActiveOnNextRender = true;
 
             return;
         }
 
-        NavigateGroupedTo(displayedEvents, targetRow, scanDirection, args.ShiftKey);
+        NavigateGroupedTo(targetRow, scanDirection, args.ShiftKey);
     }
 
     private void HandleTreegridLeft()
@@ -704,9 +750,9 @@ public sealed partial class LogTablePane
 
         if (view is null) { return; }
 
-        if (_cursor is { Kind: TableRowKind.Event, Event: { } @event })
+        if (_cursor is { Kind: TableRowKind.Event, Handle: { } handle })
         {
-            int index = RowIndexOf(@event);
+            int index = RowIndexOf(handle);
 
             if (index >= 0)
             {
@@ -746,10 +792,10 @@ public sealed partial class LogTablePane
 
         if (group.EventCount > 0)
         {
-            var first = _activeDisplayedEvents[group.StartIndex];
-            _selectionAnchor = first;
-            SetCursorEvent(first);
-            DispatchSetSelection([first], first);
+            var firstLocator = _activeDisplayedEvents.LocatorAt(group.StartIndex);
+            _selectionAnchor = firstLocator;
+            SetCursorEvent(firstLocator);
+            DispatchSetSelection([EntryFor(firstLocator)], firstLocator);
             _focusActiveOnNextRender = true;
         }
     }
@@ -766,21 +812,22 @@ public sealed partial class LogTablePane
         await _tableModule.InvokeVoidAsync("initializeTableEvents", _dotNetRef);
     }
 
-    private void InvokeCellContextMenu(MouseEventArgs args, ResolvedEvent @event, ColumnName? column)
+    private void InvokeCellContextMenu(MouseEventArgs args, DisplayRow row, ColumnName? column)
     {
         var items = new List<MenuItem>();
+        var detail = _activeDisplayedEvents.GetDetail(row.Loc);
 
-        AppendCellFilterItems(items, @event, column);
-        items.AddRange(ShowContextMenuItems(@event));
+        AppendCellFilterItems(items, detail, column);
+        items.AddRange(ShowContextMenuItems(detail));
 
         MenuService.OpenAt(args.ClientX, args.ClientY, items);
     }
 
     private void InvokeContextMenu(MouseEventArgs args)
     {
-        var clicked = SelectedEvent.Value;
+        if (Focus.Value?.CurrentHandle is not { } handle) { return; }
 
-        if (clicked is null) { return; }
+        if (!_activeDisplayedEvents.TryGetDetail(handle, out var clicked)) { return; }
 
         MenuService.OpenAt(args.ClientX, args.ClientY, ShowContextMenuItems(clicked));
     }
@@ -794,13 +841,13 @@ public sealed partial class LogTablePane
     private void InvokeTableColumnMenu(MouseEventArgs args) =>
         MenuService.OpenAt(args.ClientX, args.ClientY, ShowColumnMenuItems());
 
-    private bool IsSelectionOutOfSortOrder(IReadOnlyList<ResolvedEvent> selection)
+    private bool IsSelectionOutOfSortOrder(IReadOnlyList<SelectionEntry> selection)
     {
         int lastIndex = -1;
 
-        foreach (var selectedEvent in selection)
+        foreach (var entry in selection)
         {
-            int index = RowIndexOf(selectedEvent);
+            int index = entry.CurrentHandle is { } handle ? RowIndexOf(handle) : -1;
 
             if (index < 0) { continue; }
 
@@ -812,11 +859,10 @@ public sealed partial class LogTablePane
         return false;
     }
 
-    private ValueTask<ItemsProviderResult<ResolvedEvent>> LoadEventViewport(ItemsProviderRequest request) =>
+    private ValueTask<ItemsProviderResult<DisplayRow>> LoadEventViewport(ItemsProviderRequest request) =>
         ValueTask.FromResult(ComputeEventViewport(_activeDisplayedEvents, request));
 
     private void NavigateGroupedTo(
-        IReadOnlyList<ResolvedEvent> displayedEvents,
         int targetRow,
         int scanDirection,
         bool shift)
@@ -826,7 +872,7 @@ public sealed partial class LogTablePane
 
         if (row.Kind == TableRowKind.Event)
         {
-            ApplyNavSelection(displayedEvents, view.EventAt(row), shift);
+            ApplyNavSelection(view.LocatorAt(row), shift);
             _focusActiveOnNextRender = true;
 
             return;
@@ -849,7 +895,7 @@ public sealed partial class LogTablePane
 
         if (probe < 0 || probe >= view.Count) { return; }
 
-        ApplyNavSelection(displayedEvents, view.EventAt(view[probe]), shift: true);
+        ApplyNavSelection(view.LocatorAt(view[probe]), shift: true);
         _focusActiveOnNextRender = true;
     }
 
@@ -871,12 +917,12 @@ public sealed partial class LogTablePane
     private TableCursor? NormalizeCursor(TableCursor? cursor)
     {
         if (_rowView is not { } view ||
-            cursor is not { Kind: TableRowKind.Event, Event: { } @event })
+            cursor is not { Kind: TableRowKind.Event, Handle: { } handle })
         {
             return cursor;
         }
 
-        int index = RowIndexOf(@event);
+        int index = RowIndexOf(handle);
 
         if (index < 0) { return cursor; }
 
@@ -899,27 +945,27 @@ public sealed partial class LogTablePane
         }
     }
 
-    private void RebuildGroupedRowView(IReadOnlyList<ResolvedEvent> displayedEvents)
+    private void RebuildGroupedRowView(IEventColumnView displayedEvents)
     {
         var state = _logTableState;
 
         if (state.GroupBy is not { } groupBy)
         {
-            ResolvedEvent? formerGroupFirstEvent = null;
+            EventLocator? formerGroupFirstLocator = null;
 
             if (_rowView is { } priorView &&
                 _cursor is { Kind: TableRowKind.Header, GroupKey: { } headerKey } &&
                 priorView.TryGetGroupByKey(headerKey, out var priorGroup) && priorGroup.EventCount > 0)
             {
-                formerGroupFirstEvent = priorView.FirstEventOf(priorGroup);
+                formerGroupFirstLocator = priorView.FirstLocatorOf(priorGroup);
             }
 
             _rowView = null;
             _rowViewSnapshot = default;
 
-            if (formerGroupFirstEvent is not null)
+            if (formerGroupFirstLocator is not null)
             {
-                SetCursorEvent(formerGroupFirstEvent);
+                SetCursorEvent(formerGroupFirstLocator);
             }
 
             return;
@@ -943,10 +989,20 @@ public sealed partial class LogTablePane
         var displayedEvents = ResolveActiveDisplayedEvents();
         _activeDisplayedEvents = displayedEvents;
 
+        var currentTableId = _currentTable?.Id;
+
+        // Highlight results are keyed by locator (stable within a generation across re-sorts). A reload mints a new
+        // EventLogId, so clear the cache only when the active table identity changes, bounding growth without discarding
+        // still-valid entries on every re-sort.
+        if (!Equals(currentTableId, _highlightCacheTableId))
+        {
+            _highlightCacheTableId = currentTableId;
+            _highlightCache.Clear();
+        }
+
         if (!ReferenceEquals(displayedEvents, _lastIndexedDisplayedEvents))
         {
             _lastIndexedDisplayedEvents = displayedEvents;
-            _highlightCache.Clear();
             _refreshEventViewportOnRender = true;
 
             if (displayedEvents.Count == 0)
@@ -956,15 +1012,20 @@ public sealed partial class LogTablePane
             }
             else
             {
-                _selectionAnchor = ResolveByKey(displayedEvents, _selectionAnchor);
-
-                if (_cursor is { Kind: TableRowKind.Event, Event: { } cursorEvent })
+                // Locators are physical positions within a generation: a re-sort keeps them valid (Rank >= 0); a
+                // reload invalidates them (wrong generation, Rank -1), dropping the stale anchor/cursor.
+                if (_selectionAnchor is { } anchor && displayedEvents.Rank(anchor) < 0)
                 {
-                    var resolved = ResolveByKey(displayedEvents, cursorEvent);
-                    _cursor = resolved is null ? null : TableCursor.ForEvent(resolved);
+                    _selectionAnchor = null;
                 }
 
-                if (IsSelectionOutOfSortOrder(_selectedEvents))
+                if (_cursor is { Kind: TableRowKind.Event, Handle: { } cursorHandle } &&
+                    displayedEvents.Rank(cursorHandle) < 0)
+                {
+                    _cursor = null;
+                }
+
+                if (IsSelectionOutOfSortOrder(_selection))
                 {
                     _resortSelectionOnNextRender = true;
                 }
@@ -979,9 +1040,9 @@ public sealed partial class LogTablePane
     {
         if (_rowView is not { } view || _cursor is not { } cursor) { return; }
 
-        if (cursor is { Kind: TableRowKind.Event, Event: { } @event })
+        if (cursor is { Kind: TableRowKind.Event, Handle: { } handle })
         {
-            int index = RowIndexOf(@event);
+            int index = RowIndexOf(handle);
 
             if (index >= 0)
             {
@@ -1015,8 +1076,8 @@ public sealed partial class LogTablePane
         }
     }
 
-    private IReadOnlyList<ResolvedEvent> ResolveActiveDisplayedEvents() =>
-        _currentTable is null ? [] : _logTableState.DisplayedEventsForTab(_currentTable);
+    private IEventColumnView ResolveActiveDisplayedEvents() =>
+        _currentTable is null ? s_emptyView : _logTableState.DisplayedEventsForTab(_currentTable);
 
     private int ResolveCursorVisibleRow()
     {
@@ -1025,9 +1086,9 @@ public sealed partial class LogTablePane
             return _rowView?.VisibleRowForHeader(key) ?? -1;
         }
 
-        if (_cursor is { Kind: TableRowKind.Event, Event: { } @event })
+        if (_cursor is { Kind: TableRowKind.Event, Handle: { } handle })
         {
-            int index = RowIndexOf(@event);
+            int index = RowIndexOf(handle);
 
             if (index >= 0)
             {
@@ -1040,31 +1101,23 @@ public sealed partial class LogTablePane
 
     private void ResortSelectionForCurrentTable()
     {
-        DispatchSetSelection(_selectedEvents, ActiveEvent ?? _selectedEvent);
+        DispatchSetSelection(_selection, ActiveHandle ?? _focus?.CurrentHandle);
     }
 
-    private int RowIndexOf(ResolvedEvent @event) =>
-        ResolvedEventIndex.IndexOf(
-            _activeDisplayedEvents,
-            @event,
-            _logTableState.OrderBy,
-            _logTableState.IsDescending,
-            _logTableState.GroupBy,
-            _logTableState.IsGroupDescending);
+    private int RowIndexOf(EventLocator locator) => _activeDisplayedEvents.Rank(locator);
 
     private async Task ScrollToSelectedEvent()
     {
-        var target = ActiveEvent ?? _selectedEvent ?? _selectedEvents.LastOrDefault();
+        var target = ActiveHandle
+            ?? _focus?.CurrentHandle
+            ?? (_selection.Count > 0 ? _selection[^1].CurrentHandle : null);
 
-        if (target is null) { return; }
+        if (target is not { } handle) { return; }
 
         if (_activeDisplayedEvents.Count == 0) { return; }
 
-        var resolved = ResolvedEventIndex.ResolveByKey(_activeDisplayedEvents, target);
-
-        if (resolved is null) { return; }
-
-        int index = RowIndexOf(resolved);
+        // Locators are live positions within the current generation; no value-key re-resolve is needed.
+        int index = RowIndexOf(handle);
 
         if (index < 0) { return; }
 
@@ -1073,7 +1126,7 @@ public sealed partial class LogTablePane
         if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("scrollToRow", targetRow); }
     }
 
-    private void SelectEvent(MouseEventArgs args, ResolvedEvent @event)
+    private void SelectEvent(MouseEventArgs args, DisplayRow row)
     {
         var displayedEvents = _activeDisplayedEvents;
 
@@ -1082,67 +1135,68 @@ public sealed partial class LogTablePane
             case { ShiftKey: true } when displayedEvents.Count > 0:
                 if (_selectionAnchor is null)
                 {
-                    _selectionAnchor = @event;
-                    SetCursorEvent(@event);
-                    DispatchSetSelection([@event], @event);
+                    _selectionAnchor = row.Loc;
+                    SetCursorEvent(row.Loc);
+                    DispatchSetSelection([EntryFor(row)], row.Loc);
 
                     return;
                 }
 
-                SetCursorEvent(@event);
-                var range = BuildRange(displayedEvents, _selectionAnchor, @event);
+                SetCursorEvent(row.Loc);
+                var range = BuildRange(_selectionAnchor.Value, row.Loc);
 
                 if (args.CtrlKey)
                 {
-                    var merged = new List<ResolvedEvent>(_selectedEvents.Count + range.Count);
-                    merged.AddRange(_selectedEvents);
+                    var merged = new List<SelectionEntry>(_selection.Count + range.Count);
+                    merged.AddRange(_selection);
                     merged.AddRange(range);
-                    DispatchSetSelection(merged, @event);
+                    DispatchSetSelection(merged, row.Loc);
                 }
                 else
                 {
-                    DispatchSetSelection(range, @event, alreadyOrdered: true);
+                    DispatchSetSelection(range, row.Loc, alreadyOrdered: true);
                 }
 
                 return;
 
             case { CtrlKey: true }:
-                _selectionAnchor = @event;
-                SetCursorEvent(@event);
+                _selectionAnchor = row.Loc;
+                SetCursorEvent(row.Loc);
 
-                if (_selectedSet.Contains(@event))
+                if (_selectedSet.Contains(row.Loc))
                 {
-                    var remaining = new List<ResolvedEvent>(_selectedEvents.Count);
+                    var remaining = new List<SelectionEntry>(_selection.Count);
 
-                    foreach (var existingEvent in _selectedEvents)
+                    foreach (var existing in _selection)
                     {
-                        if (!ReferenceEquals(existingEvent, @event)) { remaining.Add(existingEvent); }
+                        // Toggle off by live position (CurrentHandle), not OriginHandle; they differ after a reload.
+                        if (existing.CurrentHandle != row.Loc) { remaining.Add(existing); }
                     }
 
-                    DispatchSetSelection(remaining, @event);
+                    DispatchSetSelection(remaining, row.Loc);
                 }
                 else
                 {
-                    var combined = new List<ResolvedEvent>(_selectedEvents.Count + 1);
-                    combined.AddRange(_selectedEvents);
-                    combined.Add(@event);
-                    DispatchSetSelection(combined, @event);
+                    var combined = new List<SelectionEntry>(_selection.Count + 1);
+                    combined.AddRange(_selection);
+                    combined.Add(EntryFor(row));
+                    DispatchSetSelection(combined, row.Loc);
                 }
 
                 return;
 
             default:
-                if (args.Button == 2 && _selectedSet.Contains(@event))
+                if (args.Button == 2 && _selectedSet.Contains(row.Loc))
                 {
-                    SetCursorEvent(@event);
-                    DispatchSetSelection(_selectedEvents, @event);
+                    SetCursorEvent(row.Loc);
+                    DispatchSetSelection(_selection, row.Loc);
 
                     return;
                 }
 
-                _selectionAnchor = @event;
-                SetCursorEvent(@event);
-                DispatchSetSelection([@event], @event);
+                _selectionAnchor = row.Loc;
+                SetCursorEvent(row.Loc);
+                DispatchSetSelection([EntryFor(row)], row.Loc);
 
                 return;
         }
@@ -1156,12 +1210,15 @@ public sealed partial class LogTablePane
             return;
         }
 
-        var members = ResolvedEventIndex.Slice(_activeDisplayedEvents, group.StartIndex, group.EventCount);
+        var members = _activeDisplayedEvents.Slice(group.StartIndex, group.EventCount);
+        var entries = new List<SelectionEntry>(members.Count);
 
-        var active = members[0];
-        _selectionAnchor = active;
-        SetCursorEvent(active);
-        DispatchSetSelection(members, active, alreadyOrdered: true);
+        foreach (var row in members) { entries.Add(EntryFor(row)); }
+
+        var activeLocator = members[0].Loc;
+        _selectionAnchor = activeLocator;
+        SetCursorEvent(activeLocator);
+        DispatchSetSelection(entries, activeLocator, alreadyOrdered: true);
     }
 
     private void SelectGroupByKey(string key)
@@ -1173,8 +1230,8 @@ public sealed partial class LogTablePane
 
     private void SetCursor(TableCursor? cursor) => _cursor = NormalizeCursor(cursor);
 
-    private void SetCursorEvent(ResolvedEvent? @event) =>
-        SetCursor(@event is null ? null : TableCursor.ForEvent(@event));
+    private void SetCursorEvent(EventLocator? handle) =>
+        SetCursor(handle is { } locator ? TableCursor.ForEvent(locator) : null);
 
     private void SetCursorHeader(string groupKey) => SetCursor(TableCursor.ForHeader(groupKey));
 

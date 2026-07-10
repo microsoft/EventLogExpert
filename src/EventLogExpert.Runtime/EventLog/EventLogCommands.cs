@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
-using EventLogExpert.Eventing.Common.Events;
 using Fluxor;
 
 namespace EventLogExpert.Runtime.EventLog;
@@ -24,6 +23,6 @@ internal sealed class EventLogCommands(IDispatcher dispatcher) : IEventLogComman
     public void SetContinuouslyUpdate(bool continuouslyUpdate) =>
         _dispatcher.Dispatch(new SetContinuouslyUpdateAction(continuouslyUpdate));
 
-    public void SetSelectedEvents(IReadOnlyCollection<ResolvedEvent> selectedEvents, ResolvedEvent? selectedEvent) =>
-        _dispatcher.Dispatch(new SetSelectedEventsAction(selectedEvents, selectedEvent));
+    public void SetSelectedEvents(IReadOnlyCollection<SelectionEntry> selection, SelectionEntry? focus) =>
+        _dispatcher.Dispatch(new SetSelectedEventsAction(selection, focus));
 }

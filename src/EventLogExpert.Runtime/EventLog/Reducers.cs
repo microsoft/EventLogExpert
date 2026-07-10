@@ -36,8 +36,8 @@ internal sealed class Reducers
             OpenLogs = [],
             NamesByLog = s_emptyNamesByLog,
             LoadedLogNames = RecomputeLoadedLogNames(s_emptyNamesByLog, state.LoadedLogNames),
-            SelectedEvent = null,
-            SelectedEvents = [],
+            Focus = null,
+            Selection = [],
             NewEventBuffer = [],
             NewEventBufferIsFull = false
         };
@@ -49,20 +49,16 @@ internal sealed class Reducers
             .Where(e => e.OwningLog != action.LogName)
             .ToList();
 
-        // Drop selections belonging to the closed log so stale references don't linger
-        // in SelectedEvents. Without this, a reload (which closes and re-opens the log
-        // to load XML) would leave stale entries that prevent the highlight refresh
-        // when the new instances are restored via SelectEvents.
-        var newSelectedEvents = state.SelectedEvents
-            .RemoveAll(e => string.Equals(e.OwningLog, action.LogName, StringComparison.Ordinal));
+        // Drop selections belonging to the closed log; otherwise a reload (close then reopen) leaves stale-generation
+        // handles that block the highlight refresh when the restored entries arrive.
+        var newSelection = state.Selection
+            .RemoveAll(entry => entry.OriginHandle.LogId == action.LogId);
 
-        // Clear the focused event when it belongs to the closed log; otherwise focus would
-        // point at a stale instance after reload-driven close + reopen.
-        var newSelectedEvent =
-            state.SelectedEvent is not null &&
-            string.Equals(state.SelectedEvent.OwningLog, action.LogName, StringComparison.Ordinal)
+        // Clear focus when it belongs to the closed log; otherwise it would address a defunct generation after the reopen.
+        var newFocus =
+            state.Focus is { } focus && focus.OriginHandle.LogId == action.LogId
                 ? null
-                : state.SelectedEvent;
+                : state.Focus;
 
         var newNamesByLog = state.NamesByLog.Remove(action.LogName);
 
@@ -73,8 +69,8 @@ internal sealed class Reducers
             LoadedLogNames = RecomputeLoadedLogNames(newNamesByLog, state.LoadedLogNames),
             NewEventBuffer = newEventBuffer,
             NewEventBufferIsFull = newEventBuffer.Count >= EventLogState.MaxNewEvents,
-            SelectedEvent = newSelectedEvent,
-            SelectedEvents = newSelectedEvents
+            Focus = newFocus,
+            Selection = newSelection
         };
     }
 
@@ -139,8 +135,8 @@ internal sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceOpenLog(EventLogState state, OpenLogAction action)
     {
-        // Idempotent: re-opening an already-active log is a no-op so callers (menu, drag/drop, command line,
-        // SettingsModal.ReloadOpenLogs, effects) don't need to coordinate to avoid ImmutableDictionary.Add throwing.
+        // Idempotent: re-opening an already-active log is a no-op, so callers need not coordinate to avoid
+        // ImmutableDictionary.Add throwing.
         if (state.OpenLogs.ContainsKey(action.LogName)) { return state; }
 
         var openLogId = EventLogId.Create();
@@ -162,22 +158,18 @@ internal sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceSelectEvent(EventLogState state, SelectEventAction action)
     {
-        // Reference equality keeps selection consistent with EventTable's
-        // ReferenceEqualityComparer-based selection set. Value equality on
-        // ResolvedEvent (a record) would treat distinct-but-value-equal
-        // instances as the same — e.g., after a log reload, SelectedEvents
-        // may still hold stale references that are value-equal to new ones.
-        bool alreadySelected = ContainsReference(state.SelectedEvents, action.SelectedEvent);
+        // OriginHandle value equality is the selection identity: a stale (prior-generation) handle is distinct from the
+        // fresh one, matching reference-identity semantics without holding event object references.
+        bool alreadySelected = ContainsByOriginHandle(state.Selection, action.Selection);
 
-        // SelectedEvent always tracks the affected row (Explorer-style focus),
-        // independent of whether the row ends up selected.
+        // Focus always tracks the affected row (Explorer-style focus), independent of whether the row ends up selected.
         if (!alreadySelected)
         {
             return state with
             {
-                SelectedEvents = action.IsMultiSelect ?
-                    state.SelectedEvents.Add(action.SelectedEvent) : [action.SelectedEvent],
-                SelectedEvent = action.SelectedEvent
+                Selection = action.IsMultiSelect ?
+                    state.Selection.Add(action.Selection) : [action.Selection],
+                Focus = action.Selection
             };
         }
 
@@ -185,88 +177,61 @@ internal sealed class Reducers
         {
             return state with
             {
-                SelectedEvents = RemoveByReference(state.SelectedEvents, action.SelectedEvent),
-                SelectedEvent = action.SelectedEvent
+                Selection = RemoveByOriginHandle(state.Selection, action.Selection),
+                Focus = action.Selection
             };
         }
 
         if (action.ShouldStaySelected)
         {
-            return ReferenceEquals(state.SelectedEvent, action.SelectedEvent)
+            return FocusEqualsByOriginHandle(state.Focus, action.Selection)
                 ? state
-                : state with { SelectedEvent = action.SelectedEvent };
+                : state with { Focus = action.Selection };
         }
 
-        return state with { SelectedEvents = [action.SelectedEvent], SelectedEvent = action.SelectedEvent };
+        return state with { Selection = [action.Selection], Focus = action.Selection };
     }
 
     [ReducerMethod]
     public static EventLogState ReduceSelectEvents(EventLogState state, SelectEventsAction action)
     {
-        // Reference-identity dedupe only: prevents adding the same instance
-        // twice, but intentionally allows distinct value-equal instances
-        // (for example, stale vs. fresh events after a reload) to coexist
-        // so a stale reference in SelectedEvents isn't silently collapsed
-        // with a freshly loaded copy.
-        var existing = new HashSet<ResolvedEvent>(state.SelectedEvents, ReferenceEqualityComparer.Instance);
-        List<ResolvedEvent> eventsToAdd = [];
+        // OriginHandle-identity dedupe only: blocks the same handle twice but lets distinct-generation handles (a stale
+        // entry and a freshly restored one) coexist, so a stale selection isn't collapsed with the fresh copy.
+        var existing = new HashSet<EventLocator>();
 
-        foreach (var selectedEvent in action.SelectedEvents)
+        foreach (var entry in state.Selection) { existing.Add(entry.OriginHandle); }
+
+        List<SelectionEntry> entriesToAdd = [];
+
+        foreach (var entry in action.Selection)
         {
-            if (existing.Add(selectedEvent))
-            {
-                eventsToAdd.Add(selectedEvent);
-            }
+            if (existing.Add(entry.OriginHandle)) { entriesToAdd.Add(entry); }
         }
 
-        if (eventsToAdd.Count == 0) { return state; }
+        if (entriesToAdd.Count == 0) { return state; }
 
-        var newSelection = state.SelectedEvents.AddRange(eventsToAdd);
+        var newSelection = state.Selection.AddRange(entriesToAdd);
 
-        // Preserve focus when it survives the merge, but always resolve
-        // SelectedEvent to the instance that actually lives in newSelection
-        // so subsequent reference-equality checks stay valid. Prefer the
-        // same reference; fall back to a value-equal instance when only a
-        // replacement reference is present. If neither is found, focus the
-        // last incoming event so the restore path leaves something focused.
-        ResolvedEvent newSelectedEvent = eventsToAdd[^1];
+        // Preserve focus when it survives the merge (matched by OriginHandle); otherwise focus the last incoming entry
+        // so the restore path leaves something focused.
+        SelectionEntry newFocus = entriesToAdd[^1];
 
-        if (state.SelectedEvent is null)
+        if (state.Focus is not { } priorFocus)
         {
-            return state with
-            {
-                SelectedEvents = newSelection,
-                SelectedEvent = newSelectedEvent
-            };
+            return state with { Selection = newSelection, Focus = newFocus };
         }
 
-        ResolvedEvent? valueEqualMatch = null;
-
-        foreach (var selectedEvent in newSelection)
+        foreach (var entry in newSelection)
         {
-            if (ReferenceEquals(selectedEvent, state.SelectedEvent))
+            if (entry.OriginHandle == priorFocus.OriginHandle)
             {
-                valueEqualMatch = selectedEvent;
+                newFocus = entry;
 
                 break;
             }
-
-            if (valueEqualMatch is null && selectedEvent == state.SelectedEvent)
-            {
-                valueEqualMatch = selectedEvent;
-            }
         }
 
-        if (valueEqualMatch is not null)
-        {
-            newSelectedEvent = valueEqualMatch;
-        }
-
-        return state with
-        {
-            SelectedEvents = newSelection,
-            SelectedEvent = newSelectedEvent
-        };
+        return state with { Selection = newSelection, Focus = newFocus };
     }
 
     [ReducerMethod]
@@ -278,46 +243,45 @@ internal sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceSetSelectedEvents(EventLogState state, SetSelectedEventsAction action)
     {
-        // Order-preserving distinct by reference identity. The caller (typically
-        // EventTable) is responsible for ordering events according to the current
-        // sort column; the reducer honors whatever order it receives.
-        var seen = new HashSet<ResolvedEvent>(ReferenceEqualityComparer.Instance);
-        var builder = ImmutableList.CreateBuilder<ResolvedEvent>();
+        // Order-preserving distinct by OriginHandle; the caller orders entries by the current sort, and the reducer
+        // honors that order.
+        var seen = new HashSet<EventLocator>();
+        var builder = ImmutableList.CreateBuilder<SelectionEntry>();
 
-        foreach (var selectedEvent in action.SelectedEvents)
+        foreach (var entry in action.Selection)
         {
-            if (seen.Add(selectedEvent))
+            if (seen.Add(entry.OriginHandle))
             {
-                builder.Add(selectedEvent);
+                builder.Add(entry);
             }
         }
 
         var newSelection = builder.ToImmutable();
 
-        // Avoid publishing a new state reference when nothing changed —
-        // EventTable.ShouldRender uses ReferenceEquals on SelectedEvents.
-        bool selectionUnchanged = SelectionsEqualByReference(state.SelectedEvents, newSelection);
-        bool selectedUnchanged = ReferenceEquals(state.SelectedEvent, action.SelectedEvent);
+        // Avoid a new state reference when nothing changed; SelectionEntry is a value type, so identity uses OriginHandle
+        // value equality, not ReferenceEquals.
+        bool selectionUnchanged = SelectionsEqualByOriginHandle(state.Selection, newSelection);
+        bool focusUnchanged = FocusEqualsByOriginHandle(state.Focus, action.Focus);
 
-        if (selectionUnchanged && selectedUnchanged) { return state; }
+        if (selectionUnchanged && focusUnchanged) { return state; }
 
         if (selectionUnchanged)
         {
-            return state with { SelectedEvent = action.SelectedEvent };
+            return state with { Focus = action.Focus };
         }
 
         return state with
         {
-            SelectedEvent = action.SelectedEvent,
-            SelectedEvents = newSelection
+            Focus = action.Focus,
+            Selection = newSelection
         };
     }
 
-    private static bool ContainsReference(ImmutableList<ResolvedEvent> list, ResolvedEvent target)
+    private static bool ContainsByOriginHandle(ImmutableList<SelectionEntry> list, SelectionEntry target)
     {
-        foreach (var item in list)
+        foreach (var entry in list)
         {
-            if (ReferenceEquals(item, target)) { return true; }
+            if (entry.OriginHandle == target.OriginHandle) { return true; }
         }
 
         return false;
@@ -335,6 +299,13 @@ internal sealed class Reducers
         return builder.ToImmutable();
     }
 
+    private static bool FocusEqualsByOriginHandle(SelectionEntry? left, SelectionEntry? right)
+    {
+        if (left is not { } leftEntry) { return right is null; }
+
+        return right is { } rightEntry && leftEntry.OriginHandle == rightEntry.OriginHandle;
+    }
+
     private static ImmutableHashSet<string> RecomputeLoadedLogNames(
         ImmutableDictionary<string, ImmutableHashSet<string>> namesByLog,
         ImmutableHashSet<string> priorLoadedLogNames)
@@ -348,13 +319,13 @@ internal sealed class Reducers
         return union.SetEquals(priorLoadedLogNames) ? priorLoadedLogNames : union;
     }
 
-    private static ImmutableList<ResolvedEvent> RemoveByReference(
-        ImmutableList<ResolvedEvent> list,
-        ResolvedEvent target)
+    private static ImmutableList<SelectionEntry> RemoveByOriginHandle(
+        ImmutableList<SelectionEntry> list,
+        SelectionEntry target)
     {
         for (int i = 0; i < list.Count; i++)
         {
-            if (ReferenceEquals(list[i], target))
+            if (list[i].OriginHandle == target.OriginHandle)
             {
                 return list.RemoveAt(i);
             }
@@ -363,9 +334,9 @@ internal sealed class Reducers
         return list;
     }
 
-    private static bool SelectionsEqualByReference(
-        ImmutableList<ResolvedEvent> left,
-        ImmutableList<ResolvedEvent> right)
+    private static bool SelectionsEqualByOriginHandle(
+        ImmutableList<SelectionEntry> left,
+        ImmutableList<SelectionEntry> right)
     {
         if (ReferenceEquals(left, right)) { return true; }
 
@@ -373,7 +344,7 @@ internal sealed class Reducers
 
         for (int i = 0; i < left.Count; i++)
         {
-            if (!ReferenceEquals(left[i], right[i])) { return false; }
+            if (left[i].OriginHandle != right[i].OriginHandle) { return false; }
         }
 
         return true;
