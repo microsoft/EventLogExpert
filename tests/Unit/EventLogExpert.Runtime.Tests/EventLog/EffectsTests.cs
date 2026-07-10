@@ -208,7 +208,7 @@ public sealed class EffectsTests
     public async Task HandleApplyFilter_FilterBranch_WhenFilterServiceThrows_ShouldStillClearFilterProgress()
     {
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var raw = RawEventList.Empty.Append(new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) });
+        var raw = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
 
         var state = new EventLogState
         {
@@ -253,14 +253,14 @@ public sealed class EffectsTests
     public async Task HandleApplyFilter_FilterBranch_WhenFinalizeArrivesDuringOffThreadBuild_ShouldRefilterAndReflectIt()
     {
         var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var snapshotRaw = RawEventList.Empty.Append(new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(200) });
+        var snapshotRaw = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(200) };
 
-        var finalizedRaw = RawEventList.Empty.Append(new List<ResolvedEvent>
+        var finalizedRaw = new List<ResolvedEvent>
         {
             FilterEventBuilder.CreateTestEvent(200),
             FilterEventBuilder.CreateTestEvent(201),
             FilterEventBuilder.CreateTestEvent(202)
-        });
+        };
 
         var state = new EventLogState
         {
@@ -271,7 +271,7 @@ public sealed class EffectsTests
             AppliedFilter = new Filter(null, [])
         };
 
-        RawEventStoreState RawStateWith(RawEventList events, long contentVersion = 0) => new()
+        RawEventStoreState RawStateWith(IReadOnlyList<ResolvedEvent> events, long contentVersion = 0) => new()
         {
             ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty.Add(snapshotData.Id, EventColumnStore.Build(events, 0, contentVersion))
         };
@@ -297,13 +297,13 @@ public sealed class EffectsTests
     public async Task HandleApplyFilter_FilterBranch_WhenLiveTailArrivesDuringOffThreadBuild_ShouldRefilterAndIncludeIt()
     {
         var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var snapshotRaw = RawEventList.Empty.Append(new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) });
+        var snapshotRaw = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
 
-        var liveTailRaw = RawEventList.Empty.Append(new List<ResolvedEvent>
+        var liveTailRaw = new List<ResolvedEvent>
         {
             FilterEventBuilder.CreateTestEvent(100),
             FilterEventBuilder.CreateTestEvent(101)
-        });
+        };
 
         var state = new EventLogState
         {
@@ -314,7 +314,7 @@ public sealed class EffectsTests
             AppliedFilter = new Filter(null, [])
         };
 
-        RawEventStoreState RawStateWith(RawEventList events, long contentVersion = 0) => new()
+        RawEventStoreState RawStateWith(IReadOnlyList<ResolvedEvent> events, long contentVersion = 0) => new()
         {
             ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty.Add(snapshotData.Id, EventColumnStore.Build(events, 0, contentVersion))
         };
@@ -344,7 +344,7 @@ public sealed class EffectsTests
         // reducer also skips unknown log ids, but checking at the effect keeps the dispatch minimal.)
         var snapshotEvents = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
         var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var snapshotRaw = RawEventList.Empty.Append(snapshotEvents);
+        var snapshotRaw = snapshotEvents;
 
         var openState = new EventLogState
         {
@@ -384,7 +384,7 @@ public sealed class EffectsTests
         // a single retry pass so the user sees the filter applied to the updated row set, not stale rows.
         var snapshotEvents = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
         var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var snapshotRaw = RawEventList.Empty.Append(snapshotEvents);
+        var snapshotRaw = snapshotEvents;
 
         var liveTailEvents = new List<ResolvedEvent>
         {
@@ -392,7 +392,7 @@ public sealed class EffectsTests
             FilterEventBuilder.CreateTestEvent(101)
         };
 
-        var liveTailRaw = RawEventList.Empty.Append(liveTailEvents);
+        var liveTailRaw = liveTailEvents;
 
         var state = new EventLogState
         {
@@ -441,7 +441,7 @@ public sealed class EffectsTests
         // lost live events) AND a ConvergeFilterAction is scheduled to re-filter the log once it stabilizes.
         var snapshotEvents = new List<ResolvedEvent>();
         var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var snapshotRaw = RawEventList.Empty.Append(snapshotEvents);
+        var snapshotRaw = snapshotEvents;
 
         var pass1MutationEvents = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
 
@@ -451,8 +451,8 @@ public sealed class EffectsTests
             FilterEventBuilder.CreateTestEvent(101)
         };
 
-        var pass1MutationRaw = RawEventList.Empty.Append(pass1MutationEvents);
-        var pass2MutationRaw = RawEventList.Empty.Append(pass2MutationEvents);
+        var pass1MutationRaw = pass1MutationEvents;
+        var pass2MutationRaw = pass2MutationEvents;
 
         var state = new EventLogState
         {
@@ -463,7 +463,7 @@ public sealed class EffectsTests
             AppliedFilter = new Filter(null, [])
         };
 
-        RawEventStoreState RawStateWith(RawEventList events, long contentVersion = 0) => new()
+        RawEventStoreState RawStateWith(IReadOnlyList<ResolvedEvent> events, long contentVersion = 0) => new()
         {
             ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty.Add(snapshotData.Id, EventColumnStore.Build(events, 0, contentVersion))
         };
@@ -513,7 +513,7 @@ public sealed class EffectsTests
         {
             ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty.Add(
                 logData.Id,
-                EventColumnStore.Build(RawEventList.Empty.Append(new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) }), 0, 0))
+                EventColumnStore.Build(new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) }, 0, 0))
         };
 
         var (effects, mockDispatcher, _) =
@@ -921,7 +921,7 @@ public sealed class EffectsTests
         mockRawStore.Value.Returns(new RawEventStoreState
         {
             ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty.Add(
-                logData.Id, EventColumnStore.Build(RawEventList.Empty.Append(reloadedEvents), 0, 0))
+                logData.Id, EventColumnStore.Build(reloadedEvents, 0, 0))
         });
 
         var mockEventLogState = Substitute.For<IState<EventLogState>>();
@@ -1124,7 +1124,7 @@ public sealed class EffectsTests
         {
             ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty.Add(
                 logData.Id,
-                EventColumnStore.Build(RawEventList.Empty.Append(new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(999) }), 0, 0))
+                EventColumnStore.Build(new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(999) }, 0, 0))
         };
 
         var (effects, mockDispatcher, _) =
@@ -1367,7 +1367,7 @@ public sealed class EffectsTests
         // re-filtered slice, clear the progress spinner, and NOT schedule another ConvergeFilterAction.
         var events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var raw = RawEventList.Empty.Append(events);
+        var raw = events;
 
         var state = new EventLogState
         {
@@ -1411,7 +1411,7 @@ public sealed class EffectsTests
         // dispatching DisplayReady.
         var events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var raw = RawEventList.Empty.Append(events);
+        var raw = events;
 
         var state = new EventLogState
         {
@@ -1519,7 +1519,7 @@ public sealed class EffectsTests
         {
             ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty.Add(
                 logData.Id,
-                EventColumnStore.Build(RawEventList.Empty.Append(events), 0, 0))
+                EventColumnStore.Build(events, 0, 0))
         };
 
         var (effects, mockDispatcher, _) =
@@ -2192,7 +2192,7 @@ public sealed class EffectsTests
             FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
             FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
         };
-        var rawEvents = RawEventList.Empty.Append(events);
+        var rawEvents = events;
 
         var rawState = new RawEventStoreState
         {
@@ -2263,7 +2263,7 @@ public sealed class EffectsTests
         {
             ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty.Add(
                 logData.Id,
-                EventColumnStore.Build(RawEventList.Empty.Append(new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(id: 1, source: "A") }), 0, 0))
+                EventColumnStore.Build(new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(id: 1, source: "A") }, 0, 0))
         };
 
         var eventLogState = new EventLogState
@@ -2299,7 +2299,7 @@ public sealed class EffectsTests
             FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
             FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
         };
-        var rawEvents = RawEventList.Empty.Append(events);
+        var rawEvents = events;
 
         var rawState = new RawEventStoreState
         {
@@ -2344,8 +2344,8 @@ public sealed class EffectsTests
         var rawState = new RawEventStoreState
         {
             ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty
-                .Add(logA.Id, EventColumnStore.Build(RawEventList.Empty.Append(eventsA), 0, 0))
-                .Add(logB.Id, EventColumnStore.Build(RawEventList.Empty.Append(eventsB), 0, 0))
+                .Add(logA.Id, EventColumnStore.Build(eventsA, 0, 0))
+                .Add(logB.Id, EventColumnStore.Build(eventsB, 0, 0))
         };
 
         var eventLogState = new EventLogState

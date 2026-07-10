@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using Reducers = EventLogExpert.Runtime.LogTable.Reducers;
 
@@ -242,8 +243,8 @@ public sealed class LogTableReducerDifferentialTests
         {
             foreach (var log in OpenLogs())
             {
-                var oracle = log.Events.SortEvents(
-                    EffectiveOrderBy, State.IsDescending, State.GroupBy, State.IsGroupDescending);
+                var oracle = AosReferenceOrdering.OrderedEvents(
+                    log.Events, EffectiveOrderBy, State.IsDescending, State.GroupBy, State.IsGroupDescending);
                 var view = State.EventsForLog(log.Id);
 
                 Assert.True(
@@ -368,9 +369,9 @@ public sealed class LogTableReducerDifferentialTests
         private List<LogModel> OpenLogs() => _logs.Where(log => log.IsOpen).ToList();
 
         private IReadOnlyList<ResolvedEvent> Oracle() =>
-            OpenLogs()
-                .SelectMany(log => log.Events)
-                .SortEvents(EffectiveOrderBy, State.IsDescending, State.GroupBy, State.IsGroupDescending);
+            AosReferenceOrdering.OrderedEvents(
+                OpenLogs().SelectMany(log => log.Events),
+                EffectiveOrderBy, State.IsDescending, State.GroupBy, State.IsGroupDescending);
 
         private void ReapplyFilter(IReadOnlyList<LogModel> open)
         {

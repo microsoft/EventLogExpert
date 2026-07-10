@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 using System.Diagnostics;
 using System.Security.Principal;
 
@@ -13,8 +14,8 @@ namespace EventLogExpert.Runtime.Tests.LogTable;
 /// <summary>
 ///     Differential parity for the bulk column-scan sort kernel (
 ///     <see cref="ResolvedEventOrdering.SortColumnDirect" />): over the full 756-config sort matrix it must produce the
-///     exact physical-index order that sorting the same survivors through the per-compare oracle (
-///     <see cref="ResolvedEventOrdering.SelectColumnComparer" />) plus the same final physical-index ascending tie-break
+///     exact physical-index order that sorting the same survivors through the relocated array-of-structs reference
+///     comparer (<see cref="AosReferenceOrdering.Reference" />) plus the same final physical-index ascending tie-break
 ///     produces. A <see cref="LegacyEventColumnReader" /> feeds both sides the same corpus, so any divergence isolates the
 ///     kernel. A perf smoke test guards that the kernel finishes on a large synthetic corpus.
 /// </summary>
@@ -71,9 +72,9 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
 
         // Log the array-of-structs baseline for context only; a strict "faster than AoS" assert is too flaky for CI.
         var baseline = Stopwatch.StartNew();
-        _ = corpus.SortEvents(ColumnName.DateAndTime, isDescending: true).Count;
+        _ = AosReferenceOrdering.Order(corpus, ColumnName.DateAndTime, isDescending: true).Length;
         baseline.Stop();
-        _output.WriteLine($"SortEvents (AoS baseline, DateAndTime desc): {baseline.ElapsedMilliseconds} ms for {eventCount:N0} events");
+        _output.WriteLine($"AosReferenceOrdering.Order (reference baseline, DateAndTime desc): {baseline.ElapsedMilliseconds} ms for {eventCount:N0} events");
     }
 
     [Fact]
@@ -157,6 +158,10 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
         var middle = new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc);
         var late = new DateTime(2024, 12, 1, 0, 0, 0, DateTimeKind.Utc);
 
+        // Oracle-vs-kernel edge: do not pair a null and an empty-string value in the same string column here. The
+        // AosReferenceOrdering oracle is struct-based and sorts null before "" (raw string.Compare), while the live
+        // SortColumnDirect reads through the reader (AsString collapses null to "") and ties them, so pairing the two
+        // in one column would fail this parity test spuriously. No current row does so.
         return
         [
             FilterEventBuilder.CreateTestEvent(id: 2, recordId: 2, processId: 2, threadId: 2, source: "Alpha", level: "Information", timeCreated: early, activityId: guidLow, userId: sidLow),
@@ -261,17 +266,18 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
     private static LegacyEventColumnReader NewReader(IReadOnlyList<ResolvedEvent> corpus) =>
         new(EventLogId.Create(), generation: 1, contentVersion: 1, corpus);
 
-    // The oracle order: sort the survivors through SelectColumnComparer, then break residual ties by physical index
-    // ascending (the same total-order completion the kernel appends), so the comparison is well-defined on ties.
-    private static int[] OracleOrder(IEventColumnReader reader, int[] survivors, SortConfig config)
+    // The oracle order: sort the survivors through the relocated array-of-structs reference comparer, then break residual
+    // ties by physical index ascending (the same total-order completion the kernel appends), so the comparison is
+    // well-defined on ties.
+    private static int[] OracleOrder(IReadOnlyList<ResolvedEvent> corpus, int[] survivors, SortConfig config)
     {
-        Comparison<EventLocator> chain = ResolvedEventOrdering.SelectColumnComparer(
-            reader, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
+        Comparison<ResolvedEvent> chain = AosReferenceOrdering.Reference(
+            config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
         int[] order = (int[])survivors.Clone();
 
         Array.Sort(order, (a, b) =>
         {
-            int compared = chain(reader.LocatorAt(a), reader.LocatorAt(b));
+            int compared = chain(corpus[a], corpus[b]);
 
             return compared != 0 ? compared : a.CompareTo(b);
         });
@@ -298,7 +304,7 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
         {
             int[] actual = ResolvedEventOrdering.SortColumnDirect(
                 reader, survivors, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
-            int[] expected = OracleOrder(reader, survivors, config);
+            int[] expected = OracleOrder(corpus, survivors, config);
 
             if (!actual.SequenceEqual(expected))
             {

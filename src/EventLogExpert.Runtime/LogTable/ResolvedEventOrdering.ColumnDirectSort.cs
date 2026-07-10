@@ -7,16 +7,6 @@ namespace EventLogExpert.Runtime.LogTable;
 
 internal static partial class ResolvedEventOrdering
 {
-    /// <summary>
-    ///     Column-scan twin of <see cref="SelectColumnComparer" />: materializes the columns the selected chain touches once
-    ///     into flat physical-row arrays (bulk-copied per column, not per row), then sorts the
-    ///     <paramref
-    ///         name="survivors" />
-    ///     physical indices into display order by reading only those arrays. Reproduces the per-column typed order of
-    ///     <see cref="CompareColumnDirect" /> exactly, then appends a final physical-index ascending tie-break so the result
-    ///     is a strict total order (identical to <see cref="SelectColumnComparer" /> wrapped with the same index tie-break).
-    ///     Additive and unwired; the live path still sorts through <see cref="SelectComparer" />.
-    /// </summary>
     internal static int[] SortColumnDirect(
         IEventColumnReader reader,
         ReadOnlySpan<int> survivors,

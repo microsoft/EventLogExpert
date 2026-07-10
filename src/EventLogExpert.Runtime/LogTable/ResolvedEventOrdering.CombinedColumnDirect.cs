@@ -34,8 +34,8 @@ internal static partial class ResolvedEventOrdering
         };
     }
 
-    // Cross-reader twin of SelectColumnComparer: must reproduce its ordering chain exactly, reading each side from its
-    // own reader.
+    // Cross-reader form of the column-direct ordering chain: reproduces the same ungrouped, no-order-by-default, or grouped
+    // order as the single-reader sort, reading each side from its own reader.
     internal static CrossComparison SelectCrossColumnComparer(
         ColumnName? orderBy,
         bool isDescending,
