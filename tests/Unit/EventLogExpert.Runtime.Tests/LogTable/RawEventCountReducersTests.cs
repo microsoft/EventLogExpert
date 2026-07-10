@@ -103,7 +103,7 @@ public sealed class RawEventCountReducersTests
     [Fact]
     public void ReduceIngestRawEvents_ReplaceWithSameCountDifferentEvents_KeepsCountAndStaysInSync()
     {
-        // Locks the int-vs-reference change-detection edge: the store emits a new RawEventList reference but the
+        // Locks the int-vs-reference change-detection edge: the store emits a new EventColumnStore reference but the
         // count value is unchanged, so the count reducer must not drift from the store.
         var store = new RawEventStoreState();
         var count = new RawEventCountState();

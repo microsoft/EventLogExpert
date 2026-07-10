@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web.Virtualization;
@@ -60,14 +59,14 @@ public sealed class LogTablePaneViewportTests
     }
 
     [Fact]
-    public void ComputeEventViewport_Window_MatchesResolvedEventIndexSlice()
+    public void ComputeEventViewport_Window_MatchesViewSlice()
     {
         var events = Events(20);
         var view = DisplayViewTestFactory.Identity(events);
 
         var result = LogTablePane.ComputeEventViewport(view, Request(startIndex: 7, count: 6));
 
-        Assert.Equal(ResolvedEventIndex.Slice(events, 7, 6).Select(eventItem => eventItem.Id), result.Items.Select(row => row.Lean.Id));
+        Assert.Equal(view.Slice(7, 6).Select(row => row.Lean.Id), result.Items.Select(row => row.Lean.Id));
     }
 
     [Fact]

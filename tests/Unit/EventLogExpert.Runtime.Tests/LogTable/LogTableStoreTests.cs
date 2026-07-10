@@ -7,6 +7,7 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Filtering.TestUtils.Constants;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
@@ -39,7 +40,7 @@ public sealed class LogTableStoreTests
         var clone = new ResolvedEvent(Constants.LogNameTestLog, LogPathType.Channel) { Id = 2, RecordId = 20 };
 
         // A value-equal clone (e.g. a reloaded selection) resolves to the live instance's index via the single-log
-        // fast path, matching CombinedEventView's key-based Rank rather than returning -1.
+        // fast path, matching CombinedColumnView's key-based Rank rather than returning -1.
         Assert.True(ValueKey.TryCreate(clone, out var key));
         var resolved = displayed.ResolveByKey(key);
         Assert.NotNull(resolved);
@@ -80,7 +81,7 @@ public sealed class LogTableStoreTests
             }));
 
         // Assert: the single-log fast path returns the per-log list itself (same reference as EventsForLog),
-        // bypassing the CombinedEventView merge wrapper used for multiple logs.
+        // bypassing the CombinedColumnView merge wrapper used for multiple logs.
         Assert.Same(state.EventsForLog(logData.Id), state.DisplayedEvents);
     }
 
@@ -1801,11 +1802,15 @@ public sealed class LogTableStoreTests
         var log2 = new LogView(EventLogId.Create()) { LogName = "Log2" };
         var combined = new LogView(EventLogId.Create()) { GroupId = LogTabGroupId.AllLogs };
 
-        var existing = new List<ResolvedEvent>
-        {
-            FilterEventBuilder.CreateTestEvent(id: 1, source: "A", timeCreated: baseTime.AddSeconds(1), owningLog: "Log1"),
-            FilterEventBuilder.CreateTestEvent(id: 2, source: "A", timeCreated: baseTime.AddSeconds(2), owningLog: "Log2")
-        }.SortEvents(orderBy: null, isDescending: false, groupBy: ColumnName.Source);
+        var existing = AosReferenceOrdering.OrderedEvents(
+            new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(id: 1, source: "A", timeCreated: baseTime.AddSeconds(1), owningLog: "Log1"),
+                FilterEventBuilder.CreateTestEvent(id: 2, source: "A", timeCreated: baseTime.AddSeconds(2), owningLog: "Log2")
+            },
+            orderBy: null,
+            isDescending: false,
+            groupBy: ColumnName.Source);
 
         var state = new LogTableState
         {

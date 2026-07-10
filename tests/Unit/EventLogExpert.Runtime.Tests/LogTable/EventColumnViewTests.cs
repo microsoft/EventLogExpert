@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 using System.Security.Principal;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
@@ -13,7 +14,7 @@ namespace EventLogExpert.Runtime.Tests.LogTable;
 ///     End-to-end display parity for <see cref="EventColumnView" /> over a REAL <see cref="EventColumnStore" />
 ///     (built and sealed into columnar chunks, so the view rehydrates from columns, not the original objects). Across the
 ///     full 756-config sort matrix the view must (a) report the corpus count, (b) display the same order as the
-///     array-of-structs oracle <see cref="ResolvedEventOrdering.SortEvents" />, and (c) round-trip every
+///     array-of-structs oracle <see cref="AosReferenceOrdering.OrderedEvents" />, and (c) round-trip every
 ///     <see cref="DisplayRow.Loc" /> through <see cref="EventColumnView.Rank" /> and <c>GetDetail</c>. A filtered survivor
 ///     subset must display exactly those rows. The corpus uses distinct non-null RecordIds so both sort paths resolve to
 ///     one strict total order (the null-RecordId tie-burst corpus is <see cref="ColumnDirectSortKernelTests" />' job, not
@@ -61,7 +62,7 @@ public sealed class EventColumnViewTests
         Assert.Equal(survivorSet, displayed.Select(row => row.Loc.Index).ToHashSet());
 
         // The displayed order still matches the oracle sorted over just the survivor events.
-        IReadOnlyList<ResolvedEvent> oracle = survivors.Select(index => s_corpus[index]).SortEvents(config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
+        IReadOnlyList<ResolvedEvent> oracle = AosReferenceOrdering.OrderedEvents(survivors.Select(index => s_corpus[index]), config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
 
         for (int displayIndex = 0; displayIndex < oracle.Count; displayIndex++)
         {
@@ -112,7 +113,7 @@ public sealed class EventColumnViewTests
         {
             EventColumnView view = CreateView(survivors, config);
             IReadOnlyList<DisplayRow> displayed = view.Slice(0, view.Count);
-            IReadOnlyList<ResolvedEvent> oracle = s_corpus.SortEvents(config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
+            IReadOnlyList<ResolvedEvent> oracle = AosReferenceOrdering.OrderedEvents(s_corpus, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
 
             if (displayed.Count != oracle.Count)
             {
@@ -172,7 +173,7 @@ public sealed class EventColumnViewTests
         const int count = 4;
         var config = new SortConfig(ColumnName.RecordId, IsDescending: false, GroupBy: null, IsGroupDescending: false);
         EventColumnView view = CreateView(AllIndices(), config);
-        IReadOnlyList<ResolvedEvent> oracle = s_corpus.SortEvents(config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
+        IReadOnlyList<ResolvedEvent> oracle = AosReferenceOrdering.OrderedEvents(s_corpus, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
 
         IReadOnlyList<DisplayRow> window = view.Slice(start, count);
 

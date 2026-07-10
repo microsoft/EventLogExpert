@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using System.Collections.Immutable;
 using Reducers = EventLogExpert.Runtime.LogTable.Reducers;
@@ -513,7 +514,8 @@ public sealed class LogTabGroupTests
     private static void AssertViewExactly(
         LogTableState state, IEventColumnView view, IReadOnlyList<ResolvedEvent> expected)
     {
-        var oracle = expected.SortEvents(
+        var oracle = AosReferenceOrdering.OrderedEvents(
+            expected,
             ResolvedEventOrdering.ResolveDefaultOrderBy(state.OrderBy, state.GroupBy, state.PerLogEvents.Count),
             state.IsDescending,
             state.GroupBy,
