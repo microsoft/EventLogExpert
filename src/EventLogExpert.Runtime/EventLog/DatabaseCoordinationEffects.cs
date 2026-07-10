@@ -46,13 +46,16 @@ internal sealed class DatabaseCoordinationEffects(
         {
             var reloadNames = openLogs.Select(l => l.Name).ToHashSet(StringComparer.Ordinal);
 
-            var selectionByLog = _eventLogState.Value.SelectedEvents
-                .Where(e => e.RecordId.HasValue && reloadNames.Contains(e.OwningLog))
-                .GroupBy(e => e.OwningLog)
-                .ToDictionary(g => g.Key, g => (IReadOnlySet<long>)g.Select(e => e.RecordId!.Value).ToHashSet());
+            var selectionByLog = _eventLogState.Value.Selection
+                .Where(entry => entry.ReloadKey is { } key && reloadNames.Contains(key.OwningLog))
+                .GroupBy(entry => entry.ReloadKey!.Value.OwningLog)
+                .ToDictionary(
+                    group => group.Key,
+                    IReadOnlySet<long> (group) => group.Select(entry => entry.ReloadKey!.Value.RecordId).ToHashSet());
 
-            var selectedRecordId = _eventLogState.Value.SelectedEvent?.RecordId;
-            var selectedLogName = _eventLogState.Value.SelectedEvent?.OwningLog;
+            var focus = _eventLogState.Value.Focus;
+            var selectedRecordId = focus?.ReloadKey?.RecordId;
+            var selectedLogName = focus?.ReloadKey?.OwningLog;
 
             if (selectedRecordId.HasValue &&
                 !string.IsNullOrEmpty(selectedLogName) &&

@@ -5,17 +5,21 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.TestUtils;
 using Reducers = EventLogExpert.Runtime.LogTable.Reducers;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
 
-// Named-edge invariants; the differential test is the broad guard.
+// Named-edge invariants; the differential test is the broad guard. The live path is the columnar view, so parity is by
+// value identity against the retained array-of-structs oracle.
 public sealed class LogTableReducerInvariantTests
 {
     [Fact]
-    public void AppendingAStraddlingBatch_TakesTheMergeFallback_WhileOutrankingBatchesStayOnTheFastPath()
+    public void AppendingBatches_WhetherOutrankingOrStraddling_PreserveDisplayOrder()
     {
-        // Level descending: Warning > Information > Error > Critical (ordinal).
+        // Level descending: Warning > Information > Error > Critical (ordinal). The old segmented list took a fast path
+        // or a merge fallback depending on whether the batch outranked or straddled; the columnar view rebuilds the
+        // whole order each time, so the only observable invariant is that display order stays exact regardless.
         var info = MakeEvent(0, 1, Time(0, 1), level: "Information");
         var error = MakeEvent(0, 2, Time(0, 2), level: "Error");
         var warning = MakeEvent(0, 3, Time(0, 3), level: "Warning");
@@ -28,16 +32,14 @@ public sealed class LogTableReducerInvariantTests
         state = Settle(state);
 
         state = AppendBatch(state, data.Id, info, error);
-        Assert.Equal(1, SegmentCountOf(state, data.Id));
+        AssertDisplayedExactly(state, [info, error]);
 
-        // An outranking batch prepends (the fast path adds a segment).
+        // An outranking batch prepends ahead of the earlier events.
         state = AppendBatch(state, data.Id, warning);
-        Assert.Equal(2, SegmentCountOf(state, data.Id));
+        AssertDisplayedExactly(state, [info, error, warning]);
 
-        // A straddling batch forces the full merge to one segment.
+        // A straddling batch interleaves with the earlier events.
         state = AppendBatch(state, data.Id, info2, critical);
-        Assert.Equal(1, SegmentCountOf(state, data.Id));
-
         AssertDisplayedExactly(state, [info, error, warning, info2, critical]);
     }
 
@@ -51,11 +53,13 @@ public sealed class LogTableReducerInvariantTests
 
         state = Reducers.ReduceCloseLog(state, new CloseLogAction(ids[1]));
 
-        Assert.Empty(state.EventsForLog(ids[1]));
+        Assert.Equal(0, state.EventsForLog(ids[1]).Count);
+
+        var displayed = state.DisplayedEvents.Slice(0, state.DisplayedEvents.Count);
 
         foreach (var dropped in log1)
         {
-            Assert.DoesNotContain(dropped, state.DisplayedEvents);
+            Assert.DoesNotContain(displayed, row => SameEvent(dropped, row.Lean));
         }
 
         // Two per-log tables plus a fresh combined table remain.
@@ -105,7 +109,8 @@ public sealed class LogTableReducerInvariantTests
     [Fact]
     public void NullRecordIdTies_WithinALog_ResolveToAStableBijection()
     {
-        // Null-RecordId, same-timestamp reads tie; reference identity separates them.
+        // Null-RecordId, same-timestamp reads tie on every sort key; the physical locator (its Index) is what separates
+        // them, so Rank must still map each displayed row to a distinct position.
         var sharedTime = Time(0, 10);
         var (state, _) = SeedLogs(
         [
@@ -119,17 +124,18 @@ public sealed class LogTableReducerInvariantTests
         var displayed = state.DisplayedEvents;
         Assert.Equal(5, displayed.Count);
 
+        var rows = displayed.Slice(0, displayed.Count);
         var positions = new HashSet<int>();
 
-        foreach (var resolved in displayed)
+        foreach (var row in rows)
         {
-            int index = ResolvedEventIndex.IndexOf(
-                displayed, resolved, state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending);
+            int index = displayed.Rank(row.Loc);
 
             Assert.InRange(index, 0, displayed.Count - 1);
-            Assert.True(ReferenceEquals(displayed[index], resolved), "IndexOf resolved to a different reference.");
             Assert.True(positions.Add(index), $"Index {index} was claimed by two events (not a bijection).");
         }
+
+        Assert.Equal(displayed.Count, positions.Count);
     }
 
     [Fact]
@@ -146,12 +152,7 @@ public sealed class LogTableReducerInvariantTests
 
         var append0 = MakeEvent(0, 3, Time(0, 7), source: "A");
         var append1 = MakeEvent(1, 3, Time(1, 4), source: "B");
-        state = Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction(
-            new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
-            {
-                [ids[0]] = [append0],
-                [ids[1]] = [append1]
-            }));
+        state = AppendMultiLogBatch(state, (ids[0], [append0]), (ids[1], [append1]));
 
         AssertEveryLogIsOnTheCurrentContext(state);
         AssertDisplayedExactly(state, [.. log0, .. log1, append0, append1]);
@@ -167,17 +168,12 @@ public sealed class LogTableReducerInvariantTests
         state = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Level));
         state = Settle(state);
 
-        // Atomicity: no list may lag the old context.
+        // Atomicity: no view may lag the old context.
         AssertEveryLogIsOnTheCurrentContext(state);
 
         var append0 = MakeEvent(0, 3, Time(0, 7), level: "Critical");
         var append1 = MakeEvent(1, 3, Time(1, 4), level: "Warning");
-        state = Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction(
-            new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
-            {
-                [ids[0]] = [append0],
-                [ids[1]] = [append1]
-            }));
+        state = AppendMultiLogBatch(state, (ids[0], [append0]), (ids[1], [append1]));
 
         AssertEveryLogIsOnTheCurrentContext(state);
 
@@ -186,10 +182,29 @@ public sealed class LogTableReducerInvariantTests
     }
 
     private static LogTableState AppendBatch(LogTableState state, EventLogId logId, params ResolvedEvent[] events) =>
-        Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction(
-            new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [logId] = events }));
+        AppendMultiLogBatch(state, (logId, events));
 
-    // Asserts against test-owned refs, so a dropped event fails loudly.
+    // The columnar view is a full snapshot rebuilt over the whole raw store per append, so accumulate the delta onto the
+    // log's current events (rehydrated from the stored view) and store the full rebuilt view, mirroring production.
+    private static LogTableState AppendMultiLogBatch(
+        LogTableState state, params (EventLogId LogId, ResolvedEvent[] Events)[] perLog)
+    {
+        var views = new Dictionary<EventLogId, EventColumnView>(perLog.Length);
+
+        foreach (var (logId, events) in perLog)
+        {
+            List<ResolvedEvent> all = state.PerLogEvents.TryGetValue(logId, out var existing)
+                ? [.. existing.EnumerateDetail(), .. events]
+                : [.. events];
+
+            views[logId] = DisplayViewTestFactory.Build(logId, all);
+        }
+
+        return Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction { ViewsByLog = views });
+    }
+
+    // Asserts against test-owned refs, so a dropped event fails loudly. The view rehydrates fresh objects, so compare by
+    // value identity rather than reference.
     private static void AssertDisplayedExactly(LogTableState state, IReadOnlyList<ResolvedEvent> expected)
     {
         var oracle = expected.SortEvents(
@@ -202,9 +217,11 @@ public sealed class LogTableReducerInvariantTests
 
         Assert.Equal(oracle.Count, displayed.Count);
 
+        var rows = displayed.Slice(0, displayed.Count);
+
         for (int i = 0; i < oracle.Count; i++)
         {
-            Assert.True(ReferenceEquals(oracle[i], displayed[i]), $"Order mismatch at index {i}.");
+            Assert.True(SameEvent(oracle[i], rows[i].Lean), $"Order mismatch at index {i}.");
         }
     }
 
@@ -216,9 +233,9 @@ public sealed class LogTableReducerInvariantTests
             state.GroupBy,
             state.IsGroupDescending);
 
-        foreach (var list in state.PerLogEvents.Values)
+        foreach (var view in state.PerLogEvents.Values)
         {
-            Assert.True(list.HasContext(displayed), "A per-log list lagged the state's displayed context.");
+            Assert.True(view.HasContext(displayed), "A per-log view lagged the state's displayed context.");
         }
     }
 
@@ -232,40 +249,45 @@ public sealed class LogTableReducerInvariantTests
             Source = source
         };
 
+    private static bool SameEvent(ResolvedEvent expected, ResolvedEvent actual) =>
+        expected.RecordId == actual.RecordId
+        && expected.Id == actual.Id
+        && expected.TimeCreated == actual.TimeCreated
+        && string.Equals(expected.Level, actual.Level, StringComparison.Ordinal)
+        && string.Equals(expected.Source, actual.Source, StringComparison.Ordinal);
+
     private static (LogTableState State, EventLogId[] Ids) SeedLogs(params IReadOnlyList<ResolvedEvent>[] perLog)
     {
         var state = new LogTableState();
         var ids = new EventLogId[perLog.Length];
-        var batch = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>(perLog.Length);
+        var batch = new Dictionary<EventLogId, EventColumnView>(perLog.Length);
 
         for (int i = 0; i < perLog.Length; i++)
         {
             var data = new EventLogData($"Log{i}", LogPathType.Channel);
             ids[i] = data.Id;
             state = Reducers.ReduceAddTable(state, new AddTableAction(data));
-            batch[data.Id] = perLog[i];
+            batch[data.Id] = DisplayViewTestFactory.Build(data.Id, perLog[i]);
         }
 
-        state = Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction(batch));
+        state = Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction { ViewsByLog = batch });
 
         return (state, ids);
     }
 
-    private static int SegmentCountOf(LogTableState state, EventLogId logId) => state.PerLogEvents[logId].SegmentCount;
-
     private static LogTableState Settle(LogTableState state)
     {
         var context = state.SortContext;
-        var lists = new Dictionary<EventLogId, SegmentedSortedList>(state.PerLogEvents.Count);
+        var views = new Dictionary<EventLogId, EventColumnView>(state.PerLogEvents.Count);
 
-        foreach (var (logId, list) in state.PerLogEvents)
+        foreach (var (logId, view) in state.PerLogEvents)
         {
-            lists[logId] = SegmentedSortedList.CreateSorted(list, context);
+            views[logId] = view.WithContext(context);
         }
 
         return Reducers.ReduceDisplayReady(
             state,
-            new DisplayReadyAction { Lists = lists, Version = state.DisplayListVersion });
+            new DisplayReadyAction { Views = views, Version = state.DisplayListVersion });
     }
 
     private static DateTime Time(int logIndex, int seconds) =>

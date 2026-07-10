@@ -38,8 +38,7 @@ internal sealed class OpenLogEffects(
     PartialLoadCoordinator coordinator,
     IEventLogReaderFactory readerFactory)
 {
-    // A screenful of newest events: the eager first paint dispatches once this many are resolved so the newest rows
-    // render in ~1s instead of waiting for the 3-second partial timer.
+    // Eager first paint fires at a screenful so the newest rows render in ~1s instead of waiting for the 3s partial timer.
     private const int EagerFirstPaintThreshold = 200;
 
     // EvtNext batch: benchmarked Win11 throughput sweet spot; 512 regresses.
@@ -55,9 +54,9 @@ internal sealed class OpenLogEffects(
     private readonly IDatabaseService _databaseService = databaseService;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly Lock _globalCtsLock = new();
+    private readonly ITraceLogger _lifecycleLogger = logger.ForCategory(LogCategories.EventLogLifecycle);
     private readonly ConcurrentDictionary<EventLogId, CancellationTokenSource> _logCts = new();
     private readonly ITraceLogger _logger = logger;
-    private readonly ITraceLogger _lifecycleLogger = logger.ForCategory(LogCategories.EventLogLifecycle);
     private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logLoadCompletions = new();
     private readonly ILogWatcherService _logWatcherService = logWatcherService;
     private readonly IEventLogReaderFactory _readerFactory = readerFactory;
@@ -382,12 +381,11 @@ internal sealed class OpenLogEffects(
                 {
                     EventRecord[] batch = item.Batch;
 
-                    // First-screenful resolution preempts in-flight bulk across all loads. Classify by ADMITTED
-                    // (not completed) events so a slow-resolving load still demotes to Bulk after its first
-                    // screenful instead of monopolizing the high-priority lane.
-                    var priority = Volatile.Read(ref highAdmitted) < EagerFirstPaintThreshold
-                        ? ResolutionPriority.FirstScreenful
-                        : ResolutionPriority.Bulk;
+                    // Classify by ADMITTED (not completed) events so a slow-resolving load still demotes to Bulk after
+                    // its first screenful instead of monopolizing the high-priority lane.
+                    var priority = Volatile.Read(ref highAdmitted) < EagerFirstPaintThreshold ?
+                        ResolutionPriority.FirstScreenful :
+                        ResolutionPriority.Bulk;
 
                     if (priority == ResolutionPriority.FirstScreenful)
                     {
@@ -437,9 +435,8 @@ internal sealed class OpenLogEffects(
                                 nextDrainSeq++;
                             }
 
-                            // Eager first paint: once the first screenful of (newest, because the read is reversed)
-                            // events has drained in order, dispatch immediately instead of waiting for the 3s timer.
-                            // Fires exactly once across the resolve workers and reuses the shared partial cursor.
+                            // Dispatch the first screenful immediately instead of waiting for the 3s timer (the read is
+                            // reversed, so these are the newest events).
                             if (events.Count >= EagerFirstPaintThreshold && Interlocked.Exchange(ref eagerFired, 1) == 0)
                             {
                                 dispatchEager = true;
@@ -503,14 +500,12 @@ internal sealed class OpenLogEffects(
             return;
         }
 
-        // Stop the timer before sorting/dispatching to prevent a stale
-        // LoadEventsPartialAction from being dispatched after the final LoadEventsAction.
-        // DisposeAsync waits for any in-flight callback to complete; the second disposal
-        // at await-using scope exit is idempotent.
+        // Stop the timer before dispatching so no stale LoadEventsPartialAction fires after the final LoadEventsAction.
         await timer.DisposeAsync();
 
-        events.Sort((a, b) => Comparer<long?>.Default.Compare(b.RecordId, a.RecordId));
-
+        // Dispatch the finalized list in physical read order (the order partials were appended) so the finalization
+        // Build keeps every physical Index stable; re-sorting would strand partial-era EventLocators (the selection and
+        // highlight-cache keys) on a different physical row.
         token.ThrowIfCancellationRequested();
 
         if (!_eventLogState.Value.OpenLogs.TryGetValue(logData.Name, out var activeLog)

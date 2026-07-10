@@ -13,19 +13,22 @@ namespace EventLogExpert.Runtime.LogTable;
 [FeatureState]
 public sealed record LogTableState
 {
-    internal ImmutableDictionary<EventLogId, SegmentedSortedList> PerLogEvents { get; init; } =
-        ImmutableDictionary<EventLogId, SegmentedSortedList>.Empty;
+    internal ImmutableDictionary<EventLogId, EventColumnView> PerLogEvents { get; init; } =
+        ImmutableDictionary<EventLogId, EventColumnView>.Empty;
 
     public ImmutableList<LogView> EventTables { get; init; } = [];
 
     public ImmutableList<LogTabGroup> Groups { get; init; } = [];
 
-    public IReadOnlyList<ResolvedEvent> DisplayedEvents =>
+    public IEventColumnView DisplayedEvents =>
         PerLogEvents.IsEmpty
-            ? CombinedEventView.Empty
+            ? CombinedColumnView.Empty
             : PerLogEvents.Count == 1
                 ? SingleLogDisplayList()
                 : AllLogsView();
+
+    /// <summary>An empty view sentinel for the UI to bind when no tab is active.</summary>
+    public static IEventColumnView EmptyView => CombinedColumnView.Empty;
 
     public ImmutableDictionary<EventLogId, int> EventCountByLog { get; init; } =
         ImmutableDictionary<EventLogId, int>.Empty;
@@ -80,10 +83,10 @@ public sealed record LogTableState
     private static readonly object s_allLogsKey = new();
 
     private static readonly ConditionalWeakTable<
-        ImmutableDictionary<EventLogId, SegmentedSortedList>,
-        ConcurrentDictionary<object, CombinedEventView>> s_viewsByGeneration = [];
+        ImmutableDictionary<EventLogId, EventColumnView>,
+        ConcurrentDictionary<object, CombinedColumnView>> s_viewsByGeneration = [];
 
-    public IReadOnlyList<ResolvedEvent> DisplayedEventsForTab(LogView tab)
+    public IEventColumnView DisplayedEventsForTab(LogView tab)
     {
         if (tab.GroupId is null) { return EventsForLog(tab.Id); }
 
@@ -91,30 +94,30 @@ public sealed record LogTableState
 
         var group = Groups.FirstOrDefault(candidate => candidate.Id == tab.GroupId.Value);
 
-        return group is null ? CombinedEventView.Empty : GroupView(group);
+        return group is null ? CombinedColumnView.Empty : GroupView(group);
     }
 
-    private IReadOnlyList<ResolvedEvent> AllLogsView() =>
+    private IEventColumnView AllLogsView() =>
         InnerCache().GetOrAdd(
             s_allLogsKey,
-            static (_, perLog) => new CombinedEventView(perLog.Values, perLog.Values.First().Context),
+            static (_, perLog) => new CombinedColumnView([.. perLog.Values], perLog.Values.First().Context),
             PerLogEvents);
 
-    private IReadOnlyList<ResolvedEvent> GroupView(LogTabGroup group)
+    private IEventColumnView GroupView(LogTabGroup group)
     {
-        SegmentedSortedList? firstPresent = null;
+        EventColumnView? firstPresent = null;
         int presentCount = 0;
 
         foreach (var memberId in group.MemberIds)
         {
-            if (PerLogEvents.TryGetValue(memberId, out var list))
+            if (PerLogEvents.TryGetValue(memberId, out var view))
             {
-                firstPresent ??= list;
+                firstPresent ??= view;
                 presentCount++;
             }
         }
 
-        if (presentCount == 0) { return CombinedEventView.Empty; }
+        if (presentCount == 0) { return CombinedColumnView.Empty; }
 
         if (presentCount == 1) { return firstPresent!; }
 
@@ -124,27 +127,27 @@ public sealed record LogTableState
             (PerLogEvents, group.MemberIds));
     }
 
-    private static CombinedEventView BuildGroupView(
-        ImmutableDictionary<EventLogId, SegmentedSortedList> perLog,
+    private static CombinedColumnView BuildGroupView(
+        ImmutableDictionary<EventLogId, EventColumnView> perLog,
         ImmutableHashSet<EventLogId> memberIds)
     {
-        var lists = new List<SegmentedSortedList>(memberIds.Count);
+        var views = new List<EventColumnView>(memberIds.Count);
 
         foreach (var memberId in memberIds)
         {
-            if (perLog.TryGetValue(memberId, out var list)) { lists.Add(list); }
+            if (perLog.TryGetValue(memberId, out var view)) { views.Add(view); }
         }
 
-        return new CombinedEventView(lists, lists[0].Context);
+        return new CombinedColumnView(views, views[0].Context);
     }
 
-    private ConcurrentDictionary<object, CombinedEventView> InnerCache() =>
+    private ConcurrentDictionary<object, CombinedColumnView> InnerCache() =>
         s_viewsByGeneration.GetValue(
-            PerLogEvents, static _ => new ConcurrentDictionary<object, CombinedEventView>());
+            PerLogEvents, static _ => new ConcurrentDictionary<object, CombinedColumnView>());
 
-    // Caller guarantees PerLogEvents.Count == 1. Return that sole list via the struct enumerator instead of
-    // LINQ .Values.First(), which boxes an enumerator on this render-path property read.
-    private SegmentedSortedList SingleLogDisplayList()
+    // Caller guarantees PerLogEvents.Count == 1. Use the struct enumerator, not LINQ .Values.First(), to avoid boxing
+    // on this render-path read.
+    private EventColumnView SingleLogDisplayList()
     {
         using var enumerator = PerLogEvents.GetEnumerator();
         enumerator.MoveNext();
@@ -152,14 +155,14 @@ public sealed record LogTableState
         return enumerator.Current.Value;
     }
 
-    public IReadOnlyList<ResolvedEvent> EventsForLog(EventLogId logId) =>
-        PerLogEvents.TryGetValue(logId, out var list) ? list : [];
+    public IEventColumnView EventsForLog(EventLogId logId) =>
+        PerLogEvents.TryGetValue(logId, out var view) ? view : CombinedColumnView.Empty;
 
-    public IReadOnlyList<ResolvedEvent> GetActiveDisplayedEvents()
+    public IEventColumnView GetActiveDisplayedEvents()
     {
         var activeTable = EventTables.FirstOrDefault(table => table.Id == ActiveEventLogId);
 
-        return activeTable is null ? [] : DisplayedEventsForTab(activeTable);
+        return activeTable is null ? CombinedColumnView.Empty : DisplayedEventsForTab(activeTable);
     }
 
     public IReadOnlyList<ColumnName> GetOrderedEnabledColumns(ILogTableColumnDefaultsProvider columnDefaults)
@@ -222,16 +225,31 @@ public sealed record LogTableState
             IsGroupDescending);
 
         var builder = PerLogEvents.ToBuilder();
-        builder[logId] = SegmentedSortedList.CreateSorted(events, context);
+        builder[logId] = BuildUnfilteredView(logId, events, context);
 
-        foreach (var (id, list) in PerLogEvents)
+        foreach (var (id, view) in PerLogEvents)
         {
-            if (id != logId && !list.HasContext(context))
+            if (id != logId && !view.HasContext(context))
             {
-                builder[id] = SegmentedSortedList.CreateSorted(list, context);
+                builder[id] = view.WithContext(context);
             }
         }
 
         return this with { PerLogEvents = builder.ToImmutable() };
+    }
+
+    // Seeds a display view directly from unfiltered events (test/reconcile helper); with no filter every physical row
+    // survives.
+    private static EventColumnView BuildUnfilteredView(
+        EventLogId logId,
+        IReadOnlyList<ResolvedEvent> events,
+        SortContext context)
+    {
+        var reader = EventColumnStore.Build(events, 0, 0).CreateReader(logId);
+        int[] survivors = new int[reader.Count];
+
+        for (int i = 0; i < survivors.Length; i++) { survivors[i] = i; }
+
+        return EventColumnView.Create(reader, survivors, context);
     }
 }

@@ -5,25 +5,21 @@ namespace EventLogExpert.Runtime.LogTable;
 
 internal static class RawEventStoreStateExtensions
 {
-    /// <summary>
-    ///     Computes the raw (unrounded) bounds across every log in the store: <c>After</c> is the oldest event timestamp
-    ///     and <c>Before</c> is the newest. Returns <see langword="null" /> when no log has any events. Relies on the raw-list
-    ///     ordering invariant (index 0 = newest, index Count-1 = oldest), so each endpoint is O(1) per log; callers apply
-    ///     rounding and fallback via <c>RoundOrFallback</c>.
-    /// </summary>
     internal static (DateTime After, DateTime Before)? TryGetRawEventDateRange(this RawEventStoreState state)
     {
         DateTime? oldest = null;
         DateTime? newest = null;
 
-        foreach (var events in state.ByLog.Values)
+        foreach (var store in state.ByLog.Values)
         {
-            if (events.Count == 0) { continue; }
+            if (!store.TryGetTimeRange(out long minTicks, out long maxTicks)) { continue; }
 
-            var logNewest = events[0].TimeCreated;
-            var logOldest = events[^1].TimeCreated;
+            // Only Ticks are read downstream (comparison and hour rounding), so stamping UTC is safe.
+            var logOldest = new DateTime(minTicks, DateTimeKind.Utc);
+            var logNewest = new DateTime(maxTicks, DateTimeKind.Utc);
 
             if (oldest is null || logOldest < oldest) { oldest = logOldest; }
+
             if (newest is null || logNewest > newest) { newest = logNewest; }
         }
 

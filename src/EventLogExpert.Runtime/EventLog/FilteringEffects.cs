@@ -45,19 +45,23 @@ internal sealed class FilteringEffects(
 
         if (_eventLogState.Value.ContinuouslyUpdate)
         {
-            // Ingest the raw event unconditionally (even when the filter hides it); the display append below
-            // stays filter-gated.
+            // Raw ingest is unconditional even when the filter hides the event; only the display rebuild is filter-gated.
             dispatcher.Dispatch(new IngestRawEventsAction(
                 new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [owningLog.Id] = [action.NewEvent] },
                 RawIngestMode.Prepend));
 
+            // Skip the rebuild when the new event is hidden: the view is unchanged, so avoid the version churn.
             var filteredNew = _filterService.GetFilteredEvents(
                 [action.NewEvent],
                 _eventLogState.Value.AppliedFilter);
 
-            if (filteredNew.Count > 0)
+            if (filteredNew.Count > 0 &&
+                _rawEventStore.Value.ByLog.TryGetValue(owningLog.Id, out var store))
             {
-                dispatcher.Dispatch(new AppendTableEventsAction(owningLog.Id, filteredNew));
+                var view = DisplayViewBuilder.Build(
+                    store, owningLog.Id, _eventLogState.Value.AppliedFilter, _logTableState.Value.SortContext);
+
+                dispatcher.Dispatch(new AppendTableEventsAction(owningLog.Id) { View = view });
             }
 
             return Task.CompletedTask;
@@ -84,8 +88,7 @@ internal sealed class FilteringEffects(
 
         bool newRequiresXml = action.Filter.RequiresXml;
 
-        // Reopen a log only when it lacks the XML the new filter needs; UserData resolves from stored fields at resolve
-        // time, so a UserData filter change never forces a reload.
+        // Reopen only logs missing the XML the new filter needs; UserData filters resolve from stored fields and never force a reload.
         var logsNeedingReload = newRequiresXml && !_eventLogState.Value.OpenLogs.IsEmpty
             ? _eventLogState.Value.OpenLogs
                 .Where(kvp => !_concurrencyState.IsLoadedWithXml(kvp.Value.Id))
@@ -140,19 +143,20 @@ internal sealed class FilteringEffects(
 
             if (_concurrencyState.GetCurrentFilterToken() != filterToken) { return; }
 
-            var inputById = snapshot.ToDictionary(pair => pair.Id, pair => pair.Events);
+            var capturedByLog = snapshot.ToDictionary(pair => pair.Id, pair => pair.ContentVersion);
             var nowRaw = _rawEventStore.Value.ByLog;
-            var fresh = new Dictionary<EventLogId, SegmentedSortedList>(sorted.Count);
+            var fresh = new Dictionary<EventLogId, EventColumnView>(sorted.Count);
             var residual = new List<EventLogId>();
 
             foreach (var logId in targets)
             {
-                if (sorted.TryGetValue(logId, out var sortedList) &&
-                    inputById.TryGetValue(logId, out var input) &&
+                // M1 race guard: an unchanged ContentVersion means no rebuild slipped in since the snapshot, so the built view still matches the live store.
+                if (sorted.TryGetValue(logId, out var view) &&
+                    capturedByLog.TryGetValue(logId, out var capturedVersion) &&
                     nowRaw.TryGetValue(logId, out var now) &&
-                    ReferenceEquals(input, now))
+                    now.ContentVersion == capturedVersion)
                 {
-                    fresh[logId] = sortedList;
+                    fresh[logId] = view;
                 }
                 else
                 {
@@ -162,7 +166,7 @@ internal sealed class FilteringEffects(
 
             if (fresh.Count > 0)
             {
-                dispatcher.Dispatch(new DisplayReadyAction { Lists = fresh, Version = version });
+                dispatcher.Dispatch(new DisplayReadyAction { Views = fresh, Version = version });
             }
 
             var stillStale = ResidualOpenStale(residual);
@@ -193,7 +197,8 @@ internal sealed class FilteringEffects(
     {
         if (action.ContinuouslyUpdate)
         {
-            LogReloadEffects.ProcessNewEventBuffer(_eventLogState.Value, dispatcher, _filterService);
+            LogReloadEffects.ProcessNewEventBuffer(
+                _eventLogState.Value, _rawEventStore, _logTableState, dispatcher, _filterService);
         }
 
         return Task.CompletedTask;
@@ -222,10 +227,25 @@ internal sealed class FilteringEffects(
     [EffectMethod(typeof(UpdateTableAction))]
     public async Task HandleUpdateTable(IDispatcher dispatcher)
     {
-        // An XML-reload reopen settles under the live sort and drops the in-flight rebuild; if a sort is still pending, republish so it applies.
+        // A reopen settles under the live sort and drops the in-flight rebuild; republish if a sort is still pending.
         if (!_logTableState.Value.HasPendingSortChange) { return; }
 
         await RepublishForSortAsync(dispatcher);
+    }
+
+    private static Dictionary<EventLogId, EventColumnView> FilterAndSort(
+        IReadOnlyList<(EventLogId Id, EventColumnStore Store, long ContentVersion)> snapshot,
+        Filter filter,
+        SortContext context)
+    {
+        var views = new Dictionary<EventLogId, EventColumnView>(snapshot.Count);
+
+        foreach (var (logId, store, _) in snapshot)
+        {
+            views[logId] = DisplayViewBuilder.Build(store, logId, filter, context);
+        }
+
+        return views;
     }
 
     private async Task ApplyFilterAndPublishAsync(Filter filter, long filterToken, IDispatcher dispatcher)
@@ -245,19 +265,19 @@ internal sealed class FilteringEffects(
 
             if (_concurrencyState.GetCurrentFilterToken() != filterToken) { return; }
 
-            var snapshotById = snapshot.ToDictionary(pair => pair.Id, pair => pair.Events);
+            var snapshotById = snapshot.ToDictionary(pair => pair.Id, pair => pair.ContentVersion);
             var currentRaw = _rawEventStore.Value.ByLog;
-            var fresh = new Dictionary<EventLogId, SegmentedSortedList>(sortedActiveLogs.Count);
+            var fresh = new Dictionary<EventLogId, EventColumnView>(sortedActiveLogs.Count);
             var staleIds = new List<EventLogId>();
 
-            foreach (var (logId, sortedList) in sortedActiveLogs)
+            foreach (var (logId, view) in sortedActiveLogs)
             {
-                if (!snapshotById.TryGetValue(logId, out var snapshotEvents)) { continue; }
+                if (!snapshotById.TryGetValue(logId, out var snapshotVersion)) { continue; }
 
-                if (currentRaw.TryGetValue(logId, out var currentEvents) &&
-                    ReferenceEquals(snapshotEvents, currentEvents))
+                if (currentRaw.TryGetValue(logId, out var current) &&
+                    current.ContentVersion == snapshotVersion)
                 {
-                    fresh[logId] = sortedList;
+                    fresh[logId] = view;
                 }
                 else
                 {
@@ -272,22 +292,22 @@ internal sealed class FilteringEffects(
 
                 if (_concurrencyState.GetCurrentFilterToken() != filterToken) { return; }
 
-                var pass2InputById = pass2Snapshot.ToDictionary(pair => pair.Id, pair => pair.Events);
+                var pass2CapturedById = pass2Snapshot.ToDictionary(pair => pair.Id, pair => pair.ContentVersion);
                 var nowRaw = _rawEventStore.Value.ByLog;
 
-                foreach (var (logId, sortedList) in refilteredSorted)
+                foreach (var (logId, view) in refilteredSorted)
                 {
-                    if (!pass2InputById.TryGetValue(logId, out var pass2Events)) { continue; }
+                    if (!pass2CapturedById.TryGetValue(logId, out var pass2Version)) { continue; }
 
-                    if (nowRaw.TryGetValue(logId, out var nowEvents) &&
-                        ReferenceEquals(pass2Events, nowEvents))
+                    if (nowRaw.TryGetValue(logId, out var now) &&
+                        now.ContentVersion == pass2Version)
                     {
-                        fresh[logId] = sortedList;
+                        fresh[logId] = view;
                     }
                 }
             }
 
-            dispatcher.Dispatch(new DisplayReadyAction { Lists = fresh, Version = version });
+            dispatcher.Dispatch(new DisplayReadyAction { Views = fresh, Version = version });
 
             var residualStale = ResidualOpenStale(staleIds.Where(id => !fresh.ContainsKey(id)));
 
@@ -312,22 +332,6 @@ internal sealed class FilteringEffects(
         }
     }
 
-    private Dictionary<EventLogId, SegmentedSortedList> FilterAndSort(
-        IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> snapshot,
-        Filter filter,
-        SortContext context)
-    {
-        var filtered = _filterService.FilterActiveLogs(snapshot, filter);
-        var sorted = new Dictionary<EventLogId, SegmentedSortedList>(filtered.Count);
-
-        foreach (var (logId, events) in filtered)
-        {
-            sorted[logId] = SegmentedSortedList.CreateSorted(events, context);
-        }
-
-        return sorted;
-    }
-
     private async Task ReloadLogsWithXmlAsync(
         List<(EventLogId Id, string Name, LogPathType Type)> logsNeedingReload,
         long reloadToken,
@@ -335,14 +339,16 @@ internal sealed class FilteringEffects(
     {
         var reloadNames = logsNeedingReload.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
 
-        var selectionByLog = _eventLogState.Value.SelectedEvents
-            .Where(e => e.RecordId.HasValue && reloadNames.Contains(e.OwningLog))
-            .GroupBy(e => e.OwningLog)
-            .ToDictionary(g => g.Key, g => (IReadOnlySet<long>)g.Select(e => e.RecordId!.Value).ToHashSet());
+        var selectionByLog = _eventLogState.Value.Selection
+            .Where(entry => entry.ReloadKey is { } key && reloadNames.Contains(key.OwningLog))
+            .GroupBy(entry => entry.ReloadKey!.Value.OwningLog)
+            .ToDictionary(
+                group => group.Key,
+                IReadOnlySet<long> (group) => group.Select(entry => entry.ReloadKey!.Value.RecordId).ToHashSet());
 
-        var selectedEvent = _eventLogState.Value.SelectedEvent;
-        long? selectedRecordId = selectedEvent?.RecordId;
-        string? selectedLogName = selectedEvent?.OwningLog;
+        var focus = _eventLogState.Value.Focus;
+        long? selectedRecordId = focus?.ReloadKey?.RecordId;
+        string? selectedLogName = focus?.ReloadKey?.OwningLog;
 
         if (selectedRecordId.HasValue &&
             !string.IsNullOrEmpty(selectedLogName) &&
@@ -460,33 +466,33 @@ internal sealed class FilteringEffects(
         return [.. candidateStaleIds.Distinct().Where(id => openIds.Contains(id) && raw.ContainsKey(id))];
     }
 
-    private List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> SnapshotEventsForLogs(
+    private List<(EventLogId Id, EventColumnStore Store, long ContentVersion)> SnapshotEventsForLogs(
         IReadOnlyList<EventLogId> logIds)
     {
         var raw = _rawEventStore.Value.ByLog;
-        var snapshot = new List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>();
+        var snapshot = new List<(EventLogId Id, EventColumnStore Store, long ContentVersion)>();
 
         foreach (var logId in logIds)
         {
-            if (raw.TryGetValue(logId, out var events))
+            if (raw.TryGetValue(logId, out var store))
             {
-                snapshot.Add((logId, events));
+                snapshot.Add((logId, store, store.ContentVersion));
             }
         }
 
         return snapshot;
     }
 
-    private List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> SnapshotOpenLogEvents()
+    private List<(EventLogId Id, EventColumnStore Store, long ContentVersion)> SnapshotOpenLogEvents()
     {
         var raw = _rawEventStore.Value.ByLog;
-        var snapshot = new List<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)>();
+        var snapshot = new List<(EventLogId Id, EventColumnStore Store, long ContentVersion)>();
 
         foreach (var info in _eventLogState.Value.OpenLogs.Values)
         {
-            if (raw.TryGetValue(info.Id, out var events))
+            if (raw.TryGetValue(info.Id, out var store))
             {
-                snapshot.Add((info.Id, events));
+                snapshot.Add((info.Id, store, store.ContentVersion));
             }
         }
 

@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.Export;
 using EventLogExpert.Runtime.LogTable;
@@ -154,6 +155,17 @@ public sealed class EventTableExporterTests
         Assert.Equal("Event ID,Source\r\n", ExportTestHelpers.DecodeWithoutBom(bytes));
     }
 
+    // The exporter now consumes an IEventColumnView, so round-trip the events through a real column store (null orderBy
+    // preserves the input order the assertions expect) rather than a hand-rolled adapter.
+    private static IEventColumnView BuildView(IReadOnlyList<ResolvedEvent> events)
+    {
+        var reader = EventColumnStore.Build(events, generation: 0, contentVersion: 0).CreateReader(EventLogId.Create());
+        int[] survivors = Enumerable.Range(0, events.Count).ToArray();
+
+        return EventColumnView.Create(
+            reader, survivors, orderBy: null, isDescending: false, groupBy: null, isGroupDescending: false);
+    }
+
     private static async Task<byte[]> ExportAsync(
         ExportFormat format,
         IReadOnlyList<ResolvedEvent> events,
@@ -164,7 +176,7 @@ public sealed class EventTableExporterTests
         using MemoryStream stream = new();
 
         await exporter.ExportAsync(
-            stream, format, events, columns, s_utc, includeDescription, TestContext.Current.CancellationToken);
+            stream, format, BuildView(events), columns, s_utc, includeDescription, TestContext.Current.CancellationToken);
 
         return stream.ToArray();
     }

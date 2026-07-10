@@ -1,43 +1,42 @@
-@using EventLogExpert.Eventing.Common.Events
 @using EventLogExpert.UI.LogTable.Grouping
 @inherits FluxorComponent
 
 <LogTabBar />
 
 @{
-    RenderFragment RenderEventRow(ResolvedEvent evt) =>
+    RenderFragment RenderEventRow(DisplayRow row) =>
         @<tr aria-level="@(_rowView is null ? null : "2")"
-             aria-rowindex="@GetRowIndex(evt)"
-             aria-selected="@_selectedSet.Contains(evt).ToString().ToLower()"
-             class="@GetCss(evt)"
-             data-highlight="@GetHighlight(evt)"
-             data-stripe="@GetRowStripe(evt)"
-             @key="@($"{evt.OwningLog}_{evt.RecordId}_{evt.TimeCreated:O}")"
-             @onmousedown="args => SelectEvent(args, evt)"
+             aria-rowindex="@GetRowIndex(row.Loc)"
+             aria-selected="@_selectedSet.Contains(row.Loc).ToString().ToLower()"
+             class="@GetCss(row.Loc)"
+             data-highlight="@GetHighlight(row)"
+             data-stripe="@GetRowStripe(row.Loc)"
+             @key="row.Loc"
+             @onmousedown="args => SelectEvent(args, row)"
              role="row"
              tabindex="0">
             @for (int i = 0; i < _enabledColumns.Length; i++)
             {
                 var capturedColumn = _enabledColumns[i];
                 <td aria-colindex="@(i + 1)"
-                    @oncontextmenu="@(args => InvokeCellContextMenu(args, evt, capturedColumn))"
+                    @oncontextmenu="@(args => InvokeCellContextMenu(args, row, capturedColumn))"
                     @oncontextmenu:preventDefault="true"
                     @oncontextmenu:stopPropagation="true"
                     role="gridcell">
                     @if (capturedColumn == ColumnName.Level)
                     {
-                        <span aria-hidden="true" class="@GetLevelClass(evt.Level)"></span>
+                        <span aria-hidden="true" class="@GetLevelClass(row.Lean.Level)"></span>
                     }
-                    @EventTableColumnFormatter.GetCellText(evt, capturedColumn, _timeZoneSettings)
+                    @EventTableColumnFormatter.GetCellText(row.Lean, capturedColumn, _timeZoneSettings)
                 </td>
             }
 
             <td aria-colindex="@(_enabledColumns.Length + 1)"
-                @oncontextmenu="@(args => InvokeCellContextMenu(args, evt, null))"
+                @oncontextmenu="@(args => InvokeCellContextMenu(args, row, null))"
                 @oncontextmenu:preventDefault="true"
                 @oncontextmenu:stopPropagation="true"
                 role="gridcell">
-                @evt.Description
+                @row.Lean.Description
             </td>
         </tr>;
 }
@@ -95,10 +94,10 @@
         {
             @if (_rowView is null)
             {
-                @* Ungrouped: ItemsProvider fetches one Slice per viewport window (a single cursor walk),
-                   avoiding the Items= binding's per-row this[i] re-seek over the K-way merge. *@
-                <Virtualize Context="evt" ItemSize="@EventRowHeightPixels" ItemsProvider="LoadEventViewport" @ref="_eventVirtualize">
-                    @RenderEventRow(evt)
+                @* Ungrouped: ItemsProvider fetches one Slice per viewport window, avoiding the Items= binding's
+                   per-row this[i] re-seek over the K-way merge. *@
+                <Virtualize Context="row" ItemSize="@EventRowHeightPixels" ItemsProvider="LoadEventViewport" @ref="_eventVirtualize">
+                    @RenderEventRow(row)
                 </Virtualize>
             }
             else

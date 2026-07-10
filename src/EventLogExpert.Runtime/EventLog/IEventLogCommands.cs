@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
-using EventLogExpert.Eventing.Common.Events;
 
 namespace EventLogExpert.Runtime.EventLog;
 
@@ -19,5 +18,5 @@ public interface IEventLogCommands
 
     void SetContinuouslyUpdate(bool continuouslyUpdate);
 
-    void SetSelectedEvents(IReadOnlyCollection<ResolvedEvent> selectedEvents, ResolvedEvent? selectedEvent);
+    void SetSelectedEvents(IReadOnlyCollection<SelectionEntry> selection, SelectionEntry? focus);
 }

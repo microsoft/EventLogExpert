@@ -25,7 +25,7 @@ public sealed class RawEventStoreReducersTests
         var state = RawEventStoreReducers.ReduceAddTable(new RawEventStoreState(), new AddTableAction(logData));
 
         Assert.True(state.ByLog.ContainsKey(logData.Id));
-        Assert.Empty(state.ByLog[logData.Id]);
+        Assert.Equal(0, state.ByLog[logData.Id].Count);
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public sealed class RawEventStoreReducersTests
         state = Ingest(state, id, RawIngestMode.Append, Ev(1), Ev(2));
         state = Ingest(state, id, RawIngestMode.Append, Ev(3));
 
-        Assert.Equal([1, 2, 3], state.ByLog[id].Select(e => e.Id));
+        Assert.Equal([1, 2, 3], Ids(state, id));
     }
 
     [Fact]
@@ -73,15 +73,16 @@ public sealed class RawEventStoreReducersTests
     }
 
     [Fact]
-    public void ReduceIngestRawEvents_Prepend_PutsNewestFirst()
+    public void ReduceIngestRawEvents_Prepend_AccumulatesPhysicallyLikeAppend()
     {
         var (state, id) = Opened();
 
         state = Ingest(state, id, RawIngestMode.Append, Ev(1), Ev(2));
         state = Ingest(state, id, RawIngestMode.Prepend, Ev(3));
 
-        // Live-tail order: newest prepended ahead of the earlier events.
-        Assert.Equal([3, 1, 2], state.ByLog[id].Select(e => e.Id));
+        // Prepend now maps to Append at the raw layer: the physical order is pure ingest order. Live-tail newest-first
+        // ordering is the display view's responsibility (it sorts survivors), not the raw store's.
+        Assert.Equal([1, 2, 3], Ids(state, id));
     }
 
     [Fact]
@@ -92,7 +93,7 @@ public sealed class RawEventStoreReducersTests
 
         state = Ingest(state, id, RawIngestMode.Replace, Ev(9));
 
-        Assert.Equal([9], state.ByLog[id].Select(e => e.Id));
+        Assert.Equal([9], Ids(state, id));
     }
 
     [Fact]
@@ -127,7 +128,7 @@ public sealed class RawEventStoreReducersTests
 
         state = RawEventStoreReducers.ReduceLoadEvents(state, new LoadEventsAction(log, [Ev(9)]));
 
-        Assert.Equal([9], state.ByLog[log.Id].Select(e => e.Id));
+        Assert.Equal([9], Ids(state, log.Id));
     }
 
     [Fact]
@@ -160,7 +161,7 @@ public sealed class RawEventStoreReducersTests
 
         state = RawEventStoreReducers.ReduceLoadEventsPartial(state, new LoadEventsPartialAction(log, [Ev(3)]));
 
-        Assert.Equal([1, 2, 3], state.ByLog[log.Id].Select(e => e.Id));
+        Assert.Equal([1, 2, 3], Ids(state, log.Id));
     }
 
     [Fact]
@@ -179,6 +180,18 @@ public sealed class RawEventStoreReducersTests
 
     private static ResolvedEvent EvNamed(int id, string logName) =>
         new("LogA", LogPathType.File) { Id = id, LogName = logName };
+
+    // Extract the Event IDs in the store's physical order by rehydrating each locator through a reader; the raw store
+    // no longer exposes the events as an enumerable, so the columnar reader is the only way to read them back.
+    private static IReadOnlyList<int> Ids(RawEventStoreState state, EventLogId id)
+    {
+        var reader = state.ByLog[id].CreateReader(id);
+        var ids = new int[reader.Count];
+
+        for (int i = 0; i < reader.Count; i++) { ids[i] = reader.GetDetail(reader.LocatorAt(i)).Id; }
+
+        return ids;
+    }
 
     private static RawEventStoreState Ingest(
         RawEventStoreState state,

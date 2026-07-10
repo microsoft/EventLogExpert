@@ -8,8 +8,8 @@ namespace EventLogExpert.Runtime.LogTable;
 
 public sealed record DisplayReadyAction
 {
-    internal IReadOnlyDictionary<EventLogId, SegmentedSortedList> Lists { get; init; } =
-        ImmutableDictionary<EventLogId, SegmentedSortedList>.Empty;
+    internal IReadOnlyDictionary<EventLogId, EventColumnView> Views { get; init; } =
+        ImmutableDictionary<EventLogId, EventColumnView>.Empty;
 
     internal int Version { get; init; }
 }

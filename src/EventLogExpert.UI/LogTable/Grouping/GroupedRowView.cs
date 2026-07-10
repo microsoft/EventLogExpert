@@ -7,24 +7,19 @@ using System.Collections;
 
 namespace EventLogExpert.UI.LogTable.Grouping;
 
-/// <summary>
-///     Virtual row-view over an already group-sorted event list: header and event rows resolved on demand via O(log
-///     groups) binary search over an <see cref="EventGroup" /> prefix-sum (and O(1) group lookup by key), with no per-row
-///     materialization.
-/// </summary>
 internal sealed class GroupedRowView : IReadOnlyList<TableRow>, IList<TableRow>
 {
-    private readonly IReadOnlyList<ResolvedEvent> _events;
     private readonly Dictionary<string, int> _groupIndexByKey;
     private readonly EventGroup[] _groups;
+    private readonly IEventColumnView _view;
 
     private GroupedRowView(
-        IReadOnlyList<ResolvedEvent> events,
+        IEventColumnView view,
         EventGroup[] groups,
         int count,
         Dictionary<string, int> groupIndexByKey)
     {
-        _events = events;
+        _view = view;
         _groups = groups;
         Count = count;
         _groupIndexByKey = groupIndexByKey;
@@ -53,22 +48,21 @@ internal sealed class GroupedRowView : IReadOnlyList<TableRow>, IList<TableRow>
     }
 
     public static GroupedRowView Build(
-        IReadOnlyList<ResolvedEvent> events,
+        IEventColumnView view,
         ColumnName groupBy,
         Func<string, bool> isCollapsed)
     {
         var groups = new List<EventGroup>();
-        // Keys are unique per run, so a key->index map gives O(1) header lookup.
+        // Keys are unique per run, so a key-to-index map gives O(1) header lookup.
         var groupIndexByKey = new Dictionary<string, int>(StringComparer.Ordinal);
         int visible = 0;
-        int index = 0;
         int start = 0;
         string? currentKey = null;
 
-        // The view may compute elements on demand; avoid random indexing.
-        foreach (var resolved in events)
+        // Walk the display order once, reading each row's group key column-direct (no rehydrate).
+        for (int index = 0; index < view.Count; index++)
         {
-            string key = ResolvedEventGroupKey.For(groupBy, resolved);
+            string key = view.GroupKeyAt(view.LocatorAt(index), groupBy);
 
             if (currentKey is null)
             {
@@ -80,16 +74,14 @@ internal sealed class GroupedRowView : IReadOnlyList<TableRow>, IList<TableRow>
                 currentKey = key;
                 start = index;
             }
-
-            index++;
         }
 
         if (currentKey is not null)
         {
-            CloseGroup(groups, groupIndexByKey, currentKey, start, index, isCollapsed, ref visible);
+            CloseGroup(groups, groupIndexByKey, currentKey, start, view.Count, isCollapsed, ref visible);
         }
 
-        return new GroupedRowView(events, [.. groups], visible, groupIndexByKey);
+        return new GroupedRowView(view, [.. groups], visible, groupIndexByKey);
     }
 
     public void Add(TableRow item) => throw new NotSupportedException();
@@ -103,9 +95,14 @@ internal sealed class GroupedRowView : IReadOnlyList<TableRow>, IList<TableRow>
         for (int i = 0; i < Count; i++) { array[arrayIndex + i] = this[i]; }
     }
 
-    public ResolvedEvent EventAt(TableRow row) => _events[row.EventIndex];
+    public DisplayRow EventAt(TableRow row)
+    {
+        var locator = _view.LocatorAt(row.EventIndex);
 
-    public ResolvedEvent FirstEventOf(EventGroup group) => _events[group.StartIndex];
+        return new DisplayRow(locator, _view.GetDetailLean(locator));
+    }
+
+    public EventLocator FirstLocatorOf(EventGroup group) => _view.LocatorAt(group.StartIndex);
 
     public IEnumerator<TableRow> GetEnumerator()
     {
@@ -127,6 +124,9 @@ internal sealed class GroupedRowView : IReadOnlyList<TableRow>, IList<TableRow>
     }
 
     public void Insert(int index, TableRow item) => throw new NotSupportedException();
+
+    // The locator of the event row without rehydrating it, for cursor/nav that only needs identity.
+    public EventLocator LocatorAt(TableRow row) => _view.LocatorAt(row.EventIndex);
 
     public bool Remove(TableRow item) => throw new NotSupportedException();
 
@@ -150,9 +150,9 @@ internal sealed class GroupedRowView : IReadOnlyList<TableRow>, IList<TableRow>
     {
         var group = _groups[FindGroupByEventIndex(eventIndex)];
 
-        return group.IsCollapsed
-            ? group.VisibleStart
-            : group.VisibleStart + 1 + (eventIndex - group.StartIndex);
+        return group.IsCollapsed ?
+            group.VisibleStart :
+            group.VisibleStart + 1 + (eventIndex - group.StartIndex);
     }
 
     public int VisibleRowForHeader(string groupKey) =>

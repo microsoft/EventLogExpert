@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.Eventing.Common.Events;
 
-internal readonly record struct ValueKey(long RecordId, DateTime TimeCreated, string OwningLog, string LogName)
+public readonly record struct ValueKey(long RecordId, DateTime TimeCreated, string OwningLog, string LogName)
 {
     /// <summary>
     ///     Builds a key from a resolved event, returning false for a null <c>RecordId</c> (error-read events must not

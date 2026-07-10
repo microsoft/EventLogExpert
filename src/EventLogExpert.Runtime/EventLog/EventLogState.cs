@@ -35,7 +35,7 @@ public sealed record EventLogState
 
     public bool NewEventBufferIsFull { get; init; }
 
-    public ResolvedEvent? SelectedEvent { get; init; }
+    public SelectionEntry? Focus { get; init; }
 
-    public ImmutableList<ResolvedEvent> SelectedEvents { get; init; } = [];
+    public ImmutableList<SelectionEntry> Selection { get; init; } = [];
 }

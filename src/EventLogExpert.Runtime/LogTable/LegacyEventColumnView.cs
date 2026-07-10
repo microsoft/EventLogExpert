@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Runtime.LogTable;
 
@@ -18,6 +19,14 @@ internal sealed class LegacyEventColumnView(
     public int Count => _reader.Count;
 
     public IEventColumnReader Reader => _reader;
+
+    public IEnumerable<ResolvedEvent> EnumerateDetail()
+    {
+        for (int physical = 0; physical < _reader.Count; physical++)
+        {
+            yield return _reader.GetEvent(_reader.LocatorAt(physical));
+        }
+    }
 
     public ResolvedEvent GetDetail(EventLocator locator) => _reader.GetEvent(locator);
 
@@ -35,6 +44,23 @@ internal sealed class LegacyEventColumnView(
         && locator.Index < _reader.Count
             ? locator.Index
             : -1;
+
+    public EventLocator? ResolveByKey(ValueKey key)
+    {
+        for (int physical = 0; physical < _reader.Count; physical++)
+        {
+            var locator = _reader.LocatorAt(physical);
+
+            // First match wins; null-RecordId rows never produce a key, so they stay unresolvable, mirroring
+            // EventColumnView.ResolveByKey so differential parity holds.
+            if (ValueKey.TryCreate(_reader.GetDetailLean(locator), out ValueKey candidate) && candidate == key)
+            {
+                return locator;
+            }
+        }
+
+        return null;
+    }
 
     public IReadOnlyList<DisplayRow> Slice(int start, int count)
     {
@@ -56,5 +82,22 @@ internal sealed class LegacyEventColumnView(
         }
 
         return rows;
+    }
+
+    public bool TryGetDetail(EventLocator locator, [NotNullWhen(true)] out ResolvedEvent? detail)
+    {
+        if (locator.LogId == _reader.LogId
+            && locator.Generation == _reader.Generation
+            && locator.Index >= 0
+            && locator.Index < _reader.Count)
+        {
+            detail = _reader.GetEvent(locator);
+
+            return true;
+        }
+
+        detail = null;
+
+        return false;
     }
 }

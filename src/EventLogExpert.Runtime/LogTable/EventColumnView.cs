@@ -2,33 +2,44 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Runtime.LogTable;
 
-/// <summary>
-///     The real column-backed display view: pairs an <see cref="IEventColumnReader" /> with a sorted,
-///     filter-surviving display order (<c>_order</c>, display -&gt; physical) and its inverse (<c>_rankByPhysical</c>,
-///     physical -&gt; display, <c>-1</c> for a physical row not in the view). The viewport reads rows by display position
-///     through <see cref="Slice" />; selection and highlight resolve by <see cref="EventLocator" /> through
-///     <see cref="Rank" />. Additive and unwired; the live display path still runs through
-///     <see cref="SegmentedSortedList" /> until the later flip.
-/// </summary>
 internal sealed class EventColumnView : IEventColumnView
 {
+    private readonly SortContext _context;
     private readonly int[] _order;
     private readonly int[] _rankByPhysical;
     private readonly IEventColumnReader _reader;
 
-    private EventColumnView(IEventColumnReader reader, int[] order, int[] rankByPhysical)
+    private Dictionary<ValueKey, int>? _byKey;
+
+    private EventColumnView(IEventColumnReader reader, int[] order, int[] rankByPhysical, SortContext context)
     {
         _reader = reader;
         _order = order;
         _rankByPhysical = rankByPhysical;
+        _context = context;
     }
 
     public int Count => _order.Length;
 
-    public IEventColumnReader Reader => _reader;
+    internal SortContext Context => _context;
+
+    internal IEventColumnReader Reader => _reader;
+
+    // The filter-surviving physical rows, used by WithContext to re-sort in place; the survivor set is order-independent,
+    // so the current display order is a valid re-sort input.
+    internal ReadOnlySpan<int> Survivors => _order;
+
+    public IEnumerable<ResolvedEvent> EnumerateDetail()
+    {
+        foreach (int physical in _order)
+        {
+            yield return _reader.GetDetail(_reader.LocatorAt(physical));
+        }
+    }
 
     public ResolvedEvent GetDetail(EventLocator locator) => _reader.GetDetail(locator);
 
@@ -47,6 +58,13 @@ internal sealed class EventColumnView : IEventColumnView
             ? _rankByPhysical[locator.Index]
             : -1;
 
+    public EventLocator? ResolveByKey(ValueKey key)
+    {
+        var byKey = _byKey ??= BuildByKey();
+
+        return byKey.TryGetValue(key, out int physical) ? _reader.LocatorAt(physical) : null;
+    }
+
     public IReadOnlyList<DisplayRow> Slice(int start, int count)
     {
         int clampedStart = Math.Clamp(start, 0, _order.Length);
@@ -62,10 +80,26 @@ internal sealed class EventColumnView : IEventColumnView
         return rows;
     }
 
+    public bool TryGetDetail(EventLocator locator, [NotNullWhen(true)] out ResolvedEvent? detail)
+    {
+        if (locator.LogId == _reader.LogId
+            && locator.Generation == _reader.Generation
+            && locator.Index >= 0
+            && locator.Index < _reader.Count)
+        {
+            detail = _reader.GetDetail(locator);
+
+            return true;
+        }
+
+        detail = null;
+
+        return false;
+    }
+
     /// <summary>
-    ///     Builds a view over <paramref name="survivors" /> (the filter-surviving physical rows) sorted into display
-    ///     order by the <see cref="ResolvedEventOrdering.SortColumnDirect" /> kernel, then materializes the physical -&gt;
-    ///     display inverse used by <see cref="Rank" />.
+    ///     Builds a view over the filter-surviving <paramref name="survivors" />, sorted into display order, with the
+    ///     physical-to-display inverse used by <see cref="Rank" />.
     /// </summary>
     internal static EventColumnView Create(
         IEventColumnReader reader,
@@ -73,12 +107,19 @@ internal sealed class EventColumnView : IEventColumnView
         ColumnName? orderBy,
         bool isDescending,
         ColumnName? groupBy,
-        bool isGroupDescending)
+        bool isGroupDescending) =>
+        Create(reader, survivors, new SortContext(orderBy, isDescending, groupBy, isGroupDescending));
+
+    /// <summary>
+    ///     Live-path overload: sorts under <paramref name="context" /> and retains it so the reducers can detect
+    ///     (<see cref="HasContext" />) and repair (<see cref="WithContext" />) a stale sort without re-reading the raw store.
+    /// </summary>
+    internal static EventColumnView Create(IEventColumnReader reader, ReadOnlySpan<int> survivors, SortContext context)
     {
         ArgumentNullException.ThrowIfNull(reader);
 
         int[] order = ResolvedEventOrdering.SortColumnDirect(
-            reader, survivors, orderBy, isDescending, groupBy, isGroupDescending);
+            reader, survivors, context.OrderBy, context.IsDescending, context.GroupBy, context.IsGroupDescending);
 
         int[] rankByPhysical = new int[reader.Count];
         Array.Fill(rankByPhysical, -1);
@@ -88,6 +129,28 @@ internal sealed class EventColumnView : IEventColumnView
             rankByPhysical[order[display]] = display;
         }
 
-        return new EventColumnView(reader, order, rankByPhysical);
+        return new EventColumnView(reader, order, rankByPhysical, context);
+    }
+
+    internal bool HasContext(SortContext context) => _context.Equals(context);
+
+    // Re-sorts the same survivor set under a new context without re-reading the raw store (the reducers use this when the
+    // effective default order flips between single- and multi-log).
+    internal EventColumnView WithContext(SortContext context) => Create(_reader, _order, context);
+
+    private Dictionary<ValueKey, int> BuildByKey()
+    {
+        var map = new Dictionary<ValueKey, int>(_order.Length);
+
+        foreach (int physical in _order)
+        {
+            // First survivor wins on a duplicate key; null-RecordId rows never produce a key, so they stay unresolvable.
+            if (ValueKey.TryCreate(_reader.GetDetailLean(_reader.LocatorAt(physical)), out ValueKey key))
+            {
+                map.TryAdd(key, physical);
+            }
+        }
+
+        return map;
     }
 }
