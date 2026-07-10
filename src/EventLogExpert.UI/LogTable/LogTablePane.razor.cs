@@ -62,6 +62,7 @@ public sealed partial class LogTablePane
     private ColumnName[] _previousEnabledColumns = [];
     private bool _refreshEventViewportOnRender;
     private bool _repaintViewportOnNextRender;
+    private bool _rescrollToSelectedOnRender;
     private bool _resortSelectionOnNextRender;
     private GroupedRowView? _rowView;
     private (IEventColumnView View, EventLogId? TableId, ColumnName? GroupBy, bool GroupDescending, bool CollapsedDefault, ImmutableHashSet<string>? Overrides) _rowViewSnapshot;
@@ -157,6 +158,12 @@ public sealed partial class LogTablePane
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // Capture up front and clear: consuming the request after the awaits below could otherwise steal a request
+        // that a background action (e.g. a live-tail append) queued during one of those awaits, dropping that later
+        // render's scroll. A request arriving mid-render stays set and is handled by the next render instead.
+        bool rescrollRequested = _rescrollToSelectedOnRender;
+        _rescrollToSelectedOnRender = false;
+
         if (firstRender || !_enabledColumns.SequenceEqual(_previousEnabledColumns))
         {
             _previousEnabledColumns = _enabledColumns.ToArray();
@@ -218,6 +225,19 @@ public sealed partial class LogTablePane
             }
         }
 
+        if (rescrollRequested)
+        {
+            try
+            {
+                await ScrollToSelectedEvent();
+            }
+            catch (JSDisconnectedException) { /* Circuit gone; nothing to scroll. */ }
+            catch (Exception e)
+            {
+                TraceLogger.Error($"Failed to scroll to selected event: {e}");
+            }
+        }
+
         await base.OnAfterRenderAsync(firstRender);
     }
 
@@ -226,7 +246,7 @@ public sealed partial class LogTablePane
         Focus.Select(s => s.Focus);
         Selection.Select(s => s.Selection);
 
-        SubscribeToAction<SetActiveTableAction>(OnSetActiveTable);
+        SubscribeToAction<SetActiveTableAction>(_ => RescrollToSelected());
         SubscribeToAction<DisplayReadyAction>(_ => RescrollToSelected());
         SubscribeToAction<AppendTableEventsAction>(_ => RescrollToSelected());
         SubscribeToAction<AppendTableEventsBatchAction>(_ => RescrollToSelected());
@@ -265,6 +285,7 @@ public sealed partial class LogTablePane
         // Also render for a pending focus move or a post-refresh viewport repaint, neither of which changes Fluxor state.
         if (!_focusActiveOnNextRender &&
             !_repaintViewportOnNextRender &&
+            !_rescrollToSelectedOnRender &&
             ReferenceEquals(LogTableState.Value, _logTableState) &&
             ReferenceEquals(Selection.Value, _selection) &&
             !focusChanged &&
@@ -933,18 +954,6 @@ public sealed partial class LogTablePane
         return cursor;
     }
 
-    private async void OnSetActiveTable(SetActiveTableAction action)
-    {
-        try
-        {
-            await InvokeAsync(ScrollToSelectedEvent);
-        }
-        catch (Exception e)
-        {
-            TraceLogger.Error($"Failed to scroll to selected event: {e}");
-        }
-    }
-
     private void RebuildGroupedRowView(IEventColumnView displayedEvents)
     {
         var state = _logTableState;
@@ -1064,17 +1073,12 @@ public sealed partial class LogTablePane
         }
     }
 
-    private async void RescrollToSelected()
-    {
-        try
+    private void RescrollToSelected() =>
+        _ = InvokeAsync(() =>
         {
-            await InvokeAsync(ScrollToSelectedEvent);
-        }
-        catch (Exception e)
-        {
-            TraceLogger.Error($"Failed to scroll to selected event: {e}");
-        }
-    }
+            _rescrollToSelectedOnRender = true;
+            StateHasChanged();
+        });
 
     private IEventColumnView ResolveActiveDisplayedEvents() =>
         _currentTable is null ? s_emptyView : _logTableState.DisplayedEventsForTab(_currentTable);

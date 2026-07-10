@@ -637,6 +637,40 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     }
 
     [Fact]
+    public async Task ReactiveScroll_WhenDisplayOrderChanges_RanksTargetAgainstNewView()
+    {
+        var alpha1 = Event(1, "Alpha");
+        var beta2 = Event(2, "Beta");
+        var gamma3 = Event(3, "Gamma");
+        _selectedEvent.Value.Returns(Focus(gamma3, 2));
+        _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), alpha1, beta2, gamma3));
+
+        var cut = Render<LogTablePane>();
+        await cut.InvokeAsync(() => Services.GetRequiredService<IStore>().InitializeAsync());
+        await cut.InvokeAsync(() =>
+            Services.GetRequiredService<IDispatcher>().Dispatch(new DisplayReadyAction()));
+
+        // Ascending by RecordId: gamma3 (newest) is the last visible row.
+        cut.WaitForAssertion(() =>
+        {
+            var scrolls = _jsModule.Invocations["scrollToRow"];
+            Assert.NotEmpty(scrolls);
+            Assert.Equal(2, (int)scrolls.Last().Arguments[0]!);
+        });
+
+        // Flip to descending (same events, same physical identity): gamma3 becomes the first visible row.
+        _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), descending: true, alpha1, beta2, gamma3));
+        await cut.InvokeAsync(() =>
+            Services.GetRequiredService<IDispatcher>().Dispatch(new DisplayReadyAction()));
+
+        cut.WaitForAssertion(() =>
+        {
+            var scrolls = _jsModule.Invocations["scrollToRow"];
+            Assert.Equal(0, (int)scrolls.Last().Arguments[0]!);
+        });
+    }
+
+    [Fact]
     public void Ungrouped_ArrowDown_SelectsNextEvent()
     {
         _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), Event(1, "Alpha"), Event(2, "Beta")));
@@ -718,6 +752,13 @@ public sealed class LogTablePaneGroupingTests : BunitContext
     private LogTableState BuildState(
         ColumnName? groupBy,
         ImmutableHashSet<string> collapsed,
+        params ResolvedEvent[] events) =>
+        BuildState(groupBy, collapsed, descending: false, events);
+
+    private LogTableState BuildState(
+        ColumnName? groupBy,
+        ImmutableHashSet<string> collapsed,
+        bool descending,
         params ResolvedEvent[] events)
     {
         return new LogTableState
@@ -727,7 +768,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
             EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(_logId, events.Length),
             Columns = ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.Source, true),
             ColumnOrder = ImmutableList.Create(ColumnName.Source),
-            IsDescending = false,
+            IsDescending = descending,
             GroupBy = groupBy,
             GroupCollapseOverrides = collapsed
         }.WithLogEvents(_logId, events);
