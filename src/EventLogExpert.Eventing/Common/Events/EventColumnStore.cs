@@ -764,9 +764,9 @@ public sealed class EventColumnStore
         return values.MoveToImmutable();
     }
 
-    private string[] ReconstructKeywords(int index)
+    private string[] ReconstructKeywords(EventColumnChunk chunk, int row)
     {
-        ReadOnlySpan<int> keywordIndices = RawKeywords(index);
+        ReadOnlySpan<int> keywordIndices = chunk.RowKeywords(row);
 
         if (keywordIndices.Length == 0) { return []; }
 
@@ -779,31 +779,33 @@ public sealed class EventColumnStore
 
     private ResolvedEvent ReconstructLeanEvent(int index)
     {
-        int userIdPoolIndex = RawPoolIndex(EventColumnField.UserId, index);
-        long recordId = RawRecordId(index, out bool hasRecordId);
-        Guid activityId = RawActivityId(index, out bool hasActivityId);
-        int processId = RawProcessId(index, out bool hasProcessId);
-        int threadId = RawThreadId(index, out bool hasThreadId);
+        (EventColumnChunk chunk, int row) = LocateSealed(index);
+
+        int userIdPoolIndex = chunk.RowPoolIndex(EventColumnField.UserId, row);
+        long recordId = chunk.RowRecordId(row, out bool hasRecordId);
+        Guid activityId = chunk.RowActivityId(row, out bool hasActivityId);
+        int processId = chunk.RowProcessId(row, out bool hasProcessId);
+        int threadId = chunk.RowThreadId(row, out bool hasThreadId);
 
         return new ResolvedEvent(
-            PoolGet(RawPoolIndex(EventColumnField.OwningLog, index))!,
-            (LogPathType)RawLogPathType(index))
+            PoolGet(chunk.RowPoolIndex(EventColumnField.OwningLog, row))!,
+            (LogPathType)chunk.RowLogPathType(row))
         {
-            Id = RawId(index),
-            TimeCreated = new DateTime(RawTimeTicks(index), DateTimeKind.Utc),
-            ComputerName = PoolGet(RawPoolIndex(EventColumnField.ComputerName, index)) ?? string.Empty,
-            Description = PoolGet(RawPoolIndex(EventColumnField.Description, index)) ?? string.Empty,
-            Level = PoolGet(RawPoolIndex(EventColumnField.Level, index)) ?? string.Empty,
-            LogName = PoolGet(RawPoolIndex(EventColumnField.LogName, index)) ?? string.Empty,
-            Source = PoolGet(RawPoolIndex(EventColumnField.Source, index)) ?? string.Empty,
-            TaskCategory = PoolGet(RawPoolIndex(EventColumnField.TaskCategory, index)) ?? string.Empty,
+            Id = chunk.RowId(row),
+            TimeCreated = new DateTime(chunk.RowTimeTicks(row), DateTimeKind.Utc),
+            ComputerName = PoolGet(chunk.RowPoolIndex(EventColumnField.ComputerName, row)) ?? string.Empty,
+            Description = PoolGet(chunk.RowPoolIndex(EventColumnField.Description, row)) ?? string.Empty,
+            Level = PoolGet(chunk.RowPoolIndex(EventColumnField.Level, row)) ?? string.Empty,
+            LogName = PoolGet(chunk.RowPoolIndex(EventColumnField.LogName, row)) ?? string.Empty,
+            Source = PoolGet(chunk.RowPoolIndex(EventColumnField.Source, row)) ?? string.Empty,
+            TaskCategory = PoolGet(chunk.RowPoolIndex(EventColumnField.TaskCategory, row)) ?? string.Empty,
             UserId = userIdPoolIndex < 0 ? null : new SecurityIdentifier(PoolGet(userIdPoolIndex)!),
             RecordId = hasRecordId ? recordId : null,
             ActivityId = hasActivityId ? activityId : null,
             ProcessId = hasProcessId ? processId : null,
             ThreadId = hasThreadId ? threadId : null,
-            UserDataIncomplete = RawUserDataIncomplete(index),
-            Keywords = ReconstructKeywords(index)
+            UserDataIncomplete = chunk.RowUserDataIncomplete(row),
+            Keywords = ReconstructKeywords(chunk, row)
         };
     }
 
