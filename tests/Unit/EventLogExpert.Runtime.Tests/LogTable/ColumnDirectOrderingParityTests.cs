@@ -14,8 +14,8 @@ namespace EventLogExpert.Runtime.Tests.LogTable;
 ///     Differential parity for the column-side group keys: the live
 ///     <see cref="ResolvedEventGroupKey.For(IEventColumnReader, EventLocator, ColumnName)" /> and
 ///     <see cref="IEventColumnView.GroupKeyAt" /> must match the relocated array-of-structs group key
-///     <see cref="ResolvedEventGroupKey.For(ColumnName, ResolvedEvent)" /> for every column and event, and their
-///     contiguous group runs must match over the grouped-sort order produced by the reference comparer
+///     <see cref="AosReferenceGroupKey.For(ColumnName, ResolvedEvent)" /> for every column and event, and their contiguous
+///     group runs must match over the grouped-sort order produced by the reference comparer
 ///     <see cref="AosReferenceOrdering.Reference" />. A <see cref="LegacyEventColumnReader" /> reads the same
 ///     <see cref="ResolvedEvent" /> corpus, so any divergence isolates the column-side group-key logic rather than the
 ///     store.
@@ -39,7 +39,7 @@ public sealed class ColumnDirectOrderingParityTests
 
             foreach (ColumnName column in s_allColumns)
             {
-                string arrayOfStructsKey = ResolvedEventGroupKey.For(column, s_edgeCorpus[index]);
+                string arrayOfStructsKey = AosReferenceGroupKey.For(column, s_edgeCorpus[index]);
                 string viewKey = s_edgeView.GroupKeyAt(locator, column);
                 string readerKey = ResolvedEventGroupKey.For(s_edgeView.Reader, locator, column);
 
@@ -65,7 +65,7 @@ public sealed class ColumnDirectOrderingParityTests
             int[] order = Enumerable.Range(0, s_edgeCorpus.Count).ToArray();
             Array.Sort(order, (left, right) => comparer(s_edgeCorpus[left], s_edgeCorpus[right]));
 
-            List<string> arrayOfStructsKeys = order.Select(index => ResolvedEventGroupKey.For(column, s_edgeCorpus[index])).ToList();
+            List<string> arrayOfStructsKeys = order.Select(index => AosReferenceGroupKey.For(column, s_edgeCorpus[index])).ToList();
             List<string> columnKeys = order.Select(index => s_edgeView.GroupKeyAt(s_edgeView.LocatorAt(index), column)).ToList();
 
             if (!arrayOfStructsKeys.SequenceEqual(columnKeys, StringComparer.Ordinal))

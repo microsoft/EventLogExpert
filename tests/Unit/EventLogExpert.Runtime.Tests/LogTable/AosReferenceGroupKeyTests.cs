@@ -3,12 +3,13 @@
 
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 using System.Globalization;
 using System.Security.Principal;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
 
-public sealed class ResolvedEventGroupKeyTests
+public sealed class AosReferenceGroupKeyTests
 {
     [Fact]
     public void For_ActivityId_UsesInvariantDFormat()
@@ -18,7 +19,7 @@ public sealed class ResolvedEventGroupKeyTests
 
         Assert.Equal(
             id.ToString("D", CultureInfo.InvariantCulture),
-            ResolvedEventGroupKey.For(ColumnName.ActivityId, evt));
+            AosReferenceGroupKey.For(ColumnName.ActivityId, evt));
     }
 
     [Fact]
@@ -26,7 +27,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(computerName: "HOST-01");
 
-        Assert.Equal("HOST-01", ResolvedEventGroupKey.For(ColumnName.ComputerName, evt));
+        Assert.Equal("HOST-01", AosReferenceGroupKey.For(ColumnName.ComputerName, evt));
     }
 
     [Fact]
@@ -37,7 +38,7 @@ public sealed class ResolvedEventGroupKeyTests
 
         Assert.Equal(
             time.Ticks.ToString(CultureInfo.InvariantCulture),
-            ResolvedEventGroupKey.For(ColumnName.DateAndTime, evt));
+            AosReferenceGroupKey.For(ColumnName.DateAndTime, evt));
     }
 
     [Fact]
@@ -45,7 +46,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(id: 4242);
 
-        Assert.Equal("4242", ResolvedEventGroupKey.For(ColumnName.EventId, evt));
+        Assert.Equal("4242", AosReferenceGroupKey.For(ColumnName.EventId, evt));
     }
 
     [Fact]
@@ -53,7 +54,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(keywords: ["Audit", "Classic"]);
 
-        Assert.Equal("Audit, Classic", ResolvedEventGroupKey.For(ColumnName.Keywords, evt));
+        Assert.Equal("Audit, Classic", AosReferenceGroupKey.For(ColumnName.Keywords, evt));
     }
 
     [Fact]
@@ -61,7 +62,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(level: "Warning");
 
-        Assert.Equal("Warning", ResolvedEventGroupKey.For(ColumnName.Level, evt));
+        Assert.Equal("Warning", AosReferenceGroupKey.For(ColumnName.Level, evt));
     }
 
     [Fact]
@@ -69,7 +70,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(logName: "Security");
 
-        Assert.Equal("Security", ResolvedEventGroupKey.For(ColumnName.Log, evt));
+        Assert.Equal("Security", AosReferenceGroupKey.For(ColumnName.Log, evt));
     }
 
     [Fact]
@@ -77,7 +78,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(activityId: null);
 
-        Assert.Equal(string.Empty, ResolvedEventGroupKey.For(ColumnName.ActivityId, evt));
+        Assert.Equal(string.Empty, AosReferenceGroupKey.For(ColumnName.ActivityId, evt));
     }
 
     [Fact]
@@ -85,7 +86,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(computerName: null!);
 
-        Assert.Equal(string.Empty, ResolvedEventGroupKey.For(ColumnName.ComputerName, evt));
+        Assert.Equal(string.Empty, AosReferenceGroupKey.For(ColumnName.ComputerName, evt));
     }
 
     [Fact]
@@ -93,7 +94,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(processId: null);
 
-        Assert.Equal(string.Empty, ResolvedEventGroupKey.For(ColumnName.ProcessId, evt));
+        Assert.Equal(string.Empty, AosReferenceGroupKey.For(ColumnName.ProcessId, evt));
     }
 
     [Fact]
@@ -101,7 +102,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(recordId: null);
 
-        Assert.Equal(string.Empty, ResolvedEventGroupKey.For(ColumnName.RecordId, evt));
+        Assert.Equal(string.Empty, AosReferenceGroupKey.For(ColumnName.RecordId, evt));
     }
 
     [Fact]
@@ -109,7 +110,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(threadId: null);
 
-        Assert.Equal(string.Empty, ResolvedEventGroupKey.For(ColumnName.ThreadId, evt));
+        Assert.Equal(string.Empty, AosReferenceGroupKey.For(ColumnName.ThreadId, evt));
     }
 
     [Fact]
@@ -117,7 +118,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(userId: null);
 
-        Assert.Equal(string.Empty, ResolvedEventGroupKey.For(ColumnName.User, evt));
+        Assert.Equal(string.Empty, AosReferenceGroupKey.For(ColumnName.User, evt));
     }
 
     [Fact]
@@ -125,7 +126,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(processId: 4096);
 
-        Assert.Equal("4096", ResolvedEventGroupKey.For(ColumnName.ProcessId, evt));
+        Assert.Equal("4096", AosReferenceGroupKey.For(ColumnName.ProcessId, evt));
     }
 
     [Fact]
@@ -133,7 +134,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(recordId: 4096);
 
-        Assert.Equal("4096", ResolvedEventGroupKey.For(ColumnName.RecordId, evt));
+        Assert.Equal("4096", AosReferenceGroupKey.For(ColumnName.RecordId, evt));
     }
 
     [Fact]
@@ -141,7 +142,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(source: "Kernel-Power");
 
-        Assert.Equal("Kernel-Power", ResolvedEventGroupKey.For(ColumnName.Source, evt));
+        Assert.Equal("Kernel-Power", AosReferenceGroupKey.For(ColumnName.Source, evt));
     }
 
     [Fact]
@@ -149,7 +150,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(taskCategory: "Logon");
 
-        Assert.Equal("Logon", ResolvedEventGroupKey.For(ColumnName.TaskCategory, evt));
+        Assert.Equal("Logon", AosReferenceGroupKey.For(ColumnName.TaskCategory, evt));
     }
 
     [Fact]
@@ -157,7 +158,7 @@ public sealed class ResolvedEventGroupKeyTests
     {
         var evt = FilterEventBuilder.CreateTestEvent(threadId: 88);
 
-        Assert.Equal("88", ResolvedEventGroupKey.For(ColumnName.ThreadId, evt));
+        Assert.Equal("88", AosReferenceGroupKey.For(ColumnName.ThreadId, evt));
     }
 
     [Fact]
@@ -166,6 +167,6 @@ public sealed class ResolvedEventGroupKeyTests
         var sid = new SecurityIdentifier("S-1-5-18");
         var evt = FilterEventBuilder.CreateTestEvent(userId: sid);
 
-        Assert.Equal(sid.Value, ResolvedEventGroupKey.For(ColumnName.User, evt));
+        Assert.Equal(sid.Value, AosReferenceGroupKey.For(ColumnName.User, evt));
     }
 }
