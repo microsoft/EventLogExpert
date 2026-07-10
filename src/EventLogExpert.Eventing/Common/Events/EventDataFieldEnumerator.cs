@@ -7,13 +7,12 @@ namespace EventLogExpert.Eventing.Common.Events;
 ///     A ref-struct enumerator that yields an event's &lt;EventData&gt; fields POSITIONALLY as
 ///     <see cref="EventDataView.Field" /> pairs - every position, including duplicate names and positional-empty nodes
 ///     (the wildcard-name filter arms are existential over this iteration, so a dropped duplicate would silently miss a
-///     match). It supports two source modes behind one type because <see cref="LegacyEventColumnReader" /> reads whole
-///     <see cref="ResolvedEvent" /> objects while <see cref="EventColumnStoreReader" /> reads a pending
+///     match). It supports two source modes behind one type because <see cref="EventColumnStoreReader" /> reads a pending
 ///     <see cref="ResolvedEvent" /> or the sealed columns: <em>view mode</em> delegates to the
-///     <see cref="EventDataView.Enumerator" />; <em>columns mode</em> reconstructs each field from the store columns. It
-///     is a ref struct because columns mode holds a <see cref="ReadOnlySpan{T}" /> of schema name indices and reconstructs
-///     through the internal <see cref="RawEventDataField" /> ref struct, so it never escapes to the heap on the all-N
-///     filter hot path.
+///     <see cref="EventDataView.Enumerator" /> for a pending event's whole <see cref="ResolvedEvent" />;
+///     <em>columns mode</em> reconstructs each field from the store columns. It is a ref struct because columns mode holds
+///     a <see cref="ReadOnlySpan{T}" /> of schema name indices and reconstructs through the internal
+///     <see cref="RawEventDataField" /> ref struct, so it never escapes to the heap on the all-N filter hot path.
 /// </summary>
 public ref struct EventDataFieldEnumerator
 {

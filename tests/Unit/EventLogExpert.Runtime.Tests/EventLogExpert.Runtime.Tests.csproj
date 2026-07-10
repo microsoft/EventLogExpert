@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Shared\EventLogExpert.Filtering.TestUtils\EventLogExpert.Filtering.TestUtils.csproj" />
+    <ProjectReference Include="..\..\Shared\EventLogExpert.Eventing.TestUtils\EventLogExpert.Eventing.TestUtils.csproj" />
   </ItemGroup>
 
 </Project>

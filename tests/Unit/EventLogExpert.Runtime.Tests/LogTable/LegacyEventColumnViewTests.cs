@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
 

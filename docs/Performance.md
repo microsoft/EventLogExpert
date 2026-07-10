@@ -49,18 +49,23 @@ resolution runs under a global gate (`OpenLogEffects` uses a `PrioritySemaphore`
 `ProcessorCount - 1`), so multiple readers resolve in parallel while leaving a core for the UI,
 and foreground work can jump the queue ahead of background prefetch.
 
-### P5 - Segmented sorted store and the combined merge view
+### P5 - Chunked columnar store and the combined merge view
 
-**Problem:** a sorted, growing list that is re-sorted or copied on every append is O(n^2) over a
-streaming load; a combined (multi-log) view must stay globally sorted without materializing a
-single giant array. **Mechanism:** `SegmentedSortedList` keeps immutable, globally
-non-interleaving sorted segments (segment *i* entirely `<=` segment *i+1*), so the logical
-sequence is their concatenation and indexing is a prefix-sum binary search; an append that sits
-before or after the existing data adds a segment with no copy, and only a genuinely interleaving
-append falls back to a merge. `CombinedEventView` merges several such lists with a K-way cursor
-walk plus a periodic checkpoint index (stride 64) so a positional read seeks in log(segments)
-rather than walking from the start, with per-read offset scratch stack-allocated up to a capped
-K.
+**Problem:** retaining every row as a fully materialized event object per log is heap-heavy over a
+streaming million-row load, and a combined (multi-log) view must stay globally sorted without
+rehydrating events or materializing one giant array. **Mechanism:** `EventColumnStore` is an
+immutable, chunked, columnar per-log snapshot: older rows are columnarized into self-contained
+typed-column chunks addressed by a lazy prefix-sum binary search over chunk row counts, while the
+newest rows stay as a bounded array-of-structs tail that seals into a new chunk once it reaches the
+target size, giving amortized O(1) append. Repeated strings fold into an interned pool and
+`EventData` field-name sequences into a shared schema table, and `Append` returns a new snapshot
+that reference-shares the prior chunks, pool, and schema table, so a published snapshot is safe to
+read while the next ingest builds. Each log exposes an `EventColumnView` that sorts its rows into a
+display order and reads fields straight through the store's reader with no event objects rehydrated;
+`CombinedColumnView` merges several such views with a K-way, column-direct cursor walk that compares
+head-to-head off each row's own reader, plus a periodic checkpoint index (stride 64) so a positional
+read seeks in log(rows) rather than walking from the start, with per-read offset scratch
+stack-allocated up to a capped K.
 
 ### P6 - Viewport virtualization and render-buffer reuse
 
@@ -104,7 +109,7 @@ filtering.
 | Read | Reverse read, newest bookmark, tuned `EvtNext` batch | `EventLogReader` |
 | Marshalling | Non-boxing packed `EventProperty` | `EventProperty`, `NativeMethods.Evt` |
 | Resolve | `ProcessorCount - 1` priority-gated parallelism | `OpenLogEffects` |
-| Store | Segmented sorted list + K-way combined view | `SegmentedSortedList`, `CombinedEventView` |
+| Store | Chunked columnar snapshot + K-way combined view | `EventColumnStore`, `EventColumnView`, `CombinedColumnView` |
 | Viewport | `Virtualize` + one-slice-per-window provider | `LogTablePane` |
 | Render | Per-thread grow-only render buffer, skip-probe | `NativeMethods.Evt` |
 | Filter memory | Retained structured `EventData` / `UserData` fields | `ResolvedEvent`, `UserDataValueExtractor` |
