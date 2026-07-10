@@ -412,20 +412,36 @@ export function scrollToRow(offset) {
         return;
     }
 
+    const container = table.parentNode;
+
+    if (!container) {
+        return;
+    }
+
     // Sample a body row's height (as computePageSize does) instead of
     // getElementsByTagName("tr")[0] - that first row is the <thead> header,
     // whose height can diverge from the 22px data rows and would skew the
     // scroll target, magnified by a deep offset.
-    const bodyRow = table.querySelector("tbody tr");
+    const applyScroll = () => {
+        const bodyRow = table.querySelector("tbody tr");
 
-    if (!bodyRow) {
-        return;
-    }
+        if (!bodyRow) {
+            return;
+        }
 
-    table.parentNode.scrollTo({
-        top: bodyRow.offsetHeight * offset - (table.parentNode.offsetHeight / 3),
-        behavior: "smooth"
-    });
+        container.scrollTo({
+            top: Math.max(0, bodyRow.offsetHeight * offset - container.offsetHeight / 3),
+            behavior: "smooth"
+        });
+    };
+
+    applyScroll();
+
+    // Load-bearing, do not remove: the C# caller fires this scroll in the same render as the list change (before
+    // the queued Virtualize repaint lands), and Virtualize reconciles its total scroll height asynchronously. So on
+    // the first attempt the container can still cap a deep target against the previous, smaller item count. The
+    // re-apply after the spacer has grown is what actually lands the target (mirrors focusEventTableRow's retry).
+    requestAnimationFrame(() => requestAnimationFrame(applyScroll));
 }
 
 // Returns the PageUp/PageDown jump size in body rows. Derived from the
