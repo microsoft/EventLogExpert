@@ -3,9 +3,10 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Runtime.LogTable;
 using System.Diagnostics.CodeAnalysis;
 
-namespace EventLogExpert.Runtime.LogTable;
+namespace EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 
 internal sealed class LegacyEventColumnView(
     EventLogId logId,

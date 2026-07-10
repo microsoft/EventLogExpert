@@ -5,6 +5,7 @@ let activeDocumentListeners = [];
 let controller = null;
 let dotNetRef = null;
 let keyboardResizeTimer = null;
+let scrollToRowGeneration = 0;
 
 // Attaches a document-level listener tied to the current AbortController
 // signal so dispose() guarantees cleanup even if the caller forgets to
@@ -304,9 +305,9 @@ function enableColumnReorder(table, signal) {
         { signal });
 
     // Returns:
-    //   { targetColumn, insertAfter, indicatorX, refRect } — valid drop position
-    //   false — cursor is over the source column (cancel)
-    //   null — no column found under cursor
+    //   { targetColumn, insertAfter, indicatorX, refRect } - valid drop position
+    //   false - cursor is over the source column (cancel)
+    //   null - no column found under cursor
     function computeDropInfo(allHeaders, clientX, clientY, sourceIndex) {
         let targetIndex = -1;
 
@@ -406,6 +407,8 @@ function registerKeyHandlers(table, signal) {
 }
 
 export function scrollToRow(offset) {
+    const generation = ++scrollToRowGeneration;
+
     const table = document.getElementById("eventTable");
 
     if (!table) {
@@ -441,7 +444,12 @@ export function scrollToRow(offset) {
     // the queued Virtualize repaint lands), and Virtualize reconciles its total scroll height asynchronously. So on
     // the first attempt the container can still cap a deep target against the previous, smaller item count. The
     // re-apply after the spacer has grown is what actually lands the target (mirrors focusEventTableRow's retry).
-    requestAnimationFrame(() => requestAnimationFrame(applyScroll));
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        // Abort if a newer scrollToRow superseded this call so a stale re-apply can't scroll to an old target.
+        if (generation === scrollToRowGeneration) {
+            applyScroll();
+        }
+    }));
 }
 
 // Returns the PageUp/PageDown jump size in body rows. Derived from the
@@ -484,7 +492,7 @@ function computePageSize(table) {
 
 // Scrolls the row at the given index into view and focuses it. Targets
 // rows by aria-rowindex (set by Razor as displayed-events index + 2)
-// because Virtualize only renders rows in/near the viewport — indexing
+// because Virtualize only renders rows in/near the viewport - indexing
 // into the live `<tbody tr>` NodeList would point at the wrong row
 // once the user has scrolled away from the top. When the row is not
 // yet materialized, we scroll to its approximate position and retry

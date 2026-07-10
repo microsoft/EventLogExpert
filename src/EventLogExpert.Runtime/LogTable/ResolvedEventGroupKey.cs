@@ -7,7 +7,7 @@ using System.Globalization;
 namespace EventLogExpert.Runtime.LogTable;
 
 /// <summary>Per-column grouping key mirroring the field each grouped comparer reads; "" is the no-value bucket.</summary>
-public static class ResolvedEventGroupKey
+internal static class ResolvedEventGroupKey
 {
     /// <summary>
     ///     Reads the grouping bucket field for <paramref name="column" /> through the reader. DateAndTime uses invariant
