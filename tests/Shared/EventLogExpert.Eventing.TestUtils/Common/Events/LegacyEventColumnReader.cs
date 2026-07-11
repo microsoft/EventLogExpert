@@ -41,16 +41,28 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(hasValue);
 
-        if (field != EventFieldId.ActivityId)
+        switch (field)
         {
-            throw new ArgumentOutOfRangeException(nameof(field), field, "Not a Guid column.");
-        }
+            case EventFieldId.ActivityId:
+                for (int index = 0; index < _events.Count; index++)
+                {
+                    Guid? value = _events[index].ActivityId;
+                    values[index] = value ?? Guid.Empty;
+                    hasValue[index] = value.HasValue;
+                }
 
-        for (int index = 0; index < _events.Count; index++)
-        {
-            Guid? value = _events[index].ActivityId;
-            values[index] = value ?? Guid.Empty;
-            hasValue[index] = value.HasValue;
+                break;
+            case EventFieldId.RelatedActivityId:
+                for (int index = 0; index < _events.Count; index++)
+                {
+                    Guid? value = _events[index].RelatedActivityId;
+                    values[index] = value ?? Guid.Empty;
+                    hasValue[index] = value.HasValue;
+                }
+
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(field), field, "Not a Guid column.");
         }
     }
 
@@ -155,6 +167,7 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         EventFieldId.Description => resolvedEvent.Description,
         EventFieldId.Xml => resolvedEvent.Xml,
         EventFieldId.OwningLog => resolvedEvent.OwningLog,
+        EventFieldId.Opcode => resolvedEvent.Opcode,
         _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Not a single pooled string column.")
     };
 
@@ -174,6 +187,7 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
             Add(resolvedEvent.Description, indexByValue, values);
             Add(resolvedEvent.Xml, indexByValue, values);
             Add(resolvedEvent.OwningLog, indexByValue, values);
+            Add(resolvedEvent.Opcode, indexByValue, values);
         }
 
         return new LegacyStringPool(values, indexByValue);

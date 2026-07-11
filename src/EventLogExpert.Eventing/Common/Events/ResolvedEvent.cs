@@ -35,9 +35,14 @@ public sealed record ResolvedEvent(
     // The event's Channel system property (e.g. "Security"), populated for .evtx files as the original channel, not the file path.
     public string LogName { get; init; } = string.Empty;
 
+    // The resolved opcode display name (e.g. "Info", "Start"), like TaskCategory; empty when the event carries no opcode.
+    public string Opcode { get; init; } = string.Empty;
+
     public int? ProcessId { get; init; }
 
     public long? RecordId { get; init; }
+
+    public Guid? RelatedActivityId { get; init; }
 
     public string Source { get; init; } = string.Empty;
 

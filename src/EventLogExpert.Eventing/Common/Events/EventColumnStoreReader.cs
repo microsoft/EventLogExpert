@@ -41,12 +41,17 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(hasValue);
 
-        if (field != EventFieldId.ActivityId)
+        switch (field)
         {
-            throw new ArgumentOutOfRangeException(nameof(field), field, "Not a Guid column.");
+            case EventFieldId.ActivityId:
+                _store.CopyActivityId(values, hasValue);
+                break;
+            case EventFieldId.RelatedActivityId:
+                _store.CopyRelatedActivityId(values, hasValue);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(field), field, "Not a Guid column.");
         }
-
-        _store.CopyActivityId(values, hasValue);
     }
 
     public void CopyInt64Column(EventFieldId field, long[] values, bool[] hasValue)
@@ -181,6 +186,14 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
                 return PooledField(EventColumnField.Xml, index);
             case EventFieldId.OwningLog:
                 return PooledField(EventColumnField.OwningLog, index);
+            case EventFieldId.Opcode:
+                return PooledField(EventColumnField.Opcode, index);
+            case EventFieldId.RelatedActivityId:
+            {
+                Guid value = _store.RawRelatedActivityId(index, out bool hasValue);
+
+                return hasValue ? EventFieldValue.FromProperty(value) : ResolvedEventFieldReader.Absent;
+            }
             default:
                 return ResolvedEventFieldReader.Absent;
         }
@@ -278,6 +291,7 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         EventColumnField.TaskCategory => pending.TaskCategory,
         EventColumnField.Xml => pending.Xml,
         EventColumnField.UserId => pending.UserId?.Value,
+        EventColumnField.Opcode => pending.Opcode,
         _ => throw new ArgumentOutOfRangeException(nameof(column), column, null)
     };
 
@@ -292,6 +306,7 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         EventFieldId.Description => EventColumnField.Description,
         EventFieldId.Xml => EventColumnField.Xml,
         EventFieldId.OwningLog => EventColumnField.OwningLog,
+        EventFieldId.Opcode => EventColumnField.Opcode,
         _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Not a single pooled string column.")
     };
 
@@ -312,6 +327,7 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
             AddPendingValue(pending.TaskCategory, indexByValue, extras);
             AddPendingValue(pending.Xml, indexByValue, extras);
             AddPendingValue(pending.UserId?.Value, indexByValue, extras);
+            AddPendingValue(pending.Opcode, indexByValue, extras);
         }
 
         return new PendingPoolExtension(_store.PoolDistinctCount, [.. extras], indexByValue);

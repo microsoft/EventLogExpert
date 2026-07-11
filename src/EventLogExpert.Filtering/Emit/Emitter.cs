@@ -111,6 +111,10 @@ internal static class Emitter
                 static resolvedEvent => resolvedEvent.ActivityId,
                 node.Op,
                 node.Literal.GuidValue),
+            ResolvedEventField.RelatedActivityId => EmitNullableGuidComparison(
+                static resolvedEvent => resolvedEvent.RelatedActivityId,
+                node.Op,
+                node.Literal.GuidValue),
             _ => throw new EmitException(
                 $"Field '{node.Field}' cannot be compared to a {node.Literal.Kind} literal.")
         };
@@ -166,6 +170,15 @@ internal static class Emitter
                 return resolvedEvent.ActivityId.Value.TryFormat(buffer, out var written, "D")
                     && buffer[..written].Contains(needle, comparison);
             },
+            ResolvedEventField.RelatedActivityId => resolvedEvent =>
+            {
+                if (!resolvedEvent.RelatedActivityId.HasValue) { return false; }
+
+                Span<char> buffer = stackalloc char[36];
+
+                return resolvedEvent.RelatedActivityId.Value.TryFormat(buffer, out var written, "D")
+                    && buffer[..written].Contains(needle, comparison);
+            },
             ResolvedEventField.UserId => resolvedEvent => resolvedEvent.UserId is not null && resolvedEvent.UserId.Value.Contains(needle, comparison),
             ResolvedEventField.ComputerName => resolvedEvent => resolvedEvent.ComputerName.Contains(needle, comparison),
             ResolvedEventField.Description => resolvedEvent => resolvedEvent.Description.Contains(needle, comparison),
@@ -173,6 +186,7 @@ internal static class Emitter
             ResolvedEventField.LogName => resolvedEvent => resolvedEvent.LogName.Contains(needle, comparison),
             ResolvedEventField.Source => resolvedEvent => resolvedEvent.Source.Contains(needle, comparison),
             ResolvedEventField.TaskCategory => resolvedEvent => resolvedEvent.TaskCategory.Contains(needle, comparison),
+            ResolvedEventField.Opcode => resolvedEvent => resolvedEvent.Opcode.Contains(needle, comparison),
             ResolvedEventField.Xml => resolvedEvent => resolvedEvent.Xml.Contains(needle, comparison),
             _ => throw new EmitException($"Cannot emit Contains for field '{node.Field}'.")
         };
@@ -349,6 +363,7 @@ internal static class Emitter
             ResolvedEventField.ThreadId => EmitMultiEqualsNullableInt(static resolvedEvent => resolvedEvent.ThreadId, node.Values),
             ResolvedEventField.RecordId => EmitMultiEqualsNullableLong(static resolvedEvent => resolvedEvent.RecordId, node.Values),
             ResolvedEventField.ActivityId => EmitMultiEqualsNullableGuid(static resolvedEvent => resolvedEvent.ActivityId, node.Values),
+            ResolvedEventField.RelatedActivityId => EmitMultiEqualsNullableGuid(static resolvedEvent => resolvedEvent.RelatedActivityId, node.Values),
             ResolvedEventField.UserId => EmitMultiEqualsUserId(node.Values),
             ResolvedEventField.ComputerName => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.ComputerName, node.Values),
             ResolvedEventField.Description => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Description, node.Values),
@@ -356,6 +371,7 @@ internal static class Emitter
             ResolvedEventField.LogName => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.LogName, node.Values),
             ResolvedEventField.Source => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Source, node.Values),
             ResolvedEventField.TaskCategory => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.TaskCategory, node.Values),
+            ResolvedEventField.Opcode => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Opcode, node.Values),
             ResolvedEventField.Xml => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Xml, node.Values),
             _ => throw new EmitException($"Cannot emit MultiEquals for field '{node.Field}'.")
         };
@@ -579,6 +595,8 @@ internal static class Emitter
                 return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.RecordId.HasValue, op);
             case ResolvedEventField.ActivityId:
                 return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.ActivityId.HasValue, op);
+            case ResolvedEventField.RelatedActivityId:
+                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.RelatedActivityId.HasValue, op);
             case ResolvedEventField.UserId:
                 return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.UserId is not null, op);
             case ResolvedEventField.Id:
@@ -595,6 +613,7 @@ internal static class Emitter
             case ResolvedEventField.LogName:
             case ResolvedEventField.Source:
             case ResolvedEventField.TaskCategory:
+            case ResolvedEventField.Opcode:
             case ResolvedEventField.Xml:
                 // ResolvedEvent string properties default to string.Empty and writer paths never assign null.
                 return op switch
@@ -642,6 +661,7 @@ internal static class Emitter
             ResolvedEventField.LogName => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.LogName, op, value),
             ResolvedEventField.Source => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.Source, op, value),
             ResolvedEventField.TaskCategory => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.TaskCategory, op, value),
+            ResolvedEventField.Opcode => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.Opcode, op, value),
             ResolvedEventField.Xml => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.Xml, op, value),
             ResolvedEventField.UserId => EmitUserIdStringCompare(op, value),
             ResolvedEventField.Id => EmitIntegerStringCompare(
@@ -665,6 +685,10 @@ internal static class Emitter
                 value),
             ResolvedEventField.ActivityId => EmitIntegerStringCompare(
                 static resolvedEvent => resolvedEvent.ActivityId.HasValue ? resolvedEvent.ActivityId.Value.ToString() : string.Empty,
+                op,
+                value),
+            ResolvedEventField.RelatedActivityId => EmitIntegerStringCompare(
+                static resolvedEvent => resolvedEvent.RelatedActivityId.HasValue ? resolvedEvent.RelatedActivityId.Value.ToString() : string.Empty,
                 op,
                 value),
             ResolvedEventField.TimeCreated => throw new EmitException(

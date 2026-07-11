@@ -54,6 +54,7 @@ internal static class ColumnEmitter
             ResolvedEventField.ThreadId => EventFieldId.ThreadId,
             ResolvedEventField.RecordId => EventFieldId.RecordId,
             ResolvedEventField.ActivityId => EventFieldId.ActivityId,
+            ResolvedEventField.RelatedActivityId => EventFieldId.RelatedActivityId,
             ResolvedEventField.UserId => EventFieldId.UserId,
             ResolvedEventField.ComputerName => EventFieldId.ComputerName,
             ResolvedEventField.Description => EventFieldId.Description,
@@ -61,6 +62,7 @@ internal static class ColumnEmitter
             ResolvedEventField.LogName => EventFieldId.LogName,
             ResolvedEventField.Source => EventFieldId.Source,
             ResolvedEventField.TaskCategory => EventFieldId.TaskCategory,
+            ResolvedEventField.Opcode => EventFieldId.Opcode,
             ResolvedEventField.Xml => EventFieldId.Xml,
             _ => throw new EmitException($"Cannot emit Contains for field '{field}'.")
         };
@@ -94,6 +96,7 @@ internal static class ColumnEmitter
                 node.Op,
                 node.Literal.Kind == TypedLiteralKind.Long ? node.Literal.LongValue : node.Literal.IntValue),
             ResolvedEventField.ActivityId => FilterCompare.NullableGuid(EventFieldId.ActivityId, node.Op, node.Literal.GuidValue),
+            ResolvedEventField.RelatedActivityId => FilterCompare.NullableGuid(EventFieldId.RelatedActivityId, node.Op, node.Literal.GuidValue),
             _ => throw new EmitException(
                 $"Field '{node.Field}' cannot be compared to a {node.Literal.Kind} literal.")
         };
@@ -265,6 +268,7 @@ internal static class ColumnEmitter
             ResolvedEventField.ThreadId => EmitMultiEqualsInt(EventFieldId.ThreadId, node.Values),
             ResolvedEventField.RecordId => EmitMultiEqualsLong(EventFieldId.RecordId, node.Values),
             ResolvedEventField.ActivityId => EmitMultiEqualsGuid(EventFieldId.ActivityId, node.Values),
+            ResolvedEventField.RelatedActivityId => EmitMultiEqualsGuid(EventFieldId.RelatedActivityId, node.Values),
             ResolvedEventField.UserId => EmitMultiEqualsUserId(node.Values),
             ResolvedEventField.ComputerName => EmitMultiEqualsString(EventFieldId.ComputerName, node.Values),
             ResolvedEventField.Description => EmitMultiEqualsString(EventFieldId.Description, node.Values),
@@ -272,6 +276,7 @@ internal static class ColumnEmitter
             ResolvedEventField.LogName => EmitMultiEqualsString(EventFieldId.LogName, node.Values),
             ResolvedEventField.Source => EmitMultiEqualsString(EventFieldId.Source, node.Values),
             ResolvedEventField.TaskCategory => EmitMultiEqualsString(EventFieldId.TaskCategory, node.Values),
+            ResolvedEventField.Opcode => EmitMultiEqualsString(EventFieldId.Opcode, node.Values),
             ResolvedEventField.Xml => EmitMultiEqualsString(EventFieldId.Xml, node.Values),
             _ => throw new EmitException($"Cannot emit MultiEquals for field '{node.Field}'.")
         };
@@ -468,6 +473,8 @@ internal static class ColumnEmitter
                 return EmitNullableNullCheck(EventFieldId.RecordId, op);
             case ResolvedEventField.ActivityId:
                 return EmitNullableNullCheck(EventFieldId.ActivityId, op);
+            case ResolvedEventField.RelatedActivityId:
+                return EmitNullableNullCheck(EventFieldId.RelatedActivityId, op);
             case ResolvedEventField.UserId:
                 return EmitNullableNullCheck(EventFieldId.UserId, op);
             case ResolvedEventField.Id:
@@ -479,6 +486,7 @@ internal static class ColumnEmitter
             case ResolvedEventField.LogName:
             case ResolvedEventField.Source:
             case ResolvedEventField.TaskCategory:
+            case ResolvedEventField.Opcode:
             case ResolvedEventField.Xml:
                 // String properties default to string.Empty and are never null; the row emits a constant without
                 // reading the field, so the column does the same.
@@ -509,6 +517,7 @@ internal static class ColumnEmitter
             ResolvedEventField.LogName => FilterCompare.StringOrdinal(EventFieldId.LogName, op, value),
             ResolvedEventField.Source => FilterCompare.StringOrdinal(EventFieldId.Source, op, value),
             ResolvedEventField.TaskCategory => FilterCompare.StringOrdinal(EventFieldId.TaskCategory, op, value),
+            ResolvedEventField.Opcode => FilterCompare.StringOrdinal(EventFieldId.Opcode, op, value),
             ResolvedEventField.Xml => FilterCompare.StringOrdinal(EventFieldId.Xml, op, value),
             ResolvedEventField.UserId => FilterCompare.UserIdString(op, value),
             ResolvedEventField.Id => FilterCompare.StringOrdinal(EventFieldId.Id, op, value),
@@ -516,6 +525,7 @@ internal static class ColumnEmitter
             ResolvedEventField.ThreadId => FilterCompare.StringOrdinal(EventFieldId.ThreadId, op, value),
             ResolvedEventField.RecordId => FilterCompare.StringOrdinal(EventFieldId.RecordId, op, value),
             ResolvedEventField.ActivityId => FilterCompare.StringOrdinal(EventFieldId.ActivityId, op, value),
+            ResolvedEventField.RelatedActivityId => FilterCompare.StringOrdinal(EventFieldId.RelatedActivityId, op, value),
             ResolvedEventField.TimeCreated => throw new EmitException(
                 "TimeCreated comparison against a string literal is not supported."),
             ResolvedEventField.Keywords => throw new EmitException(

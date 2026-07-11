@@ -875,6 +875,47 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
+    public void GetEventRecord_WhenOpcodeNullVsPresent_ShouldPreserveDistinction()
+    {
+        // Opcode reads via ReadOptionalByte: Type=Null -> null (absent); Type=Byte value 0 -> 0 (present, the "Info"
+        // opcode); a non-zero byte -> that value. The Null guard keeps absent distinct from present-and-zero.
+        var absent = BuildAndReadSystemRecord((buffer, size) =>
+            SetSlotType(buffer, (int)EvtSystemPropertyId.Opcode, size, EvtVariantType.Null));
+        var zero = BuildAndReadSystemRecord((buffer, size) =>
+            SetSlotScalarByte(buffer, (int)EvtSystemPropertyId.Opcode, size, 0));
+        var present = BuildAndReadSystemRecord((buffer, size) =>
+            SetSlotScalarByte(buffer, (int)EvtSystemPropertyId.Opcode, size, 5));
+
+        Assert.Null(absent.Opcode);
+        Assert.Equal((byte)0, zero.Opcode);
+        Assert.Equal((byte)5, present.Opcode);
+    }
+
+    [Fact]
+    public void GetEventRecord_WhenRelatedActivityIdNullVsPresent_ShouldPreserveDistinction()
+    {
+        var expected = Guid.NewGuid();
+        IntPtr guidPtr = Marshal.AllocHGlobal(Marshal.SizeOf<Guid>());
+
+        try
+        {
+            Marshal.StructureToPtr(expected, guidPtr, false);
+
+            var absent = BuildAndReadSystemRecord((buffer, size) =>
+                SetSlotType(buffer, (int)EvtSystemPropertyId.RelatedActivityID, size, EvtVariantType.Null));
+            var present = BuildAndReadSystemRecord((buffer, size) =>
+                WriteVariantSlot(buffer, (int)EvtSystemPropertyId.RelatedActivityID, size, EvtVariantType.Guid, guidPtr));
+
+            Assert.Null(absent.RelatedActivityId);
+            Assert.Equal(expected, present.RelatedActivityId);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(guidPtr);
+        }
+    }
+
+    [Fact]
     public void ThrowEventLogException_WhenAccessDenied_ShouldThrowUnauthorizedAccessException()
     {
         // Arrange
@@ -1121,6 +1162,12 @@ public sealed class NativeMethodsEvtTests
         {
             Marshal.FreeHGlobal(buffer);
         }
+    }
+
+    private static unsafe void SetSlotScalarByte(IntPtr buffer, int index, int variantSize, byte value)
+    {
+        *(byte*)(buffer + (index * variantSize)) = value;
+        SetSlotType(buffer, index, variantSize, EvtVariantType.Byte);
     }
 
     private static unsafe void SetSlotScalarUInt16(IntPtr buffer, int index, int variantSize, ushort value)

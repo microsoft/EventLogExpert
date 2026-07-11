@@ -29,6 +29,23 @@ internal sealed class TaskKeywordResolver(IEventResolverCache? cache, ITraceLogg
         { 0x80000000000000, "Classic" }
     };
 
+    // OS-level standard opcodes (winmeta) that providers do not carry in their own Opcodes table; display text matches
+    // Windows Event Viewer.
+    private static readonly Dictionary<byte, string> s_standardOpcodes = new()
+    {
+        { 0, "Info" },
+        { 1, "Start" },
+        { 2, "Stop" },
+        { 3, "DC Start" },
+        { 4, "DC Stop" },
+        { 5, "Extension" },
+        { 6, "Reply" },
+        { 7, "Resume" },
+        { 8, "Suspend" },
+        { 9, "Send" },
+        { 240, "Receive" }
+    };
+
     private readonly IEventResolverCache? _cache = cache;
     private readonly ITraceLogger? _logger = logger;
 
@@ -95,6 +112,36 @@ internal sealed class TaskKeywordResolver(IEventResolverCache? cache, ITraceLogg
     }
 
     /// <summary>
+    ///     Resolves the human-readable opcode name for the event, preferring provider tables then the winmeta standard
+    ///     opcodes, falling back to a numeric placeholder.
+    /// </summary>
+    public string ResolveOpcodeName(
+        EventRecord eventRecord,
+        ProviderDetails? details,
+        EventModel? modernEvent,
+        ProviderDetails? supplemental,
+        EventModel? supplementalModernEvent)
+    {
+        if (TryResolveOpcodeNameFromDetails(eventRecord, details, modernEvent, out var opcodeName))
+        {
+            return CacheOpcodeName(opcodeName);
+        }
+
+        if (supplemental is not null &&
+            !ReferenceEquals(supplemental, details) &&
+            TryResolveOpcodeNameFromDetails(eventRecord, supplemental, supplementalModernEvent, out opcodeName))
+        {
+            return CacheOpcodeName(opcodeName);
+        }
+
+        if (!eventRecord.Opcode.HasValue) { return string.Empty; }
+
+        return s_standardOpcodes.TryGetValue(eventRecord.Opcode.Value, out var standardName)
+            ? CacheOpcodeName(standardName)
+            : CacheOpcodeName($"({eventRecord.Opcode.Value})");
+    }
+
+    /// <summary>
     ///     Resolves the human-readable task name for the event, preferring primary provider tables then supplemental,
     ///     falling back to a numeric placeholder when neither resolves the task.
     /// </summary>
@@ -123,6 +170,42 @@ internal sealed class TaskKeywordResolver(IEventResolverCache? cache, ITraceLogg
         return !eventRecord.Task.HasValue ?
             string.Empty :
             CacheTaskName(eventRecord.Task == 0 ? "None" : $"({eventRecord.Task})");
+    }
+
+    private static bool TryResolveOpcodeNameFromDetails(
+        EventRecord eventRecord,
+        ProviderDetails? details,
+        EventModel? modernEvent,
+        out string opcodeName)
+    {
+        opcodeName = string.Empty;
+
+        if (details is null) { return false; }
+
+        if (modernEvent is not null && details.Opcodes.TryGetValue(modernEvent.Opcode, out var name))
+        {
+            opcodeName = name;
+
+            return true;
+        }
+
+        if (!eventRecord.Opcode.HasValue) { return false; }
+
+        if (details.Opcodes.TryGetValue(eventRecord.Opcode.Value, out name))
+        {
+            opcodeName = name;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private string CacheOpcodeName(string opcodeName)
+    {
+        opcodeName = opcodeName.TrimEnd('\0');
+
+        return _cache?.GetOrAddValue(opcodeName) ?? opcodeName;
     }
 
     private string CacheTaskName(string taskName)
