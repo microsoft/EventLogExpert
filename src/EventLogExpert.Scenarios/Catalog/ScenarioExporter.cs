@@ -105,7 +105,7 @@ public static class ScenarioExporter
             Property = comparison.Property.ToString(),
             EventDataFieldName = comparison.Property == EventProperty.EventData ? comparison.EventDataFieldName : null,
             UserDataFieldName = comparison.Property == EventProperty.UserData ? comparison.UserDataFieldName : null,
-            Operator = isMany || comparison.Operator == ComparisonOperator.Equals ? null : comparison.Operator.ToString(),
+            Operator = comparison.Operator == ComparisonOperator.Equals ? null : comparison.Operator.ToString(),
             MatchMode = isMany ? comparison.MatchMode.ToString() : null,
             Value = isMany ? null : comparison.Value,
             Values = isMany && comparison.Values.Count > 0 ? [.. comparison.Values] : null

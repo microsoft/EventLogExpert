@@ -8,6 +8,15 @@ namespace EventLogExpert.Filtering.Tests.Basic;
 
 public sealed class BasicFilterDecomposerTests
 {
+    public static IEnumerable<object[]> ManyOperatorRoundTrips() =>
+        from property in new[]
+        {
+            EventProperty.Source, EventProperty.Level, EventProperty.LogName,
+            EventProperty.TaskCategory, EventProperty.UserId, EventProperty.Opcode
+        }
+        from op in new[] { ComparisonOperator.Contains, ComparisonOperator.NotEqual, ComparisonOperator.NotContains }
+        select new object[] { property, op };
+
     public static IEnumerable<object[]> ManyValueRoundTrips() =>
         from property in EachBasicFilterProperty()
         where property is not EventProperty.Description
@@ -22,6 +31,25 @@ public sealed class BasicFilterDecomposerTests
         let value = SingleValueFor(property, op)
         where value is not null
         select new object[] { property, op, value };
+
+    [Theory]
+    [MemberData(nameof(ManyOperatorRoundTrips))]
+    public void TryDecompose_ManyWithOperator_RoundTripsCanonically(EventProperty property, ComparisonOperator op)
+    {
+        var values = ManyValuesFor(property) ?? ImmutableList.Create("alpha", "beta");
+
+        var original = new BasicFilter(
+            new FilterComparison
+            {
+                Property = property,
+                Operator = op,
+                MatchMode = MatchMode.Many,
+                Values = values
+            },
+            []);
+
+        AssertCanonicalRoundTrip(original);
+    }
 
     [Fact]
     public void TryDecompose_WhenActivityIdNotContainsNestedInSubFilterChain_ReconstructsEquivalentBasicFilter()

@@ -563,7 +563,7 @@ public sealed class DebugLogModalTests : BunitContext
 
         await AddFilterAsync(component);
         await SelectOptionAsync(component, "Filter field", "Level");
-        await SelectOptionAsync(component, "Filter operator", "Multi Select");
+        await SelectOptionAsync(component, "Filter operator", "Is Any Of");
         await SelectOptionAsync(component, "Filter value", "Error");
         await SelectOptionAsync(component, "Filter value", "Warning");
         await SaveFilterAsync(component);
@@ -571,7 +571,7 @@ public sealed class DebugLogModalTests : BunitContext
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("2 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
 
-        // Re-open the chip and switch Multi Select -> Equals; the stale second value is dropped so only Error
+        // Re-open the chip and switch Is Any Of -> Equals; the stale second value is dropped so only Error
         // (the first value) remains after Save.
         await component.Find(".debug-log-filter-chip-edit").ClickAsync(new MouseEventArgs());
         await SelectOptionAsync(component, "Filter operator", "Equals");

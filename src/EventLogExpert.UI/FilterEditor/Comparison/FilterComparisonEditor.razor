@@ -49,7 +49,8 @@
     MatchMode="Comparison.MatchMode"
     OnChanged="HandleOperatorChanged"
     Operator="Comparison.Operator"
-    SupportsMany="!IsTextOnlyProperty(Comparison.Property)" />
+    SupportsMany="!IsTextOnlyProperty(Comparison.Property)"
+    SupportsManyOperators="FilterPropertyConstraints.SupportsManyOperators(Comparison.Property)" />
 
 <label class="visually-hidden" id="@($"{Id}_Value")">Value</label>
 @if (IsTextOnlyProperty(Comparison.Property))

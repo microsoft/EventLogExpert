@@ -377,9 +377,12 @@ internal static class BasicFilterDecomposer
                 return true;
 
             case MultiEqualsNode multi:
+                // Equals-any maps for any Many-capable field; the negated "is none of" form only maps for the scalar
+                // string fields the Basic editor can author (keeps the decomposer in lock-step with the UI).
                 if (multi.Values.Count == 0
                     || multi.Field == ResolvedEventField.Keywords
-                    || !TryMapField(multi.Field, out var multiProp))
+                    || !TryMapField(multi.Field, out var multiProp)
+                    || (multi.Negated && !FilterPropertyConstraints.SupportsManyOperators(multiProp)))
                 {
                     return false;
                 }
@@ -387,9 +390,30 @@ internal static class BasicFilterDecomposer
                 comparison = new FilterComparison
                 {
                     Property = multiProp,
-                    Operator = ComparisonOperator.Equals,
+                    Operator = multi.Negated ? ComparisonOperator.NotEqual : ComparisonOperator.Equals,
                     MatchMode = MatchMode.Many,
                     Values = multi.Values.ToImmutableList()
+                };
+
+                return true;
+
+            case MultiContainsNode multiContains:
+                // Basic is always OrdinalIgnoreCase, and contains-any / contains-none are operator-aware multi kinds
+                // only the scalar string fields expose, so anything else stays Advanced-only.
+                if (multiContains.Values.Count == 0
+                    || !multiContains.IgnoreCase
+                    || !TryMapField(multiContains.Field, out var multiContainsProp)
+                    || !FilterPropertyConstraints.SupportsManyOperators(multiContainsProp))
+                {
+                    return false;
+                }
+
+                comparison = new FilterComparison
+                {
+                    Property = multiContainsProp,
+                    Operator = multiContains.Negated ? ComparisonOperator.NotContains : ComparisonOperator.Contains,
+                    MatchMode = MatchMode.Many,
+                    Values = multiContains.Values.ToImmutableList()
                 };
 
                 return true;

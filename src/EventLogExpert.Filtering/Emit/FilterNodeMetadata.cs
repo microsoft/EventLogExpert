@@ -21,6 +21,7 @@ internal static class FilterNodeMetadata
             ComparisonNode cmp => cmp.Field == ResolvedEventField.Xml,
             ContainsNode cn => cn.Field == ResolvedEventField.Xml,
             MultiEqualsNode mn => mn.Field == ResolvedEventField.Xml,
+            MultiContainsNode mcn => mcn.Field == ResolvedEventField.Xml,
             _ => false
         };
 

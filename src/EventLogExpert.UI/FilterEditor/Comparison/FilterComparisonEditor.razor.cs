@@ -72,10 +72,20 @@ public sealed partial class FilterComparisonEditor : ComponentBase
         {
             Comparison.ChangeProperty(value);
 
-            if (IsTextOnlyProperty(value) && Comparison.MatchMode == MatchMode.Many)
+            // Normalize a multi-select the new property no longer supports: text-only fields have no multi-select at
+            // all, and non-string fields keep only Equals-any (drop the operator-aware Many kinds back to Single).
+            if (Comparison.MatchMode == MatchMode.Many)
             {
-                Comparison.Operator = ComparisonOperator.Contains;
-                Comparison.MatchMode = MatchMode.Single;
+                if (IsTextOnlyProperty(value))
+                {
+                    Comparison.Operator = ComparisonOperator.Contains;
+                    Comparison.MatchMode = MatchMode.Single;
+                }
+                else if (Comparison.Operator != ComparisonOperator.Equals
+                    && !FilterPropertyConstraints.SupportsManyOperators(value))
+                {
+                    Comparison.MatchMode = MatchMode.Single;
+                }
             }
 
             _ = OnChanged.InvokeAsync();
