@@ -24,7 +24,6 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
     private static readonly ColumnName[] s_allColumns = Enum.GetValues<ColumnName>();
     private static readonly bool[] s_bools = [false, true];
     private static readonly IReadOnlyList<SortConfig> s_allConfigs = BuildAllConfigs();
-
     private static readonly IReadOnlyList<ResolvedEvent> s_edgeCorpus = BuildEdgeCorpus();
     private static readonly IReadOnlyList<ResolvedEvent> s_tieBurstCorpus = BuildTieBurstCorpus();
 
@@ -75,6 +74,61 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
         _ = AosReferenceOrdering.Order(corpus, ColumnName.DateAndTime, isDescending: true).Length;
         baseline.Stop();
         _output.WriteLine($"AosReferenceOrdering.Order (reference baseline, DateAndTime desc): {baseline.ElapsedMilliseconds} ms for {eventCount:N0} events");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SortColumnDirect_FullTieCorpus_ReordersToAscendingIndexTieBreak_RegardlessOfDescending(bool isDescending)
+    {
+        // Four byte-identical events with a null RecordId in one OwningLog: the whole chain (RecordId, time, OwningLog)
+        // ties, so only the final physical-index tie-break separates rows. The survivors are handed in DESCENDING index
+        // order, so the expected ascending result can ONLY come from the tie-break actively reordering - the test fails if
+        // WithIndexTieBreak is broken to return 0 (a pre-sorted input would leave it a placebo). That tie-break is ascending
+        // and never negated, so a descending order still lands ascending physical index.
+        var when = new DateTime(2024, 3, 3, 3, 3, 3, DateTimeKind.Utc);
+        IReadOnlyList<ResolvedEvent> corpus =
+        [
+            FilterEventBuilder.CreateTestEvent(id: 9, source: "Same", level: "Same", timeCreated: when, owningLog: "L"),
+            FilterEventBuilder.CreateTestEvent(id: 9, source: "Same", level: "Same", timeCreated: when, owningLog: "L"),
+            FilterEventBuilder.CreateTestEvent(id: 9, source: "Same", level: "Same", timeCreated: when, owningLog: "L"),
+            FilterEventBuilder.CreateTestEvent(id: 9, source: "Same", level: "Same", timeCreated: when, owningLog: "L")
+        ];
+        var reader = NewReader(corpus);
+        int[] survivors = [3, 2, 1, 0];
+
+        int[] order = ResolvedEventOrdering.SortColumnDirect(
+            reader, survivors, ColumnName.DateAndTime, isDescending, groupBy: null, isGroupDescending: false);
+
+        Assert.Equal(new[] { 0, 1, 2, 3 }, order);
+    }
+
+    [Theory]
+    [InlineData(false, false, new[] { 0, 1, 2, 3 })]
+    [InlineData(true, false, new[] { 1, 0, 3, 2 })]
+    [InlineData(false, true, new[] { 2, 3, 0, 1 })]
+    [InlineData(true, true, new[] { 3, 2, 1, 0 })]
+    public void SortColumnDirect_GroupedChain_NegatesGroupAndWithinOrderIndependently(
+        bool isWithinDescending, bool isGroupDescending, int[] expectedOrder)
+    {
+        // Two Source groups (Alpha < Beta ordinally), two distinct RecordIds within each. With groupBy=Source and
+        // orderBy=RecordId the two GroupedChain negations are isolated: the group order flips with isGroupDescending and
+        // the within-group order flips with isDescending, independently. These direct expected orders guard the two
+        // -Math.Sign(...) sites in GroupedChain without routing through the AoS parity oracle.
+        var when = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        IReadOnlyList<ResolvedEvent> corpus =
+        [
+            FilterEventBuilder.CreateTestEvent(id: 1, recordId: 1, source: "Alpha", timeCreated: when, owningLog: "L"),
+            FilterEventBuilder.CreateTestEvent(id: 1, recordId: 2, source: "Alpha", timeCreated: when, owningLog: "L"),
+            FilterEventBuilder.CreateTestEvent(id: 1, recordId: 3, source: "Beta", timeCreated: when, owningLog: "L"),
+            FilterEventBuilder.CreateTestEvent(id: 1, recordId: 4, source: "Beta", timeCreated: when, owningLog: "L")
+        ];
+        var reader = NewReader(corpus);
+
+        int[] order = ResolvedEventOrdering.SortColumnDirect(
+            reader, AllIndices(corpus.Count), ColumnName.RecordId, isWithinDescending, ColumnName.Source, isGroupDescending);
+
+        Assert.Equal(expectedOrder, order);
     }
 
     [Fact]
