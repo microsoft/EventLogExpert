@@ -187,6 +187,9 @@ public sealed class ColumnEmitterParityTests
         "EventData[\"User\"].Contains(\"adm\", StringComparison.OrdinalIgnoreCase)",
         "!EventData[\"User\"].Contains(\"xyz\")",
         "(new[] {\"admin\", \"root\"}).Contains(EventData[\"User\"])",
+        "(new[] {\"adm\", \"zzz\"}).Any(e => EventData[\"User\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+        "(new[] {\"zzz\", \"dmi\"}).Any(e => EventData[\"User\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+        "(new[] {\"zzz\", \"nomatch\"}).Any(e => EventData[\"User\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
         "EventData[\"Dup\"] == \"first\"",
         "EventData[\"Missing\"] == \"x\"",
         "EventData[\"Missing\"] != \"x\"",
@@ -197,6 +200,9 @@ public sealed class ColumnEmitterParityTests
         "UserData[\"Foo\"].Contains(\"admin\", StringComparison.OrdinalIgnoreCase)",
         "!UserData[\"Foo\"].Contains(\"zzz\")",
         "(new[] {\"adminvalue\", \"root\"}).Contains(UserData[\"Foo\"])",
+        "(new[] {\"admin\", \"zzz\"}).Any(e => UserData[\"Foo\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+        "(new[] {\"zzz\", \"minval\"}).Any(e => UserData[\"Foo\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+        "(new[] {\"zzz\", \"nomatch\"}).Any(e => UserData[\"Trunc\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
         "UserData[\"Trunc\"] == \"y\"",
         "UserData[\"Path\"] == \"v1\"",
         "UserData[\"Absent\"] == \"x\"",
@@ -221,6 +227,7 @@ public sealed class ColumnEmitterParityTests
         "EventData[\"Us*\"] != \"admin\"",
         "EventData[\"Pat*\"].Contains(\"cmd\", StringComparison.OrdinalIgnoreCase)",
         "(new[] {\"admin\", \"root\"}).Contains(EventData[\"Us*\"])",
+        "(new[] {\"nomatch\", \"dmin\"}).Any(e => EventData[\"Us*\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
         "EventData[\"Du*\"] == \"second\"",
         "EventData[\"*zzz*\"] == \"x\"",
         "EventData[\"*cert*\"] == \"x\"",
@@ -243,6 +250,7 @@ public sealed class ColumnEmitterParityTests
         // incomplete-tail Unknown over corpus[9] (UserDataIncomplete, no path matches -> keep-visible Unknown).
         "UserData[\"*oo\"] == \"adminvalue\"",
         "UserData[\"Tr*\"].Contains(\"y\")",
+        "(new[] {\"zzz\", \"admin\"}).Any(e => UserData[\"*oo\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
         "UserData[\"*nomatch*\"] == \"x\"",
         "UserData[\"*cert*\"] == \"x\""
     ];
@@ -269,6 +277,59 @@ public sealed class ColumnEmitterParityTests
                 expected == actual,
                 $"Divergence at corpus[{index}] for '{expression}': row={expected}, column={actual}.");
         }
+    }
+
+    // Absolute (not differential) oracle for EventData Contains-Any: first-needle match, second-needle match,
+    // present-but-no-needle NoMatch, and an ABSENT named field NoMatch (presence-required). Also pins the wildcard
+    // field-name path. Exact results on BOTH backends catch a same-direction emitter bug the differential battery can't.
+    [Fact]
+    public void EventDataContainsAny_Absolute_MatchesAnyNeedleAndRequiresPresence()
+    {
+        const string firstNeedle =
+            "(new[] {\"adm\", \"zzz\"}).Any(e => EventData[\"User\"].Contains(e, StringComparison.OrdinalIgnoreCase))";
+        const string secondNeedle =
+            "(new[] {\"zzz\", \"dmi\"}).Any(e => EventData[\"User\"].Contains(e, StringComparison.OrdinalIgnoreCase))";
+        const string noNeedle =
+            "(new[] {\"zzz\", \"nomatch\"}).Any(e => EventData[\"User\"].Contains(e, StringComparison.OrdinalIgnoreCase))";
+
+        AssertBothBackends(firstNeedle, s_eventDataRich, FilterMatch.Match);
+        AssertBothBackends(secondNeedle, s_eventDataRich, FilterMatch.Match);
+        AssertBothBackends(noNeedle, s_eventDataRich, FilterMatch.NoMatch);
+
+        // "User" is absent on s_eventDataOther (only "Other"): presence-required Contains-Any is NoMatch.
+        AssertBothBackends(firstNeedle, s_eventDataOther, FilterMatch.NoMatch);
+
+        // Wildcard field name resolves to the matching field ("Us*" -> "User"): match and no-match both pinned.
+        AssertBothBackends(
+            "(new[] {\"nomatch\", \"dmin\"}).Any(e => EventData[\"Us*\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+            s_eventDataRich,
+            FilterMatch.Match);
+        AssertBothBackends(
+            "(new[] {\"nomatch\", \"zzz\"}).Any(e => EventData[\"Us*\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+            s_eventDataRich,
+            FilterMatch.NoMatch);
+
+        // A wildcard that matches ZERO fields is presence-required -> NoMatch (distinct from a present-but-non-matching field).
+        AssertBothBackends(
+            "(new[] {\"admin\"}).Any(e => EventData[\"*zzz*\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+            s_eventDataRich,
+            FilterMatch.NoMatch);
+
+        // Duplicate field name is first-wins ("first", not "second"): the first value's needle matches; a second-only needle does not.
+        AssertBothBackends(
+            "(new[] {\"first\", \"zzz\"}).Any(e => EventData[\"Dup\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+            s_eventDataRich,
+            FilterMatch.Match);
+        AssertBothBackends(
+            "(new[] {\"second\", \"zzz\"}).Any(e => EventData[\"Dup\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+            s_eventDataRich,
+            FilterMatch.NoMatch);
+
+        // A typed EventData value (Code = 5L) is coerced to string for the substring test.
+        AssertBothBackends(
+            "(new[] {\"5\", \"zzz\"}).Any(e => EventData[\"Code\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+            s_eventDataRich,
+            FilterMatch.Match);
     }
 
     // MultiContains on Xml is reachable only via Advanced text (Xml is text-only in Basic), but the compiled filter
@@ -392,6 +453,52 @@ public sealed class ColumnEmitterParityTests
         AssertBothBackends("RelatedActivityId == null", eventNull, FilterMatch.Match);
         AssertBothBackends("RelatedActivityId == null", eventEmpty, FilterMatch.NoMatch);
         AssertBothBackends("RelatedActivityId != null", eventEmpty, FilterMatch.Match);
+    }
+
+    // Absolute oracle for UserData Contains-Any (tri-state via the shared UserDataMatch.MultiContains core): needle match,
+    // second-needle match, complete-present no-match (NoMatch), an absent path (decisive NoMatch), and a TRUNCATED
+    // non-match (Unknown - the elided tail could contain a needle). Pins the tri-state on BOTH backends so a
+    // Unknown->NoMatch regression in the shared core cannot pass the differential battery. Also pins the wildcard path.
+    [Fact]
+    public void UserDataContainsAny_Absolute_TriStateAcrossPresentAbsentTruncated()
+    {
+        AssertBothBackends(
+            "(new[] {\"admin\", \"zzz\"}).Any(e => UserData[\"Foo\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+            s_userDataPresentTruncated,
+            FilterMatch.Match);
+        AssertBothBackends(
+            "(new[] {\"zzz\", \"minval\"}).Any(e => UserData[\"Foo\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+            s_userDataPresentTruncated,
+            FilterMatch.Match);
+        AssertBothBackends(
+            "(new[] {\"zzz\", \"nomatch\"}).Any(e => UserData[\"Foo\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+            s_userDataPresentTruncated,
+            FilterMatch.NoMatch);
+
+        // "Absent" is not present and the event is not UserDataIncomplete: decisive absent -> NoMatch.
+        AssertBothBackends(
+            "(new[] {\"admin\"}).Any(e => UserData[\"Absent\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+            s_userDataPresentTruncated,
+            FilterMatch.NoMatch);
+
+        // "Trunc" is truncated and no visible needle matches -> Unknown (keep-visible; the hidden tail could match).
+        AssertBothBackends(
+            "(new[] {\"zzz\", \"nomatch\"}).Any(e => UserData[\"Trunc\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+            s_userDataPresentTruncated,
+            FilterMatch.Unknown);
+
+        // Wildcard path resolves to "Foo": match pinned.
+        AssertBothBackends(
+            "(new[] {\"admin\"}).Any(e => UserData[\"*oo\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+            s_userDataPresentTruncated,
+            FilterMatch.Match);
+
+        // An ABSENT path on an INCOMPLETE UserData event cannot be decided absent -> Unknown (keep-visible), unlike the
+        // decisive NoMatch an absent path yields on a complete event.
+        AssertBothBackends(
+            "(new[] {\"anything\"}).Any(e => UserData[\"Absent\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
+            s_userDataIncompleteEvent,
+            FilterMatch.Unknown);
     }
 
     // UserId '==' on an absent UserId is NoMatch (presence-required).

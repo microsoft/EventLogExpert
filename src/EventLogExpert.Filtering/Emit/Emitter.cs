@@ -52,7 +52,7 @@ internal static class Emitter
     private static bool ContainsUserDataNode(FilterNode node) =>
         node switch
         {
-            UserDataComparisonNode or UserDataContainsNode or UserDataMultiEqualsNode => true,
+            UserDataComparisonNode or UserDataContainsNode or UserDataMultiEqualsNode or UserDataMultiContainsNode => true,
             AndNode and => ContainsUserDataNode(and.Left) || ContainsUserDataNode(and.Right),
             OrNode or => ContainsUserDataNode(or.Left) || ContainsUserDataNode(or.Right),
             NotNode not => ContainsUserDataNode(not.Operand),
@@ -265,6 +265,50 @@ internal static class Emitter
 
         return resolvedEvent => resolvedEvent.EventData.TryGetValue(name, out var value)
             && value.AsString().Contains(needle, comparison);
+    }
+
+    private static Func<ResolvedEvent, bool> EmitEventDataMultiContains(EventDataMultiContainsNode node)
+    {
+        var name = node.FieldName;
+        var needles = node.Needles;
+        var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+        if (!WildcardMatcher.ContainsWildcard(name))
+        {
+            return resolvedEvent =>
+            {
+                if (!resolvedEvent.EventData.TryGetValue(name, out var value)) { return false; }
+
+                var actual = value.AsString();
+
+                for (var i = 0; i < needles.Count; i++)
+                {
+                    if (actual.Contains(needles[i], comparison)) { return true; }
+                }
+
+                return false;
+            };
+        }
+
+        var matchesName = WildcardMatcher.Compile(name);
+
+        return resolvedEvent =>
+        {
+            foreach (var field in resolvedEvent.EventData)
+            {
+                if (!matchesName(field.Name)) { continue; }
+
+                var value = field.Value.AsString();
+
+                for (var i = 0; i < needles.Count; i++)
+                {
+                    if (value.Contains(needles[i], comparison)) { return true; }
+                }
+            }
+
+            return false;
+        };
+
     }
 
     private static Func<ResolvedEvent, bool> EmitEventDataMultiEquals(EventDataMultiEqualsNode node)
@@ -597,6 +641,7 @@ internal static class Emitter
             EventDataComparisonNode edCmp => EmitEventDataComparison(edCmp),
             EventDataContainsNode edContains => EmitEventDataContains(edContains),
             EventDataMultiEqualsNode edMulti => EmitEventDataMultiEquals(edMulti),
+            EventDataMultiContainsNode edMultiContains => EmitEventDataMultiContains(edMultiContains),
             KeywordsAnyEqualsNode kn => EmitKeywordsAnyEquals(kn),
             KeywordsAnyContainsNode kn => EmitKeywordsAnyContains(kn),
             KeywordsMatchAnyOfNode kn => EmitKeywordsMatchAnyOf(kn),
@@ -824,6 +869,8 @@ internal static class Emitter
                 return EmitUserDataFieldMatcher(contains.CanonicalPath, UserDataMatch.Contains(contains));
             case UserDataMultiEqualsNode multi:
                 return EmitUserDataFieldMatcher(multi.CanonicalPath, UserDataMatch.MultiEquals(multi));
+            case UserDataMultiContainsNode multiContains:
+                return EmitUserDataFieldMatcher(multiContains.CanonicalPath, UserDataMatch.MultiContains(multiContains));
             default:
                 throw new EmitException($"Unsupported UserData-bearing node {node.GetType().Name}.");
         }

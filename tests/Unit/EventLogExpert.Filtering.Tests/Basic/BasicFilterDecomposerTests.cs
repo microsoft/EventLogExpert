@@ -32,6 +32,23 @@ public sealed class BasicFilterDecomposerTests
         where value is not null
         select new object[] { property, op, value };
 
+    [Fact]
+    public void TryDecompose_EventDataContainsAny_RoundTripsCanonically()
+    {
+        var original = new BasicFilter(
+            new FilterComparison
+            {
+                Property = EventProperty.EventData,
+                EventDataFieldName = "NewProcessName",
+                Operator = ComparisonOperator.Contains,
+                MatchMode = MatchMode.Many,
+                Values = ImmutableList.Create("mshta.exe", "wscript.exe", "cscript.exe")
+            },
+            []);
+
+        AssertCanonicalRoundTrip(original);
+    }
+
     [Theory]
     [MemberData(nameof(ManyOperatorRoundTrips))]
     public void TryDecompose_ManyWithOperator_RoundTripsCanonically(EventProperty property, ComparisonOperator op)
@@ -45,6 +62,23 @@ public sealed class BasicFilterDecomposerTests
                 Operator = op,
                 MatchMode = MatchMode.Many,
                 Values = values
+            },
+            []);
+
+        AssertCanonicalRoundTrip(original);
+    }
+
+    [Fact]
+    public void TryDecompose_UserDataContainsAny_RoundTripsCanonically()
+    {
+        var original = new BasicFilter(
+            new FilterComparison
+            {
+                Property = EventProperty.UserData,
+                UserDataFieldName = "Foo/Bar",
+                Operator = ComparisonOperator.Contains,
+                MatchMode = MatchMode.Many,
+                Values = ImmutableList.Create("alpha", "beta")
             },
             []);
 
@@ -420,6 +454,11 @@ public sealed class BasicFilterDecomposerTests
 
         // ImmutableList<T> equality is reference-based on records; compare sequences directly.
         Assert.Equal<IEnumerable<string>>(expected.Values, actual.Values);
+
+        // The dynamic field name (EventData) / storage-key path (UserData) must survive the round-trip; a
+        // formatter/decomposer pair consistently using the wrong field would otherwise pass value/operator equality.
+        Assert.Equal(expected.EventDataFieldName, actual.EventDataFieldName);
+        Assert.Equal(expected.UserDataFieldName, actual.UserDataFieldName);
     }
 
     private static void AssertStructuralEquivalence(BasicFilter expected, BasicFilter actual)

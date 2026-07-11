@@ -553,14 +553,9 @@
       "order": 37,
       "version": 1,
       "filters": [
-        { "color": "DarkRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "mshta.exe" } } ] },
-        { "color": "DarkRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "wscript.exe" } } ] },
-        { "color": "DarkRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "cscript.exe" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "rundll32.exe" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "regsvr32.exe" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "installutil.exe" } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "certutil.exe" } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "value": "bitsadmin.exe" } } ] }
+        { "color": "DarkRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "matchMode": "Many", "values": [ "mshta.exe", "wscript.exe", "cscript.exe" ] } } ] },
+        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "matchMode": "Many", "values": [ "rundll32.exe", "regsvr32.exe", "installutil.exe" ] } } ] },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "matchMode": "Many", "values": [ "certutil.exe", "bitsadmin.exe" ] } } ] }
       ]
     },
     {
@@ -592,12 +587,7 @@
       "order": 39,
       "version": 1,
       "filters": [
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "value": "-EncodedCommand" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "value": "FromBase64String" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "value": "IEX" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "value": "DownloadString" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "value": "-w hidden" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "value": "-nop" } } ] }
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "matchMode": "Many", "values": [ "-EncodedCommand", "FromBase64String", "IEX", "DownloadString", "-w hidden", "-nop" ] } } ] }
       ]
     },
     {
@@ -611,11 +601,8 @@
       "order": 40,
       "version": 1,
       "filters": [
-        { "color": "Red", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "value": "FromBase64String" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "value": "Invoke-Expression" } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "value": "DownloadString" } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "value": "New-Object Net.WebClient" } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "value": "Reflection.Assembly]::Load" } } ] },
+        { "color": "Red", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "matchMode": "Many", "values": [ "FromBase64String", "Invoke-Expression" ] } } ] },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "matchMode": "Many", "values": [ "DownloadString", "New-Object Net.WebClient", "Reflection.Assembly]::Load" ] } } ] },
         { "color": "Blue", "comparison": { "property": "Level", "value": "Warning" }, "predicates": [ { "comparison": { "property": "Id", "value": "4104" } } ] }
       ]
     },
@@ -630,14 +617,9 @@
       "order": 41,
       "version": 1,
       "filters": [
-        { "color": "DarkRed", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "mshta.exe" } } ] },
-        { "color": "DarkRed", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "wscript.exe" } } ] },
-        { "color": "DarkRed", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "cscript.exe" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "powershell.exe" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "pwsh.exe" } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "rundll32.exe" } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "regsvr32.exe" } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "value": "certutil.exe" } } ] }
+        { "color": "DarkRed", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "matchMode": "Many", "values": [ "mshta.exe", "wscript.exe", "cscript.exe" ] } } ] },
+        { "color": "Red", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "matchMode": "Many", "values": [ "powershell.exe", "pwsh.exe" ] } } ] },
+        { "color": "Orange", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "matchMode": "Many", "values": [ "rundll32.exe", "regsvr32.exe", "certutil.exe" ] } } ] }
       ]
     }
   ]

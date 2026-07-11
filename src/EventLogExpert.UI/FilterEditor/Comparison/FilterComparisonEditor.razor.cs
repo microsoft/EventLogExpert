@@ -73,7 +73,7 @@ public sealed partial class FilterComparisonEditor : ComponentBase
             Comparison.ChangeProperty(value);
 
             // Normalize a multi-select the new property no longer supports: text-only fields have no multi-select at
-            // all, and non-string fields keep only Equals-any (drop the operator-aware Many kinds back to Single).
+            // all; otherwise drop to Single any operator-aware Many kind the new property doesn't offer.
             if (Comparison.MatchMode == MatchMode.Many)
             {
                 if (IsTextOnlyProperty(value))
@@ -81,10 +81,16 @@ public sealed partial class FilterComparisonEditor : ComponentBase
                     Comparison.Operator = ComparisonOperator.Contains;
                     Comparison.MatchMode = MatchMode.Single;
                 }
-                else if (Comparison.Operator != ComparisonOperator.Equals
-                    && !FilterPropertyConstraints.SupportsManyOperators(value))
+                else
                 {
-                    Comparison.MatchMode = MatchMode.Single;
+                    var stillSupported = Comparison.Operator switch
+                    {
+                        ComparisonOperator.Equals => true,
+                        ComparisonOperator.Contains => FilterPropertyConstraints.SupportsContainsMany(value),
+                        _ => FilterPropertyConstraints.SupportsNoneOfMany(value)
+                    };
+
+                    if (!stillSupported) { Comparison.MatchMode = MatchMode.Single; }
                 }
             }
 

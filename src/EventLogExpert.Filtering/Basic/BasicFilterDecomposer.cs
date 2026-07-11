@@ -249,6 +249,30 @@ internal static class BasicFilterDecomposer
         return true;
     }
 
+    private static bool TryMapEventDataMultiContains(
+        EventDataMultiContainsNode node,
+        [NotNullWhen(true)] out FilterComparison? comparison)
+    {
+        comparison = null;
+
+        // Basic is always OrdinalIgnoreCase, so a case-sensitive Advanced contains-any stays Advanced-only.
+        if (!node.IgnoreCase || node.Needles.Count == 0 || string.IsNullOrWhiteSpace(node.FieldName))
+        {
+            return false;
+        }
+
+        comparison = new FilterComparison
+        {
+            Property = EventProperty.EventData,
+            EventDataFieldName = node.FieldName,
+            Operator = ComparisonOperator.Contains,
+            MatchMode = MatchMode.Many,
+            Values = [.. node.Needles]
+        };
+
+        return true;
+    }
+
     private static bool TryMapEventDataMultiEquals(
         EventDataMultiEqualsNode node,
         [NotNullWhen(true)] out FilterComparison? comparison)
@@ -382,7 +406,7 @@ internal static class BasicFilterDecomposer
                 if (multi.Values.Count == 0
                     || multi.Field == ResolvedEventField.Keywords
                     || !TryMapField(multi.Field, out var multiProp)
-                    || (multi.Negated && !FilterPropertyConstraints.SupportsManyOperators(multiProp)))
+                    || (multi.Negated && !FilterPropertyConstraints.SupportsNoneOfMany(multiProp)))
                 {
                     return false;
                 }
@@ -403,7 +427,7 @@ internal static class BasicFilterDecomposer
                 if (multiContains.Values.Count == 0
                     || !multiContains.IgnoreCase
                     || !TryMapField(multiContains.Field, out var multiContainsProp)
-                    || !FilterPropertyConstraints.SupportsManyOperators(multiContainsProp))
+                    || !FilterPropertyConstraints.SupportsContainsMany(multiContainsProp))
                 {
                     return false;
                 }
@@ -427,6 +451,9 @@ internal static class BasicFilterDecomposer
             case EventDataMultiEqualsNode eventDataMulti:
                 return TryMapEventDataMultiEquals(eventDataMulti, out comparison);
 
+            case EventDataMultiContainsNode eventDataMultiContains:
+                return TryMapEventDataMultiContains(eventDataMultiContains, out comparison);
+
             case UserDataComparisonNode userDataComparison:
                 return TryMapUserDataComparison(userDataComparison, out comparison);
 
@@ -435,6 +462,9 @@ internal static class BasicFilterDecomposer
 
             case UserDataMultiEqualsNode userDataMulti:
                 return TryMapUserDataMultiEquals(userDataMulti, out comparison);
+
+            case UserDataMultiContainsNode userDataMultiContains:
+                return TryMapUserDataMultiContains(userDataMultiContains, out comparison);
 
             case NotNode not:
                 return TryMapNegatedLeaf(not, out comparison);
@@ -552,6 +582,30 @@ internal static class BasicFilterDecomposer
             Operator = node.Negated ? ComparisonOperator.NotContains : ComparisonOperator.Contains,
             MatchMode = MatchMode.Single,
             Value = node.Needle
+        };
+
+        return true;
+    }
+
+    private static bool TryMapUserDataMultiContains(
+        UserDataMultiContainsNode node,
+        [NotNullWhen(true)] out FilterComparison? comparison)
+    {
+        comparison = null;
+
+        // Basic is always OrdinalIgnoreCase, so a case-sensitive Advanced contains-any stays Advanced-only.
+        if (!node.IgnoreCase || node.Needles.Count == 0 || string.IsNullOrWhiteSpace(node.CanonicalPath))
+        {
+            return false;
+        }
+
+        comparison = new FilterComparison
+        {
+            Property = EventProperty.UserData,
+            UserDataFieldName = UserDataFieldPath.ToStorageKey(node.CanonicalPath),
+            Operator = ComparisonOperator.Contains,
+            MatchMode = MatchMode.Many,
+            Values = [.. node.Needles]
         };
 
         return true;

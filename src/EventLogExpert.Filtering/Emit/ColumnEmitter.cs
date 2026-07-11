@@ -195,6 +195,50 @@ internal static class ColumnEmitter
 
     }
 
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitEventDataMultiContains(EventDataMultiContainsNode node)
+    {
+        var name = node.FieldName;
+        var needles = node.Needles;
+        var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+        if (!WildcardMatcher.ContainsWildcard(name))
+        {
+            return (reader, locator) =>
+            {
+                if (!reader.TryGetEventData(locator, name, out var value)) { return FilterMatch.NoMatch; }
+
+                var actual = value.AsString();
+
+                for (var i = 0; i < needles.Count; i++)
+                {
+                    if (actual.Contains(needles[i], comparison)) { return FilterMatch.Match; }
+                }
+
+                return FilterMatch.NoMatch;
+            };
+        }
+
+        var matchesName = WildcardMatcher.Compile(name);
+
+        return (reader, locator) =>
+        {
+            foreach (var field in reader.EnumerateEventData(locator))
+            {
+                if (!matchesName(field.Name)) { continue; }
+
+                var value = field.Value.AsString();
+
+                for (var i = 0; i < needles.Count; i++)
+                {
+                    if (value.Contains(needles[i], comparison)) { return FilterMatch.Match; }
+                }
+            }
+
+            return FilterMatch.NoMatch;
+        };
+
+    }
+
     private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitEventDataMultiEquals(EventDataMultiEqualsNode node)
     {
         var name = node.FieldName;
@@ -485,6 +529,7 @@ internal static class ColumnEmitter
             EventDataComparisonNode edCmp => EmitEventDataComparison(edCmp),
             EventDataContainsNode edContains => EmitEventDataContains(edContains),
             EventDataMultiEqualsNode edMulti => EmitEventDataMultiEquals(edMulti),
+            EventDataMultiContainsNode edMultiContains => EmitEventDataMultiContains(edMultiContains),
             KeywordsAnyEqualsNode kae => EmitKeywordsAnyEquals(kae),
             KeywordsAnyContainsNode kac => EmitKeywordsAnyContains(kac),
             KeywordsMatchAnyOfNode kma => EmitKeywordsMatchAnyOf(kma),
@@ -493,6 +538,7 @@ internal static class ColumnEmitter
             UserDataComparisonNode ud => EmitUserData(ud.CanonicalPath, UserDataMatch.Comparison(ud)),
             UserDataContainsNode ud => EmitUserData(ud.CanonicalPath, UserDataMatch.Contains(ud)),
             UserDataMultiEqualsNode ud => EmitUserData(ud.CanonicalPath, UserDataMatch.MultiEquals(ud)),
+            UserDataMultiContainsNode ud => EmitUserData(ud.CanonicalPath, UserDataMatch.MultiContains(ud)),
             _ => throw new EmitException($"Unsupported filter node {node.GetType().Name}.")
         };
 

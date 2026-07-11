@@ -159,6 +159,14 @@ public sealed class BasicFilterFormatterTests
     [InlineData(EventProperty.EventData, ComparisonOperator.Contains, false, "EventData[\"Field\"].Contains(\"Val\", StringComparison.OrdinalIgnoreCase)")]
     [InlineData(EventProperty.EventData, ComparisonOperator.NotContains, false, "!EventData[\"Field\"].Contains(\"Val\", StringComparison.OrdinalIgnoreCase)")]
     [InlineData(EventProperty.EventData, ComparisonOperator.Equals, true, "(new[] {\"Aaa\", \"Bbb\"}).Contains(EventData[\"Field\"])")]
+    [InlineData(EventProperty.EventData, ComparisonOperator.Contains, true, "(new[] {\"Aaa\", \"Bbb\"}).Any(e => EventData[\"Field\"].Contains(e, StringComparison.OrdinalIgnoreCase))")]
+    // UserData indexer (distinct property-expression path; storage-key path preserved)
+    [InlineData(EventProperty.UserData, ComparisonOperator.Equals, false, "UserData[\"Path/Sub\"] == \"Val\"")]
+    [InlineData(EventProperty.UserData, ComparisonOperator.NotEqual, false, "UserData[\"Path/Sub\"] != \"Val\"")]
+    [InlineData(EventProperty.UserData, ComparisonOperator.Contains, false, "UserData[\"Path/Sub\"].Contains(\"Val\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData(EventProperty.UserData, ComparisonOperator.NotContains, false, "!UserData[\"Path/Sub\"].Contains(\"Val\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData(EventProperty.UserData, ComparisonOperator.Equals, true, "(new[] {\"Aaa\", \"Bbb\"}).Contains(UserData[\"Path/Sub\"])")]
+    [InlineData(EventProperty.UserData, ComparisonOperator.Contains, true, "(new[] {\"Aaa\", \"Bbb\"}).Any(e => UserData[\"Path/Sub\"].Contains(e, StringComparison.OrdinalIgnoreCase))")]
     public void TryFormatComparison_FullOperatorMatrix_EmitsCanonicalLinq(
         EventProperty property,
         ComparisonOperator op,
@@ -189,6 +197,9 @@ public sealed class BasicFilterFormatterTests
     [InlineData(EventProperty.Keywords, ComparisonOperator.Contains)]
     [InlineData(EventProperty.Keywords, ComparisonOperator.NotContains)]
     [InlineData(EventProperty.EventData, ComparisonOperator.NotEqual)]
+    [InlineData(EventProperty.EventData, ComparisonOperator.NotContains)]
+    [InlineData(EventProperty.UserData, ComparisonOperator.NotEqual)]
+    [InlineData(EventProperty.UserData, ComparisonOperator.NotContains)]
     public void TryFormatComparison_NonEqualsManyOnUnsupportedField_IsRejected(
         EventProperty property,
         ComparisonOperator op)
@@ -199,7 +210,8 @@ public sealed class BasicFilterFormatterTests
             Operator = op,
             MatchMode = MatchMode.Many,
             Values = ImmutableList.Create("Aaa", "Bbb"),
-            EventDataFieldName = property == EventProperty.EventData ? "Field" : null
+            EventDataFieldName = property == EventProperty.EventData ? "Field" : null,
+            UserDataFieldName = property == EventProperty.UserData ? "Path/Sub" : null
         };
 
         Assert.False(BasicFilterFormatter.TryFormatComparison(comparison, null, out _));
