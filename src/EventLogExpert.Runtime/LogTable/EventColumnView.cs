@@ -60,7 +60,15 @@ internal sealed class EventColumnView : IEventColumnView
 
     public EventLocator? ResolveByKey(ValueKey key)
     {
-        var byKey = _byKey ??= BuildByKey();
+        var byKey = Volatile.Read(ref _byKey);
+
+        if (byKey is null)
+        {
+            byKey = BuildByKey();
+
+            // First writer wins; a racing reader either sees null (and builds its own discarded copy) or a complete map.
+            byKey = Interlocked.CompareExchange(ref _byKey, byKey, null) ?? byKey;
+        }
 
         return byKey.TryGetValue(key, out int physical) ? _reader.LocatorAt(physical) : null;
     }
