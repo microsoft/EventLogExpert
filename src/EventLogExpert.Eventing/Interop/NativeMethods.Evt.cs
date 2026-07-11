@@ -540,6 +540,9 @@ internal static partial class NativeMethods
                 case (int)EvtSystemPropertyId.Task:
                     properties.Task = ReadOptionalUInt16(variant);
                     break;
+                case (int)EvtSystemPropertyId.Opcode:
+                    properties.Opcode = ReadOptionalByte(variant);
+                    break;
                 case (int)EvtSystemPropertyId.Keywords:
                     properties.Keywords = ReadOptionalInt64(variant);
                     break;
@@ -551,6 +554,9 @@ internal static partial class NativeMethods
                     break;
                 case (int)EvtSystemPropertyId.ActivityId:
                     properties.ActivityId = ReadGuidOrNull(variant);
+                    break;
+                case (int)EvtSystemPropertyId.RelatedActivityID:
+                    properties.RelatedActivityId = ReadGuidOrNull(variant);
                     break;
                 case (int)EvtSystemPropertyId.ProcessID:
                     properties.ProcessId = ReadOptionalInt32(variant);

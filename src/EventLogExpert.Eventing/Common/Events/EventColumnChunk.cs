@@ -24,7 +24,8 @@ internal enum EventColumnField : byte
     Source,
     TaskCategory,
     Xml,
-    UserId
+    UserId,
+    Opcode
 }
 
 /// <summary>
@@ -90,12 +91,15 @@ internal sealed class EventColumnChunk
     private readonly int[] _level;
     private readonly int[] _logName;
     private readonly byte[] _logPathType;
+    private readonly int[] _opcode;
     private readonly int[] _owningLog;
     private readonly int[] _processId;
     private readonly bool[] _processIdHas;
 
     private readonly long[] _recordId;
     private readonly bool[] _recordIdHas;
+    private readonly Guid[] _relatedActivityId;
+    private readonly bool[] _relatedActivityIdHas;
     private readonly int[] _source;
     private readonly int[] _taskCategory;
     private readonly int[] _threadId;
@@ -126,6 +130,7 @@ internal sealed class EventColumnChunk
         _taskCategory = builder.TaskCategory;
         _xml = builder.Xml;
         _userId = builder.UserId;
+        _opcode = builder.Opcode;
 
         _id = builder.Id;
         _timeTicks = builder.TimeTicks;
@@ -136,6 +141,8 @@ internal sealed class EventColumnChunk
         _recordIdHas = builder.RecordIdHas;
         _activityId = builder.ActivityId;
         _activityIdHas = builder.ActivityIdHas;
+        _relatedActivityId = builder.RelatedActivityId;
+        _relatedActivityIdHas = builder.RelatedActivityIdHas;
         _processId = builder.ProcessId;
         _processIdHas = builder.ProcessIdHas;
         _threadId = builder.ThreadId;
@@ -183,6 +190,10 @@ internal sealed class EventColumnChunk
 
     internal ReadOnlySpan<bool> RecordIdHasColumn => _recordIdHas;
 
+    internal ReadOnlySpan<Guid> RelatedActivityIdColumn => _relatedActivityId;
+
+    internal ReadOnlySpan<bool> RelatedActivityIdHasColumn => _relatedActivityIdHas;
+
     internal int RowCount { get; }
 
     internal ReadOnlySpan<int> ThreadIdColumn => _threadId;
@@ -220,6 +231,7 @@ internal sealed class EventColumnChunk
         EventColumnField.TaskCategory => _taskCategory,
         EventColumnField.Xml => _xml,
         EventColumnField.UserId => _userId,
+        EventColumnField.Opcode => _opcode,
         _ => throw new ArgumentOutOfRangeException(nameof(column), column, null)
     };
 
@@ -265,6 +277,7 @@ internal sealed class EventColumnChunk
         EventColumnField.TaskCategory => _taskCategory[row],
         EventColumnField.Xml => _xml[row],
         EventColumnField.UserId => _userId[row],
+        EventColumnField.Opcode => _opcode[row],
         _ => throw new ArgumentOutOfRangeException(nameof(column), column, null)
     };
 
@@ -280,6 +293,13 @@ internal sealed class EventColumnChunk
         hasValue = _recordIdHas[row];
 
         return _recordId[row];
+    }
+
+    internal Guid RowRelatedActivityId(int row, out bool hasValue)
+    {
+        hasValue = _relatedActivityIdHas[row];
+
+        return _relatedActivityId[row];
     }
 
     internal int RowThreadId(int row, out bool hasValue)
@@ -366,12 +386,15 @@ internal sealed class EventColumnChunk
         internal readonly int[] Level;
         internal readonly int[] LogName;
         internal readonly byte[] LogPathType;
+        internal readonly int[] Opcode;
         internal readonly int[] OwningLog;
         internal readonly int[] ProcessId;
         internal readonly bool[] ProcessIdHas;
 
         internal readonly long[] RecordId;
         internal readonly bool[] RecordIdHas;
+        internal readonly Guid[] RelatedActivityId;
+        internal readonly bool[] RelatedActivityIdHas;
         internal readonly int[] Source;
         internal readonly int[] TaskCategory;
         internal readonly int[] ThreadId;
@@ -402,6 +425,7 @@ internal sealed class EventColumnChunk
             TaskCategory = new int[count];
             Xml = new int[count];
             UserId = new int[count];
+            Opcode = new int[count];
 
             Id = new int[count];
             TimeTicks = new long[count];
@@ -412,6 +436,8 @@ internal sealed class EventColumnChunk
             RecordIdHas = new bool[count];
             ActivityId = new Guid[count];
             ActivityIdHas = new bool[count];
+            RelatedActivityId = new Guid[count];
+            RelatedActivityIdHas = new bool[count];
             ProcessId = new int[count];
             ProcessIdHas = new bool[count];
             ThreadId = new int[count];
@@ -443,6 +469,7 @@ internal sealed class EventColumnChunk
             TaskCategory[row] = pool.Intern(resolvedEvent.TaskCategory);
             Xml[row] = pool.Intern(resolvedEvent.Xml);
             UserId[row] = pool.Intern(resolvedEvent.UserId?.Value);
+            Opcode[row] = pool.Intern(resolvedEvent.Opcode);
 
             Id[row] = resolvedEvent.Id;
             TimeTicks[row] = resolvedEvent.TimeCreated.Ticks;
@@ -452,6 +479,8 @@ internal sealed class EventColumnChunk
             if (resolvedEvent.RecordId is { } recordId) { RecordId[row] = recordId; RecordIdHas[row] = true; }
 
             if (resolvedEvent.ActivityId is { } activityId) { ActivityId[row] = activityId; ActivityIdHas[row] = true; }
+
+            if (resolvedEvent.RelatedActivityId is { } relatedActivityId) { RelatedActivityId[row] = relatedActivityId; RelatedActivityIdHas[row] = true; }
 
             if (resolvedEvent.ProcessId is { } processId) { ProcessId[row] = processId; ProcessIdHas[row] = true; }
 

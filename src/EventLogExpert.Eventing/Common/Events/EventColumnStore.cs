@@ -319,6 +319,30 @@ public sealed class EventColumnStore
         }
     }
 
+    /// <summary>
+    ///     Bulk-copies the <see cref="ResolvedEvent.RelatedActivityId" /> column into caller-owned flat arrays over the
+    ///     whole physical range, mirroring <see cref="CopyActivityId" />. <paramref name="hasValue" /> is false for an absent
+    ///     value.
+    /// </summary>
+    internal void CopyRelatedActivityId(Guid[] values, bool[] hasValue)
+    {
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            chunk.RelatedActivityIdColumn.CopyTo(values.AsSpan(offset));
+            chunk.RelatedActivityIdHasColumn.CopyTo(hasValue.AsSpan(offset));
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            Guid? value = Pending(index).RelatedActivityId;
+            values[index] = value ?? Guid.Empty;
+            hasValue[index] = value.HasValue;
+        }
+    }
+
     /// <summary>Bulk-copies the sealed rows' pool-index column for <paramref name="column" /> (pending rows unset).</summary>
     internal void CopySealedPoolIndex(EventColumnField column, int[] poolIndices)
     {
@@ -532,6 +556,21 @@ public sealed class EventColumnStore
         hasValue = value.HasValue;
 
         return value ?? 0;
+    }
+
+    internal Guid RawRelatedActivityId(int index, out bool hasValue)
+    {
+        if (index < _sealedCount)
+        {
+            (EventColumnChunk chunk, int row) = Locate(index);
+
+            return chunk.RowRelatedActivityId(row, out hasValue);
+        }
+
+        Guid? value = Pending(index).RelatedActivityId;
+        hasValue = value.HasValue;
+
+        return value ?? Guid.Empty;
     }
 
     internal int RawThreadId(int index, out bool hasValue)
@@ -784,6 +823,7 @@ public sealed class EventColumnStore
         int userIdPoolIndex = chunk.RowPoolIndex(EventColumnField.UserId, row);
         long recordId = chunk.RowRecordId(row, out bool hasRecordId);
         Guid activityId = chunk.RowActivityId(row, out bool hasActivityId);
+        Guid relatedActivityId = chunk.RowRelatedActivityId(row, out bool hasRelatedActivityId);
         int processId = chunk.RowProcessId(row, out bool hasProcessId);
         int threadId = chunk.RowThreadId(row, out bool hasThreadId);
 
@@ -797,11 +837,13 @@ public sealed class EventColumnStore
             Description = PoolGet(chunk.RowPoolIndex(EventColumnField.Description, row)) ?? string.Empty,
             Level = PoolGet(chunk.RowPoolIndex(EventColumnField.Level, row)) ?? string.Empty,
             LogName = PoolGet(chunk.RowPoolIndex(EventColumnField.LogName, row)) ?? string.Empty,
+            Opcode = PoolGet(chunk.RowPoolIndex(EventColumnField.Opcode, row)) ?? string.Empty,
             Source = PoolGet(chunk.RowPoolIndex(EventColumnField.Source, row)) ?? string.Empty,
             TaskCategory = PoolGet(chunk.RowPoolIndex(EventColumnField.TaskCategory, row)) ?? string.Empty,
             UserId = userIdPoolIndex < 0 ? null : new SecurityIdentifier(PoolGet(userIdPoolIndex)!),
             RecordId = hasRecordId ? recordId : null,
             ActivityId = hasActivityId ? activityId : null,
+            RelatedActivityId = hasRelatedActivityId ? relatedActivityId : null,
             ProcessId = hasProcessId ? processId : null,
             ThreadId = hasThreadId ? threadId : null,
             UserDataIncomplete = chunk.RowUserDataIncomplete(row),

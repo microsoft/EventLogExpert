@@ -67,6 +67,41 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_AbsentOpcode_ResolvesToEmptyOpcodeName()
+    {
+        // Arrange - no opcode on the record and none in the provider table resolves to the empty string (not a crash
+        // and not a "(0)" placeholder).
+        var details = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([details]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 901,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName,
+            Opcode = null
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal(string.Empty, displayEvent.Opcode);
+    }
+
+    [Fact]
     public void ResolveEvent_ConcurrentCalls_ShouldHandleThreadSafely()
     {
         // Arrange
@@ -149,6 +184,81 @@ public sealed class EventResolverBaseTests
         Assert.Equal(EventDataKind.None, resolved.EventData.Kind);
     }
 
+    [Theory]
+    [InlineData((byte)10, "CustomOpcode")]
+    [InlineData((byte)1, "Start")]
+    [InlineData((byte)200, "(200)")]
+    public void ResolveEvent_OpcodeName_PrefersProviderTableThenWinmetaStandardThenNumericPlaceholder(
+        byte opcode,
+        string expected)
+    {
+        // Arrange - the provider table maps only opcode 10; opcode 1 falls back to the winmeta standard table
+        // ("Start") and opcode 200 falls through to the numeric placeholder "(200)".
+        var details = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string> { { 10, "CustomOpcode" } },
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([details]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 900,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName,
+            Opcode = opcode
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal(expected, displayEvent.Opcode);
+    }
+
+    [Fact]
+    public void ResolveEvent_OpcodeName_ProviderTableBeatsWinmetaStandard()
+    {
+        // Arrange - opcode 1 is the winmeta standard "Start"; a provider that redefines opcode 1 must win over the
+        // standard table (provider precedence, exercised at a key that collides with the standard table).
+        var details = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string> { { 1, "ProviderStart" } },
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([details]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 903,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName,
+            Opcode = 1
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal("ProviderStart", displayEvent.Opcode);
+    }
+
     [Fact]
     public void ResolveEvent_PropertyCountMatchesNeitherOrdering_FailsClosedToNone()
     {
@@ -162,6 +272,43 @@ public sealed class EventResolverBaseTests
         var resolved = resolver.ResolveEvent(eventRecord);
 
         Assert.Equal(EventDataKind.None, resolved.EventData.Kind);
+    }
+
+    [Fact]
+    public void ResolveEvent_RelatedActivityId_FlowsFromEventRecordToResolvedEvent()
+    {
+        // Arrange - RelatedActivityId is a passthrough correlation id (no provider resolution), so it must surface on
+        // the resolved event exactly as read from the record.
+        var relatedActivityId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+
+        var details = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([details]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 902,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName,
+            RelatedActivityId = relatedActivityId
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal(relatedActivityId, displayEvent.RelatedActivityId);
     }
 
     [Fact]

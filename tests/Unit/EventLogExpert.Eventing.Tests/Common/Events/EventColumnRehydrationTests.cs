@@ -409,9 +409,11 @@ public sealed class EventColumnRehydrationTests
         Assert.Equal(expected.LogName, actual.LogName);
         Assert.Equal(expected.Source, actual.Source);
         Assert.Equal(expected.TaskCategory, actual.TaskCategory);
+        Assert.Equal(expected.Opcode, actual.Opcode);
         Assert.Equal(expected.Xml, actual.Xml);
         Assert.Equal(expected.RecordId, actual.RecordId);
         Assert.Equal(expected.ActivityId, actual.ActivityId);
+        Assert.Equal(expected.RelatedActivityId, actual.RelatedActivityId);
         Assert.Equal(expected.ProcessId, actual.ProcessId);
         Assert.Equal(expected.ThreadId, actual.ThreadId);
         Assert.Equal(expected.UserId, actual.UserId);
@@ -436,8 +438,10 @@ public sealed class EventColumnRehydrationTests
         Assert.Equal(full.LogName, lean.LogName);
         Assert.Equal(full.Source, lean.Source);
         Assert.Equal(full.TaskCategory, lean.TaskCategory);
+        Assert.Equal(full.Opcode, lean.Opcode);
         Assert.Equal(full.RecordId, lean.RecordId);
         Assert.Equal(full.ActivityId, lean.ActivityId);
+        Assert.Equal(full.RelatedActivityId, lean.RelatedActivityId);
         Assert.Equal(full.ProcessId, lean.ProcessId);
         Assert.Equal(full.ThreadId, lean.ThreadId);
         Assert.Equal(full.UserId, lean.UserId);
@@ -568,6 +572,8 @@ public sealed class EventColumnRehydrationTests
             UserId = new SecurityIdentifier("S-1-5-18"),
             RecordId = 99L,
             ActivityId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            RelatedActivityId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+            Opcode = "Start",
             ProcessId = 1234,
             ThreadId = 5678,
             Keywords = ["Audit Success", "Classic"],

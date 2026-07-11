@@ -52,7 +52,7 @@ internal static class Lowerer
             ResolvedEventField.Id or ResolvedEventField.ProcessId or ResolvedEventField.ThreadId =>
                 TypedLiteralKind.Int,
             ResolvedEventField.RecordId => TypedLiteralKind.Long,
-            ResolvedEventField.ActivityId => TypedLiteralKind.Guid,
+            ResolvedEventField.ActivityId or ResolvedEventField.RelatedActivityId => TypedLiteralKind.Guid,
             _ => TypedLiteralKind.String
         };
     }

@@ -31,6 +31,14 @@ public sealed class ColumnEmitterParityTests
         ("Path", @"C:\Windows\System32\cmd.exe"),
         ("Dup", "first"),
         ("Dup", "second"));
+    private static readonly ResolvedEvent s_readerEnablerEvent = new("TestLog", LogPathType.Channel)
+    {
+        Id = 700,
+        Opcode = "Start",
+        RelatedActivityId = new Guid("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+        Keywords = [],
+        TimeCreated = FilterTestFixtures.FixedTimestamp
+    };
     private static readonly ResolvedEvent s_userDataIncompleteEvent = new("TestLog", LogPathType.Channel)
     {
         Id = 501,
@@ -57,7 +65,8 @@ public sealed class ColumnEmitterParityTests
         s_eventDataRich,
         s_eventDataOther,
         s_userDataPresentTruncated,
-        s_userDataIncompleteEvent
+        s_userDataIncompleteEvent,
+        s_readerEnablerEvent
     ];
 
     // Index 1 is FilterTestFixtures.NoNullables: the null-UserId + absent-nullable-ids event that drives the null-vs-present asymmetry.
@@ -71,7 +80,8 @@ public sealed class ColumnEmitterParityTests
 
     /// <summary>
     ///     The parity battery, each expression tagged with the arm it exercises and the null/absence case(s) it
-    ///     exercises. Every expression compiles on both backends and is differentially checked against all ten corpus events.
+    ///     exercises. Every expression compiles on both backends and is differentially checked against all eleven corpus
+    ///     events.
     /// </summary>
     public static TheoryData<string> DifferentialBattery =>
     [
@@ -203,6 +213,20 @@ public sealed class ColumnEmitterParityTests
         "EventData[\"*zzz*\"] == \"x\"",
         "EventData[\"*cert*\"] == \"x\"",
 
+        // Opcode (pooled string) + RelatedActivityId (nullable Guid): the reader-enabler fields. Opcode exercises the
+        // string-form, Contains, and MultiEquals(String) arms; RelatedActivityId exercises the typed-Guid, ToString
+        // Contains/MultiEquals, and null-comparison arms. corpus[10] sets both; every other event leaves them empty/null.
+        "Opcode == \"Start\"",
+        "Opcode != \"Start\"",
+        "Opcode.Contains(\"tar\", StringComparison.OrdinalIgnoreCase)",
+        "(new[] {\"Start\", \"Stop\"}).Contains(Opcode)",
+        "RelatedActivityId == \"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\"",
+        "RelatedActivityId != \"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\"",
+        "RelatedActivityId == null",
+        "RelatedActivityId != null",
+        "RelatedActivityId.ToString().Contains(\"aaaa\", StringComparison.OrdinalIgnoreCase)",
+        "(new[] {\"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\"}).Contains(RelatedActivityId.ToString())",
+
         // P2-4b glob UserData paths (tri-state): present match on corpus[8] Foo, truncated Trunc -> Unknown, and the
         // incomplete-tail Unknown over corpus[9] (UserDataIncomplete, no path matches -> keep-visible Unknown).
         "UserData[\"*oo\"] == \"adminvalue\"",
@@ -235,11 +259,50 @@ public sealed class ColumnEmitterParityTests
         }
     }
 
+    // Absolute (not differential) oracle for the Opcode reader-enabler field: exact match results pin the string-compare
+    // semantics on BOTH backends, so a same-direction bug in both emitters cannot pass.
+    [Fact]
+    public void OpcodeEquals_Absolute_MatchesOnlyTheExactValue()
+    {
+        ResolvedEvent start = new("TestLog", LogPathType.Channel) { Id = 1, Opcode = "Start" };
+        ResolvedEvent stop = new("TestLog", LogPathType.Channel) { Id = 2, Opcode = "Stop" };
+        ResolvedEvent emptyOpcode = new("TestLog", LogPathType.Channel) { Id = 3 };
+
+        AssertBothBackends("Opcode == \"Start\"", start, FilterMatch.Match);
+        AssertBothBackends("Opcode == \"Start\"", stop, FilterMatch.NoMatch);
+        AssertBothBackends("Opcode == \"Start\"", emptyOpcode, FilterMatch.NoMatch);
+        AssertBothBackends("Opcode.Contains(\"top\", StringComparison.OrdinalIgnoreCase)", stop, FilterMatch.Match);
+    }
+
     // A nullable numeric '!=' on an absent field is Match (typed lift), unlike the presence-required UserId arms.
     [Fact]
     public void ProcessIdNotEquals_OverAbsentProcessId_IsMatch()
     {
         AssertBothBackends("ProcessId != 5", FilterTestFixtures.NoNullables, FilterMatch.Match);
+    }
+
+    // Absolute oracle for the RelatedActivityId reader-enabler field: the typed-Guid equality and the null comparison must
+    // distinguish a specific Guid, a different Guid, absent (null), and present-but-Guid.Empty (the has-value flag makes
+    // Guid.Empty a real value, NOT the same as absent).
+    [Fact]
+    public void RelatedActivityIdComparisons_Absolute_DistinguishGuidNullAndEmpty()
+    {
+        var guidA = new Guid("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        ResolvedEvent eventA = new("TestLog", LogPathType.Channel) { Id = 1, RelatedActivityId = guidA };
+        ResolvedEvent eventB = new("TestLog", LogPathType.Channel)
+        {
+            Id = 2,
+            RelatedActivityId = new Guid("11111111-1111-1111-1111-111111111111")
+        };
+        ResolvedEvent eventNull = new("TestLog", LogPathType.Channel) { Id = 3 };
+        ResolvedEvent eventEmpty = new("TestLog", LogPathType.Channel) { Id = 4, RelatedActivityId = Guid.Empty };
+
+        AssertBothBackends($"RelatedActivityId == \"{guidA}\"", eventA, FilterMatch.Match);
+        AssertBothBackends($"RelatedActivityId == \"{guidA}\"", eventB, FilterMatch.NoMatch);
+        AssertBothBackends($"RelatedActivityId == \"{guidA}\"", eventNull, FilterMatch.NoMatch);
+        AssertBothBackends("RelatedActivityId == null", eventNull, FilterMatch.Match);
+        AssertBothBackends("RelatedActivityId == null", eventEmpty, FilterMatch.NoMatch);
+        AssertBothBackends("RelatedActivityId != null", eventEmpty, FilterMatch.Match);
     }
 
     // UserId '==' on an absent UserId is NoMatch (presence-required).

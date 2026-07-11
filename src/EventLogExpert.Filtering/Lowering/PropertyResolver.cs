@@ -60,6 +60,11 @@ internal static class PropertyResolver
                 literalKind = TypedLiteralKind.String;
 
                 return true;
+            case "OPCODE":
+                field = ResolvedEventField.Opcode;
+                literalKind = TypedLiteralKind.String;
+
+                return true;
             case "PROCESSID":
                 field = ResolvedEventField.ProcessId;
                 literalKind = TypedLiteralKind.Int;
@@ -68,6 +73,11 @@ internal static class PropertyResolver
             case "RECORDID":
                 field = ResolvedEventField.RecordId;
                 literalKind = TypedLiteralKind.Long;
+
+                return true;
+            case "RELATEDACTIVITYID":
+                field = ResolvedEventField.RelatedActivityId;
+                literalKind = TypedLiteralKind.Guid;
 
                 return true;
             case "SOURCE":

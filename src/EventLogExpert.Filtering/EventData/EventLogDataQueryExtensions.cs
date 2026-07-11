@@ -52,10 +52,12 @@ internal static class EventLogDataQueryExtensions
             {
                 EventProperty.Id => events.Select(e => e.Id.ToString(CultureInfo.InvariantCulture)).Distinct(),
                 EventProperty.ActivityId => events.Select(e => e.ActivityId?.ToString() ?? string.Empty).Distinct(),
+                EventProperty.RelatedActivityId => events.Select(e => e.RelatedActivityId?.ToString() ?? string.Empty).Distinct(),
                 EventProperty.Level => Enum.GetNames<SeverityLevel>(),
                 EventProperty.Keywords => events.SelectMany(e => e.Keywords).Distinct(),
                 EventProperty.Source => events.Select(e => e.Source).Distinct(),
                 EventProperty.TaskCategory => events.Select(e => e.TaskCategory).Distinct(),
+                EventProperty.Opcode => events.Select(e => e.Opcode).Distinct(),
                 EventProperty.LogName => events.Select(e => e.LogName).Distinct(),
                 _ => [],
             };

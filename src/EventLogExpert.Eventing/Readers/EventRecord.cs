@@ -16,6 +16,8 @@ public sealed record EventRecord
 
     public Guid? ActivityId { get; set; }
 
+    public Guid? RelatedActivityId { get; set; }
+
     public string ComputerName { get; set; } = string.Empty;
 
     public ushort Id { get; set; }
@@ -25,6 +27,8 @@ public sealed record EventRecord
     public ushort? Qualifiers { get; set; }
 
     public byte? Level { get; set; }
+
+    public byte? Opcode { get; set; }
 
     public string LogName { get; set; } = string.Empty;
 

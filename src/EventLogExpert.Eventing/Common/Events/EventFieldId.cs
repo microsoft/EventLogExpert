@@ -20,5 +20,7 @@ public enum EventFieldId
     UserId,
     Description,
     Xml,
-    OwningLog
+    OwningLog,
+    Opcode,
+    RelatedActivityId
 }

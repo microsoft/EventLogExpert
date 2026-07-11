@@ -29,6 +29,10 @@ internal static class ResolvedEventFieldReader
             EventFieldId.Description => EventFieldValue.FromProperty(resolvedEvent.Description),
             EventFieldId.Xml => EventFieldValue.FromProperty(resolvedEvent.Xml),
             EventFieldId.OwningLog => EventFieldValue.FromProperty(resolvedEvent.OwningLog),
+            EventFieldId.Opcode => EventFieldValue.FromProperty(resolvedEvent.Opcode),
+            EventFieldId.RelatedActivityId => resolvedEvent.RelatedActivityId is { } relatedActivityId
+                ? EventFieldValue.FromProperty(relatedActivityId)
+                : Absent,
             _ => Absent
         };
     }
