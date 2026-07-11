@@ -83,6 +83,29 @@ internal static class UserDataMatch
         };
     }
 
+    public static Func<StructuredFieldResult, FilterMatch> MultiContains(UserDataMultiContainsNode node)
+    {
+        var needles = node.Needles;
+        var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+        return result =>
+        {
+            var values = result.PresentValues;
+
+            for (var i = 0; i < values.Length; i++)
+            {
+                var value = values[i];
+
+                for (var j = 0; j < needles.Count; j++)
+                {
+                    if (value.Contains(needles[j], comparison)) { return FilterMatch.Match; }
+                }
+            }
+
+            return result.IsTruncated ? FilterMatch.Unknown : FilterMatch.NoMatch;
+        };
+    }
+
     public static Func<StructuredFieldResult, FilterMatch> MultiEquals(UserDataMultiEqualsNode node)
     {
         var literals = node.Literals;

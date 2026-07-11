@@ -45,7 +45,7 @@ internal sealed class ComparisonNode(
 }
 
 /// <summary>
-///     <c>{Field}.Contains(Needle, OIC)</c> — or for Id / ActivityId the formatter shape
+///     <c>{Field}.Contains(Needle, OIC)</c>, or for Id / ActivityId the formatter shape
 ///     <c>{Field}.ToString().Contains(Needle, OIC)</c>. UserId resolves to the underlying SDDL string.
 /// </summary>
 internal sealed class ContainsNode(ResolvedEventField field, string needle, bool ignoreCase) : FilterNode
@@ -80,7 +80,7 @@ internal sealed class KeywordsMatchAnyOfNode(IReadOnlyList<string> needles) : Fi
 }
 
 /// <summary>
-///     <c>(new[] {...}).Contains({Field})</c> — and the int variant <c>(new[] {...}).Contains({Field}.ToString())</c>
+///     <c>(new[] {...}).Contains({Field})</c>, and the int variant <c>(new[] {...}).Contains({Field}.ToString())</c>
 ///     for Id and Level. <see cref="Negated" /> carries the <c>!(...)</c> ("is none of") form; the emitter keeps
 ///     presence-required fields (UserId) at NoMatch for an absent value regardless of negation.
 /// </summary>
@@ -95,7 +95,7 @@ internal sealed class MultiEqualsNode(ResolvedEventField field, IReadOnlyList<st
 }
 
 /// <summary>
-///     <c>(new[] {...}).Any(e =&gt; {Field}.Contains(e, OIC))</c> — string "contains any of" over a scalar string
+///     <c>(new[] {...}).Any(e =&gt; {Field}.Contains(e, OIC))</c>: string "contains any of" over a scalar string
 ///     field. <see cref="Negated" /> carries the <c>!(...)</c> ("contains none of") form. <see cref="IgnoreCase" /> is
 ///     true for the Basic (always <c>OrdinalIgnoreCase</c>) shape. UserId is presence-required (an absent UserId is
 ///     NoMatch for both polarities).
@@ -149,7 +149,7 @@ internal sealed class EventDataContainsNode(string fieldName, string needle, boo
 }
 
 /// <summary>
-///     <c>(new[] {...}).Contains(EventData["Name"])</c> — any-of typed value equality against a dynamic named
+///     <c>(new[] {...}).Contains(EventData["Name"])</c>: any-of typed value equality against a dynamic named
 ///     EventData field. Presence-required. Positive only: <c>!(any-of)</c> ("none-of") has no Basic representation and is
 ///     rejected by the Lowerer.
 /// </summary>
@@ -202,4 +202,34 @@ internal sealed class UserDataMultiEqualsNode(string canonicalPath, IReadOnlyLis
     public string CanonicalPath { get; } = canonicalPath;
 
     public IReadOnlyList<string> Literals { get; } = literals;
+}
+
+/// <summary>
+///     <c>(new[] {...}).Any(e =&gt; EventData["Name"].Contains(e, OIC))</c>: "contains any of" over a dynamic named
+///     EventData field, string-based over each present value. Presence-required (an absent field never matches). Positive
+///     only; the "contains none of" negation has no Basic representation and is rejected by the Lowerer.
+/// </summary>
+internal sealed class EventDataMultiContainsNode(string fieldName, IReadOnlyList<string> needles, bool ignoreCase)
+    : FilterNode
+{
+    public string FieldName { get; } = fieldName;
+
+    public bool IgnoreCase { get; } = ignoreCase;
+
+    public IReadOnlyList<string> Needles { get; } = needles;
+}
+
+/// <summary>
+///     <c>(new[] {...}).Any(e =&gt; UserData["Event/UserData/..."].Contains(e, OIC))</c>: "contains any of" over a
+///     structured UserData path, tri-state ordinal over each present value (a truncated non-matching field surfaces
+///     <see cref="EventLogExpert.Filtering.Evaluation.FilterMatch.Unknown" />). Presence-required; positive only.
+/// </summary>
+internal sealed class UserDataMultiContainsNode(string canonicalPath, IReadOnlyList<string> needles, bool ignoreCase)
+    : FilterNode
+{
+    public string CanonicalPath { get; } = canonicalPath;
+
+    public bool IgnoreCase { get; } = ignoreCase;
+
+    public IReadOnlyList<string> Needles { get; } = needles;
 }

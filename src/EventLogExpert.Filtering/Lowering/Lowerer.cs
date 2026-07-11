@@ -92,7 +92,7 @@ internal static class Lowerer
     private static bool ContainsEventDataNode(FilterNode node) =>
         node switch
         {
-            EventDataComparisonNode or EventDataContainsNode or EventDataMultiEqualsNode => true,
+            EventDataComparisonNode or EventDataContainsNode or EventDataMultiEqualsNode or EventDataMultiContainsNode => true,
             AndNode and => ContainsEventDataNode(and.Left) || ContainsEventDataNode(and.Right),
             OrNode or => ContainsEventDataNode(or.Left) || ContainsEventDataNode(or.Right),
             NotNode not => ContainsEventDataNode(not.Operand),
@@ -102,7 +102,7 @@ internal static class Lowerer
     private static bool ContainsUserDataNode(FilterNode node) =>
         node switch
         {
-            UserDataComparisonNode or UserDataContainsNode or UserDataMultiEqualsNode => true,
+            UserDataComparisonNode or UserDataContainsNode or UserDataMultiEqualsNode or UserDataMultiContainsNode => true,
             AndNode and => ContainsUserDataNode(and.Left) || ContainsUserDataNode(and.Right),
             OrNode or => ContainsUserDataNode(or.Left) || ContainsUserDataNode(or.Right),
             NotNode not => ContainsUserDataNode(not.Operand),
@@ -471,16 +471,14 @@ internal static class Lowerer
     // with the lambda parameter as the first Contains argument.
     private static FilterNode LowerMultiContainsLambda(ArrayCreationSyntax array, LambdaSyntax lambda, int position)
     {
+        // Body must be `<target>.Contains(param, [OIC])` with the lambda parameter as the first Contains argument.
         if (lambda.Body is not MethodCallSyntax contains
             || !IsCaseInsensitiveMatch(contains.Name, "Contains")
-            || contains.Target is not IdentifierSyntax fieldId
-            || !PropertyResolver.TryResolve(fieldId.Name, out var field, out _)
-            || !IsMultiContainsField(field)
             || contains.Arguments.Count is < 1 or > 2
             || !IsLambdaParam(contains.Arguments[0], lambda.ParameterName))
         {
             throw new LowerException(
-                $"Unsupported .Any lambda; expected `field.Contains({lambda.ParameterName}, StringComparison.OrdinalIgnoreCase)` over a string field (position {lambda.Body.Position}).");
+                $"Unsupported .Any lambda; expected `<field>.Contains({lambda.ParameterName}, StringComparison.OrdinalIgnoreCase)` (position {lambda.Body.Position}).");
         }
 
         var ignoreCase = false;
@@ -496,7 +494,30 @@ internal static class Lowerer
             ignoreCase = true;
         }
 
-        return new MultiContainsNode(field, ExtractStringArray(array, position), ignoreCase);
+        var needles = ExtractStringArray(array, position);
+
+        // EventData / UserData indexer targets (presence-required, positive-only) are recognized before the scalar
+        // field so an IndexAccess receiver is not misread as a property identifier.
+        if (TryResolveEventDataField(contains.Target, out var eventDataName))
+        {
+            return new EventDataMultiContainsNode(eventDataName, needles, ignoreCase);
+        }
+
+        if (TryResolveUserDataField(contains.Target, out var userDataPath))
+        {
+            return new UserDataMultiContainsNode(userDataPath, needles, ignoreCase);
+        }
+
+        // Scalar string field target (kept in lock-step with Emitter.EmitMultiContains).
+        if (contains.Target is IdentifierSyntax fieldId
+            && PropertyResolver.TryResolve(fieldId.Name, out var field, out _)
+            && IsMultiContainsField(field))
+        {
+            return new MultiContainsNode(field, needles, ignoreCase);
+        }
+
+        throw new LowerException(
+            $"Unsupported .Any lambda target; expected a string field, EventData[\"...\"], or UserData[\"...\"] (position {contains.Target.Position}).");
     }
 
     // Normalizes `!` over EventData so a NotNode never wraps an EventData node (presence-required must hold at any
@@ -520,7 +541,7 @@ internal static class Lowerer
                     contains.Needle,
                     contains.IgnoreCase,
                     !contains.Negated);
-            case EventDataMultiEqualsNode:
+            case EventDataMultiEqualsNode or EventDataMultiContainsNode:
                 throw new LowerException(
                     $"Negating an EventData any-of match is not supported; use separate '!=' conditions (position {neg.Position}).");
             case UserDataComparisonNode userComparison:
@@ -535,7 +556,7 @@ internal static class Lowerer
                     userContains.Needle,
                     userContains.IgnoreCase,
                     !userContains.Negated);
-            case UserDataMultiEqualsNode:
+            case UserDataMultiEqualsNode or UserDataMultiContainsNode:
                 throw new LowerException(
                     $"Negating a UserData any-of match is not supported; use separate '!=' conditions (position {neg.Position}).");
             case MultiEqualsNode multiEquals:

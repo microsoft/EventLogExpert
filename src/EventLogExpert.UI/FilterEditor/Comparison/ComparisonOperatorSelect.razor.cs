@@ -8,9 +8,9 @@ namespace EventLogExpert.UI.FilterEditor.Comparison;
 
 /// <summary>
 ///     Single-dropdown widget that surfaces the (<see cref="ComparisonOperator" />, <see cref="MatchMode" />) pair as
-///     a user-friendly enumeration. Equals + Many maps to "Is Any Of"; for scalar string fields (via
-///     <see cref="SupportsManyOperators" />) the other operators pair with Many as "Contains Any" / "Is None Of" /
-///     "Contains None". All remaining choices map to single-value variants.
+///     a user-friendly enumeration. Equals + Many maps to "Is Any Of"; "Contains Any" is offered when
+///     <see cref="SupportsContainsMany" /> and the negated "Is None Of" / "Contains None" when
+///     <see cref="SupportsNoneOfMany" />. All remaining choices map to single-value variants.
 /// </summary>
 public sealed partial class ComparisonOperatorSelect
 {
@@ -38,14 +38,17 @@ public sealed partial class ComparisonOperatorSelect
 
     [Parameter] public ComparisonOperator Operator { get; set; }
 
+    /// <summary>Set <c>true</c> for fields that also offer "Contains Any" multi-select (scalar strings + EventData/UserData).</summary>
+    [Parameter] public bool SupportsContainsMany { get; set; }
+
     /// <summary>Set <c>false</c> for fields that do not support multi-value selection (e.g., free-text Description/Xml).</summary>
     [Parameter] public bool SupportsMany { get; set; } = true;
 
     /// <summary>
-    ///     Set <c>true</c> for scalar string fields that also offer the operator-aware multi kinds (Contains-any,
-    ///     Is-none-of, Contains-none) on top of the default Equals-any "Is Any Of".
+    ///     Set <c>true</c> for fields that also offer the negated "Is None Of" / "Contains None" multi kinds (scalar
+    ///     strings).
     /// </summary>
-    [Parameter] public bool SupportsManyOperators { get; set; }
+    [Parameter] public bool SupportsNoneOfMany { get; set; }
 
     /// <summary>Set <c>false</c> for non-text fields where substring comparison is meaningless (e.g., an enum field).</summary>
     [Parameter] public bool SupportsText { get; set; } = true;

@@ -73,14 +73,19 @@ public static class BasicFilterFormatter
 
         StringBuilder stringBuilder = new(joinPrefix ?? string.Empty);
 
-        // A non-Equals Many is valid only for the operator-aware scalar string fields; every other Many (Keywords,
-        // numeric, Guid, EventData/UserData) is Equals-any only, so reject non-Equals there rather than emit text the
-        // Lowerer would reject (or, for Keywords, silently drop the operator).
-        if (comparison.MatchMode == MatchMode.Many
-            && comparison.Operator != ComparisonOperator.Equals
-            && !FilterPropertyConstraints.SupportsManyOperators(comparison.Property))
+        // Reject Many combinations the target field doesn't support (would emit text the Lowerer rejects, or for
+        // Keywords silently drop the operator): Contains-any needs SupportsContainsMany, the negated kinds need
+        // SupportsNoneOfMany; Equals-any is valid for every Many-capable field.
+        if (comparison.MatchMode == MatchMode.Many)
         {
-            return false;
+            var operatorSupported = comparison.Operator switch
+            {
+                ComparisonOperator.Equals => true,
+                ComparisonOperator.Contains => FilterPropertyConstraints.SupportsContainsMany(comparison.Property),
+                _ => FilterPropertyConstraints.SupportsNoneOfMany(comparison.Property)
+            };
+
+            if (!operatorSupported) { return false; }
         }
 
         // Many + non-Keywords uses one of the four operator-aware LINQ shapes. Keywords Many and every Single shape
