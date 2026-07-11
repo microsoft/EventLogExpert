@@ -8,8 +8,9 @@ namespace EventLogExpert.UI.FilterEditor.Comparison;
 
 /// <summary>
 ///     Single-dropdown widget that surfaces the (<see cref="ComparisonOperator" />, <see cref="MatchMode" />) pair as
-///     a user-friendly enumeration. Equals + Many maps to the "Multi Select" kind (any-of); all other choices map to
-///     single-value variants.
+///     a user-friendly enumeration. Equals + Many maps to "Is Any Of"; for scalar string fields (via
+///     <see cref="SupportsManyOperators" />) the other operators pair with Many as "Contains Any" / "Is None Of" /
+///     "Contains None". All remaining choices map to single-value variants.
 /// </summary>
 public sealed partial class ComparisonOperatorSelect
 {
@@ -19,7 +20,10 @@ public sealed partial class ComparisonOperatorSelect
         Contains,
         NotEqual,
         NotContains,
-        MultiSelect
+        MultiSelect,
+        MultiContains,
+        MultiNotEqual,
+        MultiNotContains
     }
 
     [Parameter] public string? AriaLabel { get; set; }
@@ -37,6 +41,12 @@ public sealed partial class ComparisonOperatorSelect
     /// <summary>Set <c>false</c> for fields that do not support multi-value selection (e.g., free-text Description/Xml).</summary>
     [Parameter] public bool SupportsMany { get; set; } = true;
 
+    /// <summary>
+    ///     Set <c>true</c> for scalar string fields that also offer the operator-aware multi kinds (Contains-any,
+    ///     Is-none-of, Contains-none) on top of the default Equals-any "Is Any Of".
+    /// </summary>
+    [Parameter] public bool SupportsManyOperators { get; set; }
+
     /// <summary>Set <c>false</c> for non-text fields where substring comparison is meaningless (e.g., an enum field).</summary>
     [Parameter] public bool SupportsText { get; set; } = true;
 
@@ -44,6 +54,9 @@ public sealed partial class ComparisonOperatorSelect
         (Operator, MatchMode) switch
         {
             (ComparisonOperator.Equals, MatchMode.Many) => ComparisonKind.MultiSelect,
+            (ComparisonOperator.Contains, MatchMode.Many) => ComparisonKind.MultiContains,
+            (ComparisonOperator.NotEqual, MatchMode.Many) => ComparisonKind.MultiNotEqual,
+            (ComparisonOperator.NotContains, MatchMode.Many) => ComparisonKind.MultiNotContains,
             (ComparisonOperator.Contains, _) => ComparisonKind.Contains,
             (ComparisonOperator.NotEqual, _) => ComparisonKind.NotEqual,
             (ComparisonOperator.NotContains, _) => ComparisonKind.NotContains,
@@ -57,7 +70,10 @@ public sealed partial class ComparisonOperatorSelect
             ComparisonKind.Contains => "Contains",
             ComparisonKind.NotEqual => "Not Equal",
             ComparisonKind.NotContains => "Not Contains",
-            ComparisonKind.MultiSelect => "Multi Select",
+            ComparisonKind.MultiSelect => "Is Any Of",
+            ComparisonKind.MultiContains => "Contains Any",
+            ComparisonKind.MultiNotEqual => "Is None Of",
+            ComparisonKind.MultiNotContains => "Contains None",
             _ => kind.ToString()
         };
 
@@ -70,6 +86,9 @@ public sealed partial class ComparisonOperatorSelect
             ComparisonKind.NotEqual => (ComparisonOperator.NotEqual, MatchMode.Single),
             ComparisonKind.NotContains => (ComparisonOperator.NotContains, MatchMode.Single),
             ComparisonKind.MultiSelect => (ComparisonOperator.Equals, MatchMode.Many),
+            ComparisonKind.MultiContains => (ComparisonOperator.Contains, MatchMode.Many),
+            ComparisonKind.MultiNotEqual => (ComparisonOperator.NotEqual, MatchMode.Many),
+            ComparisonKind.MultiNotContains => (ComparisonOperator.NotContains, MatchMode.Many),
             _ => (ComparisonOperator.Equals, MatchMode.Single)
         };
 

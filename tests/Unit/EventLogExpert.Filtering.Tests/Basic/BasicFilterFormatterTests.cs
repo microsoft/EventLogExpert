@@ -114,4 +114,94 @@ public sealed class BasicFilterFormatterTests
         Assert.True(lenientResult);
         Assert.Equal(strict, lenient);
     }
+
+    // Full characterization of the formatter's LINQ output: every operator (==, !=, Contains, !Contains) in Single and
+    // Many across each distinct field shape (scalar string, bare-integer numeric, Guid, presence-required UserId,
+    // Keywords collection, EventData indexer). Pins the exact canonical text so any pattern drift is caught.
+    [Theory]
+    // Scalar string (Source)
+    [InlineData(EventProperty.Source, ComparisonOperator.Equals, false, "Source == \"Val\"")]
+    [InlineData(EventProperty.Source, ComparisonOperator.NotEqual, false, "Source != \"Val\"")]
+    [InlineData(EventProperty.Source, ComparisonOperator.Contains, false, "Source.Contains(\"Val\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData(EventProperty.Source, ComparisonOperator.NotContains, false, "!Source.Contains(\"Val\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData(EventProperty.Source, ComparisonOperator.Equals, true, "(new[] {\"Aaa\", \"Bbb\"}).Contains(Source)")]
+    [InlineData(EventProperty.Source, ComparisonOperator.NotEqual, true, "!(new[] {\"Aaa\", \"Bbb\"}).Contains(Source)")]
+    [InlineData(EventProperty.Source, ComparisonOperator.Contains, true, "(new[] {\"Aaa\", \"Bbb\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))")]
+    [InlineData(EventProperty.Source, ComparisonOperator.NotContains, true, "!(new[] {\"Aaa\", \"Bbb\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))")]
+    // Numeric (Id): bare-integer ==/!=, ToString-shorthand contains, equals-any
+    [InlineData(EventProperty.Id, ComparisonOperator.Equals, false, "Id == 100")]
+    [InlineData(EventProperty.Id, ComparisonOperator.NotEqual, false, "Id != 100")]
+    [InlineData(EventProperty.Id, ComparisonOperator.Contains, false, "Id.Contains(\"100\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData(EventProperty.Id, ComparisonOperator.NotContains, false, "!Id.Contains(\"100\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData(EventProperty.Id, ComparisonOperator.Equals, true, "(new[] {\"Aaa\", \"Bbb\"}).Contains(Id)")]
+    // Guid (ActivityId)
+    [InlineData(EventProperty.ActivityId, ComparisonOperator.Equals, false, "ActivityId == \"Val\"")]
+    [InlineData(EventProperty.ActivityId, ComparisonOperator.NotEqual, false, "ActivityId != \"Val\"")]
+    [InlineData(EventProperty.ActivityId, ComparisonOperator.Equals, true, "(new[] {\"Aaa\", \"Bbb\"}).Contains(ActivityId)")]
+    // UserId: presence-required single, operator-aware Many
+    [InlineData(EventProperty.UserId, ComparisonOperator.Equals, false, "UserId != null && UserId.Value == \"Val\"")]
+    [InlineData(EventProperty.UserId, ComparisonOperator.NotEqual, false, "UserId != null && UserId.Value != \"Val\"")]
+    [InlineData(EventProperty.UserId, ComparisonOperator.Contains, false, "UserId != null && UserId.Value.Contains(\"Val\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData(EventProperty.UserId, ComparisonOperator.NotContains, false, "UserId != null && !UserId.Value.Contains(\"Val\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData(EventProperty.UserId, ComparisonOperator.Equals, true, "(new[] {\"Aaa\", \"Bbb\"}).Contains(UserId)")]
+    [InlineData(EventProperty.UserId, ComparisonOperator.NotEqual, true, "!(new[] {\"Aaa\", \"Bbb\"}).Contains(UserId)")]
+    [InlineData(EventProperty.UserId, ComparisonOperator.Contains, true, "(new[] {\"Aaa\", \"Bbb\"}).Any(e => UserId.Contains(e, StringComparison.OrdinalIgnoreCase))")]
+    [InlineData(EventProperty.UserId, ComparisonOperator.NotContains, true, "!(new[] {\"Aaa\", \"Bbb\"}).Any(e => UserId.Contains(e, StringComparison.OrdinalIgnoreCase))")]
+    // Keywords collection
+    [InlineData(EventProperty.Keywords, ComparisonOperator.Equals, false, "Keywords.Any(e => string.Equals(e, \"Val\", StringComparison.OrdinalIgnoreCase))")]
+    [InlineData(EventProperty.Keywords, ComparisonOperator.NotEqual, false, "!Keywords.Any(e => string.Equals(e, \"Val\", StringComparison.OrdinalIgnoreCase))")]
+    [InlineData(EventProperty.Keywords, ComparisonOperator.Contains, false, "Keywords.Any(e => e.Contains(\"Val\", StringComparison.OrdinalIgnoreCase))")]
+    [InlineData(EventProperty.Keywords, ComparisonOperator.NotContains, false, "!Keywords.Any(e => e.Contains(\"Val\", StringComparison.OrdinalIgnoreCase))")]
+    [InlineData(EventProperty.Keywords, ComparisonOperator.Equals, true, "Keywords.Any(e => (new[] {\"Aaa\", \"Bbb\"}).Contains(e))")]
+    // EventData indexer
+    [InlineData(EventProperty.EventData, ComparisonOperator.Equals, false, "EventData[\"Field\"] == \"Val\"")]
+    [InlineData(EventProperty.EventData, ComparisonOperator.NotEqual, false, "EventData[\"Field\"] != \"Val\"")]
+    [InlineData(EventProperty.EventData, ComparisonOperator.Contains, false, "EventData[\"Field\"].Contains(\"Val\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData(EventProperty.EventData, ComparisonOperator.NotContains, false, "!EventData[\"Field\"].Contains(\"Val\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData(EventProperty.EventData, ComparisonOperator.Equals, true, "(new[] {\"Aaa\", \"Bbb\"}).Contains(EventData[\"Field\"])")]
+    public void TryFormatComparison_FullOperatorMatrix_EmitsCanonicalLinq(
+        EventProperty property,
+        ComparisonOperator op,
+        bool isMany,
+        string expected)
+    {
+        var comparison = new FilterComparison
+        {
+            Property = property,
+            Operator = op,
+            MatchMode = isMany ? MatchMode.Many : MatchMode.Single,
+            Value = isMany
+                ? null
+                : property is EventProperty.Id or EventProperty.ProcessId or EventProperty.ThreadId ? "100" : "Val",
+            Values = isMany ? ImmutableList.Create("Aaa", "Bbb") : [],
+            EventDataFieldName = property == EventProperty.EventData ? "Field" : null,
+            UserDataFieldName = property == EventProperty.UserData ? "Path/Sub" : null
+        };
+
+        Assert.True(BasicFilterFormatter.TryFormatComparison(comparison, null, out var formatted));
+        Assert.Equal(expected, formatted);
+    }
+
+    [Theory]
+    [InlineData(EventProperty.Id, ComparisonOperator.Contains)]
+    [InlineData(EventProperty.Id, ComparisonOperator.NotEqual)]
+    [InlineData(EventProperty.ActivityId, ComparisonOperator.Contains)]
+    [InlineData(EventProperty.Keywords, ComparisonOperator.Contains)]
+    [InlineData(EventProperty.Keywords, ComparisonOperator.NotContains)]
+    [InlineData(EventProperty.EventData, ComparisonOperator.NotEqual)]
+    public void TryFormatComparison_NonEqualsManyOnUnsupportedField_IsRejected(
+        EventProperty property,
+        ComparisonOperator op)
+    {
+        var comparison = new FilterComparison
+        {
+            Property = property,
+            Operator = op,
+            MatchMode = MatchMode.Many,
+            Values = ImmutableList.Create("Aaa", "Bbb"),
+            EventDataFieldName = property == EventProperty.EventData ? "Field" : null
+        };
+
+        Assert.False(BasicFilterFormatter.TryFormatComparison(comparison, null, out _));
+    }
 }

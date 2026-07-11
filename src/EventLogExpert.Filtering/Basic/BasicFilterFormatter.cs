@@ -73,13 +73,28 @@ public static class BasicFilterFormatter
 
         StringBuilder stringBuilder = new(joinPrefix ?? string.Empty);
 
-        // The Many+non-Keywords shape is `(new[]{...}).Contains(property)` — the property-reference template
-        // moves to the suffix. Everything else prepends the operator+property template.
-        if (comparison.MatchMode != MatchMode.Many || comparison.Property is EventProperty.Keywords)
+        // A non-Equals Many is valid only for the operator-aware scalar string fields; every other Many (Keywords,
+        // numeric, Guid, EventData/UserData) is Equals-any only, so reject non-Equals there rather than emit text the
+        // Lowerer would reject (or, for Keywords, silently drop the operator).
+        if (comparison.MatchMode == MatchMode.Many
+            && comparison.Operator != ComparisonOperator.Equals
+            && !FilterPropertyConstraints.SupportsManyOperators(comparison.Property))
         {
-            stringBuilder.Append(
-                GetComparisonString(comparison.Property, propertyExpression, comparison.Operator, comparison.MatchMode));
+            return false;
         }
+
+        // Many + non-Keywords uses one of the four operator-aware LINQ shapes. Keywords Many and every Single shape
+        // fall through to the operator+property template below.
+        if (comparison is { MatchMode: MatchMode.Many, Property: not EventProperty.Keywords })
+        {
+            AppendManyComparison(comparison, propertyExpression, stringBuilder);
+            formatted = stringBuilder.ToString();
+
+            return true;
+        }
+
+        stringBuilder.Append(
+            GetComparisonString(comparison.Property, propertyExpression, comparison.Operator, comparison.MatchMode));
 
         if (comparison.MatchMode == MatchMode.Many)
         {
@@ -90,15 +105,32 @@ public static class BasicFilterFormatter
             return false;
         }
 
-        if (comparison is { MatchMode: MatchMode.Many, Property: not EventProperty.Keywords })
-        {
-            stringBuilder.Append(
-                GetComparisonString(comparison.Property, propertyExpression, comparison.Operator, comparison.MatchMode));
-        }
-
         formatted = stringBuilder.ToString();
 
         return true;
+    }
+
+    // Emits the Many + non-Keywords advanced-text shape honoring the operator:
+    //   Equals       -> (new[] {"a", "b"}).Contains(F)
+    //   Contains     -> (new[] {"a", "b"}).Any(e => F.Contains(e, StringComparison.OrdinalIgnoreCase))
+    //   NotEqual     -> !(new[] {"a", "b"}).Contains(F)
+    //   NotContains  -> !(new[] {"a", "b"}).Any(e => F.Contains(e, StringComparison.OrdinalIgnoreCase))
+    private static void AppendManyComparison(
+        FilterComparison comparison,
+        string propertyExpression,
+        StringBuilder stringBuilder)
+    {
+        var joined = string.Join("\", \"", comparison.Values.Select(EscapeStringLiteral));
+        var negated = comparison.Operator is ComparisonOperator.NotEqual or ComparisonOperator.NotContains;
+        var isContains = comparison.Operator is ComparisonOperator.Contains or ComparisonOperator.NotContains;
+
+        if (negated) { stringBuilder.Append('!'); }
+
+        stringBuilder.Append($"(new[] {{\"{joined}\"}})");
+
+        stringBuilder.Append(isContains
+            ? $".Any(e => {propertyExpression}.Contains(e, StringComparison.OrdinalIgnoreCase))"
+            : $".Contains({propertyExpression})");
     }
 
     private static void EmitManyValues(FilterComparison comparison, StringBuilder stringBuilder)

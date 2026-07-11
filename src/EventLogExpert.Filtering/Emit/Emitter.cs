@@ -355,8 +355,89 @@ internal static class Emitter
         return resolvedEvent => KeywordMatch.MatchAnyOf(resolvedEvent.Keywords, needles);
     }
 
-    private static Func<ResolvedEvent, bool> EmitMultiEquals(MultiEqualsNode node) =>
-        node.Field switch
+    private static Func<ResolvedEvent, bool> EmitMultiContains(MultiContainsNode node)
+    {
+        var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+        if (node.Field == ResolvedEventField.UserId)
+        {
+            return EmitMultiContainsUserId(node.Values, comparison, node.Negated);
+        }
+
+        Func<ResolvedEvent, string> getter = node.Field switch
+        {
+            ResolvedEventField.ComputerName => static resolvedEvent => resolvedEvent.ComputerName,
+            ResolvedEventField.Description => static resolvedEvent => resolvedEvent.Description,
+            ResolvedEventField.Level => static resolvedEvent => resolvedEvent.Level,
+            ResolvedEventField.LogName => static resolvedEvent => resolvedEvent.LogName,
+            ResolvedEventField.Source => static resolvedEvent => resolvedEvent.Source,
+            ResolvedEventField.TaskCategory => static resolvedEvent => resolvedEvent.TaskCategory,
+            ResolvedEventField.Opcode => static resolvedEvent => resolvedEvent.Opcode,
+            ResolvedEventField.Xml => static resolvedEvent => resolvedEvent.Xml,
+            _ => throw new EmitException($"Cannot emit MultiContains for field '{node.Field}'.")
+        };
+
+        var needles = CompileTimeLiterals.Snapshot(node.Values);
+        var negated = node.Negated;
+
+        return resolvedEvent =>
+        {
+            var actual = getter(resolvedEvent);
+            var matched = false;
+
+            for (var i = 0; i < needles.Length; i++)
+            {
+                if (actual.Contains(needles[i], comparison))
+                {
+                    matched = true;
+
+                    break;
+                }
+            }
+
+            return negated ? !matched : matched;
+        };
+    }
+
+    private static Func<ResolvedEvent, bool> EmitMultiContainsUserId(
+        IReadOnlyList<string> values,
+        StringComparison comparison,
+        bool negated)
+    {
+        var needles = CompileTimeLiterals.Snapshot(values);
+
+        // Presence-required: an absent UserId is a decisive NoMatch for both polarities.
+        return resolvedEvent =>
+        {
+            if (resolvedEvent.UserId is null) { return false; }
+
+            var sddl = resolvedEvent.UserId.Value;
+            var matched = false;
+
+            for (var i = 0; i < needles.Length; i++)
+            {
+                if (sddl.Contains(needles[i], comparison))
+                {
+                    matched = true;
+
+                    break;
+                }
+            }
+
+            return negated ? !matched : matched;
+        };
+    }
+
+    private static Func<ResolvedEvent, bool> EmitMultiEquals(MultiEqualsNode node)
+    {
+        // UserId is presence-required (absent -> NoMatch for both polarities); every other field negates the whole
+        // positive result, which correctly matches single-value semantics (an absent nullable id is a `!=` Match).
+        if (node.Field == ResolvedEventField.UserId)
+        {
+            return EmitMultiEqualsUserId(node.Values, node.Negated);
+        }
+
+        Func<ResolvedEvent, bool> positive = node.Field switch
         {
             ResolvedEventField.Id => EmitMultiEqualsInt(static resolvedEvent => resolvedEvent.Id, node.Values),
             ResolvedEventField.ProcessId => EmitMultiEqualsNullableInt(static resolvedEvent => resolvedEvent.ProcessId, node.Values),
@@ -364,7 +445,6 @@ internal static class Emitter
             ResolvedEventField.RecordId => EmitMultiEqualsNullableLong(static resolvedEvent => resolvedEvent.RecordId, node.Values),
             ResolvedEventField.ActivityId => EmitMultiEqualsNullableGuid(static resolvedEvent => resolvedEvent.ActivityId, node.Values),
             ResolvedEventField.RelatedActivityId => EmitMultiEqualsNullableGuid(static resolvedEvent => resolvedEvent.RelatedActivityId, node.Values),
-            ResolvedEventField.UserId => EmitMultiEqualsUserId(node.Values),
             ResolvedEventField.ComputerName => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.ComputerName, node.Values),
             ResolvedEventField.Description => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Description, node.Values),
             ResolvedEventField.Level => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Level, node.Values),
@@ -375,6 +455,9 @@ internal static class Emitter
             ResolvedEventField.Xml => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Xml, node.Values),
             _ => throw new EmitException($"Cannot emit MultiEquals for field '{node.Field}'.")
         };
+
+        return node.Negated ? resolvedEvent => !positive(resolvedEvent) : positive;
+    }
 
     private static Func<ResolvedEvent, bool> EmitMultiEqualsInt(
         Func<ResolvedEvent, int> getter,
@@ -477,22 +560,29 @@ internal static class Emitter
         };
     }
 
-    private static Func<ResolvedEvent, bool> EmitMultiEqualsUserId(IReadOnlyList<string> values)
+    private static Func<ResolvedEvent, bool> EmitMultiEqualsUserId(IReadOnlyList<string> values, bool negated)
     {
         var snapshot = CompileTimeLiterals.Snapshot(values);
 
+        // Presence-required: an absent UserId is a decisive NoMatch for both polarities.
         return resolvedEvent =>
         {
             if (resolvedEvent.UserId is null) { return false; }
 
             var sddl = resolvedEvent.UserId.Value;
+            var matched = false;
 
             for (var i = 0; i < snapshot.Length; i++)
             {
-                if (string.Equals(sddl, snapshot[i], StringComparison.Ordinal)) { return true; }
+                if (string.Equals(sddl, snapshot[i], StringComparison.Ordinal))
+                {
+                    matched = true;
+
+                    break;
+                }
             }
 
-            return false;
+            return negated ? !matched : matched;
         };
     }
 
@@ -511,6 +601,7 @@ internal static class Emitter
             KeywordsAnyContainsNode kn => EmitKeywordsAnyContains(kn),
             KeywordsMatchAnyOfNode kn => EmitKeywordsMatchAnyOf(kn),
             MultiEqualsNode mn => EmitMultiEquals(mn),
+            MultiContainsNode mcn => EmitMultiContains(mcn),
             _ => throw new EmitException($"Unsupported filter node {node.GetType().Name}.")
         };
 

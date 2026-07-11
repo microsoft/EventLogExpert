@@ -81,11 +81,36 @@ internal sealed class KeywordsMatchAnyOfNode(IReadOnlyList<string> needles) : Fi
 
 /// <summary>
 ///     <c>(new[] {...}).Contains({Field})</c> — and the int variant <c>(new[] {...}).Contains({Field}.ToString())</c>
-///     for Id and Level.
+///     for Id and Level. <see cref="Negated" /> carries the <c>!(...)</c> ("is none of") form; the emitter keeps
+///     presence-required fields (UserId) at NoMatch for an absent value regardless of negation.
 /// </summary>
-internal sealed class MultiEqualsNode(ResolvedEventField field, IReadOnlyList<string> values) : FilterNode
+internal sealed class MultiEqualsNode(ResolvedEventField field, IReadOnlyList<string> values, bool negated = false)
+    : FilterNode
 {
     public ResolvedEventField Field { get; } = field;
+
+    public bool Negated { get; } = negated;
+
+    public IReadOnlyList<string> Values { get; } = values;
+}
+
+/// <summary>
+///     <c>(new[] {...}).Any(e =&gt; {Field}.Contains(e, OIC))</c> — string "contains any of" over a scalar string
+///     field. <see cref="Negated" /> carries the <c>!(...)</c> ("contains none of") form. <see cref="IgnoreCase" /> is
+///     true for the Basic (always <c>OrdinalIgnoreCase</c>) shape. UserId is presence-required (an absent UserId is
+///     NoMatch for both polarities).
+/// </summary>
+internal sealed class MultiContainsNode(
+    ResolvedEventField field,
+    IReadOnlyList<string> values,
+    bool ignoreCase,
+    bool negated = false) : FilterNode
+{
+    public ResolvedEventField Field { get; } = field;
+
+    public bool IgnoreCase { get; } = ignoreCase;
+
+    public bool Negated { get; } = negated;
 
     public IReadOnlyList<string> Values { get; } = values;
 }

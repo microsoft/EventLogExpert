@@ -260,8 +260,79 @@ internal static class ColumnEmitter
             KeywordMatch.MatchAnyOf(reader.GetKeywords(locator), needles) ? FilterMatch.Match : FilterMatch.NoMatch;
     }
 
-    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitMultiEquals(MultiEqualsNode node) =>
-        node.Field switch
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitMultiContains(MultiContainsNode node)
+    {
+        var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+        if (node.Field == ResolvedEventField.UserId)
+        {
+            return EmitMultiContainsUserId(node.Values, comparison, node.Negated);
+        }
+
+        var fieldId = ContainsFieldId(node.Field);
+        var needles = CompileTimeLiterals.Snapshot(node.Values);
+        var negated = node.Negated;
+
+        return (reader, locator) =>
+        {
+            var actual = reader.GetField(locator, fieldId).AsString();
+            var matched = false;
+
+            for (var i = 0; i < needles.Length; i++)
+            {
+                if (actual.Contains(needles[i], comparison))
+                {
+                    matched = true;
+
+                    break;
+                }
+            }
+
+            return (negated ? !matched : matched) ? FilterMatch.Match : FilterMatch.NoMatch;
+        };
+    }
+
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitMultiContainsUserId(
+        IReadOnlyList<string> values,
+        StringComparison comparison,
+        bool negated)
+    {
+        var needles = CompileTimeLiterals.Snapshot(values);
+
+        // Presence-required: an absent UserId is a decisive NoMatch for both polarities.
+        return (reader, locator) =>
+        {
+            var value = reader.GetField(locator, EventFieldId.UserId);
+
+            if (value.Kind == EventFieldValueKind.Null) { return FilterMatch.NoMatch; }
+
+            var sddl = value.AsString();
+            var matched = false;
+
+            for (var i = 0; i < needles.Length; i++)
+            {
+                if (sddl.Contains(needles[i], comparison))
+                {
+                    matched = true;
+
+                    break;
+                }
+            }
+
+            return (negated ? !matched : matched) ? FilterMatch.Match : FilterMatch.NoMatch;
+        };
+    }
+
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitMultiEquals(MultiEqualsNode node)
+    {
+        // UserId is presence-required (absent -> NoMatch for both polarities); every other field negates the whole
+        // positive result, matching single-value semantics (an absent nullable id is a `!=` Match).
+        if (node.Field == ResolvedEventField.UserId)
+        {
+            return EmitMultiEqualsUserId(node.Values, node.Negated);
+        }
+
+        Func<IEventColumnReader, EventLocator, FilterMatch> positive = node.Field switch
         {
             ResolvedEventField.Id => EmitMultiEqualsInt(EventFieldId.Id, node.Values),
             ResolvedEventField.ProcessId => EmitMultiEqualsInt(EventFieldId.ProcessId, node.Values),
@@ -269,7 +340,6 @@ internal static class ColumnEmitter
             ResolvedEventField.RecordId => EmitMultiEqualsLong(EventFieldId.RecordId, node.Values),
             ResolvedEventField.ActivityId => EmitMultiEqualsGuid(EventFieldId.ActivityId, node.Values),
             ResolvedEventField.RelatedActivityId => EmitMultiEqualsGuid(EventFieldId.RelatedActivityId, node.Values),
-            ResolvedEventField.UserId => EmitMultiEqualsUserId(node.Values),
             ResolvedEventField.ComputerName => EmitMultiEqualsString(EventFieldId.ComputerName, node.Values),
             ResolvedEventField.Description => EmitMultiEqualsString(EventFieldId.Description, node.Values),
             ResolvedEventField.Level => EmitMultiEqualsString(EventFieldId.Level, node.Values),
@@ -280,6 +350,9 @@ internal static class ColumnEmitter
             ResolvedEventField.Xml => EmitMultiEqualsString(EventFieldId.Xml, node.Values),
             _ => throw new EmitException($"Cannot emit MultiEquals for field '{node.Field}'.")
         };
+
+        return node.Negated ? (reader, locator) => Negate(positive(reader, locator)) : positive;
+    }
 
     private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitMultiEqualsGuid(
         EventFieldId field,
@@ -371,11 +444,13 @@ internal static class ColumnEmitter
         };
     }
 
-    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitMultiEqualsUserId(IReadOnlyList<string> values)
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitMultiEqualsUserId(
+        IReadOnlyList<string> values,
+        bool negated)
     {
         var snapshot = CompileTimeLiterals.Snapshot(values);
 
-        // Presence-required: an absent UserId is a decisive NoMatch.
+        // Presence-required: an absent UserId is a decisive NoMatch for both polarities.
         return (reader, locator) =>
         {
             var value = reader.GetField(locator, EventFieldId.UserId);
@@ -383,13 +458,19 @@ internal static class ColumnEmitter
             if (value.Kind == EventFieldValueKind.Null) { return FilterMatch.NoMatch; }
 
             var sddl = value.AsString();
+            var matched = false;
 
             for (var i = 0; i < snapshot.Length; i++)
             {
-                if (string.Equals(sddl, snapshot[i], StringComparison.Ordinal)) { return FilterMatch.Match; }
+                if (string.Equals(sddl, snapshot[i], StringComparison.Ordinal))
+                {
+                    matched = true;
+
+                    break;
+                }
             }
 
-            return FilterMatch.NoMatch;
+            return (negated ? !matched : matched) ? FilterMatch.Match : FilterMatch.NoMatch;
         };
     }
 
@@ -408,6 +489,7 @@ internal static class ColumnEmitter
             KeywordsAnyContainsNode kac => EmitKeywordsAnyContains(kac),
             KeywordsMatchAnyOfNode kma => EmitKeywordsMatchAnyOf(kma),
             MultiEqualsNode mn => EmitMultiEquals(mn),
+            MultiContainsNode mcn => EmitMultiContains(mcn),
             UserDataComparisonNode ud => EmitUserData(ud.CanonicalPath, UserDataMatch.Comparison(ud)),
             UserDataContainsNode ud => EmitUserData(ud.CanonicalPath, UserDataMatch.Contains(ud)),
             UserDataMultiEqualsNode ud => EmitUserData(ud.CanonicalPath, UserDataMatch.MultiEquals(ud)),

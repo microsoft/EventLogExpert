@@ -21,4 +21,12 @@
     {
         <ValueSelectItem T="ComparisonKind" Value="ComparisonKind.MultiSelect" />
     }
+    @if (SupportsManyOperators)
+    {
+        <ValueSelectItem T="ComparisonKind" Value="ComparisonKind.MultiContains" />
+
+        <ValueSelectItem T="ComparisonKind" Value="ComparisonKind.MultiNotEqual" />
+
+        <ValueSelectItem T="ComparisonKind" Value="ComparisonKind.MultiNotContains" />
+    }
 </ValueSelect>

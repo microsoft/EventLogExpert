@@ -166,6 +166,18 @@ public sealed class ColumnEmitterParityTests
         "(new[] {\"1234567890123\", \"999\"}).Contains(RecordId.ToString())",
         "(new[] {\"11111111-2222-3333-4444-555555555555\"}).Contains(ActivityId.ToString())",
 
+        // Multi-select honoring the operator over scalar strings: Is Any Of / Contains Any / Is None Of / Contains
+        // None, including presence-required UserId (corpus[1] NoNullables has a null UserId) and Opcode.
+        "(new[] {\"Test\", \"Other\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))",
+        "!(new[] {\"TestSource\"}).Contains(Source)",
+        "!(new[] {\"Test\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))",
+        "(new[] {\"Error\", \"Critical\"}).Any(e => Level.Contains(e, StringComparison.OrdinalIgnoreCase))",
+        "!(new[] {\"Information\"}).Contains(Level)",
+        "!(new[] {\"Start\"}).Any(e => Opcode.Contains(e, StringComparison.OrdinalIgnoreCase))",
+        "(new[] {\"S-1-5-18\", \"S-1-5-19\"}).Any(e => UserId.Contains(e, StringComparison.OrdinalIgnoreCase))",
+        "!(new[] {\"S-1-5-99\"}).Contains(UserId)",
+        "!(new[] {\"S-1-5-99\"}).Any(e => UserId.Contains(e, StringComparison.OrdinalIgnoreCase))",
+
         // EventData exact-name (presence-required, all ops; typed coercion; duplicate-name first-wins; absent name).
         "EventData[\"User\"] == \"admin\"",
         "EventData[\"User\"] != \"admin\"",
@@ -257,6 +269,83 @@ public sealed class ColumnEmitterParityTests
                 expected == actual,
                 $"Divergence at corpus[{index}] for '{expression}': row={expected}, column={actual}.");
         }
+    }
+
+    // MultiContains on Xml is reachable only via Advanced text (Xml is text-only in Basic), but the compiled filter
+    // must still flag RequiresXml on both backends so the columnar reader materializes Xml before evaluation.
+    [Fact]
+    public void MultiContains_OnXml_FlagsRequiresXmlOnBothBackends()
+    {
+        const string expression = "(new[] {\"data\"}).Any(e => Xml.Contains(e, StringComparison.OrdinalIgnoreCase))";
+
+        Assert.True(FilterParser.TryCompile(expression, out CompiledFilter? row, out var rowError), rowError);
+        Assert.True(row.RequiresXml);
+
+        Assert.True(
+            FilterParser.TryCompileColumn(expression, out ColumnCompiledFilter? column, out var columnError),
+            columnError);
+        Assert.True(column.RequiresXml);
+    }
+
+    // Presence-required UserId: an absent UserId is NoMatch for ALL FOUR Many operators on BOTH backends. Locks the
+    // negation-presence invariant so "is none of" / "contains none" don't wrongly match a missing UserId.
+    [Fact]
+    public void MultiSelectOperators_AbsentUserId_IsNoMatchForAllFourOperators()
+    {
+        ResolvedEvent absentUserId = new("TestLog", LogPathType.Channel) { Id = 1, UserId = null };
+
+        AssertBothBackends("(new[] {\"S-1-5-18\"}).Contains(UserId)", absentUserId, FilterMatch.NoMatch);
+        AssertBothBackends(
+            "(new[] {\"S-1-5\"}).Any(e => UserId.Contains(e, StringComparison.OrdinalIgnoreCase))",
+            absentUserId,
+            FilterMatch.NoMatch);
+        AssertBothBackends("!(new[] {\"S-1-5-18\"}).Contains(UserId)", absentUserId, FilterMatch.NoMatch);
+        AssertBothBackends(
+            "!(new[] {\"S-1-5\"}).Any(e => UserId.Contains(e, StringComparison.OrdinalIgnoreCase))",
+            absentUserId,
+            FilterMatch.NoMatch);
+    }
+
+    // Multi-select honoring the operator over a scalar string field: exact (not differential) results pin the four Many
+    // shapes (Is Any Of / Contains Any / Is None Of / Contains None) on BOTH backends.
+    [Fact]
+    public void MultiSelectOperators_Absolute_OverScalarString()
+    {
+        ResolvedEvent testSource = new("TestLog", LogPathType.Channel) { Id = 1, Source = "TestSource" };
+        ResolvedEvent otherSource = new("TestLog", LogPathType.Channel) { Id = 2, Source = "OtherSource" };
+
+        AssertBothBackends("(new[] {\"TestSource\", \"Foo\"}).Contains(Source)", testSource, FilterMatch.Match);
+        AssertBothBackends("(new[] {\"TestSource\", \"Foo\"}).Contains(Source)", otherSource, FilterMatch.NoMatch);
+        AssertBothBackends(
+            "(new[] {\"Test\", \"Foo\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))",
+            testSource,
+            FilterMatch.Match);
+        AssertBothBackends(
+            "(new[] {\"Test\", \"Foo\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))",
+            otherSource,
+            FilterMatch.NoMatch);
+        AssertBothBackends("!(new[] {\"TestSource\"}).Contains(Source)", testSource, FilterMatch.NoMatch);
+        AssertBothBackends("!(new[] {\"TestSource\"}).Contains(Source)", otherSource, FilterMatch.Match);
+        AssertBothBackends(
+            "!(new[] {\"Test\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))",
+            testSource,
+            FilterMatch.NoMatch);
+        AssertBothBackends(
+            "!(new[] {\"Test\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))",
+            otherSource,
+            FilterMatch.Match);
+
+        // Second-element match: the "any of" must scan the whole list, not just element 0.
+        AssertBothBackends("(new[] {\"Nope\", \"OtherSource\"}).Contains(Source)", otherSource, FilterMatch.Match);
+        AssertBothBackends(
+            "(new[] {\"Nope\", \"Other\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))",
+            otherSource,
+            FilterMatch.Match);
+        AssertBothBackends("!(new[] {\"Nope\", \"OtherSource\"}).Contains(Source)", otherSource, FilterMatch.NoMatch);
+        AssertBothBackends(
+            "!(new[] {\"Nope\", \"Other\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))",
+            otherSource,
+            FilterMatch.NoMatch);
     }
 
     // Absolute (not differential) oracle for the Opcode reader-enabler field: exact match results pin the string-compare
