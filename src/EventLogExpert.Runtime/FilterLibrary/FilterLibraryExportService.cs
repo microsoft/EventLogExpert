@@ -83,7 +83,14 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
                 return new ImportPreflight([], [], [], error: "Import file contains an entry with a missing name.");
             }
 
-            var nonParseableNames = incoming.Where(EntryHasNonParseableBasicFilter).Select(entry => entry.Name).ToList();
+            var classifications = incoming
+                .Select(entry => (Entry: entry, Class: ClassifyEntry(entry)))
+                .ToList();
+
+            var nonParseableNames = classifications
+                .Where(classified => classified.Class.HasNonParseable)
+                .Select(classified => classified.Entry.Name)
+                .ToList();
 
             if (nonParseableNames.Count > 0)
             {
@@ -102,7 +109,10 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
                 };
             }
 
-            var flaggedNames = incoming.Where(EntryHasEmptyValueBasicFilter).Select(entry => entry.Name).ToList();
+            var flaggedNames = classifications
+                .Where(classified => classified.Class.HasFlagged)
+                .Select(classified => classified.Entry.Name)
+                .ToList();
 
             return ComputePreflight(incoming, existingEntries) with
             {
@@ -140,6 +150,33 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
         return normalized.HasEmptyMultiContainsComparison()
             ? (EmptyValueClass.NormalizableDrop, null)
             : (EmptyValueClass.NormalizableKeep, normalized);
+    }
+
+    private static (bool HasNonParseable, bool HasFlagged) ClassifyEntry(LibraryEntry entry)
+    {
+        switch (entry)
+        {
+            case LibraryEntrySavedFilter savedEntry:
+                var savedClass = ClassifyBasicFilter(savedEntry.Filter).Class;
+
+                return (savedClass == EmptyValueClass.NonParseable, IsFlagged(savedClass));
+
+            case LibraryEntryFilterSet setEntry:
+                var hasNonParseable = false;
+                var hasFlagged = false;
+
+                foreach (var member in setEntry.Filters)
+                {
+                    var memberClass = ClassifyBasicFilter(member).Class;
+                    hasNonParseable |= memberClass == EmptyValueClass.NonParseable;
+                    hasFlagged |= IsFlagged(memberClass);
+                }
+
+                return (hasNonParseable, hasFlagged);
+
+            default:
+                return (false, false);
+        }
     }
 
     private static LibraryEntry CloneWithFreshId(LibraryEntry entry) => entry switch
@@ -285,20 +322,6 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
         LibraryEntryFilterSet fs => FilterLibraryDedupKeys.ForFilterSet(fs),
         LibraryEntrySavedFilter sf => FilterLibraryDedupKeys.ForSavedFilter(sf),
         _ => throw new NotSupportedException($"Unknown LibraryEntry kind: {entry.GetType().Name}"),
-    };
-
-    private static bool EntryHasEmptyValueBasicFilter(LibraryEntry entry) => entry switch
-    {
-        LibraryEntrySavedFilter f => IsFlagged(ClassifyBasicFilter(f.Filter).Class),
-        LibraryEntryFilterSet fs => fs.Filters.Any(f => IsFlagged(ClassifyBasicFilter(f).Class)),
-        _ => false,
-    };
-
-    private static bool EntryHasNonParseableBasicFilter(LibraryEntry entry) => entry switch
-    {
-        LibraryEntrySavedFilter f => ClassifyBasicFilter(f.Filter).Class == EmptyValueClass.NonParseable,
-        LibraryEntryFilterSet fs => fs.Filters.Any(f => ClassifyBasicFilter(f).Class == EmptyValueClass.NonParseable),
-        _ => false,
     };
 
     private static bool IsFlagged(EmptyValueClass classification) =>
