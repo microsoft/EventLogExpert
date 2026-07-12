@@ -163,8 +163,10 @@ public static class EventPropertyValuesCache
     private static bool IsLogDerivedProperty(EventProperty property) => property is
         EventProperty.Id or
         EventProperty.ActivityId or
+        EventProperty.RelatedActivityId or
         EventProperty.Keywords or
         EventProperty.Source or
         EventProperty.TaskCategory or
+        EventProperty.Opcode or
         EventProperty.LogName;
 }
