@@ -187,46 +187,6 @@
       ]
     },
     {
-      "id": "suspicious-lolbin-execution",
-      "name": "Suspicious LOLBin execution",
-      "purpose": "Process-creation events whose command line names a commonly abused living-off-the-land binary.",
-      "group": "ThreatsAndIncidentResponse",
-      "channels": [ "Security" ],
-      "requiresAdmin": true,
-      "priority": 1,
-      "order": 13,
-      "version": 1,
-      "filters": [
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "rundll32" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "regsvr32" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "mshta" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "wmic" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "certutil" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "bitsadmin" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "msiexec" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "installutil" } } ] }
-      ]
-    },
-    {
-      "id": "encoded-hidden-powershell-cmdline",
-      "name": "Encoded / hidden PowerShell command line",
-      "purpose": "Process-creation events whose command line shows encoded or hidden PowerShell execution.",
-      "group": "ThreatsAndIncidentResponse",
-      "channels": [ "Security" ],
-      "requiresAdmin": true,
-      "priority": 1,
-      "order": 14,
-      "version": 1,
-      "filters": [
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "-enc" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "-EncodedCommand" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "FromBase64String" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "-w hidden" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "-nop" } } ] },
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "Description", "operator": "Contains", "value": "DownloadString" } } ] }
-      ]
-    },
-    {
       "id": "sysmon-process-creation",
       "name": "Sysmon process creation",
       "purpose": "Sysmon process-create events with full parent and hash detail (1).",
@@ -555,7 +515,7 @@
       "filters": [
         { "color": "DarkRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "matchMode": "Many", "values": [ "mshta.exe", "wscript.exe", "cscript.exe" ] } } ] },
         { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "matchMode": "Many", "values": [ "rundll32.exe", "regsvr32.exe", "installutil.exe" ] } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "matchMode": "Many", "values": [ "certutil.exe", "bitsadmin.exe" ] } } ] }
+        { "color": "Orange", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "matchMode": "Many", "values": [ "certutil.exe", "bitsadmin.exe", "wmic.exe" ] } } ] }
       ]
     },
     {
@@ -587,7 +547,7 @@
       "order": 39,
       "version": 1,
       "filters": [
-        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "matchMode": "Many", "values": [ "-EncodedCommand", "FromBase64String", "IEX", "DownloadString", "-w hidden", "-nop" ] } } ] }
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "matchMode": "Many", "values": [ "-EncodedCommand", "-enc ", "FromBase64String", "IEX", "DownloadString", "-w hidden", "-nop" ] } } ] }
       ]
     },
     {
@@ -620,6 +580,20 @@
         { "color": "DarkRed", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "matchMode": "Many", "values": [ "mshta.exe", "wscript.exe", "cscript.exe" ] } } ] },
         { "color": "Red", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "matchMode": "Many", "values": [ "powershell.exe", "pwsh.exe" ] } } ] },
         { "color": "Orange", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "matchMode": "Many", "values": [ "rundll32.exe", "regsvr32.exe", "certutil.exe" ] } } ] }
+      ]
+    },
+    {
+      "id": "lolbin-in-process-command-line",
+      "name": "LOLBin referenced in process command line",
+      "purpose": "4688 process-creation events whose CommandLine EventData field names a living-off-the-land binary. Catches LOLBins invoked indirectly through a proxy (cmd /c certutil ...), where NewProcessName is the parent shell rather than the LOLBin itself. Companion to lolbin-process-creation-by-name, which catches direct execution by NewProcessName. Requires Audit Process Creation and the 'Include command line in process creation events' policy. ATT&CK T1218, T1105, T1047.",
+      "group": "ThreatsAndIncidentResponse",
+      "channels": [ "Security" ],
+      "requiresAdmin": true,
+      "priority": 1,
+      "order": 42,
+      "version": 1,
+      "filters": [
+        { "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CommandLine", "operator": "Contains", "matchMode": "Many", "values": [ "rundll32", "regsvr32", "mshta", "wmic", "certutil", "bitsadmin", "installutil", "wscript", "cscript" ] } } ] }
       ]
     }
   ]
