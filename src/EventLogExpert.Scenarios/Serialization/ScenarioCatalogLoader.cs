@@ -342,6 +342,13 @@ internal static partial class ScenarioCatalogLoader
             return false;
         }
 
+        if (matchMode == MatchMode.Many && (dto.Values is null || dto.Values.Count == 0))
+        {
+            errors.Add($"{context}: a Many comparison must provide at least one value.");
+
+            return false;
+        }
+
         if (matchMode == MatchMode.Many &&
             op is ComparisonOperator.Contains or ComparisonOperator.NotContains &&
             dto.Values is not null &&

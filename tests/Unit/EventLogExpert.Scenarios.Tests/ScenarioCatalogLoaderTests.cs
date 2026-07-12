@@ -256,6 +256,18 @@ public sealed class ScenarioCatalogLoaderTests
     }
 
     [Fact]
+    public void Load_ManyWithNoValues_IsError()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ],
+              "filters": [ { "comparison": { "property": "Source", "matchMode": "Many", "values": [] } } ] }
+            """));
+
+        Assert.Contains(result.Errors, error => error.Contains("at least one value"));
+    }
+
+    [Fact]
     public void Load_MinimalValidScenario_Succeeds()
     {
         var result = Load(Wrap("""
