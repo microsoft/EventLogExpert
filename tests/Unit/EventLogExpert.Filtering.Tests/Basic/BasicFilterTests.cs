@@ -8,6 +8,65 @@ namespace EventLogExpert.Filtering.Tests.Basic;
 public sealed class BasicFilterTests
 {
     [Fact]
+    public void HasEmptyMultiContainsComparison_EveryComparisonKeepsValues_ReturnsFalse()
+    {
+        var root = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.Contains,
+            MatchMode = MatchMode.Many,
+            Values = ["a", ""]
+        };
+        var predicate = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.NotContains,
+            MatchMode = MatchMode.Many,
+            Values = ["", "b"]
+        };
+        var filter = new BasicFilter(root, [new FilterPredicate(predicate, false)]);
+
+        Assert.False(filter.WithNormalizedValues().HasEmptyMultiContainsComparison());
+    }
+
+    [Fact]
+    public void HasEmptyMultiContainsComparison_PredicateEmptiesOut_ReturnsTrue()
+    {
+        var root = new FilterComparison
+        {
+            Property = EventProperty.Id,
+            Operator = ComparisonOperator.Equals,
+            MatchMode = MatchMode.Single,
+            Value = "4624"
+        };
+        var predicate = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.Contains,
+            MatchMode = MatchMode.Many,
+            Values = [""]
+        };
+        var filter = new BasicFilter(root, [new FilterPredicate(predicate, false)]);
+
+        Assert.True(filter.WithNormalizedValues().HasEmptyMultiContainsComparison());
+    }
+
+    [Fact]
+    public void HasEmptyMultiContainsComparison_RootEmptiesOut_ReturnsTrue()
+    {
+        var root = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.Contains,
+            MatchMode = MatchMode.Many,
+            Values = [""]
+        };
+        var filter = new BasicFilter(root, ImmutableList<FilterPredicate>.Empty);
+
+        Assert.True(filter.WithNormalizedValues().HasEmptyMultiContainsComparison());
+    }
+
+    [Fact]
     public void WithNormalizedValues_NormalizesRootAndEveryPredicate()
     {
         var root = new FilterComparison

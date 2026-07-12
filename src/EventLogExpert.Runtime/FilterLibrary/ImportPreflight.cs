@@ -63,4 +63,8 @@ public sealed record ImportPreflight
     public bool ImportBlocked { get; init; }
 
     public IReadOnlyList<string> InvalidLegacyNames { get; init; }
+
+    public IReadOnlyList<string> NormalizableEmptyValueEntryNames { get; init; } = [];
+
+    public IReadOnlyList<string> NormalizeRemovedFilterNames { get; init; } = [];
 }

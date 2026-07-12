@@ -14,6 +14,64 @@ public sealed class FilterComparisonTests
         Assert.Empty(comparison.Values);
     }
 
+    [Theory]
+    [InlineData(ComparisonOperator.Contains)]
+    [InlineData(ComparisonOperator.NotContains)]
+    public void IsEmptyMultiContains_ManyContainsOrNotContainsWithNoValues_ReturnsTrue(ComparisonOperator op)
+    {
+        var comparison = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = op,
+            MatchMode = MatchMode.Many,
+            Values = []
+        };
+
+        Assert.True(comparison.IsEmptyMultiContains());
+    }
+
+    [Fact]
+    public void IsEmptyMultiContains_ManyContainsWithValues_ReturnsFalse()
+    {
+        var comparison = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.Contains,
+            MatchMode = MatchMode.Many,
+            Values = ["a"]
+        };
+
+        Assert.False(comparison.IsEmptyMultiContains());
+    }
+
+    [Fact]
+    public void IsEmptyMultiContains_ManyEqualsWithNoValues_ReturnsFalse()
+    {
+        var comparison = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.Equals,
+            MatchMode = MatchMode.Many,
+            Values = []
+        };
+
+        Assert.False(comparison.IsEmptyMultiContains());
+    }
+
+    [Fact]
+    public void IsEmptyMultiContains_SingleMode_ReturnsFalse()
+    {
+        var comparison = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.Contains,
+            MatchMode = MatchMode.Single,
+            Value = ""
+        };
+
+        Assert.False(comparison.IsEmptyMultiContains());
+    }
+
     [Fact]
     public void WithField_ShouldNotMutateOriginal()
     {

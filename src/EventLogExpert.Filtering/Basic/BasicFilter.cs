@@ -35,4 +35,13 @@ public sealed record BasicFilter(
             ? this
             : new BasicFilter(Comparison: comparison, Predicates: predicates);
     }
+
+    /// <summary>
+    ///     True when the root comparison or any predicate is an empty <see cref="MatchMode.Many" /> Contains/NotContains
+    ///     criterion (see <see cref="FilterComparison.IsEmptyMultiContains" />). Evaluate on the
+    ///     <see cref="WithNormalizedValues" /> result to detect a filter whose only value in some criterion was empty.
+    /// </summary>
+    public bool HasEmptyMultiContainsComparison() =>
+        Comparison.IsEmptyMultiContains() ||
+        Predicates.Any(predicate => predicate.Comparison.IsEmptyMultiContains());
 }

@@ -1,6 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Basic;
+using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using System.Collections.Immutable;
 using System.Text.Json;
@@ -14,7 +16,21 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
 
     private static readonly JsonSerializerOptions s_writeOptions = new() { WriteIndented = true };
 
-    public ImportPreflight Deserialize(string json, IReadOnlyList<LibraryEntry> existingEntries)
+    private enum EmptyValueClass
+    {
+        Clean,
+        NonParseable,
+        NormalizableKeep,
+        NormalizableDrop,
+    }
+
+    public ImportPreflight Deserialize(string json, IReadOnlyList<LibraryEntry> existingEntries) =>
+        Deserialize(json, existingEntries, normalizeEmptyValues: false);
+
+    public ImportPreflight Deserialize(
+        string json,
+        IReadOnlyList<LibraryEntry> existingEntries,
+        bool normalizeEmptyValues)
     {
         ArgumentNullException.ThrowIfNull(existingEntries);
 
@@ -62,9 +78,36 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
                     ?? throw new JsonException("Unsupported import file shape.");
             }
 
-            return incoming.Any(e => e?.Name is null) ?
-                new ImportPreflight([], [], [], error: "Import file contains an entry with a missing name.") :
-                ComputePreflight(incoming, existingEntries);
+            if (incoming.Any(e => e?.Name is null))
+            {
+                return new ImportPreflight([], [], [], error: "Import file contains an entry with a missing name.");
+            }
+
+            var nonParseableNames = incoming.Where(EntryHasNonParseableBasicFilter).Select(entry => entry.Name).ToList();
+
+            if (nonParseableNames.Count > 0)
+            {
+                return new ImportPreflight([], [], [], error:
+                    "Import file contains Basic filter(s) that did not parse into a valid Basic filter: " +
+                    string.Join(", ", nonParseableNames) + ". Remove or fix them and re-import.");
+            }
+
+            if (normalizeEmptyValues)
+            {
+                var (normalizedEntries, removedFilterNames) = NormalizeEmptyValueEntries(incoming);
+
+                return ComputePreflight(normalizedEntries, existingEntries) with
+                {
+                    NormalizeRemovedFilterNames = removedFilterNames,
+                };
+            }
+
+            var flaggedNames = incoming.Where(EntryHasEmptyValueBasicFilter).Select(entry => entry.Name).ToList();
+
+            return ComputePreflight(incoming, existingEntries) with
+            {
+                NormalizableEmptyValueEntryNames = flaggedNames,
+            };
         }
         catch (Exception ex)
         {
@@ -79,6 +122,24 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
         var envelope = new ExportEnvelope(CurrentSchemaVersion, entries);
 
         return JsonSerializer.Serialize(envelope, s_writeOptions);
+    }
+
+    private static (EmptyValueClass Class, BasicFilter? Normalized) ClassifyBasicFilter(SavedFilter filter)
+    {
+        if (filter.Mode != FilterMode.Basic) { return (EmptyValueClass.Clean, null); }
+
+        if (SavedFilter.TryCreate(filter.ComparisonText, mode: FilterMode.Basic)?.BasicFilter is not { } fromText)
+        {
+            return (EmptyValueClass.NonParseable, null);
+        }
+
+        var normalized = fromText.WithNormalizedValues();
+
+        if (ReferenceEquals(fromText, normalized)) { return (EmptyValueClass.Clean, null); }
+
+        return normalized.HasEmptyMultiContainsComparison()
+            ? (EmptyValueClass.NormalizableDrop, null)
+            : (EmptyValueClass.NormalizableKeep, normalized);
     }
 
     private static LibraryEntry CloneWithFreshId(LibraryEntry entry) => entry switch
@@ -177,6 +238,7 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
                 {
                     ambiguous.Add((relaxedMatches.ToImmutableList(), entry));
                 }
+
                 continue;
             }
 
@@ -224,6 +286,121 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
         LibraryEntrySavedFilter sf => FilterLibraryDedupKeys.ForSavedFilter(sf),
         _ => throw new NotSupportedException($"Unknown LibraryEntry kind: {entry.GetType().Name}"),
     };
+
+    private static bool EntryHasEmptyValueBasicFilter(LibraryEntry entry) => entry switch
+    {
+        LibraryEntrySavedFilter f => IsFlagged(ClassifyBasicFilter(f.Filter).Class),
+        LibraryEntryFilterSet fs => fs.Filters.Any(f => IsFlagged(ClassifyBasicFilter(f).Class)),
+        _ => false,
+    };
+
+    private static bool EntryHasNonParseableBasicFilter(LibraryEntry entry) => entry switch
+    {
+        LibraryEntrySavedFilter f => ClassifyBasicFilter(f.Filter).Class == EmptyValueClass.NonParseable,
+        LibraryEntryFilterSet fs => fs.Filters.Any(f => ClassifyBasicFilter(f).Class == EmptyValueClass.NonParseable),
+        _ => false,
+    };
+
+    private static bool IsFlagged(EmptyValueClass classification) =>
+        classification is EmptyValueClass.NormalizableKeep or EmptyValueClass.NormalizableDrop;
+
+    private static (List<LibraryEntry> Entries, List<string> RemovedFilterNames) NormalizeEmptyValueEntries(
+        IReadOnlyList<LibraryEntry> incoming)
+    {
+        var entries = new List<LibraryEntry>(incoming.Count);
+        var removedFilterNames = new List<string>();
+
+        foreach (var entry in incoming)
+        {
+            switch (entry)
+            {
+                case LibraryEntrySavedFilter savedEntry:
+                    var normalizedFilter = NormalizeFilter(savedEntry.Filter);
+
+                    if (normalizedFilter is null)
+                    {
+                        removedFilterNames.Add(savedEntry.Name);
+                    }
+                    else
+                    {
+                        entries.Add(ReferenceEquals(normalizedFilter, savedEntry.Filter)
+                            ? savedEntry
+                            : savedEntry with { Filter = normalizedFilter });
+                    }
+
+                    break;
+
+                case LibraryEntryFilterSet setEntry:
+                    var keptFilters = new List<SavedFilter>(setEntry.Filters.Count);
+                    var changed = false;
+
+                    foreach (var member in setEntry.Filters)
+                    {
+                        var normalizedMember = NormalizeFilter(member);
+
+                        if (normalizedMember is null)
+                        {
+                            removedFilterNames.Add(setEntry.Name);
+                            changed = true;
+                        }
+                        else
+                        {
+                            keptFilters.Add(normalizedMember);
+                            changed |= !ReferenceEquals(normalizedMember, member);
+                        }
+                    }
+
+                    if (keptFilters.Count > 0 || !changed)
+                    {
+                        // Preserve an unchanged set (including one that was already empty); omit only a set whose members
+                        // were all dropped by normalization (those members are recorded in removedFilterNames above).
+                        entries.Add(changed ? setEntry with { Filters = [.. keptFilters] } : setEntry);
+                    }
+
+                    break;
+
+                default:
+                    entries.Add(entry);
+
+                    break;
+            }
+        }
+
+        return (entries, removedFilterNames);
+    }
+
+    private static SavedFilter? NormalizeFilter(SavedFilter filter)
+    {
+        var (classification, normalized) = ClassifyBasicFilter(filter);
+
+        switch (classification)
+        {
+            case EmptyValueClass.NormalizableDrop:
+                return null;
+
+            case EmptyValueClass.NormalizableKeep:
+                if (normalized is null ||
+                    !BasicFilterFormatter.TryFormat(normalized, strictPredicates: true, out var text))
+                {
+                    throw new InvalidOperationException(
+                        $"Could not format the normalized Basic filter '{filter.ComparisonText}'.");
+                }
+
+                return SavedFilter.TryCreate(
+                        text,
+                        normalized,
+                        filter.Color,
+                        filter.IsExcluded,
+                        filter.IsEnabled,
+                        filter.Id,
+                        FilterMode.Basic)
+                    ?? throw new InvalidOperationException(
+                        $"Could not rebuild the normalized Basic filter '{filter.ComparisonText}'.");
+
+            default:
+                return filter;
+        }
+    }
 
     private static IReadOnlyList<LibraryEntry>? ReadBareArrayWithLegacyFallback(JsonElement root)
     {
