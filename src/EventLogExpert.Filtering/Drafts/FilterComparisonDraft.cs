@@ -11,6 +11,11 @@ public sealed class FilterComparisonDraft
     /// <summary>The named EventData field this row targets; meaningful only when <see cref="Property" /> is EventData.</summary>
     public string? EventDataFieldName { get; set; }
 
+    public bool HasUsableManyValues =>
+        Operator is ComparisonOperator.Contains or ComparisonOperator.NotContains
+            ? Values.Any(value => !string.IsNullOrEmpty(value))
+            : Values.Count > 0;
+
     public MatchMode MatchMode { get; set; }
 
     public ComparisonOperator Operator { get; set; }

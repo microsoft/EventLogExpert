@@ -43,6 +43,45 @@ public sealed class EventDataDraftTests
     public void IsComplete_False_WhenValueMissing() => Assert.False(EventDataDraft("User", null).IsComplete);
 
     [Fact]
+    public void IsComplete_ManyContains_RequiresAtLeastOneNonEmptyValue()
+    {
+        var draft = new FilterPredicateDraft
+        {
+            Comparison = new FilterComparisonDraft
+            {
+                Property = EventProperty.Source,
+                Operator = ComparisonOperator.Contains,
+                MatchMode = MatchMode.Many,
+                Values = ["", ""]
+            }
+        };
+
+        Assert.False(draft.IsComplete);
+
+        draft.Comparison.Values = ["", "mshta.exe"];
+
+        Assert.True(draft.IsComplete);
+    }
+
+    [Fact]
+    public void IsComplete_ManyEquals_EmptyValueCounts()
+    {
+        // An empty Equals value legitimately matches an empty-valued field, so the row is complete.
+        var draft = new FilterPredicateDraft
+        {
+            Comparison = new FilterComparisonDraft
+            {
+                Property = EventProperty.Source,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Many,
+                Values = [""]
+            }
+        };
+
+        Assert.True(draft.IsComplete);
+    }
+
+    [Fact]
     public void IsComplete_NonEventDataRow_IgnoresFieldName()
     {
         var draft = new FilterPredicateDraft

@@ -214,11 +214,48 @@ public sealed class FilterDraftModeTests
     }
 
     [Fact]
+    public void HasMeaningfulStructure_ContainsManyOnlyEmpty_IsFalse()
+    {
+        // A Contains-Many that carries only empty values is degenerate (would match everything) and formats to nothing,
+        // so it does not count as meaningful structure.
+        FilterDraft draft = new()
+        {
+            Comparison =
+            {
+                Property = EventProperty.Source,
+                Operator = ComparisonOperator.Contains,
+                MatchMode = MatchMode.Many,
+                Values = ["", ""]
+            }
+        };
+
+        Assert.False(draft.HasMeaningfulStructure);
+    }
+
+    [Fact]
     public void HasMeaningfulStructure_DefaultDraft_IsFalse()
     {
         FilterDraft draft = new();
 
         Assert.False(draft.HasMeaningfulStructure);
+    }
+
+    [Fact]
+    public void HasMeaningfulStructure_EqualsManyEmpty_IsTrue()
+    {
+        // Equals with an empty value is a valid empty-valued-field match, so it carries meaningful data.
+        FilterDraft draft = new()
+        {
+            Comparison =
+            {
+                Property = EventProperty.Source,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Many,
+                Values = [""]
+            }
+        };
+
+        Assert.True(draft.HasMeaningfulStructure);
     }
 
     [Fact]

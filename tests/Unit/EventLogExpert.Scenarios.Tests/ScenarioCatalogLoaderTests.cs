@@ -136,6 +136,46 @@ public sealed class ScenarioCatalogLoaderTests
         Assert.Single(result.Scenarios);
     }
 
+    [Theory]
+    [InlineData("Contains")]
+    [InlineData("NotContains")]
+    public void Load_ContainsManyWithEmptyValue_IsError(string op)
+    {
+        var result = Load(Wrap($$"""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ],
+              "filters": [ { "comparison": { "property": "Source", "operator": "{{op}}", "matchMode": "Many", "values": [ "storahci", "" ] } } ] }
+            """));
+
+        Assert.Contains(result.Errors, error => error.Contains("null or empty value"));
+    }
+
+    [Fact]
+    public void Load_ContainsManyWithNullValue_IsError()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ],
+              "filters": [ { "comparison": { "property": "Source", "operator": "Contains", "matchMode": "Many", "values": [ "storahci", null ] } } ] }
+            """));
+
+        Assert.Contains(result.Errors, error => error.Contains("null or empty value"));
+    }
+
+    [Fact]
+    public void Load_ContainsManyWithWhitespaceValue_IsAccepted()
+    {
+        // A literal space is a valid substring search, not a match-all: the scenario loads with no errors.
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ],
+              "filters": [ { "comparison": { "property": "Source", "operator": "Contains", "matchMode": "Many", "values": [ "a b", " " ] } } ] }
+            """));
+
+        Assert.Empty(result.Errors);
+        Assert.Single(result.Scenarios);
+    }
+
     [Fact]
     public void Load_DuplicateId_IsError()
     {
@@ -149,6 +189,20 @@ public sealed class ScenarioCatalogLoaderTests
             """);
 
         Assert.Contains(result.Errors, error => error.Contains("duplicate id"));
+    }
+
+    [Fact]
+    public void Load_EqualsManyWithEmptyValue_IsAccepted()
+    {
+        // Equals-any with an empty value matches an empty-valued field (not match-all): the scenario loads cleanly.
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ],
+              "filters": [ { "comparison": { "property": "Source", "matchMode": "Many", "values": [ "storahci", "" ] } } ] }
+            """));
+
+        Assert.Empty(result.Errors);
+        Assert.Single(result.Scenarios);
     }
 
     [Fact]
