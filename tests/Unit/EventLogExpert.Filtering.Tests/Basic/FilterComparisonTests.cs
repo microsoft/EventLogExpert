@@ -52,4 +52,83 @@ public sealed class FilterComparisonTests
         Assert.Equal(ComparisonOperator.Contains, updated.Operator);
         Assert.Equal(MatchMode.Single, updated.MatchMode);
     }
+
+    [Fact]
+    public void WithNormalizedValues_ManyContainsAllEmpty_ProducesEmptyList()
+    {
+        var comparison = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.Contains,
+            MatchMode = MatchMode.Many,
+            Values = ["", null!, ""]
+        };
+
+        Assert.Empty(comparison.WithNormalizedValues().Values);
+    }
+
+    [Fact]
+    public void WithNormalizedValues_ManyContainsNoEmpty_ReturnsSameInstance()
+    {
+        var comparison = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.Contains,
+            MatchMode = MatchMode.Many,
+            Values = ["a", " ", "b"]
+        };
+
+        Assert.Same(comparison, comparison.WithNormalizedValues());
+    }
+
+    [Theory]
+    [InlineData(ComparisonOperator.Contains)]
+    [InlineData(ComparisonOperator.NotContains)]
+    public void WithNormalizedValues_ManyContainsOrNotContains_DropsNullAndEmptyButKeepsWhitespace(ComparisonOperator op)
+    {
+        var comparison = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = op,
+            MatchMode = MatchMode.Many,
+            Values = ["a", "", " ", null!, "\t", "b"]
+        };
+
+        var normalized = comparison.WithNormalizedValues();
+
+        // "" and null are degenerate (F.Contains("") is always true); a literal space and tab are valid substring searches.
+        Assert.NotSame(comparison, normalized);
+        Assert.Equal<IEnumerable<string>>(["a", " ", "\t", "b"], normalized.Values);
+    }
+
+    [Theory]
+    [InlineData(ComparisonOperator.Equals)]
+    [InlineData(ComparisonOperator.NotEqual)]
+    public void WithNormalizedValues_ManyEqualsOrNotEqual_PreservesEmptyValue(ComparisonOperator op)
+    {
+        var comparison = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = op,
+            MatchMode = MatchMode.Many,
+            Values = ["a", "", "b"]
+        };
+
+        // Equals/NotEqual with an empty value matches an empty-valued field: preserved, and the instance is unchanged.
+        Assert.Same(comparison, comparison.WithNormalizedValues());
+    }
+
+    [Fact]
+    public void WithNormalizedValues_SingleMode_ReturnsSameInstance()
+    {
+        var comparison = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.Contains,
+            MatchMode = MatchMode.Single,
+            Value = ""
+        };
+
+        Assert.Same(comparison, comparison.WithNormalizedValues());
+    }
 }

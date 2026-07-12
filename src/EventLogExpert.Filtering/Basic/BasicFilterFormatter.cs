@@ -48,6 +48,7 @@ public static class BasicFilterFormatter
         ArgumentNullException.ThrowIfNull(comparison);
 
         formatted = string.Empty;
+        comparison = comparison.WithNormalizedValues();
 
         if (comparison.MatchMode == MatchMode.Single && string.IsNullOrWhiteSpace(comparison.Value))
         {

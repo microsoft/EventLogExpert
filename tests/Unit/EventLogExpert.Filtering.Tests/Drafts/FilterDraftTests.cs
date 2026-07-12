@@ -44,6 +44,27 @@ public sealed class FilterDraftModelTests
     }
 
     [Fact]
+    public void FromSavedFilter_ContainsManyBlobWithEmpty_HydratesWithoutEmptyValue()
+    {
+        var basicFilter = new BasicFilter(
+            new FilterComparison
+            {
+                Property = EventProperty.Source,
+                Operator = ComparisonOperator.Contains,
+                MatchMode = MatchMode.Many,
+                Values = ["mshta.exe", ""]
+            },
+            []);
+
+        var original = FilterBuilder.CreateTestFilter(basicFilter: basicFilter);
+
+        var draft = FilterDraft.FromSavedFilter(original);
+
+        // Reopening a legacy blank-carrying Basic filter shows a clean multiselect (Contains empty stripped on hydrate).
+        Assert.Equal<IEnumerable<string>>(["mshta.exe"], draft.Comparison.Values);
+    }
+
+    [Fact]
     public void FromSavedFilter_DeepCopiesValuesList_SoEditorMutationDoesNotAffectModel()
     {
         // Arrange
@@ -241,5 +262,28 @@ public sealed class FilterDraftModelTests
         Assert.True(source.Predicates[0].JoinWithAny);
         Assert.Equal(EventProperty.Level, source.Predicates[0].Comparison.Property);
         Assert.Equal("Error", source.Predicates[0].Comparison.Value);
+    }
+
+    [Fact]
+    public void TryBuildSavedFilter_ContainsManyWithEmpty_NormalizesTextAndBlob()
+    {
+        var draft = new FilterDraft
+        {
+            Mode = FilterMode.Basic,
+            Comparison =
+            {
+                Property = EventProperty.Source,
+                Operator = ComparisonOperator.Contains,
+                MatchMode = MatchMode.Many,
+                Values = ["mshta.exe", "", "wscript.exe"]
+            }
+        };
+
+        Assert.True(draft.TryBuildSavedFilter(out var saved, out _));
+
+        // Both the compiled text AND the stored Basic model must be free of the degenerate empty value (no drift).
+        Assert.DoesNotContain("\"\"", saved.ComparisonText);
+        Assert.NotNull(saved.BasicFilter);
+        Assert.Equal<IEnumerable<string>>(["mshta.exe", "wscript.exe"], saved.BasicFilter!.Comparison.Values);
     }
 }

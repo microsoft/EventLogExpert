@@ -39,4 +39,16 @@ public sealed record FilterComparison
     /// </summary>
     public FilterComparison WithProperty(EventProperty property) =>
         this with { Property = property, Value = null, Values = [], EventDataFieldName = null, UserDataFieldName = null };
+
+    public FilterComparison WithNormalizedValues()
+    {
+        if (MatchMode != MatchMode.Many ||
+            Operator is not (ComparisonOperator.Contains or ComparisonOperator.NotContains) ||
+            !Values.Any(string.IsNullOrEmpty))
+        {
+            return this;
+        }
+
+        return this with { Values = [.. Values.Where(value => !string.IsNullOrEmpty(value))] };
+    }
 }

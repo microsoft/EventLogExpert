@@ -46,7 +46,7 @@ public sealed class FilterPredicateDraft
             }
 
             return Comparison.MatchMode == MatchMode.Many
-                ? Comparison.Values.Count > 0
+                ? Comparison.HasUsableManyValues
                 : !string.IsNullOrWhiteSpace(Comparison.Value);
         }
     }

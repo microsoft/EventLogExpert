@@ -65,6 +65,11 @@ public sealed partial class FilterComparisonEditor : ComponentBase
         _ => EventLogQueries.GetPropertyValues(Comparison.Property)
     };
 
+    private IEnumerable<string> MultiSelectCandidates =>
+        Comparison.Operator is ComparisonOperator.Contains or ComparisonOperator.NotContains
+            ? Items.Where(item => !string.IsNullOrEmpty(item))
+            : Items;
+
     private EventProperty PropertyBinding
     {
         get => Comparison.Property;
@@ -116,6 +121,14 @@ public sealed partial class FilterComparisonEditor : ComponentBase
     {
         Comparison.Operator = value.Op;
         Comparison.MatchMode = value.Mode;
+
+        // Switching into a Many Contains/NotContains drops any empty values carried over from a prior Equals selection,
+        // so the row never visibly holds an "(Empty)" chip that would be stripped again at save.
+        if (value is { Mode: MatchMode.Many, Op: ComparisonOperator.Contains or ComparisonOperator.NotContains })
+        {
+            Comparison.Values = Comparison.Values.Where(item => !string.IsNullOrEmpty(item)).ToList();
+        }
+
         await OnChanged.InvokeAsync();
     }
 
@@ -137,7 +150,12 @@ public sealed partial class FilterComparisonEditor : ComponentBase
 
     private async Task HandleValuesChanged(List<string> values)
     {
-        Comparison.Values = values;
+        // Drop degenerate empty values for Contains/NotContains so a selected "(Empty)" candidate can't turn the row
+        // into a match-all; Equals/NotEqual keep empty values (a valid empty-field match).
+        Comparison.Values = Comparison.Operator is ComparisonOperator.Contains or ComparisonOperator.NotContains
+            ? values.Where(value => !string.IsNullOrEmpty(value)).ToList()
+            : values;
+
         await OnChanged.InvokeAsync();
     }
 }

@@ -342,6 +342,18 @@ internal static partial class ScenarioCatalogLoader
             return false;
         }
 
+        if (matchMode == MatchMode.Many &&
+            op is ComparisonOperator.Contains or ComparisonOperator.NotContains &&
+            dto.Values is not null &&
+            dto.Values.Any(string.IsNullOrEmpty))
+        {
+            errors.Add(
+                $"{context}: a Contains/NotContains multi-value comparison must not contain a null or empty value " +
+                "(it would match every event).");
+
+            return false;
+        }
+
         comparison = new FilterComparison
         {
             Property = property,

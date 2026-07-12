@@ -25,7 +25,7 @@ public sealed class FilterDraft
     /// </summary>
     public bool HasMeaningfulStructure =>
         !string.IsNullOrWhiteSpace(Comparison.Value) ||
-        Comparison.Values.Count > 0 ||
+        Comparison.HasUsableManyValues ||
         Predicates.Count > 0;
 
     public FilterId Id { get; init; } = FilterId.Create();
@@ -130,6 +130,7 @@ public sealed class FilterDraft
     /// </summary>
     public void HydrateStructure(BasicFilter basicFilter)
     {
+        basicFilter = basicFilter.WithNormalizedValues();
         Comparison = FilterComparisonDraft.FromComparison(basicFilter.Comparison);
         Predicates = [.. basicFilter.Predicates.Select(FilterPredicateDraftFromFilterPredicate)];
     }
@@ -159,7 +160,7 @@ public sealed class FilterDraft
                 return false;
             }
 
-            var draftBasic = ToBasicFilter();
+            var draftBasic = ToBasicFilter().WithNormalizedValues();
 
             if (!BasicFilterFormatter.TryFormat(draftBasic, true, out var formatted))
             {

@@ -68,11 +68,11 @@ else if (Comparison.MatchMode == MatchMode.Many)
         EmptyText="All"
         IsMultiSelect
         T="string"
-        ToStringFunc="@(x => string.IsNullOrWhiteSpace(x) ? "All" : x)"
+        ToStringFunc="@(x => string.IsNullOrEmpty(x) ? "(Empty)" : x)"
         Values="Comparison.Values"
         ValuesChanged="HandleValuesChanged">
         <ValueSelectItem ClearItem T="string">All</ValueSelectItem>
-        @foreach (var item in Items)
+        @foreach (var item in MultiSelectCandidates)
         {
             <ValueSelectItem T="string" Value="item" />
         }

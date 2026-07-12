@@ -1,12 +1,47 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Parsing;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Filtering.Tests.Basic;
 
 public sealed class BasicFilterFormatterTests
 {
+    // End-to-end: a Contains-any built with a stray empty value compiles to a real substring filter (NOT match-all),
+    // while an Equals-any with an empty value still matches an event whose field value is empty.
+    [Fact]
+    public void FormatThenCompile_ContainsAnyWithEmpty_IsNotMatchAll_ButEqualsAnyWithEmpty_MatchesEmptyField()
+    {
+        var contains = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.Contains,
+            MatchMode = MatchMode.Many,
+            Values = ["mshta.exe", ""]
+        };
+        Assert.True(BasicFilterFormatter.TryFormatComparison(contains, null, out var containsText));
+        Assert.True(FilterParser.TryCompile(containsText, out CompiledFilter? containsCompiled, out _));
+
+        var benign = new ResolvedEvent("TestLog", LogPathType.Channel) { Source = "Application" };
+        Assert.False(containsCompiled!.Predicate(benign));
+
+        var equals = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.Equals,
+            MatchMode = MatchMode.Many,
+            Values = ["mshta.exe", ""]
+        };
+        Assert.True(BasicFilterFormatter.TryFormatComparison(equals, null, out var equalsText));
+        Assert.True(FilterParser.TryCompile(equalsText, out CompiledFilter? equalsCompiled, out _));
+
+        var emptySource = new ResolvedEvent("TestLog", LogPathType.Channel) { Source = "" };
+        Assert.True(equalsCompiled!.Predicate(emptySource));
+    }
+
     [Fact]
     public void TryFormat_WhenLenientAndAnySubFilterInvalid_ShouldSkipInvalidAndReturnTrue()
     {
@@ -188,6 +223,59 @@ public sealed class BasicFilterFormatterTests
 
         Assert.True(BasicFilterFormatter.TryFormatComparison(comparison, null, out var formatted));
         Assert.Equal(expected, formatted);
+    }
+
+    // The empty-value normalization (operator-specific) applied at the top of TryFormatComparison: a Many Contains list
+    // drops "" and null values (degenerate match-all) but keeps a literal space/tab (valid substring searches).
+    [Fact]
+    public void TryFormatComparison_ManyContains_DropsEmptyValuesKeepsWhitespace()
+    {
+        var comparison = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.Contains,
+            MatchMode = MatchMode.Many,
+            Values = ["a", "", " ", null!, "b"]
+        };
+
+        Assert.True(BasicFilterFormatter.TryFormatComparison(comparison, null, out var formatted));
+        Assert.Equal(
+            "(new[] {\"a\", \" \", \"b\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))",
+            formatted);
+    }
+
+    // An all-empty Contains/NotContains Many collapses to zero values and is rejected (consistent with the Single-blank
+    // reject), so a degenerate row never emits Contains("").
+    [Theory]
+    [InlineData(ComparisonOperator.Contains)]
+    [InlineData(ComparisonOperator.NotContains)]
+    public void TryFormatComparison_ManyContainsAllEmpty_IsRejected(ComparisonOperator op)
+    {
+        var comparison = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = op,
+            MatchMode = MatchMode.Many,
+            Values = ["", null!]
+        };
+
+        Assert.False(BasicFilterFormatter.TryFormatComparison(comparison, null, out _));
+    }
+
+    // Equals-any with an empty value is NOT match-all (it matches an empty-valued field), so the empty value is preserved.
+    [Fact]
+    public void TryFormatComparison_ManyEqualsWithEmpty_PreservesEmptyValue()
+    {
+        var comparison = new FilterComparison
+        {
+            Property = EventProperty.Source,
+            Operator = ComparisonOperator.Equals,
+            MatchMode = MatchMode.Many,
+            Values = ["a", "", "b"]
+        };
+
+        Assert.True(BasicFilterFormatter.TryFormatComparison(comparison, null, out var formatted));
+        Assert.Equal("(new[] {\"a\", \"\", \"b\"}).Contains(Source)", formatted);
     }
 
     [Theory]
