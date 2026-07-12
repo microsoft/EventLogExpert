@@ -65,10 +65,12 @@ public sealed partial class FilterComparisonEditor : ComponentBase
         _ => EventLogQueries.GetPropertyValues(Comparison.Property)
     };
 
-    private IEnumerable<string> MultiSelectCandidates =>
+    private bool ExcludesEmptyMultiSelectValue =>
         Comparison.Operator is ComparisonOperator.Contains or ComparisonOperator.NotContains
-            ? Items.Where(item => !string.IsNullOrEmpty(item))
-            : Items;
+            || FilterPropertyConstraints.IsGuidValued(Comparison.Property);
+
+    private IEnumerable<string> MultiSelectCandidates =>
+        ExcludesEmptyMultiSelectValue ? Items.Where(item => !string.IsNullOrEmpty(item)) : Items;
 
     private EventProperty PropertyBinding
     {
@@ -150,9 +152,10 @@ public sealed partial class FilterComparisonEditor : ComponentBase
 
     private async Task HandleValuesChanged(List<string> values)
     {
-        // Drop degenerate empty values for Contains/NotContains so a selected "(Empty)" candidate can't turn the row
-        // into a match-all; Equals/NotEqual keep empty values (a valid empty-field match).
-        Comparison.Values = Comparison.Operator is ComparisonOperator.Contains or ComparisonOperator.NotContains
+        // Drop degenerate empty values for Contains/NotContains (a selected "(Empty)" would turn the row into a
+        // match-all) and for GUID-valued properties (an empty value coerces away and can never match); Equals/NotEqual
+        // on string fields keep empty values (a valid empty-field match).
+        Comparison.Values = ExcludesEmptyMultiSelectValue
             ? values.Where(value => !string.IsNullOrEmpty(value)).ToList()
             : values;
 

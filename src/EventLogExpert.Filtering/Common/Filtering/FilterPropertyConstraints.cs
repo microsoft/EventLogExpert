@@ -24,6 +24,9 @@ public static class FilterPropertyConstraints
     public static bool SupportsNoneOfMany(EventProperty property) =>
         IsScalarStringManyField(property);
 
+    public static bool IsGuidValued(EventProperty property) =>
+        property is EventProperty.ActivityId or EventProperty.RelatedActivityId;
+
     /// <summary>
     ///     The scalar string properties whose multi-select supports the full operator set (Contains-any and the negated
     ///     Is-none-of / Contains-none). EventData/UserData and everything else are handled separately below.
