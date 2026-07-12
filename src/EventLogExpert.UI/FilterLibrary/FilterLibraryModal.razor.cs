@@ -482,7 +482,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         if (preflight.NormalizeRemovedFilterNames.Count > 0)
         {
             notices.Add(
-                $"Removed {preflight.NormalizeRemovedFilterNames.Count} filter(s) left with an empty criterion " +
+                $"Removed empty-criterion filters from {preflight.NormalizeRemovedFilterNames.Count} library item(s) " +
                 "after removing empty values.");
         }
 
@@ -492,8 +492,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     }
 
     private static string BuildNothingToImportMessage(ImportPreflight preflight) =>
-        $"Nothing to import. Removed {preflight.NormalizeRemovedFilterNames.Count} filter(s) that were left with an " +
-        $"empty criterion, skipped {preflight.SkippedDuplicates.Count} duplicate(s).";
+        $"Nothing to import. Removed empty-criterion filters from {preflight.NormalizeRemovedFilterNames.Count} " +
+        $"library item(s), skipped {preflight.SkippedDuplicates.Count} duplicate(s).";
 
     private static bool HasApplicableImportChanges(ImportPreflight preflight) =>
         preflight.ToAdd.Count > 0 ||
