@@ -333,6 +333,7 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
                 case LibraryEntryFilterSet setEntry:
                     var keptFilters = new List<SavedFilter>(setEntry.Filters.Count);
                     var changed = false;
+                    var anyMemberRemoved = false;
 
                     foreach (var member in setEntry.Filters)
                     {
@@ -340,7 +341,7 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
 
                         if (normalizedMember is null)
                         {
-                            removedFilterNames.Add(setEntry.Name);
+                            anyMemberRemoved = true;
                             changed = true;
                         }
                         else
@@ -350,10 +351,15 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
                         }
                     }
 
+                    if (anyMemberRemoved)
+                    {
+                        removedFilterNames.Add(setEntry.Name);
+                    }
+
                     if (keptFilters.Count > 0 || !changed)
                     {
                         // Preserve an unchanged set (including one that was already empty); omit only a set whose members
-                        // were all dropped by normalization (those members are recorded in removedFilterNames above).
+                        // were all dropped by normalization (the set is recorded once in removedFilterNames above).
                         entries.Add(changed ? setEntry with { Filters = [.. keptFilters] } : setEntry);
                     }
 

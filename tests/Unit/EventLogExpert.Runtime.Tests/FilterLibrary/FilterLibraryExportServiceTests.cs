@@ -365,6 +365,30 @@ public sealed class FilterLibraryExportServiceTests
     }
 
     [Fact]
+    public void Deserialize_NormalizeFilterSetLosingMultipleMembers_ReportsSetNameOnce()
+    {
+        var clean = BuildBasicSavedFilter("Source == \"Foo\"");
+        var onlyEmptyA = BuildBasicSavedFilter(
+            "(new[] {\"\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))");
+        var onlyEmptyB = BuildBasicSavedFilter(
+            "!(new[] {\"\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))");
+        var set = new LibraryEntryFilterSet
+        {
+            Name = "multi-empty-set",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = [clean, onlyEmptyA, onlyEmptyB],
+        };
+        var json = _service.Serialize([set]);
+
+        var preflight = _service.Deserialize(json, [], normalizeEmptyValues: true);
+
+        Assert.Null(preflight.Error);
+        var imported = Assert.IsType<LibraryEntryFilterSet>(Assert.Single(preflight.ToAdd));
+        Assert.Single(imported.Filters);
+        Assert.Equal(["multi-empty-set"], preflight.NormalizeRemovedFilterNames);
+    }
+
+    [Fact]
     public void Deserialize_NormalizeFilterSetLosingOneMember_KeepsSetWithoutIt()
     {
         var clean = BuildBasicSavedFilter("Source == \"Foo\"");
@@ -405,7 +429,7 @@ public sealed class FilterLibraryExportServiceTests
 
         Assert.Null(preflight.Error);
         Assert.Empty(preflight.ToAdd);
-        Assert.Contains("all-empty-set", preflight.NormalizeRemovedFilterNames);
+        Assert.Equal(["all-empty-set"], preflight.NormalizeRemovedFilterNames);
     }
 
     [Fact]
