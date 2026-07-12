@@ -56,6 +56,13 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private Dictionary<LibraryTab, ImmutableList<string>>? _selectedTagsBeforeTagOp;
     private SidebarTabs<LibraryTab>? _sidebarTabsRef;
 
+    private enum EmptyValueChoice
+    {
+        Normalize,
+        ImportAsIs,
+        Cancel,
+    }
+
     [Parameter] public LibraryTab? InitialTab { get; set; }
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
@@ -384,7 +391,43 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             return;
         }
 
-        await PromptAndApplyImportAsync(preflight);
+        var keptEmptyValuesAsIs = false;
+
+        if (preflight is { ImportBlocked: false, NormalizableEmptyValueEntryNames.Count: > 0 })
+        {
+            switch (await PromptEmptyValueChoiceAsync(preflight.NormalizableEmptyValueEntryNames))
+            {
+                case EmptyValueChoice.Cancel:
+                    return;
+
+                case EmptyValueChoice.Normalize:
+                    preflight = ExportService.Deserialize(
+                        json,
+                        FilterLibraryState.Value.Entries,
+                        normalizeEmptyValues: true);
+
+                    if (preflight.Error is not null)
+                    {
+                        await ShowImportExportErrorAsync("Import error", preflight.Error);
+                        return;
+                    }
+
+                    if (!preflight.ImportBlocked && !HasApplicableImportChanges(preflight))
+                    {
+                        await ShowImportExportErrorAsync("Import", BuildNothingToImportMessage(preflight));
+                        return;
+                    }
+
+                    break;
+
+                case EmptyValueChoice.ImportAsIs:
+                    keptEmptyValuesAsIs = true;
+
+                    break;
+            }
+        }
+
+        await PromptAndApplyImportAsync(preflight, keptEmptyValuesAsIs);
     }
 
     protected override void OnInitialized()
@@ -421,6 +464,42 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
         return Task.FromResult(false);
     }
+
+    private static string BuildImportConfirmationMessage(ImportPreflight preflight, bool keptEmptyValuesAsIs)
+    {
+        var notices = new List<string>();
+
+        if (keptEmptyValuesAsIs && preflight.NormalizableEmptyValueEntryNames.Count > 0)
+        {
+            var count = preflight.NormalizableEmptyValueEntryNames.Count;
+
+            notices.Add(
+                $"Keeping {count} {(count == 1 ? "entry" : "entries")} with empty values as authored. " +
+                "An empty Contains criterion matches every event and an empty NotContains matches none; " +
+                "each filter's overall result still depends on its other criteria.");
+        }
+
+        if (preflight.NormalizeRemovedFilterNames.Count > 0)
+        {
+            notices.Add(
+                $"Removed {preflight.NormalizeRemovedFilterNames.Count} filter(s) left with an empty criterion " +
+                "after removing empty values.");
+        }
+
+        var summary = BuildPreflightSummary(preflight);
+
+        return notices.Count > 0 ? string.Join("\n", notices) + "\n\n" + summary : summary;
+    }
+
+    private static string BuildNothingToImportMessage(ImportPreflight preflight) =>
+        $"Nothing to import. Removed {preflight.NormalizeRemovedFilterNames.Count} filter(s) that were left with an " +
+        $"empty criterion, skipped {preflight.SkippedDuplicates.Count} duplicate(s).";
+
+    private static bool HasApplicableImportChanges(ImportPreflight preflight) =>
+        preflight.ToAdd.Count > 0 ||
+        preflight.ToReplace.Count > 0 ||
+        preflight.ToUpdate.Count > 0 ||
+        preflight.AmbiguousMatches.Count > 0;
 
     private static bool MatchesTagFilter(LibraryEntry entry, ImmutableList<string> selectedTags) =>
         selectedTags.Count == 0 || selectedTags.All(t => entry.Tags.Contains(t, StringComparer.OrdinalIgnoreCase));
@@ -619,7 +698,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private void OnRowDisposed((LibraryTab Tab, LibraryEntryId Id) key) => _rowRefs.Remove(key);
 
-    private async Task PromptAndApplyImportAsync(ImportPreflight preflight)
+    private async Task PromptAndApplyImportAsync(ImportPreflight preflight, bool keptEmptyValuesAsIs)
     {
         if (preflight.ImportBlocked)
         {
@@ -628,7 +707,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             return;
         }
 
-        var summary = BuildPreflightSummary(preflight);
+        var summary = BuildImportConfirmationMessage(preflight, keptEmptyValuesAsIs);
         var request = new InlineAlertRequest(
             Title: "Confirm import",
             Message: summary,
@@ -661,6 +740,41 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             $"updated {updatedCount} tags, " +
             $"skipped {preflight.SkippedDuplicates.Count}" +
             (ambiguousCount > 0 ? $", imported {ambiguousCount} ambiguous as new" : string.Empty));
+    }
+
+    private async Task<EmptyValueChoice> PromptEmptyValueChoiceAsync(IReadOnlyList<string> entryNames)
+    {
+        var request = new InlineAlertRequest(
+            Title: "Filters with an empty value",
+            Message:
+                $"{entryNames.Count} library item(s) contain a filter with an empty value: " +
+                $"{string.Join(", ", entryNames)}. An empty Contains matches every event; an empty NotContains " +
+                "matches none. Normalize removes the empty values; if that leaves a Contains/NotContains criterion " +
+                "with no values, the whole filter is removed (including its other criteria). Import as-is keeps them " +
+                "all as authored. An as-is filter may lose its empty values or need repair if you later edit it in " +
+                "the Basic editor.",
+            AcceptLabel: "Normalize",
+            CancelLabel: "Cancel",
+            IsPrompt: false,
+            PromptInitialValue: null)
+        {
+            SecondaryActionLabel = "Import as-is",
+        };
+
+        InlineAlertResult result;
+
+        try
+        {
+            result = await ((IInlineAlertHost)this).ShowInlineAlertAsync(request, CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            return EmptyValueChoice.Cancel;
+        }
+
+        if (result.Accepted) { return EmptyValueChoice.Normalize; }
+
+        return result.SecondaryChosen ? EmptyValueChoice.ImportAsIs : EmptyValueChoice.Cancel;
     }
 
     private void PruneStaleRowRefs()

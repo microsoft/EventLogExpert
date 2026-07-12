@@ -164,6 +164,12 @@
                         @InlineAlert.AcceptLabel
                     </PrimaryButton>
                 }
+                @if (!string.IsNullOrEmpty(InlineAlert.SecondaryActionLabel))
+                {
+                    <Button OnClick="HandleInlineAlertSecondaryAsync">
+                        @InlineAlert.SecondaryActionLabel
+                    </Button>
+                }
                 <Button autofocus="@(string.IsNullOrEmpty(InlineAlert.AcceptLabel))"
                     OnClick="HandleInlineAlertCancelAsync"
                     @ref="_inlineAlertCancelButton">

@@ -22,6 +22,38 @@ public sealed class ModalChromeTests : BunitContext
     }
 
     [Fact]
+    public void ClickSecondaryButton_ResolvesWithSecondaryChosen()
+    {
+        InlineAlertResult? captured = null;
+        var alert = new InlineAlertRequest(
+            Title: "Filters with an empty value",
+            Message: "Choose",
+            AcceptLabel: "Normalize",
+            CancelLabel: "Cancel",
+            IsPrompt: false,
+            PromptInitialValue: null)
+        {
+            SecondaryActionLabel = "Import as-is",
+        };
+
+        var component = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Title, "Test")
+            .Add(p => p.InlineAlert, alert)
+            .Add(
+                p => p.OnInlineAlertResolved,
+                EventCallback.Factory.Create<InlineAlertResult>(this, result => captured = result))
+            .AddChildContent("<p>body</p>"));
+
+        component.FindAll(".inline-alert-buttons button")
+            .Single(button => button.TextContent.Contains("Import as-is"))
+            .Click();
+
+        Assert.NotNull(captured);
+        Assert.False(captured.Accepted);
+        Assert.True(captured.SecondaryChosen);
+    }
+
+    [Fact]
     public async Task DisposeAsync_SetsModalContentDisplayedFalse()
     {
         var cycleState = Services.GetRequiredService<IBannerCycleStateService>();
@@ -112,6 +144,47 @@ public sealed class ModalChromeTests : BunitContext
     }
 
     [Fact]
+    public void Render_InlineAlertWithoutSecondaryActionLabel_RendersNoSecondaryButton()
+    {
+        var alert = new InlineAlertRequest(
+            Title: "Confirm",
+            Message: "Are you sure?",
+            AcceptLabel: "Yes",
+            CancelLabel: "No",
+            IsPrompt: false,
+            PromptInitialValue: null);
+
+        var component = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Title, "Test")
+            .Add(p => p.InlineAlert, alert)
+            .AddChildContent("<p>body</p>"));
+
+        Assert.Equal(2, component.FindAll(".inline-alert-buttons button").Count);
+    }
+
+    [Fact]
+    public void Render_InlineAlertWithSecondaryActionLabel_RendersSecondaryButton()
+    {
+        var alert = new InlineAlertRequest(
+            Title: "Filters with an empty value",
+            Message: "Choose",
+            AcceptLabel: "Normalize",
+            CancelLabel: "Cancel",
+            IsPrompt: false,
+            PromptInitialValue: null)
+        {
+            SecondaryActionLabel = "Import as-is",
+        };
+
+        var component = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Title, "Test")
+            .Add(p => p.InlineAlert, alert)
+            .AddChildContent("<p>body</p>"));
+
+        Assert.Equal(3, component.FindAll(".inline-alert-buttons button").Count);
+    }
+
+    [Fact]
     public void Render_WhenFooterPresetNone_RendersNoBuiltInButtons()
     {
         var component = Render<ModalChrome>(parameters => parameters
@@ -129,7 +202,7 @@ public sealed class ModalChromeTests : BunitContext
         var component = Render<ModalChrome>(parameters => parameters
             .Add(p => p.Title, "Test")
             .Add(p => p.Footer, FooterPreset.None)
-            .Add(p => p.ExtraFooterContent, (RenderFragment)(builder =>
+            .Add(p => p.ExtraFooterContent, builder =>
             {
                 builder.OpenElement(0, "button");
                 builder.AddAttribute(1, "type", "button");
@@ -143,7 +216,7 @@ public sealed class ModalChromeTests : BunitContext
                 builder.AddAttribute(7, "type", "button");
                 builder.AddContent(8, "Three");
                 builder.CloseElement();
-            }))
+            })
             .AddChildContent("<p>body</p>"));
 
         var footerGroup = component.Find(".footer-group");

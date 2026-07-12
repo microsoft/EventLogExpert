@@ -51,4 +51,14 @@ public sealed record FilterComparison
 
         return this with { Values = [.. Values.Where(value => !string.IsNullOrEmpty(value))] };
     }
+
+    /// <summary>
+    ///     True when this is a <see cref="MatchMode.Many" /> Contains/NotContains criterion with no values left - it
+    ///     would emit a vacuous <c>F.Contains("")</c> (matches every event) or <c>!F.Contains("")</c> (matches none). Evaluate
+    ///     on the <see cref="WithNormalizedValues" /> result to detect a criterion whose values were all empty.
+    /// </summary>
+    public bool IsEmptyMultiContains() =>
+        MatchMode == MatchMode.Many &&
+        Operator is ComparisonOperator.Contains or ComparisonOperator.NotContains &&
+        Values.Count == 0;
 }
