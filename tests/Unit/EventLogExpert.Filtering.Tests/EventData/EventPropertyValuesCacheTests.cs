@@ -92,6 +92,27 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
     }
 
     [Fact]
+    public void GetValues_OpcodeAndRelatedActivityId_ReturnDistinctSortedValues()
+    {
+        var snapshot = new object();
+        var firstRelated = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var secondRelated = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        var events = new List<ResolvedEvent>
+        {
+            CreateTestEvent(100, opcode: "Start", relatedActivityId: firstRelated),
+            CreateTestEvent(200, opcode: "Stop", relatedActivityId: secondRelated),
+            CreateTestEvent(300, opcode: "Start", relatedActivityId: firstRelated)
+        };
+
+        var opcodes = EventPropertyValuesCache.GetValues(snapshot, events, EventProperty.Opcode);
+        var relatedActivityIds =
+            EventPropertyValuesCache.GetValues(snapshot, events, EventProperty.RelatedActivityId);
+
+        Assert.Equal(["Start", "Stop"], opcodes);
+        Assert.Equal([firstRelated.ToString(), secondRelated.ToString()], relatedActivityIds);
+    }
+
+    [Fact]
     public void GetValues_SameSnapshotKeyAndField_ReturnsCachedInstance()
     {
         var snapshot = new object();
@@ -115,7 +136,9 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
         int id = 1,
         string source = "TestSource",
         string logName = "Application",
-        string owningLog = Constants.LogNameTestLog) =>
+        string owningLog = Constants.LogNameTestLog,
+        string opcode = "",
+        Guid? relatedActivityId = null) =>
         new(owningLog, LogPathType.Channel)
         {
             Id = id,
@@ -124,6 +147,8 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
             Description = "Test description",
             ComputerName = "TestComputer",
             TaskCategory = "TestCategory",
+            Opcode = opcode,
+            RelatedActivityId = relatedActivityId,
             LogName = logName,
             TimeCreated = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc),
             Keywords = []
