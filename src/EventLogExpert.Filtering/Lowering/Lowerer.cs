@@ -445,7 +445,7 @@ internal static class Lowerer
             return new ContainsNode(toStringField, needle, ignoreCase);
         }
 
-        // (new[] {...}).Any(e => F.Contains(e, OIC)) — string "contains any of" over a scalar string field.
+        // (new[] {...}).Any(e => F.Contains(e, OIC)) - string "contains any of" over a scalar string field.
         if (IsCaseInsensitiveMatch(call.Name, "Any")
             && call is { Target: ArrayCreationSyntax anyContainsArray, Arguments: [LambdaSyntax anyContainsLambda] })
         {

