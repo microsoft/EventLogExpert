@@ -11,6 +11,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
@@ -80,6 +81,8 @@ public sealed partial class LogTablePane
     [Inject] private ILogTableColumnDefaultsProvider ColumnDefaults { get; init; } = null!;
 
     [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
+
+    [Inject] private IFilterLensCommands FilterLensCommands { get; init; } = null!;
 
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
@@ -1319,6 +1322,12 @@ public sealed partial class LogTablePane
             MenuItem.Item("Exclude Events After", () =>
                 FilterPaneCommands.SetFilterDateRange(
                     new DateFilter { After = selectedEvent.TimeCreated })),
+            MenuItem.Separator(),
+            MenuItem.Item(
+                "Show Related by Activity ID",
+                () => FilterLensCommands.ShowRelatedByActivityId(selectedEvent.ActivityId, selectedEvent.OwningLog),
+                isEnabled: selectedEvent.ActivityId.HasValue,
+                disabledReason: selectedEvent.ActivityId.HasValue ? null : "This event has no Activity ID."),
             MenuItem.Separator(),
             MenuItem.SubMenu(
                 "More Fields",

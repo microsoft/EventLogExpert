@@ -8,6 +8,7 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Filtering.TestUtils.Constants;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.FilterProgress;
@@ -572,7 +573,10 @@ public sealed class EffectsTests
         var mockRawEventStore = Substitute.For<IState<RawEventStoreState>>();
         mockRawEventStore.Value.Returns(rawStore);
 
-        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState);
+        var mockLensState = Substitute.For<IState<FilterLensState>>();
+        mockLensState.Value.Returns(new FilterLensState());
+
+        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState, mockLensState);
         var mockDispatcher = Substitute.For<IDispatcher>();
 
         return (effects, mockDispatcher);

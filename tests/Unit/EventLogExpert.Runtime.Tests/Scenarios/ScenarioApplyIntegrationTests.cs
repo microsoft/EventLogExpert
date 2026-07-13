@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
@@ -47,7 +48,10 @@ public sealed class ScenarioApplyIntegrationTests
         var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
         rawEventStore.Value.Returns(new RawEventStoreState());
 
-        var effects = new FilterPaneEffects(appliedFilter, rawEventStore, paneStateAccessor);
+        var lensState = Substitute.For<IState<FilterLensState>>();
+        lensState.Value.Returns(new FilterLensState());
+
+        var effects = new FilterPaneEffects(appliedFilter, rawEventStore, paneStateAccessor, lensState);
         var dispatcher = Substitute.For<IDispatcher>();
 
         ApplyFilterAction? captured = null;

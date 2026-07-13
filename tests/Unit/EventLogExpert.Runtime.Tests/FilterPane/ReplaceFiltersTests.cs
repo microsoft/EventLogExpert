@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
@@ -103,7 +104,10 @@ public sealed class ReplaceFiltersTests
         var mockRawEventStore = Substitute.For<IState<RawEventStoreState>>();
         mockRawEventStore.Value.Returns(new RawEventStoreState());
 
-        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState);
+        var mockLensState = Substitute.For<IState<FilterLensState>>();
+        mockLensState.Value.Returns(new FilterLensState());
+
+        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState, mockLensState);
         var dispatcher = Substitute.For<IDispatcher>();
 
         return (effects, dispatcher);

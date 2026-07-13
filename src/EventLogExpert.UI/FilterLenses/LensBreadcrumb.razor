@@ -1,0 +1,33 @@
+@inherits FluxorComponent
+
+@{
+    var lenses = LensState.Value.Lenses;
+}
+
+@if (!lenses.IsEmpty)
+{
+    <div aria-label="Active filter lenses"
+        class="lens-breadcrumb"
+        @onkeydown="HandleKeyDown"
+        @onkeydown:stopPropagation="true"
+        role="region"
+        tabindex="0">
+        <span class="lens-breadcrumb-label">Lenses</span>
+
+        @foreach (var lens in lenses)
+        {
+            var captured = lens;
+            <span class="lens-chip">
+                <span class="lens-chip-label" title="@lens.Label">@lens.Label</span>
+                <button aria-label="@($"Remove lens: {lens.Label}")"
+                    class="lens-chip-remove"
+                    @onclick="@(() => Commands.RemoveLens(captured))"
+                    type="button">
+                    &times;
+                </button>
+            </span>
+        }
+
+        <button class="lens-clear" @onclick="Commands.ClearLenses" type="button">Clear all</button>
+    </div>
+}

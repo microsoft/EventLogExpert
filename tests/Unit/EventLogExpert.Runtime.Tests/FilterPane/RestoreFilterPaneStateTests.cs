@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
@@ -61,7 +62,10 @@ public sealed class RestoreFilterPaneStateTests
         var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
         rawEventStore.Value.Returns(new RawEventStoreState());
 
-        var effects = new Effects(appliedFilter, rawEventStore, filterPaneState);
+        var lensState = Substitute.For<IState<FilterLensState>>();
+        lensState.Value.Returns(new FilterLensState());
+
+        var effects = new Effects(appliedFilter, rawEventStore, filterPaneState, lensState);
 
         return (effects, Substitute.For<IDispatcher>());
     }
