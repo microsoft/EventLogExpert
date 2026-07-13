@@ -475,8 +475,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
             notices.Add(
                 $"Keeping {count} {(count == 1 ? "entry" : "entries")} with empty values as authored. " +
-                "An empty Contains criterion matches every event and an empty NotContains matches none; " +
-                "each filter's overall result still depends on its other criteria.");
+                "An empty Contains matches every event and an empty NotContains matches none; " +
+                "depending on how a filter combines its criteria, that can force the whole filter to always match or never match.");
         }
 
         if (preflight.NormalizeRemovedFilterNames.Count > 0)
