@@ -13,6 +13,9 @@ internal sealed class FilterLensCommands(IDispatcher dispatcher) : IFilterLensCo
 
     public void RemoveLens(FilterLens lens) => _dispatcher.Dispatch(new RemoveFilterLensAction(lens));
 
+    public void ShowEventsNearTime(DateTime timeCreated, TimeSpan radius, TimeZoneInfo displayZone, string? originLog = null) =>
+        PushLens(FilterLensFactory.ForTimeWindow(timeCreated, radius, displayZone, originLog));
+
     public void ShowParentActivity(Guid? relatedActivityId, string? originLog = null)
     {
         if (relatedActivityId is { } id)

@@ -1338,6 +1338,30 @@ public sealed partial class LogTablePane
                 () => FilterLensCommands.ShowParentActivity(selectedEvent.RelatedActivityId, selectedEvent.OwningLog),
                 isEnabled: selectedEvent.RelatedActivityId.HasValue,
                 disabledReason: selectedEvent.RelatedActivityId.HasValue ? null : "This event has no Related Activity ID."),
+            MenuItem.SubMenu(
+                "Show Events Near This Time",
+                [
+                    MenuItem.Item(
+                        "\u00b130 Seconds",
+                        () => FilterLensCommands.ShowEventsNearTime(
+                            selectedEvent.TimeCreated, TimeSpan.FromSeconds(30), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
+                    MenuItem.Item(
+                        "\u00b11 Minute",
+                        () => FilterLensCommands.ShowEventsNearTime(
+                            selectedEvent.TimeCreated, TimeSpan.FromMinutes(1), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
+                    MenuItem.Item(
+                        "\u00b15 Minutes",
+                        () => FilterLensCommands.ShowEventsNearTime(
+                            selectedEvent.TimeCreated, TimeSpan.FromMinutes(5), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
+                    MenuItem.Item(
+                        "\u00b115 Minutes",
+                        () => FilterLensCommands.ShowEventsNearTime(
+                            selectedEvent.TimeCreated, TimeSpan.FromMinutes(15), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
+                    MenuItem.Item(
+                        "\u00b11 Hour",
+                        () => FilterLensCommands.ShowEventsNearTime(
+                            selectedEvent.TimeCreated, TimeSpan.FromHours(1), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
+                ]),
             MenuItem.Separator(),
             MenuItem.SubMenu(
                 "More Fields",

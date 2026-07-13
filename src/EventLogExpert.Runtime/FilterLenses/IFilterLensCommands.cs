@@ -12,6 +12,15 @@ public interface IFilterLensCommands
     void RemoveLens(FilterLens lens);
 
     /// <summary>
+    ///     Pushes a transient time-window lens centered on <paramref name="timeCreated" /> (the source event's UTC
+    ///     timestamp), narrowing the view to events no more than <paramref name="radius" /> before or after it. The window is
+    ///     inclusive, so the source event always stays in view. <paramref name="displayZone" /> renders the chip's anchor time
+    ///     in the grid's display zone; <paramref name="originLog" /> is the source event's
+    ///     <see cref="ResolvedEvent.OwningLog" /> so the lens auto-clears when that log is closed.
+    /// </summary>
+    void ShowEventsNearTime(DateTime timeCreated, TimeSpan radius, TimeZoneInfo displayZone, string? originLog = null);
+
+    /// <summary>
     ///     Pushes a lens narrowing the view to the parent activity's events - those whose ActivityId equals the source
     ///     event's <paramref name="relatedActivityId" />. A null id is a no-op. <paramref name="originLog" /> is the source
     ///     event's <see cref="ResolvedEvent.OwningLog" /> so the lens auto-clears when that log is closed.
