@@ -54,6 +54,43 @@ public sealed class ModalChromeTests : BunitContext
     }
 
     [Fact]
+    public void ClickSecondaryButton_WhenPrompt_CarriesTypedPromptValue()
+    {
+        // Regression: the secondary action must preserve the typed prompt value in a prompt scenario,
+        // consistent with the Accept path. Previously it hardcoded PromptValue = null, silently losing input.
+        InlineAlertResult? captured = null;
+        var alert = new InlineAlertRequest(
+            Title: "Rename",
+            Message: "New name:",
+            AcceptLabel: "Rename",
+            CancelLabel: "Cancel",
+            IsPrompt: true,
+            PromptInitialValue: "current")
+        {
+            SecondaryActionLabel = "Reset to default",
+        };
+
+        var component = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Title, "Test")
+            .Add(p => p.InlineAlert, alert)
+            .Add(
+                p => p.OnInlineAlertResolved,
+                EventCallback.Factory.Create<InlineAlertResult>(this, result => captured = result))
+            .AddChildContent("<p>body</p>"));
+
+        component.Find("input.dialog-input").Input("renamed");
+
+        component.FindAll(".inline-alert-buttons button")
+            .Single(button => button.TextContent.Contains("Reset to default"))
+            .Click();
+
+        Assert.NotNull(captured);
+        Assert.False(captured.Accepted);
+        Assert.True(captured.SecondaryChosen);
+        Assert.Equal("renamed", captured.PromptValue);
+    }
+
+    [Fact]
     public async Task DisposeAsync_SetsModalContentDisplayedFalse()
     {
         var cycleState = Services.GetRequiredService<IBannerCycleStateService>();

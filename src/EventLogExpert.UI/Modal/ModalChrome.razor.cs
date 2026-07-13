@@ -300,8 +300,14 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     private void HandleInlineAlertPromptValueChanged(string value) => _inlineAlertPromptValue = value;
 
-    private Task HandleInlineAlertSecondaryAsync() =>
-        OnInlineAlertResolved.InvokeAsync(new InlineAlertResult(false, null) { SecondaryChosen = true });
+    private async Task HandleInlineAlertSecondaryAsync()
+    {
+        if (InlineAlert is null) { return; }
+
+        string? promptValue = InlineAlert.IsPrompt ? _inlineAlertPromptValue : null;
+
+        await OnInlineAlertResolved.InvokeAsync(new InlineAlertResult(false, promptValue) { SecondaryChosen = true });
+    }
 
     private Task HandleSaveAsync() => OnSave.InvokeAsync();
 
