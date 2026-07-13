@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
@@ -14,16 +15,19 @@ internal sealed class Effects
 {
     private readonly IStateSelection<EventLogState, Filter> _appliedFilter;
     private readonly IState<FilterPaneState> _filterPaneState;
+    private readonly IState<FilterLensState> _lensState;
     private readonly IState<RawEventStoreState> _rawEventStore;
 
     public Effects(
         IStateSelection<EventLogState, Filter> appliedFilter,
         IState<RawEventStoreState> rawEventStore,
-        IState<FilterPaneState> filterPaneState)
+        IState<FilterPaneState> filterPaneState,
+        IState<FilterLensState> lensState)
     {
         _appliedFilter = appliedFilter;
         _rawEventStore = rawEventStore;
         _filterPaneState = filterPaneState;
+        _lensState = lensState;
 
         _appliedFilter.Select(static s => s.AppliedFilter);
     }
@@ -171,16 +175,14 @@ internal sealed class Effects
         return Task.CompletedTask;
     }
 
-    private static Filter GetFilter(FilterPaneState filterPaneState) =>
-        new(filterPaneState.FilteredDateRange, [.. filterPaneState.Filters.Where(f => f.IsEnabled)]);
-
     private void UpdateEventTableFilters(FilterPaneState filterPaneState, IDispatcher dispatcher)
     {
-        var candidate = filterPaneState.IsEnabled
-            ? GetFilter(filterPaneState)
-            : new Filter(
-                filterPaneState.FilteredDateRange,
-                [.. filterPaneState.Filters.Where(filter => filter.IsExcluded)]);
+        // Build the effective filter by layering any active transient lenses onto the base through the single shared
+        // EffectiveFilterBuilder, so the FilterPane apply path and the FilterLens push/pop path can never diverge.
+        // FilterPaneFilterBuilder handles both the enabled and the excluded-only (pane-disabled) branch, so lenses narrow in both.
+        var candidate = EffectiveFilterBuilder.Build(
+            FilterPaneFilterBuilder.Build(filterPaneState),
+            _lensState.Value.Lenses);
 
         if (!candidate.HasFilteringChangedFrom(_appliedFilter.Value))
         {

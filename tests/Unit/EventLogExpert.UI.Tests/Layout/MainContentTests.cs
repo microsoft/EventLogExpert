@@ -5,6 +5,7 @@ using Bunit;
 using Bunit.TestDoubles;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.UI.Dashboard;
+using EventLogExpert.UI.FilterLenses;
 using EventLogExpert.UI.Layout;
 using EventLogExpert.UI.LogTable;
 using Fluxor;
@@ -27,6 +28,7 @@ public sealed class MainContentTests : BunitContext
         JSInterop.Mode = JSRuntimeMode.Loose;
 
         ComponentFactories.AddStub<FilterPaneComponent>();
+        ComponentFactories.AddStub<LensBreadcrumb>();
         ComponentFactories.AddStub<LogTablePane>();
         ComponentFactories.AddStub<DetailsPaneComponent>();
         ComponentFactories.AddStub<EmptyStateDashboard>();

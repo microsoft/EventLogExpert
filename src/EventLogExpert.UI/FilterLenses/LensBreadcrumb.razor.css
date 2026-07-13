@@ -1,0 +1,58 @@
+.lens-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    padding: 0.25rem 0.5rem;
+    border-bottom: 1px solid var(--border-divider);
+}
+
+.lens-breadcrumb-label {
+    color: var(--text-secondary);
+    font-size: 0.85em;
+    margin-right: 0.25rem;
+}
+
+.lens-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    max-width: 22rem;
+    padding: 0.1rem 0.25rem 0.1rem 0.5rem;
+    border: 1px solid var(--clr-lightblue);
+    border-radius: 1rem;
+    color: var(--text-primary);
+    font-size: 0.85em;
+}
+
+.lens-chip-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lens-chip-remove,
+.lens-clear {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    line-height: 1;
+    color: var(--text-secondary);
+}
+
+.lens-clear {
+    color: var(--clr-lightblue);
+    font-size: 0.85em;
+}
+
+.lens-chip-remove:hover,
+.lens-clear:hover {
+    color: var(--clr-red);
+}
+
+.lens-breadcrumb:focus-visible,
+.lens-chip-remove:focus-visible,
+.lens-clear:focus-visible {
+    outline: 2px solid var(--toggle-accent);
+}

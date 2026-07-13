@@ -19,6 +19,7 @@ using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Export;
+using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
@@ -163,6 +164,7 @@ public static class RuntimeServiceCollectionExtensions
 
             // Command facades.
             services.AddSingleton<IEventLogCommands, EventLogCommands>();
+            services.AddSingleton<IFilterLensCommands, FilterLensCommands>();
             services.AddSingleton<IFilterLibraryCommands, FilterLibraryCommands>();
             services.AddSingleton<IFilterPaneCommands, FilterPaneCommands>();
             services.AddSingleton<ILogTableCommands, LogTableCommands>();
