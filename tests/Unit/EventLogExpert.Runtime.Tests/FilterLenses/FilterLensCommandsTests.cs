@@ -135,6 +135,22 @@ public sealed class FilterLensCommandsTests
     }
 
     [Fact]
+    public void ShowEventsNearTime_MinValueAnchorWithNegativeOffsetZone_RendersLabelWithoutThrowing()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+        var westOfUtc = TimeZoneInfo.CreateCustomTimeZone("test-5", TimeSpan.FromHours(-5), "test-5", "test-5");
+
+        // Guards the chip-label conversion for a degenerate default(DateTime) anchor against a non-UTC display zone: on
+        // net10 TimeZoneInfo.ConvertTimeFromUtc clamps an out-of-range result to DateTime.MinValue instead of throwing, so
+        // the label renders without crashing the context-menu handler. (Legacy .NET Framework threw for this exact case; a
+        // future retarget that reintroduced the throw would fail this test rather than crashing at runtime.)
+        new FilterLensCommands(dispatcher).ShowEventsNearTime(
+            DateTime.MinValue, TimeSpan.FromSeconds(30), westOfUtc);
+
+        dispatcher.Received(1).Dispatch(Arg.Any<PushFilterLensAction>());
+    }
+
+    [Fact]
     public void ShowEventsNearTime_WithOriginLog_TagsLensWithThatLog()
     {
         var dispatcher = Substitute.For<IDispatcher>();
