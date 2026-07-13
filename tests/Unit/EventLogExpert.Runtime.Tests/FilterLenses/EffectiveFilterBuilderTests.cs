@@ -107,6 +107,27 @@ public sealed class EffectiveFilterBuilderTests
     }
 
     [Fact]
+    public void Build_TimeWindowLensFromFactory_KeepsEventsWithinRadius_IncludingInclusiveBoundsAndSource()
+    {
+        // The factory-built centered window [T-1h, T+1h] keeps the source event at T and neighbors exactly on the
+        // inclusive bounds, and hides anything past them.
+        var anchor = At(12);
+        var source = FilterEventBuilder.CreateTestEvent(id: 1, timeCreated: anchor);
+        var onLowerBound = FilterEventBuilder.CreateTestEvent(id: 2, timeCreated: At(11));
+        var onUpperBound = FilterEventBuilder.CreateTestEvent(id: 3, timeCreated: At(13));
+        var belowWindow = FilterEventBuilder.CreateTestEvent(id: 4, timeCreated: At(10));
+        var aboveWindow = FilterEventBuilder.CreateTestEvent(id: 5, timeCreated: At(14));
+
+        var lens = FilterLensFactory.ForTimeWindow(anchor, TimeSpan.FromHours(1), TimeZoneInfo.Utc);
+        var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [lens]);
+
+        var result = s_filterService.GetFilteredEvents(
+            [source, onLowerBound, onUpperBound, belowWindow, aboveWindow], composed);
+
+        Assert.Equal([1, 2, 3], result.Select(e => e.Id).OrderBy(id => id));
+    }
+
+    [Fact]
     public void Build_WithActivityIdLensOnBaseInclude_NarrowsToIntersection()
     {
         // Arrange - base includes Level == Error (OR-combined include list); the lens must AND-narrow, so only the
