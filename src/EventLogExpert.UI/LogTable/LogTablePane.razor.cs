@@ -1328,6 +1328,16 @@ public sealed partial class LogTablePane
                 () => FilterLensCommands.ShowRelatedByActivityId(selectedEvent.ActivityId, selectedEvent.OwningLog),
                 isEnabled: selectedEvent.ActivityId.HasValue,
                 disabledReason: selectedEvent.ActivityId.HasValue ? null : "This event has no Activity ID."),
+            MenuItem.Item(
+                "Show Events Sharing Related Activity ID",
+                () => FilterLensCommands.ShowRelatedByRelatedActivityId(selectedEvent.RelatedActivityId, selectedEvent.OwningLog),
+                isEnabled: selectedEvent.RelatedActivityId.HasValue,
+                disabledReason: selectedEvent.RelatedActivityId.HasValue ? null : "This event has no Related Activity ID."),
+            MenuItem.Item(
+                "Show Parent Activity",
+                () => FilterLensCommands.ShowParentActivity(selectedEvent.RelatedActivityId, selectedEvent.OwningLog),
+                isEnabled: selectedEvent.RelatedActivityId.HasValue,
+                disabledReason: selectedEvent.RelatedActivityId.HasValue ? null : "This event has no Related Activity ID."),
             MenuItem.Separator(),
             MenuItem.SubMenu(
                 "More Fields",

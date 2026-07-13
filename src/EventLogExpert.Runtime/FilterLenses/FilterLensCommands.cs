@@ -13,13 +13,26 @@ internal sealed class FilterLensCommands(IDispatcher dispatcher) : IFilterLensCo
 
     public void RemoveLens(FilterLens lens) => _dispatcher.Dispatch(new RemoveFilterLensAction(lens));
 
+    public void ShowParentActivity(Guid? relatedActivityId, string? originLog = null)
+    {
+        if (relatedActivityId is { } id)
+        {
+            PushLens(FilterLensFactory.ForActivityId(id, originLog, label: $"Parent Activity = {id}"));
+        }
+    }
+
     public void ShowRelatedByActivityId(Guid? activityId, string? originLog = null)
     {
-        if (activityId is not { } id) { return; }
+        if (activityId is { } id) { PushLens(FilterLensFactory.ForActivityId(id, originLog)); }
+    }
 
-        if (FilterLensFactory.ForActivityId(id, originLog) is { } lens)
-        {
-            _dispatcher.Dispatch(new PushFilterLensAction(lens));
-        }
+    public void ShowRelatedByRelatedActivityId(Guid? relatedActivityId, string? originLog = null)
+    {
+        if (relatedActivityId is { } id) { PushLens(FilterLensFactory.ForRelatedActivityId(id, originLog)); }
+    }
+
+    private void PushLens(FilterLens? lens)
+    {
+        if (lens != null) { _dispatcher.Dispatch(new PushFilterLensAction(lens)); }
     }
 }

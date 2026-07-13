@@ -15,6 +15,21 @@ public sealed class EffectiveFilterBuilderTests
     private static readonly Guid s_target = new("11111111-2222-3333-4444-555555555555");
 
     [Fact]
+    public void Build_DisabledWindowLens_DoesNotApplyDateFilter()
+    {
+        var disabledWindowLens = new FilterLens
+        {
+            Label = "window",
+            Kind = LensKind.TimeWindow,
+            Window = new DateFilter { After = At(12), Before = At(16), IsEnabled = false }
+        };
+
+        var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [disabledWindowLens]);
+
+        Assert.Null(composed.DateFilter);
+    }
+
+    [Fact]
     public void Build_MultipleActivityLenses_AndTogether()
     {
         var matchBoth = FilterEventBuilder.CreateTestEvent(id: 1, activityId: s_target);
@@ -131,18 +146,41 @@ public sealed class EffectiveFilterBuilderTests
     }
 
     [Fact]
-    public void Build_DisabledWindowLens_DoesNotApplyDateFilter()
+    public void Build_WithParentActivityLens_NarrowsToActivityIdEqualsValue_NotRelatedActivityId()
     {
-        var disabledWindowLens = new FilterLens
-        {
-            Label = "window",
-            Kind = LensKind.TimeWindow,
-            Window = new DateFilter { After = At(12), Before = At(16), IsEnabled = false }
-        };
+        // The parent-jump lens is an ActivityId-equality narrowing on the value: it keeps the parent event whose
+        // ActivityId == target, NOT the child whose RelatedActivityId == target. This locks the field mapping.
+        var parent = FilterEventBuilder.CreateTestEvent(id: 1, activityId: s_target);
+        var child = FilterEventBuilder.CreateTestEvent(id: 2, activityId: s_other, relatedActivityId: s_target);
+        var unrelated = FilterEventBuilder.CreateTestEvent(id: 3, activityId: s_other);
 
-        var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [disabledWindowLens]);
+        var parentLens = FilterLensFactory.ForActivityId(s_target, label: $"Parent Activity = {s_target}")!;
+        var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [parentLens]);
 
-        Assert.Null(composed.DateFilter);
+        var result = s_filterService.GetFilteredEvents([parent, child, unrelated], composed);
+
+        Assert.Equal([1], result.Select(e => e.Id).OrderBy(id => id));
+    }
+
+    [Fact]
+    public void Build_WithRelatedActivityIdLensOnEmptyBase_KeepsOnlyMatching_HidesOtherAndAbsent()
+    {
+        // Mirror of the ActivityId absent-hidden proof for RelatedActivityId: exclude-of-complement
+        // (RelatedActivityId != target) narrows to exactly RelatedActivityId == target, and because NotEqual on the
+        // nullable Guid is total the absent-RelatedActivityId event is HIDDEN, not leaked. (Row-eval path via
+        // GetFilteredEvents; column-path parity for the exclude is covered by ColumnEmitterParityTests.)
+        var matching = FilterEventBuilder.CreateTestEvent(id: 1, relatedActivityId: s_target);
+        var other = FilterEventBuilder.CreateTestEvent(id: 2, relatedActivityId: s_other);
+        var absent = FilterEventBuilder.CreateTestEvent(id: 3, relatedActivityId: null);
+
+        var lens = FilterLensFactory.ForRelatedActivityId(s_target);
+        Assert.NotNull(lens);
+
+        var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [lens]);
+
+        var result = s_filterService.GetFilteredEvents([matching, other, absent], composed);
+
+        Assert.Equal([1], result.Select(e => e.Id).OrderBy(id => id));
     }
 
     private static DateTime At(int hourUtc) => new(2024, 1, 1, hourUtc, 0, 0, DateTimeKind.Utc);
