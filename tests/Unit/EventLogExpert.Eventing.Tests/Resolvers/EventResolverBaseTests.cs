@@ -102,6 +102,136 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_AbsentRecordOpcode_WithSupplementalModernEventCustomOpcode_ResolvesManifestOpcode()
+    {
+        // Arrange - parallel to ResolveEvent_WithAmbiguousPrimaryAndSupplementalModernEventTask_ShouldUseModernEventTaskForLookup:
+        // when the record carries no opcode but the event matches a supplemental modern definition that
+        // declares a custom opcode present in the provider Opcodes table, the manifest opcode name is
+        // surfaced (metadata enrichment). This is the ONLY path by which an absent record opcode resolves
+        // to a non-empty name.
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel { ShortId = 710, RawId = 0x40000710, Text = Constants.PrimaryShortA, LogLink = null },
+                new MessageModel { ShortId = 710, RawId = 0x40000710, Text = Constants.PrimaryShortB, LogLink = null }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 710,
+                    Version = 0,
+                    Opcode = 10,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Supplemental modern description",
+                    Keywords = [],
+                    Template = Constants.EmptyTemplate
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string> { { 10, "CustomModernOpcode" } },
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 710,
+            Version = 0,
+            // EventRecord.Opcode is null - the only way Opcode can resolve is via the supplemental
+            // modern event's Opcode = 10 mapping to the provider Opcodes table.
+            Level = 4,
+            LogName = Constants.ApplicationLogName
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal("CustomModernOpcode", displayEvent.Opcode);
+    }
+
+    [Fact]
+    public void ResolveEvent_AbsentRecordOpcode_WithSupplementalModernEventDefaultOpcode_ResolvesToEmpty()
+    {
+        // Arrange - the complement to the enrichment case: a matched supplemental modern definition whose
+        // Opcode is the default 0 (never present in the provider Opcodes table, which excludes the standard
+        // opcodes - that is why the separate winmeta standard-opcode table exists) must NOT synthesize a name
+        // for a record that carries no opcode. The standard "Info" table is only consulted for a present
+        // opcode (guarded by eventRecord.Opcode.HasValue), so an absent opcode stays empty.
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel { ShortId = 711, RawId = 0x40000711, Text = Constants.PrimaryShortA, LogLink = null },
+                new MessageModel { ShortId = 711, RawId = 0x40000711, Text = Constants.PrimaryShortB, LogLink = null }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 711,
+                    Version = 0,
+                    Opcode = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Supplemental modern description",
+                    Keywords = [],
+                    Template = Constants.EmptyTemplate
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 711,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal(string.Empty, displayEvent.Opcode);
+    }
+
+    [Fact]
     public void ResolveEvent_ConcurrentCalls_ShouldHandleThreadSafely()
     {
         // Arrange
