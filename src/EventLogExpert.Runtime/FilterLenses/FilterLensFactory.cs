@@ -11,17 +11,35 @@ namespace EventLogExpert.Runtime.FilterLenses;
 internal static class FilterLensFactory
 {
     /// <summary>
-    ///     Builds a "Show Related by Activity ID" lens: keep only rows whose ActivityId equals
-    ///     <paramref name="activityId" />, hiding every other row including those with no ActivityId. Because the base's
-    ///     include filters are OR-combined an appended include would broaden, so the complement is excluded (
-    ///     <c>ActivityId != X</c>, <see cref="SavedFilter.IsExcluded" />) to AND-narrow to exactly <c>ActivityId == X</c>.
-    ///     <c>NotEqual</c> on the nullable-Guid column is total (a decisive Match for an absent value), so the exclude hides
-    ///     absent-ActivityId rows rather than leaking them. Returns <see langword="null" /> only if the criterion fails to
-    ///     format or compile.
+    ///     Builds a lens that keeps only rows whose ActivityId equals <paramref name="activityId" />. An optional
+    ///     <paramref name="label" /> overrides the default chip text - used by the parent-activity jump, which is an
+    ///     ActivityId-equality narrowing surfaced to the user under a different name.
     /// </summary>
-    public static FilterLens? ForActivityId(Guid activityId, string? originLog = null)
+    public static FilterLens? ForActivityId(Guid activityId, string? originLog = null, string? label = null) =>
+        BuildEqualityLens(EventProperty.ActivityId, activityId, label ?? $"Activity ID = {activityId}", originLog);
+
+    /// <summary>
+    ///     Builds a lens that keeps only rows whose RelatedActivityId equals <paramref name="relatedActivityId" />,
+    ///     grouping events that share the same parent/correlation activity.
+    /// </summary>
+    public static FilterLens? ForRelatedActivityId(Guid relatedActivityId, string? originLog = null) =>
+        BuildEqualityLens(
+            EventProperty.RelatedActivityId,
+            relatedActivityId,
+            $"Related Activity ID = {relatedActivityId}",
+            originLog);
+
+    /// <summary>
+    ///     Encodes a nullable-Guid equality narrowing (keep only rows where the field equals <paramref name="value" />)
+    ///     as an <em>exclude-of-complement</em>: because the base's include filters are OR-combined an appended include would
+    ///     broaden, so the complement (<c>field != value</c>, <see cref="SavedFilter.IsExcluded" />) is excluded to AND-narrow
+    ///     to exactly <c>field == value</c>. <c>NotEqual</c> on a nullable-Guid column is total (a decisive Match for an
+    ///     absent value), so the exclude hides absent-field rows rather than leaking them. Returns <see langword="null" />
+    ///     only if the criterion fails to format or compile.
+    /// </summary>
+    private static FilterLens? BuildEqualityLens(EventProperty property, Guid value, string label, string? originLog)
     {
-        if (!TryFormatNotEqual(EventProperty.ActivityId, activityId.ToString(), out var comparisonText))
+        if (!TryFormatNotEqual(property, value.ToString(), out var comparisonText))
         {
             return null;
         }
@@ -36,7 +54,7 @@ internal static class FilterLensFactory
 
         return new FilterLens
         {
-            Label = $"Activity ID = {activityId}",
+            Label = label,
             Kind = LensKind.Property,
             ExcludeFilters = [complement],
             OriginLog = originLog
