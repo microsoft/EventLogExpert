@@ -2,9 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
-using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterLenses;
+using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.StatusBar;
 using Fluxor;
@@ -19,9 +20,16 @@ public sealed partial class StatusBar
     private IStateSelection<EventLogState, (
         Filter AppliedFilter,
         bool ContinuouslyUpdate,
-        IReadOnlyList<ResolvedEvent> NewEventBuffer,
-        bool NewEventBufferIsFull)> EventLogSelection
+        int NewEventBufferCount,
+        bool NewEventBufferIsFull,
+        int SelectionCount)> EventLogSelection
     { get; init; } = null!;
+
+    [Inject]
+    private IStateSelection<FilterPaneState, bool> FilterActiveSelection { get; init; } = null!;
+
+    [Inject]
+    private IStateSelection<FilterLensState, int> LensCountSelection { get; init; } = null!;
 
     [Inject]
     private IStateSelection<LogTableState, (
@@ -47,7 +55,7 @@ public sealed partial class StatusBar
     protected override void OnInitialized()
     {
         EventLogSelection.Select(static s =>
-            (s.AppliedFilter, s.ContinuouslyUpdate, s.NewEventBuffer, s.NewEventBufferIsFull));
+            (s.AppliedFilter, s.ContinuouslyUpdate, s.NewEventBuffer.Count, s.NewEventBufferIsFull, s.Selection.Count));
         RawCountSelection.Select(static s => (s.Total, s.ByLog));
         LogTableSelection.Select(static s =>
         {
@@ -61,6 +69,8 @@ public sealed partial class StatusBar
                 s.Groups);
         });
         StatusBarSelection.Select(static s => (s.EventsLoading, s.ResolverStatus));
+        FilterActiveSelection.Select(static s => s.IsFilteringEnabled);
+        LensCountSelection.Select(static s => s.Lenses.Count);
 
         base.OnInitialized();
     }
@@ -72,13 +82,13 @@ public sealed partial class StatusBar
     {
         if (activeTable.GroupId?.IsAll == true) { return rawCount.Total; }
 
-        if (activeTable.GroupId is { } groupId)
+        if (activeTable.GroupId is not { } groupId)
         {
-            var group = groups.FirstOrDefault(candidate => candidate.Id == groupId);
-
-            return group is null ? 0 : group.MemberIds.Sum(id => rawCount.ByLog.GetValueOrDefault(id, 0));
+            return rawCount.ByLog.GetValueOrDefault(activeTable.Id, 0);
         }
 
-        return rawCount.ByLog.GetValueOrDefault(activeTable.Id, 0);
+        var group = groups.FirstOrDefault(candidate => candidate.Id == groupId);
+
+        return group is null ? 0 : group.MemberIds.Sum(id => rawCount.ByLog.GetValueOrDefault(id, 0));
     }
 }

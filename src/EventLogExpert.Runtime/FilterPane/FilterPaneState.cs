@@ -16,4 +16,8 @@ public sealed record FilterPaneState
     public DateFilter? FilteredDateRange { get; init; }
 
     public bool IsEnabled { get; init; } = true;
+
+    public bool IsFilteringEnabled =>
+        FilteredDateRange?.IsEnabled is true ||
+        (IsEnabled ? Filters.Any(filter => filter.IsEnabled) : Filters.Any(filter => filter.IsExcluded));
 }

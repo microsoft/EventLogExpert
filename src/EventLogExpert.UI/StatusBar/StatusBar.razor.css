@@ -1,10 +1,63 @@
 ﻿.status-bar {
     flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     background-color: var(--clr-statusbar);
     color: var(--clr-white);
-    padding-left: 5px;
+    padding: 2px 8px;
 }
 
-.status-bar > span {
-    margin-right: 10px;
+.status-bar-left,
+.status-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.status-bar-right {
+    justify-content: flex-end;
+    flex-shrink: 0;
+}
+
+.status-bar-source {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 40ch;
+}
+
+.status-bar-counts,
+.status-bar-activity {
+    white-space: nowrap;
+}
+
+.status-bar-sep {
+    opacity: 0.5;
+}
+
+.status-bar-filter {
+    font-weight: 600;
+}
+
+/* White (inherited) text keeps WCAG AA contrast on the blue status bar; weight distinguishes the state. A color-coded
+   status palette that meets AA on the status-bar fill is deferred to v2. */
+.status-bar-warn,
+.status-bar-live {
+    font-weight: 600;
+}
+
+/* Screen-reader-only region: announces the coarse activity transition without showing a duplicate visual label. */
+.status-bar-announce {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
