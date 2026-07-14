@@ -17,7 +17,20 @@ public sealed record FilterPaneState
 
     public bool IsEnabled { get; init; } = true;
 
-    public bool IsFilteringEnabled =>
-        FilteredDateRange?.IsEnabled is true ||
-        (IsEnabled ? Filters.Any(filter => filter.IsEnabled) : Filters.Any(filter => filter.IsExcluded));
+    public bool IsFilteringEnabled
+    {
+        get
+        {
+            if (FilteredDateRange?.IsEnabled is true) { return true; }
+
+            // foreach over the typed ImmutableList uses its struct enumerator; Filters.Any(predicate) would box the
+            // enumerator via IEnumerable, allocating on this frequently-evaluated render / state-selection path.
+            foreach (var filter in Filters)
+            {
+                if (IsEnabled ? filter.IsEnabled : filter.IsExcluded) { return true; }
+            }
+
+            return false;
+        }
+    }
 }

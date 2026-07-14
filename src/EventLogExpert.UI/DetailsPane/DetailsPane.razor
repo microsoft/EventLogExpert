@@ -1,64 +1,235 @@
 @inherits FluxorComponent
 
-<div class="details-pane" data-toggle="@IsVisible" hidden="@(_selectedEvent is null)">
+<div class="details-pane" data-toggle="@IsExpanded" hidden="@(_selectedEvent is null)">
     <div class="details-resizer"></div>
 
-    <ChromelessButton aria-expanded="@_isVisible.ToString().ToLower()"
-        aria-label="@(_isVisible ? "Details Expanded" : "Details Collapsed")"
+    <ChromelessButton aria-expanded="@IsExpanded"
+        aria-label="@(_isExpanded ? "Collapse details" : "Expand details")"
         CssClass="flex-space-between"
         id="details-header"
         OnClick="ToggleMenu">
         <span>Details</span>
 
-        <span class="menu-toggle" data-rotate="@IsVisible">
+        <span class="menu-toggle" data-rotate="@IsExpanded">
             <i class="bi bi-caret-up"></i>
         </span>
     </ChromelessButton>
 
-    @if (_selectedEvent is not null)
-    {
-        <div class="details-group" data-toggle="@_isXmlVisible.ToString().ToLower()">
-            <div class="d-flex flex-row">
-                <div>Log Name: @_selectedEvent.LogName</div>
-                <div>Source: @_selectedEvent.Source</div>
-                <div>Event Id: @_selectedEvent.Id</div>
-                <div>Level: @_selectedEvent.Level</div>
-                @if (_selectedEvent.Keywords.Any())
-                {
-                    <div>Keywords: @_selectedEvent.KeywordsDisplayName</div>
-                }
-                <div>Date and Time: @_selectedEvent.TimeCreated.ConvertTimeZone(Settings.TimeZoneInfo)</div>
+    <div class="details-body">
+        @if (_model is not null)
+        {
+            <div aria-label="Event detail views" class="details-tabs" role="tablist">
+                <button aria-controls="details-tabpanel-reader"
+                    aria-selected="@(_activeTab == DetailsTab.Reader ? "true" : "false")"
+                    class="details-tab"
+                    data-active="@(_activeTab == DetailsTab.Reader ? "true" : "false")"
+                    id="details-tab-reader"
+                    @onclick="() => SetTab(DetailsTab.Reader)"
+                    role="tab"
+                    type="button">
+                    Reader
+                </button>
+                <button aria-controls="details-tabpanel-xml"
+                    aria-selected="@(_activeTab == DetailsTab.Xml ? "true" : "false")"
+                    class="details-tab"
+                    data-active="@(_activeTab == DetailsTab.Xml ? "true" : "false")"
+                    id="details-tab-xml"
+                    @onclick="() => SetTab(DetailsTab.Xml)"
+                    role="tab"
+                    type="button">
+                    XML
+                </button>
+
+                <button aria-label="Copy event to clipboard" class="details-copy-event" @onclick="CopyEventAsync" type="button">
+                    <i class="bi bi-clipboard"></i>
+                    <span class="details-copy-event-label">Copy event</span>
+                </button>
             </div>
 
-            <div>Description:</div>
-            <p class="details-description">@_selectedEvent.Description</p>
-        </div>
+            <div aria-labelledby="details-tab-reader" class="details-reader" hidden="@(_activeTab != DetailsTab.Reader)" id="details-tabpanel-reader" role="tabpanel">
+                @if (_activeTab == DetailsTab.Reader)
+                {
+                    <div class="details-reader-layout">
+                        <div class="reader-rail">
+                            <div class="details-summary">
+                                <span class="details-summary-id">Event ID @_model.EventId</span>
+                                @if (!string.IsNullOrEmpty(_model.Level))
+                                {
+                                    <span class="details-summary-level">
+                                        @if (SeverityDot(_model.Severity) is { } severity)
+                                        {
+                                            <span aria-hidden="true" class="details-severity-dot" data-severity="@severity" title="@($"Severity: {_model.Level}")"></span>
+                                        }
+                                        @_model.Level
+                                    </span>
+                                }
+                            </div>
 
-        <hr />
+                            @if (_model.Header.Count > 0)
+                            {
+                                <dl class="details-grid">
+                                    @foreach (DetailsProperty property in _model.Header)
+                                    {
+                                        <dt>@property.Label</dt>
+                                        <dd>@property.Value</dd>
+                                    }
+                                </dl>
+                            }
 
-        <ChromelessButton aria-expanded="@_isXmlVisible.ToString().ToLower()"
-            aria-label="@(_isXmlVisible ? "XML Expanded" : "XML Collapsed")"
-            CssClass="details-row-xml flex-space-between"
-            OnClick="ToggleXml">
-            <span>XML</span>
-            <span class="menu-toggle" data-rotate="@_isXmlVisible.ToString().ToLower()">
-                <i class="bi bi-caret-up"></i>
-            </span>
-        </ChromelessButton>
+                            @* Capture the render-time non-null event so the button closures act on the event that was
+                               displayed when clicked, never on a newer/null selection read from the mutable field. *@
+                            @if (_selectedEvent is { } correlationEvent && (correlationEvent.ActivityId.HasValue || correlationEvent.RelatedActivityId.HasValue))
+                            {
+                                <section class="details-correlation">
+                                    <h3>Correlation</h3>
+                                    <div class="details-correlation-actions">
+                                        @if (correlationEvent.ActivityId.HasValue)
+                                        {
+                                            <button class="button details-correlation-action"
+                                                @onclick="() => FilterLensCommands.ShowRelatedByActivityId(correlationEvent.ActivityId, correlationEvent.OwningLog)"
+                                                type="button">
+                                                Show related events
+                                            </button>
+                                        }
+                                        @if (correlationEvent.RelatedActivityId.HasValue)
+                                        {
+                                            <button class="button details-correlation-action"
+                                                @onclick="() => FilterLensCommands.ShowParentActivity(correlationEvent.RelatedActivityId, correlationEvent.OwningLog)"
+                                                type="button">
+                                                Show parent activity
+                                            </button>
+                                        }
+                                    </div>
+                                </section>
+                            }
 
-        <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">
-            @if (_resolvedXml is null)
-            {
-                <text>Resolving XML...</text>
-            }
-            else if (_resolvedXml.Length > 0)
-            {
-                @GetXmlForDisplay()
-            }
-            else
-            {
-                <text>No XML available for this event.</text>
-            }
-        </p>
-    }
+                            @if (_model.SystemProperties.Count > 0)
+                            {
+                                <details class="details-section" open>
+                                    <summary>
+                                        <span>System details</span>
+                                        <button aria-label="Copy system details to clipboard"
+                                            class="details-copy-section"
+                                            @onclick="() => CopyPropertiesAsync(_model.SystemProperties)"
+                                            @onclick:preventDefault="true"
+                                            @onclick:stopPropagation="true"
+                                            type="button">
+                                            <i class="bi bi-clipboard"></i>
+                                        </button>
+                                    </summary>
+                                    <dl class="details-grid">
+                                        @foreach (DetailsProperty property in _model.SystemProperties)
+                                        {
+                                            <dt>@property.Label</dt>
+                                            <dd>@property.Value</dd>
+                                        }
+                                    </dl>
+                                </details>
+                            }
+                        </div>
+
+                        <div class="reader-payload">
+                            <section class="details-section">
+                                <h3>Message</h3>
+                                @if (_model.HasMessage)
+                                {
+                                    <p class="details-message">@_model.Message</p>
+                                }
+                                else
+                                {
+                                    <p class="details-muted">No provider-formatted message is available for this event.</p>
+                                }
+                            </section>
+
+                            <section class="details-section">
+                                <div class="details-section-head">
+                                    <h3>Event Data</h3>
+                                    @if (_model.HasNamedEventData)
+                                    {
+                                        <button aria-label="Copy event data to clipboard"
+                                            class="details-copy-section"
+                                            @onclick="() => CopyFieldsAsync(_model.EventData)"
+                                            type="button">
+                                            <i class="bi bi-clipboard"></i>
+                                        </button>
+                                    }
+                                </div>
+
+                                @if (_model.HasNamedEventData)
+                                {
+                                    <div class="details-fields">
+                                        @for (int i = 0; i < _model.EventData.Count; i++)
+                                        {
+                                            int index = i;
+                                            DetailsField field = _model.EventData[index];
+
+                                            <DetailsFieldRow Field="field"
+                                                IsExpanded="IsFieldExpanded(index)"
+                                                OnCopy="() => CopyValueAsync(field)"
+                                                OnToggleExpand="() => ToggleFieldExpansion(index)" />
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <p class="details-muted">This event has no named data fields. See the message above or the XML view.</p>
+                                }
+                            </section>
+
+                            @if (_model.UserData.Count > 0)
+                            {
+                                <section class="details-section">
+                                    <div class="details-section-head">
+                                        <h3>User Data</h3>
+                                        <button aria-label="Copy user data to clipboard"
+                                            class="details-copy-section"
+                                            @onclick="() => CopyFieldsAsync(_model.UserData)"
+                                            type="button">
+                                            <i class="bi bi-clipboard"></i>
+                                        </button>
+                                    </div>
+
+                                    @if (_model.UserDataIncomplete)
+                                    {
+                                        <p class="details-warn">Some user-data fields may be missing; extraction reached its limit. See the XML view for the full payload.</p>
+                                    }
+
+                                    <div class="details-fields-userdata">
+                                        @for (int j = 0; j < _model.UserData.Count; j++)
+                                        {
+                                            int index = _model.EventData.Count + j;
+                                            DetailsField field = _model.UserData[j];
+
+                                            <DetailsFieldRow Field="field"
+                                                IsExpanded="IsFieldExpanded(index)"
+                                                OnCopy="() => CopyValueAsync(field)"
+                                                OnToggleExpand="() => ToggleFieldExpansion(index)" />
+                                        }
+                                    </div>
+                                </section>
+                            }
+                        </div>
+                    </div>
+                }
+                </div>
+
+                <p aria-labelledby="details-tab-xml" class="details-xml" hidden="@(_activeTab != DetailsTab.Xml)" id="details-tabpanel-xml" role="tabpanel">
+                    @if (_activeTab == DetailsTab.Xml)
+                    {
+                        @if (_resolvedXml is null)
+                        {
+                            <text>Resolving XML...</text>
+                        }
+                        else if (_resolvedXml.Length > 0)
+                        {
+                            @GetXmlForDisplay()
+                        }
+                        else
+                        {
+                            <text>No XML available for this event.</text>
+                        }
+                    }
+                </p>
+        }
+    </div>
 </div>

@@ -170,6 +170,45 @@ public sealed class EventFieldValueTests
     }
 
     [Fact]
+    public void TryGetArray_ReturnsFalse_ForStringArrayKind()
+    {
+        EventFieldValue value = EventFieldValue.FromProperty((EventProperty)(string[])["a", "b"]);
+
+        Assert.Equal(EventFieldValueKind.StringArray, value.Kind);
+        Assert.False(value.TryGetArray(out Array? array));
+        Assert.Null(array);
+    }
+
+    [Fact]
+    public void TryGetArray_ReturnsStoredArray_ForArrayKind()
+    {
+        EventFieldValue value = EventFieldValue.FromProperty(EventProperty.FromReference(new uint[] { 1, 2, 3 }));
+
+        Assert.Equal(EventFieldValueKind.Array, value.Kind);
+        Assert.True(value.TryGetArray(out Array? array));
+        Assert.Equal(new uint[] { 1, 2, 3 }, array);
+    }
+
+    [Fact]
+    public void TryGetBytes_ReturnsFalse_ForNonBytesKind()
+    {
+        EventFieldValue value = EventFieldValue.FromProperty((EventProperty)"not-bytes");
+
+        Assert.False(value.TryGetBytes(out byte[]? bytes));
+        Assert.Null(bytes);
+    }
+
+    [Fact]
+    public void TryGetBytes_ReturnsStoredBytes_ForBytesKind()
+    {
+        EventFieldValue value = EventFieldValue.FromProperty((EventProperty)(byte[])[1, 2, 3]);
+
+        Assert.Equal(EventFieldValueKind.Bytes, value.Kind);
+        Assert.True(value.TryGetBytes(out byte[]? bytes));
+        Assert.Equal((byte[])[1, 2, 3], bytes);
+    }
+
+    [Fact]
     public void TryGetGuid_ReturnsStoredValue()
     {
         var guid = Guid.NewGuid();
