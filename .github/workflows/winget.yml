@@ -1,0 +1,57 @@
+name: Publish to WinGet
+
+# Submits the multi-architecture (x64 + arm64) .msixbundle to the Windows Package
+# Manager community repo (microsoft/winget-pkgs) using Microsoft's wingetcreate tool.
+on:
+  # Fires when a draft release is manually published as a full (stable) release.
+  # Pre-releases do not raise this event, so they are never pushed to WinGet.
+  release:
+    types: [released]
+  # Manual run: submit a specific version on demand (blank input = latest release).
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to submit, e.g. 26.7.10.1209 (blank = latest release)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  # wingetcreate reads this token to fork winget-pkgs and open the pull request.
+  # Store a classic PAT with the public_repo scope as the WINGET_TOKEN repo secret.
+  # See https://aka.ms/winget-create-token
+  WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+
+jobs:
+  publish:
+    name: Submit Microsoft.EventLogExpert to WinGet
+    runs-on: windows-latest # wingetcreate runs on Windows only
+    steps:
+      - name: Submit updated manifest
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # Resolve the version: a manual input wins; otherwise use the release tag;
+          # otherwise fall back to the latest published release.
+          $version = '${{ inputs.version }}'.Trim()
+          if (-not $version) {
+            $version = ('${{ github.event.release.tag_name }}'.Trim()) -replace '^v', ''
+          }
+          if (-not $version) {
+            $headers = @{ 'User-Agent' = 'eventlogexpert-winget'; 'Authorization' = "Bearer $env:WINGET_CREATE_GITHUB_TOKEN" }
+            $latest = Invoke-RestMethod -Headers $headers 'https://api.github.com/repos/microsoft/EventLogExpert/releases/latest'
+            $version = ($latest.tag_name) -replace '^v', ''
+          }
+          if (-not $version) { throw 'Could not determine a version to submit.' }
+
+          Write-Host "Submitting Microsoft.EventLogExpert $version to WinGet"
+
+          # One self-contained multi-arch bundle; wingetcreate reads both the x64 and
+          # arm64 packages from it and updates the matching installer nodes.
+          $bundleUrl = "https://github.com/microsoft/EventLogExpert/releases/download/v$version/EventLogExpert_$version.msixbundle"
+
+          curl.exe -JLO https://aka.ms/wingetcreate/latest
+          .\wingetcreate.exe update Microsoft.EventLogExpert --submit --version $version --urls $bundleUrl
