@@ -28,7 +28,7 @@ jobs:
   publish:
     name: Submit Microsoft.EventLogExpert to WinGet
     # Stable releases only: manual dispatch runs on demand; release events run only for non-prereleases.
-    if: ${{ github.event_name != 'release' || github.event.release.prerelease == false }}
+    if: ${{ github.event_name != 'release' || github.event.release.prerelease != true }}
     runs-on: windows-2022 # pinned like the repo's other workflows; wingetcreate runs on Windows only
     steps:
       - name: Submit updated manifest
@@ -36,6 +36,9 @@ jobs:
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          # Least privilege: the ephemeral job token (contents: read) is used for the
+          # Releases API lookup; the WINGET_TOKEN PAT is reserved for wingetcreate.
+          GH_API_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
 
@@ -44,15 +47,16 @@ jobs:
           }
 
           # Resolve the version: a manual input wins; otherwise use the release tag;
-          # otherwise fall back to the latest published release. Event-supplied values
-          # are read from env vars (not inlined) to avoid script injection.
+          # otherwise fall back to the latest published release. The event-supplied
+          # version values are read from env vars (not inlined) to avoid script injection;
+          # github.repository below is a trusted, non-user-controlled context value.
           $version = ("$env:INPUT_VERSION".Trim()) -replace '^v', ''
           if (-not $version) {
             $version = ("$env:RELEASE_TAG".Trim()) -replace '^v', ''
           }
           if (-not $version) {
             $headers = @{ 'User-Agent' = 'eventlogexpert-winget' }
-            if ($env:WINGET_CREATE_GITHUB_TOKEN) { $headers['Authorization'] = "token $env:WINGET_CREATE_GITHUB_TOKEN" }
+            if ($env:GH_API_TOKEN) { $headers['Authorization'] = "Bearer $env:GH_API_TOKEN" }
             $latest = Invoke-RestMethod -Headers $headers 'https://api.github.com/repos/${{ github.repository }}/releases/latest'
             $version = ($latest.tag_name) -replace '^v', ''
           }
