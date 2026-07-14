@@ -1,0 +1,82 @@
+name: Publish to WinGet
+
+# Submits the multi-architecture (x64 + arm64) .msixbundle to the Windows Package
+# Manager community repo (microsoft/winget-pkgs) using Microsoft's wingetcreate tool.
+on:
+  # Fires when a draft release is published as a full (stable) release. `released`
+  # does not fire for pre-releases; the job-level guard below also enforces stable-only.
+  release:
+    types: [released]
+  # Manual run: submit a specific version on demand (blank input = latest release).
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to submit, e.g. 26.7.10.1209 (blank = latest release)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  # wingetcreate reads this token to fork winget-pkgs and open the pull request.
+  # Store a classic PAT with the public_repo scope as the WINGET_TOKEN repo secret.
+  # See https://aka.ms/winget-create-token
+  WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+
+jobs:
+  publish:
+    name: Submit Microsoft.EventLogExpert to WinGet
+    # Stable releases only: manual dispatch runs on demand; release events run only for non-prereleases.
+    if: ${{ github.event_name != 'release' || github.event.release.prerelease != true }}
+    runs-on: windows-2022 # pinned like the repo's other workflows; wingetcreate runs on Windows only
+    steps:
+      - name: Submit updated manifest
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          # Least privilege: the ephemeral job token (contents: read) is used for the
+          # Releases API lookup; the WINGET_TOKEN PAT is reserved for wingetcreate.
+          GH_API_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if (-not $env:WINGET_CREATE_GITHUB_TOKEN) {
+            throw 'The WINGET_TOKEN secret is not set. Add a classic PAT with the public_repo scope as the WINGET_TOKEN repository secret.'
+          }
+
+          # Resolve the version: a manual input wins; otherwise use the release tag;
+          # otherwise fall back to the latest published release. The event-supplied
+          # version values are read from env vars (not inlined) to avoid script injection;
+          # github.repository below is a trusted, non-user-controlled context value.
+          $version = ("$env:INPUT_VERSION".Trim()) -replace '^v', ''
+          if (-not $version) {
+            $version = ("$env:RELEASE_TAG".Trim()) -replace '^v', ''
+          }
+          if (-not $version) {
+            $headers = @{ 'User-Agent' = 'eventlogexpert-winget' }
+            if ($env:GH_API_TOKEN) { $headers['Authorization'] = "Bearer $env:GH_API_TOKEN" }
+            $latest = Invoke-RestMethod -Headers $headers 'https://api.github.com/repos/${{ github.repository }}/releases/latest'
+            $version = ($latest.tag_name) -replace '^v', ''
+          }
+          if (-not $version) { throw 'Could not determine a version to submit.' }
+          if ($version -notmatch '^\d+(\.\d+){3}$') {
+            throw "Resolved version '$version' is not a valid four-part version (e.g. 26.7.10.1209)."
+          }
+
+          Write-Host "Submitting Microsoft.EventLogExpert $version to WinGet"
+
+          # One self-contained multi-arch bundle; wingetcreate reads both the x64 and
+          # arm64 packages from it and updates the matching installer nodes.
+          $bundleUrl = "https://github.com/${{ github.repository }}/releases/download/v$version/EventLogExpert_$version.msixbundle"
+
+          # Download Microsoft's wingetcreate and verify its Authenticode signature before running it.
+          curl.exe -fsSL -o wingetcreate.exe https://aka.ms/wingetcreate/latest
+          if ($LASTEXITCODE -ne 0) { throw "Failed to download wingetcreate.exe (curl exit $LASTEXITCODE)." }
+          $signature = Get-AuthenticodeSignature .\wingetcreate.exe
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*Microsoft Corporation*') {
+            throw "wingetcreate.exe failed Authenticode verification (status: $($signature.Status); signer: $($signature.SignerCertificate.Subject))."
+          }
+          .\wingetcreate.exe update Microsoft.EventLogExpert --submit --version $version --urls $bundleUrl
+          if ($LASTEXITCODE -ne 0) { throw "wingetcreate update failed (exit $LASTEXITCODE)." }
