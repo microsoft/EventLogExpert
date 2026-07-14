@@ -48,7 +48,7 @@ jobs:
           }
           if (-not $version) {
             $headers = @{ 'User-Agent' = 'eventlogexpert-winget' }
-            if ($env:WINGET_CREATE_GITHUB_TOKEN) { $headers['Authorization'] = "Bearer $env:WINGET_CREATE_GITHUB_TOKEN" }
+            if ($env:WINGET_CREATE_GITHUB_TOKEN) { $headers['Authorization'] = "token $env:WINGET_CREATE_GITHUB_TOKEN" }
             $latest = Invoke-RestMethod -Headers $headers 'https://api.github.com/repos/${{ github.repository }}/releases/latest'
             $version = ($latest.tag_name) -replace '^v', ''
           }
