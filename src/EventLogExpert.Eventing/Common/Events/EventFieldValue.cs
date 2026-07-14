@@ -108,6 +108,20 @@ public readonly struct EventFieldValue
         return false;
     }
 
+    public bool TryGetBytes([NotNullWhen(true)] out byte[]? value)
+    {
+        if (_kind == EventFieldValueKind.Bytes && _reference is byte[] bytes)
+        {
+            value = bytes;
+
+            return true;
+        }
+
+        value = null;
+
+        return false;
+    }
+
     public bool TryGetStringArray([NotNullWhen(true)] out string[]? values)
     {
         if (_kind == EventFieldValueKind.StringArray && _reference is string[] array)
@@ -118,6 +132,20 @@ public readonly struct EventFieldValue
         }
 
         values = null;
+
+        return false;
+    }
+
+    public bool TryGetArray([NotNullWhen(true)] out Array? value)
+    {
+        if (_kind == EventFieldValueKind.Array && _reference is Array array)
+        {
+            value = array;
+
+            return true;
+        }
+
+        value = null;
 
         return false;
     }

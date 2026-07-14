@@ -22,6 +22,24 @@ public static class EventDataTestFactory
     public static ResolvedEvent CreateEventWithData(params (string Name, object? Value)[] fields) =>
         new ResolvedEvent("TestLog", LogPathType.Channel).WithEventData(fields);
 
+    // Produces an event whose EventData carries values but no aligned field-name schema, so Kind is EventData and Count
+    // is non-zero while the enumerator yields nothing - the template/values mismatch the reader view must fall back on.
+    public static ResolvedEvent CreateEventWithUnalignedData(params object?[] values)
+    {
+        var builder = ImmutableArray.CreateBuilder<EventProperty>(values.Length);
+
+        foreach (object? value in values)
+        {
+            builder.Add(ToEventProperty(value));
+        }
+
+        return new ResolvedEvent("TestLog", LogPathType.Channel) with
+        {
+            EventDataValues = builder.MoveToImmutable(),
+            EventDataSchema = null
+        };
+    }
+
     public static ResolvedEvent WithEventData(this ResolvedEvent source, params (string Name, object? Value)[] fields)
     {
         var template = "<template>"
@@ -57,6 +75,7 @@ public static class EventDataTestFactory
             SecurityIdentifier sid => sid,
             byte[] bytes => bytes,
             string[] strings => strings,
+            Array array => EventProperty.FromReference(array),
             _ => value.ToString() ?? string.Empty
         };
 }

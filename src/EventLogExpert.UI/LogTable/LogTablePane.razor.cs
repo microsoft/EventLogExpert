@@ -143,6 +143,15 @@ public sealed partial class LogTablePane
         return new ItemsProviderResult<DisplayRow>(window, totalCount);
     }
 
+    internal static string GetLevelClass(string level) =>
+        LevelSeverity.FromLevelName(level) switch
+        {
+            SeverityLevel.Error => "bi bi-exclamation-circle error",
+            SeverityLevel.Warning => "bi bi-exclamation-triangle warning",
+            SeverityLevel.Information => "bi bi-info-circle",
+            _ => string.Empty,
+        };
+
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
         if (disposing)
@@ -355,15 +364,6 @@ public sealed partial class LogTablePane
     // after a reload (null for a null-RecordId row, which cannot be re-resolved).
     private static SelectionEntry EntryFor(DisplayRow row) =>
         new(row.Loc, row.Loc, ValueKey.TryCreate(row.Lean, out var key) ? key : null);
-
-    private static string GetLevelClass(string level) =>
-        level switch
-        {
-            nameof(SeverityLevel.Error) => "bi bi-exclamation-circle error",
-            nameof(SeverityLevel.Warning) => "bi bi-exclamation-triangle warning",
-            nameof(SeverityLevel.Information) => "bi bi-info-circle",
-            _ => string.Empty,
-        };
 
     private static string TruncateForMenu(string value)
     {

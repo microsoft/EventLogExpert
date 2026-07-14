@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\EventLogExpert.Eventing.OfflineImaging\EventLogExpert.Eventing.OfflineImaging.csproj" />
+    <ProjectReference Include="..\..\Shared\EventLogExpert.Eventing.TestUtils\EventLogExpert.Eventing.TestUtils.csproj" />
     <ProjectReference Include="..\..\..\src\EventLogExpert.UI\EventLogExpert.UI.csproj" />
   </ItemGroup>
 

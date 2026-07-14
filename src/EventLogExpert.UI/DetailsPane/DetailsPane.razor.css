@@ -1,15 +1,13 @@
-﻿.details-pane {
+.details-pane {
+    position: relative;
     display: flex;
     flex-direction: column;
     flex: 0 0 auto;
-    position: relative;
-
-    margin: 0 5px;
     height: var(--details-pane-height, 30%);
     min-height: 20%;
-    overflow: hidden;
-
+    margin: 0 5px;
     border-top: solid var(--background-darkgray);
+    overflow: hidden;
 
     &[data-toggle="false"] {
         height: auto;
@@ -20,67 +18,312 @@
 .details-pane[data-toggle="false"] ::deep > :not(#details-header) { display: none; }
 
 .details-resizer {
-    height: 10px;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    user-select: none;
     position: absolute;
     top: -6px;
     left: 0;
     z-index: var(--z-base);
-
+    width: 100%;
+    height: 10px;
+    margin: 0;
+    padding: 0;
+    user-select: none;
     cursor: n-resize;
 }
 
 .details-pane ::deep #details-header {
     appearance: none;
-    background: none;
-    border: 0;
     padding: 0;
-    color: inherit;
+    border: 0;
     font: inherit;
     text-align: left;
+    color: inherit;
+    background: none;
     user-select: none;
     cursor: pointer;
 }
 
-.details-group { display: contents; }
-
-    .details-group[data-toggle="true"] { display: none; }
-
-.flex-row > div { padding-right: 5rem; }
-
-.details-description {
+.details-body {
+    display: flex;
+    flex-direction: column;
     height: 100%;
-    overflow-y: auto;
+    overflow: hidden;
+}
+
+.details-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 2px;
+    padding: 0 0.5rem;
+    border-bottom: 1px solid var(--border-divider);
+}
+
+.details-tab {
+    appearance: none;
+    padding: 5px 12px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    font: inherit;
+    color: var(--text-secondary);
+    background: none;
+    cursor: pointer;
+
+    &[data-active="true"] {
+        color: var(--text-primary);
+        border-bottom-color: var(--clr-lightblue);
+        font-weight: 600;
+    }
+}
+
+/* The reader is the SOLE scrollport (keeps overflow-y:auto). The split grid lives on the descendant
+   .details-reader-layout, which - unlike .details-reader itself - can respond to this container query. */
+.details-reader {
+    container: details-reader / inline-size;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.6rem 0.85rem 1rem;
+    line-height: 1.35;
     overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.details-reader-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+}
+
+.reader-rail {
+    min-width: 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-divider);
+}
+
+.reader-payload {
+    container: reader-payload / inline-size;
+    min-width: 0;
+}
+
+/* Wide-short pane: metadata rail beside the payload, filling the horizontal space. One scrollport still (the reader);
+   grid cells stretch so the rail divider runs full height. */
+@container details-reader (min-width: 46rem) {
+    .details-reader-layout {
+        grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
+        column-gap: 1.25rem;
+    }
+
+    .reader-rail {
+        padding-bottom: 0;
+        padding-right: 1.25rem;
+        border-bottom: 0;
+        border-right: 1px solid var(--border-divider);
+    }
+}
+
+.details-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.details-summary-id {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.details-summary-level {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.details-severity-dot {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--text-secondary);
+}
+
+.details-severity-dot[data-severity="error"] { background: var(--clr-red); }
+
+.details-severity-dot[data-severity="warning"] { background: var(--clr-yellow); }
+
+.details-grid {
+    display: grid;
+    grid-template-columns: minmax(6rem, max-content) minmax(0, 1fr);
+    align-items: baseline;
+    gap: 0.3rem 1rem;
+    margin: 0 0 0.25rem;
+
+    & dt {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    & dd {
+        margin: 0;
+        color: var(--text-primary);
+        font-size: 13px;
+        overflow-wrap: anywhere;
+    }
+}
+
+.details-section {
+    margin: 0;
+    padding: 0.6rem 0;
+    border-top: 1px solid var(--border-divider);
+}
+
+.reader-payload > .details-section:first-child {
+    padding-top: 0;
+    border-top: 0;
+}
+
+.details-section-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.details-reader h3,
+.details-section > summary {
+    margin: 0 0 0.35rem;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.details-section-head h3 { margin: 0; }
+
+.details-section > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    user-select: none;
+    cursor: pointer;
+}
+
+.details-correlation {
+    margin: 0;
+    padding: 0.6rem 0;
+    border-top: 1px solid var(--border-divider);
+}
+
+.details-correlation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.details-correlation-action {
+    font-size: 12px;
+}
+
+.details-message {
+    margin: 0;
+    max-width: 90ch;
+    color: var(--text-primary);
+    font-size: 13px;
+    line-height: 1.4;
     overflow-wrap: anywhere;
     white-space: pre-wrap;
 }
 
-.details-pane ::deep .details-row-xml {
+.details-muted {
+    margin: 0.25rem 0;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.details-warn {
+    margin: 0.25rem 0;
+    color: var(--clr-yellow);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* EventData packs into at most three columns; the tiers are keyed on the payload width and raised so each card stays
+   >= ~22rem (a starved narrow card would truncate long field names - stacked rows already give the name full width). */
+.details-fields {
+    display: grid;
+    grid-template-columns: 1fr;
+    column-gap: 1.25rem;
+}
+
+@container reader-payload (min-width: 46rem) {
+    .details-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container reader-payload (min-width: 70rem) {
+    .details-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* UserData stays single-column (path-like values want full width regardless of the field's line count). */
+.details-fields-userdata {
+    display: grid;
+    grid-template-columns: 1fr;
+}
+
+.details-copy-event {
     appearance: none;
-    background: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 24px;
+    margin-left: auto;
+    padding: 0 0.55rem;
     border: 0;
-    padding: 0;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    user-select: none;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    background: none;
     cursor: pointer;
 }
 
+.details-copy-event-label { font-size: 12px; }
+
+.details-copy-section {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    background: none;
+    cursor: pointer;
+}
+
+.details-copy-event:hover,
+.details-copy-event:focus-visible,
+.details-copy-section:hover,
+.details-copy-section:focus-visible {
+    color: var(--text-primary);
+}
+
 .details-xml {
+    flex: 1 1 auto;
+    min-height: 0;
     margin: 0;
-    height: 100%;
-    overflow-y: auto;
+    padding: 0.5rem 0.85rem;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
     overflow-x: hidden;
+    overflow-y: auto;
     overflow-wrap: anywhere;
     text-wrap: pretty;
     white-space: pre-wrap;
 }
-
-    .details-xml[data-toggle="false"] { display: none; }
-
-hr { margin: 1px 0; }
