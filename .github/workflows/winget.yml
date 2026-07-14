@@ -27,6 +27,8 @@ env:
 jobs:
   publish:
     name: Submit Microsoft.EventLogExpert to WinGet
+    # Stable releases only: manual dispatch runs on demand; release events run only for non-prereleases.
+    if: ${{ github.event_name != 'release' || github.event.release.prerelease == false }}
     runs-on: windows-latest # wingetcreate runs on Windows only
     steps:
       - name: Submit updated manifest
@@ -58,9 +60,11 @@ jobs:
           $bundleUrl = "https://github.com/${{ github.repository }}/releases/download/v$version/EventLogExpert_$version.msixbundle"
 
           # Download Microsoft's wingetcreate and verify its Authenticode signature before running it.
-          curl.exe -sSL -o wingetcreate.exe https://aka.ms/wingetcreate/latest
+          curl.exe -fsSL -o wingetcreate.exe https://aka.ms/wingetcreate/latest
+          if ($LASTEXITCODE -ne 0) { throw "Failed to download wingetcreate.exe (curl exit $LASTEXITCODE)." }
           $signature = Get-AuthenticodeSignature .\wingetcreate.exe
           if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*Microsoft Corporation*') {
             throw "wingetcreate.exe failed Authenticode verification (status: $($signature.Status); signer: $($signature.SignerCertificate.Subject))."
           }
           .\wingetcreate.exe update Microsoft.EventLogExpert --submit --version $version --urls $bundleUrl
+          if ($LASTEXITCODE -ne 0) { throw "wingetcreate update failed (exit $LASTEXITCODE)." }
