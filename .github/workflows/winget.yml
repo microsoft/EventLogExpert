@@ -36,12 +36,13 @@ jobs:
 
           # Resolve the version: a manual input wins; otherwise use the release tag;
           # otherwise fall back to the latest published release.
-          $version = '${{ inputs.version }}'.Trim()
+          $version = ('${{ inputs.version }}'.Trim()) -replace '^v', ''
           if (-not $version) {
             $version = ('${{ github.event.release.tag_name }}'.Trim()) -replace '^v', ''
           }
           if (-not $version) {
-            $headers = @{ 'User-Agent' = 'eventlogexpert-winget'; 'Authorization' = "Bearer $env:WINGET_CREATE_GITHUB_TOKEN" }
+            $headers = @{ 'User-Agent' = 'eventlogexpert-winget' }
+            if ($env:WINGET_CREATE_GITHUB_TOKEN) { $headers['Authorization'] = "Bearer $env:WINGET_CREATE_GITHUB_TOKEN" }
             $latest = Invoke-RestMethod -Headers $headers 'https://api.github.com/repos/microsoft/EventLogExpert/releases/latest'
             $version = ($latest.tag_name) -replace '^v', ''
           }
@@ -53,5 +54,10 @@ jobs:
           # arm64 packages from it and updates the matching installer nodes.
           $bundleUrl = "https://github.com/microsoft/EventLogExpert/releases/download/v$version/EventLogExpert_$version.msixbundle"
 
-          curl.exe -JLO https://aka.ms/wingetcreate/latest
+          # Download Microsoft's wingetcreate and verify its Authenticode signature before running it.
+          curl.exe -sSL -o wingetcreate.exe https://aka.ms/wingetcreate/latest
+          $signature = Get-AuthenticodeSignature .\wingetcreate.exe
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*Microsoft Corporation*') {
+            throw "wingetcreate.exe failed Authenticode verification (status: $($signature.Status); signer: $($signature.SignerCertificate.Subject))."
+          }
           .\wingetcreate.exe update Microsoft.EventLogExpert --submit --version $version --urls $bundleUrl
