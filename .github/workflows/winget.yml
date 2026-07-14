@@ -3,8 +3,8 @@ name: Publish to WinGet
 # Submits the multi-architecture (x64 + arm64) .msixbundle to the Windows Package
 # Manager community repo (microsoft/winget-pkgs) using Microsoft's wingetcreate tool.
 on:
-  # Fires when a draft release is manually published as a full (stable) release.
-  # Pre-releases do not raise this event, so they are never pushed to WinGet.
+  # Fires when a draft release is published as a full (stable) release. `released`
+  # does not fire for pre-releases; the job-level guard below also enforces stable-only.
   release:
     types: [released]
   # Manual run: submit a specific version on demand (blank input = latest release).
@@ -35,6 +35,10 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+
+          if (-not $env:WINGET_CREATE_GITHUB_TOKEN) {
+            throw 'The WINGET_TOKEN secret is not set. Add a classic PAT with the public_repo scope as the WINGET_TOKEN repository secret.'
+          }
 
           # Resolve the version: a manual input wins; otherwise use the release tag;
           # otherwise fall back to the latest published release.
