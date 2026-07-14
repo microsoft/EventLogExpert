@@ -29,10 +29,13 @@ jobs:
     name: Submit Microsoft.EventLogExpert to WinGet
     # Stable releases only: manual dispatch runs on demand; release events run only for non-prereleases.
     if: ${{ github.event_name != 'release' || github.event.release.prerelease == false }}
-    runs-on: windows-latest # wingetcreate runs on Windows only
+    runs-on: windows-2022 # pinned like the repo's other workflows; wingetcreate runs on Windows only
     steps:
       - name: Submit updated manifest
         shell: pwsh
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           $ErrorActionPreference = 'Stop'
 
@@ -41,10 +44,11 @@ jobs:
           }
 
           # Resolve the version: a manual input wins; otherwise use the release tag;
-          # otherwise fall back to the latest published release.
-          $version = ('${{ github.event.inputs.version }}'.Trim()) -replace '^v', ''
+          # otherwise fall back to the latest published release. Event-supplied values
+          # are read from env vars (not inlined) to avoid script injection.
+          $version = ("$env:INPUT_VERSION".Trim()) -replace '^v', ''
           if (-not $version) {
-            $version = ('${{ github.event.release.tag_name }}'.Trim()) -replace '^v', ''
+            $version = ("$env:RELEASE_TAG".Trim()) -replace '^v', ''
           }
           if (-not $version) {
             $headers = @{ 'User-Agent' = 'eventlogexpert-winget' }
