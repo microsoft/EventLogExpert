@@ -34,7 +34,7 @@ export function registerKeyboardShortcuts(ref) {
         if (e.altKey || e.shiftKey) { return; }
 
         const code = e.code;
-        if (code !== "KeyO" && code !== "KeyH" && code !== "KeyC") { return; }
+        if (code !== "KeyO" && code !== "KeyH" && code !== "KeyC" && code !== "KeyF") { return; }
 
         // Ctrl+C must yield to the browser's native copy whenever the user could
         // reasonably be copying text. The .NET handler can't tell from afar, so the

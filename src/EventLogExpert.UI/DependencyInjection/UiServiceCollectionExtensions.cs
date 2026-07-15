@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Keyboard;
+using EventLogExpert.UI.LogTable.Find;
 using EventLogExpert.UI.Menu;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,7 @@ public static class UiServiceCollectionExtensions
             ArgumentNullException.ThrowIfNull(services);
 
             services.AddSingleton<IMenuHostRegistry, MenuHostRegistry>();
+            services.AddSingleton<IFindCoordinator, FindCoordinator>();
             services.AddSingleton<KeyboardShortcutService>();
 
             return services;

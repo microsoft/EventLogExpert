@@ -1,33 +1,58 @@
+@using EventLogExpert.UI.LogTable.Find
 @using EventLogExpert.UI.LogTable.Grouping
 @inherits FluxorComponent
 
 <LogTabBar />
 
 @{
+    RenderFragment FindableCell((string? Text, bool Mark) context) =>
+        @<text>
+             @if (context.Mark)
+             {
+                 foreach (var segment in BuildFindSegments(context.Text))
+                 {
+                     if (segment.IsMark)
+                     {
+                         <mark class="find-mark">@segment.Text</mark>
+                     }
+                     else { @segment.Text }
+                 }
+             }
+             else { @context.Text }
+        </text>;
+
     RenderFragment RenderEventRow(DisplayRow row) =>
-        @<tr aria-level="@(_rowView is null ? null : "2")"
+        @<tr aria-current="@(IsCurrentFindMatch(row) ? "true" : null)"
+             aria-level="@(_rowView is null ? null : "2")"
              aria-rowindex="@GetRowIndex(row.Loc)"
              aria-selected="@_selectedSet.Contains(row.Loc).ToString().ToLower()"
              class="@GetCss(row.Loc)"
+             data-find="@GetFindState(row)"
              data-highlight="@GetHighlight(row)"
              data-stripe="@GetRowStripe(row.Loc)"
              @key="row.Loc"
              @onmousedown="args => SelectEvent(args, row)"
              role="row"
              tabindex="0">
+            @{
+                bool isCurrentFindMatch = IsCurrentFindMatch(row);
+            }
             @for (int i = 0; i < _enabledColumns.Length; i++)
             {
                 var capturedColumn = _enabledColumns[i];
+
                 <td aria-colindex="@(i + 1)"
                     @oncontextmenu="@(args => InvokeCellContextMenu(args, row, capturedColumn))"
                     @oncontextmenu:preventDefault="true"
                     @oncontextmenu:stopPropagation="true"
                     role="gridcell">
+
                     @if (capturedColumn == ColumnName.Level)
                     {
                         <span aria-hidden="true" class="@GetLevelClass(row.Lean.Level)"></span>
                     }
-                    @EventTableColumnFormatter.GetCellText(row.Lean, capturedColumn, _timeZoneSettings)
+
+                    @FindableCell((EventTableColumnFormatter.GetCellText(row.Lean, capturedColumn, _timeZoneSettings), isCurrentFindMatch))
                 </td>
             }
 
@@ -36,109 +61,128 @@
                 @oncontextmenu:preventDefault="true"
                 @oncontextmenu:stopPropagation="true"
                 role="gridcell">
-                @row.Lean.Description
+                @FindableCell((row.Lean.Description, isCurrentFindMatch))
             </td>
         </tr>;
 }
 
-<div aria-labelledby="eventTable" class="table-container" @onkeydown="HandleKeyDown" role="region" tabindex="0">
-    <table aria-label="Event Log Table"
-        aria-multiselectable="true"
-        aria-rowcount="@GetAriaRowCount()"
-        id="eventTable"
-        role="@(_rowView is null ? "grid" : "treegrid")">
-        <thead @oncontextmenu="InvokeTableColumnMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
-        <tr role="row">
-            @for (int columnIndex = 0; columnIndex < _enabledColumns.Length; columnIndex++)
-            {
-                var columnHeader = _enabledColumns[columnIndex];
-                _headerName = columnHeader.ToFullString();
-                var width = GetColumnWidth(columnHeader);
+<div class="table-find-host">
+    @if (_findOpen)
+    {
+        <FindBar CaseSensitive="_findCaseSensitive"
+            CaseSensitiveChanged="OnFindCaseChanged"
+            CurrentOrdinal="FindCurrentOrdinal"
+            FocusSignal="_findFocusSignal"
+            IsScanning="_findScanning"
+            MatchCount="FindMatchCount"
+            OnClose="CloseFind"
+            OnNext="FindNext"
+            OnPrevious="FindPrevious"
+            Query="@_findQuery"
+            QueryChanged="OnFindQueryChanged"
+            WholeWord="_findWholeWord"
+            WholeWordChanged="OnFindWholeWordChanged"
+            WrapAnnouncement="@_findWrapAnnouncement" />
+    }
+    <div aria-labelledby="eventTable" class="table-container" @onkeydown="HandleKeyDown" role="region" tabindex="0">
+        <table aria-label="Event Log Table"
+            aria-multiselectable="true"
+            aria-rowcount="@GetAriaRowCount()"
+            id="eventTable"
+            role="@(_rowView is null ? "grid" : "treegrid")">
+            <thead @oncontextmenu="InvokeTableColumnMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+            <tr role="row">
+                @for (int columnIndex = 0; columnIndex < _enabledColumns.Length; columnIndex++)
+                {
+                    var columnHeader = _enabledColumns[columnIndex];
+                    _headerName = columnHeader.ToFullString();
+                    var width = GetColumnWidth(columnHeader);
 
-                <th aria-colindex="@(columnIndex + 1)"
-                    aria-sort="@(_logTableState.OrderBy == columnHeader ? _logTableState.IsDescending ? "descending" : "ascending" : "none")"
-                    class="@columnHeader.ToString().ToLowerInvariant()"
-                    data-column="@columnHeader"
-                    @key="columnHeader"
-                    role="columnheader"
-                    style="width: @(width)px">
-                    @if (columnHeader == ColumnName.DateAndTime)
-                    {
-                        <text>@GetDateColumnHeader()</text>
-                    }
-                    else
-                    {
-                        @_headerName
-                    }
-                    @if (_logTableState.OrderBy == columnHeader)
-                    {
-                        <ChromelessButton aria-label="Toggle sort direction"
-                            CssClass="menu-toggle"
-                            data-rotate="@_logTableState.IsDescending.ToString().ToLower()"
-                            IconClass="bi bi-caret-up"
-                            OnClick="ToggleSorting"
-                            StopKeyDownPropagation="true" />
-                    }
+                    <th aria-colindex="@(columnIndex + 1)"
+                        aria-sort="@(_logTableState.OrderBy == columnHeader ? _logTableState.IsDescending ? "descending" : "ascending" : "none")"
+                        class="@columnHeader.ToString().ToLowerInvariant()"
+                        data-column="@columnHeader"
+                        @key="columnHeader"
+                        role="columnheader"
+                        style="width: @(width)px">
+                        @if (columnHeader == ColumnName.DateAndTime)
+                        {
+                            <text>@GetDateColumnHeader()</text>
+                        }
+                        else
+                        {
+                            @_headerName
+                        }
+                        @if (_logTableState.OrderBy == columnHeader)
+                        {
+                            <ChromelessButton aria-label="Toggle sort direction"
+                                CssClass="menu-toggle"
+                                data-rotate="@_logTableState.IsDescending.ToString().ToLower()"
+                                IconClass="bi bi-caret-up"
+                                OnClick="ToggleSorting"
+                                StopKeyDownPropagation="true" />
+                        }
+                    </th>
+                }
+
+                <th aria-colindex="@(_enabledColumns.Length + 1)"
+                    class="description"
+                    role="columnheader">
+                    @EventTableColumnFormatter.DescriptionColumnHeader
                 </th>
-            }
-
-            <th aria-colindex="@(_enabledColumns.Length + 1)"
-                class="description"
-                role="columnheader">
-                @EventTableColumnFormatter.DescriptionColumnHeader
-            </th>
-        </tr>
-        </thead>
-        <tbody @oncontextmenu="InvokeContextMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
-        @if (_currentTable is not null)
-        {
-            @if (_rowView is null)
+            </tr>
+            </thead>
+            <tbody @oncontextmenu="InvokeContextMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+            @if (_currentTable is not null)
             {
-                @* Ungrouped: ItemsProvider fetches one Slice per viewport window, avoiding the Items= binding's
+                @if (_rowView is null)
+                {
+                    @* Ungrouped: ItemsProvider fetches one Slice per viewport window, avoiding the Items= binding's
                    per-row this[i] re-seek over the K-way merge. *@
-                <Virtualize Context="row" ItemSize="@EventRowHeightPixels" ItemsProvider="LoadEventViewport" @ref="_eventVirtualize">
-                    @RenderEventRow(row)
-                </Virtualize>
-            }
-            else
-            {
-                var view = _rowView;
+                    <Virtualize Context="row" ItemSize="@EventRowHeightPixels" ItemsProvider="LoadEventViewport" @ref="_eventVirtualize">
+                        @RenderEventRow(row)
+                    </Virtualize>
+                }
+                else
+                {
+                    var view = _rowView;
 
-                <Virtualize Context="row" Items="view" ItemSize="@EventRowHeightPixels">
-                    @if (row.Kind == TableRowKind.Header)
-                    {
-                        var group = view.GroupAt(row);
+                    <Virtualize Context="row" Items="view" ItemSize="@EventRowHeightPixels">
+                        @if (row.Kind == TableRowKind.Header)
+                        {
+                            var group = view.GroupAt(row);
 
-                        <tr aria-expanded="@((!group.IsCollapsed).ToString().ToLower())"
-                            aria-level="1"
-                            aria-rowindex="@(group.VisibleStart + 2)"
-                            class="group-header-row"
-                            data-collapsed="@group.IsCollapsed.ToString().ToLower()"
-                            @key="@($"hdr:{group.Key}")"
-                            @onclick="() => ToggleGroupCollapsed(group.Key)"
-                            @oncontextmenu="args => InvokeGroupContextMenu(args, group)"
-                            @oncontextmenu:preventDefault="true"
-                            @oncontextmenu:stopPropagation="true"
-                            @onfocus="() => SetCursorHeader(group.Key)"
-                            role="row"
-                            tabindex="0">
-                            <td colspan="@(_enabledColumns.Length + 1)" role="gridcell">
-                                <span class="group-chevron" data-collapsed="@group.IsCollapsed.ToString().ToLower()">
-                                    <i aria-hidden="true" class="bi bi-caret-right"></i>
-                                </span>
-                                <span class="group-name">@GetGroupName():</span>
-                                <span class="group-value">@GetGroupValueText(group)</span>
-                                <span class="group-count">(@group.EventCount)</span>
-                            </td>
-                        </tr>
-                    }
-                    else
-                    {
-                        @RenderEventRow(view.EventAt(row))
-                    }
-                </Virtualize>
+                            <tr aria-expanded="@((!group.IsCollapsed).ToString().ToLower())"
+                                aria-level="1"
+                                aria-rowindex="@(group.VisibleStart + 2)"
+                                class="group-header-row"
+                                data-collapsed="@group.IsCollapsed.ToString().ToLower()"
+                                @key="@($"hdr:{group.Key}")"
+                                @onclick="() => ToggleGroupCollapsed(group.Key)"
+                                @oncontextmenu="args => InvokeGroupContextMenu(args, group)"
+                                @oncontextmenu:preventDefault="true"
+                                @oncontextmenu:stopPropagation="true"
+                                @onfocus="() => SetCursorHeader(group.Key)"
+                                role="row"
+                                tabindex="0">
+                                <td colspan="@(_enabledColumns.Length + 1)" role="gridcell">
+                                    <span class="group-chevron" data-collapsed="@group.IsCollapsed.ToString().ToLower()">
+                                        <i aria-hidden="true" class="bi bi-caret-right"></i>
+                                    </span>
+                                    <span class="group-name">@GetGroupName():</span>
+                                    <span class="group-value">@GetGroupValueText(group)</span>
+                                    <span class="group-count">(@group.EventCount)</span>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @RenderEventRow(view.EventAt(row))
+                        }
+                    </Virtualize>
+                }
             }
-        }
-        </tbody>
-    </table>
+            </tbody>
+        </table>
+    </div>
 </div>
