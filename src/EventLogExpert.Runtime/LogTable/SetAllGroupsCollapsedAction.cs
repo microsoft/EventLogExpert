@@ -3,4 +3,5 @@
 
 namespace EventLogExpert.Runtime.LogTable;
 
-internal sealed record SetAllGroupsCollapsedAction(bool Collapsed);
+// Public so LogTablePane can subscribe via SubscribeToAction, like the other LogTable actions.
+public sealed record SetAllGroupsCollapsedAction(bool Collapsed);

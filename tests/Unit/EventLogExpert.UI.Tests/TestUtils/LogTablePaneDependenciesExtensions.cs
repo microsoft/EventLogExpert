@@ -9,6 +9,7 @@ using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
+using EventLogExpert.UI.LogTable.Find;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -25,6 +26,7 @@ internal static class LogTablePaneDependenciesExtensions
             services.AddSingleton(Substitute.For<IFilterLensCommands>());
             services.AddSingleton(Substitute.For<IFilterPaneCommands>());
             services.AddSingleton(Substitute.For<IFilterService>());
+            services.AddSingleton<IFindCoordinator, FindCoordinator>();
             services.AddSingleton(Substitute.For<ILogTableCommands>());
             services.AddSingleton(Substitute.For<IMenuService>());
             services.AddSingleton(Substitute.For<ITraceLogger>());

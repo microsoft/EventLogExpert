@@ -19,6 +19,10 @@
     --clr-placeholder:  light-dark(#6B6B6B, #A3A1A1);
     --clr-statusbar:    light-dark(#2E50C0, #3C64E7);
 
+    /* Find highlight: highlighter-yellow background fill for the current match's inline marks; #1A1A1A text clears WCAG AA on both themes. */
+    --clr-find:    light-dark(#FFE066, #F8C84B);
+    --clr-on-find: #1A1A1A;
+
     --background-dark:     light-dark(#E0E0E0, #222222);
     --background-darkgray: light-dark(#CECECE, #353535);
 

@@ -156,6 +156,8 @@ public sealed partial class LogTablePane
     {
         if (disposing)
         {
+            DisposeFind();
+
             await JsModuleInterop.DisposeModuleSafelyAsync(
                 _tableModule,
                 static module => module.InvokeVoidAsync("disposeTableEvents"));
@@ -250,6 +252,20 @@ public sealed partial class LogTablePane
             }
         }
 
+        if (_findScrollToCurrentOnRender)
+        {
+            try
+            {
+                await ScrollToCurrentFindMatchAsync();
+            }
+            catch (JSDisconnectedException) { /* Circuit gone; nothing to scroll. */ _findScrollToCurrentOnRender = false; }
+            catch (Exception e)
+            {
+                _findScrollToCurrentOnRender = false;
+                TraceLogger.Error($"{nameof(LogTablePane)}: failed to scroll to find match: {e}");
+            }
+        }
+
         await base.OnAfterRenderAsync(firstRender);
     }
 
@@ -263,6 +279,9 @@ public sealed partial class LogTablePane
         SubscribeToAction<AppendTableEventsAction>(_ => RescrollToSelected());
         SubscribeToAction<AppendTableEventsBatchAction>(_ => RescrollToSelected());
         SubscribeToAction<UpdateTableAction>(_ => RescrollToSelected());
+
+        // A bulk expand/collapse (any trigger) is a user choice: Find relinquishes group-expansion ownership so it won't later undo the user's collapse.
+        SubscribeToAction<SetAllGroupsCollapsedAction>(_ => RelinquishFindGroupOwnership());
 
         _logTableState = LogTableState.Value;
 
@@ -282,6 +301,8 @@ public sealed partial class LogTablePane
 
         RebuildRowMaps();
 
+        RegisterFind();
+
         await base.OnInitializedAsync();
     }
 
@@ -298,6 +319,7 @@ public sealed partial class LogTablePane
         if (!_focusActiveOnNextRender &&
             !_repaintViewportOnNextRender &&
             !_rescrollToSelectedOnRender &&
+            !_findRenderRequested &&
             ReferenceEquals(LogTableState.Value, _logTableState) &&
             ReferenceEquals(Selection.Value, _selection) &&
             !focusChanged &&
@@ -305,13 +327,16 @@ public sealed partial class LogTablePane
             Settings.TimeZoneInfo.Equals(_timeZoneSettings)) { return false; }
 
         _repaintViewportOnNextRender = false;
+        _findRenderRequested = false;
 
         bool selectionChanged = !ReferenceEquals(Selection.Value, _selection);
 
         _logTableState = LogTableState.Value;
 
         _currentTable = _logTableState.EventTables.FirstOrDefault(x => x.Id == _logTableState.ActiveEventLogId);
+        var previousColumnsForFind = _enabledColumns;
         _enabledColumns = GetOrderedEnabledColumns();
+        bool findSearchTextChanged = _findOpen && !previousColumnsForFind.SequenceEqual(_enabledColumns);
 
         if (selectionChanged)
         {
@@ -339,9 +364,12 @@ public sealed partial class LogTablePane
             }
         }
 
+        findSearchTextChanged |= _findOpen && !Settings.TimeZoneInfo.Equals(_timeZoneSettings);
         _timeZoneSettings = Settings.TimeZoneInfo;
 
         RebuildRowMaps();
+
+        if (findSearchTextChanged) { NotifyFindViewChanged(); }
 
         return true;
     }
@@ -512,12 +540,19 @@ public sealed partial class LogTablePane
     {
         int visibleRow = ResolveCursorVisibleRow();
 
-        // A negative index would target aria-rowindex=1 (the header row).
-        if (visibleRow < 0) { return; }
-
         try
         {
-            if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("focusEventTableRow", visibleRow); }
+            if (_tableModule is null) { return; }
+
+            // No cursor row to land on (e.g. closing Find over an empty table): focus the scroll container so keyboard nav isn't stranded on a removed element.
+            if (visibleRow < 0)
+            {
+                await _tableModule.InvokeVoidAsync("focusTableContainer");
+
+                return;
+            }
+
+            await _tableModule.InvokeVoidAsync("focusEventTableRow", visibleRow);
         }
         catch (JSDisconnectedException) { /* Circuit gone; focus best-effort during teardown. */ }
         catch (Exception e)
@@ -646,6 +681,14 @@ public sealed partial class LogTablePane
 
     private async Task HandleKeyDown(KeyboardEventArgs args)
     {
+        // Esc closes an open Find here BEFORE the selection-clearing Escape branch below, so closing Find never wipes the user's selection.
+        if (_findOpen && args.Code == "Escape")
+        {
+            await CloseFind();
+
+            return;
+        }
+
         var displayedEvents = _activeDisplayedEvents;
 
         if (displayedEvents.Count == 0) { return; }
@@ -1001,6 +1044,9 @@ public sealed partial class LogTablePane
         var displayedEvents = ResolveActiveDisplayedEvents();
         _activeDisplayedEvents = displayedEvents;
 
+        // Drop Find's group-expansion ownership when the group-key namespace (active table / GroupBy) has changed.
+        PruneFindGroupOwnershipOnContextChange();
+
         var currentTableId = _currentTable?.Id;
 
         // Highlight results are keyed by locator (stable within a generation across re-sorts). A reload mints a new
@@ -1016,6 +1062,9 @@ public sealed partial class LogTablePane
         {
             _lastIndexedDisplayedEvents = displayedEvents;
             _refreshEventViewportOnRender = true;
+
+            // The event set changed (filter/sort/append/reload) so prior Find matches are stale; collapse/regroup keep the same reference and deliberately don't reach here.
+            NotifyFindViewChanged();
 
             if (displayedEvents.Count == 0)
             {
@@ -1401,7 +1450,7 @@ public sealed partial class LogTablePane
         [
             MenuItem.Item(
                 collapsedNow ? "Expand Group" : "Collapse Group",
-                () => SetGroupCollapsed(group.Key, !collapsedNow)),
+                () => UserSetGroupCollapsed(group.Key, !collapsedNow)),
             MenuItem.Item("Expand All Groups", () => LogTableCommands.SetAllGroupsCollapsed(false)),
             MenuItem.Item("Collapse All Groups", () => LogTableCommands.SetAllGroupsCollapsed(true)),
             MenuItem.Separator(),
@@ -1414,7 +1463,12 @@ public sealed partial class LogTablePane
         ];
     }
 
-    private void ToggleGroupCollapsed(string groupKey) => LogTableCommands.ToggleGroupCollapsed(groupKey);
+    private void ToggleGroupCollapsed(string groupKey)
+    {
+        // A manual toggle of a Find-expanded group hands ownership back to the user, so Find will not later re-collapse it.
+        _findExpandedGroupKeys.Remove(groupKey);
+        LogTableCommands.ToggleGroupCollapsed(groupKey);
+    }
 
     private void ToggleSorting() => LogTableCommands.ToggleSortDirection();
 

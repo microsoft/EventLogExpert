@@ -1,0 +1,64 @@
+@namespace EventLogExpert.UI.LogTable.Find
+
+<div class="find-bar" @onkeydown="HandleRootKeyDown" role="search">
+    <div class="find-main">
+        <div class="find-inputbox">
+            <input aria-label="Find in events"
+                class="find-input"
+                @oninput="OnInput"
+                @onkeydown="HandleInputKeyDown"
+                placeholder="Find in events"
+                @ref="_input"
+                spellcheck="false"
+                type="text"
+                value="@Query" />
+            <span class="find-inline">
+                <span aria-live="polite" class="find-count">@CountText</span>
+                <button aria-label="Previous match"
+                    class="find-nav"
+                    disabled="@NavDisabled"
+                    @onclick="OnPrevious"
+                    @onmousedown:preventDefault="true"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-chevron-up"></i>
+                </button>
+                <button aria-label="Next match"
+                    class="find-nav"
+                    disabled="@NavDisabled"
+                    @onclick="OnNext"
+                    @onmousedown:preventDefault="true"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-chevron-down"></i>
+                </button>
+            </span>
+        </div>
+        <span aria-live="polite" class="find-wrap">@WrapAnnouncement</span>
+        <button aria-controls="@(_optionsOpen ? "find-options" : null)"
+            aria-expanded="@(_optionsOpen ? "true" : "false")"
+            aria-label="Search options"
+            class="find-options-toggle @(OptionsActive ? "is-active" : null)"
+            @onclick="ToggleOptions"
+            type="button">
+            <i aria-hidden="true" class="bi bi-sliders"></i>
+        </button>
+        <button aria-label="Close find"
+            class="find-close"
+            @onclick="OnClose"
+            type="button">
+            <i aria-hidden="true" class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    @if (_optionsOpen)
+    {
+        <div class="find-options" id="find-options">
+            <div class="flex-center-aligned-row">
+                <label for="find-opt-case">Match case</label>
+                <Toggle Id="find-opt-case" Value="CaseSensitive" ValueChanged="OnCaseChanged" />
+            </div>
+            <div class="flex-center-aligned-row">
+                <label for="find-opt-word">Match whole word</label>
+                <Toggle Id="find-opt-word" Value="WholeWord" ValueChanged="OnWholeWordChanged" />
+            </div>
+        </div>
+    }
+</div>

@@ -406,6 +406,15 @@ function registerKeyHandlers(table, signal) {
         { capture: true, signal });
 }
 
+export function focusTableContainer() {
+    const table = document.getElementById("eventTable");
+    const container = table ? table.parentNode : null;
+
+    if (container) {
+        container.focus({ preventScroll: true });
+    }
+}
+
 export function scrollToRow(offset) {
     const generation = ++scrollToRowGeneration;
 

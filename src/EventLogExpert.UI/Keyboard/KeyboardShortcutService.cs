@@ -5,6 +5,7 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common.Interop;
+using EventLogExpert.UI.LogTable.Find;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Keyboard;
@@ -17,9 +18,11 @@ namespace EventLogExpert.UI.Keyboard;
 public sealed class KeyboardShortcutService(
     IMenuActionService actions,
     IModalCoordinator modalCoordinator,
+    IFindCoordinator findCoordinator,
     ISettingsService settings) : IAsyncDisposable
 {
     private readonly IMenuActionService _actions = actions;
+    private readonly IFindCoordinator _findCoordinator = findCoordinator;
     private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
     private readonly ISettingsService _settings = settings;
 
@@ -96,6 +99,10 @@ public sealed class KeyboardShortcutService(
 
         switch (code)
         {
+            case "KeyF":
+                _findCoordinator.RequestOpen();
+                return;
+
             case "KeyO":
                 await _actions.OpenFileAsync(false);
                 return;
