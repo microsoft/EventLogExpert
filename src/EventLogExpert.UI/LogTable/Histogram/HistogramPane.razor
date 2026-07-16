@@ -1,0 +1,195 @@
+@using EventLogExpert.Runtime.Histogram
+@inherits FluxorComponent
+
+<div class="histogram-pane">
+    <div class="histogram-toolbar">
+        <div class="histogram-toolbar-controls">
+            <div class="histogram-groupby">
+                <span class="histogram-groupby-label" id="histogram-groupby-label">Group by</span>
+                <ValueSelect AriaLabelledBy="histogram-groupby-label"
+                    CssClass="input histogram-dimension-select"
+                    T="HistogramDimension"
+                    ToStringFunc="@DimensionLabel"
+                    Value="_dimension"
+                    ValueChanged="OnDimensionSelected">
+                    <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.Severity" />
+                    <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.Source" />
+                    <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.EventId" />
+                    <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.TaskCategory" />
+                    <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.Opcode" />
+                </ValueSelect>
+            </div>
+            @if (_baseData is { } legendData)
+            {
+                <div class="histogram-legend">
+                    @for (int group = legendData.Groups.Count - 1; group >= 0; group--)
+                    {
+                        var info = legendData.Groups[group];
+                        string key = info.Key;
+                        bool shown = !_hiddenGroups.Contains(key);
+
+                        <button aria-pressed="@(shown ? "true" : "false")"
+                            class="histogram-legend-item@(shown ? "" : " histogram-legend-hidden")"
+                            @onclick="() => ToggleGroup(key)"
+                            title="@(shown ? $"Hide {info.Label}" : $"Show {info.Label}")"
+                            type="button">
+                            <svg aria-hidden="true"
+                                class="histogram-swatch"
+                                focusable="false"
+                                height="9"
+                                width="9">
+                                <rect class="@info.ColorClass" height="9" width="9"></rect>
+                            </svg>@info.Label
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+        @if (_isZoomed)
+        {
+            <span class="histogram-zoom-hint">Zoom is visual; use Scope to filter the table.</span>
+        }
+        <div class="histogram-buttons">
+            <button aria-label="Zoom out" class="histogram-button" @onclick="() => ZoomFromControl(ZoomOutFactor)" title="Zoom out" type="button">-</button>
+            <button aria-label="Zoom in" class="histogram-button" @onclick="() => ZoomFromControl(ZoomInFactor)" title="Zoom in" type="button">+</button>
+            <button aria-label="Undo zoom"
+                class="histogram-button"
+                disabled="@(_windowHistory.Count == 0)"
+                @onclick="UndoZoom"
+                title="Undo zoom (or right-click the timeline)"
+                type="button">
+                Undo
+            </button>
+            <button aria-label="Fit all events" class="histogram-button" @onclick="Fit" title="Fit all events" type="button">Fit</button>
+            <button aria-label="Scope the table to the visible range"
+                class="histogram-button@(_isZoomed ? " histogram-button-accent" : "")"
+                @onclick="ScopeToRange"
+                title="Filter the table to the visible range"
+                type="button">
+                Scope
+            </button>
+        </div>
+    </div>
+
+    <div aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home Enter Shift+ArrowLeft Shift+ArrowRight"
+        aria-label="@RegionAria()"
+        aria-roledescription="Timeline"
+        class="histogram-scroll"
+        @onkeydown="HandleKeyDown"
+        role="region"
+        tabindex="0">
+        <div class="histogram-track" style="@TrackWidthStyle()"></div>
+        @if (_render is { Bins.Count: > 0, WindowTotal: > 0 } render && _baseData is { } data && _viewportWidthPx > 0 && _plotHeightPx > 0)
+        {
+            double plotWidth = _viewportWidthPx;
+            int barCount = render.Bins.Count;
+            double barWidth = plotWidth / barCount;
+            int barsHeight = BarsAreaHeight();
+            int groupCount = data.Groups.Count;
+            var axisLabels = AxisLabels();
+
+            <div class="histogram-viewport" style="width:@FormatCoordinate(plotWidth)px">
+                <svg class="histogram-plot" height="@_plotHeightPx" role="presentation" width="@FormatCoordinate(plotWidth)">
+                    <defs>
+                        <pattern height="4" id="histogram-hatch-error" patternTransform="rotate(45)" patternUnits="userSpaceOnUse" width="4">
+                            <rect fill="Canvas" height="4" width="4"></rect>
+                            <line stroke="CanvasText" stroke-width="2.5" x1="0" x2="0" y1="0" y2="4"></line>
+                        </pattern>
+                        <pattern height="6" id="histogram-hatch-warning" patternTransform="rotate(45)" patternUnits="userSpaceOnUse" width="6">
+                            <rect fill="Canvas" height="6" width="6"></rect>
+                            <line stroke="CanvasText" stroke-width="1" x1="0" x2="0" y1="0" y2="6"></line>
+                        </pattern>
+                        <pattern height="6" id="histogram-hatch-cat-0" patternUnits="userSpaceOnUse" width="6">
+                            <rect fill="Canvas" height="6" width="6"></rect>
+                            <line stroke="CanvasText" stroke-width="1" x1="0" x2="6" y1="0" y2="0"></line>
+                        </pattern>
+                        <pattern height="6" id="histogram-hatch-cat-1" patternTransform="rotate(45)" patternUnits="userSpaceOnUse" width="6">
+                            <rect fill="Canvas" height="6" width="6"></rect>
+                            <line stroke="CanvasText" stroke-width="1" x1="0" x2="0" y1="0" y2="6"></line>
+                        </pattern>
+                        <pattern height="6" id="histogram-hatch-cat-2" patternTransform="rotate(-45)" patternUnits="userSpaceOnUse" width="6">
+                            <rect fill="Canvas" height="6" width="6"></rect>
+                            <line stroke="CanvasText" stroke-width="1" x1="0" x2="0" y1="0" y2="6"></line>
+                        </pattern>
+                        <pattern height="5" id="histogram-hatch-cat-3" patternUnits="userSpaceOnUse" width="5">
+                            <rect fill="Canvas" height="5" width="5"></rect>
+                            <line stroke="CanvasText" stroke-width="1" x1="0" x2="0" y1="0" y2="5"></line>
+                        </pattern>
+                    </defs>
+
+                    @for (int index = 0; index < barCount; index++)
+                    {
+                        var bin = render.Bins[index];
+                        // Integer-align each bar slot to whole pixels so the 1px separator stays uniform; empty bins still hold their slot.
+                        int barLeft = (int)Math.Round(index * barWidth);
+                        int barRight = (int)Math.Round((index + 1) * barWidth);
+                        int slotWidth = Math.Max(1, barRight - barLeft);
+                        int barDrawWidth = Math.Max(1, slotWidth - 1);
+                        double segmentTop = barsHeight;
+                        int visiblePx = 0;
+                        int baseSlot = index * groupCount;
+
+                        <g data-tip="@BarTooltip(bin)">
+                            <rect class="histogram-hit" height="@barsHeight" pointer-events="all" width="@slotWidth" x="@barLeft" y="0"></rect>
+                            @for (int group = 0; group < groupCount; group++)
+                            {
+                                int height = _segmentHeights[baseSlot + group];
+
+                                if (height <= 0 || IsGroupHidden(group)) { continue; }
+
+                                segmentTop -= height;
+                                visiblePx += height;
+
+                                <rect class="@GroupColorClass(group)"
+                                    height="@height"
+                                    shape-rendering="crispEdges"
+                                    width="@barDrawWidth"
+                                    x="@barLeft"
+                                    y="@FormatCoordinate(segmentTop)">
+                                </rect>
+                            }
+                            @if (bin.IsAnomaly && visiblePx > 0)
+                            {
+                                <rect class="histogram-anomaly" height="@visiblePx" width="@barDrawWidth" x="@barLeft" y="@FormatCoordinate(barsHeight - visiblePx)"></rect>
+                            }
+                            @if (HasFindHit(bin.StartTicks, bin.EndTicks))
+                            {
+                                <polygon class="histogram-find-marker" points="@FindMarkerPoints(barLeft + (slotWidth / 2.0))"></polygon>
+                            }
+                            @if (_binCursor == index)
+                            {
+                                <rect class="histogram-bin-cursor" height="@barsHeight" width="@slotWidth" x="@barLeft" y="0"></rect>
+                            }
+                        </g>
+                    }
+
+                    <line class="histogram-axis-baseline" x1="0" x2="@FormatCoordinate(plotWidth)" y1="@barsHeight" y2="@barsHeight"></line>
+                    @foreach (var label in axisLabels)
+                    {
+                        <line class="histogram-axis-tick" x1="@FormatCoordinate(label.X)" x2="@FormatCoordinate(label.X)" y1="@barsHeight" y2="@(barsHeight + 3)"></line>
+                    }
+                    @if (FocusMarkerX() is { } markerX)
+                    {
+                        <line class="histogram-marker-selected" x1="@FormatCoordinate(markerX)" x2="@FormatCoordinate(markerX)" y1="0" y2="@barsHeight"></line>
+                    }
+                </svg>
+
+                <div aria-hidden="true" class="histogram-axis-labels">
+                    @foreach (var label in axisLabels)
+                    {
+                        <span class="histogram-axis-label anchor-@label.Anchor" style="left:@FormatCoordinate(label.X)px">@label.Text</span>
+                    }
+                </div>
+                <div class="histogram-selection" hidden></div>
+            </div>
+        }
+        else
+        {
+            <div class="histogram-empty">No events to chart in the current view.</div>
+        }
+    </div>
+
+    <div aria-live="polite" class="histogram-status" role="status">@_announcement</div>
+    <div aria-atomic="true" aria-live="assertive" class="histogram-status">@_binAnnouncement</div>
+    <div class="histogram-tooltip" hidden></div>
+</div>

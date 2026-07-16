@@ -36,6 +36,91 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
 
     public IReadOnlyList<string?> Pool => StringPool().Values;
 
+    public void BucketTimeTicksByEventId(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(targetIds);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        int slotCount = targetIds.Length + 1;
+        int otherSlot = targetIds.Length;
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            long bucket = (_events[index].TimeCreated.Ticks - minTicks) / bucketSpanTicks;
+            int clamped = bucket < 0 ? 0 : bucket >= bucketCount ? bucketCount - 1 : (int)bucket;
+            int slot = otherSlot;
+
+            for (int target = 0; target < targetIds.Length; target++)
+            {
+                if (_events[index].Id == targetIds[target]) { slot = target; break; }
+            }
+
+            slotCounts[(clamped * slotCount) + slot]++;
+        }
+    }
+
+    public void BucketTimeTicksByField(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventFieldId field,
+        string[] targetValues,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(targetValues);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        int slotCount = targetValues.Length + 1;
+        int otherSlot = targetValues.Length;
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            long bucket = (_events[index].TimeCreated.Ticks - minTicks) / bucketSpanTicks;
+            int clamped = bucket < 0 ? 0 : bucket >= bucketCount ? bucketCount - 1 : (int)bucket;
+            int slot = SlotForString(FieldValue(_events[index], field), targetValues, otherSlot);
+            slotCounts[(clamped * slotCount) + slot]++;
+        }
+    }
+
+    public void BucketTimeTicksBySeverity(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        int slotCount = LevelSeverity.SlotCount;
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            long bucket = (_events[index].TimeCreated.Ticks - minTicks) / bucketSpanTicks;
+            int clamped = bucket < 0 ? 0 : bucket >= bucketCount ? bucketCount - 1 : (int)bucket;
+            int slot = LevelSeverity.Slot(LevelSeverity.FromLevelName(_events[index].Level));
+            slotCounts[(clamped * slotCount) + slot]++;
+        }
+    }
+
     public void CopyGuidColumn(EventFieldId field, Guid[] values, bool[] hasValue)
     {
         ArgumentNullException.ThrowIfNull(values);
@@ -116,6 +201,37 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         }
     }
 
+    public void CountEventIds(ReadOnlySpan<int> rankByPhysical, IDictionary<int, int> counts, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(counts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            int id = _events[index].Id;
+            counts[id] = counts.TryGetValue(id, out int existing) ? existing + 1 : 1;
+        }
+    }
+
+    public void CountFieldValues(ReadOnlySpan<int> rankByPhysical, EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(counts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            string? value = FieldValue(_events[index], field);
+
+            if (string.IsNullOrEmpty(value)) { continue; }
+
+            counts[value] = counts.TryGetValue(value, out int existing) ? existing + 1 : 1;
+        }
+    }
+
     public EventDataFieldEnumerator EnumerateEventData(EventLocator locator) => new(GetEvent(locator).EventData);
 
     public UserDataFieldEnumerator EnumerateUserData(EventLocator locator)
@@ -146,6 +262,8 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
 
     public IReadOnlyList<string> GetKeywords(EventLocator locator) => GetEvent(locator).Keywords;
 
+    public long GetTimeTicks(EventLocator locator) => GetEvent(locator).TimeCreated.Ticks;
+
     public StructuredFieldResult GetUserData(EventLocator locator, string storageKey) =>
         GetEvent(locator).TryGetUserDataValues(storageKey);
 
@@ -155,6 +273,45 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
 
     public bool TryGetEventData(EventLocator locator, string fieldName, out EventFieldValue value) =>
         GetEvent(locator).EventData.TryGetValue(fieldName, out value);
+
+    public bool TryGetTimeTicksRange(
+        ReadOnlySpan<int> rankByPhysical,
+        out long minTicks,
+        out long maxTicks,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        long min = long.MaxValue;
+        long max = long.MinValue;
+        bool any = false;
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            long ticks = _events[index].TimeCreated.Ticks;
+            if (ticks < min) { min = ticks; }
+            if (ticks > max) { max = ticks; }
+            any = true;
+        }
+
+        minTicks = any ? min : 0;
+        maxTicks = any ? max : 0;
+
+        return any;
+    }
+
+    private static string? FieldValue(ResolvedEvent @event, EventFieldId field) => field switch
+    {
+        EventFieldId.Source => @event.Source,
+        EventFieldId.TaskCategory => @event.TaskCategory,
+        EventFieldId.Opcode => @event.Opcode,
+        EventFieldId.LogName => @event.LogName,
+        EventFieldId.ComputerName => @event.ComputerName,
+        EventFieldId.OwningLog => @event.OwningLog,
+        _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Field is not a supported group-by dimension.")
+    };
 
     private static string? RawPoolString(ResolvedEvent resolvedEvent, EventFieldId field) => field switch
     {
@@ -170,6 +327,16 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         EventFieldId.Opcode => resolvedEvent.Opcode,
         _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Not a single pooled string column.")
     };
+
+    private static int SlotForString(string? value, string[] targets, int otherSlot)
+    {
+        for (int slot = 0; slot < targets.Length; slot++)
+        {
+            if (string.Equals(value, targets[slot], StringComparison.Ordinal)) { return slot; }
+        }
+
+        return otherSlot;
+    }
 
     private LegacyStringPool BuildStringPool()
     {

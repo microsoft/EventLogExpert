@@ -15,6 +15,51 @@ public interface IEventColumnView
 {
     int Count { get; }
 
+    /// <summary>Group-by variant keyed on the numeric event id; (targetIds length + 1) slots per bin.</summary>
+    void BucketTimeTicksByEventId(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Group-by variant of <see cref="BucketTimeTicksBySeverity" /> for a pooled string field; (targetValues length +
+    ///     1) slots per bin.
+    /// </summary>
+    void BucketTimeTicksByField(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventFieldId field,
+        string[] targetValues,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Additively buckets this view's rows by UTC tick and severity slot; bucket-major
+    ///     slotCounts[i*LevelSeverity.SlotCount + slot], out-of-domain ticks clamp to the end buckets.
+    /// </summary>
+    void BucketTimeTicksBySeverity(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Tallies this view's rows by numeric event id into <paramref name="counts" /> (accumulating across a combined
+    ///     view).
+    /// </summary>
+    void CountEventIds(IDictionary<int, int> counts, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Tallies this view's rows by non-empty pooled string value of field (accumulating, so a combined view sums by
+    ///     logical value across logs); resolves the top-N group-by categories.
+    /// </summary>
+    void CountFieldValues(EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken);
+
     /// <summary>Full-detail rehydrate of every display row, in display order, for export and clipboard.</summary>
     IEnumerable<ResolvedEvent> EnumerateDetail();
 
@@ -52,4 +97,14 @@ public interface IEventColumnView
     ///     inspectable after a filter hides it.
     /// </summary>
     bool TryGetDetail(EventLocator locator, [NotNullWhen(true)] out ResolvedEvent? detail);
+
+    /// <summary>
+    ///     Exception-free read of locator's UTC-tick timestamp from the tick column (no rehydrate); false when it no
+    ///     longer addresses a live row. Like TryGetDetail, a filtered-out row still resolves, so in-view callers must also
+    ///     check Rank.
+    /// </summary>
+    bool TryGetTimeTicks(EventLocator locator, out long ticks);
+
+    /// <summary>UTC-tick span across this view's rows: true with [minTicks, maxTicks], false when the view is empty.</summary>
+    bool TryGetTimeTicksRange(out long minTicks, out long maxTicks, CancellationToken cancellationToken);
 }

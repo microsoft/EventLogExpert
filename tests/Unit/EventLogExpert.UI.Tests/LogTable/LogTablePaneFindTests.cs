@@ -70,6 +70,21 @@ public sealed class LogTablePaneFindTests : BunitContext
     }
 
     [Fact]
+    public void ClosingFind_ClearsTheMarkerSource()
+    {
+        var markers = Services.GetRequiredService<IFindMarkerSource>();
+        var cut = RenderWithEvents(NewEvent(1, "alpha match"), NewEvent(2, "beta"));
+
+        OpenFindAndSearch(cut, "match");
+        cut.WaitForAssertion(() => Assert.NotEmpty(markers.Ticks));
+
+        cut.Find(".table-container").KeyDown(new KeyboardEventArgs { Code = "Escape", Key = "Escape" });
+
+        cut.WaitForAssertion(() => Assert.Empty(markers.Ticks));
+        Assert.Null(markers.Owner);
+    }
+
+    [Fact]
     public void CurrentMatch_RendersInlineMark()
     {
         var cut = RenderWithEvents(NewEvent(1, "alpha"), NewEvent(2, "beta match"), NewEvent(3, "gamma match"));
@@ -128,6 +143,21 @@ public sealed class LogTablePaneFindTests : BunitContext
         cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll("tr[data-find]").Count));
         Assert.Single(cut.FindAll("tr[data-find='current']"));
         Assert.Contains("/2", cut.Find(".find-count").TextContent);
+    }
+
+    [Fact]
+    public void Query_PublishesMatchTimestampsToTheMarkerSource()
+    {
+        var markers = Services.GetRequiredService<IFindMarkerSource>();
+        var second = NewEvent(2, "beta match");
+        var fourth = NewEvent(4, "delta match");
+        var cut = RenderWithEvents(NewEvent(1, "alpha"), second, NewEvent(3, "gamma"), fourth);
+
+        OpenFindAndSearch(cut, "match");
+
+        cut.WaitForAssertion(() => Assert.Equal(2, markers.Ticks.Count));
+        Assert.Equal(_logId, markers.Owner);
+        Assert.Equal(new[] { second.TimeCreated.Ticks, fourth.TimeCreated.Ticks }, markers.Ticks);
     }
 
     [Fact]

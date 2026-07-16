@@ -22,6 +22,7 @@ using EventLogExpert.Runtime.Export;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
@@ -167,6 +168,7 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IFilterLensCommands, FilterLensCommands>();
             services.AddSingleton<IFilterLibraryCommands, FilterLibraryCommands>();
             services.AddSingleton<IFilterPaneCommands, FilterPaneCommands>();
+            services.AddSingleton<IHistogramCommands, HistogramCommands>();
             services.AddSingleton<ILogTableCommands, LogTableCommands>();
             services.AddSingleton<IScenarioFavoriteCommands, ScenarioFavoriteCommands>();
 

@@ -107,6 +107,22 @@ public sealed class FilterLensCommandsTests
             action.Lens.Window.Before == DateTime.MinValue.AddSeconds(30)));
     }
 
+    [Fact]
+    public void ShowEventsNearTime_MinValueAnchorWithNegativeOffsetZone_RendersLabelWithoutThrowing()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+        var westOfUtc = TimeZoneInfo.CreateCustomTimeZone("test-5", TimeSpan.FromHours(-5), "test-5", "test-5");
+
+        // Guards the chip-label conversion for a degenerate default(DateTime) anchor against a non-UTC display zone: on
+        // net10 TimeZoneInfo.ConvertTimeFromUtc clamps an out-of-range result to DateTime.MinValue instead of throwing, so
+        // the label renders without crashing the context-menu handler. (Legacy .NET Framework threw for this exact case; a
+        // future retarget that reintroduced the throw would fail this test rather than crashing at runtime.)
+        new FilterLensCommands(dispatcher).ShowEventsNearTime(
+            DateTime.MinValue, TimeSpan.FromSeconds(30), westOfUtc);
+
+        dispatcher.Received(1).Dispatch(Arg.Any<PushFilterLensAction>());
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-30)]
@@ -132,22 +148,6 @@ public sealed class FilterLensCommandsTests
             new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc), TimeSpan.FromMilliseconds(500), TimeZoneInfo.Utc));
 
         dispatcher.DidNotReceive().Dispatch(Arg.Any<PushFilterLensAction>());
-    }
-
-    [Fact]
-    public void ShowEventsNearTime_MinValueAnchorWithNegativeOffsetZone_RendersLabelWithoutThrowing()
-    {
-        var dispatcher = Substitute.For<IDispatcher>();
-        var westOfUtc = TimeZoneInfo.CreateCustomTimeZone("test-5", TimeSpan.FromHours(-5), "test-5", "test-5");
-
-        // Guards the chip-label conversion for a degenerate default(DateTime) anchor against a non-UTC display zone: on
-        // net10 TimeZoneInfo.ConvertTimeFromUtc clamps an out-of-range result to DateTime.MinValue instead of throwing, so
-        // the label renders without crashing the context-menu handler. (Legacy .NET Framework threw for this exact case; a
-        // future retarget that reintroduced the throw would fail this test rather than crashing at runtime.)
-        new FilterLensCommands(dispatcher).ShowEventsNearTime(
-            DateTime.MinValue, TimeSpan.FromSeconds(30), westOfUtc);
-
-        dispatcher.Received(1).Dispatch(Arg.Any<PushFilterLensAction>());
     }
 
     [Fact]
@@ -263,6 +263,51 @@ public sealed class FilterLensCommandsTests
         var dispatcher = Substitute.For<IDispatcher>();
 
         new FilterLensCommands(dispatcher).ShowRelatedByRelatedActivityId(Guid.NewGuid(), "LogA");
+
+        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action => action.Lens.OriginLog == "LogA"));
+    }
+
+    [Fact]
+    public void ShowTimeRange_DispatchesPushWithInclusiveEnabledUtcWindow()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+        var start = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var end = new DateTime(2024, 1, 1, 13, 0, 0, DateTimeKind.Utc);
+
+        new FilterLensCommands(dispatcher).ShowTimeRange(start, end, TimeZoneInfo.Utc);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action.Lens.Kind == LensKind.TimeWindow &&
+            action.Lens.Window != null &&
+            action.Lens.Window.IsEnabled &&
+            action.Lens.Window.After == start &&
+            action.Lens.Window.Before == end));
+    }
+
+    [Fact]
+    public void ShowTimeRange_NormalizesAReversedRange()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+        var earlier = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var later = new DateTime(2024, 1, 1, 13, 0, 0, DateTimeKind.Utc);
+
+        new FilterLensCommands(dispatcher).ShowTimeRange(later, earlier, TimeZoneInfo.Utc);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action.Lens.Window!.After == earlier &&
+            action.Lens.Window.Before == later));
+    }
+
+    [Fact]
+    public void ShowTimeRange_WithOriginLog_TagsLensWithThatLog()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+
+        new FilterLensCommands(dispatcher).ShowTimeRange(
+            new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc),
+            new DateTime(2024, 1, 1, 13, 0, 0, DateTimeKind.Utc),
+            TimeZoneInfo.Utc,
+            "LogA");
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action => action.Lens.OriginLog == "LogA"));
     }

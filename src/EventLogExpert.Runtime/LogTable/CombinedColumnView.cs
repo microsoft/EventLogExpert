@@ -58,6 +58,46 @@ internal sealed class CombinedColumnView : IEventColumnView
 
     internal static CombinedColumnView Empty { get; } = new([], new SortContext(null, true, null, false));
 
+    public void BucketTimeTicksByEventId(long minTicks, long bucketSpanTicks, int bucketCount, int[] targetIds, int[] slotCounts, CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.BucketTimeTicksByEventId(minTicks, bucketSpanTicks, bucketCount, targetIds, slotCounts, cancellationToken);
+        }
+    }
+
+    public void BucketTimeTicksByField(long minTicks, long bucketSpanTicks, int bucketCount, EventFieldId field, string[] targetValues, int[] slotCounts, CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.BucketTimeTicksByField(minTicks, bucketSpanTicks, bucketCount, field, targetValues, slotCounts, cancellationToken);
+        }
+    }
+
+    public void BucketTimeTicksBySeverity(long minTicks, long bucketSpanTicks, int bucketCount, int[] slotCounts, CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.BucketTimeTicksBySeverity(minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
+        }
+    }
+
+    public void CountEventIds(IDictionary<int, int> counts, CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.CountEventIds(counts, cancellationToken);
+        }
+    }
+
+    public void CountFieldValues(EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.CountFieldValues(field, counts, cancellationToken);
+        }
+    }
+
     public IEnumerable<ResolvedEvent> EnumerateDetail()
     {
         var offsets = new int[_views.Length];
@@ -179,6 +219,41 @@ internal sealed class CombinedColumnView : IEventColumnView
         detail = null;
 
         return false;
+    }
+
+    public bool TryGetTimeTicks(EventLocator locator, out long ticks)
+    {
+        if (_byLog.TryGetValue(locator.LogId, out var view))
+        {
+            return view.TryGetTimeTicks(locator, out ticks);
+        }
+
+        ticks = 0;
+
+        return false;
+    }
+
+    public bool TryGetTimeTicksRange(out long minTicks, out long maxTicks, CancellationToken cancellationToken)
+    {
+        long min = long.MaxValue;
+        long max = long.MinValue;
+        bool any = false;
+
+        foreach (var view in _views)
+        {
+            if (!view.TryGetTimeTicksRange(out long viewMin, out long viewMax, cancellationToken)) { continue; }
+
+            if (viewMin < min) { min = viewMin; }
+
+            if (viewMax > max) { max = viewMax; }
+
+            any = true;
+        }
+
+        minTicks = any ? min : 0;
+        maxTicks = any ? max : 0;
+
+        return any;
     }
 
     private int[][] BuildIndex()

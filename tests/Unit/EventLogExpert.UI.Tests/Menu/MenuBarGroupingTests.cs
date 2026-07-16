@@ -7,6 +7,7 @@ using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;
@@ -26,6 +27,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     private readonly IAlertDialogService _alertDialogService = Substitute.For<IAlertDialogService>();
     private readonly IStateSelection<EventLogState, bool> _eventLogSelection = Substitute.For<IStateSelection<EventLogState, bool>>();
     private readonly IStateSelection<FilterPaneState, bool> _filterPaneIsEnabled = Substitute.For<IStateSelection<FilterPaneState, bool>>();
+    private readonly IStateSelection<HistogramState, bool> _histogramVisible = Substitute.For<IStateSelection<HistogramState, bool>>();
     private readonly List<IStateSelection<LogTableState, bool>> _logTableSelections = [];
     private readonly IMenuService _menuService = Substitute.For<IMenuService>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
@@ -39,6 +41,7 @@ public sealed class MenuBarGroupingTests : BunitContext
         Services.AddSingleton(_alertDialogService);
         Services.AddSingleton(_eventLogSelection);
         Services.AddSingleton(_filterPaneIsEnabled);
+        Services.AddSingleton(_histogramVisible);
         Services.AddTransient<IStateSelection<LogTableState, bool>>(_ => CreateLogTableSelection());
         Services.AddSingleton(_menuService);
         Services.AddSingleton(_settings);

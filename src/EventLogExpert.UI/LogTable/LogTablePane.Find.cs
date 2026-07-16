@@ -45,6 +45,9 @@ public sealed partial class LogTablePane
 
     private int FindCurrentOrdinal => _findCurrentIndex >= 0 ? _findCurrentIndex + 1 : 0;
 
+    [Inject]
+    private IFindMarkerSource FindMarkerSource { get; init; } = null!;
+
     private int FindMatchCount => _findMatches.Count;
 
     // Renders Blazor-escaped segments (never MarkupString) so event text can't inject markup; capped at MaxMarksPerCell so a pathological cell can't explode the DOM.
@@ -96,6 +99,8 @@ public sealed partial class LogTablePane
         _findCurrentLocator = null;
         _findScanning = false;
         _findWrapAnnouncement = string.Empty;
+
+        FindMarkerSource.Clear();
     }
 
     private Task CloseFind()
@@ -149,6 +154,8 @@ public sealed partial class LogTablePane
         _findDebounceCts?.Cancel();
         _findDebounceCts?.Dispose();
         _findDebounceCts = null;
+
+        FindMarkerSource.Clear();
     }
 
     private int FindAnchorIndex()
@@ -269,7 +276,23 @@ public sealed partial class LogTablePane
         }
     }
 
-    private void PublishFindMatches(List<EventLocator> matches)
+    // Hand the current match timestamps (owner-tagged, ascending) to the timeline; collected free during the scan, the histogram re-bins them against its current window.
+    private void PublishFindMarks(List<long> matchTicks)
+    {
+        if (_currentTable is not { } table)
+        {
+            FindMarkerSource.Clear();
+
+            return;
+        }
+
+        long[] sorted = [.. matchTicks];
+        Array.Sort(sorted);
+
+        FindMarkerSource.Publish(table.Id, sorted);
+    }
+
+    private void PublishFindMatches(List<EventLocator> matches, List<long> matchTicks)
     {
         EventLocator? priorLocator = _findCurrentLocator;
 
@@ -281,6 +304,7 @@ public sealed partial class LogTablePane
         ResolveCurrentMatchAfterScan(priorLocator);
         _findScrollToCurrentOnRender = _findCurrentIndex >= 0;
 
+        PublishFindMarks(matchTicks);
         RequestFindRender();
     }
 
@@ -385,13 +409,15 @@ public sealed partial class LogTablePane
         CancellationToken token)
     {
         List<EventLocator>? matches = null;
+        List<long>? matchTicks = null;
 
         try
         {
-            matches = await Task.Run(
+            (matches, matchTicks) = await Task.Run(
                 () =>
                 {
                     var found = new List<EventLocator>();
+                    var foundTicks = new List<long>();
                     int total = view.Count;
 
                     for (int start = 0; start < total; start += FindChunkSize)
@@ -406,11 +432,12 @@ public sealed partial class LogTablePane
                             if (EventFindMatcher.RowMatches(row.Lean, columns, timeZone, query, caseSensitive, wholeWord))
                             {
                                 found.Add(row.Loc);
+                                foundTicks.Add(row.Lean.TimeCreated.Ticks);
                             }
                         }
                     }
 
-                    return found;
+                    return (found, foundTicks);
                 },
                 token);
         }
@@ -434,7 +461,7 @@ public sealed partial class LogTablePane
                     return;
                 }
 
-                if (matches is null)
+                if (matches is null || matchTicks is null)
                 {
                     _findScanning = false;
                     RequestFindRender();
@@ -442,7 +469,7 @@ public sealed partial class LogTablePane
                     return;
                 }
 
-                PublishFindMatches(matches);
+                PublishFindMatches(matches, matchTicks);
             });
         }
         catch (ObjectDisposedException) { /* Component torn down mid-publish; nothing to update. */ }

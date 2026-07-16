@@ -24,6 +24,7 @@ public static class UiServiceCollectionExtensions
 
             services.AddSingleton<IMenuHostRegistry, MenuHostRegistry>();
             services.AddSingleton<IFindCoordinator, FindCoordinator>();
+            services.AddSingleton<IFindMarkerSource, FindMarkerSource>();
             services.AddSingleton<KeyboardShortcutService>();
 
             return services;

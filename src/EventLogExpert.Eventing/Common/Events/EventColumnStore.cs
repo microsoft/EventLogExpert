@@ -227,6 +227,154 @@ public sealed class EventColumnStore
         return Count > 0;
     }
 
+    internal void BucketTimeTicksByEventId(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        int otherSlot = targetIds.Length;
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> timeColumn = chunk.TimeTicksColumn;
+            ReadOnlySpan<int> idColumn = chunk.IdColumn;
+
+            for (int row = 0; row < timeColumn.Length; row++)
+            {
+                if (rankByPhysical[offset + row] < 0) { continue; }
+
+                int bucket = ToBucket(timeColumn[row], minTicks, bucketSpanTicks, bucketCount);
+                slotCounts[(bucket * slotCount) + SlotForIndex(idColumn[row], targetIds, otherSlot)]++;
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+            int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
+            slotCounts[(bucket * slotCount) + SlotForIndex(pending.Id, targetIds, otherSlot)]++;
+        }
+    }
+
+    internal void BucketTimeTicksByField(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventColumnField field,
+        string[] targetValues,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        int otherSlot = targetValues.Length;
+
+        // Resolve each target to THIS store's pool index once (miss -> int.MinValue, an impossible index) so sealed rows classify by integer compare; a null-field row (-1) can't collide with an absent target.
+        int[] targetIndices = new int[targetValues.Length];
+
+        for (int slot = 0; slot < targetValues.Length; slot++)
+        {
+            targetIndices[slot] = _pool.TryGetIndex(targetValues[slot], out int index) ? index : int.MinValue;
+        }
+
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> timeColumn = chunk.TimeTicksColumn;
+            ReadOnlySpan<int> valueColumn = chunk.PoolIndexColumn(field);
+
+            for (int row = 0; row < timeColumn.Length; row++)
+            {
+                if (rankByPhysical[offset + row] < 0) { continue; }
+
+                int bucket = ToBucket(timeColumn[row], minTicks, bucketSpanTicks, bucketCount);
+                slotCounts[(bucket * slotCount) + SlotForIndex(valueColumn[row], targetIndices, otherSlot)]++;
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+            int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
+            int slot = SlotForString(PendingFieldValue(pending, field), targetValues, otherSlot);
+            slotCounts[(bucket * slotCount) + slot]++;
+        }
+    }
+
+    internal void BucketTimeTicksBySeverity(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        // Resolve the five level names to their pool indices once (missing -> int.MinValue) so sealed rows map level by integer compare; a null-level row (-1) can't collide with an absent name.
+        int criticalIndex = _pool.TryGetIndex(nameof(SeverityLevel.Critical), out int critical) ? critical : int.MinValue;
+        int errorIndex = _pool.TryGetIndex(nameof(SeverityLevel.Error), out int error) ? error : int.MinValue;
+        int warningIndex = _pool.TryGetIndex(nameof(SeverityLevel.Warning), out int warning) ? warning : int.MinValue;
+        int informationIndex = _pool.TryGetIndex(nameof(SeverityLevel.Information), out int information) ? information : int.MinValue;
+        int verboseIndex = _pool.TryGetIndex(nameof(SeverityLevel.Verbose), out int verbose) ? verbose : int.MinValue;
+
+        const int SlotCount = LevelSeverity.SlotCount;
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> timeColumn = chunk.TimeTicksColumn;
+            ReadOnlySpan<int> levelColumn = chunk.PoolIndexColumn(EventColumnField.Level);
+
+            for (int row = 0; row < timeColumn.Length; row++)
+            {
+                if (rankByPhysical[offset + row] < 0) { continue; }
+
+                int bucket = ToBucket(timeColumn[row], minTicks, bucketSpanTicks, bucketCount);
+                slotCounts[(bucket * SlotCount) + SlotOf(levelColumn[row])]++;
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+            int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
+            slotCounts[(bucket * SlotCount) + LevelSeverity.Slot(LevelSeverity.FromLevelName(pending.Level))]++;
+        }
+
+        return;
+
+        int SlotOf(int levelPoolIndex) =>
+            levelPoolIndex == criticalIndex ? (int)SeverityLevel.Critical :
+            levelPoolIndex == errorIndex ? (int)SeverityLevel.Error :
+            levelPoolIndex == warningIndex ? (int)SeverityLevel.Warning :
+            levelPoolIndex == informationIndex ? (int)SeverityLevel.Information :
+            levelPoolIndex == verboseIndex ? (int)SeverityLevel.Verbose : 0;
+    }
+
     /// <summary>
     ///     Bulk-copies the <see cref="ResolvedEvent.ActivityId" /> column into caller-owned flat arrays over the whole
     ///     physical range [0, <see cref="Count" />): sealed rows are copied a chunk at a time (no per-row search), the bounded
@@ -395,6 +543,81 @@ public sealed class EventColumnStore
         {
             values[index] = Pending(index).TimeCreated.Ticks;
             hasValue[index] = true;
+        }
+    }
+
+    internal void CountEventIds(ReadOnlySpan<int> rankByPhysical, IDictionary<int, int> counts, CancellationToken cancellationToken)
+    {
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<int> idColumn = chunk.IdColumn;
+
+            for (int row = 0; row < idColumn.Length; row++)
+            {
+                if (rankByPhysical[offset + row] < 0) { continue; }
+
+                int id = idColumn[row];
+                counts[id] = counts.TryGetValue(id, out int existing) ? existing + 1 : 1;
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            int id = Pending(index).Id;
+            counts[id] = counts.TryGetValue(id, out int existing) ? existing + 1 : 1;
+        }
+    }
+
+    internal void CountFieldValues(ReadOnlySpan<int> rankByPhysical, EventColumnField field, IDictionary<string, int> counts, CancellationToken cancellationToken)
+    {
+        // Tally sealed rows by pooled INDEX (int-keyed, no per-row string lookup), then reverse-resolve each distinct index once and merge, so the hot path stays integer-only but still sums by logical value across differently-pooled stores.
+        var byIndex = new Dictionary<int, int>();
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<int> valueColumn = chunk.PoolIndexColumn(field);
+
+            for (int row = 0; row < valueColumn.Length; row++)
+            {
+                if (rankByPhysical[offset + row] < 0) { continue; }
+
+                int poolIndex = valueColumn[row];
+
+                if (poolIndex < 0) { continue; }
+
+                byIndex[poolIndex] = byIndex.TryGetValue(poolIndex, out int existing) ? existing + 1 : 1;
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        foreach ((int poolIndex, int count) in byIndex)
+        {
+            string? value = PoolGet(poolIndex);
+
+            if (!string.IsNullOrEmpty(value))
+            {
+                counts[value] = counts.TryGetValue(value, out int existing) ? existing + count : count;
+            }
+        }
+
+        // Pending rows carry string fields (no pool index), so tally them by value directly.
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            Tally(counts, PendingFieldValue(Pending(index), field));
         }
     }
 
@@ -698,6 +921,52 @@ public sealed class EventColumnStore
     /// <summary>The field-name pool indices backing the deduped schema at <paramref name="schemaId" />.</summary>
     internal ReadOnlySpan<int> SchemaFieldNameIndices(int schemaId) => _schemas[schemaId];
 
+    internal bool TryGetTimeTicksRange(
+        ReadOnlySpan<int> rankByPhysical,
+        out long minTicks,
+        out long maxTicks,
+        CancellationToken cancellationToken)
+    {
+        long min = long.MaxValue;
+        long max = long.MinValue;
+        bool any = false;
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> column = chunk.TimeTicksColumn;
+
+            for (int row = 0; row < column.Length; row++)
+            {
+                if (rankByPhysical[offset + row] < 0) { continue; }
+
+                long ticks = column[row];
+                if (ticks < min) { min = ticks; }
+                if (ticks > max) { max = ticks; }
+                any = true;
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            long ticks = Pending(index).TimeCreated.Ticks;
+            if (ticks < min) { min = ticks; }
+            if (ticks > max) { max = ticks; }
+            any = true;
+        }
+
+        minTicks = any ? min : 0;
+        maxTicks = any ? max : 0;
+
+        return any;
+    }
+
     /// <summary>
     ///     Builds a fresh snapshot for a reload: bumps <see cref="Generation" /> and continues (never resets)
     ///     <see cref="ContentVersion" />.
@@ -771,6 +1040,52 @@ public sealed class EventColumnStore
         StoredFieldKind.SizeT => EventPropertyKind.SizeT,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Not a packed StoredFieldKind.")
     };
+
+    private static string? PendingFieldValue(ResolvedEvent pending, EventColumnField field) => field switch
+    {
+        EventColumnField.Source => pending.Source,
+        EventColumnField.TaskCategory => pending.TaskCategory,
+        EventColumnField.Opcode => pending.Opcode,
+        EventColumnField.LogName => pending.LogName,
+        EventColumnField.ComputerName => pending.ComputerName,
+        EventColumnField.OwningLog => pending.OwningLog,
+        _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Field is not a supported group-by dimension.")
+    };
+
+    // Shared by the pooled-field and event-id group-by scans: a pure integer match, so a negative event id still matches its own target; callers resolve absent pooled targets to int.MinValue (not -1) so a null-field row can't collide.
+    private static int SlotForIndex(int value, int[] targets, int otherSlot)
+    {
+        for (int slot = 0; slot < targets.Length; slot++)
+        {
+            if (value == targets[slot]) { return slot; }
+        }
+
+        return otherSlot;
+    }
+
+    private static int SlotForString(string? value, string[] targets, int otherSlot)
+    {
+        for (int slot = 0; slot < targets.Length; slot++)
+        {
+            if (string.Equals(value, targets[slot], StringComparison.Ordinal)) { return slot; }
+        }
+
+        return otherSlot;
+    }
+
+    private static void Tally(IDictionary<string, int> counts, string? value)
+    {
+        if (string.IsNullOrEmpty(value)) { return; }
+
+        counts[value] = counts.TryGetValue(value, out int existing) ? existing + 1 : 1;
+    }
+
+    private static int ToBucket(long ticks, long minTicks, long bucketSpanTicks, int bucketCount)
+    {
+        long bucket = (ticks - minTicks) / bucketSpanTicks;
+
+        return bucket < 0 ? 0 : bucket >= bucketCount ? bucketCount - 1 : (int)bucket;
+    }
 
     private (EventColumnChunk Chunk, int Row) Locate(int index)
     {

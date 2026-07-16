@@ -41,4 +41,10 @@ public interface IFilterLensCommands
     ///     <see cref="ResolvedEvent.OwningLog" /> so the lens auto-clears when that log is closed.
     /// </summary>
     void ShowRelatedByRelatedActivityId(Guid? relatedActivityId, string? originLog = null);
+
+    /// <summary>
+    ///     Pushes a reversible lens narrowing the view to the inclusive UTC range [startUtc, endUtc] (histogram brush);
+    ///     originLog auto-clears the lens when that log closes (null for a combined view).
+    /// </summary>
+    void ShowTimeRange(DateTime startUtc, DateTime endUtc, TimeZoneInfo displayZone, string? originLog = null);
 }

@@ -27,6 +27,7 @@ internal static class LogTablePaneDependenciesExtensions
             services.AddSingleton(Substitute.For<IFilterPaneCommands>());
             services.AddSingleton(Substitute.For<IFilterService>());
             services.AddSingleton<IFindCoordinator, FindCoordinator>();
+            services.AddSingleton<IFindMarkerSource, FindMarkerSource>();
             services.AddSingleton(Substitute.For<ILogTableCommands>());
             services.AddSingleton(Substitute.For<IMenuService>());
             services.AddSingleton(Substitute.For<ITraceLogger>());

@@ -4,6 +4,10 @@
 {
     <FilterPane />
     <LensBreadcrumb />
+    @if (HistogramVisible.Value)
+    {
+        <HistogramPane />
+    }
     <LogTablePane />
     <DetailsPane />
 }

@@ -1,0 +1,308 @@
+.histogram-pane {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    height: 170px;
+    margin: 0 5px;
+    border-bottom: solid var(--background-darkgray);
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.histogram-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    flex-wrap: wrap;
+    min-height: 20px;
+    padding: 1px 0;
+    color: var(--text-secondary);
+}
+
+.histogram-toolbar-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    min-width: 0;
+}
+
+.histogram-groupby {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.histogram-groupby-label { color: var(--text-secondary); }
+
+.histogram-groupby ::deep .dropdown-input { margin: 0; }
+
+.histogram-groupby ::deep .histogram-dimension-select {
+    width: 8rem;
+    margin: 0;
+}
+
+.histogram-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+}
+
+.histogram-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 0 2px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: transparent;
+    color: inherit;
+    line-height: 1.3;
+    cursor: pointer;
+}
+
+.histogram-legend-item:hover { border-color: var(--background-darkgray); }
+
+.histogram-legend-item:focus-visible {
+    outline: 2px solid var(--toggle-accent);
+    outline-offset: 1px;
+}
+
+.histogram-legend-hidden {
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+.histogram-swatch {
+    display: inline-block;
+    flex: 0 0 auto;
+    border-radius: 1px;
+}
+
+.histogram-buttons {
+    display: flex;
+    gap: 2px;
+}
+
+.histogram-button {
+    min-width: 20px;
+    padding: 2px 6px;
+    border: 1px solid var(--background-darkgray);
+    border-radius: 2px;
+    background: transparent;
+    color: inherit;
+    line-height: 1.3;
+    cursor: pointer;
+}
+
+.histogram-button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.histogram-button:hover {
+    background: color-mix(in srgb, var(--toggle-accent) 15%, transparent);
+}
+
+.histogram-button:focus-visible {
+    outline: 2px solid var(--toggle-accent);
+    outline-offset: 1px;
+}
+
+.histogram-button-accent {
+    border-color: var(--toggle-accent);
+    color: var(--toggle-accent);
+    font-weight: 600;
+}
+
+.histogram-zoom-hint {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.histogram-scroll {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.histogram-scroll:focus-visible {
+    outline: 2px solid var(--toggle-accent);
+    outline-offset: -2px;
+}
+
+.histogram-scroll::-webkit-scrollbar { height: 6px; }
+
+.histogram-track {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    pointer-events: none;
+}
+
+.histogram-viewport {
+    position: sticky;
+    left: 0;
+    height: 100%;
+}
+
+.histogram-plot {
+    display: block;
+}
+
+.histogram-selection {
+    position: absolute;
+    top: 0;
+    z-index: 2;
+    height: 100%;
+    background: color-mix(in srgb, var(--toggle-accent) 20%, transparent);
+    border-inline: 1px solid var(--toggle-accent);
+    pointer-events: none;
+}
+
+.histogram-tooltip {
+    position: fixed;
+    z-index: 10;
+    max-width: 260px;
+    padding: 3px 6px;
+    border: 1px solid var(--background-darkgray);
+    border-radius: 3px;
+    background: var(--background-dark);
+    color: var(--text-primary, inherit);
+    font-size: 0.7rem;
+    line-height: 1.3;
+    white-space: pre-line;
+    pointer-events: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.histogram-axis-labels {
+    position: absolute;
+    left: 0;
+    bottom: 1px;
+    width: 100%;
+    height: 14px;
+    pointer-events: none;
+}
+
+.histogram-axis-label {
+    position: absolute;
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    white-space: nowrap;
+}
+
+.histogram-axis-label.anchor-start { transform: translateX(0); }
+
+.histogram-axis-label.anchor-middle { transform: translateX(-50%); }
+
+.histogram-axis-label.anchor-end { transform: translateX(-100%); }
+
+.histogram-hit { fill: transparent; cursor: pointer; }
+
+.histogram-bar-normal { fill: var(--toggle-accent); }
+
+.histogram-bar-warning { fill: var(--clr-yellow); }
+
+.histogram-bar-error { fill: var(--clr-red); }
+
+.histogram-cat-0 { fill: #56b4e9; }
+
+.histogram-cat-1 { fill: #e69f00; }
+
+.histogram-cat-2 { fill: #009e73; }
+
+.histogram-cat-3 { fill: #cc79a7; }
+
+.histogram-cat-other { fill: var(--text-secondary); }
+
+.histogram-bin-cursor {
+    fill: none;
+    stroke: var(--toggle-accent);
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
+    pointer-events: none;
+}
+
+.histogram-find-marker {
+    fill: var(--clr-find);
+    stroke: var(--background-darkgray);
+    stroke-width: 0.5;
+    pointer-events: none;
+}
+
+.histogram-anomaly {
+    fill: none;
+    stroke: var(--clr-statusbar);
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
+    pointer-events: none;
+}
+
+.histogram-marker-selected {
+    stroke: var(--toggle-accent);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 2;
+    vector-effect: non-scaling-stroke;
+    pointer-events: none;
+}
+
+.histogram-axis-baseline,
+.histogram-axis-tick {
+    stroke: var(--background-darkgray);
+    stroke-width: 1;
+}
+
+.histogram-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.histogram-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@media (forced-colors: active) {
+    .histogram-bar-normal { fill: CanvasText; }
+
+    .histogram-bar-warning { fill: url(#histogram-hatch-warning); }
+
+    .histogram-bar-error { fill: url(#histogram-hatch-error); }
+
+    /* Forced colors drop the palette, so hatch each capped top-four category distinctly; Other stays a solid fill. */
+    .histogram-cat-other { fill: CanvasText; }
+
+    .histogram-cat-0 { fill: url(#histogram-hatch-cat-0); }
+
+    .histogram-cat-1 { fill: url(#histogram-hatch-cat-1); }
+
+    .histogram-cat-2 { fill: url(#histogram-hatch-cat-2); }
+
+    .histogram-cat-3 { fill: url(#histogram-hatch-cat-3); }
+
+    .histogram-find-marker { fill: Highlight; stroke: CanvasText; }
+}
