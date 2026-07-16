@@ -34,6 +34,9 @@ internal sealed class FilterLensCommands(IDispatcher dispatcher) : IFilterLensCo
         if (relatedActivityId is { } id) { PushLens(FilterLensFactory.ForRelatedActivityId(id, originLog)); }
     }
 
+    public void ShowTimeRange(DateTime startUtc, DateTime endUtc, TimeZoneInfo displayZone, string? originLog = null) =>
+        PushLens(FilterLensFactory.ForTimeRange(startUtc, endUtc, displayZone, originLog));
+
     private void PushLens(FilterLens? lens)
     {
         if (lens != null) { _dispatcher.Dispatch(new PushFilterLensAction(lens)); }

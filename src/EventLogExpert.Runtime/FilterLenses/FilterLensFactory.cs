@@ -31,6 +31,27 @@ internal static class FilterLensFactory
             originLog);
 
     /// <summary>
+    ///     Builds a lens keeping rows whose TimeCreated is in the inclusive UTC range [startUtc, endUtc]; endpoints are
+    ///     normalized so a right-to-left brush stays a valid non-empty window.
+    /// </summary>
+    public static FilterLens ForTimeRange(
+        DateTime startUtc,
+        DateTime endUtc,
+        TimeZoneInfo displayZone,
+        string? originLog = null)
+    {
+        var (after, before) = startUtc <= endUtc ? (startUtc, endUtc) : (endUtc, startUtc);
+
+        return new FilterLens
+        {
+            Label = $"{after.ConvertTimeZone(displayZone):T} - {before.ConvertTimeZone(displayZone):T}",
+            Kind = LensKind.TimeWindow,
+            Window = new DateFilter { After = after, Before = before, IsEnabled = true },
+            OriginLog = originLog
+        };
+    }
+
+    /// <summary>
     ///     Builds a transient time-window lens centered on <paramref name="timeCreatedUtc" /> (the source event's UTC
     ///     timestamp): the effective view is narrowed to the inclusive range [timeCreatedUtc - radius, timeCreatedUtc +
     ///     radius], so the source event itself always survives. Bounds are clamped to the <see cref="DateTime" /> range

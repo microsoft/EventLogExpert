@@ -36,6 +36,66 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
 
     public IReadOnlyList<string?> Pool => new PoolView(_store, PendingPool());
 
+    public void BucketTimeTicksByEventId(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(targetIds);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketSpanTicks, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketCount, 1);
+
+        int slotCount = targetIds.Length + 1;
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, bucketCount * slotCount);
+
+        _store.BucketTimeTicksByEventId(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, targetIds, slotCount, slotCounts, cancellationToken);
+    }
+
+    public void BucketTimeTicksByField(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventFieldId field,
+        string[] targetValues,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(targetValues);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketSpanTicks, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketCount, 1);
+
+        int slotCount = targetValues.Length + 1;
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, bucketCount * slotCount);
+
+        _store.BucketTimeTicksByField(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, ToColumnField(field), targetValues, slotCount, slotCounts, cancellationToken);
+    }
+
+    public void BucketTimeTicksBySeverity(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketSpanTicks, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketCount, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, bucketCount * LevelSeverity.SlotCount);
+
+        _store.BucketTimeTicksBySeverity(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
+    }
+
     public void CopyGuidColumn(EventFieldId field, Guid[] values, bool[] hasValue)
     {
         ArgumentNullException.ThrowIfNull(values);
@@ -97,6 +157,22 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
             string? value = PendingPoolString(_store.GetPendingEvent(index), column);
             poolIndices[index] = value is null ? -1 : extension.StorePoolCount + extension.IndexOf(value);
         }
+    }
+
+    public void CountEventIds(ReadOnlySpan<int> rankByPhysical, IDictionary<int, int> counts, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(counts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        _store.CountEventIds(rankByPhysical, counts, cancellationToken);
+    }
+
+    public void CountFieldValues(ReadOnlySpan<int> rankByPhysical, EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(counts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        _store.CountFieldValues(rankByPhysical, ToColumnField(field), counts, cancellationToken);
     }
 
     public EventDataFieldEnumerator EnumerateEventData(EventLocator locator)
@@ -208,6 +284,8 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
             : _store.ReconstructStringArray(_store.RawKeywords(index));
     }
 
+    public long GetTimeTicks(EventLocator locator) => _store.RawTimeTicks(Resolve(locator));
+
     public StructuredFieldResult GetUserData(EventLocator locator, string storageKey)
     {
         int index = Resolve(locator);
@@ -278,6 +356,17 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         value = default;
 
         return false;
+    }
+
+    public bool TryGetTimeTicksRange(
+        ReadOnlySpan<int> rankByPhysical,
+        out long minTicks,
+        out long maxTicks,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        return _store.TryGetTimeTicksRange(rankByPhysical, out minTicks, out maxTicks, cancellationToken);
     }
 
     private static string? PendingPoolString(ResolvedEvent pending, EventColumnField column) => column switch

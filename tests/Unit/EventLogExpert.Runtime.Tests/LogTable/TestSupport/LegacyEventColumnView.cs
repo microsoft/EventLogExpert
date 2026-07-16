@@ -21,6 +21,21 @@ internal sealed class LegacyEventColumnView(
 
     public IEventColumnReader Reader => _reader;
 
+    public void BucketTimeTicksByEventId(long minTicks, long bucketSpanTicks, int bucketCount, int[] targetIds, int[] slotCounts, CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventId(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, targetIds, slotCounts, cancellationToken);
+
+    public void BucketTimeTicksByField(long minTicks, long bucketSpanTicks, int bucketCount, EventFieldId field, string[] targetValues, int[] slotCounts, CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByField(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, field, targetValues, slotCounts, cancellationToken);
+
+    public void BucketTimeTicksBySeverity(long minTicks, long bucketSpanTicks, int bucketCount, int[] slotCounts, CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksBySeverity(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
+
+    public void CountEventIds(IDictionary<int, int> counts, CancellationToken cancellationToken) =>
+        _reader.CountEventIds(AllSurvive(), counts, cancellationToken);
+
+    public void CountFieldValues(EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken) =>
+        _reader.CountFieldValues(AllSurvive(), field, counts, cancellationToken);
+
     public IEnumerable<ResolvedEvent> EnumerateDetail()
     {
         for (int physical = 0; physical < _reader.Count; physical++)
@@ -100,5 +115,34 @@ internal sealed class LegacyEventColumnView(
         detail = null;
 
         return false;
+    }
+
+    public bool TryGetTimeTicks(EventLocator locator, out long ticks)
+    {
+        if (locator.LogId == _reader.LogId
+            && locator.Generation == _reader.Generation
+            && locator.Index >= 0
+            && locator.Index < _reader.Count)
+        {
+            ticks = _reader.GetEvent(locator).TimeCreated.Ticks;
+
+            return true;
+        }
+
+        ticks = 0;
+
+        return false;
+    }
+
+    public bool TryGetTimeTicksRange(out long minTicks, out long maxTicks, CancellationToken cancellationToken) =>
+        _reader.TryGetTimeTicksRange(AllSurvive(), out minTicks, out maxTicks, cancellationToken);
+
+    private int[] AllSurvive()
+    {
+        int[] ranks = new int[_reader.Count];
+
+        for (int index = 0; index < ranks.Length; index++) { ranks[index] = index; }
+
+        return ranks;
     }
 }

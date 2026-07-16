@@ -50,6 +50,9 @@ internal sealed class EventColumnPool
         return _segments[segment][index - prefix[segment]];
     }
 
+    /// <summary>The stable index interned for <paramref name="value" />, or <c>false</c> when it was never interned.</summary>
+    internal bool TryGetIndex(string value, out int index) => _map.TryGetValue(value, out index);
+
     private static int FindSegment(int[] prefix, int index)
     {
         int low = 0;

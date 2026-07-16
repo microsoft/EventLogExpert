@@ -22,6 +22,42 @@ public interface IEventColumnReader
     /// </summary>
     IReadOnlyList<string?> Pool { get; }
 
+    /// <summary>Group-by variant keyed on the numeric event id; (<paramref name="targetIds" /> length + 1) slots per bin.</summary>
+    void BucketTimeTicksByEventId(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Group-by variant for a pooled string field: each survivor lands in its targetValues slot (resolved per store,
+    ///     so it sums across differently-pooled logs) else the trailing "other" slot; (targetValues length + 1) slots per bin.
+    /// </summary>
+    void BucketTimeTicksByField(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventFieldId field,
+        string[] targetValues,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Additively buckets survivors (rank &gt;= 0) by UTC tick and severity slot; bucket-major
+    ///     slotCounts[i*LevelSeverity.SlotCount + slot], out-of-domain ticks clamp to the end buckets.
+    /// </summary>
+    void BucketTimeTicksBySeverity(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
     /// <summary>
     ///     Bulk-copies the <see cref="EventFieldId.ActivityId" /> column into caller-owned arrays over the physical range
     ///     [0, <see cref="Count" />). <paramref name="hasValue" />[i] is false for an absent (null) value.
@@ -41,6 +77,18 @@ public interface IEventColumnReader
     ///     entry indexes <see cref="Pool" />. KeywordsDisplay is not a single pooled column and is not supported here.
     /// </summary>
     void CopyPoolIndexColumn(EventFieldId field, int[] poolIndices);
+
+    /// <summary>
+    ///     Tallies each surviving row by its numeric event id into <paramref name="counts" /> (accumulating across a
+    ///     combined view).
+    /// </summary>
+    void CountEventIds(ReadOnlySpan<int> rankByPhysical, IDictionary<int, int> counts, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Tallies survivors by non-empty pooled string value of field (accumulating, so a combined view sums by logical
+    ///     value across pools); resolves the top-N group-by categories.
+    /// </summary>
+    void CountFieldValues(ReadOnlySpan<int> rankByPhysical, EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken);
 
     EventDataFieldEnumerator EnumerateEventData(EventLocator locator);
 
@@ -67,6 +115,9 @@ public interface IEventColumnReader
 
     IReadOnlyList<string> GetKeywords(EventLocator locator);
 
+    /// <summary>The UTC-tick timestamp of <paramref name="locator" /> read straight from the tick column, with no rehydrate.</summary>
+    long GetTimeTicks(EventLocator locator);
+
     StructuredFieldResult GetUserData(EventLocator locator, string storageKey);
 
     bool GetUserDataIncomplete(EventLocator locator);
@@ -74,4 +125,11 @@ public interface IEventColumnReader
     EventLocator LocatorAt(int index);
 
     bool TryGetEventData(EventLocator locator, string fieldName, out EventFieldValue value);
+
+    /// <summary>UTC-tick span across survivors (rank &gt;= 0): true with [minTicks, maxTicks], false when none survive.</summary>
+    bool TryGetTimeTicksRange(
+        ReadOnlySpan<int> rankByPhysical,
+        out long minTicks,
+        out long maxTicks,
+        CancellationToken cancellationToken);
 }

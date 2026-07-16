@@ -33,6 +33,60 @@ internal sealed class EventColumnView : IEventColumnView
     // so the current display order is a valid re-sort input.
     internal ReadOnlySpan<int> Survivors => _order;
 
+    public void BucketTimeTicksByEventId(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventId(_rankByPhysical,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            targetIds,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksByField(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventFieldId field,
+        string[] targetValues,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByField(_rankByPhysical,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            field,
+            targetValues,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksBySeverity(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksBySeverity(_rankByPhysical,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            slotCounts,
+            cancellationToken);
+
+    public void CountEventIds(IDictionary<int, int> counts, CancellationToken cancellationToken) =>
+        _reader.CountEventIds(_rankByPhysical, counts, cancellationToken);
+
+    public void CountFieldValues(
+        EventFieldId field,
+        IDictionary<string, int> counts,
+        CancellationToken cancellationToken) =>
+        _reader.CountFieldValues(_rankByPhysical, field, counts, cancellationToken);
+
     public IEnumerable<ResolvedEvent> EnumerateDetail()
     {
         foreach (int physical in _order)
@@ -105,6 +159,26 @@ internal sealed class EventColumnView : IEventColumnView
         return false;
     }
 
+    public bool TryGetTimeTicks(EventLocator locator, out long ticks)
+    {
+        if (locator.LogId == _reader.LogId
+            && locator.Generation == _reader.Generation
+            && locator.Index >= 0
+            && locator.Index < _reader.Count)
+        {
+            ticks = _reader.GetTimeTicks(locator);
+
+            return true;
+        }
+
+        ticks = 0;
+
+        return false;
+    }
+
+    public bool TryGetTimeTicksRange(out long minTicks, out long maxTicks, CancellationToken cancellationToken) =>
+        _reader.TryGetTimeTicksRange(_rankByPhysical, out minTicks, out maxTicks, cancellationToken);
+
     /// <summary>
     ///     Builds a view over the filter-surviving <paramref name="survivors" />, sorted into display order, with the
     ///     physical-to-display inverse used by <see cref="Rank" />.
@@ -119,8 +193,8 @@ internal sealed class EventColumnView : IEventColumnView
         Create(reader, survivors, new SortContext(orderBy, isDescending, groupBy, isGroupDescending));
 
     /// <summary>
-    ///     Live-path overload: sorts under <paramref name="context" /> and retains it so the reducers can detect
-    ///     (<see cref="HasContext" />) and repair (<see cref="WithContext" />) a stale sort without re-reading the raw store.
+    ///     Live-path overload: sorts under <paramref name="context" /> and retains it so the reducers can detect (
+    ///     <see cref="HasContext" />) and repair (<see cref="WithContext" />) a stale sort without re-reading the raw store.
     /// </summary>
     internal static EventColumnView Create(IEventColumnReader reader, ReadOnlySpan<int> survivors, SortContext context)
     {

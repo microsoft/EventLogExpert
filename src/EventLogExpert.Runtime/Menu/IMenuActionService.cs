@@ -48,6 +48,8 @@ public interface IMenuActionService
 
     void SetContinuouslyUpdate(bool value);
 
+    void SetHistogramVisible(bool value);
+
     Task ShowDebugLogsAsync();
 
     Task ShowReleaseNotesAsync();

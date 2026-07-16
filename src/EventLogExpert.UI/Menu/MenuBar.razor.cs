@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Export;
 using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;
@@ -51,6 +52,9 @@ public sealed partial class MenuBar
 
     [Inject]
     private IStateSelection<LogTableState, bool> HasActiveLogs { get; init; } = null!;
+
+    [Inject]
+    private IStateSelection<HistogramState, bool> HistogramVisible { get; init; } = null!;
 
     [Inject]
     private IStateSelection<LogTableState, bool> IsGroupDescending { get; init; } = null!;
@@ -114,6 +118,7 @@ public sealed partial class MenuBar
         ContinuouslyUpdate.Select(state => state.ContinuouslyUpdate);
         FilterPaneIsEnabled.Select(state => state.IsEnabled);
         HasActiveLogs.Select(state => state.EventTables.Any(table => !table.IsCombined));
+        HistogramVisible.Select(state => state.IsVisible);
         IsGroupDescending.Select(state => state.IsGroupDescending);
         IsGrouping.Select(state => state.GroupBy is not null);
 
@@ -278,6 +283,7 @@ public sealed partial class MenuBar
         bool isContinuouslyUpdating = ContinuouslyUpdate.Value;
         bool isGrouping = IsGrouping.Value;
         bool isGroupDescending = IsGroupDescending.Value;
+        bool isHistogramVisible = HistogramVisible.Value;
 
         return
         [
@@ -308,6 +314,11 @@ public sealed partial class MenuBar
                 () => Actions.SetAllGroupsCollapsed(true),
                 isEnabled: isGrouping,
                 disabledReason: isGrouping ? null : GroupDisabledReason),
+            MenuItem.Separator(),
+            MenuItem.Item(
+                "Timeline",
+                () => Actions.SetHistogramVisible(!isHistogramVisible),
+                isChecked: isHistogramVisible),
         ];
     }
 

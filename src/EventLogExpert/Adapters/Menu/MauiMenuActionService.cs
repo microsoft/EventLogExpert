@@ -13,6 +13,7 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Export;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
@@ -43,6 +44,7 @@ public sealed class MauiMenuActionService(
     IEventLogCommands eventLogCommands,
     IFilterLibraryCommands filterLibraryCommands,
     IFilterPaneCommands filterPaneCommands,
+    IHistogramCommands histogramCommands,
     ILogTableCommands logTableCommands,
     IClipboardService clipboardService,
     IAlertDialogService dialogService,
@@ -72,6 +74,7 @@ public sealed class MauiMenuActionService(
     private readonly IFilterLibraryCommands _filterLibraryCommands = filterLibraryCommands;
     private readonly IFilterPaneCommands _filterPaneCommands = filterPaneCommands;
     private readonly IFolderPickerService _folderPickerService = folderPickerService;
+    private readonly IHistogramCommands _histogramCommands = histogramCommands;
     private readonly SemaphoreSlim _logNamesLock = new(1, 1);
     private readonly ILogTableCommands _logTableCommands = logTableCommands;
     private readonly IState<LogTableState> _logTableState = logTableState;
@@ -432,6 +435,8 @@ public sealed class MauiMenuActionService(
 
     public void SetContinuouslyUpdate(bool value) =>
         _eventLogCommands.SetContinuouslyUpdate(value);
+
+    public void SetHistogramVisible(bool value) => _histogramCommands.SetVisible(value);
 
     public Task ShowDebugLogsAsync() =>
         TryOpenModalAsync(_modalCoordinator.OpenDebugLogsAsync, nameof(DebugLogModal));
