@@ -572,8 +572,16 @@ public sealed partial class HistogramPane
         _dimension = dimension;
         _hiddenGroups.Clear();
 
-        // A retained absent-field result would otherwise render its empty-state under the newly-selected dimension's name until the rescan lands.
-        if (_baseData is { GroupingFieldAbsent: true }) { _baseData = null; _render = null; }
+        // A retained absent-field result would otherwise render its empty-state under the newly-selected dimension's name
+        // until the rescan lands; clear the live-region status with it so a screen reader isn't left holding the previous
+        // dimension's "no values" message during the gap.
+        if (_baseData is { GroupingFieldAbsent: true })
+        {
+            _baseData = null;
+            _render = null;
+            _announcement = string.Empty;
+            _binAnnouncement = string.Empty;
+        }
 
         RecomputeSegmentHeights();
 
