@@ -1519,7 +1519,7 @@ public sealed class EventColumnStore
                 // A win:HexInt32 failure code (high bit set) sign-extends to a negative Int64; reinterpret the low 32 bits.
                 if (field.Bits is >= int.MinValue and <= uint.MaxValue)
                 {
-                    code = (uint)field.Bits;
+                    code = unchecked((uint)field.Bits);
 
                     return true;
                 }
@@ -1536,7 +1536,7 @@ public sealed class EventColumnStore
 
                 if (unsigned <= uint.MaxValue)
                 {
-                    code = (uint)unsigned;
+                    code = unchecked((uint)unsigned);
 
                     return true;
                 }
