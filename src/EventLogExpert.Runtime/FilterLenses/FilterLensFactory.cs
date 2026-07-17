@@ -41,10 +41,15 @@ internal static class FilterLensFactory
         string? originLog = null)
     {
         var (after, before) = startUtc <= endUtc ? (startUtc, endUtc) : (endUtc, startUtc);
+        var afterLocal = after.ConvertTimeZone(displayZone);
+        var beforeLocal = before.ConvertTimeZone(displayZone);
 
         return new FilterLens
         {
-            Label = $"{after.ConvertTimeZone(displayZone):T} - {before.ConvertTimeZone(displayZone):T}",
+            // Include each endpoint's date when the window spans more than one displayed day, so a midnight-straddling or multi-day range isn't a bare, ambiguous "23:55:00 - 00:05:00".
+            Label = afterLocal.Date == beforeLocal.Date
+                ? $"{afterLocal:T} - {beforeLocal:T}"
+                : $"{afterLocal:d} {afterLocal:T} - {beforeLocal:d} {beforeLocal:T}",
             Kind = LensKind.TimeWindow,
             Window = new DateFilter { After = after, Before = before, IsEnabled = true },
             OriginLog = originLog
