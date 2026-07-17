@@ -14,10 +14,12 @@
                     ValueChanged="OnDimensionSelected">
                     <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.EventId" />
                     <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.Log" />
+                    <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.LogonType" />
                     <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.Opcode" />
                     <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.Severity" />
                     <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.Source" />
                     <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.TaskCategory" />
+                    <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.TicketEncryptionType" />
                 </ValueSelect>
             </div>
             @if (_baseData is { } legendData)
@@ -177,6 +179,10 @@
                 </div>
                 <div class="histogram-selection" hidden></div>
             </div>
+        }
+        else if (_baseData is { GroupingFieldAbsent: true })
+        {
+            <div class="histogram-empty">No @DimensionLabel(_dimension) values in this view.</div>
         }
         else
         {

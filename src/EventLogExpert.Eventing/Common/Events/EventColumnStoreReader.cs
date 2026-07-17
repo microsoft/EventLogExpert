@@ -36,6 +36,29 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
 
     public IReadOnlyList<string?> Pool => new PoolView(_store, PendingPool());
 
+    public void BucketTimeTicksByEventData(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(fieldName);
+        ArgumentNullException.ThrowIfNull(targetCodes);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketSpanTicks, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketCount, 1);
+
+        int slotCount = targetCodes.Length + 1;
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, bucketCount * slotCount);
+
+        _store.BucketTimeTicksByEventData(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, fieldName, targetCodes, slotCount, slotCounts, cancellationToken);
+    }
+
     public void BucketTimeTicksByEventId(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -157,6 +180,15 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
             string? value = PendingPoolString(_store.GetPendingEvent(index), column);
             poolIndices[index] = value is null ? -1 : extension.StorePoolCount + extension.IndexOf(value);
         }
+    }
+
+    public void CountEventDataValues(ReadOnlySpan<int> rankByPhysical, string fieldName, IDictionary<long, int> counts, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(fieldName);
+        ArgumentNullException.ThrowIfNull(counts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        _store.CountEventDataValues(rankByPhysical, fieldName, counts, cancellationToken);
     }
 
     public void CountEventIds(ReadOnlySpan<int> rankByPhysical, IDictionary<int, int> counts, CancellationToken cancellationToken)

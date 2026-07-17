@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Tests.TestUtils;
@@ -159,6 +160,61 @@ public sealed class HistogramBuilderTests
     }
 
     [Fact]
+    public void Build_GroupByLogonType_FieldAbsentFromView_SignalsEmptyState()
+    {
+        var view = DisplayViewTestFactory.Build(s_logId, EventsAt(0, 100, 200)); // no EventData at all
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.LogonType, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.True(data!.GroupingFieldAbsent);
+        Assert.Empty(data.Groups);
+        Assert.Equal(3, data.Total); // the true survivor count, so the accessible region label isn't "0 events"
+    }
+
+    [Fact]
+    public void Build_GroupByLogonType_RowsWithoutTheFieldFallToOther()
+    {
+        var view = DisplayViewTestFactory.Build(s_logId, EventDataEvents("LogonType", (3, 2), (null, 3)));
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.LogonType, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal(3, GroupTotal(data, 0)); // Other absorbs the 3 field-less rows
+        Assert.Equal("Network", data!.Groups[1].Label);
+        Assert.Equal(2, GroupTotal(data, 1));
+    }
+
+    [Fact]
+    public void Build_GroupByLogonType_SplitsByDecodedLabel()
+    {
+        // LogonType 3 = Network (x3), 10 = RemoteInteractive (x2).
+        var view = DisplayViewTestFactory.Build(s_logId, EventDataEvents("LogonType", (3, 3), (10, 2)));
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.LogonType, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.False(data!.GroupingFieldAbsent);
+        Assert.Equal("Network", data.Groups[1].Label);
+        Assert.Equal("cat:3", data.Groups[1].Key);
+        Assert.Equal(3, GroupTotal(data, 1));
+        Assert.Equal("RemoteInteractive", data.Groups[2].Label);
+        Assert.Equal(2, GroupTotal(data, 2));
+    }
+
+    [Fact]
+    public void Build_GroupByLogonType_UnrecognizedCode_KeepsTheRawCodeAsLabel()
+    {
+        var view = DisplayViewTestFactory.Build(s_logId, EventDataEvents("LogonType", (99, 2)));
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.LogonType, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal("99", data!.Groups[1].Label);
+        Assert.Equal("cat:99", data.Groups[1].Key);
+    }
+
+    [Fact]
     public void Build_GroupBySource_FoldsValuesBeyondTheTopCapIntoOther()
     {
         var events = SourceEvents(("s1", 5), ("s2", 4), ("s3", 3), ("s4", 2), ("s5", 1), ("s6", 1));
@@ -195,6 +251,21 @@ public sealed class HistogramBuilderTests
     }
 
     [Fact]
+    public void Build_GroupByTicketEncryptionType_DecimalAndHexCodesFoldIntoOneBand()
+    {
+        // 0x17 and 23 are the same RC4 etype; the numeric-code scan must fold both spellings into one group.
+        var view = DisplayViewTestFactory.Build(s_logId, EventDataEvents("TicketEncryptionType", (23, 2), ("0x17", 1)));
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.TicketEncryptionType, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal(2, data!.Groups.Count); // Other + a single RC4 band
+        Assert.Equal("RC4", data.Groups[1].Label);
+        Assert.Equal("cat:23", data.Groups[1].Key);
+        Assert.Equal(3, GroupTotal(data, 1));
+    }
+
+    [Fact]
     public void Build_RecordsPerSeverityCountsInTheBaseBuffer()
     {
         var events = new[]
@@ -224,6 +295,28 @@ public sealed class HistogramBuilderTests
             TimeCreated = new DateTime(ticks, DateTimeKind.Utc),
             Level = level
         };
+
+    private static ResolvedEvent[] EventDataEvents(string fieldName, params (object? Value, int Count)[] groups)
+    {
+        var events = new List<ResolvedEvent>();
+        long ticks = 0;
+
+        foreach ((object? value, int count) in groups)
+        {
+            for (int index = 0; index < count; index++)
+            {
+                var @event = new ResolvedEvent("TestLog", LogPathType.Channel)
+                {
+                    Id = 4624,
+                    TimeCreated = new DateTime(ticks++, DateTimeKind.Utc)
+                };
+
+                events.Add(value is null ? @event : @event.WithEventData((fieldName, value)));
+            }
+        }
+
+        return [.. events];
+    }
 
     private static ResolvedEvent[] EventsAt(params long[] ticks)
     {

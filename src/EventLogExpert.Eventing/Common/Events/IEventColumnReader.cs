@@ -22,6 +22,21 @@ public interface IEventColumnReader
     /// </summary>
     IReadOnlyList<string?> Pool { get; }
 
+    /// <summary>
+    ///     Bucket-by-EventData variant of <see cref="BucketTimeTicksByField" />: each survivor lands in its
+    ///     <paramref name="targetCodes" /> slot (matched on the field's whole-number code) else the trailing "other" slot,
+    ///     which also absorbs rows that lack the field; (<paramref name="targetCodes" /> length + 1) slots per bin.
+    /// </summary>
+    void BucketTimeTicksByEventData(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
     /// <summary>Group-by variant keyed on the numeric event id; (<paramref name="targetIds" /> length + 1) slots per bin.</summary>
     void BucketTimeTicksByEventId(
         ReadOnlySpan<int> rankByPhysical,
@@ -77,6 +92,13 @@ public interface IEventColumnReader
     ///     entry indexes <see cref="Pool" />. KeywordsDisplay is not a single pooled column and is not supported here.
     /// </summary>
     void CopyPoolIndexColumn(EventFieldId field, int[] poolIndices);
+
+    /// <summary>
+    ///     Group-by variant for a named EventData field of allowlisted numeric codes: tallies survivors by the field's
+    ///     whole-number code (decimal and <c>0x</c>-hex spellings canonicalize to one code), so the histogram can split, for
+    ///     example, by LogonType or TicketEncryptionType. Rows that lack the field are omitted.
+    /// </summary>
+    void CountEventDataValues(ReadOnlySpan<int> rankByPhysical, string fieldName, IDictionary<long, int> counts, CancellationToken cancellationToken);
 
     /// <summary>
     ///     Tallies each surviving row by its numeric event id into <paramref name="counts" /> (accumulating across a

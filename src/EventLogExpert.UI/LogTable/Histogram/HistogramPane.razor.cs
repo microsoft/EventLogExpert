@@ -243,7 +243,9 @@ public sealed partial class HistogramPane
     private static string DimensionLabel(HistogramDimension dimension) => dimension switch
     {
         HistogramDimension.EventId => "Event ID",
+        HistogramDimension.LogonType => "Logon Type",
         HistogramDimension.TaskCategory => "Task Category",
+        HistogramDimension.TicketEncryptionType => "Ticket Encryption Type",
         _ => dimension.ToString()
     };
 
@@ -263,9 +265,17 @@ public sealed partial class HistogramPane
     {
         _binCursor = null;
 
-        if (_baseData is not { } data)
+        if (_baseData is not { } data || data.GroupingFieldAbsent)
         {
             _render = null;
+
+            if (_baseData is { GroupingFieldAbsent: true })
+            {
+                // Match the visible empty-state so a screen reader is told why the timeline is blank, and drop any stale bin readout.
+                _binAnnouncement = string.Empty;
+                _announcement = $"No {DimensionLabel(_dimension)} values in this view.";
+            }
+
             StateHasChanged();
 
             return;
@@ -561,6 +571,10 @@ public sealed partial class HistogramPane
 
         _dimension = dimension;
         _hiddenGroups.Clear();
+
+        // A retained absent-field result would otherwise render its empty-state under the newly-selected dimension's name until the rescan lands.
+        if (_baseData is { GroupingFieldAbsent: true }) { _baseData = null; _render = null; }
+
         RecomputeSegmentHeights();
 
         StartScan();

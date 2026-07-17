@@ -33,6 +33,24 @@ internal sealed class EventColumnView : IEventColumnView
     // so the current display order is a valid re-sort input.
     internal ReadOnlySpan<int> Survivors => _order;
 
+    public void BucketTimeTicksByEventData(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventData(
+            _rankByPhysical,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            fieldName,
+            targetCodes,
+            slotCounts,
+            cancellationToken);
+
     public void BucketTimeTicksByEventId(
         long minTicks,
         long bucketSpanTicks,
@@ -77,6 +95,12 @@ internal sealed class EventColumnView : IEventColumnView
             bucketCount,
             slotCounts,
             cancellationToken);
+
+    public void CountEventDataValues(
+        string fieldName,
+        IDictionary<long, int> counts,
+        CancellationToken cancellationToken) =>
+        _reader.CountEventDataValues(_rankByPhysical, fieldName, counts, cancellationToken);
 
     public void CountEventIds(IDictionary<int, int> counts, CancellationToken cancellationToken) =>
         _reader.CountEventIds(_rankByPhysical, counts, cancellationToken);

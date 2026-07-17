@@ -21,6 +21,9 @@ internal sealed class LegacyEventColumnView(
 
     public IEventColumnReader Reader => _reader;
 
+    public void BucketTimeTicksByEventData(long minTicks, long bucketSpanTicks, int bucketCount, string fieldName, long[] targetCodes, int[] slotCounts, CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventData(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, fieldName, targetCodes, slotCounts, cancellationToken);
+
     public void BucketTimeTicksByEventId(long minTicks, long bucketSpanTicks, int bucketCount, int[] targetIds, int[] slotCounts, CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByEventId(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, targetIds, slotCounts, cancellationToken);
 
@@ -29,6 +32,9 @@ internal sealed class LegacyEventColumnView(
 
     public void BucketTimeTicksBySeverity(long minTicks, long bucketSpanTicks, int bucketCount, int[] slotCounts, CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksBySeverity(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
+
+    public void CountEventDataValues(string fieldName, IDictionary<long, int> counts, CancellationToken cancellationToken) =>
+        _reader.CountEventDataValues(AllSurvive(), fieldName, counts, cancellationToken);
 
     public void CountEventIds(IDictionary<int, int> counts, CancellationToken cancellationToken) =>
         _reader.CountEventIds(AllSurvive(), counts, cancellationToken);

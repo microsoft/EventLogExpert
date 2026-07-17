@@ -41,7 +41,7 @@
 .histogram-groupby ::deep .dropdown-input { margin: 0; }
 
 .histogram-groupby ::deep .histogram-dimension-select {
-    width: 8rem;
+    width: 13rem;
     margin: 0;
 }
 

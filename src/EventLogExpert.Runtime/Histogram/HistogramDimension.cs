@@ -10,5 +10,7 @@ public enum HistogramDimension
     EventId,
     TaskCategory,
     Opcode,
-    Log
+    Log,
+    LogonType,
+    TicketEncryptionType
 }

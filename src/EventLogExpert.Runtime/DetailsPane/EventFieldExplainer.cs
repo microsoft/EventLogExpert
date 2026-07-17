@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Runtime.Common.Display;
 using System.Collections.Frozen;
-using System.Globalization;
 
 namespace EventLogExpert.Runtime.DetailsPane;
 
@@ -44,12 +44,6 @@ public static class EventFieldExplainer
         new(null, null, "WorkstationName", "The name of the workstation from which the action originated.")
     ];
 
-    private static readonly FrozenDictionary<string, Func<EventFieldValue, string?>> s_valueDecoders =
-        new Dictionary<string, Func<EventFieldValue, string?>>
-        {
-            ["LogonType"] = DecodeLogonType
-        }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
-
     /// <summary>
     ///     Produces an <see cref="EventFieldExplanation" /> for the given field, resolving a value decode and a glossary
     ///     description independently. Returns <c>false</c> (and an empty explanation) when neither applies.
@@ -67,28 +61,6 @@ public static class EventFieldExplainer
         explanation = new EventFieldExplanation(decodedLabel, description);
 
         return explanation.HasValue;
-    }
-
-    private static string? DecodeLogonType(EventFieldValue value)
-    {
-        if (!TryReadWholeNumber(value, out ulong logonType)) { return null; }
-
-        return logonType switch
-        {
-            0 => "System",
-            2 => "Interactive",
-            3 => "Network",
-            4 => "Batch",
-            5 => "Service",
-            7 => "Unlock",
-            8 => "NetworkCleartext",
-            9 => "NewCredentials",
-            10 => "RemoteInteractive",
-            11 => "CachedInteractive",
-            12 => "CachedRemoteInteractive",
-            13 => "CachedUnlock",
-            _ => null
-        };
     }
 
     private static string? ResolveDescription(string providerName, int eventId, string fieldName)
@@ -133,32 +105,7 @@ public static class EventFieldExplainer
     }
 
     private static string? TryDecodeValue(string fieldName, in EventFieldValue value) =>
-        s_valueDecoders.TryGetValue(fieldName, out Func<EventFieldValue, string?>? decoder)
-            ? decoder(value)
-            : null;
-
-    private static bool TryReadWholeNumber(in EventFieldValue value, out ulong number)
-    {
-        if (value.TryGetUInt64(out number)) { return true; }
-
-        if (value.TryGetInt64(out long signed) && signed >= 0)
-        {
-            number = (ulong)signed;
-
-            return true;
-        }
-
-        // Strict parse only for a string-typed value: no sign, whitespace, or fractional part.
-        if (value.Kind == EventFieldValueKind.String
-            && ulong.TryParse(value.AsString(), NumberStyles.None, CultureInfo.InvariantCulture, out number))
-        {
-            return true;
-        }
-
-        number = 0;
-
-        return false;
-    }
+        value.TryGetWholeNumber(out long code) ? EventDataValueDecoder.TryDecodeLabel(fieldName, code) : null;
 
     private sealed record GlossaryEntry(string? Provider, int? EventId, string Field, string Description);
 }
