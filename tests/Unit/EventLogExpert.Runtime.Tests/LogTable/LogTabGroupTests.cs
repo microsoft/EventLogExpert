@@ -516,7 +516,7 @@ public sealed class LogTabGroupTests
     {
         var oracle = AosReferenceOrdering.OrderedEvents(
             expected,
-            ResolvedEventOrdering.ResolveDefaultOrderBy(state.OrderBy, state.GroupBy, state.PerLogEvents.Count),
+            ResolvedEventOrdering.ResolveDefaultOrderBy(state.OrderBy, state.GroupBy, state.PerLogEvents.Count, state.TimelineVisible),
             state.IsDescending,
             state.GroupBy,
             state.IsGroupDescending);

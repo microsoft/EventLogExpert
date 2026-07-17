@@ -50,6 +50,13 @@ public sealed record LogTableState
 
     public bool IsGroupDescending { get; init; }
 
+    /// <summary>
+    ///     Mirrors the timeline pane's visibility (kept in sync through <c>SetHistogramVisibleAction</c>). A single log
+    ///     with no explicit sort defaults to Date/Time order while the timeline is shown, so the table reads in the same order
+    ///     as the time axis, and to Record ID order while it is hidden. Combined views are unaffected (always Date/Time).
+    /// </summary>
+    public bool TimelineVisible { get; init; }
+
     internal ColumnName? RequestedOrderBy { get; init; }
 
     internal bool RequestedIsDescending { get; init; } = true;
@@ -66,7 +73,7 @@ public sealed record LogTableState
         ImmutableHashSet.Create<string>(StringComparer.Ordinal);
 
     internal SortContext SortContext =>
-        new(ResolvedEventOrdering.ResolveDefaultOrderBy(RequestedOrderBy, RequestedGroupBy, PerLogEvents.Count),
+        new(ResolvedEventOrdering.ResolveDefaultOrderBy(RequestedOrderBy, RequestedGroupBy, PerLogEvents.Count, TimelineVisible),
             RequestedIsDescending,
             RequestedGroupBy,
             RequestedIsGroupDescending);
@@ -219,7 +226,7 @@ public sealed record LogTableState
         int newCount = PerLogEvents.ContainsKey(logId) ? PerLogEvents.Count : PerLogEvents.Count + 1;
 
         var context = new SortContext(
-            ResolvedEventOrdering.ResolveDefaultOrderBy(OrderBy, GroupBy, newCount),
+            ResolvedEventOrdering.ResolveDefaultOrderBy(OrderBy, GroupBy, newCount, TimelineVisible),
             IsDescending,
             GroupBy,
             IsGroupDescending);

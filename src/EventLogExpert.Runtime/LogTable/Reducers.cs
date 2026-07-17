@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.Histogram;
 using Fluxor;
 using System.Collections.Immutable;
 
@@ -75,7 +76,7 @@ internal sealed class Reducers
             state.PerLogEvents.Count + 1;
 
         var context = EffectiveSortContext(
-            state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending, postCount);
+            state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending, postCount, state.TimelineVisible);
 
         var perLog = SetLog(state.PerLogEvents, table.Id, view, context);
         perLog = ReconcileToLogCount(perLog, state);
@@ -119,7 +120,7 @@ internal sealed class Reducers
         }
 
         var context = EffectiveSortContext(
-            state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending, perLog.Count + newLogs);
+            state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending, perLog.Count + newLogs, state.TimelineVisible);
 
         foreach (var (logId, view) in action.ViewsByLog)
         {
@@ -255,7 +256,7 @@ internal sealed class Reducers
         }
 
         var context = EffectiveSortContext(
-            flipped.OrderBy, flipped.IsDescending, flipped.GroupBy, flipped.IsGroupDescending, postCount);
+            flipped.OrderBy, flipped.IsDescending, flipped.GroupBy, flipped.IsGroupDescending, postCount, flipped.TimelineVisible);
         var perLogBuilder = ImmutableDictionary.CreateBuilder<EventLogId, EventColumnView>();
         var perLogVersion = state.PerLogListVersion;
         var counts = state.EventCountByLog;
@@ -326,7 +327,7 @@ internal sealed class Reducers
                 GroupCollapseOverrides = ImmutableHashSet.Create<string>(StringComparer.Ordinal),
                 PerLogEvents = ResortAllLogs(
                     updated.PerLogEvents,
-                    EffectiveSortContext(updated.OrderBy, updated.IsDescending, null, false, updated.PerLogEvents.Count))
+                    EffectiveSortContext(updated.OrderBy, updated.IsDescending, null, false, updated.PerLogEvents.Count, updated.TimelineVisible))
             };
         }
 
@@ -481,6 +482,25 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
+    public static LogTableState ReduceSetHistogramVisible(LogTableState state, SetHistogramVisibleAction action)
+    {
+        if (state.TimelineVisible == action.IsVisible) { return state; }
+
+        // A single log with no explicit sort takes its default order from timeline visibility, so bump the display version
+        // only when that republish will actually follow (see FilteringEffects.HandleSetHistogramVisible). Bumping on a
+        // combined or explicitly sorted toggle would reject an in-flight republish carrying the pre-bump version with no replacement.
+        bool willResort = state.PerLogEvents.Count == 1 &&
+            state.RequestedOrderBy is null &&
+            state.RequestedGroupBy is null;
+
+        return state with
+        {
+            TimelineVisible = action.IsVisible,
+            DisplayListVersion = willResort ? state.DisplayListVersion + 1 : state.DisplayListVersion
+        };
+    }
+
+    [ReducerMethod]
     public static LogTableState ReduceSetOrderBy(LogTableState state, SetOrderByAction action) =>
         state.RequestedOrderBy.Equals(action.OrderBy) ?
             state with
@@ -573,7 +593,7 @@ internal sealed class Reducers
             state.PerLogEvents.Count + 1;
 
         var context = EffectiveSortContext(
-            state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending, postCount);
+            state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending, postCount, state.TimelineVisible);
 
         // Always store the finalize view: built over the just-rebuilt raw store, its reader (and every locator it hands
         // out) addresses the current generation, so a pre-finalize view would strand selection.
@@ -598,8 +618,9 @@ internal sealed class Reducers
         bool isDescending,
         ColumnName? groupBy,
         bool isGroupDescending,
-        int logCount) =>
-        new(ResolvedEventOrdering.ResolveDefaultOrderBy(orderBy, groupBy, logCount),
+        int logCount,
+        bool timelineVisible) =>
+        new(ResolvedEventOrdering.ResolveDefaultOrderBy(orderBy, groupBy, logCount, timelineVisible),
             isDescending,
             groupBy,
             isGroupDescending);
@@ -613,7 +634,8 @@ internal sealed class Reducers
                 state.IsDescending,
                 state.GroupBy,
                 state.IsGroupDescending,
-                perLog.Count));
+                perLog.Count,
+                state.TimelineVisible));
 
     private static LogTableState RedirectActiveToGroupIfHidden(LogTableState state)
     {

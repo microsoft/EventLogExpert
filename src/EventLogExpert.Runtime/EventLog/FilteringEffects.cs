@@ -8,6 +8,7 @@ using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.FilterProgress;
+using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
@@ -207,6 +208,21 @@ internal sealed class FilteringEffects(
     [EffectMethod]
     public async Task HandleSetGroupBy(SetGroupByAction action, IDispatcher dispatcher) =>
         await RepublishForSortAsync(dispatcher);
+
+    [EffectMethod]
+    public async Task HandleSetHistogramVisible(SetHistogramVisibleAction action, IDispatcher dispatcher)
+    {
+        // Timeline visibility only changes the default order of a single log with no explicit sort or grouping; every other
+        // view keeps its order, so skip the rebuild. This predicate matches the reducer's conditional DisplayListVersion bump.
+        var logTable = _logTableState.Value;
+
+        if (logTable.PerLogEvents.Count != 1 || logTable.RequestedOrderBy is not null || logTable.RequestedGroupBy is not null)
+        {
+            return;
+        }
+
+        await RepublishForSortAsync(dispatcher);
+    }
 
     [EffectMethod]
     public async Task HandleSetOrderBy(SetOrderByAction action, IDispatcher dispatcher) =>

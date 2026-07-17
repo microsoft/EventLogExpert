@@ -92,7 +92,7 @@ public sealed class LogTableReducerDifferentialTests
         public LogTableState State { get; private set; } = new();
 
         private ColumnName? EffectiveOrderBy =>
-            ResolvedEventOrdering.ResolveDefaultOrderBy(State.OrderBy, State.GroupBy, OpenLogs().Count);
+            ResolvedEventOrdering.ResolveDefaultOrderBy(State.OrderBy, State.GroupBy, OpenLogs().Count, State.TimelineVisible);
 
         public void AppendToAnyLog()
         {

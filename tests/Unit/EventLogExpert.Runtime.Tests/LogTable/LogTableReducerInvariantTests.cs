@@ -210,7 +210,7 @@ public sealed class LogTableReducerInvariantTests
     {
         var oracle = AosReferenceOrdering.OrderedEvents(
             expected,
-            ResolvedEventOrdering.ResolveDefaultOrderBy(state.OrderBy, state.GroupBy, state.PerLogEvents.Count),
+            ResolvedEventOrdering.ResolveDefaultOrderBy(state.OrderBy, state.GroupBy, state.PerLogEvents.Count, state.TimelineVisible),
             state.IsDescending,
             state.GroupBy,
             state.IsGroupDescending);
@@ -230,7 +230,7 @@ public sealed class LogTableReducerInvariantTests
     private static void AssertEveryLogIsOnTheCurrentContext(LogTableState state)
     {
         var displayed = new SortContext(
-            ResolvedEventOrdering.ResolveDefaultOrderBy(state.OrderBy, state.GroupBy, state.PerLogEvents.Count),
+            ResolvedEventOrdering.ResolveDefaultOrderBy(state.OrderBy, state.GroupBy, state.PerLogEvents.Count, state.TimelineVisible),
             state.IsDescending,
             state.GroupBy,
             state.IsGroupDescending);
