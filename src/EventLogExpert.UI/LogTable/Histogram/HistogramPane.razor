@@ -127,7 +127,6 @@
                         int slotWidth = Math.Max(1, barRight - barLeft);
                         int barDrawWidth = Math.Max(1, slotWidth - 1);
                         double segmentTop = barsHeight;
-                        int visiblePx = 0;
                         int baseSlot = index * groupCount;
 
                         <g data-tip="@BarTooltip(bin)">
@@ -139,7 +138,6 @@
                                 if (height <= 0 || IsGroupHidden(group)) { continue; }
 
                                 segmentTop -= height;
-                                visiblePx += height;
 
                                 <rect class="@GroupColorClass(group)"
                                     height="@height"
@@ -148,10 +146,6 @@
                                     x="@barLeft"
                                     y="@FormatCoordinate(segmentTop)">
                                 </rect>
-                            }
-                            @if (bin.IsAnomaly && visiblePx > 0)
-                            {
-                                <rect class="histogram-anomaly" height="@visiblePx" width="@barDrawWidth" x="@barLeft" y="@FormatCoordinate(barsHeight - visiblePx)"></rect>
                             }
                             @if (HasFindHit(bin.StartTicks, bin.EndTicks))
                             {

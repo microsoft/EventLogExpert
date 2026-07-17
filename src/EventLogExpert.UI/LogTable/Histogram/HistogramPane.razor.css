@@ -243,14 +243,6 @@
     pointer-events: none;
 }
 
-.histogram-anomaly {
-    fill: none;
-    stroke: var(--clr-statusbar);
-    stroke-width: 1.5;
-    vector-effect: non-scaling-stroke;
-    pointer-events: none;
-}
-
 .histogram-marker-selected {
     stroke: var(--toggle-accent);
     stroke-width: 1.5;
