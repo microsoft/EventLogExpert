@@ -37,6 +37,23 @@ public interface IEventColumnReader
         int[] slotCounts,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    ///     HRESULT-code variant of <see cref="BucketTimeTicksByEventData" /> for the ErrorCode dimension: each survivor
+    ///     from a provider in <paramref name="eligibleProviders" /> whose <paramref name="fieldName" /> field holds a nonzero
+    ///     32-bit HRESULT lands in its <paramref name="targetCodes" /> slot else the trailing "other" slot; every
+    ///     ineligible-provider, absent-field, or zero/undecodable row is omitted (contributes to no slot).
+    /// </summary>
+    void BucketTimeTicksByEventDataHResult(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
     /// <summary>Group-by variant keyed on the numeric event id; (<paramref name="targetIds" /> length + 1) slots per bin.</summary>
     void BucketTimeTicksByEventId(
         ReadOnlySpan<int> rankByPhysical,
@@ -92,6 +109,15 @@ public interface IEventColumnReader
     ///     entry indexes <see cref="Pool" />. KeywordsDisplay is not a single pooled column and is not supported here.
     /// </summary>
     void CopyPoolIndexColumn(EventFieldId field, int[] poolIndices);
+
+    /// <summary>
+    ///     HRESULT-code variant of <see cref="CountEventDataValues" /> for the ErrorCode dimension: tallies survivors
+    ///     from a provider in <paramref name="eligibleProviders" /> by the nonzero 32-bit HRESULT in
+    ///     <paramref name="fieldName" /> (a <c>win:HexInt32</c> code that sign-extends negative is reinterpreted unsigned, and
+    ///     hex / decimal string spellings fold to one code); ineligible-provider, absent-field, and zero/undecodable rows are
+    ///     omitted.
+    /// </summary>
+    void CountEventDataHResults(ReadOnlySpan<int> rankByPhysical, string fieldName, IReadOnlyCollection<string> eligibleProviders, IDictionary<long, int> counts, CancellationToken cancellationToken);
 
     /// <summary>
     ///     Group-by variant for a named EventData field of allowlisted numeric codes: tallies survivors by the field's

@@ -18,4 +18,8 @@ public sealed record HistogramData(
     // whole-number value (the field is absent from every row, or every occurrence is non-numeric or out of range), so the
     // pane shows an explicit empty-state rather than a single, meaningless "Other" band.
     public bool GroupingFieldAbsent { get; init; }
+
+    // The unit Total and the group / bin counts represent, for the accessible summaries. A subset dimension (ErrorCode
+    // charts only failure rows) sets a narrower noun so the announcements say "N error-code events", not the whole-view total.
+    public string EventNoun { get; init; } = "events";
 }

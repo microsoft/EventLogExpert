@@ -111,6 +111,57 @@ public readonly struct EventFieldValue
         return true;
     }
 
+    /// <summary>
+    ///     Reads this value as a 32-bit HRESULT / Win32 error code, canonicalized to <see cref="uint" />. Unlike
+    ///     <see cref="TryGetWholeNumber" />, this accepts the negative <see cref="EventFieldValueKind.Int64" /> that a
+    ///     <c>win:HexInt32</c> failure code (high bit set, e.g. 0x800F0823) sign-extends to, and the hex or decimal
+    ///     <see cref="EventFieldValueKind.String" /> form other providers store. Values outside the 32-bit range are rejected.
+    ///     Allocation-free.
+    /// </summary>
+    public bool TryGetHResult32(out uint value)
+    {
+        switch (_kind)
+        {
+            case EventFieldValueKind.Int64 when _bits is >= int.MinValue and <= uint.MaxValue:
+            case EventFieldValueKind.UInt64 when unchecked((ulong)_bits) <= uint.MaxValue:
+                value = unchecked((uint)_bits);
+
+                return true;
+            case EventFieldValueKind.String:
+                return TryParseHResult32(_reference as string, out value);
+            default:
+                value = 0;
+
+                return false;
+        }
+    }
+
+    internal static bool TryParseHResult32(string? text, out uint value)
+    {
+        value = 0;
+
+        if (string.IsNullOrEmpty(text)) { return false; }
+
+        ReadOnlySpan<char> span = text.AsSpan().Trim();
+
+        if (span.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            return uint.TryParse(span[2..], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out value);
+        }
+
+        if (uint.TryParse(span, NumberStyles.None, CultureInfo.InvariantCulture, out value)) { return true; }
+
+        // A signed-decimal rendering of a high-bit HRESULT (e.g. "-2146498525" for 0x800F0823) reinterprets to uint.
+        if (int.TryParse(span, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int signed))
+        {
+            value = unchecked((uint)signed);
+
+            return true;
+        }
+
+        return false;
+    }
+
     public bool TryGetDouble(out double value)
     {
         if (_kind == EventFieldValueKind.Double) { value = BitConverter.Int64BitsToDouble(_bits); return true; }

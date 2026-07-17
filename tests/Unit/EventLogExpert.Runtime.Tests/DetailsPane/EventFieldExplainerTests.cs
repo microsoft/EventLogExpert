@@ -12,6 +12,22 @@ public sealed class EventFieldExplainerTests
     private const string SecurityAuditing = "Microsoft-Windows-Security-Auditing";
 
     [Fact]
+    public void ErrorCode_NegativeHexInt32_DecodesToSymbol()
+    {
+        // The high-bit HexInt32 that the LogonType (TryGetWholeNumber) path rejects must decode through the HResult reader,
+        // so the details pane shows the same curated symbol the histogram legend does.
+        Assert.True(EventFieldExplainer.TryExplain("Microsoft-Windows-WindowsUpdateClient", 20, "errorCode", ValueOf(unchecked((int)0x800F081Fu)), out EventFieldExplanation explanation));
+        Assert.Equal("CBS_E_SOURCE_MISSING", explanation.DecodedLabel);
+    }
+
+    [Fact]
+    public void ErrorCode_UnknownCode_IsNotDecoded()
+    {
+        Assert.False(EventFieldExplainer.TryExplain("Microsoft-Windows-WindowsUpdateClient", 20, "errorCode", ValueOf(unchecked((int)0x80070005u)), out EventFieldExplanation explanation));
+        Assert.Null(explanation.DecodedLabel);
+    }
+
+    [Fact]
     public void Explain_AmbiguousBareName_IsNotExplained()
     {
         Assert.False(EventFieldExplainer.TryExplain("Contoso-Provider", 1, "Status", ValueOf("0x0"), out EventFieldExplanation explanation));

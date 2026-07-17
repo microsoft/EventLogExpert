@@ -74,6 +74,50 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         }
     }
 
+    public void BucketTimeTicksByEventDataHResult(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(fieldName);
+        ArgumentNullException.ThrowIfNull(eligibleProviders);
+        ArgumentNullException.ThrowIfNull(targetCodes);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        int slotCount = targetCodes.Length + 1;
+        int otherSlot = targetCodes.Length;
+        IReadOnlySet<string> eligibleNames = AsOrdinalSet(eligibleProviders);
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent resolved = _events[index];
+
+            if (!eligibleNames.Contains(resolved.Source)) { continue; }
+
+            if (!(resolved.EventData.TryGetValue(fieldName, out EventFieldValue value) && value.TryGetHResult32(out uint hresult) && hresult != 0)) { continue; }
+
+            long bucket = (resolved.TimeCreated.Ticks - minTicks) / bucketSpanTicks;
+            int clamped = bucket < 0 ? 0 : bucket >= bucketCount ? bucketCount - 1 : (int)bucket;
+            int slot = otherSlot;
+
+            for (int target = 0; target < targetCodes.Length; target++)
+            {
+                if (targetCodes[target] == hresult) { slot = target; break; }
+            }
+
+            slotCounts[(clamped * slotCount) + slot]++;
+        }
+    }
+
     public void BucketTimeTicksByEventId(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -239,6 +283,31 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         }
     }
 
+    public void CountEventDataHResults(ReadOnlySpan<int> rankByPhysical, string fieldName, IReadOnlyCollection<string> eligibleProviders, IDictionary<long, int> counts, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(fieldName);
+        ArgumentNullException.ThrowIfNull(eligibleProviders);
+        ArgumentNullException.ThrowIfNull(counts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        IReadOnlySet<string> eligibleNames = AsOrdinalSet(eligibleProviders);
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent resolved = _events[index];
+
+            if (!eligibleNames.Contains(resolved.Source)) { continue; }
+
+            if (resolved.EventData.TryGetValue(fieldName, out EventFieldValue value) && value.TryGetHResult32(out uint hresult) && hresult != 0)
+            {
+                long code = hresult;
+                counts[code] = counts.TryGetValue(code, out int existing) ? existing + 1 : 1;
+            }
+        }
+    }
+
     public void CountEventDataValues(ReadOnlySpan<int> rankByPhysical, string fieldName, IDictionary<long, int> counts, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(fieldName);
@@ -356,6 +425,8 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
 
         return any;
     }
+
+    private static HashSet<string> AsOrdinalSet(IReadOnlyCollection<string> providers) => new(providers, StringComparer.Ordinal);
 
     private static string? FieldValue(ResolvedEvent @event, EventFieldId field) => field switch
     {

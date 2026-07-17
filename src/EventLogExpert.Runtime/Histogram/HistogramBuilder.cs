@@ -10,6 +10,13 @@ namespace EventLogExpert.Runtime.Histogram;
 
 public static class HistogramBuilder
 {
+    private const string ErrorCodeEventNoun = "error-code events";
+    // The ErrorCode dimension keys on the lowercase win:HexInt32 / win:UnicodeString errorCode field, scoped to the update
+    // and servicing providers so a generic errorCode field on an unrelated provider does not pollute the failure view.
+    private const string ErrorCodeFieldName = "errorCode";
+
+    private static readonly string[] s_updateProviders = ["Microsoft-Windows-WindowsUpdateClient", "Microsoft-Windows-Servicing"];
+
     public static HistogramData? Build(
         IEventColumnView view,
         HistogramDimension dimension,
@@ -29,6 +36,11 @@ public static class HistogramBuilder
         if (dimension is HistogramDimension.LogonType or HistogramDimension.TicketEncryptionType)
         {
             return BuildByEventData(view, ToEventDataFieldName(dimension), minTicks, maxTicks, bucketSpanTicks, bucketCount, cancellationToken);
+        }
+
+        if (dimension is HistogramDimension.ErrorCode)
+        {
+            return BuildByErrorCode(view, minTicks, maxTicks, bucketSpanTicks, bucketCount, cancellationToken);
         }
 
         (int[] slotCounts, int slotCount, IReadOnlyList<HistogramGroup> groups) = dimension switch
@@ -52,6 +64,64 @@ public static class HistogramBuilder
             total,
             bucketSpanTicks,
             groups);
+    }
+
+    private static HistogramData BuildByErrorCode(
+        IEventColumnView view,
+        long minTicks,
+        long maxTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        CancellationToken cancellationToken)
+    {
+        var counts = new Dictionary<long, int>();
+        view.CountEventDataHResults(ErrorCodeFieldName, s_updateProviders, counts, cancellationToken);
+
+        var minUtc = new DateTime(minTicks, DateTimeKind.Utc);
+        var maxUtc = new DateTime(maxTicks, DateTimeKind.Utc);
+
+        if (counts.Count == 0)
+        {
+            // Total = 0 is the honest failure-subset count (not view.Count), and the noun keeps the always-present region
+            // announcement accurate ("0 error-code events") over a view that may still hold successful (errorCode = 0) rows.
+            return new HistogramData([], 0, bucketCount, minUtc, maxUtc, 0, bucketSpanTicks, [])
+            {
+                GroupingFieldAbsent = true,
+                EventNoun = ErrorCodeEventNoun
+            };
+        }
+
+        long[] targetCodes = counts
+            .OrderByDescending(pair => pair.Value)
+            .ThenBy(pair => pair.Key)
+            .Take(HistogramConstants.MaxGroupByCategories)
+            .Select(pair => pair.Key)
+            .ToArray();
+
+        int slotCount = targetCodes.Length + 1;
+        int[] slotCounts = new int[bucketCount * slotCount];
+        view.BucketTimeTicksByEventDataHResult(minTicks, bucketSpanTicks, bucketCount, ErrorCodeFieldName, s_updateProviders, targetCodes, slotCounts, cancellationToken);
+
+        int total = 0;
+
+        foreach (int count in slotCounts) { total += count; }
+
+        // Key = the raw invariant code (stable toggle key); Label = the 8-digit hex form plus its curated HRESULT symbol.
+        string[] keys = Array.ConvertAll(targetCodes, code => code.ToString(CultureInfo.InvariantCulture));
+        string[] labels = Array.ConvertAll(targetCodes, FormatErrorCodeLabel);
+
+        return new HistogramData(
+            slotCounts,
+            slotCount,
+            bucketCount,
+            minUtc,
+            maxUtc,
+            total,
+            bucketSpanTicks,
+            HistogramGroups.ForCategories(keys, labels))
+        {
+            EventNoun = ErrorCodeEventNoun
+        };
     }
 
     private static HistogramData BuildByEventData(
@@ -108,6 +178,14 @@ public static class HistogramBuilder
             total,
             bucketSpanTicks,
             HistogramGroups.ForCategories(keys, labels));
+    }
+
+    private static string FormatErrorCodeLabel(long code)
+    {
+        string hex = "0x" + ((uint)code).ToString("X8", CultureInfo.InvariantCulture);
+        string? symbol = EventDataValueDecoder.TryDecodeLabel(ErrorCodeFieldName, code);
+
+        return symbol is null ? hex : $"{hex} {symbol}";
     }
 
     private static (int[] SlotCounts, int SlotCount, IReadOnlyList<HistogramGroup> Groups) ScanByEventId(

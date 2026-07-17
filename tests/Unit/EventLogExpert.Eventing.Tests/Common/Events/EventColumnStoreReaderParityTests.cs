@@ -143,6 +143,31 @@ public sealed class EventColumnStoreReaderParityTests
     }
 
     [Fact]
+    public void HResultScans_SealedAndPending_MatchLegacyReader()
+    {
+        string[] providers = ["Microsoft-Windows-WindowsUpdateClient", "Microsoft-Windows-Servicing"];
+        long[] targetCodes = [0x800F0823L, 0x800F081FL];
+
+        foreach (bool sealRows in new[] { true, false })
+        {
+            (IEventColumnReader legacy, IEventColumnReader column) = BuildErrorCodeReaders(sealRows);
+            int[] rank = AllSurvive(legacy.Count);
+
+            var legacyCounts = new Dictionary<long, int>();
+            var columnCounts = new Dictionary<long, int>();
+            legacy.CountEventDataHResults(rank, "errorCode", providers, legacyCounts, CancellationToken.None);
+            column.CountEventDataHResults(rank, "errorCode", providers, columnCounts, CancellationToken.None);
+            Assert.Equal(legacyCounts.OrderBy(pair => pair.Key), columnCounts.OrderBy(pair => pair.Key));
+
+            int[] legacySlots = new int[targetCodes.Length + 1];
+            int[] columnSlots = new int[targetCodes.Length + 1];
+            legacy.BucketTimeTicksByEventDataHResult(rank, 0, long.MaxValue, 1, "errorCode", providers, targetCodes, legacySlots, CancellationToken.None);
+            column.BucketTimeTicksByEventDataHResult(rank, 0, long.MaxValue, 1, "errorCode", providers, targetCodes, columnSlots, CancellationToken.None);
+            Assert.Equal(legacySlots, columnSlots);
+        }
+    }
+
+    [Fact]
     public void Surface_PendingStore_MatchesLegacyReader()
     {
         (IEventColumnReader legacy, IEventColumnReader column, _) = BuildPending();
@@ -172,6 +197,15 @@ public sealed class EventColumnStoreReaderParityTests
         (IEventColumnReader legacy, IEventColumnReader column, ResolvedEvent[] corpus) = BuildSealed();
 
         AssertEventDataParity(legacy, column, corpus);
+    }
+
+    private static int[] AllSurvive(int count)
+    {
+        int[] rank = new int[count];
+
+        for (int index = 0; index < count; index++) { rank[index] = index; }
+
+        return rank;
     }
 
     private static void AssertEventDataEnumerationParity(IEventColumnReader legacy, IEventColumnReader column, int count)
@@ -407,6 +441,26 @@ public sealed class EventColumnStoreReaderParityTests
             "v0", "v1", "v2")
     ];
 
+    private static ResolvedEvent[] BuildErrorCodeCorpus() =>
+    [
+        ErrorCodeEvent("Microsoft-Windows-WindowsUpdateClient", unchecked((int)0x800F0823u), 0),
+        ErrorCodeEvent("Microsoft-Windows-Servicing", "0x800F081F", 1),
+        ErrorCodeEvent("Microsoft-Windows-WindowsUpdateClient", 0, 2),
+        ErrorCodeEvent("Microsoft-Windows-WindowsUpdateClient", unchecked((int)0x80070005u), 3),
+        new ResolvedEvent("TestLog", LogPathType.Channel) { Id = 44, Source = "Microsoft-Windows-WindowsUpdateClient", TimeCreated = s_time.AddMinutes(4) },
+        ErrorCodeEvent("Some-Other-Provider", unchecked((int)0x800F0823u), 5)
+    ];
+
+    private static (IEventColumnReader Legacy, IEventColumnReader Column) BuildErrorCodeReaders(bool sealRows)
+    {
+        ResolvedEvent[] corpus = BuildErrorCodeCorpus();
+        EventColumnStore store = sealRows
+            ? EventColumnStore.Build(corpus, Generation, ContentVersion)
+            : EventColumnStore.Build([], Generation, ContentVersion).Append(corpus);
+
+        return (new LegacyEventColumnReader(s_logId, store.Generation, store.ContentVersion, corpus), new EventColumnStoreReader(s_logId, store));
+    }
+
     private static (IEventColumnReader Legacy, IEventColumnReader Column, ResolvedEvent[] Corpus) BuildPending()
     {
         ResolvedEvent[] corpus = BuildCorpus();
@@ -470,6 +524,10 @@ public sealed class EventColumnStoreReaderParityTests
 
         return [.. keys];
     }
+
+    private static ResolvedEvent ErrorCodeEvent(string source, object errorCode, int index) =>
+        new ResolvedEvent("TestLog", LogPathType.Channel) { Id = 20, Source = source, TimeCreated = s_time.AddMinutes(index) }
+            .WithEventData(("errorCode", errorCode));
 
     private static List<(string Name, EventFieldValueKind Kind, string Value)> MaterializeEventData(
         IEventColumnReader reader,

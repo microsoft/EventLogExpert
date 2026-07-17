@@ -79,6 +79,29 @@ internal sealed class CombinedColumnView : IEventColumnView
         }
     }
 
+    public void BucketTimeTicksByEventDataHResult(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.BucketTimeTicksByEventDataHResult(minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                fieldName,
+                eligibleProviders,
+                targetCodes,
+                slotCounts,
+                cancellationToken);
+        }
+    }
+
     public void BucketTimeTicksByEventId(
         long minTicks,
         long bucketSpanTicks,
@@ -129,6 +152,14 @@ internal sealed class CombinedColumnView : IEventColumnView
         foreach (var view in _views)
         {
             view.BucketTimeTicksBySeverity(minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
+        }
+    }
+
+    public void CountEventDataHResults(string fieldName, IReadOnlyCollection<string> eligibleProviders, IDictionary<long, int> counts, CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.CountEventDataHResults(fieldName, eligibleProviders, counts, cancellationToken);
         }
     }
 

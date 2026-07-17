@@ -246,7 +246,20 @@ public sealed partial class HistogramPane
         HistogramDimension.LogonType => "Logon Type",
         HistogramDimension.TaskCategory => "Task Category",
         HistogramDimension.TicketEncryptionType => "Ticket Encryption Type",
+        HistogramDimension.ErrorCode => "Error Code",
         _ => dimension.ToString()
+    };
+
+    // ErrorCode charts a failure subset, so its empty-state reports the absence of failures (not of the field, which may be
+    // present as errorCode = 0); visibleRange distinguishes a zoomed window with no failures from the whole view having none.
+    private static string EmptyStateMessage(HistogramDimension dimension, bool visibleRange) => dimension switch
+    {
+        HistogramDimension.ErrorCode => visibleRange
+            ? "No update error codes in the visible range."
+            : "No update error codes in this view.",
+        _ => visibleRange
+            ? "No events to chart in the current view."
+            : $"No {DimensionLabel(dimension)} values in this view."
     };
 
     private static string FindMarkerPoints(double centerX) =>
@@ -273,7 +286,7 @@ public sealed partial class HistogramPane
             {
                 // Match the visible empty-state so a screen reader is told why the timeline is blank, and drop any stale bin readout.
                 _binAnnouncement = string.Empty;
-                _announcement = $"No {DimensionLabel(_dimension)} values in this view.";
+                _announcement = EmptyStateMessage(_dimension, visibleRange: false);
             }
 
             StateHasChanged();
@@ -301,7 +314,7 @@ public sealed partial class HistogramPane
             {
                 if (generation != _announceGeneration || _disposed || _render is not { } render || _baseData is not { } data) { return; }
 
-                _announcement = HistogramSummary.WindowAnnouncement(render, data.Groups, _timeZone);
+                _announcement = HistogramSummary.WindowAnnouncement(render, data.Groups, data.EventNoun, _timeZone);
                 StateHasChanged();
             });
         }
@@ -394,7 +407,7 @@ public sealed partial class HistogramPane
         string startText = crossesDay ? $"{start:d} {start:HH:mm:ss}" : $"{start:HH:mm:ss}";
         string endText = crossesDay ? $"{end:d} {end:HH:mm:ss}" : $"{end:HH:mm:ss}";
 
-        return $"{bin.Total} events{GroupBreakdown(bin)}, {startText} - {endText}";
+        return $"{bin.Total} {_baseData?.EventNoun ?? "events"}{GroupBreakdown(bin)}, {startText} - {endText}";
     }
 
     private string BinCursorAnnouncement(HistogramRenderBin bin)
@@ -403,7 +416,7 @@ public sealed partial class HistogramPane
         var end = ToDisplay(new DateTime(Math.Max(bin.StartTicks, bin.EndTicks), DateTimeKind.Utc));
         string anomaly = bin.IsAnomaly ? ", spike" : string.Empty;
 
-        return $"{start:g} to {end:g}: {bin.Total} events{GroupBreakdown(bin)}{anomaly}.";
+        return $"{start:g} to {end:g}: {bin.Total} {_baseData?.EventNoun ?? "events"}{GroupBreakdown(bin)}{anomaly}.";
     }
 
     private void ClearBinCursor()

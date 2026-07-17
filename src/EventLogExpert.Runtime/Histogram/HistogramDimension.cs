@@ -12,5 +12,6 @@ public enum HistogramDimension
     Opcode,
     Log,
     LogonType,
-    TicketEncryptionType
+    TicketEncryptionType,
+    ErrorCode
 }
