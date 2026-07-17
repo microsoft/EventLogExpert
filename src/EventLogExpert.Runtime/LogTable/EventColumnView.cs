@@ -51,6 +51,26 @@ internal sealed class EventColumnView : IEventColumnView
             slotCounts,
             cancellationToken);
 
+    public void BucketTimeTicksByEventDataHResult(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventDataHResult(
+            _rankByPhysical,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            fieldName,
+            eligibleProviders,
+            targetCodes,
+            slotCounts,
+            cancellationToken);
+
     public void BucketTimeTicksByEventId(
         long minTicks,
         long bucketSpanTicks,
@@ -95,6 +115,13 @@ internal sealed class EventColumnView : IEventColumnView
             bucketCount,
             slotCounts,
             cancellationToken);
+
+    public void CountEventDataHResults(
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        IDictionary<long, int> counts,
+        CancellationToken cancellationToken) =>
+        _reader.CountEventDataHResults(_rankByPhysical, fieldName, eligibleProviders, counts, cancellationToken);
 
     public void CountEventDataValues(
         string fieldName,

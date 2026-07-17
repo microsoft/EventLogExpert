@@ -104,8 +104,17 @@ public static class EventFieldExplainer
         return null;
     }
 
-    private static string? TryDecodeValue(string fieldName, in EventFieldValue value) =>
-        value.TryGetWholeNumber(out long code) ? EventDataValueDecoder.TryDecodeLabel(fieldName, code) : null;
+    private static string? TryDecodeValue(string fieldName, in EventFieldValue value)
+    {
+        // errorCode is a win:HexInt32 whose high-bit failure codes read as a negative Int32 that TryGetWholeNumber rejects,
+        // so it decodes through the HRESULT-32 reader; every other decoded field keeps the strict whole-number parse.
+        if (string.Equals(fieldName, "errorCode", StringComparison.OrdinalIgnoreCase))
+        {
+            return value.TryGetHResult32(out uint hresult) ? EventDataValueDecoder.TryDecodeLabel(fieldName, hresult) : null;
+        }
+
+        return value.TryGetWholeNumber(out long code) ? EventDataValueDecoder.TryDecodeLabel(fieldName, code) : null;
+    }
 
     private sealed record GlossaryEntry(string? Provider, int? EventId, string Field, string Description);
 }

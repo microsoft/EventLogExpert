@@ -103,6 +103,68 @@ public sealed class HistogramBuilderTests
     }
 
     [Fact]
+    public void Build_GroupByErrorCode_NoFailures_SignalsEmptyStateWithZeroTotalAndNoun()
+    {
+        var view = DisplayViewTestFactory.Build(s_logId, ErrorCodeEvents(
+            ("Microsoft-Windows-WindowsUpdateClient", 0, 4)));
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ErrorCode, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.True(data!.GroupingFieldAbsent);
+        Assert.Empty(data.Groups);
+        Assert.Equal(0, data.Total); // the failure-subset count, not view.Count, so the region label never overstates
+        Assert.Equal("error-code events", data.EventNoun);
+    }
+
+    [Fact]
+    public void Build_GroupByErrorCode_OmitsSuccessesAndIneligibleProviders()
+    {
+        var view = DisplayViewTestFactory.Build(s_logId, ErrorCodeEvents(
+            ("Microsoft-Windows-WindowsUpdateClient", unchecked((int)0x800F0823u), 2),
+            ("Microsoft-Windows-WindowsUpdateClient", 0, 5),
+            ("Some-Other-Provider", unchecked((int)0x800F0823u), 3)));
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ErrorCode, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal(2, data!.Total); // only the eligible failures contribute; successes and other providers are omitted
+        Assert.Equal(2, GroupTotal(data, 1));
+    }
+
+    [Fact]
+    public void Build_GroupByErrorCode_SplitsByHexLabelWithCuratedSymbol()
+    {
+        var view = DisplayViewTestFactory.Build(s_logId, ErrorCodeEvents(
+            ("Microsoft-Windows-WindowsUpdateClient", unchecked((int)0x800F081Fu), 2),
+            ("Microsoft-Windows-Servicing", "0x800F0823", 1)));
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ErrorCode, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.False(data!.GroupingFieldAbsent);
+        Assert.Equal("error-code events", data.EventNoun);
+        Assert.Equal("0x800F081F CBS_E_SOURCE_MISSING", data.Groups[1].Label);
+        Assert.Equal("cat:2148468767", data.Groups[1].Key);
+        Assert.Equal(2, GroupTotal(data, 1));
+        Assert.Equal("0x800F0823 CBS_E_NEW_SERVICING_STACK_REQUIRED", data.Groups[2].Label);
+        Assert.Equal(1, GroupTotal(data, 2));
+        Assert.Equal(3, data.Total);
+    }
+
+    [Fact]
+    public void Build_GroupByErrorCode_UnrecognizedCode_UsesHexLabelWithoutSymbol()
+    {
+        var view = DisplayViewTestFactory.Build(s_logId, ErrorCodeEvents(
+            ("Microsoft-Windows-WindowsUpdateClient", unchecked((int)0x80070005u), 1)));
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ErrorCode, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal("0x80070005", data!.Groups[1].Label);
+    }
+
+    [Fact]
     public void Build_GroupByEventId_LabelsCategoriesWithTheNumericIds()
     {
         var events = IdEvents((1000, 3), (2000, 2), (3000, 1));
@@ -286,6 +348,29 @@ public sealed class HistogramBuilderTests
         Assert.Equal(1, data.SlotCounts[(int)SeverityLevel.Warning]);
         Assert.Equal(1, data.SlotCounts[(int)SeverityLevel.Information]);
         Assert.Equal(4, data.Total);
+    }
+
+    private static ResolvedEvent[] ErrorCodeEvents(params (string Source, object? ErrorCode, int Count)[] groups)
+    {
+        var events = new List<ResolvedEvent>();
+        long ticks = 0;
+
+        foreach ((string source, object? errorCode, int count) in groups)
+        {
+            for (int index = 0; index < count; index++)
+            {
+                var @event = new ResolvedEvent("TestLog", LogPathType.Channel)
+                {
+                    Id = 20,
+                    TimeCreated = new DateTime(ticks++, DateTimeKind.Utc),
+                    Source = source
+                };
+
+                events.Add(errorCode is null ? @event : @event.WithEventData(("errorCode", errorCode)));
+            }
+        }
+
+        return [.. events];
     }
 
     private static ResolvedEvent EventAt(long ticks, string level) =>

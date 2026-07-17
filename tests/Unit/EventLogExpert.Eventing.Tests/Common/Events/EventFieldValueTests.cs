@@ -217,4 +217,68 @@ public sealed class EventFieldValueTests
         Assert.True(value.TryGetGuid(out Guid result));
         Assert.Equal(guid, result);
     }
+
+    [Fact]
+    public void TryGetHResult32_HexInt32SignExtendedNegative_ReinterpretsUnsigned()
+    {
+        // A win:HexInt32 failure code (high bit set) is stored as a negative Int32; TryGetWholeNumber rejects it, but the
+        // HRESULT reader reinterprets the low 32 bits: 0x800F0823 == -2146498525 signed.
+        EventFieldValue value = EventFieldValue.FromProperty(-2146498525);
+
+        Assert.False(value.TryGetWholeNumber(out _));
+        Assert.True(value.TryGetHResult32(out uint code));
+        Assert.Equal(0x800F0823u, code);
+    }
+
+    [Fact]
+    public void TryGetHResult32_NonNumericString_Rejected()
+    {
+        Assert.False(EventFieldValue.FromProperty((EventProperty)"not-a-code").TryGetHResult32(out uint code));
+        Assert.Equal(0u, code);
+    }
+
+    [Fact]
+    public void TryGetHResult32_SignedNarrowNegative_SignExtendsToThirtyTwoBits()
+    {
+        Assert.True(EventFieldValue.FromProperty((sbyte)-1).TryGetHResult32(out uint fromSByte));
+        Assert.Equal(0xFFFFFFFFu, fromSByte);
+
+        Assert.True(EventFieldValue.FromProperty((short)-1).TryGetHResult32(out uint fromInt16));
+        Assert.Equal(0xFFFFFFFFu, fromInt16);
+    }
+
+    [Theory]
+    [InlineData("0x800F081F", 0x800F081Fu)]
+    [InlineData("2148468771", 0x800F0823u)]
+    [InlineData("-2146498525", 0x800F0823u)]
+    [InlineData("0", 0u)]
+    public void TryGetHResult32_StringSpellings_FoldToOneCode(string text, uint expected)
+    {
+        Assert.True(EventFieldValue.FromProperty((EventProperty)text).TryGetHResult32(out uint code));
+        Assert.Equal(expected, code);
+    }
+
+    [Fact]
+    public void TryGetHResult32_UInt64OverUintMax_Rejected()
+    {
+        Assert.False(EventFieldValue.FromProperty(ulong.MaxValue).TryGetHResult32(out uint code));
+        Assert.Equal(0u, code);
+    }
+
+    [Fact]
+    public void TryGetHResult32_UnsignedIntegralAndSizeT_Read()
+    {
+        Assert.True(EventFieldValue.FromProperty(5u).TryGetHResult32(out uint fromUInt));
+        Assert.Equal(5u, fromUInt);
+
+        Assert.True(EventFieldValue.FromProperty((nuint)5).TryGetHResult32(out uint fromSizeT));
+        Assert.Equal(5u, fromSizeT);
+    }
+
+    [Fact]
+    public void TryGetHResult32_Zero_ReadsAsSuccess()
+    {
+        Assert.True(EventFieldValue.FromProperty(0).TryGetHResult32(out uint code));
+        Assert.Equal(0u, code);
+    }
 }

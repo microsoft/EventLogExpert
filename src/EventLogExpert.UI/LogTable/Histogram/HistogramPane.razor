@@ -12,6 +12,7 @@
                     ToStringFunc="@DimensionLabel"
                     Value="_dimension"
                     ValueChanged="OnDimensionSelected">
+                    <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.ErrorCode" />
                     <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.EventId" />
                     <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.Log" />
                     <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.LogonType" />
@@ -182,7 +183,11 @@
         }
         else if (_baseData is { GroupingFieldAbsent: true })
         {
-            <div class="histogram-empty">No @DimensionLabel(_dimension) values in this view.</div>
+            <div class="histogram-empty">@EmptyStateMessage(_dimension, false)</div>
+        }
+        else if (_render is { Bins.Count: > 0, WindowTotal: 0 })
+        {
+            <div class="histogram-empty">@EmptyStateMessage(_dimension, true)</div>
         }
         else
         {

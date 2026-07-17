@@ -13,19 +13,20 @@ public static class HistogramSummary
         var min = TimeZoneInfo.ConvertTimeFromUtc(data.MinUtc, displayZone);
         var max = TimeZoneInfo.ConvertTimeFromUtc(data.MaxUtc, displayZone);
 
-        return $"Timeline: {data.Total} events from {min:g} to {max:g}{GroupBreakdown(GroupTotals(data), data.Groups)}.";
+        return $"Timeline: {data.Total} {data.EventNoun} from {min:g} to {max:g}{GroupBreakdown(GroupTotals(data), data.Groups)}.";
     }
 
-    public static string WindowAnnouncement(HistogramRender render, IReadOnlyList<HistogramGroup> groups, TimeZoneInfo displayZone)
+    public static string WindowAnnouncement(HistogramRender render, IReadOnlyList<HistogramGroup> groups, string eventNoun, TimeZoneInfo displayZone)
     {
         ArgumentNullException.ThrowIfNull(render);
         ArgumentNullException.ThrowIfNull(groups);
+        ArgumentException.ThrowIfNullOrEmpty(eventNoun);
         ArgumentNullException.ThrowIfNull(displayZone);
 
         var start = TimeZoneInfo.ConvertTimeFromUtc(new DateTime(render.WindowStartTicks, DateTimeKind.Utc), displayZone);
         var end = TimeZoneInfo.ConvertTimeFromUtc(new DateTime(render.WindowEndTicks, DateTimeKind.Utc), displayZone);
 
-        return $"Showing {start:g} to {end:g}: {render.WindowTotal} events{GroupBreakdown(render.WindowGroupTotals, groups)}.";
+        return $"Showing {start:g} to {end:g}: {render.WindowTotal} {eventNoun}{GroupBreakdown(render.WindowGroupTotals, groups)}.";
     }
 
     private static string GroupBreakdown(int[] totals, IReadOnlyList<HistogramGroup> groups)

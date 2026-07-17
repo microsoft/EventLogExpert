@@ -89,7 +89,7 @@ public sealed class HistogramSummaryTests
             15,
             [4, 9, 2]);
 
-        string announcement = HistogramSummary.WindowAnnouncement(render, HistogramGroups.Severity, TimeZoneInfo.Utc);
+        string announcement = HistogramSummary.WindowAnnouncement(render, HistogramGroups.Severity, "events", TimeZoneInfo.Utc);
 
         Assert.Contains("Showing", announcement);
         Assert.Contains("15 events", announcement);

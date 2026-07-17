@@ -28,6 +28,21 @@ public interface IEventColumnView
         int[] slotCounts,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    ///     HRESULT-code variant of <see cref="BucketTimeTicksByEventData" /> for the ErrorCode dimension: only survivors
+    ///     from a provider in <paramref name="eligibleProviders" /> whose <paramref name="fieldName" /> field holds a nonzero
+    ///     32-bit HRESULT contribute (their target slot, else the trailing "other" slot); every other row is omitted.
+    /// </summary>
+    void BucketTimeTicksByEventDataHResult(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
     /// <summary>Group-by variant keyed on the numeric event id; (targetIds length + 1) slots per bin.</summary>
     void BucketTimeTicksByEventId(
         long minTicks,
@@ -60,6 +75,13 @@ public interface IEventColumnView
         int bucketCount,
         int[] slotCounts,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     HRESULT-code variant of <see cref="CountEventDataValues" /> for the ErrorCode dimension: tallies this view's
+    ///     survivors from a provider in <paramref name="eligibleProviders" /> by the nonzero 32-bit HRESULT in
+    ///     <paramref name="fieldName" /> (accumulating across a combined view); resolves the top-N failure codes.
+    /// </summary>
+    void CountEventDataHResults(string fieldName, IReadOnlyCollection<string> eligibleProviders, IDictionary<long, int> counts, CancellationToken cancellationToken);
 
     /// <summary>
     ///     Tallies this view's rows by the whole-number code of a named EventData field (accumulating across a combined

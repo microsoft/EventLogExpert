@@ -20,8 +20,22 @@ public static class EventDataValueDecoder
     {
         if (string.Equals(fieldName, "LogonType", StringComparison.OrdinalIgnoreCase)) { return DecodeLogonType(code); }
 
-        return string.Equals(fieldName, "TicketEncryptionType", StringComparison.OrdinalIgnoreCase) ? DecodeTicketEncryptionType(code) : null;
+        if (string.Equals(fieldName, "TicketEncryptionType", StringComparison.OrdinalIgnoreCase)) { return DecodeTicketEncryptionType(code); }
+
+        return string.Equals(fieldName, "errorCode", StringComparison.OrdinalIgnoreCase) ? DecodeHResult(code) : null;
     }
+
+    // Curated update/servicing failure HRESULTs; an unrecognized code falls back to its hex form at the call site.
+    private static string? DecodeHResult(long code) => (uint)code switch
+    {
+        0x800F081F => "CBS_E_SOURCE_MISSING",
+        0x800F0922 => "CBS_E_INSTALLERS_FAILED",
+        0x800F0823 => "CBS_E_NEW_SERVICING_STACK_REQUIRED",
+        0x80073712 => "ERROR_SXS_COMPONENT_STORE_CORRUPT",
+        0x80D05001 => "DO_E_HTTP_BLOCKSIZE_MISMATCH",
+        0x80246007 => "WU_E_DM_NOTDOWNLOADED",
+        _ => null
+    };
 
     private static string? DecodeLogonType(long code) => code switch
     {
