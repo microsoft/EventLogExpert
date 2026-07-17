@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.LogTable;
 using System.Globalization;
 
@@ -25,6 +26,11 @@ public static class HistogramBuilder
         long bucketSpanTicks = Math.Max(1, (spanTicks + maxBuckets - 1) / maxBuckets);
         int bucketCount = (int)Math.Min((spanTicks + bucketSpanTicks - 1) / bucketSpanTicks, maxBuckets);
 
+        if (dimension is HistogramDimension.LogonType or HistogramDimension.TicketEncryptionType)
+        {
+            return BuildByEventData(view, ToEventDataFieldName(dimension), minTicks, maxTicks, bucketSpanTicks, bucketCount, cancellationToken);
+        }
+
         (int[] slotCounts, int slotCount, IReadOnlyList<HistogramGroup> groups) = dimension switch
         {
             HistogramDimension.Severity => ScanSeverity(view, minTicks, bucketSpanTicks, bucketCount, cancellationToken),
@@ -46,6 +52,61 @@ public static class HistogramBuilder
             total,
             bucketSpanTicks,
             groups);
+    }
+
+    private static HistogramData BuildByEventData(
+        IEventColumnView view,
+        string fieldName,
+        long minTicks,
+        long maxTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        CancellationToken cancellationToken)
+    {
+        var counts = new Dictionary<long, int>();
+        view.CountEventDataValues(fieldName, counts, cancellationToken);
+
+        var minUtc = new DateTime(minTicks, DateTimeKind.Utc);
+        var maxUtc = new DateTime(maxTicks, DateTimeKind.Utc);
+
+        if (counts.Count == 0)
+        {
+            // No row in the view carries this field. Report the true survivor count (view.Count - every survivor falls within
+            // the view's own min/max span) so the accessible region label isn't "0 events" over a non-empty span, and flag the
+            // empty-state so the pane shows a message rather than a lone "Other" band.
+            return new HistogramData([], 0, bucketCount, minUtc, maxUtc, view.Count, bucketSpanTicks, []) { GroupingFieldAbsent = true };
+        }
+
+        long[] targetCodes = counts
+            .OrderByDescending(pair => pair.Value)
+            .ThenBy(pair => pair.Key)
+            .Take(HistogramConstants.MaxGroupByCategories)
+            .Select(pair => pair.Key)
+            .ToArray();
+
+        int slotCount = targetCodes.Length + 1;
+        int[] slotCounts = new int[bucketCount * slotCount];
+        view.BucketTimeTicksByEventData(minTicks, bucketSpanTicks, bucketCount, fieldName, targetCodes, slotCounts, cancellationToken);
+
+        int total = 0;
+
+        foreach (int count in slotCounts) { total += count; }
+
+        // Key = the raw invariant code (stable toggle key); Label = the friendly decode, or the raw code when unrecognized.
+        string[] keys = Array.ConvertAll(targetCodes, code => code.ToString(CultureInfo.InvariantCulture));
+        string[] labels = Array.ConvertAll(
+            targetCodes,
+            code => EventDataValueDecoder.TryDecodeLabel(fieldName, code) ?? code.ToString(CultureInfo.InvariantCulture));
+
+        return new HistogramData(
+            slotCounts,
+            slotCount,
+            bucketCount,
+            minUtc,
+            maxUtc,
+            total,
+            bucketSpanTicks,
+            HistogramGroups.ForCategories(keys, labels));
     }
 
     private static (int[] SlotCounts, int SlotCount, IReadOnlyList<HistogramGroup> Groups) ScanByEventId(
@@ -114,6 +175,13 @@ public static class HistogramBuilder
 
         return (slotCounts, slotCount, HistogramGroups.Severity);
     }
+
+    private static string ToEventDataFieldName(HistogramDimension dimension) => dimension switch
+    {
+        HistogramDimension.LogonType => "LogonType",
+        HistogramDimension.TicketEncryptionType => "TicketEncryptionType",
+        _ => throw new ArgumentOutOfRangeException(nameof(dimension), dimension, "Dimension is not an EventData field.")
+    };
 
     private static EventFieldId ToFieldId(HistogramDimension dimension) => dimension switch
     {

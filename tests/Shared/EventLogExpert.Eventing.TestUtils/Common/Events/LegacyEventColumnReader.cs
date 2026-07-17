@@ -36,6 +36,44 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
 
     public IReadOnlyList<string?> Pool => StringPool().Values;
 
+    public void BucketTimeTicksByEventData(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(fieldName);
+        ArgumentNullException.ThrowIfNull(targetCodes);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        int slotCount = targetCodes.Length + 1;
+        int otherSlot = targetCodes.Length;
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            long bucket = (_events[index].TimeCreated.Ticks - minTicks) / bucketSpanTicks;
+            int clamped = bucket < 0 ? 0 : bucket >= bucketCount ? bucketCount - 1 : (int)bucket;
+            int slot = otherSlot;
+
+            if (_events[index].EventData.TryGetValue(fieldName, out EventFieldValue value) && value.TryGetWholeNumber(out long code))
+            {
+                for (int target = 0; target < targetCodes.Length; target++)
+                {
+                    if (targetCodes[target] == code) { slot = target; break; }
+                }
+            }
+
+            slotCounts[(clamped * slotCount) + slot]++;
+        }
+    }
+
     public void BucketTimeTicksByEventId(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -198,6 +236,23 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         {
             string? value = RawPoolString(_events[index], field);
             poolIndices[index] = value is null ? -1 : pool.IndexOf(value);
+        }
+    }
+
+    public void CountEventDataValues(ReadOnlySpan<int> rankByPhysical, string fieldName, IDictionary<long, int> counts, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(fieldName);
+        ArgumentNullException.ThrowIfNull(counts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            if (_events[index].EventData.TryGetValue(fieldName, out EventFieldValue value) && value.TryGetWholeNumber(out long code))
+            {
+                counts[code] = counts.TryGetValue(code, out int existing) ? existing + 1 : 1;
+            }
         }
     }
 

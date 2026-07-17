@@ -75,6 +75,9 @@ internal sealed class EventDataSchemaBuilder
 /// </summary>
 public sealed class EventColumnStore
 {
+    // Per-scan EventData field-index memo sentinels: a schema not yet looked up, and a schema that lacks the field.
+    private const int SchemaFieldAbsent = -1;
+    private const int SchemaFieldUnresolved = -2;
     // Target sealed-chunk size. The pending tail columnarizes into one new chunk each time it reaches this many rows,
     // giving amortized O(1) append with no partially filled columnar chunks.
     private const int TargetChunkSize = 4096;
@@ -225,6 +228,54 @@ public sealed class EventColumnStore
         maxTicks = MaxTimeTicks;
 
         return Count > 0;
+    }
+
+    internal void BucketTimeTicksByEventData(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        int otherSlot = targetCodes.Length;
+        int[] fieldIndexBySchema = NewSchemaFieldMemo();
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> timeColumn = chunk.TimeTicksColumn;
+
+            for (int row = 0; row < timeColumn.Length; row++)
+            {
+                if (rankByPhysical[offset + row] < 0) { continue; }
+
+                int slot = TryGetSealedEventDataCode(chunk, row, fieldName, fieldIndexBySchema, out long code)
+                    ? SlotForCode(code, targetCodes, otherSlot)
+                    : otherSlot;
+                int bucket = ToBucket(timeColumn[row], minTicks, bucketSpanTicks, bucketCount);
+                slotCounts[(bucket * slotCount) + slot]++;
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+            int slot = TryGetPendingEventDataCode(pending, fieldName, out long code)
+                ? SlotForCode(code, targetCodes, otherSlot)
+                : otherSlot;
+            int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
+            slotCounts[(bucket * slotCount) + slot]++;
+        }
     }
 
     internal void BucketTimeTicksByEventId(
@@ -543,6 +594,41 @@ public sealed class EventColumnStore
         {
             values[index] = Pending(index).TimeCreated.Ticks;
             hasValue[index] = true;
+        }
+    }
+
+    internal void CountEventDataValues(ReadOnlySpan<int> rankByPhysical, string fieldName, IDictionary<long, int> counts, CancellationToken cancellationToken)
+    {
+        int[] fieldIndexBySchema = NewSchemaFieldMemo();
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> timeColumn = chunk.TimeTicksColumn;
+
+            for (int row = 0; row < timeColumn.Length; row++)
+            {
+                if (rankByPhysical[offset + row] < 0) { continue; }
+
+                if (TryGetSealedEventDataCode(chunk, row, fieldName, fieldIndexBySchema, out long code))
+                {
+                    counts[code] = counts.TryGetValue(code, out int existing) ? existing + 1 : 1;
+                }
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            if (TryGetPendingEventDataCode(Pending(index), fieldName, out long code))
+            {
+                counts[code] = counts.TryGetValue(code, out int existing) ? existing + 1 : 1;
+            }
         }
     }
 
@@ -1052,6 +1138,16 @@ public sealed class EventColumnStore
         _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Field is not a supported group-by dimension.")
     };
 
+    private static int SlotForCode(long value, long[] targets, int otherSlot)
+    {
+        for (int slot = 0; slot < targets.Length; slot++)
+        {
+            if (value == targets[slot]) { return slot; }
+        }
+
+        return otherSlot;
+    }
+
     // Shared by the pooled-field and event-id group-by scans: a pure integer match, so a negative event id still matches its own target; callers resolve absent pooled targets to int.MinValue (not -1) so a null-field row can't collide.
     private static int SlotForIndex(int value, int[] targets, int otherSlot)
     {
@@ -1087,6 +1183,15 @@ public sealed class EventColumnStore
         return bucket < 0 ? 0 : bucket >= bucketCount ? bucketCount - 1 : (int)bucket;
     }
 
+    private static bool TryGetPendingEventDataCode(ResolvedEvent pending, string fieldName, out long code)
+    {
+        if (pending.EventData.TryGetValue(fieldName, out EventFieldValue value)) { return value.TryGetWholeNumber(out code); }
+
+        code = 0;
+
+        return false;
+    }
+
     private (EventColumnChunk Chunk, int Row) Locate(int index)
     {
         int[] prefix = SealedPrefix();
@@ -1099,6 +1204,16 @@ public sealed class EventColumnStore
         (uint)index >= (uint)_sealedCount ? throw new ArgumentOutOfRangeException(nameof(index),
             "The columnar representation exists only for sealed rows; check IsPending first.") :
         Locate(index);
+
+    // A fresh per-scan memo (schemaId -> field index, or Unresolved until first hit), so each distinct schema's field
+    // position is resolved exactly once per scan rather than once per row.
+    private int[] NewSchemaFieldMemo()
+    {
+        int[] memo = new int[_schemas.Length];
+        Array.Fill(memo, SchemaFieldUnresolved);
+
+        return memo;
+    }
 
     private ResolvedEvent Pending(int index) => _pendingTail[index - _sealedCount];
 
@@ -1208,6 +1323,20 @@ public sealed class EventColumnStore
         return fields.MoveToImmutable();
     }
 
+    private int ResolveSchemaFieldIndex(int schemaId, string fieldName)
+    {
+        int[] nameIndices = _schemas[schemaId];
+
+        for (int i = 0; i < nameIndices.Length; i++)
+        {
+            string? name = PoolGet(nameIndices[i]);
+
+            if (!string.IsNullOrEmpty(name) && string.Equals(name, fieldName, StringComparison.Ordinal)) { return i; }
+        }
+
+        return SchemaFieldAbsent;
+    }
+
     private int[] SealedPrefix()
     {
         int[]? prefix = Volatile.Read(ref _sealedPrefix);
@@ -1221,5 +1350,62 @@ public sealed class EventColumnStore
         Volatile.Write(ref _sealedPrefix, prefix);
 
         return prefix;
+    }
+
+    private bool TryGetSealedEventDataCode(EventColumnChunk chunk, int row, string fieldName, int[] fieldIndexBySchema, out long code)
+    {
+        int schemaId = chunk.RowEventDataSchemaId(row);
+
+        if ((uint)schemaId >= (uint)fieldIndexBySchema.Length) { code = 0; return false; }
+
+        int fieldIndex = fieldIndexBySchema[schemaId];
+
+        if (fieldIndex == SchemaFieldUnresolved)
+        {
+            fieldIndex = ResolveSchemaFieldIndex(schemaId, fieldName);
+            fieldIndexBySchema[schemaId] = fieldIndex;
+        }
+
+        if (fieldIndex < 0 || fieldIndex >= chunk.RowEventDataCount(row))
+        {
+            code = 0;
+
+            return false;
+        }
+
+        return TryGetWholeNumberFromRawField(chunk.RowEventDataField(row, fieldIndex), out code);
+    }
+
+    private bool TryGetWholeNumberFromRawField(in RawEventDataField field, out long code)
+    {
+        switch (field.Kind)
+        {
+            case StoredFieldKind.SByte:
+            case StoredFieldKind.Int16:
+            case StoredFieldKind.Int32:
+            case StoredFieldKind.Int64:
+                code = field.Bits;
+
+                return code >= 0;
+            case StoredFieldKind.Byte:
+            case StoredFieldKind.UInt16:
+            case StoredFieldKind.UInt32:
+            case StoredFieldKind.UInt64:
+            case StoredFieldKind.SizeT:
+                ulong unsigned = unchecked((ulong)field.Bits);
+
+                if (unsigned <= long.MaxValue) { code = (long)unsigned; return true; }
+
+                code = 0;
+
+                return false;
+            case StoredFieldKind.String:
+            case StoredFieldKind.StringForm:
+                return EventFieldValue.TryParseWholeNumber(PoolGet(field.RefIndex), out code);
+            default:
+                code = 0;
+
+                return false;
+        }
     }
 }

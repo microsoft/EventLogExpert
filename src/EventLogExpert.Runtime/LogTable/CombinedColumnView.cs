@@ -58,27 +58,85 @@ internal sealed class CombinedColumnView : IEventColumnView
 
     internal static CombinedColumnView Empty { get; } = new([], new SortContext(null, true, null, false));
 
-    public void BucketTimeTicksByEventId(long minTicks, long bucketSpanTicks, int bucketCount, int[] targetIds, int[] slotCounts, CancellationToken cancellationToken)
+    public void BucketTimeTicksByEventData(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
     {
         foreach (var view in _views)
         {
-            view.BucketTimeTicksByEventId(minTicks, bucketSpanTicks, bucketCount, targetIds, slotCounts, cancellationToken);
+            view.BucketTimeTicksByEventData(minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                fieldName,
+                targetCodes,
+                slotCounts,
+                cancellationToken);
         }
     }
 
-    public void BucketTimeTicksByField(long minTicks, long bucketSpanTicks, int bucketCount, EventFieldId field, string[] targetValues, int[] slotCounts, CancellationToken cancellationToken)
+    public void BucketTimeTicksByEventId(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
     {
         foreach (var view in _views)
         {
-            view.BucketTimeTicksByField(minTicks, bucketSpanTicks, bucketCount, field, targetValues, slotCounts, cancellationToken);
+            view.BucketTimeTicksByEventId(minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                targetIds,
+                slotCounts,
+                cancellationToken);
         }
     }
 
-    public void BucketTimeTicksBySeverity(long minTicks, long bucketSpanTicks, int bucketCount, int[] slotCounts, CancellationToken cancellationToken)
+    public void BucketTimeTicksByField(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventFieldId field,
+        string[] targetValues,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.BucketTimeTicksByField(minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                field,
+                targetValues,
+                slotCounts,
+                cancellationToken);
+        }
+    }
+
+    public void BucketTimeTicksBySeverity(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
     {
         foreach (var view in _views)
         {
             view.BucketTimeTicksBySeverity(minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
+        }
+    }
+
+    public void CountEventDataValues(string fieldName, IDictionary<long, int> counts, CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.CountEventDataValues(fieldName, counts, cancellationToken);
         }
     }
 

@@ -15,6 +15,19 @@ public interface IEventColumnView
 {
     int Count { get; }
 
+    /// <summary>
+    ///     Group-by variant keyed on a named EventData field's whole-number code; (targetCodes length + 1) slots per bin,
+    ///     with the trailing "other" slot also absorbing rows that lack the field.
+    /// </summary>
+    void BucketTimeTicksByEventData(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
     /// <summary>Group-by variant keyed on the numeric event id; (targetIds length + 1) slots per bin.</summary>
     void BucketTimeTicksByEventId(
         long minTicks,
@@ -47,6 +60,12 @@ public interface IEventColumnView
         int bucketCount,
         int[] slotCounts,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Tallies this view's rows by the whole-number code of a named EventData field (accumulating across a combined
+    ///     view, since a numeric code is store-independent); resolves the top-N group-by categories for the histogram.
+    /// </summary>
+    void CountEventDataValues(string fieldName, IDictionary<long, int> counts, CancellationToken cancellationToken);
 
     /// <summary>
     ///     Tallies this view's rows by numeric event id into <paramref name="counts" /> (accumulating across a combined

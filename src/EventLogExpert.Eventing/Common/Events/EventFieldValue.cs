@@ -63,6 +63,54 @@ public readonly struct EventFieldValue
         return false;
     }
 
+    /// <summary>
+    ///     Reads this value as a non-negative whole number when it is one: a typed integral kind, or a
+    ///     <see cref="EventFieldValueKind.String" /> holding a plain decimal (e.g. "23") or a <c>0x</c>-prefixed hex form
+    ///     (e.g. "0x17"). Decimal and hex spellings of the same code canonicalize to the same value. Allocation-free.
+    /// </summary>
+    public bool TryGetWholeNumber(out long value)
+    {
+        switch (_kind)
+        {
+            case EventFieldValueKind.Int64 when _bits >= 0:
+            case EventFieldValueKind.UInt64 when unchecked((ulong)_bits) <= long.MaxValue:
+                value = _bits;
+
+                return true;
+            case EventFieldValueKind.String:
+                return TryParseWholeNumber(_reference as string, out value);
+            default:
+                value = 0;
+
+                return false;
+        }
+    }
+
+    internal static bool TryParseWholeNumber(string? text, out long value)
+    {
+        value = 0;
+
+        if (string.IsNullOrEmpty(text)) { return false; }
+
+        ReadOnlySpan<char> span = text;
+
+        if (!span.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            return long.TryParse(span, NumberStyles.None, CultureInfo.InvariantCulture, out value);
+        }
+
+        // Parse hex as unsigned so a high-bit form (e.g. 0xFFFF...) can't wrap to a negative code, then keep only codes that fit a non-negative long.
+        if (!ulong.TryParse(span[2..], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out ulong hex) ||
+            hex > long.MaxValue)
+        {
+            return false;
+        }
+
+        value = (long)hex;
+
+        return true;
+    }
+
     public bool TryGetDouble(out double value)
     {
         if (_kind == EventFieldValueKind.Double) { value = BitConverter.Int64BitsToDouble(_bits); return true; }
