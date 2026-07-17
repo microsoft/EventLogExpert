@@ -14,7 +14,8 @@ public sealed record HistogramData(
     long BucketSpanTicks,
     IReadOnlyList<HistogramGroup> Groups)
 {
-    // True when the selected group-by dimension is a named EventData field that no row in the view carries, so the pane
-    // shows an explicit empty-state rather than a single, meaningless "Other" band.
+    // True when the selected group-by dimension is a named EventData field for which no row in the view yields a decodable
+    // whole-number value (the field is absent from every row, or every occurrence is non-numeric or out of range), so the
+    // pane shows an explicit empty-state rather than a single, meaningless "Other" band.
     public bool GroupingFieldAbsent { get; init; }
 }

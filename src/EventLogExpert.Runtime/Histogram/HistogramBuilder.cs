@@ -71,9 +71,10 @@ public static class HistogramBuilder
 
         if (counts.Count == 0)
         {
-            // No row in the view carries this field. Report the true survivor count (view.Count - every survivor falls within
-            // the view's own min/max span) so the accessible region label isn't "0 events" over a non-empty span, and flag the
-            // empty-state so the pane shows a message rather than a lone "Other" band.
+            // No row in the view yields a decodable whole-number value for this field - the field is absent from every row,
+            // or every occurrence is non-numeric or out of range. Report the true survivor count (view.Count - every survivor
+            // falls within the view's own min/max span) so the accessible region label isn't "0 events" over a non-empty span,
+            // and flag the empty-state so the pane shows a message rather than a lone "Other" band.
             return new HistogramData([], 0, bucketCount, minUtc, maxUtc, view.Count, bucketSpanTicks, []) { GroupingFieldAbsent = true };
         }
 
