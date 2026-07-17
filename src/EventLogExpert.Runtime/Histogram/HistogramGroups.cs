@@ -18,19 +18,25 @@ public static class HistogramGroups
 
     public static int SeveritySlotCount => LevelSeverity.SlotCount;
 
-    public static IReadOnlyList<HistogramGroup> ForCategories(IReadOnlyList<string> labels)
-    {
-        ArgumentNullException.ThrowIfNull(labels);
+    public static IReadOnlyList<HistogramGroup> ForCategories(IReadOnlyList<string> labels) =>
+        ForCategories(labels, labels);
 
-        int otherSlot = labels.Count;
-        var groups = new List<HistogramGroup>(labels.Count + 1)
+    // Keys drive bucketing and the stable toggle Key; labels are the parallel display strings, so distinct keys that resolve to the same display value still stay separate groups.
+    public static IReadOnlyList<HistogramGroup> ForCategories(IReadOnlyList<string> keys, IReadOnlyList<string> labels)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        ArgumentNullException.ThrowIfNull(labels);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(labels.Count, keys.Count);
+
+        int otherSlot = keys.Count;
+        var groups = new List<HistogramGroup>(keys.Count + 1)
         {
             new("Other", "histogram-cat-other", "cat-other", [otherSlot])
         };
 
-        for (int index = 0; index < labels.Count; index++)
+        for (int index = 0; index < keys.Count; index++)
         {
-            groups.Add(new HistogramGroup(labels[index], $"histogram-cat-{index}", $"cat:{labels[index]}", [index]));
+            groups.Add(new HistogramGroup(labels[index], $"histogram-cat-{index}", $"cat:{keys[index]}", [index]));
         }
 
         return groups;

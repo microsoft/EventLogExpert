@@ -29,7 +29,8 @@ public static class HistogramBuilder
         {
             HistogramDimension.Severity => ScanSeverity(view, minTicks, bucketSpanTicks, bucketCount, cancellationToken),
             HistogramDimension.EventId => ScanByEventId(view, minTicks, bucketSpanTicks, bucketCount, cancellationToken),
-            _ => ScanByField(view, ToFieldId(dimension), minTicks, bucketSpanTicks, bucketCount, cancellationToken)
+            HistogramDimension.Log => ScanByField(view, EventFieldId.OwningLog, OwningLogDisplay.DistinctShortNames, minTicks, bucketSpanTicks, bucketCount, cancellationToken),
+            _ => ScanByField(view, ToFieldId(dimension), static keys => keys, minTicks, bucketSpanTicks, bucketCount, cancellationToken)
         };
 
         int total = 0;
@@ -76,6 +77,7 @@ public static class HistogramBuilder
     private static (int[] SlotCounts, int SlotCount, IReadOnlyList<HistogramGroup> Groups) ScanByField(
         IEventColumnView view,
         EventFieldId field,
+        Func<IReadOnlyList<string>, IReadOnlyList<string>> labelMapper,
         long minTicks,
         long bucketSpanTicks,
         int bucketCount,
@@ -95,7 +97,7 @@ public static class HistogramBuilder
         int[] slotCounts = new int[bucketCount * slotCount];
         view.BucketTimeTicksByField(minTicks, bucketSpanTicks, bucketCount, field, targetValues, slotCounts, cancellationToken);
 
-        return (slotCounts, slotCount, HistogramGroups.ForCategories(targetValues));
+        return (slotCounts, slotCount, HistogramGroups.ForCategories(targetValues, labelMapper(targetValues)));
     }
 
     private static (int[] SlotCounts, int SlotCount, IReadOnlyList<HistogramGroup> Groups) ScanSeverity(

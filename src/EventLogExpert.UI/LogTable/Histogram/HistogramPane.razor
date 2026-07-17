@@ -12,11 +12,12 @@
                     ToStringFunc="@DimensionLabel"
                     Value="_dimension"
                     ValueChanged="OnDimensionSelected">
+                    <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.EventId" />
+                    <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.Log" />
+                    <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.Opcode" />
                     <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.Severity" />
                     <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.Source" />
-                    <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.EventId" />
                     <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.TaskCategory" />
-                    <ValueSelectItem T="HistogramDimension" Value="HistogramDimension.Opcode" />
                 </ValueSelect>
             </div>
             @if (_baseData is { } legendData)

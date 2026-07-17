@@ -118,6 +118,47 @@ public sealed class HistogramBuilderTests
     }
 
     [Fact]
+    public void Build_GroupByLog_EscalatesToFullPathWhenFileNameAndParentBothCollide()
+    {
+        var events = LogEvents(
+            (@"C:\logs\Security.evtx", 2),
+            (@"D:\logs\Security.evtx", 1));
+        var view = DisplayViewTestFactory.Build(s_logId, events);
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.Log, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        // Same file name AND parent folder ("logs"), so the parenthetical form also collides and both escalate to the full owning-log path.
+        Assert.Equal(@"C:\logs\Security.evtx", data!.Groups[1].Label);
+        Assert.Equal(@"D:\logs\Security.evtx", data.Groups[2].Label);
+        Assert.NotEqual(data.Groups[1].Label, data.Groups[2].Label);
+    }
+
+    [Fact]
+    public void Build_GroupByLog_LabelsWithShortNameAndKeepsSameShortNameLogsSeparate()
+    {
+        var events = LogEvents(
+            (@"C:\logsA\Security.evtx", 3),
+            (@"C:\logsB\Security.evtx", 2),
+            ("System", 1));
+        var view = DisplayViewTestFactory.Build(s_logId, events);
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.Log, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal(4, data!.Groups.Count); // Other + 3 distinct logs
+        Assert.Equal("Security.evtx (logsA)", data.Groups[1].Label); // colliding file names disambiguated by parent folder...
+        Assert.Equal("Security.evtx (logsB)", data.Groups[2].Label);
+        Assert.Equal("System", data.Groups[3].Label);
+        Assert.Equal(@"cat:C:\logsA\Security.evtx", data.Groups[1].Key); // ...while the toggle Key stays the raw owning-log path
+        Assert.NotEqual(data.Groups[1].Key, data.Groups[2].Key);
+        Assert.Equal(3, GroupTotal(data, 1));
+        Assert.Equal(2, GroupTotal(data, 2));
+        Assert.Equal(1, GroupTotal(data, 3));
+        Assert.Equal(6, data.Total);
+    }
+
+    [Fact]
     public void Build_GroupBySource_FoldsValuesBeyondTheTopCapIntoOther()
     {
         var events = SourceEvents(("s1", 5), ("s2", 4), ("s3", 3), ("s4", 2), ("s5", 1), ("s6", 1));
@@ -226,6 +267,26 @@ public sealed class HistogramBuilderTests
                 events.Add(new ResolvedEvent("TestLog", LogPathType.Channel)
                 {
                     Id = id,
+                    TimeCreated = new DateTime(ticks++, DateTimeKind.Utc)
+                });
+            }
+        }
+
+        return [.. events];
+    }
+
+    private static ResolvedEvent[] LogEvents(params (string OwningLog, int Count)[] groups)
+    {
+        var events = new List<ResolvedEvent>();
+        long ticks = 0;
+
+        foreach ((string owningLog, int count) in groups)
+        {
+            for (int index = 0; index < count; index++)
+            {
+                events.Add(new ResolvedEvent(owningLog, LogPathType.Channel)
+                {
+                    Id = 0,
                     TimeCreated = new DateTime(ticks++, DateTimeKind.Utc)
                 });
             }
