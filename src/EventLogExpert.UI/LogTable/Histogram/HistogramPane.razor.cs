@@ -125,11 +125,14 @@ public sealed partial class HistogramPane
 
         if (widthPx <= 0 || heightPx <= 0) { return; }
 
-        if (!hadDimensions) { StartScan(); }
-        else if (_baseData is not null)
+        // A widened or newly-revealed viewport can push the current zoom depth past the track-width cap, so re-clamp the retained window and render immediately: the inline track width is a percentage the browser re-resolves against the new viewport at once, so deferring the render to an async rescan would briefly expose the stale over-cap track.
+        if (_baseData is { } data)
         {
+            SetWindowByBins(data, WindowStartBin(data), WindowBinCount(data));
             AggregateAndRender();
         }
+
+        if (!hadDimensions) { StartScan(); }
     }
 
     [JSInvokable]
@@ -738,6 +741,13 @@ public sealed partial class HistogramPane
     {
         int totalBins = data.BinCount;
         int minBins = Math.Min(MinWindowBaseBins, totalBins);
+
+        // Keep the virtual scroll track under the browser's maximum layout width so scrollWidth == clientWidth / WindowFraction holds and the scrollbar can reach the final bins; a deeper zoom would overflow the cap.
+        if (_viewportWidthPx > 0)
+        {
+            minBins = Math.Max(minBins, HistogramTrackCap.MinBinsForWidth(_viewportWidthPx, totalBins));
+        }
+
         binCount = Math.Clamp(binCount, minBins, totalBins);
         startBin = Math.Clamp(startBin, 0, totalBins - binCount);
 
@@ -819,21 +829,30 @@ public sealed partial class HistogramPane
 
         SupersedeQueuedNavigation();
 
-        (long start, long end, bool zoomed) = _windowHistory[^1];
-        _windowHistory.RemoveAt(_windowHistory.Count - 1);
+        long beforeStart = _windowStartTicks;
+        long beforeEnd = _windowEndTicks;
 
-        if (!zoomed)
+        // Pop past any snapshot that, after the track-cap clamp, reproduces the current window (a resize-forced re-clamp can leave the top entry equal to the current view), so Undo always moves visibly.
+        while (_windowHistory.Count > 0)
         {
-            SetWindowByBins(data, 0, data.BinCount);
-        }
-        else
-        {
-            long span = data.BucketSpanTicks;
-            long baseMin = data.MinUtc.Ticks;
-            int totalBins = data.BinCount;
-            int startBin = (int)Math.Clamp((start - baseMin) / span, 0, totalBins - 1);
-            int endBin = (int)Math.Clamp((end - baseMin) / span, 0, totalBins - 1);
-            SetWindowByBins(data, startBin, endBin - startBin + 1);
+            (long start, long end, bool zoomed) = _windowHistory[^1];
+            _windowHistory.RemoveAt(_windowHistory.Count - 1);
+
+            if (!zoomed)
+            {
+                SetWindowByBins(data, 0, data.BinCount);
+            }
+            else
+            {
+                long span = data.BucketSpanTicks;
+                long baseMin = data.MinUtc.Ticks;
+                int totalBins = data.BinCount;
+                int startBin = (int)Math.Clamp((start - baseMin) / span, 0, totalBins - 1);
+                int endBin = (int)Math.Clamp((end - baseMin) / span, 0, totalBins - 1);
+                SetWindowByBins(data, startBin, endBin - startBin + 1);
+            }
+
+            if (_windowStartTicks != beforeStart || _windowEndTicks != beforeEnd) { break; }
         }
 
         AggregateAndRender();
