@@ -102,9 +102,6 @@ public sealed class MauiClipboardService : IClipboardService
         }
     }
 
-    private static string GetLogShortName(string owningLog) =>
-        owningLog[(owningLog.LastIndexOf('\\') + 1)..];
-
     private static ResolvedEvent? ResolveEntry(SelectionEntry? entry, LogTableState logTable)
     {
         if (entry?.CurrentHandle is not { } handle) { return null; }
@@ -138,7 +135,7 @@ public sealed class MauiClipboardService : IClipboardService
                             builder.Append($"\"{@event.ActivityId}\" ");
                             break;
                         case ColumnName.Log:
-                            builder.Append($"\"{GetLogShortName(@event.OwningLog)}\" ");
+                            builder.Append($"\"{OwningLogDisplay.ShortName(@event.OwningLog)}\" ");
                             break;
                         case ColumnName.ComputerName:
                             builder.Append($"\"{@event.ComputerName}\" ");

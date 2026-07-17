@@ -19,7 +19,7 @@ public static class EventTableColumnFormatter
             ColumnName.Level => @event.Level,
             ColumnName.DateAndTime => FormatTimeCreated(@event.TimeCreated, timeZone, dateTimeFormat),
             ColumnName.ActivityId => @event.ActivityId?.ToString() ?? string.Empty,
-            ColumnName.Log => GetLogShortName(@event.OwningLog),
+            ColumnName.Log => OwningLogDisplay.ShortName(@event.OwningLog),
             ColumnName.ComputerName => @event.ComputerName,
             ColumnName.Source => @event.Source,
             ColumnName.EventId => @event.Id.ToString(),
@@ -44,7 +44,4 @@ public static class EventTableColumnFormatter
             ? converted.ToString()
             : converted.ToString(dateTimeFormat, CultureInfo.InvariantCulture);
     }
-
-    private static string GetLogShortName(string owningLog) =>
-        owningLog[(owningLog.LastIndexOf('\\') + 1)..];
 }

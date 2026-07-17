@@ -9,5 +9,6 @@ public enum HistogramDimension
     Source,
     EventId,
     TaskCategory,
-    Opcode
+    Opcode,
+    Log
 }
