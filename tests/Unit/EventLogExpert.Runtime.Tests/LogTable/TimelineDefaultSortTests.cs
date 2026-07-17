@@ -19,7 +19,7 @@ public sealed class TimelineDefaultSortTests
     {
         // Grouping short-circuits the default, so the timeline flag cannot force a column sort.
         Assert.Null(
-            ResolvedEventOrdering.ResolveDefaultOrderBy(orderBy: null, ColumnName.Source, logCount: 1, timelineVisible: true));
+            ResolvedEventOrdering.ResolveDefaultOrderBy(orderBy: null, groupBy: ColumnName.Source, logCount: 1, timelineVisible: true));
     }
 
     [Fact]
@@ -28,7 +28,7 @@ public sealed class TimelineDefaultSortTests
         // An explicit column sort always wins over the timeline-driven default, even for a single log.
         Assert.Equal(
             ColumnName.EventId,
-            ResolvedEventOrdering.ResolveDefaultOrderBy(ColumnName.EventId, groupBy: null, logCount: 1, timelineVisible: true));
+            ResolvedEventOrdering.ResolveDefaultOrderBy(orderBy: ColumnName.EventId, groupBy: null, logCount: 1, timelineVisible: true));
     }
 
     [Theory]
@@ -41,11 +41,7 @@ public sealed class TimelineDefaultSortTests
         bool timelineVisible,
         ColumnName? expected)
     {
-        var resolved = ResolvedEventOrdering.ResolveDefaultOrderBy(
-            orderBy: null,
-            groupBy: null,
-            logCount,
-            timelineVisible);
+        var resolved = ResolvedEventOrdering.ResolveDefaultOrderBy(null, null, logCount, timelineVisible);
 
         Assert.Equal(expected, resolved);
     }
