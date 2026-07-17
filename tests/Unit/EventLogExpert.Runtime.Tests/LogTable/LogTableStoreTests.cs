@@ -1534,7 +1534,7 @@ public sealed class LogTableStoreTests
         var afterSort = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.EventId));
 
         var displayed = new SortContext(
-            ResolvedEventOrdering.ResolveDefaultOrderBy(afterSort.OrderBy, afterSort.GroupBy, afterSort.PerLogEvents.Count),
+            ResolvedEventOrdering.ResolveDefaultOrderBy(afterSort.OrderBy, afterSort.GroupBy, afterSort.PerLogEvents.Count, afterSort.TimelineVisible),
             afterSort.IsDescending,
             afterSort.GroupBy,
             afterSort.IsGroupDescending);
@@ -2140,9 +2140,9 @@ public sealed class LogTableStoreTests
     {
         var byLog = events.GroupBy(resolved => resolved.OwningLog).ToList();
 
-        // Match the reducers' default: RecordId for one log, else DateAndTime.
+        // Match the reducers' default: RecordId for one log while the timeline is hidden, else DateAndTime.
         var context = new SortContext(
-            ResolvedEventOrdering.ResolveDefaultOrderBy(orderBy, groupBy, byLog.Count),
+            ResolvedEventOrdering.ResolveDefaultOrderBy(orderBy, groupBy, byLog.Count, timelineVisible: false),
             isDescending,
             groupBy,
             isGroupDescending);

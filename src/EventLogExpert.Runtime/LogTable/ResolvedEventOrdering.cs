@@ -7,12 +7,14 @@ namespace EventLogExpert.Runtime.LogTable;
 
 internal static partial class ResolvedEventOrdering
 {
-    // RecordId for one log; timestamp for a combined view of several.
-    internal static ColumnName? ResolveDefaultOrderBy(ColumnName? orderBy, ColumnName? groupBy, int logCount)
+    // RecordId for one log while the timeline is hidden; timestamp for a combined view of several, or for a single log
+    // while the timeline is shown (so the table reads in the same order as the time axis). An explicit sort or grouping
+    // always wins.
+    internal static ColumnName? ResolveDefaultOrderBy(ColumnName? orderBy, ColumnName? groupBy, int logCount, bool timelineVisible)
     {
         if (orderBy is not null || groupBy is not null) { return orderBy; }
 
-        return logCount > 1 ? ColumnName.DateAndTime : null;
+        return logCount > 1 || timelineVisible ? ColumnName.DateAndTime : null;
     }
 
     private static int CompareDateTime(EventFieldValue left, EventFieldValue right)
