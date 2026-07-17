@@ -69,9 +69,10 @@ public static class HistogramBuilder
         int[] slotCounts = new int[bucketCount * slotCount];
         view.BucketTimeTicksByEventId(minTicks, bucketSpanTicks, bucketCount, targetIds, slotCounts, cancellationToken);
 
+        string[] keys = Array.ConvertAll(targetIds, id => id.ToString(CultureInfo.InvariantCulture));
         string[] labels = Array.ConvertAll(targetIds, id => id.ToString(CultureInfo.CurrentCulture));
 
-        return (slotCounts, slotCount, HistogramGroups.ForCategories(labels));
+        return (slotCounts, slotCount, HistogramGroups.ForCategories(keys, labels));
     }
 
     private static (int[] SlotCounts, int SlotCount, IReadOnlyList<HistogramGroup> Groups) ScanByField(

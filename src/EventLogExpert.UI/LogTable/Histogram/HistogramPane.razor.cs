@@ -579,7 +579,18 @@ public sealed partial class HistogramPane
 
     private void OnTimeZoneChanged(object? sender, TimeZoneInfo timeZone) => _ = InvokeAsync(() =>
     {
+        if (_disposed) { return; }
+
         _timeZone = timeZone;
+
+        // Both live regions embed _timeZone-formatted times, so re-render alone would leave a screen reader announcing the old zone until the next pan/zoom/scan.
+        ScheduleAnnouncement();
+
+        if (_binCursor is { } cursor && _render is { Bins.Count: > 0 } render && cursor < render.Bins.Count)
+        {
+            _binAnnouncement = BinCursorAnnouncement(render.Bins[cursor]);
+        }
+
         StateHasChanged();
     });
 
