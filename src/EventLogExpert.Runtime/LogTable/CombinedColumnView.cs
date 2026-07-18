@@ -85,6 +85,7 @@ internal sealed class CombinedColumnView : IEventColumnView
         int bucketCount,
         string fieldName,
         IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
         long[] targetCodes,
         int[] slotCounts,
         CancellationToken cancellationToken)
@@ -96,6 +97,7 @@ internal sealed class CombinedColumnView : IEventColumnView
                 bucketCount,
                 fieldName,
                 eligibleProviders,
+                userDataErrorCodePaths,
                 targetCodes,
                 slotCounts,
                 cancellationToken);
@@ -155,11 +157,20 @@ internal sealed class CombinedColumnView : IEventColumnView
         }
     }
 
-    public void CountEventDataHResults(string fieldName, IReadOnlyCollection<string> eligibleProviders, IDictionary<long, int> counts, CancellationToken cancellationToken)
+    public void CountEventDataHResults(
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
+        IDictionary<long, int> counts,
+        CancellationToken cancellationToken)
     {
         foreach (var view in _views)
         {
-            view.CountEventDataHResults(fieldName, eligibleProviders, counts, cancellationToken);
+            view.CountEventDataHResults(fieldName,
+                eligibleProviders,
+                userDataErrorCodePaths,
+                counts,
+                cancellationToken);
         }
     }
 

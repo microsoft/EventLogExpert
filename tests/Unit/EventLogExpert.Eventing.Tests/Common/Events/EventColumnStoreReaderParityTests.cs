@@ -146,6 +146,7 @@ public sealed class EventColumnStoreReaderParityTests
     public void HResultScans_SealedAndPending_MatchLegacyReader()
     {
         string[] providers = ["Microsoft-Windows-WindowsUpdateClient", "Microsoft-Windows-Servicing"];
+        string[] userDataPaths = ["CbsPackageChangeState/ErrorCode", "CbsUpdateChangeState/ErrorCode"];
         long[] targetCodes = [0x800F0823L, 0x800F081FL];
 
         foreach (bool sealRows in new[] { true, false })
@@ -155,14 +156,14 @@ public sealed class EventColumnStoreReaderParityTests
 
             var legacyCounts = new Dictionary<long, int>();
             var columnCounts = new Dictionary<long, int>();
-            legacy.CountEventDataHResults(rank, "errorCode", providers, legacyCounts, CancellationToken.None);
-            column.CountEventDataHResults(rank, "errorCode", providers, columnCounts, CancellationToken.None);
+            legacy.CountEventDataHResults(rank, "errorCode", providers, userDataPaths, legacyCounts, CancellationToken.None);
+            column.CountEventDataHResults(rank, "errorCode", providers, userDataPaths, columnCounts, CancellationToken.None);
             Assert.Equal(legacyCounts.OrderBy(pair => pair.Key), columnCounts.OrderBy(pair => pair.Key));
 
             int[] legacySlots = new int[targetCodes.Length + 1];
             int[] columnSlots = new int[targetCodes.Length + 1];
-            legacy.BucketTimeTicksByEventDataHResult(rank, 0, long.MaxValue, 1, "errorCode", providers, targetCodes, legacySlots, CancellationToken.None);
-            column.BucketTimeTicksByEventDataHResult(rank, 0, long.MaxValue, 1, "errorCode", providers, targetCodes, columnSlots, CancellationToken.None);
+            legacy.BucketTimeTicksByEventDataHResult(rank, 0, long.MaxValue, 1, "errorCode", providers, userDataPaths, targetCodes, legacySlots, CancellationToken.None);
+            column.BucketTimeTicksByEventDataHResult(rank, 0, long.MaxValue, 1, "errorCode", providers, userDataPaths, targetCodes, columnSlots, CancellationToken.None);
             Assert.Equal(legacySlots, columnSlots);
         }
     }
@@ -448,7 +449,12 @@ public sealed class EventColumnStoreReaderParityTests
         ErrorCodeEvent("Microsoft-Windows-WindowsUpdateClient", 0, 2),
         ErrorCodeEvent("Microsoft-Windows-WindowsUpdateClient", unchecked((int)0x80070005u), 3),
         new ResolvedEvent("TestLog", LogPathType.Channel) { Id = 44, Source = "Microsoft-Windows-WindowsUpdateClient", TimeCreated = s_time.AddMinutes(4) },
-        ErrorCodeEvent("Some-Other-Provider", unchecked((int)0x800F0823u), 5)
+        ErrorCodeEvent("Some-Other-Provider", unchecked((int)0x800F0823u), 5),
+        // Servicing rows carry their code in UserData, not EventData: a package failure, a success (0x0, omitted),
+        // and a selectable-update failure - so the parity oracle and the store must agree on the UserData fallback.
+        ServicingUserDataEvent("CbsPackageChangeState/ErrorCode", "0x800f0816", 6),
+        ServicingUserDataEvent("CbsPackageChangeState/ErrorCode", "0x0", 7),
+        ServicingUserDataEvent("CbsUpdateChangeState/ErrorCode", "0x800F0922", 8)
     ];
 
     private static (IEventColumnReader Legacy, IEventColumnReader Column) BuildErrorCodeReaders(bool sealRows)
@@ -561,6 +567,10 @@ public sealed class EventColumnStoreReaderParityTests
 
         return fields;
     }
+
+    private static ResolvedEvent ServicingUserDataEvent(string path, string errorCode, int index) =>
+        new ResolvedEvent("TestLog", LogPathType.Channel) { Id = 3, Source = "Microsoft-Windows-Servicing", TimeCreated = s_time.AddMinutes(index) }
+            .WithUserData((path, errorCode));
 
     private static ResolvedEvent WithNamedProperties(ResolvedEvent source, params (string Name, EventProperty Value)[] fields)
     {

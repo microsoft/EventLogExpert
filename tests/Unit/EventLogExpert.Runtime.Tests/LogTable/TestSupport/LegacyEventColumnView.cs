@@ -24,8 +24,8 @@ internal sealed class LegacyEventColumnView(
     public void BucketTimeTicksByEventData(long minTicks, long bucketSpanTicks, int bucketCount, string fieldName, long[] targetCodes, int[] slotCounts, CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByEventData(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, fieldName, targetCodes, slotCounts, cancellationToken);
 
-    public void BucketTimeTicksByEventDataHResult(long minTicks, long bucketSpanTicks, int bucketCount, string fieldName, IReadOnlyCollection<string> eligibleProviders, long[] targetCodes, int[] slotCounts, CancellationToken cancellationToken) =>
-        _reader.BucketTimeTicksByEventDataHResult(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, fieldName, eligibleProviders, targetCodes, slotCounts, cancellationToken);
+    public void BucketTimeTicksByEventDataHResult(long minTicks, long bucketSpanTicks, int bucketCount, string fieldName, IReadOnlyCollection<string> eligibleProviders, IReadOnlyList<string> userDataErrorCodePaths, long[] targetCodes, int[] slotCounts, CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventDataHResult(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, fieldName, eligibleProviders, userDataErrorCodePaths, targetCodes, slotCounts, cancellationToken);
 
     public void BucketTimeTicksByEventId(long minTicks, long bucketSpanTicks, int bucketCount, int[] targetIds, int[] slotCounts, CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByEventId(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, targetIds, slotCounts, cancellationToken);
@@ -36,8 +36,8 @@ internal sealed class LegacyEventColumnView(
     public void BucketTimeTicksBySeverity(long minTicks, long bucketSpanTicks, int bucketCount, int[] slotCounts, CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksBySeverity(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
 
-    public void CountEventDataHResults(string fieldName, IReadOnlyCollection<string> eligibleProviders, IDictionary<long, int> counts, CancellationToken cancellationToken) =>
-        _reader.CountEventDataHResults(AllSurvive(), fieldName, eligibleProviders, counts, cancellationToken);
+    public void CountEventDataHResults(string fieldName, IReadOnlyCollection<string> eligibleProviders, IReadOnlyList<string> userDataErrorCodePaths, IDictionary<long, int> counts, CancellationToken cancellationToken) =>
+        _reader.CountEventDataHResults(AllSurvive(), fieldName, eligibleProviders, userDataErrorCodePaths, counts, cancellationToken);
 
     public void CountEventDataValues(string fieldName, IDictionary<long, int> counts, CancellationToken cancellationToken) =>
         _reader.CountEventDataValues(AllSurvive(), fieldName, counts, cancellationToken);

@@ -57,6 +57,7 @@ internal sealed class EventColumnView : IEventColumnView
         int bucketCount,
         string fieldName,
         IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
         long[] targetCodes,
         int[] slotCounts,
         CancellationToken cancellationToken) =>
@@ -67,6 +68,7 @@ internal sealed class EventColumnView : IEventColumnView
             bucketCount,
             fieldName,
             eligibleProviders,
+            userDataErrorCodePaths,
             targetCodes,
             slotCounts,
             cancellationToken);
@@ -119,9 +121,10 @@ internal sealed class EventColumnView : IEventColumnView
     public void CountEventDataHResults(
         string fieldName,
         IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
         IDictionary<long, int> counts,
         CancellationToken cancellationToken) =>
-        _reader.CountEventDataHResults(_rankByPhysical, fieldName, eligibleProviders, counts, cancellationToken);
+        _reader.CountEventDataHResults(_rankByPhysical, fieldName, eligibleProviders, userDataErrorCodePaths, counts, cancellationToken);
 
     public void CountEventDataValues(
         string fieldName,

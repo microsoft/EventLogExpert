@@ -287,6 +287,7 @@ public sealed class EventColumnStore
         int bucketCount,
         string fieldName,
         IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
         long[] targetCodes,
         int slotCount,
         int[] slotCounts,
@@ -297,6 +298,10 @@ public sealed class EventColumnStore
             ? stackalloc int[eligibleProviders.Count]
             : new int[eligibleProviders.Count];
         ReadOnlySpan<int> eligible = ResolveEligibleSourceIndices(eligibleProviders, eligibleBuffer);
+        Span<int> userDataPathBuffer = userDataErrorCodePaths.Count <= MaxStackProviderNames
+            ? stackalloc int[userDataErrorCodePaths.Count]
+            : new int[userDataErrorCodePaths.Count];
+        ReadOnlySpan<int> userDataPathIndices = ResolveUserDataPathIndices(userDataErrorCodePaths, userDataPathBuffer);
         int[] fieldIndexBySchema = NewSchemaFieldMemo();
         int offset = 0;
 
@@ -315,7 +320,8 @@ public sealed class EventColumnStore
                 // holds only real failure codes beyond the top-N rather than the non-failure population.
                 if (eligible.BinarySearch(sourceColumn[row]) < 0) { continue; }
 
-                if (!TryGetSealedEventDataHResult(chunk, row, fieldName, fieldIndexBySchema, out long code)) { continue; }
+                if (!TryGetSealedEventDataHResult(chunk, row, fieldName, fieldIndexBySchema, out long code)
+                    && !TryGetSealedUserDataHResult(chunk, row, userDataPathIndices, out code)) { continue; }
 
                 int bucket = ToBucket(timeColumn[row], minTicks, bucketSpanTicks, bucketCount);
                 slotCounts[(bucket * slotCount) + SlotForCode(code, targetCodes, otherSlot)]++;
@@ -336,7 +342,8 @@ public sealed class EventColumnStore
 
             if (!eligibleNames.Contains(pending.Source)) { continue; }
 
-            if (!TryGetPendingEventDataHResult(pending, fieldName, out long code)) { continue; }
+            if (!TryGetPendingEventDataHResult(pending, fieldName, out long code)
+                && !TryGetPendingUserDataHResult(pending, userDataErrorCodePaths, out code)) { continue; }
 
             int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
             slotCounts[(bucket * slotCount) + SlotForCode(code, targetCodes, otherSlot)]++;
@@ -666,6 +673,7 @@ public sealed class EventColumnStore
         ReadOnlySpan<int> rankByPhysical,
         string fieldName,
         IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
         IDictionary<long, int> counts,
         CancellationToken cancellationToken)
     {
@@ -674,6 +682,10 @@ public sealed class EventColumnStore
             : new int[eligibleProviders.Count];
 
         ReadOnlySpan<int> eligible = ResolveEligibleSourceIndices(eligibleProviders, eligibleBuffer);
+        Span<int> userDataPathBuffer = userDataErrorCodePaths.Count <= MaxStackProviderNames
+            ? stackalloc int[userDataErrorCodePaths.Count]
+            : new int[userDataErrorCodePaths.Count];
+        ReadOnlySpan<int> userDataPathIndices = ResolveUserDataPathIndices(userDataErrorCodePaths, userDataPathBuffer);
         int[] fieldIndexBySchema = NewSchemaFieldMemo();
         int offset = 0;
 
@@ -689,7 +701,8 @@ public sealed class EventColumnStore
 
                 if (eligible.BinarySearch(sourceColumn[row]) < 0) { continue; }
 
-                if (TryGetSealedEventDataHResult(chunk, row, fieldName, fieldIndexBySchema, out long code))
+                if (TryGetSealedEventDataHResult(chunk, row, fieldName, fieldIndexBySchema, out long code)
+                    || TryGetSealedUserDataHResult(chunk, row, userDataPathIndices, out code))
                 {
                     counts[code] = counts.TryGetValue(code, out int existing) ? existing + 1 : 1;
                 }
@@ -710,7 +723,8 @@ public sealed class EventColumnStore
 
             if (!eligibleNames.Contains(pending.Source)) { continue; }
 
-            if (TryGetPendingEventDataHResult(pending, fieldName, out long code))
+            if (TryGetPendingEventDataHResult(pending, fieldName, out long code)
+                || TryGetPendingUserDataHResult(pending, userDataErrorCodePaths, out code))
             {
                 counts[code] = counts.TryGetValue(code, out int existing) ? existing + 1 : 1;
             }
@@ -1218,6 +1232,16 @@ public sealed class EventColumnStore
         return (min, max);
     }
 
+    private static bool ContainsOrdinal(IReadOnlyList<string> paths, string value)
+    {
+        for (int index = 0; index < paths.Count; index++)
+        {
+            if (string.Equals(paths[index], value, StringComparison.Ordinal)) { return true; }
+        }
+
+        return false;
+    }
+
     private static int FindChunk(int[] prefix, int index)
     {
         int low = 0;
@@ -1324,6 +1348,28 @@ public sealed class EventColumnStore
             code = hresult;
 
             return true;
+        }
+
+        code = 0;
+
+        return false;
+    }
+
+    private static bool TryGetPendingUserDataHResult(ResolvedEvent pending, IReadOnlyList<string> userDataErrorCodePaths, out long code)
+    {
+        if (!pending.UserData.IsDefaultOrEmpty)
+        {
+            foreach (UserDataField field in pending.UserData)
+            {
+                if (!ContainsOrdinal(userDataErrorCodePaths, field.Path)) { continue; }
+
+                if (!field.Values.IsDefaultOrEmpty && EventFieldValue.TryParseHResult32(field.Values[0], out uint hresult) && hresult != 0)
+                {
+                    code = hresult;
+
+                    return true;
+                }
+            }
         }
 
         code = 0;
@@ -1493,6 +1539,18 @@ public sealed class EventColumnStore
         return SchemaFieldAbsent;
     }
 
+    private ReadOnlySpan<int> ResolveUserDataPathIndices(IReadOnlyList<string> paths, Span<int> buffer)
+    {
+        int count = 0;
+
+        for (int index = 0; index < paths.Count; index++)
+        {
+            if (count < buffer.Length && _pool.TryGetIndex(paths[index], out int poolIndex)) { buffer[count++] = poolIndex; }
+        }
+
+        return buffer[..count];
+    }
+
     private int[] SealedPrefix()
     {
         int[]? prefix = Volatile.Read(ref _sealedPrefix);
@@ -1610,6 +1668,32 @@ public sealed class EventColumnStore
 
         // A zero code is success (S_OK); the ErrorCode dimension charts failures only, so it is dropped like an absent field.
         return TryGetHResult32FromRawField(chunk.RowEventDataField(row, fieldIndex), out code) && code != 0;
+    }
+
+    private bool TryGetSealedUserDataHResult(EventColumnChunk chunk, int row, ReadOnlySpan<int> targetPathIndices, out long code)
+    {
+        if (!targetPathIndices.IsEmpty)
+        {
+            int count = chunk.RowUserDataCount(row);
+
+            for (int field = 0; field < count; field++)
+            {
+                if (targetPathIndices.IndexOf(chunk.RowUserDataPathIndex(row, field)) < 0) { continue; }
+
+                ReadOnlySpan<int> values = chunk.RowUserDataValues(row, field);
+
+                if (values.Length > 0 && EventFieldValue.TryParseHResult32(PoolGet(values[0]), out uint hresult) && hresult != 0)
+                {
+                    code = hresult;
+
+                    return true;
+                }
+            }
+        }
+
+        code = 0;
+
+        return false;
     }
 
     private bool TryGetWholeNumberFromRawField(in RawEventDataField field, out long code)
