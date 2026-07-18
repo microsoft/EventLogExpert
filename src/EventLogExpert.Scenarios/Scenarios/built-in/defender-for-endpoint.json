@@ -181,6 +181,8 @@
       "group": "DefenderForEndpoint",
       "channels": [ "Microsoft-Windows-Windows Defender/Operational" ],
       "requiresAdmin": false,
+      "activatesTimeline": true,
+      "timelineDimension": "EventId",
       "priority": 0,
       "order": 12,
       "version": 1,

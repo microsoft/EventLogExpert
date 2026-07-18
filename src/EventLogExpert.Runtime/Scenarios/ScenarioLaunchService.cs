@@ -55,9 +55,17 @@ internal sealed class ScenarioLaunchService(
             _dispatcher.Dispatch(new CloseAllLogsAction());
             _dispatcher.Dispatch(new RestoreFilterPaneStateAction(priorFilterState));
         }
-        else if (scenario.ActivatesTimeline && !_histogramState.Value.IsVisible)
+        else if (scenario.ActivatesTimeline)
         {
-            _menuActionService.SetHistogramVisible(true);
+            if (scenario.TimelineDimension is { } timelineDimension)
+            {
+                _dispatcher.Dispatch(new RequestHistogramDimensionAction(MapTimelineDimension(timelineDimension)));
+            }
+
+            if (!_histogramState.Value.IsVisible)
+            {
+                _menuActionService.SetHistogramVisible(true);
+            }
         }
 
         return new ScenarioLaunchResult(result.Opened, result.Empty, result.Failed);
@@ -134,6 +142,21 @@ internal sealed class ScenarioLaunchService(
 
     private static string FilesWord(int count) => count == 1 ? "1 file" : $"{count} files";
 
+#pragma warning disable CS8524
+    private static HistogramDimension MapTimelineDimension(ScenarioTimelineDimension dimension) => dimension switch
+    {
+        ScenarioTimelineDimension.Severity => HistogramDimension.Severity,
+        ScenarioTimelineDimension.Source => HistogramDimension.Source,
+        ScenarioTimelineDimension.EventId => HistogramDimension.EventId,
+        ScenarioTimelineDimension.TaskCategory => HistogramDimension.TaskCategory,
+        ScenarioTimelineDimension.Opcode => HistogramDimension.Opcode,
+        ScenarioTimelineDimension.Log => HistogramDimension.Log,
+        ScenarioTimelineDimension.LogonType => HistogramDimension.LogonType,
+        ScenarioTimelineDimension.TicketEncryptionType => HistogramDimension.TicketEncryptionType,
+        ScenarioTimelineDimension.ErrorCode => HistogramDimension.ErrorCode
+    };
+#pragma warning restore CS8524
+
     private static ImmutableArray<string> MissingChannels(ScenarioDefinition scenario, ImmutableArray<string> matchedChannels)
     {
         var matched = new HashSet<string>(matchedChannels, StringComparer.OrdinalIgnoreCase);
@@ -198,9 +221,17 @@ internal sealed class ScenarioLaunchService(
             };
         }
 
-        if (scenario.ActivatesTimeline && !_histogramState.Value.IsVisible)
+        if (scenario.ActivatesTimeline)
         {
-            _menuActionService.SetHistogramVisible(true);
+            if (scenario.TimelineDimension is { } timelineDimension)
+            {
+                _dispatcher.Dispatch(new RequestHistogramDimensionAction(MapTimelineDimension(timelineDimension)));
+            }
+
+            if (!_histogramState.Value.IsVisible)
+            {
+                _menuActionService.SetHistogramVisible(true);
+            }
         }
 
         return new ScenarioFolderLaunchResult

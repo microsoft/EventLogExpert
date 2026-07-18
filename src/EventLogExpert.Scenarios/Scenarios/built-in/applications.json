@@ -65,6 +65,8 @@
       "group": "Applications",
       "channels": [ "Application" ],
       "requiresAdmin": false,
+      "activatesTimeline": true,
+      "timelineDimension": "EventId",
       "priority": 1,
       "order": 3,
       "version": 1,

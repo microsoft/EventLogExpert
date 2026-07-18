@@ -35,6 +35,9 @@ public sealed record ScenarioDefinition
     /// <summary>True when launching this scenario should reveal the event-rate timeline for rate-over-time triage.</summary>
     public bool ActivatesTimeline { get; init; }
 
+    /// <summary>The histogram group-by dimension auto-selected when this scenario activates the timeline.</summary>
+    public ScenarioTimelineDimension? TimelineDimension { get; init; }
+
     /// <summary>The ordered filter rows, each materialising to one Basic filter.</summary>
     public required ImmutableArray<ScenarioFilterRow> Filters { get; init; }
 
