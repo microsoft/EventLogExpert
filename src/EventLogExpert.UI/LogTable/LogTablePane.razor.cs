@@ -640,7 +640,10 @@ public sealed partial class LogTablePane
         string? color = null;
         // Highlight filters can reference EventData, so evaluate against the full rehydrated event; the result is
         // cached per locator (stable within a generation) so the rehydrate happens at most once per physical row.
-        var detail = _activeDisplayedEvents.GetDetail(row.Loc);
+        // Resolve defensively: during a tab switch or reload the virtualized rows can momentarily carry a locator from
+        // the prior view/generation. A stale row yields no highlight this frame and recomputes once the view
+        // reconciles - far better than throwing out of the render tree.
+        if (!_activeDisplayedEvents.TryGetDetail(row.Loc, out var detail)) { return null; }
 
         foreach (var filter in _activeHighlightFilters)
         {
@@ -881,8 +884,10 @@ public sealed partial class LogTablePane
 
     private void InvokeCellContextMenu(MouseEventArgs args, DisplayRow row, ColumnName? column)
     {
+        // A stale row (mid tab-switch/reload) has no resolvable detail; skip the menu rather than throw.
+        if (!_activeDisplayedEvents.TryGetDetail(row.Loc, out var detail)) { return; }
+
         var items = new List<MenuItem>();
-        var detail = _activeDisplayedEvents.GetDetail(row.Loc);
 
         AppendCellFilterItems(items, detail, column);
         items.AddRange(ShowContextMenuItems(detail));

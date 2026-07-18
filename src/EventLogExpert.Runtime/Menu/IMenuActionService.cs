@@ -40,6 +40,8 @@ public interface IMenuActionService
 
     Task<OpenLogsBatchResult> OpenLiveLogsAsync(IEnumerable<string> logNames, bool combineLog);
 
+    Task<OpenLogsBatchResult> OpenLogFilesAsync(IEnumerable<string> filePaths, bool combineLog);
+
     Task<bool> OpenSettingsAsync();
 
     Task SaveFiltersAsFilterSetAsync();

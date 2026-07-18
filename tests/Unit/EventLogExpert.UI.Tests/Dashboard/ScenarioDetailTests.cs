@@ -198,6 +198,42 @@ public sealed class ScenarioDetailTests : BunitContext
     }
 
     [Fact]
+    public void OpenFromFolder_Click_InvokesLaunchFromFolder()
+    {
+        bool launched = false;
+
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
+            .Add(detail => detail.ElevationReasonId, "reason")
+            .Add(detail => detail.OnLaunchFromFolder, () => launched = true));
+
+        cut.Find(".scenario-detail__open-folder").Click();
+
+        Assert.True(launched);
+    }
+
+    [Fact]
+    public void OpenFromFolder_WhenLiveLaunchAdminDisabled_StaysAvailable()
+    {
+        bool launched = false;
+
+        // Opening exported files from a folder needs no elevation, so the folder action ignores the live-launch admin gate.
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
+            .Add(detail => detail.ElevationReasonId, "reason")
+            .Add(detail => detail.IsDisabled, true)
+            .Add(detail => detail.OnLaunchFromFolder, () => launched = true));
+
+        var folder = cut.Find(".scenario-detail__open-folder");
+
+        Assert.Null(folder.GetAttribute("aria-disabled"));
+
+        folder.Click();
+
+        Assert.True(launched);
+    }
+
+    [Fact]
     public void RendersNamePurposeAndEyebrow()
     {
         var cut = Render<ScenarioDetail>(parameters => parameters

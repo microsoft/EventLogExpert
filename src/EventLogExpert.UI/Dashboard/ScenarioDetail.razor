@@ -55,5 +55,12 @@
             OnClick="LaunchAsync">
             <span>Launch</span>
         </ChromelessButton>
+        <ChromelessButton aria-label="@($"Open {Scenario.Name} from a folder of exported logs")"
+            CssClass="scenario-detail__open-folder"
+            Disabled="@IsBusy"
+            IconClass="bi bi-folder2-open"
+            OnClick="LaunchFromFolderAsync">
+            <span>Open from folder</span>
+        </ChromelessButton>
     </div>
 </div>

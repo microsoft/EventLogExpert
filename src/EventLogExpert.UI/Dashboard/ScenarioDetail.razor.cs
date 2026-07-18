@@ -23,6 +23,8 @@ public sealed partial class ScenarioDetail
 
     [Parameter] public EventCallback OnLaunch { get; set; }
 
+    [Parameter] public EventCallback OnLaunchFromFolder { get; set; }
+
     [Parameter] public EventCallback OnToggleFavorite { get; set; }
 
     [Parameter][EditorRequired] public ScenarioDefinition Scenario { get; set; } = null!;
@@ -51,6 +53,15 @@ public sealed partial class ScenarioDetail
         if (IsDisabled) { return; }
 
         await OnLaunch.InvokeAsync();
+    }
+
+    // Opening exported files from a folder needs no elevation, so this stays available even when the live Launch is
+    // admin-gated (IsDisabled); only an in-flight operation (IsBusy) blocks it.
+    private async Task LaunchFromFolderAsync()
+    {
+        if (IsBusy) { return; }
+
+        await OnLaunchFromFolder.InvokeAsync();
     }
 
     private readonly record struct FilterLine(string Text, HighlightColor Color);
