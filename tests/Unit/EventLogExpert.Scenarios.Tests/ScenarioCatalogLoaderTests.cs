@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.Scenarios.Serialization;
 using System.Text;
 
@@ -391,6 +392,24 @@ public sealed class ScenarioCatalogLoaderTests
             """));
 
         Assert.Contains(result.Errors, error => error.Contains("SourceRegistration"));
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("EventId", ScenarioTimelineDimension.EventId)]
+    [InlineData("NotARealDimension", null)]
+    public void Load_TimelineDimension_WhenInvalid_IsIgnored(string? dimension, ScenarioTimelineDimension? expected)
+    {
+        string dimensionJson = dimension is null ? string.Empty : $", \"timelineDimension\": \"{dimension}\"";
+        var result = Load(Wrap($$"""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ], "activatesTimeline": true{{dimensionJson}},
+              "filters": [ { "comparison": { "property": "Id", "value": "1000" } } ] }
+            """));
+
+        var scenario = Assert.Single(result.Scenarios);
+        Assert.Empty(result.Errors);
+        Assert.Equal(expected, scenario.TimelineDimension);
     }
 
     [Fact]

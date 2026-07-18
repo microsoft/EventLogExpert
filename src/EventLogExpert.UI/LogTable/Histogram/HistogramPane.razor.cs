@@ -37,6 +37,7 @@ public sealed partial class HistogramPane
 
     private int _announceGeneration;
     private string _announcement = string.Empty;
+    private long _appliedDimensionToken;
     private HistogramData? _baseData;
     private string _binAnnouncement = string.Empty;
     private int? _binCursor;
@@ -68,6 +69,8 @@ public sealed partial class HistogramPane
     [Inject] private IStateSelection<LogTableState, string?> ActiveOriginLog { get; init; } = null!;
 
     [Inject] private IStateSelection<LogTableState, IEventColumnView> ActiveView { get; init; } = null!;
+
+    [Inject] private IStateSelection<HistogramState, HistogramDimensionRequest?> DimensionRequest { get; init; } = null!;
 
     [Inject] private IFilterLensCommands FilterLensCommands { get; init; } = null!;
 
@@ -174,6 +177,7 @@ public sealed partial class HistogramPane
 
             ActiveView.SelectedValueChanged -= OnActiveViewChanged;
             ActiveEventLogId.SelectedValueChanged -= OnActiveEventLogIdChanged;
+            DimensionRequest.SelectedValueChanged -= OnDimensionRequestChanged;
             Focus.SelectedValueChanged -= OnFocusChanged;
             Settings.TimeZoneChanged -= OnTimeZoneChanged;
             FindMarkers.MarksChanged -= OnFindMarksChanged;
@@ -229,11 +233,21 @@ public sealed partial class HistogramPane
         ActiveOriginLog.Select(SelectActiveOriginLog);
         ActiveEventLogId.Select(state => state.ActiveEventLogId);
         Focus.Select(state => state.Focus);
+        DimensionRequest.Select(state => state.DimensionRequest);
         ActiveView.SelectedValueChanged += OnActiveViewChanged;
         ActiveEventLogId.SelectedValueChanged += OnActiveEventLogIdChanged;
         Focus.SelectedValueChanged += OnFocusChanged;
+        DimensionRequest.SelectedValueChanged += OnDimensionRequestChanged;
         Settings.TimeZoneChanged += OnTimeZoneChanged;
         FindMarkers.MarksChanged += OnFindMarksChanged;
+
+        var initialRequest = DimensionRequest.Value;
+
+        if (initialRequest is not null && initialRequest.Token > _appliedDimensionToken)
+        {
+            _dimension = initialRequest.Dimension;
+            _appliedDimensionToken = initialRequest.Token;
+        }
 
         RefreshFindTicks();
 
@@ -319,6 +333,29 @@ public sealed partial class HistogramPane
             });
         }
         catch (ObjectDisposedException) { /* Component torn down mid-announce; nothing to update. */ }
+    }
+
+    private void ApplyDimension(HistogramDimension dimension, bool force)
+    {
+        if (!force && dimension == _dimension) { return; }
+
+        _dimension = dimension;
+        _hiddenGroups.Clear();
+
+        // A retained absent-field result would otherwise render its empty-state under the newly-selected dimension's name
+        // until the rescan lands; clear the live-region status with it so a screen reader isn't left holding the previous
+        // dimension's "no values" message during the gap.
+        if (_baseData is { GroupingFieldAbsent: true })
+        {
+            _baseData = null;
+            _render = null;
+            _announcement = string.Empty;
+            _binAnnouncement = string.Empty;
+        }
+
+        RecomputeSegmentHeights();
+
+        StartScan();
     }
 
     private void ApplyPublishedWindow()
@@ -578,27 +615,20 @@ public sealed partial class HistogramPane
 
     private void OnActiveViewChanged(object? sender, IEventColumnView view) => _ = InvokeAsync(ScheduleRecompute);
 
+    private void OnDimensionRequestChanged(object? sender, HistogramDimensionRequest? request) => _ = InvokeAsync(() =>
+    {
+        if (_disposed) { return; }
+
+        var current = DimensionRequest.Value;
+        if (current is null || current.Token <= _appliedDimensionToken) { return; }
+
+        _appliedDimensionToken = current.Token;
+        ApplyDimension(current.Dimension, force: true);
+    });
+
     private void OnDimensionSelected(HistogramDimension dimension)
     {
-        if (dimension == _dimension) { return; }
-
-        _dimension = dimension;
-        _hiddenGroups.Clear();
-
-        // A retained absent-field result would otherwise render its empty-state under the newly-selected dimension's name
-        // until the rescan lands; clear the live-region status with it so a screen reader isn't left holding the previous
-        // dimension's "no values" message during the gap.
-        if (_baseData is { GroupingFieldAbsent: true })
-        {
-            _baseData = null;
-            _render = null;
-            _announcement = string.Empty;
-            _binAnnouncement = string.Empty;
-        }
-
-        RecomputeSegmentHeights();
-
-        StartScan();
+        ApplyDimension(dimension, force: false);
     }
 
     private void OnFindMarksChanged(object? sender, EventArgs args) => _ = InvokeAsync(() =>

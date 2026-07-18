@@ -246,6 +246,12 @@ internal static partial class ScenarioCatalogLoader
         var origin = ParseEnum(dto.Origin, $"scenario {label}", "origin", required: false, local, ScenarioOrigin.BuiltIn);
         var gating = ParseEnum(dto.Gating, $"scenario {label}", "gating", required: false, local, ScenarioGating.ChannelPresence);
 
+        ScenarioTimelineDimension? timelineDimension =
+            !string.IsNullOrWhiteSpace(dto.TimelineDimension) &&
+            Enum.IsDefined(typeof(ScenarioTimelineDimension), dto.TimelineDimension)
+                ? Enum.Parse<ScenarioTimelineDimension>(dto.TimelineDimension)
+                : null;
+
         if (gating == ScenarioGating.SourceRegistration)
         {
             local.Add($"scenario {label}: gating 'SourceRegistration' is not supported in a built-in scenario yet.");
@@ -275,6 +281,7 @@ internal static partial class ScenarioCatalogLoader
                 SourceGates = [.. dto.SourceGates ?? []],
                 RequiresAdmin = dto.RequiresAdmin,
                 ActivatesTimeline = dto.ActivatesTimeline,
+                TimelineDimension = timelineDimension,
                 Filters = [.. rows],
                 Priority = dto.Priority,
                 Order = dto.Order,

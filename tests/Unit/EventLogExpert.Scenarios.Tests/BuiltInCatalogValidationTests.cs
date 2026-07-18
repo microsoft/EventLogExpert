@@ -49,6 +49,80 @@ public sealed class BuiltInCatalogValidationTests
         Assert.DoesNotContain(Guid.Empty, guids);
     }
 
+    [Fact]
+    public void Catalog_TimelineScenariosMatchExpectedDimensions()
+    {
+        Dictionary<string, ScenarioTimelineDimension> expected = new(StringComparer.Ordinal)
+        {
+            ["account-compromise-timeline"] = ScenarioTimelineDimension.EventId,
+            ["account-lockout-investigation"] = ScenarioTimelineDimension.EventId,
+            ["ad-replication-failures"] = ScenarioTimelineDimension.EventId,
+            ["boot-shutdown-restart-timeline"] = ScenarioTimelineDimension.EventId,
+            ["cluster-network-partition"] = ScenarioTimelineDimension.EventId,
+            ["cluster-node-quarantine"] = ScenarioTimelineDimension.EventId,
+            ["corrected-hardware-errors-whea"] = ScenarioTimelineDimension.EventId,
+            ["crashing-services"] = ScenarioTimelineDimension.EventId,
+            ["defender-malware-detected"] = ScenarioTimelineDimension.EventId,
+            ["defender-protection-timeline"] = ScenarioTimelineDimension.EventId,
+            ["dfsr-sysvol-failures"] = ScenarioTimelineDimension.EventId,
+            ["dhcp-lease-failures-apipa"] = ScenarioTimelineDimension.EventId,
+            ["disk-io-errors-bad-blocks"] = ScenarioTimelineDimension.EventId,
+            ["dns-analytic-query-failures"] = ScenarioTimelineDimension.EventId,
+            ["dns-resolution-timeouts"] = ScenarioTimelineDimension.EventId,
+            ["dns-zone-transfer-and-errors"] = ScenarioTimelineDimension.EventId,
+            ["endpoint-ir-triage-persistence-evasion"] = ScenarioTimelineDimension.Log,
+            ["exchange-transport-backpressure"] = ScenarioTimelineDimension.EventId,
+            ["failed-services-at-boot"] = ScenarioTimelineDimension.EventId,
+            ["failed-signins-brute-force"] = ScenarioTimelineDimension.LogonType,
+            ["faults-triage"] = ScenarioTimelineDimension.EventId,
+            ["group-policy-processing-errors"] = ScenarioTimelineDimension.Log,
+            ["hyperv-live-migration-failures"] = ScenarioTimelineDimension.EventId,
+            ["hyperv-replica-failures"] = ScenarioTimelineDimension.EventId,
+            ["hyperv-vm-health"] = ScenarioTimelineDimension.Log,
+            ["iis-app-pool-crashes"] = ScenarioTimelineDimension.EventId,
+            ["iscsi-connection-drops"] = ScenarioTimelineDimension.EventId,
+            ["kerberos-ticket-encryption-triage"] = ScenarioTimelineDimension.TicketEncryptionType,
+            ["logon-activity-triage"] = ScenarioTimelineDimension.EventId,
+            ["netlogon-secure-channel-failures"] = ScenarioTimelineDimension.EventId,
+            ["nps-per-endpoint-triage"] = ScenarioTimelineDimension.EventId,
+            ["nps-per-nas-device-triage"] = ScenarioTimelineDimension.EventId,
+            ["nps-per-policy-access-triage"] = ScenarioTimelineDimension.EventId,
+            ["nps-radius-triage"] = ScenarioTimelineDimension.EventId,
+            ["nps-user-auth-story"] = ScenarioTimelineDimension.EventId,
+            ["out-of-memory-resource-exhaustion"] = ScenarioTimelineDimension.EventId,
+            ["print-jobs-by-printer"] = ScenarioTimelineDimension.EventId,
+            ["print-jobs-by-user"] = ScenarioTimelineDimension.EventId,
+            ["rdp-activity-combined"] = ScenarioTimelineDimension.EventId,
+            ["rdp-network-failed-logon-triage"] = ScenarioTimelineDimension.LogonType,
+            ["remote-execution-lateral-movement-combined"] = ScenarioTimelineDimension.Log,
+            ["s2d-physical-disk-story"] = ScenarioTimelineDimension.EventId,
+            ["smb-client-connectivity-failures"] = ScenarioTimelineDimension.EventId,
+            ["sql-backup-restore-timeline"] = ScenarioTimelineDimension.EventId,
+            ["sql-deadlocks"] = ScenarioTimelineDimension.Source,
+            ["sql-health-triage"] = ScenarioTimelineDimension.EventId,
+            ["sql-login-failures"] = ScenarioTimelineDimension.Source,
+            ["storage-controller-driver-resets"] = ScenarioTimelineDimension.Source,
+            ["time-synchronization-failures"] = ScenarioTimelineDimension.EventId,
+            ["unexpected-restart-power-loss-bsod"] = ScenarioTimelineDimension.EventId,
+            ["update-reboot-crash-correlation"] = ScenarioTimelineDimension.EventId,
+            ["vss-shadow-copy-backup-failures"] = ScenarioTimelineDimension.Log,
+            ["w3wp-dotnet-crashes"] = ScenarioTimelineDimension.EventId,
+            ["wifi-connect-disconnect-auth"] = ScenarioTimelineDimension.EventId,
+            ["windows-setup-servicing-errors"] = ScenarioTimelineDimension.EventId,
+            ["windows-update-diagnostics"] = ScenarioTimelineDimension.EventId
+        };
+        var actual = s_registry.Scenarios
+            .Where(scenario => scenario.ActivatesTimeline)
+            .ToDictionary(scenario => scenario.Id, scenario => scenario.TimelineDimension, StringComparer.Ordinal);
+
+        Assert.Equal(expected.Count, actual.Count);
+        foreach (var (scenarioId, dimension) in expected)
+        {
+            Assert.True(actual.TryGetValue(scenarioId, out var actualDimension), $"Missing timeline scenario '{scenarioId}'.");
+            Assert.Equal(dimension, actualDimension);
+        }
+    }
+
     // The companion negative: a benign line-of-business process/command matches no row of any collapsed scenario, proving
     // the Contains-Any needle lists did not widen into a catch-all during the collapse.
     [Theory]
@@ -265,10 +339,9 @@ public sealed class BuiltInCatalogValidationTests
     }
 
     [Fact]
-    public void NonUpdateScenario_DoesNotActivateTimeline()
+    public void NonTimelineScenario_DoesNotActivateTimeline()
     {
-        // Activation is per-scenario, not catalog-wide: a neighbouring policy scenario must stay opted out.
-        var scenario = s_registry.Scenarios.Single(scenario => scenario.Id == "group-policy-processing-errors");
+        var scenario = s_registry.Scenarios.Single(scenario => scenario.Id == "directory-service-errors");
 
         Assert.False(scenario.ActivatesTimeline);
     }

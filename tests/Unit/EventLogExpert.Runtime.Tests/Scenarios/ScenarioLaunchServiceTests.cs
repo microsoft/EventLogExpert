@@ -12,6 +12,7 @@ using EventLogExpert.Scenarios.Catalog;
 using Fluxor;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using System.Reflection;
 
 namespace EventLogExpert.Runtime.Tests.Scenarios;
 
@@ -57,6 +58,46 @@ public sealed class ScenarioLaunchServiceTests
         await service.LaunchAsync(scenario, dateWindow: null);
 
         menu.DidNotReceive().SetHistogramVisible(Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task LaunchAsync_ActivatingScenarioWithoutTimelineDimension_DoesNotDispatchDimensionRequest()
+    {
+        var (service, dispatcher, _, scenario) =
+            Create(new OpenLogsBatchResult(1, 0, 0, 0, []), activatesTimeline: true);
+
+        await service.LaunchAsync(scenario, dateWindow: null);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RequestHistogramDimensionAction>());
+    }
+
+    [Fact]
+    public async Task LaunchAsync_ActivatingScenarioWithTimelineDimension_DispatchesDimensionRequest()
+    {
+        var (service, dispatcher, _, scenario) = Create(
+            new OpenLogsBatchResult(1, 0, 0, 0, []),
+            activatesTimeline: true,
+            timelineDimension: ScenarioTimelineDimension.ErrorCode);
+
+        await service.LaunchAsync(scenario, dateWindow: null);
+
+        dispatcher.Received(1).Dispatch(
+            Arg.Is<RequestHistogramDimensionAction>(action => action.Dimension == HistogramDimension.ErrorCode));
+    }
+
+    [Fact]
+    public async Task LaunchAsync_ActivatingScenarioWithTimelineDimension_WhenAlreadyVisible_DispatchesDimensionRequest()
+    {
+        var (service, dispatcher, _, scenario) = Create(
+            new OpenLogsBatchResult(1, 0, 0, 0, []),
+            activatesTimeline: true,
+            timelineVisible: true,
+            timelineDimension: ScenarioTimelineDimension.EventId);
+
+        await service.LaunchAsync(scenario, dateWindow: null);
+
+        dispatcher.Received(1).Dispatch(
+            Arg.Is<RequestHistogramDimensionAction>(action => action.Dimension == HistogramDimension.EventId));
     }
 
     [Fact]
@@ -289,6 +330,63 @@ public sealed class ScenarioLaunchServiceTests
     }
 
     [Fact]
+    public async Task LaunchFromFolderAsync_ActivatingScenarioWithoutTimelineDimension_DoesNotDispatchDimensionRequest()
+    {
+        var (service, dispatcher, menu, picker, enumerator, reader, scenario) =
+            CreateFolder(FolderScenario() with { ActivatesTimeline = true });
+        picker.PickFolderAsync().Returns("C:\\bundle");
+        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
+        menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
+
+        await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RequestHistogramDimensionAction>());
+    }
+
+    [Fact]
+    public async Task LaunchFromFolderAsync_ActivatingScenarioWithTimelineDimension_DispatchesDimensionRequest()
+    {
+        var (service, dispatcher, menu, picker, enumerator, reader, scenario) =
+            CreateFolder(FolderScenario() with
+            {
+                ActivatesTimeline = true,
+                TimelineDimension = ScenarioTimelineDimension.Log
+            });
+        picker.PickFolderAsync().Returns("C:\\bundle");
+        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
+        menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
+
+        await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+
+        dispatcher.Received(1).Dispatch(
+            Arg.Is<RequestHistogramDimensionAction>(action => action.Dimension == HistogramDimension.Log));
+    }
+
+    [Fact]
+    public async Task LaunchFromFolderAsync_ActivatingScenarioWithTimelineDimension_WhenAlreadyVisible_DispatchesDimensionRequest()
+    {
+        var (service, dispatcher, menu, picker, enumerator, reader, scenario) =
+            CreateFolder(
+                FolderScenario() with
+                {
+                    ActivatesTimeline = true,
+                    TimelineDimension = ScenarioTimelineDimension.Source
+                },
+                timelineVisible: true);
+        picker.PickFolderAsync().Returns("C:\\bundle");
+        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
+        menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
+
+        await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+
+        dispatcher.Received(1).Dispatch(
+            Arg.Is<RequestHistogramDimensionAction>(action => action.Dimension == HistogramDimension.Source));
+    }
+
+    [Fact]
     public async Task LaunchFromFolderAsync_CompletedWithUnreadableFile_PlumbsUnreadableCount()
     {
         var (service, _, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
@@ -428,10 +526,46 @@ public sealed class ScenarioLaunchServiceTests
         Assert.Equal("picker boom", result.Message);
     }
 
-    private static (IScenarioLaunchService Service, IDispatcher Dispatcher, IMenuActionService Menu, ScenarioDefinition Scenario)
-        Create(OpenLogsBatchResult openResult, bool activatesTimeline = false, bool timelineVisible = false)
+    [Theory]
+    [InlineData(ScenarioTimelineDimension.Severity, HistogramDimension.Severity)]
+    [InlineData(ScenarioTimelineDimension.Source, HistogramDimension.Source)]
+    [InlineData(ScenarioTimelineDimension.EventId, HistogramDimension.EventId)]
+    [InlineData(ScenarioTimelineDimension.TaskCategory, HistogramDimension.TaskCategory)]
+    [InlineData(ScenarioTimelineDimension.Opcode, HistogramDimension.Opcode)]
+    [InlineData(ScenarioTimelineDimension.Log, HistogramDimension.Log)]
+    [InlineData(ScenarioTimelineDimension.LogonType, HistogramDimension.LogonType)]
+    [InlineData(ScenarioTimelineDimension.TicketEncryptionType, HistogramDimension.TicketEncryptionType)]
+    [InlineData(ScenarioTimelineDimension.ErrorCode, HistogramDimension.ErrorCode)]
+    public void MapTimelineDimension_MapsEveryScenarioDimension(
+        ScenarioTimelineDimension dimension,
+        HistogramDimension expected)
     {
-        var scenario = ScenarioTestData.Single("a", "System", 1000) with { ActivatesTimeline = activatesTimeline };
+        var method = typeof(ScenarioLaunchService).GetMethod(
+            "MapTimelineDimension",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.NotNull(method);
+        Assert.Equal(expected, method.Invoke(null, [dimension]));
+    }
+
+    [Fact]
+    public void ScenarioTimelineDimension_MatchesHistogramDimensionNames()
+    {
+        Assert.Equal(Enum.GetNames<ScenarioTimelineDimension>(), Enum.GetNames<HistogramDimension>());
+    }
+
+    private static (IScenarioLaunchService Service, IDispatcher Dispatcher, IMenuActionService Menu, ScenarioDefinition Scenario)
+        Create(
+            OpenLogsBatchResult openResult,
+            bool activatesTimeline = false,
+            bool timelineVisible = false,
+            ScenarioTimelineDimension? timelineDimension = null)
+    {
+        var scenario = ScenarioTestData.Single("a", "System", 1000) with
+        {
+            ActivatesTimeline = activatesTimeline,
+            TimelineDimension = timelineDimension
+        };
         var registry = ScenarioTestData.Registry(scenario);
 
         var menu = Substitute.For<IMenuActionService>();

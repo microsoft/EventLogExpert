@@ -33,5 +33,7 @@ internal sealed class ScenarioDto
 
     public List<string>? SourceGates { get; set; }
 
+    public string? TimelineDimension { get; set; }
+
     public int Version { get; set; }
 }
