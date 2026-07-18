@@ -265,6 +265,24 @@ public sealed class BuiltInCatalogValidationTests
     }
 
     [Theory]
+    [InlineData("EventLog", 6008, "Red")]
+    [InlineData("Microsoft-Windows-Kernel-Power", 41, "Red")]
+    [InlineData("User32", 1074, "Orange")]
+    [InlineData("EventLog", 6006, "Yellow")]
+    [InlineData("EventLog", 6005, "Green")]
+    [InlineData("Microsoft-Windows-WindowsUpdateClient", 19, "Green")]
+    [InlineData("Microsoft-Windows-WindowsUpdateClient", 43, "Teal")]
+    public void RebootCrashCorrelation_MatchesEachProviderIdWithItsColor(string source, int id, string expectedColor)
+    {
+        var filterSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == "update-reboot-crash-correlation"));
+        var systemEvent = UpdateEvent("System", source, id, "Information");
+        var expected = Enum.Parse<HighlightColor>(expectedColor);
+
+        Assert.Contains(filterSet, saved => saved.Color == expected && saved.Compiled!.Predicate(systemEvent));
+        Assert.DoesNotContain(filterSet, saved => saved.Color != expected && saved.Compiled!.Predicate(systemEvent));
+    }
+
+    [Theory]
     [MemberData(nameof(AllScenarioIds))]
     public void Scenario_FilterSet_CompilesCanonicalAndBasic(string id)
     {
@@ -298,4 +316,70 @@ public sealed class BuiltInCatalogValidationTests
             Assert.True(scenario.RequiresAdmin);
         }
     }
+
+    [Fact]
+    public void ServicingOutcomes_DoesNotMatchWusaSource()
+    {
+        // Source is scoped Ordinal to Microsoft-Windows-Servicing; the sibling WUSA provider (unvalidated) must not match.
+        var filterSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == "windows-setup-servicing-errors"));
+
+        Assert.DoesNotContain(filterSet, saved => saved.Compiled!.Predicate(UpdateEvent("Setup", "Microsoft-Windows-WUSA", 3, "Information")));
+    }
+
+    // Real-log regression guard (update triage): the servicing-outcomes scenario keys on the event id because real
+    // Servicing events - including the failure event 3 - are logged at Level=Information, so the prior Level=Error
+    // filter matched nothing. See files/real-log-validation-2026-07-17.md.
+    [Theory]
+    [InlineData(3, "Red")]
+    [InlineData(4, "Yellow")]
+    [InlineData(13, "Yellow")]
+    [InlineData(2, "Green")]
+    [InlineData(9, "Green")]
+    public void ServicingOutcomes_MatchesServicingEventByIdAtInformationLevel(int id, string expectedColor)
+    {
+        var filterSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == "windows-setup-servicing-errors"));
+        var servicingEvent = UpdateEvent("Setup", "Microsoft-Windows-Servicing", id, "Information");
+        var expected = Enum.Parse<HighlightColor>(expectedColor);
+
+        Assert.Contains(filterSet, saved => saved.Color == expected && saved.Compiled!.Predicate(servicingEvent));
+        Assert.DoesNotContain(filterSet, saved => saved.Color != expected && saved.Compiled!.Predicate(servicingEvent));
+    }
+
+    [Fact]
+    public void WindowsUpdateDiagnostics_DoesNotMatchNonWuClientError()
+    {
+        var filterSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == "windows-update-diagnostics"));
+
+        Assert.DoesNotContain(filterSet, saved => saved.Compiled!.Predicate(UpdateEvent("System", "Application Error", 1000, "Error")));
+    }
+
+    [Fact]
+    public void WindowsUpdateDiagnostics_IsSystemOnly()
+    {
+        // The inert Operational optionalChannels hint was dropped (launch opens Channels only); lock the System-only
+        // shape so a re-add is caught - the behavioral filter tests would not notice a channel-metadata regression.
+        var scenario = s_registry.Scenarios.Single(scenario => scenario.Id == "windows-update-diagnostics");
+
+        Assert.Equal<IEnumerable<string>>(["System"], scenario.Channels);
+        Assert.Empty(scenario.OptionalChannels);
+    }
+
+    // WUClient failures log at Level=Error and warnings at Level=Warning (manifest), so those buckets are level-keyed;
+    // the success event 19 is Level=Information and so is keyed by id.
+    [Theory]
+    [InlineData(19, "Information", "Green")]
+    [InlineData(20, "Error", "Red")]
+    [InlineData(16, "Warning", "Yellow")]
+    public void WindowsUpdateDiagnostics_KeysSuccessByIdFailuresAndWarningsByLevel(int id, string level, string expectedColor)
+    {
+        var filterSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == "windows-update-diagnostics"));
+        var wuEvent = UpdateEvent("System", "Microsoft-Windows-WindowsUpdateClient", id, level);
+        var expected = Enum.Parse<HighlightColor>(expectedColor);
+
+        Assert.Contains(filterSet, saved => saved.Color == expected && saved.Compiled!.Predicate(wuEvent));
+        Assert.DoesNotContain(filterSet, saved => saved.Color != expected && saved.Compiled!.Predicate(wuEvent));
+    }
+
+    private static ResolvedEvent UpdateEvent(string channel, string source, int id, string level) =>
+        new(channel, LogPathType.Channel) { LogName = channel, Source = source, Id = id, Level = level };
 }

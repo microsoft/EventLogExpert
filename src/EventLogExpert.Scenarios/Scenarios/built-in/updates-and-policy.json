@@ -33,7 +33,6 @@
       "purpose": "Windows Update client outcomes, color-coded: successful install (WindowsUpdateClient 19), warnings, and errors.",
       "group": "UpdatesAndPolicy",
       "channels": [ "System" ],
-      "optionalChannels": [ "Microsoft-Windows-WindowsUpdateClient/Operational" ],
       "requiresAdmin": false,
       "priority": 0,
       "order": 1,
@@ -64,8 +63,8 @@
     },
     {
       "id": "windows-setup-servicing-errors",
-      "name": "Windows setup & servicing errors",
-      "purpose": "Component servicing and standalone-update-installer errors (Servicing, WUSA).",
+      "name": "Windows setup & servicing outcomes",
+      "purpose": "Component servicing outcomes on the Setup log: failed (Servicing 3), reboot-required (4, 13), and succeeded (2, 9). Servicing events are logged at Information level, so this keys on the event id, not severity.",
       "group": "UpdatesAndPolicy",
       "channels": [ "Setup" ],
       "requiresAdmin": false,
@@ -74,9 +73,86 @@
       "version": 1,
       "filters": [
         {
-          "comparison": { "property": "Source", "matchMode": "Many", "values": [ "Microsoft-Windows-Servicing", "Microsoft-Windows-WUSA" ] },
+          "color": "Red",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Servicing" },
           "predicates": [
-            { "comparison": { "property": "Level", "matchMode": "Many", "values": [ "Error", "Warning" ] } }
+            { "comparison": { "property": "Id", "value": "3" } }
+          ]
+        },
+        {
+          "color": "Yellow",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Servicing" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4", "13" ] } }
+          ]
+        },
+        {
+          "color": "Green",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Servicing" },
+          "predicates": [
+            { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "2", "9" ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "update-reboot-crash-correlation",
+      "name": "Update reboot & crash correlation",
+      "purpose": "Update install-to-reboot correlation on the System log: install started / succeeded (WindowsUpdateClient 43, 19), reboot initiated (User32 1074), clean vs unexpected shutdown (6006, 6008), boot (6005), and kernel power / bugcheck (41).",
+      "group": "UpdatesAndPolicy",
+      "channels": [ "System" ],
+      "requiresAdmin": false,
+      "priority": 0,
+      "order": 3,
+      "version": 1,
+      "filters": [
+        {
+          "color": "Red",
+          "comparison": { "property": "Source", "value": "EventLog" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "6008" } }
+          ]
+        },
+        {
+          "color": "Red",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-Power" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "41" } }
+          ]
+        },
+        {
+          "color": "Orange",
+          "comparison": { "property": "Source", "value": "User32" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "1074" } }
+          ]
+        },
+        {
+          "color": "Yellow",
+          "comparison": { "property": "Source", "value": "EventLog" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "6006" } }
+          ]
+        },
+        {
+          "color": "Green",
+          "comparison": { "property": "Source", "value": "EventLog" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "6005" } }
+          ]
+        },
+        {
+          "color": "Green",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-WindowsUpdateClient" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "19" } }
+          ]
+        },
+        {
+          "color": "Teal",
+          "comparison": { "property": "Source", "value": "Microsoft-Windows-WindowsUpdateClient" },
+          "predicates": [
+            { "comparison": { "property": "Id", "value": "43" } }
           ]
         }
       ]
