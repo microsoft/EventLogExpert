@@ -15,6 +15,11 @@ public static class HistogramBuilder
     // and servicing providers so a generic errorCode field on an unrelated provider does not pollute the failure view.
     private const string ErrorCodeFieldName = "errorCode";
 
+    // Microsoft-Windows-Servicing stores its failure HRESULT in a UserData Cbs*ChangeState/ErrorCode leaf (a hex string)
+    // rather than an EventData errorCode field, so the ErrorCode dimension also probes these curated storage-key paths for
+    // an eligible row whose EventData lacks the code. CbsPackageInitiateChanges carries no ErrorCode and is not listed.
+    private static readonly string[] s_updateErrorCodeUserDataPaths = ["CbsPackageChangeState/ErrorCode", "CbsUpdateChangeState/ErrorCode"];
+
     private static readonly string[] s_updateProviders = ["Microsoft-Windows-WindowsUpdateClient", "Microsoft-Windows-Servicing"];
 
     public static HistogramData? Build(
@@ -75,7 +80,7 @@ public static class HistogramBuilder
         CancellationToken cancellationToken)
     {
         var counts = new Dictionary<long, int>();
-        view.CountEventDataHResults(ErrorCodeFieldName, s_updateProviders, counts, cancellationToken);
+        view.CountEventDataHResults(ErrorCodeFieldName, s_updateProviders, s_updateErrorCodeUserDataPaths, counts, cancellationToken);
 
         var minUtc = new DateTime(minTicks, DateTimeKind.Utc);
         var maxUtc = new DateTime(maxTicks, DateTimeKind.Utc);
@@ -100,7 +105,7 @@ public static class HistogramBuilder
 
         int slotCount = targetCodes.Length + 1;
         int[] slotCounts = new int[bucketCount * slotCount];
-        view.BucketTimeTicksByEventDataHResult(minTicks, bucketSpanTicks, bucketCount, ErrorCodeFieldName, s_updateProviders, targetCodes, slotCounts, cancellationToken);
+        view.BucketTimeTicksByEventDataHResult(minTicks, bucketSpanTicks, bucketCount, ErrorCodeFieldName, s_updateProviders, s_updateErrorCodeUserDataPaths, targetCodes, slotCounts, cancellationToken);
 
         int total = 0;
 

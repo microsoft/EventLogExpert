@@ -30,8 +30,10 @@ public interface IEventColumnView
 
     /// <summary>
     ///     HRESULT-code variant of <see cref="BucketTimeTicksByEventData" /> for the ErrorCode dimension: only survivors
-    ///     from a provider in <paramref name="eligibleProviders" /> whose <paramref name="fieldName" /> field holds a nonzero
-    ///     32-bit HRESULT contribute (their target slot, else the trailing "other" slot); every other row is omitted.
+    ///     from a provider in <paramref name="eligibleProviders" /> whose <paramref name="fieldName" /> field - or, when that
+    ///     EventData field is absent, whose UserData carries one of the curated <paramref name="userDataErrorCodePaths" />
+    ///     leaves - holds a nonzero 32-bit HRESULT contribute (their target slot, else the trailing "other" slot); every other
+    ///     row is omitted.
     /// </summary>
     void BucketTimeTicksByEventDataHResult(
         long minTicks,
@@ -39,6 +41,7 @@ public interface IEventColumnView
         int bucketCount,
         string fieldName,
         IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
         long[] targetCodes,
         int[] slotCounts,
         CancellationToken cancellationToken);
@@ -79,9 +82,16 @@ public interface IEventColumnView
     /// <summary>
     ///     HRESULT-code variant of <see cref="CountEventDataValues" /> for the ErrorCode dimension: tallies this view's
     ///     survivors from a provider in <paramref name="eligibleProviders" /> by the nonzero 32-bit HRESULT in
-    ///     <paramref name="fieldName" /> (accumulating across a combined view); resolves the top-N failure codes.
+    ///     <paramref name="fieldName" /> or, when that EventData field is absent, one of the curated
+    ///     <paramref name="userDataErrorCodePaths" /> UserData leaves (accumulating across a combined view); resolves the
+    ///     top-N failure codes.
     /// </summary>
-    void CountEventDataHResults(string fieldName, IReadOnlyCollection<string> eligibleProviders, IDictionary<long, int> counts, CancellationToken cancellationToken);
+    void CountEventDataHResults(
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
+        IDictionary<long, int> counts,
+        CancellationToken cancellationToken);
 
     /// <summary>
     ///     Tallies this view's rows by the whole-number code of a named EventData field (accumulating across a combined

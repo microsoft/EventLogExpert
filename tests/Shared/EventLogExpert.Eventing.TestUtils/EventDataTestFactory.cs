@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.Eventing.Structured;
 using System.Collections.Immutable;
 using System.Security;
 using System.Security.Principal;
@@ -56,6 +57,21 @@ public static class EventDataTestFactory
         }
 
         return source with { EventDataValues = builder.MoveToImmutable(), EventDataSchema = schema };
+    }
+
+    // Attaches deduped nested-UserData fields keyed by their storage-key path (the ToStorageKey form the extractor and
+    // the column store agree on, e.g. "CbsPackageChangeState/ErrorCode"), mirroring a servicing event that stores its
+    // code in UserData rather than EventData. A null value yields a present-but-valueless field.
+    public static ResolvedEvent WithUserData(this ResolvedEvent source, params (string Path, string? Value)[] fields)
+    {
+        var builder = ImmutableArray.CreateBuilder<UserDataField>(fields.Length);
+
+        foreach (var (path, value) in fields)
+        {
+            builder.Add(new UserDataField(path, value is null ? [] : [value], false));
+        }
+
+        return source with { UserData = builder.MoveToImmutable() };
     }
 
     private static EventProperty ToEventProperty(object? value) =>

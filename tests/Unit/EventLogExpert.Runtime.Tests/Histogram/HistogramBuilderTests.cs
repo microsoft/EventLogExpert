@@ -103,6 +103,27 @@ public sealed class HistogramBuilderTests
     }
 
     [Fact]
+    public void Build_GroupByErrorCode_ChartsServicingUserDataErrorCode_OmitsSuccess()
+    {
+        // Servicing failures store their HRESULT in a UserData Cbs*/ErrorCode leaf (not EventData); the dimension must
+        // chart them end-to-end alongside a WUClient EventData failure, and omit a servicing success (0x0).
+        var events = new List<ResolvedEvent>(ErrorCodeEvents(("Microsoft-Windows-WindowsUpdateClient", unchecked((int)0x800F081Fu), 2)))
+        {
+            ServicingUserDataEvent("CbsPackageChangeState/ErrorCode", "0x800F0823", 10),
+            ServicingUserDataEvent("CbsPackageChangeState/ErrorCode", "0x0", 11)
+        };
+
+        var view = DisplayViewTestFactory.Build(s_logId, [.. events]);
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ErrorCode, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.False(data!.GroupingFieldAbsent);
+        Assert.Equal(3, data.Total); // 2 WUClient 0x800F081F + 1 servicing 0x800F0823; the 0x0 success is omitted
+        Assert.Contains(data.Groups, group => group.Label == "0x800F0823 CBS_E_NEW_SERVICING_STACK_REQUIRED");
+    }
+
+    [Fact]
     public void Build_GroupByErrorCode_NoFailures_SignalsEmptyStateWithZeroTotalAndNoun()
     {
         var view = DisplayViewTestFactory.Build(s_logId, ErrorCodeEvents(
@@ -472,6 +493,10 @@ public sealed class HistogramBuilderTests
 
         return [.. events];
     }
+
+    private static ResolvedEvent ServicingUserDataEvent(string userDataPath, string errorCode, long ticks) =>
+        new ResolvedEvent("TestLog", LogPathType.Channel) { Id = 3, Source = "Microsoft-Windows-Servicing", TimeCreated = new DateTime(ticks, DateTimeKind.Utc) }
+            .WithUserData((userDataPath, errorCode));
 
     private static ResolvedEvent[] SourceEvents(params (string Source, int Count)[] groups)
     {

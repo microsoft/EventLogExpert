@@ -39,9 +39,11 @@ public interface IEventColumnReader
 
     /// <summary>
     ///     HRESULT-code variant of <see cref="BucketTimeTicksByEventData" /> for the ErrorCode dimension: each survivor
-    ///     from a provider in <paramref name="eligibleProviders" /> whose <paramref name="fieldName" /> field holds a nonzero
-    ///     32-bit HRESULT lands in its <paramref name="targetCodes" /> slot else the trailing "other" slot; every
-    ///     ineligible-provider, absent-field, or zero/undecodable row is omitted (contributes to no slot).
+    ///     from a provider in <paramref name="eligibleProviders" /> whose <paramref name="fieldName" /> field - or, when that
+    ///     EventData field is absent, whose UserData carries one of the curated <paramref name="userDataErrorCodePaths" />
+    ///     storage-key leaves (e.g. a servicing <c>Cbs*/ErrorCode</c>) - holds a nonzero 32-bit HRESULT lands in its
+    ///     <paramref name="targetCodes" /> slot else the trailing "other" slot; every ineligible-provider, absent-field, or
+    ///     zero/undecodable row is omitted (contributes to no slot).
     /// </summary>
     void BucketTimeTicksByEventDataHResult(
         ReadOnlySpan<int> rankByPhysical,
@@ -50,6 +52,7 @@ public interface IEventColumnReader
         int bucketCount,
         string fieldName,
         IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
         long[] targetCodes,
         int[] slotCounts,
         CancellationToken cancellationToken);
@@ -114,10 +117,11 @@ public interface IEventColumnReader
     ///     HRESULT-code variant of <see cref="CountEventDataValues" /> for the ErrorCode dimension: tallies survivors
     ///     from a provider in <paramref name="eligibleProviders" /> by the nonzero 32-bit HRESULT in
     ///     <paramref name="fieldName" /> (a <c>win:HexInt32</c> code that sign-extends negative is reinterpreted unsigned, and
-    ///     hex / decimal string spellings fold to one code); ineligible-provider, absent-field, and zero/undecodable rows are
-    ///     omitted.
+    ///     hex / decimal string spellings fold to one code) or, when that EventData field is absent, in one of the curated
+    ///     <paramref name="userDataErrorCodePaths" /> UserData storage-key leaves (e.g. a servicing <c>Cbs*/ErrorCode</c> hex
+    ///     string); ineligible-provider, absent-field, and zero/undecodable rows are omitted.
     /// </summary>
-    void CountEventDataHResults(ReadOnlySpan<int> rankByPhysical, string fieldName, IReadOnlyCollection<string> eligibleProviders, IDictionary<long, int> counts, CancellationToken cancellationToken);
+    void CountEventDataHResults(ReadOnlySpan<int> rankByPhysical, string fieldName, IReadOnlyCollection<string> eligibleProviders, IReadOnlyList<string> userDataErrorCodePaths, IDictionary<long, int> counts, CancellationToken cancellationToken);
 
     /// <summary>
     ///     Group-by variant for a named EventData field of allowlisted numeric codes: tallies survivors by the field's

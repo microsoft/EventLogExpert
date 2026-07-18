@@ -81,12 +81,14 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         int bucketCount,
         string fieldName,
         IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
         long[] targetCodes,
         int[] slotCounts,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(fieldName);
         ArgumentNullException.ThrowIfNull(eligibleProviders);
+        ArgumentNullException.ThrowIfNull(userDataErrorCodePaths);
         ArgumentNullException.ThrowIfNull(targetCodes);
         ArgumentNullException.ThrowIfNull(slotCounts);
         ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
@@ -103,7 +105,7 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
 
             if (!eligibleNames.Contains(resolved.Source)) { continue; }
 
-            if (!(resolved.EventData.TryGetValue(fieldName, out EventFieldValue value) && value.TryGetHResult32(out uint hresult) && hresult != 0)) { continue; }
+            if (!TryGetHResult(resolved, fieldName, userDataErrorCodePaths, out long code)) { continue; }
 
             long bucket = (resolved.TimeCreated.Ticks - minTicks) / bucketSpanTicks;
             int clamped = bucket < 0 ? 0 : bucket >= bucketCount ? bucketCount - 1 : (int)bucket;
@@ -111,7 +113,7 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
 
             for (int target = 0; target < targetCodes.Length; target++)
             {
-                if (targetCodes[target] == hresult) { slot = target; break; }
+                if (targetCodes[target] == code) { slot = target; break; }
             }
 
             slotCounts[(clamped * slotCount) + slot]++;
@@ -283,10 +285,11 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         }
     }
 
-    public void CountEventDataHResults(ReadOnlySpan<int> rankByPhysical, string fieldName, IReadOnlyCollection<string> eligibleProviders, IDictionary<long, int> counts, CancellationToken cancellationToken)
+    public void CountEventDataHResults(ReadOnlySpan<int> rankByPhysical, string fieldName, IReadOnlyCollection<string> eligibleProviders, IReadOnlyList<string> userDataErrorCodePaths, IDictionary<long, int> counts, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(fieldName);
         ArgumentNullException.ThrowIfNull(eligibleProviders);
+        ArgumentNullException.ThrowIfNull(userDataErrorCodePaths);
         ArgumentNullException.ThrowIfNull(counts);
         ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
 
@@ -300,9 +303,8 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
 
             if (!eligibleNames.Contains(resolved.Source)) { continue; }
 
-            if (resolved.EventData.TryGetValue(fieldName, out EventFieldValue value) && value.TryGetHResult32(out uint hresult) && hresult != 0)
+            if (TryGetHResult(resolved, fieldName, userDataErrorCodePaths, out long code))
             {
-                long code = hresult;
                 counts[code] = counts.TryGetValue(code, out int existing) ? existing + 1 : 1;
             }
         }
@@ -428,6 +430,16 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
 
     private static HashSet<string> AsOrdinalSet(IReadOnlyCollection<string> providers) => new(providers, StringComparer.Ordinal);
 
+    private static bool ContainsOrdinal(IReadOnlyList<string> paths, string value)
+    {
+        for (int index = 0; index < paths.Count; index++)
+        {
+            if (string.Equals(paths[index], value, StringComparison.Ordinal)) { return true; }
+        }
+
+        return false;
+    }
+
     private static string? FieldValue(ResolvedEvent @event, EventFieldId field) => field switch
     {
         EventFieldId.Source => @event.Source,
@@ -462,6 +474,38 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         }
 
         return otherSlot;
+    }
+
+    // Mirrors EventColumnStore: an eligible row's failure HRESULT comes from its EventData errorCode field, or - when that
+    // field is absent (servicing rows store no EventData) - from a curated UserData Cbs*/ErrorCode leaf. 0x0 and empty
+    // parse to a zero/no code and are dropped like an absent field, so this oracle omits the same rows the store does.
+    private static bool TryGetHResult(ResolvedEvent resolved, string fieldName, IReadOnlyList<string> userDataErrorCodePaths, out long code)
+    {
+        if (resolved.EventData.TryGetValue(fieldName, out EventFieldValue value) && value.TryGetHResult32(out uint hresult) && hresult != 0)
+        {
+            code = hresult;
+
+            return true;
+        }
+
+        if (!resolved.UserData.IsDefaultOrEmpty)
+        {
+            foreach (UserDataField field in resolved.UserData)
+            {
+                if (!ContainsOrdinal(userDataErrorCodePaths, field.Path)) { continue; }
+
+                if (!field.Values.IsDefaultOrEmpty && EventFieldValue.TryParseHResult32(field.Values[0], out uint userDataHresult) && userDataHresult != 0)
+                {
+                    code = userDataHresult;
+
+                    return true;
+                }
+            }
+        }
+
+        code = 0;
+
+        return false;
     }
 
     private LegacyStringPool BuildStringPool()
