@@ -14,4 +14,11 @@ public interface IScenarioLaunchService
     ///     filter; <paramref name="combineLog" /> false opens a fresh view, true merges into the active workspace.
     /// </summary>
     Task<ScenarioLaunchResult> LaunchAsync(ScenarioDefinition scenario, DateFilter? dateWindow, bool combineLog = false);
+
+    /// <summary>
+    ///     Prompts for a folder, opens the exported <c>.evtx</c> files whose channel matches the scenario, and applies
+    ///     the scenario's filters to a fresh view. The scenario's filters and channels are read from the definition, so this
+    ///     works even for logs not present on the local host.
+    /// </summary>
+    Task<ScenarioFolderLaunchResult> LaunchFromFolderAsync(ScenarioDefinition scenario, DateFilter? dateWindow);
 }

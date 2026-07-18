@@ -274,6 +274,7 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IScenarioSource, BuiltInScenarioSource>();
             services.AddSingleton<BuiltInScenarioRegistry>();
             services.AddSingleton<IChannelPresenceProbe, ChannelPresenceProbe>();
+            services.AddSingleton<IEvtxChannelReader, EvtxChannelReader>();
             services.AddSingleton<IScenarioQueryService, ScenarioQueryService>();
             services.AddSingleton<IScenarioLaunchService, ScenarioLaunchService>();
             services.AddSingleton<IScenarioApplyService, ScenarioApplyService>();

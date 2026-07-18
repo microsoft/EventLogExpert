@@ -413,6 +413,13 @@ public sealed class MauiMenuActionService(
         return OpenLogStatus.Opened;
     }
 
+    public Task<OpenLogsBatchResult> OpenLogFilesAsync(IEnumerable<string> filePaths, bool combineLog)
+    {
+        ArgumentNullException.ThrowIfNull(filePaths);
+
+        return OpenLogsBatchCoreAsync(filePaths.Select(path => (path, LogPathType.File)), combineLog);
+    }
+
     public Task OpenLogsBatchAsync(IEnumerable<(string Path, LogPathType Type)> logs, bool combineLog) =>
         OpenLogsBatchCoreAsync(logs, combineLog);
 

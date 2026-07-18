@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
@@ -46,6 +47,8 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
     private IReadOnlyList<(SplashCategory Tab, string Label)> _tabs = [];
 
     [Inject] private IMenuActionService Actions { get; init; } = null!;
+
+    [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
     [Inject] private IAnnouncementService Announcer { get; init; } = null!;
 
@@ -134,6 +137,24 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
         await base.OnInitializedAsync();
     }
 
+    private static string? DescribeFolderLaunch(ScenarioDefinition scenario, ScenarioFolderLaunchResult result)
+    {
+        var scanNote = result.Unreadable > 0 ? $" {FolderFilesWord(result.Unreadable)} could not be inspected." : string.Empty;
+
+        return result.Outcome switch
+        {
+            ScenarioFolderOutcome.Cancelled => null,
+            ScenarioFolderOutcome.Error => result.Message ?? "The selected folder could not be opened.",
+            ScenarioFolderOutcome.NoMatchingLogs => $"No {scenario.Name} logs were found in the selected folder.",
+            ScenarioFolderOutcome.NoLogsOpened =>
+                $"Matched {FolderLogsWord(result.Matched)} for {scenario.Name} but none could be loaded " +
+                $"({result.Empty} empty, {result.Failed} failed).{scanNote}",
+            ScenarioFolderOutcome.Completed =>
+                $"Opened {FolderLogsWord(result.Opened)} for {scenario.Name}.{FolderMissingNote(result.MissingChannels)}{scanNote}",
+            _ => null
+        };
+    }
+
     private static string DescribeLaunch(ScenarioDefinition scenario, ScenarioLaunchResult result)
     {
         if (result.Opened == 0)
@@ -145,6 +166,13 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
             ? $"Opened {scenario.Name}; {result.Failed} {(result.Failed == 1 ? "channel" : "channels")} unavailable."
             : $"Opened {scenario.Name}.";
     }
+
+    private static string FolderFilesWord(int count) => count == 1 ? "1 file" : $"{count} files";
+
+    private static string FolderLogsWord(int count) => count == 1 ? "1 log" : $"{count} logs";
+
+    private static string FolderMissingNote(ImmutableArray<string> missing) =>
+        missing.IsDefaultOrEmpty ? string.Empty : $" Not found: {string.Join(", ", missing)}.";
 
     private void ClearFilter() => FilterCommands.ClearAllFilters();
 
@@ -166,6 +194,29 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
         {
             var result = await ScenarioLaunch.LaunchAsync(scenario, null);
             Announcer.Announce(DescribeLaunch(scenario, result));
+        });
+
+    private Task LaunchScenarioFromFolderAsync(ScenarioDefinition scenario) =>
+        RunGuardedAsync(async () =>
+        {
+            var result = await ScenarioLaunch.LaunchFromFolderAsync(scenario, null);
+
+            if (DescribeFolderLaunch(scenario, result) is not { } message) { return; }
+
+            // A launch that opens logs is self-evident (the workspace changes) and only needs the screen-reader detail;
+            // the outcomes that leave the dashboard unchanged need a visible dialog so a sighted user sees them.
+            switch (result.Outcome)
+            {
+                case ScenarioFolderOutcome.Completed:
+                    Announcer.Announce(message);
+                    break;
+                case ScenarioFolderOutcome.Error:
+                    await AlertDialogService.ShowErrorAlert("Open from folder", message);
+                    break;
+                default:
+                    await AlertDialogService.ShowAlert("Open from folder", message, "OK");
+                    break;
+            }
         });
 
     private async void OnFavoritesChanged(object? _, ImmutableHashSet<string> __)

@@ -22,6 +22,7 @@ using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.WindowsPlatform.Activation;
@@ -103,6 +104,7 @@ internal static class MauiProgramExtensions
             services.AddSingleton<IFileSaveService, MauiFileSaveService>();
             services.AddSingleton<IFilePickerService, MauiFilePickerService>();
             services.AddSingleton<IFolderPickerService, MauiFolderPickerService>();
+            services.AddSingleton<IEvtxFolderEnumerator, MauiEvtxFolderEnumerator>();
 
             return services;
         }

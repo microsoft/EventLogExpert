@@ -248,6 +248,8 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
         services.AddSingleton<HttpClient>();
         services.AddSingleton(Substitute.For<IMenuActionService>());
+        services.AddSingleton(Substitute.For<IFolderPickerService>());
+        services.AddSingleton(Substitute.For<IEvtxFolderEnumerator>());
 
         services.AddEventLogRuntime();
 
@@ -347,5 +349,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
         services.AddSingleton<HttpClient>();
         services.AddSingleton(Substitute.For<IMenuActionService>());
+        services.AddSingleton(Substitute.For<IFolderPickerService>());
+        services.AddSingleton(Substitute.For<IEvtxFolderEnumerator>());
     }
 }

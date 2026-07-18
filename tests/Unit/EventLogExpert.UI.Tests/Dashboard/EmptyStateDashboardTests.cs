@@ -4,6 +4,7 @@
 using AngleSharp.Dom;
 using Bunit;
 using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
@@ -24,10 +25,12 @@ public sealed class EmptyStateDashboardTests : BunitContext
 {
     private const string ActiveDetailLaunch = ".sidebar-tabs-tabpanel.active .scenario-detail__launch";
     private const string ActiveDetailName = ".sidebar-tabs-tabpanel.active .scenario-detail__name";
+    private const string ActiveDetailOpenFolder = ".sidebar-tabs-tabpanel.active .scenario-detail__open-folder";
     private const string ActiveDetailStar = ".sidebar-tabs-tabpanel.active .scenario-detail__star";
     private const string ActiveOption = ".sidebar-tabs-tabpanel.active [role='option']";
 
     private readonly IMenuActionService _actions = Substitute.For<IMenuActionService>();
+    private readonly IAlertDialogService _alertDialog = Substitute.For<IAlertDialogService>();
     private readonly IAnnouncementService _announcer = Substitute.For<IAnnouncementService>();
     private readonly IScenarioFavoriteCommands _favoriteCommands = Substitute.For<IScenarioFavoriteCommands>();
     private readonly IState<ScenarioFavoritesState> _favorites = Substitute.For<IState<ScenarioFavoritesState>>();
@@ -49,6 +52,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         _favoritesSelection.Value.Returns(ImmutableHashSet<string>.Empty);
 
         Services.AddSingleton(_actions);
+        Services.AddSingleton(_alertDialog);
         Services.AddSingleton(_announcer);
         Services.AddSingleton(_favoriteCommands);
         Services.AddSingleton(_favorites);
@@ -137,6 +141,55 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.WaitForAssertion(() =>
             _announcer.Received(1).Announce(Arg.Is<string>(message => message != null && message.Contains("No channels"))));
+    }
+
+    [Fact]
+    public void DetailOpenFromFolder_WhenCompleted_AnnouncesWithoutAlert()
+    {
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>())
+            .Returns(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.Completed, Opened = 1, Matched = 1 });
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailOpenFolder)));
+
+        cut.Find(ActiveDetailOpenFolder).Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            _announcer.Received(1).Announce(Arg.Any<string>());
+            _alertDialog.DidNotReceive().ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+        });
+    }
+
+    [Fact]
+    public void DetailOpenFromFolder_WhenError_ShowsErrorAlert()
+    {
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>())
+            .Returns(ScenarioFolderLaunchResult.Error("access denied"));
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailOpenFolder)));
+
+        cut.Find(ActiveDetailOpenFolder).Click();
+
+        cut.WaitForAssertion(() => _alertDialog.Received(1).ShowErrorAlert("Open from folder", "access denied"));
+    }
+
+    [Fact]
+    public void DetailOpenFromFolder_WhenNoMatchingLogs_ShowsVisibleAlert()
+    {
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>())
+            .Returns(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.NoMatchingLogs });
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailOpenFolder)));
+
+        cut.Find(ActiveDetailOpenFolder).Click();
+
+        cut.WaitForAssertion(() => _alertDialog.Received(1).ShowAlert("Open from folder", Arg.Any<string>(), "OK"));
     }
 
     [Fact]

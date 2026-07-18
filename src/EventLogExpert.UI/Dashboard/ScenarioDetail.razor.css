@@ -182,3 +182,33 @@
 .scenario-detail__actions ::deep .scenario-detail__launch[aria-disabled="true"] > .bi {
     color: var(--text-secondary);
 }
+
+.scenario-detail__actions ::deep .scenario-detail__open-folder {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: var(--control-height);
+    padding: 0.4rem 0.85rem;
+    border: 1px solid var(--border-divider);
+    border-radius: 6px;
+    background-color: transparent;
+    color: var(--text-primary);
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.scenario-detail__actions ::deep .scenario-detail__open-folder:hover:not(:disabled) {
+    border-color: var(--clr-lightblue);
+    box-shadow: var(--shadow-menu);
+}
+
+.scenario-detail__actions ::deep .scenario-detail__open-folder:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: 2px;
+}
+
+.scenario-detail__actions ::deep .scenario-detail__open-folder:disabled {
+    color: var(--text-secondary);
+    cursor: default;
+}
