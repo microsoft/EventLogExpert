@@ -5,6 +5,8 @@ namespace EventLogExpert.Scenarios.Serialization;
 
 internal sealed class ScenarioDto
 {
+    public bool ActivatesTimeline { get; set; }
+
     public List<string>? Channels { get; set; }
 
     public List<ScenarioFilterRowDto>? Filters { get; set; }

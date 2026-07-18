@@ -8,5 +8,5 @@ namespace EventLogExpert.Runtime.Histogram;
 [FeatureState]
 public sealed record HistogramState
 {
-    public bool IsVisible { get; init; } = true;
+    public bool IsVisible { get; init; }
 }

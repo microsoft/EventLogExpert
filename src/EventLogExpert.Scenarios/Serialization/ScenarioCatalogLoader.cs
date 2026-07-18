@@ -274,6 +274,7 @@ internal static partial class ScenarioCatalogLoader
                 Gating = gating,
                 SourceGates = [.. dto.SourceGates ?? []],
                 RequiresAdmin = dto.RequiresAdmin,
+                ActivatesTimeline = dto.ActivatesTimeline,
                 Filters = [.. rows],
                 Priority = dto.Priority,
                 Order = dto.Order,

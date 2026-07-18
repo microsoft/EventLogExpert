@@ -9,6 +9,32 @@ namespace EventLogExpert.Scenarios.Tests;
 public sealed class ScenarioCatalogLoaderTests
 {
     [Fact]
+    public void Load_ActivatesTimeline_WhenAbsent_DefaultsFalse()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ],
+              "filters": [ { "comparison": { "property": "Id", "value": "1000" } } ] }
+            """));
+
+        var scenario = Assert.Single(result.Scenarios);
+        Assert.False(scenario.ActivatesTimeline);
+    }
+
+    [Fact]
+    public void Load_ActivatesTimeline_WhenTrue_IsParsed()
+    {
+        var result = Load(Wrap("""
+            { "id": "x", "name": "X", "purpose": "p", "group": "SystemHealth",
+              "channels": [ "System" ], "activatesTimeline": true,
+              "filters": [ { "comparison": { "property": "Id", "value": "1000" } } ] }
+            """));
+
+        var scenario = Assert.Single(result.Scenarios);
+        Assert.True(scenario.ActivatesTimeline);
+    }
+
+    [Fact]
     public void Load_AdminChannelWithoutRequiresAdmin_IsError()
     {
         var result = Load(Wrap("""

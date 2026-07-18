@@ -23,6 +23,7 @@ using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
@@ -242,6 +243,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IState<FilterPaneState>>());
         services.AddSingleton(Substitute.For<IState<LogTableState>>());
         services.AddSingleton(Substitute.For<IState<RawEventStoreState>>());
+        services.AddSingleton(Substitute.For<IState<HistogramState>>());
         services.AddSingleton(Substitute.For<IStateSelection<EventLogState, bool>>());
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
         services.AddSingleton<HttpClient>();
@@ -340,6 +342,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IState<FilterPaneState>>());
         services.AddSingleton(Substitute.For<IState<LogTableState>>());
         services.AddSingleton(Substitute.For<IState<RawEventStoreState>>());
+        services.AddSingleton(Substitute.For<IState<HistogramState>>());
         services.AddSingleton(Substitute.For<IStateSelection<EventLogState, bool>>());
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
         services.AddSingleton<HttpClient>();

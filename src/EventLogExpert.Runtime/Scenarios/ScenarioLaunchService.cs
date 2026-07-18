@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Scenarios.Catalog;
 using Fluxor;
@@ -14,10 +15,12 @@ internal sealed class ScenarioLaunchService(
     BuiltInScenarioRegistry registry,
     IMenuActionService menuActionService,
     IState<FilterPaneState> filterPaneState,
+    IState<HistogramState> histogramState,
     IDispatcher dispatcher) : IScenarioLaunchService
 {
     private readonly IDispatcher _dispatcher = dispatcher;
     private readonly IState<FilterPaneState> _filterPaneState = filterPaneState;
+    private readonly IState<HistogramState> _histogramState = histogramState;
     private readonly IMenuActionService _menuActionService = menuActionService;
     private readonly BuiltInScenarioRegistry _registry = registry;
 
@@ -41,6 +44,10 @@ internal sealed class ScenarioLaunchService(
         {
             _dispatcher.Dispatch(new CloseAllLogsAction());
             _dispatcher.Dispatch(new RestoreFilterPaneStateAction(priorFilterState));
+        }
+        else if (scenario.ActivatesTimeline && !_histogramState.Value.IsVisible)
+        {
+            _menuActionService.SetHistogramVisible(true);
         }
 
         return new ScenarioLaunchResult(result.Opened, result.Empty, result.Failed);

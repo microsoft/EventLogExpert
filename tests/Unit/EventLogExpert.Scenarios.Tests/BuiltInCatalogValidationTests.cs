@@ -264,6 +264,15 @@ public sealed class BuiltInCatalogValidationTests
         Assert.False(saved.Compiled!.Predicate(Event("Disk", 153)), "Source matching is case-sensitive (Ordinal): the real provider is 'disk', so 'Disk' must not match");
     }
 
+    [Fact]
+    public void NonUpdateScenario_DoesNotActivateTimeline()
+    {
+        // Activation is per-scenario, not catalog-wide: a neighbouring policy scenario must stay opted out.
+        var scenario = s_registry.Scenarios.Single(scenario => scenario.Id == "group-policy-processing-errors");
+
+        Assert.False(scenario.ActivatesTimeline);
+    }
+
     [Theory]
     [InlineData("EventLog", 6008, "Red")]
     [InlineData("Microsoft-Windows-Kernel-Power", 41, "Red")]
@@ -343,6 +352,19 @@ public sealed class BuiltInCatalogValidationTests
 
         Assert.Contains(filterSet, saved => saved.Color == expected && saved.Compiled!.Predicate(servicingEvent));
         Assert.DoesNotContain(filterSet, saved => saved.Color != expected && saved.Compiled!.Predicate(servicingEvent));
+    }
+
+    [Theory]
+    [InlineData("windows-update-diagnostics")]
+    [InlineData("windows-setup-servicing-errors")]
+    [InlineData("update-reboot-crash-correlation")]
+    public void UpdateScenario_ActivatesTimeline(string scenarioId)
+    {
+        // The three update-triage scenarios reveal the event-rate timeline on launch (rate-over-time is the point of the
+        // reboot/crash correlation and the servicing/update outcome views); lock it so a JSON edit that drops the flag is caught.
+        var scenario = s_registry.Scenarios.Single(scenario => scenario.Id == scenarioId);
+
+        Assert.True(scenario.ActivatesTimeline);
     }
 
     [Fact]

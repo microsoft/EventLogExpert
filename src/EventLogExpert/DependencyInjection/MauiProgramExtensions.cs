@@ -19,7 +19,6 @@ using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.DetailsPane;
-using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
@@ -113,7 +112,6 @@ internal static class MauiProgramExtensions
             services.AddSingleton<ILogTablePreferencesProvider, LogTablePreferencesAdapter>();
             services.AddSingleton<ISettingsPreferencesProvider, SettingsPreferencesAdapter>();
             services.AddSingleton<IDetailsPanePreferencesProvider, DetailsPanePreferencesAdapter>();
-            services.AddSingleton<IHistogramPreferencesProvider, HistogramPreferencesAdapter>();
             services.AddSingleton<IDatabasePreferencesProvider, DatabasePreferencesAdapter>();
 
             return services;
