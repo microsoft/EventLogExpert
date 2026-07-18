@@ -13,4 +13,7 @@ internal interface IChannelPresenceProbe
 
     /// <summary>Warms the cache on a background thread.</summary>
     Task PrimeAsync();
+
+    /// <summary>Present channel names, or null when the channel set could not be read.</summary>
+    IReadOnlySet<string>? TryGetPresentChannels();
 }

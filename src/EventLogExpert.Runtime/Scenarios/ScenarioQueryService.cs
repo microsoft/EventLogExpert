@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Scenarios.Catalog;
+using System.Collections.Frozen;
 
 namespace EventLogExpert.Runtime.Scenarios;
 
@@ -20,14 +21,17 @@ internal sealed class ScenarioQueryService(BuiltInScenarioRegistry registry, ICh
         return [.._registry.Scenarios.Where(scenario => scenario.Channels.Any(loaded.Contains))];
     }
 
-    public IReadOnlyList<ScenarioDefinition> GetSplashScenarios()
+    public LivePresence GetLivePresence()
     {
-        var present = _presenceProbe.GetPresentChannels();
+        var present = _presenceProbe.TryGetPresentChannels();
 
-        return [
-            .._registry.Scenarios
-                .Where(scenario => scenario.Gating == ScenarioGating.ChannelPresence)
-                .Where(scenario => scenario.Channels.Any(present.Contains))
-        ];
+        return present is null
+            ? new LivePresence(false, FrozenSet<string>.Empty)
+            : new LivePresence(true, present);
     }
+
+    public IReadOnlyList<ScenarioDefinition> GetSplashScenarios() =>
+    [
+        .._registry.Scenarios.Where(scenario => scenario.Gating == ScenarioGating.ChannelPresence)
+    ];
 }

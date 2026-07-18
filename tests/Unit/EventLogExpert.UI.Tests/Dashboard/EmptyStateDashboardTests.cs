@@ -48,6 +48,8 @@ public sealed class EmptyStateDashboardTests : BunitContext
         _scenarioLaunch.LaunchAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>())
             .Returns(new ScenarioLaunchResult(1, 0, 0));
         _scenarioQuery.GetSplashScenarios().Returns([]);
+        _scenarioQuery.GetLivePresence()
+            .Returns(new LivePresence(true, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "System" }));
         _favorites.Value.Returns(new ScenarioFavoritesState());
         _favoritesSelection.Value.Returns(ImmutableHashSet<string>.Empty);
 
@@ -128,6 +130,20 @@ public sealed class EmptyStateDashboardTests : BunitContext
     }
 
     [Fact]
+    public void DetailLaunch_WhenChannelNotOnHost_IsDisabledWithOfflineNote()
+    {
+        _scenarioQuery.GetLivePresence()
+            .Returns(new LivePresence(true, new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
+
+        Assert.Equal("true", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
+        Assert.NotEmpty(cut.FindAll(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable"));
+    }
+
+    [Fact]
     public void DetailLaunch_WhenLaunchOpensNothing_AnnouncesFailure()
     {
         _scenarioLaunch.LaunchAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>())
@@ -141,6 +157,26 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.WaitForAssertion(() =>
             _announcer.Received(1).Announce(Arg.Is<string>(message => message != null && message.Contains("No channels"))));
+    }
+
+    [Fact]
+    public void DetailLaunch_WhenPresenceUnknown_StaysLaunchable()
+    {
+        _scenarioQuery.GetLivePresence()
+            .Returns(new LivePresence(false, new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
+
+        var launch = cut.Find(ActiveDetailLaunch);
+        Assert.Equal("false", launch.GetAttribute("aria-disabled"));
+        Assert.Empty(cut.FindAll(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable"));
+
+        launch.Click();
+
+        cut.WaitForAssertion(() => _scenarioLaunch.Received(1)
+            .LaunchAsync(Arg.Is<ScenarioDefinition>(scenario => scenario != null && scenario.Id == "application-crashes"), null));
     }
 
     [Fact]

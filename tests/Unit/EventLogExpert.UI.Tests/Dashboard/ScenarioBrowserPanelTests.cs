@@ -21,7 +21,6 @@ public sealed class ScenarioBrowserPanelTests : BunitContext
         var cut = Render<ScenarioBrowserPanel>(parameters => parameters
             .Add(panel => panel.Scenarios, scenarios)
             .Add(panel => panel.Selected, scenarios[0])
-            .Add(panel => panel.ElevationReasonId, "reason")
             .Add(panel => panel.IsFavored, _ => false)
             .Add(panel => panel.IsScenarioDisabled, _ => false)
             .Add(panel => panel.OnSelect, scenario => selected = scenario));
@@ -32,7 +31,7 @@ public sealed class ScenarioBrowserPanelTests : BunitContext
     }
 
     [Fact]
-    public void DisabledOption_IsSelectableButDoesNotLaunch()
+    public void DisabledOption_IsDimmedAndSelectable_ButDoesNotLaunch()
     {
         var disabled = Scenario("locked", "Locked", requiresAdmin: true);
         bool launched = false;
@@ -40,12 +39,15 @@ public sealed class ScenarioBrowserPanelTests : BunitContext
         var cut = Render<ScenarioBrowserPanel>(parameters => parameters
             .Add(panel => panel.Scenarios, [disabled])
             .Add(panel => panel.Selected, disabled)
-            .Add(panel => panel.ElevationReasonId, "reason")
             .Add(panel => panel.IsFavored, _ => false)
             .Add(panel => panel.IsScenarioDisabled, _ => true)
             .Add(panel => panel.OnLaunch, _ => launched = true));
 
-        Assert.Equal("true", cut.Find("[role='option']").GetAttribute("aria-disabled"));
+        var option = cut.Find("[role='option']");
+
+        // The option stays operable (selectable), so it must not be aria-disabled; the muted class is the only cue.
+        Assert.Null(option.GetAttribute("aria-disabled"));
+        Assert.Contains("scenario-browser__option--disabled", option.GetAttribute("class"));
 
         cut.Find(".scenario-detail__launch").Click();
 
@@ -57,12 +59,26 @@ public sealed class ScenarioBrowserPanelTests : BunitContext
     {
         var cut = Render<ScenarioBrowserPanel>(parameters => parameters
             .Add(panel => panel.Scenarios, [])
-            .Add(panel => panel.ElevationReasonId, "reason")
             .Add(panel => panel.IsFavored, _ => false)
             .Add(panel => panel.IsScenarioDisabled, _ => false));
 
         Assert.NotEmpty(cut.FindAll(".scenario-browser__empty"));
         Assert.Empty(cut.FindAll(".scenario-detail"));
+    }
+
+    [Fact]
+    public void OfflineScenario_ShowsUnavailableNoteFromLivePresenceFunc()
+    {
+        var scenario = Scenario("offline", "Offline");
+
+        var cut = Render<ScenarioBrowserPanel>(parameters => parameters
+            .Add(panel => panel.Scenarios, [scenario])
+            .Add(panel => panel.Selected, scenario)
+            .Add(panel => panel.IsFavored, _ => false)
+            .Add(panel => panel.IsScenarioDisabled, _ => true)
+            .Add(panel => panel.IsLivePresent, _ => false));
+
+        Assert.NotEmpty(cut.FindAll(".scenario-detail__unavailable"));
     }
 
     [Fact]
@@ -73,7 +89,6 @@ public sealed class ScenarioBrowserPanelTests : BunitContext
         var cut = Render<ScenarioBrowserPanel>(parameters => parameters
             .Add(panel => panel.Scenarios, scenarios)
             .Add(panel => panel.Selected, scenarios[0])
-            .Add(panel => panel.ElevationReasonId, "reason")
             .Add(panel => panel.IsFavored, _ => false)
             .Add(panel => panel.IsScenarioDisabled, _ => false));
 
@@ -93,7 +108,6 @@ public sealed class ScenarioBrowserPanelTests : BunitContext
         var cut = Render<ScenarioBrowserPanel>(parameters => parameters
             .Add(panel => panel.Scenarios, scenarios)
             .Add(panel => panel.Selected, scenarios[0])
-            .Add(panel => panel.ElevationReasonId, "reason")
             .Add(panel => panel.IsFavored, _ => false)
             .Add(panel => panel.IsScenarioDisabled, _ => false)
             .Add(panel => panel.OnSelect, scenario => selected = scenario));
@@ -111,7 +125,6 @@ public sealed class ScenarioBrowserPanelTests : BunitContext
         var cut = Render<ScenarioBrowserPanel>(parameters => parameters
             .Add(panel => panel.Scenarios, scenarios)
             .Add(panel => panel.Selected, scenarios[1])
-            .Add(panel => panel.ElevationReasonId, "reason")
             .Add(panel => panel.IsFavored, _ => false)
             .Add(panel => panel.IsScenarioDisabled, _ => false));
 

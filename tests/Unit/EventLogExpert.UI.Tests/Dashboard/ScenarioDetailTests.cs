@@ -18,8 +18,7 @@ public sealed class ScenarioDetailTests : BunitContext
     public void AdminBadge_WhenNotRequiresAdmin_IsAbsent()
     {
         var cut = Render<ScenarioDetail>(parameters => parameters
-            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
-            .Add(detail => detail.ElevationReasonId, "reason"));
+            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes")));
 
         Assert.Empty(cut.FindAll(".scenario-detail__admin-badge"));
     }
@@ -31,12 +30,11 @@ public sealed class ScenarioDetailTests : BunitContext
             .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes") with
             {
                 RequiresAdmin = true
-            })
-            .Add(detail => detail.ElevationReasonId, "reason"));
+            }));
 
         var badge = cut.Find(".scenario-detail__admin-badge");
 
-        Assert.Contains("Requires administrator", badge.TextContent);
+        Assert.Contains("Live launch requires administrator", badge.TextContent);
         Assert.NotEmpty(cut.FindAll(".scenario-detail__admin-badge .bi-shield-lock"));
     }
 
@@ -47,8 +45,7 @@ public sealed class ScenarioDetailTests : BunitContext
             .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes") with
             {
                 Channels = ["Application", "System"]
-            })
-            .Add(detail => detail.ElevationReasonId, "reason"));
+            }));
 
         var values = cut.FindAll(".scenario-detail__fact-value");
 
@@ -59,8 +56,7 @@ public sealed class ScenarioDetailTests : BunitContext
     public void Facts_WhenNoOptionalChannels_OmitsAlsoIfPresentLine()
     {
         var cut = Render<ScenarioDetail>(parameters => parameters
-            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
-            .Add(detail => detail.ElevationReasonId, "reason"));
+            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes")));
 
         Assert.Empty(cut.FindAll(".scenario-detail__fact-muted"));
     }
@@ -73,8 +69,7 @@ public sealed class ScenarioDetailTests : BunitContext
             {
                 Channels = ["Application"],
                 OptionalChannels = ["Setup", "Security"]
-            })
-            .Add(detail => detail.ElevationReasonId, "reason"));
+            }));
 
         Assert.Equal(
             "Also if present: Setup, Security",
@@ -92,8 +87,7 @@ public sealed class ScenarioDetailTests : BunitContext
                     new ScenarioFilterRow(EqualsFilter(EventProperty.Id, "100")),
                     new ScenarioFilterRow(EqualsFilter(EventProperty.Level, "Error"))
                 ]
-            })
-            .Add(detail => detail.ElevationReasonId, "reason"));
+            }));
 
         var lines = cut.FindAll(".scenario-detail__filter");
 
@@ -109,8 +103,7 @@ public sealed class ScenarioDetailTests : BunitContext
             .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes") with
             {
                 Filters = [new ScenarioFilterRow(EqualsFilter(EventProperty.Id, "100"), Color: HighlightColor.Red)]
-            })
-            .Add(detail => detail.ElevationReasonId, "reason"));
+            }));
 
         Assert.Equal("red", cut.Find(".scenario-detail__swatch").GetAttribute("data-highlight"));
     }
@@ -119,8 +112,7 @@ public sealed class ScenarioDetailTests : BunitContext
     public void Filters_WhenEmpty_OmitsFiltersSection()
     {
         var cut = Render<ScenarioDetail>(parameters => parameters
-            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
-            .Add(detail => detail.ElevationReasonId, "reason"));
+            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes")));
 
         Assert.Empty(cut.FindAll(".scenario-detail__filter"));
         Assert.DoesNotContain(
@@ -135,8 +127,7 @@ public sealed class ScenarioDetailTests : BunitContext
             .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes") with
             {
                 Filters = [new ScenarioFilterRow(EqualsFilter(EventProperty.Id, "100"), IsExcluded: true)]
-            })
-            .Add(detail => detail.ElevationReasonId, "reason"));
+            }));
 
         Assert.Equal("Exclude Id == 100", cut.Find(".scenario-detail__filter").TextContent.Trim());
     }
@@ -152,8 +143,7 @@ public sealed class ScenarioDetailTests : BunitContext
                     new ScenarioFilterRow(EqualsFilter(EventProperty.Level, "   ")),
                     new ScenarioFilterRow(EqualsFilter(EventProperty.Id, "100"))
                 ]
-            })
-            .Add(detail => detail.ElevationReasonId, "reason"));
+            }));
 
         var lines = cut.FindAll(".scenario-detail__filter");
 
@@ -162,20 +152,25 @@ public sealed class ScenarioDetailTests : BunitContext
     }
 
     [Fact]
-    public void Launch_WhenDisabled_IsGuardedAndDescribed()
+    public void Launch_WhenAdminGated_IsGuardedAndDescribesAdminBadge()
     {
         bool launched = false;
 
         var cut = Render<ScenarioDetail>(parameters => parameters
-            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
-            .Add(detail => detail.ElevationReasonId, "reason")
+            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes") with
+            {
+                RequiresAdmin = true
+            })
             .Add(detail => detail.IsDisabled, true)
             .Add(detail => detail.OnLaunch, () => launched = true));
 
         var launch = cut.Find(".scenario-detail__launch");
+        var describedBy = launch.GetAttribute("aria-describedby");
 
         Assert.Equal("true", launch.GetAttribute("aria-disabled"));
-        Assert.Equal("reason", launch.GetAttribute("aria-describedby"));
+        Assert.False(string.IsNullOrEmpty(describedBy));
+        Assert.Contains("administrator", cut.Find($"#{describedBy}").TextContent, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(cut.FindAll(".scenario-detail__unavailable"));
 
         launch.Click();
 
@@ -189,12 +184,46 @@ public sealed class ScenarioDetailTests : BunitContext
 
         var cut = Render<ScenarioDetail>(parameters => parameters
             .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
-            .Add(detail => detail.ElevationReasonId, "reason")
             .Add(detail => detail.OnLaunch, () => launched = true));
 
         cut.Find(".scenario-detail__launch").Click();
 
         Assert.True(launched);
+    }
+
+    [Fact]
+    public void Launch_WhenOffline_IsGuardedAndDescribesUnavailableNote()
+    {
+        bool launched = false;
+
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
+            .Add(detail => detail.IsDisabled, true)
+            .Add(detail => detail.IsLivePresent, false)
+            .Add(detail => detail.OnLaunch, () => launched = true));
+
+        var launch = cut.Find(".scenario-detail__launch");
+        var describedBy = launch.GetAttribute("aria-describedby");
+        var note = cut.Find(".scenario-detail__unavailable");
+
+        Assert.Equal("true", launch.GetAttribute("aria-disabled"));
+        Assert.Equal(note.Id, describedBy);
+        Assert.Contains("Open from folder", note.TextContent);
+
+        launch.Click();
+
+        Assert.False(launched);
+    }
+
+    [Fact]
+    public void OfflineNote_WhenLivePresent_IsAbsent()
+    {
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
+            .Add(detail => detail.IsDisabled, true)
+            .Add(detail => detail.IsLivePresent, true));
+
+        Assert.Empty(cut.FindAll(".scenario-detail__unavailable"));
     }
 
     [Fact]
@@ -204,7 +233,6 @@ public sealed class ScenarioDetailTests : BunitContext
 
         var cut = Render<ScenarioDetail>(parameters => parameters
             .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
-            .Add(detail => detail.ElevationReasonId, "reason")
             .Add(detail => detail.OnLaunchFromFolder, () => launched = true));
 
         cut.Find(".scenario-detail__open-folder").Click();
@@ -213,15 +241,16 @@ public sealed class ScenarioDetailTests : BunitContext
     }
 
     [Fact]
-    public void OpenFromFolder_WhenLiveLaunchAdminDisabled_StaysAvailable()
+    public void OpenFromFolder_WhenOffline_StaysAvailable()
     {
         bool launched = false;
 
-        // Opening exported files from a folder needs no elevation, so the folder action ignores the live-launch admin gate.
+        // Opening exported files from a folder needs no elevation and no local channel, so the folder action stays
+        // available even when the live Launch is disabled because the log is not on this computer.
         var cut = Render<ScenarioDetail>(parameters => parameters
             .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
-            .Add(detail => detail.ElevationReasonId, "reason")
             .Add(detail => detail.IsDisabled, true)
+            .Add(detail => detail.IsLivePresent, false)
             .Add(detail => detail.OnLaunchFromFolder, () => launched = true));
 
         var folder = cut.Find(".scenario-detail__open-folder");
@@ -237,8 +266,7 @@ public sealed class ScenarioDetailTests : BunitContext
     public void RendersNamePurposeAndEyebrow()
     {
         var cut = Render<ScenarioDetail>(parameters => parameters
-            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
-            .Add(detail => detail.ElevationReasonId, "reason"));
+            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes")));
 
         Assert.Equal("Application crashes", cut.Find(".scenario-detail__name").TextContent);
         Assert.Equal("Purpose", cut.Find(".scenario-detail__purpose").TextContent);
@@ -252,7 +280,6 @@ public sealed class ScenarioDetailTests : BunitContext
 
         var cut = Render<ScenarioDetail>(parameters => parameters
             .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
-            .Add(detail => detail.ElevationReasonId, "reason")
             .Add(detail => detail.OnToggleFavorite, () => toggled = true));
 
         cut.Find(".scenario-detail__star").Click();
@@ -265,7 +292,6 @@ public sealed class ScenarioDetailTests : BunitContext
     {
         var cut = Render<ScenarioDetail>(parameters => parameters
             .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
-            .Add(detail => detail.ElevationReasonId, "reason")
             .Add(detail => detail.IsFavored, true));
 
         Assert.Equal("true", cut.Find(".scenario-detail__star").GetAttribute("aria-pressed"));

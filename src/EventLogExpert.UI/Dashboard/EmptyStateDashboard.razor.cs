@@ -15,6 +15,7 @@ using EventLogExpert.UI.Modal;
 using Fluxor;
 using Fluxor.Blazor.Web.Components;
 using Microsoft.AspNetCore.Components;
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Dashboard;
@@ -41,6 +42,7 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
     private SplashCategory _activeCategory;
     private List<(SplashCategory Category, string Label, IReadOnlyList<ScenarioDefinition> Scenarios)> _categories = [];
     private bool _isBusy;
+    private LivePresence _livePresence = new(false, FrozenSet<string>.Empty);
     private bool _pendingTabFocus;
     private SidebarTabs<SplashCategory>? _sidebarTabs;
     private IReadOnlyList<ScenarioDefinition>? _splashScenarios;
@@ -126,7 +128,10 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
     protected override async Task OnInitializedAsync()
     {
-        _splashScenarios = await Task.Run(ScenarioQuery.GetSplashScenarios);
+        // Both the catalog and the host channel set are read once, off the UI thread; the presence snapshot warms the
+        // probe cache that GetSplashScenarios no longer touches now that it returns the full catalog.
+        (_splashScenarios, _livePresence) = await Task.Run(
+            () => (ScenarioQuery.GetSplashScenarios(), ScenarioQuery.GetLivePresence()));
         RebuildCategories();
 
         if (_categories.Count > 0 && !_categories.Any(category => category.Category.Equals(_activeCategory)))
@@ -187,7 +192,13 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
     private bool IsFavored(ScenarioDefinition scenario) =>
         ScenarioFavorites.Value.FavoriteScenarioIds.Contains(scenario.Id);
 
-    private bool IsScenarioDisabled(ScenarioDefinition scenario) => scenario.RequiresAdmin && !Version.IsAdmin;
+    // A scenario is "live present" when the host exposes one of its channels. When the channel set could not be read
+    // (Unknown), every scenario stays launchable so a probe failure never falsely reports a scenario offline.
+    private bool IsLivePresent(ScenarioDefinition scenario) =>
+        !_livePresence.Known || scenario.Channels.Any(_livePresence.Present.Contains);
+
+    private bool IsScenarioDisabled(ScenarioDefinition scenario) =>
+        (scenario.RequiresAdmin && !Version.IsAdmin) || !IsLivePresent(scenario);
 
     private Task LaunchScenarioAsync(ScenarioDefinition scenario) =>
         RunGuardedAsync(async () =>

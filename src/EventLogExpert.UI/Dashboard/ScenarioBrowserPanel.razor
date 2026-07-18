@@ -8,9 +8,7 @@
         <ul aria-label="Scenarios" class="scenario-browser__list" @onkeydown="OnListKeyDownAsync" role="listbox">
             @foreach (var scenario in Scenarios)
             {
-                <li aria-describedby="@(IsScenarioDisabled(scenario) ? ElevationReasonId : null)"
-                    aria-disabled="@(IsScenarioDisabled(scenario) ? "true" : "false")"
-                    aria-selected="@(IsSelected(scenario) ? "true" : "false")"
+                <li aria-selected="@(IsSelected(scenario) ? "true" : "false")"
                     class="@OptionClass(scenario)"
                     @onclick="() => OnSelect.InvokeAsync(scenario)"
                     @ref="_optionRefs[scenario.Id]"
@@ -28,10 +26,10 @@
         <div class="scenario-browser__detail">
             @if (Selected is not null)
             {
-                <ScenarioDetail ElevationReasonId="@ElevationReasonId"
-                    IsBusy="IsBusy"
+                <ScenarioDetail IsBusy="IsBusy"
                     IsDisabled="IsScenarioDisabled(Selected)"
                     IsFavored="IsFavored(Selected)"
+                    IsLivePresent="IsLivePresent(Selected)"
                     OnLaunch="() => OnLaunch.InvokeAsync(Selected)"
                     OnLaunchFromFolder="() => OnLaunchFromFolder.InvokeAsync(Selected)"
                     OnToggleFavorite="() => OnToggleFavorite.InvokeAsync(Selected)"
