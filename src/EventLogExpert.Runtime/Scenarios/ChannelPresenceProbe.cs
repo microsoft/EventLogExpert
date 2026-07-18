@@ -29,7 +29,13 @@ internal sealed class ChannelPresenceProbe : IChannelPresenceProbe
         _readChannels = readChannels;
     }
 
-    public IReadOnlySet<string> GetPresentChannels()
+    public IReadOnlySet<string> GetPresentChannels() => TryGetPresentChannels() ?? s_empty;
+
+    public bool IsPresent(string logName) => GetPresentChannels().Contains(logName);
+
+    public Task PrimeAsync() => Task.Run(GetPresentChannels);
+
+    public IReadOnlySet<string>? TryGetPresentChannels()
     {
         var cached = _cache;
 
@@ -46,17 +52,13 @@ internal sealed class ChannelPresenceProbe : IChannelPresenceProbe
             // A failed read is not cached, so the next read retries.
             if (loaded is not null) { _cache = loaded; }
 
-            return loaded ?? s_empty;
+            return loaded;
         }
         finally
         {
             _gate.Release();
         }
     }
-
-    public bool IsPresent(string logName) => GetPresentChannels().Contains(logName);
-
-    public Task PrimeAsync() => Task.Run(GetPresentChannels);
 
     private IReadOnlySet<string>? TryReadChannels()
     {

@@ -57,5 +57,26 @@ public sealed class ChannelPresenceProbeTests
         Assert.False(probe.IsPresent("Application"));
     }
 
+    [Fact]
+    public void TryGetPresentChannels_WhenReadFails_ReturnsNull()
+    {
+        var probe = new ChannelPresenceProbe(
+            Logger(),
+            static () => throw new InvalidOperationException("event log service unavailable"));
+
+        Assert.Null(probe.TryGetPresentChannels());
+    }
+
+    [Fact]
+    public void TryGetPresentChannels_WhenReadSucceeds_ReturnsChannels()
+    {
+        var probe = new ChannelPresenceProbe(Logger(), static () => ["System", "Security"]);
+
+        var channels = probe.TryGetPresentChannels();
+
+        Assert.NotNull(channels);
+        Assert.Contains("System", channels);
+    }
+
     private static ITraceLogger Logger() => Substitute.For<ITraceLogger>();
 }

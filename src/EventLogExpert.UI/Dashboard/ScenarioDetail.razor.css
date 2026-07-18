@@ -94,6 +94,13 @@
     color: var(--clr-yellow);
 }
 
+.scenario-detail__unavailable {
+    margin: 0.35rem 0 0;
+    font-size: 0.85rem;
+    line-height: 1.35;
+    color: var(--text-secondary);
+}
+
 .scenario-detail__filter {
     display: flex;
     align-items: center;

@@ -27,24 +27,44 @@
     <section aria-labelledby="empty-dashboard-quickstart-heading" class="empty-dashboard__section">
         <h2 class="empty-dashboard__heading" id="empty-dashboard-quickstart-heading">Quick Launch</h2>
         <div class="empty-dashboard__launchbar">
-            <ChromelessButton aria-label="Open Application + System (live)" CssClass="empty-dashboard__launch empty-dashboard__launch--primary" Disabled="@_isBusy" IconClass="bi bi-collection" OnClick="OpenApplicationAndSystemAsync">
+            <ChromelessButton aria-label="Open Application + System (live)"
+                CssClass="empty-dashboard__launch empty-dashboard__launch--primary"
+                Disabled="@_isBusy"
+                IconClass="bi bi-collection"
+                OnClick="OpenApplicationAndSystemAsync">
                 <span>Application + System (live)</span>
             </ChromelessButton>
-            <ChromelessButton aria-label="Open Application (live)" CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-window" OnClick="OpenApplicationAsync">
+            <ChromelessButton aria-label="Open Application (live)"
+                CssClass="empty-dashboard__launch"
+                Disabled="@_isBusy"
+                IconClass="bi bi-window"
+                OnClick="OpenApplicationAsync">
                 <span>Application (live)</span>
             </ChromelessButton>
-            <ChromelessButton aria-label="Open System (live)" CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-pc-display" OnClick="OpenSystemAsync">
+            <ChromelessButton aria-label="Open System (live)"
+                CssClass="empty-dashboard__launch"
+                Disabled="@_isBusy"
+                IconClass="bi bi-pc-display"
+                OnClick="OpenSystemAsync">
                 <span>System (live)</span>
             </ChromelessButton>
             @if (Version.IsAdmin)
             {
-                <ChromelessButton aria-label="Open Security (live)" CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-shield-lock" OnClick="OpenSecurityAsync">
+                <ChromelessButton aria-label="Open Security (live)"
+                    CssClass="empty-dashboard__launch"
+                    Disabled="@_isBusy"
+                    IconClass="bi bi-shield-lock"
+                    OnClick="OpenSecurityAsync">
                     <span>Security (live)</span>
                 </ChromelessButton>
             }
             else
             {
-                <ChromelessButton aria-describedby="@ElevationReasonId" aria-disabled="true" aria-label="Open Security (live)" CssClass="empty-dashboard__launch empty-dashboard__launch--disabled" IconClass="bi bi-shield-lock">
+                <ChromelessButton aria-describedby="@ElevationReasonId"
+                    aria-disabled="true"
+                    aria-label="Open Security (live)"
+                    CssClass="empty-dashboard__launch empty-dashboard__launch--disabled"
+                    IconClass="bi bi-shield-lock">
                     <span>Security (live)</span>
                 </ChromelessButton>
             }
@@ -65,15 +85,15 @@
         }
         else if (_categories.Count == 0)
         {
-            <p class="empty-dashboard__empty" role="status">No scenarios are available for this machine.</p>
+            <p class="empty-dashboard__empty" role="status">No scenarios are available.</p>
         }
         else
         {
             <SidebarTabs @bind-ActiveTab="_activeCategory" @ref="_sidebarTabs" TablistAriaLabel="Scenario categories" Tabs="_tabs" TTab="SplashCategory">
                 <TabContent Context="category">
-                    <ScenarioBrowserPanel ElevationReasonId="@ElevationReasonId"
-                        IsBusy="_isBusy"
+                    <ScenarioBrowserPanel IsBusy="_isBusy"
                         IsFavored="IsFavored"
+                        IsLivePresent="IsLivePresent"
                         IsScenarioDisabled="IsScenarioDisabled"
                         OnLaunch="LaunchScenarioAsync"
                         OnLaunchFromFolder="LaunchScenarioFromFolderAsync"

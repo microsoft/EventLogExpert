@@ -305,7 +305,7 @@ public sealed class ScenarioLaunchServiceTests
         });
 
         await menu.Received(1).OpenLogFilesAsync(
-            Arg.Is<IEnumerable<string>>(paths => paths.Single() == "C:\\bundle\\System.evtx"), false);
+            Arg.Is<IEnumerable<string>>(paths => paths != null && paths.Single() == "C:\\bundle\\System.evtx"), false);
     }
 
     [Fact]

@@ -11,15 +11,17 @@ namespace EventLogExpert.UI.Dashboard;
 
 public sealed partial class ScenarioDetail
 {
+    private readonly string _adminBadgeId = ComponentId.NewUnique().Value;
     private readonly string _nameId = ComponentId.NewUnique().Value;
-
-    [Parameter][EditorRequired] public string ElevationReasonId { get; set; } = string.Empty;
+    private readonly string _offlineId = ComponentId.NewUnique().Value;
 
     [Parameter] public bool IsBusy { get; set; }
 
     [Parameter] public bool IsDisabled { get; set; }
 
     [Parameter] public bool IsFavored { get; set; }
+
+    [Parameter] public bool IsLivePresent { get; set; } = true;
 
     [Parameter] public EventCallback OnLaunch { get; set; }
 

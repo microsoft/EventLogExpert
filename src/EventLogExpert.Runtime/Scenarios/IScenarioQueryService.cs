@@ -11,6 +11,9 @@ public interface IScenarioQueryService
     /// <summary>Scenarios whose channels match a currently-loaded log name.</summary>
     IReadOnlyList<ScenarioDefinition> GetInAppScenarios(IReadOnlyCollection<string> loadedLogNames);
 
-    /// <summary>Scenarios with at least one required channel present on the host.</summary>
+    /// <summary>A snapshot of which channels exist on this host, for gating live launches.</summary>
+    LivePresence GetLivePresence();
+
+    /// <summary>Every channel-presence scenario in the catalog, regardless of local availability.</summary>
     IReadOnlyList<ScenarioDefinition> GetSplashScenarios();
 }

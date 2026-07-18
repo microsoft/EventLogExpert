@@ -18,9 +18,9 @@
         @if (Scenario.RequiresAdmin)
         {
             <div class="scenario-detail__fact">
-                <span class="scenario-detail__admin-badge">
+                <span class="scenario-detail__admin-badge" id="@_adminBadgeId">
                     <i aria-hidden="true" class="bi bi-shield-lock"></i>
-                    <span>Requires administrator</span>
+                    <span>Live launch requires administrator.</span>
                 </span>
             </div>
         }
@@ -41,13 +41,19 @@
             </div>
         }
     </div>
+    @if (IsDisabled && !IsLivePresent)
+    {
+        <p class="scenario-detail__unavailable" id="@_offlineId">
+            This log is not on this computer. Use Open from folder to analyze an exported copy.
+        </p>
+    }
     <div class="scenario-detail__actions">
         <ChromelessButton aria-label="@(IsFavored ? $"Remove {Scenario.Name} from favorites" : $"Add {Scenario.Name} to favorites")"
             aria-pressed="@(IsFavored ? "true" : "false")"
             CssClass="scenario-detail__star"
             IconClass="@(IsFavored ? "bi bi-star-fill" : "bi bi-star")"
             OnClick="OnToggleFavorite" />
-        <ChromelessButton aria-describedby="@(IsDisabled ? ElevationReasonId : null)"
+        <ChromelessButton aria-describedby="@((IsDisabled && !IsLivePresent) ? _offlineId : (IsDisabled ? _adminBadgeId : null))"
             aria-disabled="@(IsDisabled ? "true" : "false")"
             CssClass="scenario-detail__launch"
             Disabled="@IsBusy"

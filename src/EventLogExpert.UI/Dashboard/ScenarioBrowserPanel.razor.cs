@@ -17,11 +17,11 @@ public sealed partial class ScenarioBrowserPanel : IAsyncDisposable
     private ElementReference _scenarioBrowserRootRef;
     private IJSObjectReference? _scrollSuppressorModule;
 
-    [Parameter][EditorRequired] public string ElevationReasonId { get; set; } = string.Empty;
-
     [Parameter] public bool IsBusy { get; set; }
 
     [Parameter][EditorRequired] public Func<ScenarioDefinition, bool> IsFavored { get; set; } = static _ => false;
+
+    [Parameter][EditorRequired] public Func<ScenarioDefinition, bool> IsLivePresent { get; set; } = static _ => true;
 
     [Parameter][EditorRequired] public Func<ScenarioDefinition, bool> IsScenarioDisabled { get; set; } = static _ => false;
 
