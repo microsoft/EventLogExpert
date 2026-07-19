@@ -153,7 +153,9 @@ internal sealed class ScenarioLaunchService(
         ScenarioTimelineDimension.Log => HistogramDimension.Log,
         ScenarioTimelineDimension.LogonType => HistogramDimension.LogonType,
         ScenarioTimelineDimension.TicketEncryptionType => HistogramDimension.TicketEncryptionType,
-        ScenarioTimelineDimension.ErrorCode => HistogramDimension.ErrorCode
+        ScenarioTimelineDimension.ErrorCode => HistogramDimension.ErrorCode,
+        ScenarioTimelineDimension.ProcessImage => HistogramDimension.ProcessImage,
+        ScenarioTimelineDimension.ParentProcessImage => HistogramDimension.ParentProcessImage
     };
 #pragma warning restore CS8524
 

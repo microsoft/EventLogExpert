@@ -13,5 +13,7 @@ public enum ScenarioTimelineDimension
     Log,
     LogonType,
     TicketEncryptionType,
-    ErrorCode
+    ErrorCode,
+    ProcessImage,
+    ParentProcessImage
 }

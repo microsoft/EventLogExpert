@@ -46,6 +46,17 @@ public interface IEventColumnView
         int[] slotCounts,
         CancellationToken cancellationToken);
 
+    /// <summary>Group-by EventData string variant keyed on the first usable named candidate field value.</summary>
+    void BucketTimeTicksByEventDataString(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
     /// <summary>Group-by variant keyed on the numeric event id; (targetIds length + 1) slots per bin.</summary>
     void BucketTimeTicksByEventId(
         long minTicks,
@@ -92,6 +103,9 @@ public interface IEventColumnView
         IReadOnlyList<string> userDataErrorCodePaths,
         IDictionary<long, int> counts,
         CancellationToken cancellationToken);
+
+    /// <summary>Tallies this view's rows by the first usable string value from the named EventData candidate fields.</summary>
+    void CountEventDataStringValues(string[] candidateFields, IDictionary<string, int> counts, CancellationToken cancellationToken);
 
     /// <summary>
     ///     Tallies this view's rows by the whole-number code of a named EventData field (accumulating across a combined

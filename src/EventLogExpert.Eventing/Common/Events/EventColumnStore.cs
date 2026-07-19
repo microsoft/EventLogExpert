@@ -7,6 +7,7 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Eventing.Structured;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 
@@ -232,6 +233,8 @@ public sealed class EventColumnStore
         return Count > 0;
     }
 
+    internal static bool IsUsableRawValue([NotNullWhen(true)] string? value) => !string.IsNullOrWhiteSpace(value) && value != "-";
+
     internal void BucketTimeTicksByEventData(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -347,6 +350,74 @@ public sealed class EventColumnStore
 
             int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
             slotCounts[(bucket * slotCount) + SlotForCode(code, targetCodes, otherSlot)]++;
+        }
+    }
+
+    internal void BucketTimeTicksByEventDataString(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        int otherSlot = slotCount - 1;
+        int[][] fieldIndexBySchemaPerCandidate = new int[candidateFields.Length][];
+        for (int candidate = 0; candidate < candidateFields.Length; candidate++) { fieldIndexBySchemaPerCandidate[candidate] = NewSchemaFieldMemo(); }
+
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> timeColumn = chunk.TimeTicksColumn;
+
+            for (int row = 0; row < timeColumn.Length; row++)
+            {
+                if (rankByPhysical[offset + row] < 0) { continue; }
+
+                int slot = otherSlot;
+
+                for (int candidate = 0; candidate < candidateFields.Length; candidate++)
+                {
+                    if (TryGetSealedEventDataString(chunk, row, candidateFields[candidate], fieldIndexBySchemaPerCandidate[candidate], out string? raw)
+                        && IsUsableRawValue(raw))
+                    {
+                        slot = rawValueToSlot.GetValueOrDefault(raw, otherSlot);
+
+                        break;
+                    }
+                }
+
+                int bucket = ToBucket(timeColumn[row], minTicks, bucketSpanTicks, bucketCount);
+                slotCounts[(bucket * slotCount) + slot]++;
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+            int slot = otherSlot;
+
+            for (int candidate = 0; candidate < candidateFields.Length; candidate++)
+            {
+                if (TryGetPendingEventDataString(pending, candidateFields[candidate], out string? raw) && IsUsableRawValue(raw))
+                {
+                    slot = rawValueToSlot.GetValueOrDefault(raw, otherSlot);
+                    break;
+                }
+            }
+
+            int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
+            slotCounts[(bucket * slotCount) + slot]++;
         }
     }
 
@@ -727,6 +798,54 @@ public sealed class EventColumnStore
                 || TryGetPendingUserDataHResult(pending, userDataErrorCodePaths, out code))
             {
                 counts[code] = counts.TryGetValue(code, out int existing) ? existing + 1 : 1;
+            }
+        }
+    }
+
+    internal void CountEventDataStringValues(ReadOnlySpan<int> rankByPhysical, string[] candidateFields, IDictionary<string, int> counts, CancellationToken cancellationToken)
+    {
+        int[][] fieldIndexBySchemaPerCandidate = new int[candidateFields.Length][];
+        for (int candidate = 0; candidate < candidateFields.Length; candidate++) { fieldIndexBySchemaPerCandidate[candidate] = NewSchemaFieldMemo(); }
+
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> timeColumn = chunk.TimeTicksColumn;
+
+            for (int row = 0; row < timeColumn.Length; row++)
+            {
+                if (rankByPhysical[offset + row] < 0) { continue; }
+
+                for (int candidate = 0; candidate < candidateFields.Length; candidate++)
+                {
+                    if (TryGetSealedEventDataString(chunk, row, candidateFields[candidate], fieldIndexBySchemaPerCandidate[candidate], out string? raw)
+                        && IsUsableRawValue(raw))
+                    {
+                        counts[raw] = counts.TryGetValue(raw, out int existing) ? existing + 1 : 1;
+                        break;
+                    }
+                }
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+
+            for (int candidate = 0; candidate < candidateFields.Length; candidate++)
+            {
+                if (TryGetPendingEventDataString(pending, candidateFields[candidate], out string? raw) && IsUsableRawValue(raw))
+                {
+                    counts[raw] = counts.TryGetValue(raw, out int existing) ? existing + 1 : 1;
+                    break;
+                }
             }
         }
     }
@@ -1355,6 +1474,24 @@ public sealed class EventColumnStore
         return false;
     }
 
+    private static bool TryGetPendingEventDataString(ResolvedEvent pending, string fieldName, out string? value)
+    {
+        // Count only genuine native-string values: a property whose raw reference is actually a string. This mirrors the
+        // sealed gate (StoredFieldKind.String only). An exotic reference - e.g. an EvtHandle - renders as
+        // EventFieldValueKind.String via FromProperty's stringify fallback yet seals as StringForm, so keying on the raw
+        // reference (not the rendered EventFieldValue kind) keeps the live and sealed groupings in exact lockstep.
+        if (pending.EventData.TryGetRawValue(fieldName, out EventProperty property) && property.Reference is string text)
+        {
+            value = text;
+
+            return true;
+        }
+
+        value = null;
+
+        return false;
+    }
+
     private static bool TryGetPendingUserDataHResult(ResolvedEvent pending, IReadOnlyList<string> userDataErrorCodePaths, out long code)
     {
         if (!pending.UserData.IsDefaultOrEmpty)
@@ -1668,6 +1805,45 @@ public sealed class EventColumnStore
 
         // A zero code is success (S_OK); the ErrorCode dimension charts failures only, so it is dropped like an absent field.
         return TryGetHResult32FromRawField(chunk.RowEventDataField(row, fieldIndex), out code) && code != 0;
+    }
+
+    private bool TryGetSealedEventDataString(EventColumnChunk chunk, int row, string fieldName, int[] fieldIndexBySchema, out string? value)
+    {
+        int schemaId = chunk.RowEventDataSchemaId(row);
+
+        if ((uint)schemaId >= (uint)fieldIndexBySchema.Length) { value = null; return false; }
+
+        int fieldIndex = fieldIndexBySchema[schemaId];
+
+        if (fieldIndex == SchemaFieldUnresolved)
+        {
+            fieldIndex = ResolveSchemaFieldIndex(schemaId, fieldName);
+            fieldIndexBySchema[schemaId] = fieldIndex;
+        }
+
+        if (fieldIndex < 0 || fieldIndex >= chunk.RowEventDataCount(row))
+        {
+            value = null;
+
+            return false;
+        }
+
+        RawEventDataField field = chunk.RowEventDataField(row, fieldIndex);
+
+        if (field.Kind == StoredFieldKind.String)
+        {
+            // Only a genuine native-string property seals as StoredFieldKind.String (EventColumnChunk's `case string`).
+            // The pending gate mirrors this by requiring the raw property reference to be a string, so a non-string
+            // reference - which renders as EventFieldValueKind.String via FromProperty's stringify fallback yet seals as
+            // StringForm - is excluded on BOTH sides and the live and sealed groupings stay identical.
+            value = PoolGet(field.RefIndex);
+
+            return true;
+        }
+
+        value = null;
+
+        return false;
     }
 
     private bool TryGetSealedUserDataHResult(EventColumnChunk chunk, int row, ReadOnlySpan<int> targetPathIndices, out long code)

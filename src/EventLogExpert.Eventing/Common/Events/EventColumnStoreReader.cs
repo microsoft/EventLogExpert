@@ -86,6 +86,29 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         _store.BucketTimeTicksByEventDataHResult(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, fieldName, eligibleProviders, userDataErrorCodePaths, targetCodes, slotCount, slotCounts, cancellationToken);
     }
 
+    public void BucketTimeTicksByEventDataString(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(candidateFields);
+        ArgumentNullException.ThrowIfNull(rawValueToSlot);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketSpanTicks, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketCount, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCount, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, bucketCount * slotCount);
+
+        _store.BucketTimeTicksByEventDataString(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, candidateFields, rawValueToSlot, slotCount, slotCounts, cancellationToken);
+    }
+
     public void BucketTimeTicksByEventId(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -224,6 +247,15 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
 
         _store.CountEventDataHResults(rankByPhysical, fieldName, eligibleProviders, userDataErrorCodePaths, counts, cancellationToken);
+    }
+
+    public void CountEventDataStringValues(ReadOnlySpan<int> rankByPhysical, string[] candidateFields, IDictionary<string, int> counts, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(candidateFields);
+        ArgumentNullException.ThrowIfNull(counts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        _store.CountEventDataStringValues(rankByPhysical, candidateFields, counts, cancellationToken);
     }
 
     public void CountEventDataValues(ReadOnlySpan<int> rankByPhysical, string fieldName, IDictionary<long, int> counts, CancellationToken cancellationToken)

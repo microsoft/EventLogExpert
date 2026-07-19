@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Eventing.Common.Events;
 
@@ -40,7 +41,7 @@ public readonly struct EventDataView
     {
         if (fieldName is not null
             && TryGetOrdering(out FieldNameOrdering ordering)
-            && _schema!.TryGetIndex(ordering, fieldName, out int index)
+            && _schema.TryGetIndex(ordering, fieldName, out int index)
             && (uint)index < (uint)_values.Length)
         {
             value = EventFieldValue.FromProperty(_values[index]);
@@ -49,6 +50,23 @@ public readonly struct EventDataView
         }
 
         value = default;
+
+        return false;
+    }
+
+    internal bool TryGetRawValue(string? fieldName, out EventProperty property)
+    {
+        if (fieldName is not null
+            && TryGetOrdering(out FieldNameOrdering ordering)
+            && _schema.TryGetIndex(ordering, fieldName, out int index)
+            && (uint)index < (uint)_values.Length)
+        {
+            property = _values[index];
+
+            return true;
+        }
+
+        property = default;
 
         return false;
     }
@@ -77,6 +95,7 @@ public readonly struct EventDataView
     private ImmutableArray<string> OrderingNames(FieldNameOrdering ordering) =>
         ordering == FieldNameOrdering.Visible ? _schema!.VisibleNames : _schema!.AllNames;
 
+    [MemberNotNullWhen(true, nameof(_schema))]
     private bool TryGetOrdering(out FieldNameOrdering ordering)
     {
         if (_schema is not null && !_values.IsDefaultOrEmpty)

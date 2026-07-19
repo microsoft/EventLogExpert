@@ -536,6 +536,8 @@ public sealed class ScenarioLaunchServiceTests
     [InlineData(ScenarioTimelineDimension.LogonType, HistogramDimension.LogonType)]
     [InlineData(ScenarioTimelineDimension.TicketEncryptionType, HistogramDimension.TicketEncryptionType)]
     [InlineData(ScenarioTimelineDimension.ErrorCode, HistogramDimension.ErrorCode)]
+    [InlineData(ScenarioTimelineDimension.ProcessImage, HistogramDimension.ProcessImage)]
+    [InlineData(ScenarioTimelineDimension.ParentProcessImage, HistogramDimension.ParentProcessImage)]
     public void MapTimelineDimension_MapsEveryScenarioDimension(
         ScenarioTimelineDimension dimension,
         HistogramDimension expected)

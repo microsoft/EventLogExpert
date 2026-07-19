@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.TestUtils;
 
 namespace EventLogExpert.Eventing.Tests.Common.Events;
@@ -11,7 +12,6 @@ namespace EventLogExpert.Eventing.Tests.Common.Events;
 public sealed class EventColumnStoreEventDataTests
 {
     private const string WuClient = "Microsoft-Windows-WindowsUpdateClient";
-
     private static readonly EventLogId s_logId = EventLogId.Create();
     private static readonly string[] s_updateProviders = [WuClient, "Microsoft-Windows-Servicing"];
     private static readonly string[] s_errorCodeUserDataPaths = ["CbsPackageChangeState/ErrorCode", "CbsUpdateChangeState/ErrorCode"];
@@ -125,6 +125,33 @@ public sealed class EventColumnStoreEventDataTests
         // The eligible-index buffer is stack-allocated and the schema memo is a fixed per-scan array, so the per-row path is
         // allocation-free; a single per-row byte would cost 8192.
         Assert.True(delta < 512, $"Per-row allocation detected: {delta} bytes over {events.Length} sealed rows.");
+    }
+
+    [Fact]
+    public void BucketTimeTicksByEventDataString_UsesSameCandidateSelectionAsCounts()
+    {
+        IEventColumnReader reader = ReaderFor(
+            ProcessEvent(("NewProcessName", @"C:\Windows\System32\rundll32.exe")),
+            ProcessEvent(("NewProcessName", "-"), ("Image", @"C:\temp\evil.exe")),
+            ProcessEvent(("NewProcessName", @"C:\tools\rare.exe")),
+            ProcessEvent(("NewProcessName", "-")));
+        string[] candidateFields = ["NewProcessName", "Image"];
+
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        reader.CountEventDataStringValues(AllSurvive(reader.Count), candidateFields, counts, CancellationToken.None);
+
+        var rawValueToSlot = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            [@"C:\Windows\System32\rundll32.exe"] = 0,
+            [@"C:\temp\evil.exe"] = 1
+        };
+        int[] slotCounts = new int[3];
+        reader.BucketTimeTicksByEventDataString(AllSurvive(reader.Count), 0, long.MaxValue, 1, candidateFields, rawValueToSlot, slotCount: 3, slotCounts, CancellationToken.None);
+
+        Assert.Equal(3, counts.Values.Sum());
+        Assert.Equal(1, slotCounts[0]);
+        Assert.Equal(1, slotCounts[1]);
+        Assert.Equal(2, slotCounts[2]);
     }
 
     [Fact]
@@ -311,6 +338,71 @@ public sealed class EventColumnStoreEventDataTests
     }
 
     [Fact]
+    public void CountEventDataStringValues_FallsThroughUnusableOrNonStringCandidates()
+    {
+        IEventColumnReader reader = ReaderFor(
+            ProcessEvent(("NewProcessName", "-"), ("Image", @"C:\x\evil.exe")),
+            ProcessEvent(("NewProcessName", @"C:\x\good.exe"), ("Image", @"C:\x\ignored.exe")),
+            ProcessEvent(("NewProcessName", "  "), ("Image", "-")),
+            ProcessEvent(("NewProcessName", 42L), ("Image", @"C:\x\numeric-fallback.exe")));
+
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        reader.CountEventDataStringValues(AllSurvive(reader.Count), ["NewProcessName", "Image"], counts, CancellationToken.None);
+
+        Assert.Equal(3, counts.Count);
+        Assert.Equal(1, counts[@"C:\x\evil.exe"]);
+        Assert.Equal(1, counts[@"C:\x\good.exe"]);
+        Assert.Equal(1, counts[@"C:\x\numeric-fallback.exe"]);
+        Assert.DoesNotContain("-", counts.Keys);
+        Assert.DoesNotContain(@"C:\x\ignored.exe", counts.Keys);
+    }
+
+    [Fact]
+    public void CountEventDataStringValues_NonStringReferenceRejectedConsistently()
+    {
+        // An exotic EventData reference (a boxed Int64 here; EvtVariantType.Handle -> EvtHandle in the wild) renders as
+        // EventFieldValueKind.String while the row is pending (FromProperty stringifies unrecognized references) but seals
+        // as StoredFieldKind.StringForm. The dimension groups only genuine native strings, so such a value must be rejected
+        // on BOTH paths - never grouped in the live view and then dropped (or the reverse) once its chunk seals.
+        ResolvedEvent schemaCarrier = new ResolvedEvent("TestLog", LogPathType.Channel) { Id = 4688, TimeCreated = new DateTime(0, DateTimeKind.Utc) }
+            .WithEventData(("NewProcessName", "placeholder"));
+        ResolvedEvent exoticReferenceEvent = schemaCarrier with { EventDataValues = [EventProperty.FromReference(42L)] };
+
+        foreach (bool sealRows in new[] { true, false })
+        {
+            EventColumnStore store = sealRows
+                ? EventColumnStore.Build([exoticReferenceEvent], generation: 0, contentVersion: 0)
+                : EventColumnStore.Build([], generation: 0, contentVersion: 0).Append([exoticReferenceEvent]);
+            IEventColumnReader reader = store.CreateReader(s_logId);
+
+            var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+            reader.CountEventDataStringValues(AllSurvive(reader.Count), ["NewProcessName", "Image"], counts, CancellationToken.None);
+
+            Assert.Empty(counts);
+        }
+    }
+
+    [Fact]
+    public void CountEventDataStringValues_SealedAndPendingNativeStringsMatch()
+    {
+        ResolvedEvent[] events = [ProcessEvent(("NewProcessName", @"C:\Windows\System32\cmd.exe"))];
+
+        foreach (bool sealRows in new[] { true, false })
+        {
+            EventColumnStore store = sealRows
+                ? EventColumnStore.Build(events, generation: 0, contentVersion: 0)
+                : EventColumnStore.Build([], generation: 0, contentVersion: 0).Append(events);
+            IEventColumnReader reader = store.CreateReader(s_logId);
+
+            var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+            reader.CountEventDataStringValues(AllSurvive(reader.Count), ["NewProcessName", "Image"], counts, CancellationToken.None);
+
+            Assert.Single(counts);
+            Assert.Equal(1, counts[@"C:\Windows\System32\cmd.exe"]);
+        }
+    }
+
+    [Fact]
     public void CountEventDataValues_FoldsDecimalAndHexSpellingsOfOneCode()
     {
         IEventColumnReader reader = ReaderFor(
@@ -405,6 +497,10 @@ public sealed class EventColumnStoreEventDataTests
 
     private static ResolvedEvent EventWithoutData() =>
         new("TestLog", LogPathType.Channel) { Id = 4624, TimeCreated = new DateTime(0, DateTimeKind.Utc) };
+
+    private static ResolvedEvent ProcessEvent(params (string Name, object? Value)[] fields) =>
+        new ResolvedEvent("TestLog", LogPathType.Channel) { Id = 4688, TimeCreated = new DateTime(0, DateTimeKind.Utc) }
+            .WithEventData(fields);
 
     private static IEventColumnReader ReaderFor(params ResolvedEvent[] events) =>
         EventColumnStore.Build(events, generation: 0, contentVersion: 0).CreateReader(s_logId);

@@ -298,6 +298,120 @@ public sealed class HistogramBuilderTests
     }
 
     [Fact]
+    public void Build_GroupByParentProcessImage_UsesParentImageCandidates()
+    {
+        var view = DisplayViewTestFactory.Build(
+            s_logId,
+            [
+                ProcessImageEvent(0, ("ParentProcessName", "-"), ("ParentImage", @"C:\Office\WINWORD.EXE")),
+                ProcessImageEvent(1, ("ParentProcessName", @"C:\Office\EXCEL.EXE"), ("ParentImage", @"C:\ignored.exe"))
+            ]);
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ParentProcessImage, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal("excel.exe", data.Groups[1].Label);
+        Assert.Equal("cat:excel.exe", data.Groups[1].Key);
+        Assert.Equal("winword.exe", data.Groups[2].Label);
+        Assert.Equal(2, data.Total);
+    }
+
+    [Fact]
+    public void Build_GroupByProcessImage_FieldAbsentFromView_SignalsEmptyState()
+    {
+        var view = DisplayViewTestFactory.Build(
+            s_logId,
+            [
+                ProcessImageEvent(0, ("NewProcessName", "-"), ("Image", " ")),
+                ProcessImageEvent(1, ("NewProcessName", "  "))
+            ]);
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ProcessImage, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.True(data.GroupingFieldAbsent);
+        Assert.Empty(data.Groups);
+        Assert.Equal(2, data.Total);
+    }
+
+    [Fact]
+    public void Build_GroupByProcessImage_FoldsRawPathsByShortName()
+    {
+        var view = DisplayViewTestFactory.Build(
+            s_logId,
+            [
+                ProcessImageEvent(0, ("NewProcessName", @"C:\Windows\System32\RUNDLL32.EXE")),
+                ProcessImageEvent(1, ("NewProcessName", @"C:\temp\rundll32.exe"))
+            ]);
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ProcessImage, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal(2, data.Groups.Count);
+        Assert.Equal("rundll32.exe", data.Groups[1].Label);
+        Assert.Equal("cat:rundll32.exe", data.Groups[1].Key);
+        Assert.Equal(2, GroupTotal(data, 1));
+    }
+
+    [Fact]
+    public void Build_GroupByProcessImage_HandlesSlashesQuotesAndTrailingSeparators()
+    {
+        var view = DisplayViewTestFactory.Build(
+            s_logId,
+            [
+                ProcessImageEvent(0, ("NewProcessName", "/opt/tools/CMD.EXE")),
+                ProcessImageEvent(1, ("NewProcessName", "\"C:\\Program Files\\PowerShell\\PowerShell.EXE\"")),
+                ProcessImageEvent(2, ("NewProcessName", @"C:\"))
+            ]);
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ProcessImage, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Contains(data.Groups, group => group.Label == "cmd.exe");
+        Assert.Contains(data.Groups, group => group.Label == "powershell.exe");
+        Assert.Equal(1, GroupTotal(data, 0));
+        Assert.Equal(3, data.Total);
+    }
+
+    [Fact]
+    public void Build_GroupByProcessImage_RoutesToNewProcessNameThenImage()
+    {
+        var view = DisplayViewTestFactory.Build(
+            s_logId,
+            [
+                ProcessImageEvent(0, ("NewProcessName", "-"), ("Image", @"C:\Windows\System32\NOTEPAD.EXE"))
+            ]);
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ProcessImage, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.False(data.GroupingFieldAbsent);
+        Assert.Equal("notepad.exe", data.Groups[1].Label);
+        Assert.Equal(1, data.Total);
+    }
+
+    [Fact]
+    public void Build_GroupByProcessImage_TopNamesKeepOtherBand()
+    {
+        var view = DisplayViewTestFactory.Build(
+            s_logId,
+            ProcessImageEvents(
+                (@"C:\a\alpha.exe", 5),
+                (@"C:\b\bravo.exe", 4),
+                (@"C:\c\charlie.exe", 3),
+                (@"C:\d\delta.exe", 2),
+                (@"C:\e\echo.exe", 1)));
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ProcessImage, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data.Groups.Count);
+        Assert.DoesNotContain(data.Groups, group => group.Label == "echo.exe");
+        Assert.Equal(1, GroupTotal(data, 0));
+        Assert.Equal(15, data.Total);
+    }
+
+    [Fact]
     public void Build_GroupBySource_FoldsValuesBeyondTheTopCapIntoOther()
     {
         var events = SourceEvents(("s1", 5), ("s2", 4), ("s3", 3), ("s4", 2), ("s5", 1), ("s6", 1));
@@ -488,6 +602,29 @@ public sealed class HistogramBuilderTests
                     Id = 0,
                     TimeCreated = new DateTime(ticks++, DateTimeKind.Utc)
                 });
+            }
+        }
+
+        return [.. events];
+    }
+
+    private static ResolvedEvent ProcessImageEvent(long ticks, params (string Name, object? Value)[] fields) =>
+        new ResolvedEvent("TestLog", LogPathType.Channel)
+        {
+            Id = 4688,
+            TimeCreated = new DateTime(ticks, DateTimeKind.Utc)
+        }.WithEventData(fields);
+
+    private static ResolvedEvent[] ProcessImageEvents(params (string NewProcessName, int Count)[] groups)
+    {
+        var events = new List<ResolvedEvent>();
+        long ticks = 0;
+
+        foreach ((string newProcessName, int count) in groups)
+        {
+            for (int index = 0; index < count; index++)
+            {
+                events.Add(ProcessImageEvent(ticks++, ("NewProcessName", newProcessName)));
             }
         }
 
