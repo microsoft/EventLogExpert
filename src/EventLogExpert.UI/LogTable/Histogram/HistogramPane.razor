@@ -33,18 +33,21 @@
                         var info = legendData.Groups[group];
                         string key = info.Key;
                         bool shown = !_hiddenGroups.Contains(key);
+                        string highlightText = GroupHighlightText(group);
+                        string accessibleLabel = string.IsNullOrEmpty(highlightText) ? info.Label : $"{info.Label}, {highlightText}";
 
-                        <button aria-pressed="@(shown ? "true" : "false")"
+                        <button aria-label="@(shown ? $"Hide {accessibleLabel}" : $"Show {accessibleLabel}")"
+                            aria-pressed="@(shown ? "true" : "false")"
                             class="histogram-legend-item@(shown ? "" : " histogram-legend-hidden")"
                             @onclick="() => ToggleGroup(key)"
-                            title="@(shown ? $"Hide {info.Label}" : $"Show {info.Label}")"
+                            title="@(shown ? $"Hide {accessibleLabel}" : $"Show {accessibleLabel}")"
                             type="button">
                             <svg aria-hidden="true"
                                 class="histogram-swatch"
                                 focusable="false"
                                 height="9"
                                 width="9">
-                                <rect class="@info.ColorClass" height="9" width="9"></rect>
+                                <rect class="@GroupColorClass(group)" data-highlight="@GroupHighlightCssName(group)" data-stackpos="@group" height="9" width="9"></rect>
                             </svg>@info.Label
                         </button>
                     }
@@ -121,6 +124,11 @@
                             <rect fill="Canvas" height="5" width="5"></rect>
                             <line stroke="CanvasText" stroke-width="1" x1="0" x2="0" y1="0" y2="5"></line>
                         </pattern>
+                        <pattern height="6" id="histogram-hatch-cat-4" patternUnits="userSpaceOnUse" width="6">
+                            <rect fill="Canvas" height="6" width="6"></rect>
+                            <line stroke="CanvasText" stroke-width="1" x1="0" x2="6" y1="0" y2="6"></line>
+                            <line stroke="CanvasText" stroke-width="1" x1="0" x2="6" y1="6" y2="0"></line>
+                        </pattern>
                     </defs>
 
                     @for (int index = 0; index < barCount; index++)
@@ -145,6 +153,8 @@
                                 segmentTop -= height;
 
                                 <rect class="@GroupColorClass(group)"
+                                    data-highlight="@GroupHighlightCssName(group)"
+                                    data-stackpos="@group"
                                     height="@height"
                                     shape-rendering="crispEdges"
                                     width="@barDrawWidth"

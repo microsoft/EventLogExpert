@@ -56,7 +56,7 @@ public sealed class HighlightSelectorTests
     [Fact]
     public void ComputeHighlightKey_WhenCandidatesReordered_ReturnsDifferentKey()
     {
-        // Arrange — GetHighlight is first-match-wins; ordering is load-bearing.
+        // Arrange - GetHighlight is first-match-wins; ordering is load-bearing.
         var first = FilterBuilder.CreateTestFilter(
             FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
@@ -110,7 +110,7 @@ public sealed class HighlightSelectorTests
     [Fact]
     public void ComputeHighlightKey_WhenCompiledReferenceDiffers_ReturnsDifferentKey()
     {
-        // Arrange — key hashes Compiled by reference identity (RuntimeHelpers.GetHashCode).
+        // Arrange - key hashes Compiled by reference identity (RuntimeHelpers.GetHashCode).
         var first = FilterBuilder.CreateTestFilter(
             FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
@@ -250,6 +250,41 @@ public sealed class HighlightSelectorTests
     }
 
     [Fact]
+    public void ComputePredicatePlanKey_WhenOnlyColorChanges_ReturnsSameKey()
+    {
+        var red = FilterBuilder.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+        var blue = red with { Color = HighlightColor.Blue };
+
+        Assert.Equal(
+            s_selector.ComputePredicatePlanKey(ImmutableList.Create(red)),
+            s_selector.ComputePredicatePlanKey(ImmutableList.Create(blue)));
+    }
+
+    [Fact]
+    public void ComputePredicatePlanKey_WhenPredicateOrStateChanges_ReturnsDifferentKey()
+    {
+        var original = FilterBuilder.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+        var predicateChanged = FilterBuilder.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals200,
+            HighlightColor.Red,
+            true);
+        var disabled = original with { IsEnabled = false };
+        var excluded = original with { IsExcluded = true };
+
+        int key = s_selector.ComputePredicatePlanKey(ImmutableList.Create(original));
+
+        Assert.NotEqual(key, s_selector.ComputePredicatePlanKey(ImmutableList.Create(predicateChanged)));
+        Assert.NotEqual(key, s_selector.ComputePredicatePlanKey(ImmutableList.Create(disabled)));
+        Assert.NotEqual(key, s_selector.ComputePredicatePlanKey(ImmutableList.Create(excluded)));
+    }
+
+    [Fact]
     public void Select_ResultIsIdenticalAcrossIsEnabledToggle()
     {
         // Arrange
@@ -308,7 +343,7 @@ public sealed class HighlightSelectorTests
     [Fact]
     public void Select_ShouldPreserveHighlightColorNoneCandidates()
     {
-        // Arrange — None is enum-defined; the downstream GetHighlight loop no-ops it.
+        // Arrange - None is enum-defined; the downstream GetHighlight loop no-ops it.
         var noneColored = FilterBuilder.CreateTestFilter(
             FilterTestConstants.FilterIdEquals100,
             HighlightColor.None,

@@ -57,6 +57,20 @@ public interface IEventColumnReader
         int[] slotCounts,
         CancellationToken cancellationToken);
 
+    void BucketTimeTicksByEventDataHResultWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
     /// <summary>Bucket-by-EventData string variant keyed on the first usable named candidate field value.</summary>
     void BucketTimeTicksByEventDataString(
         ReadOnlySpan<int> rankByPhysical,
@@ -69,9 +83,45 @@ public interface IEventColumnReader
         int[] slotCounts,
         CancellationToken cancellationToken);
 
+    void BucketTimeTicksByEventDataStringWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
+    void BucketTimeTicksByEventDataWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
     /// <summary>Group-by variant keyed on the numeric event id; (<paramref name="targetIds" /> length + 1) slots per bin.</summary>
     void BucketTimeTicksByEventId(
         ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
+    void BucketTimeTicksByEventIdWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
         long minTicks,
         long bucketSpanTicks,
         int bucketCount,
@@ -93,12 +143,34 @@ public interface IEventColumnReader
         int[] slotCounts,
         CancellationToken cancellationToken);
 
+    void BucketTimeTicksByFieldWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventFieldId field,
+        string[] targetValues,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
     /// <summary>
     ///     Additively buckets survivors (rank &gt;= 0) by UTC tick and severity slot; bucket-major
     ///     slotCounts[i*LevelSeverity.SlotCount + slot], out-of-domain ticks clamp to the end buckets.
     /// </summary>
     void BucketTimeTicksBySeverity(
         ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
+    void BucketTimeTicksBySeverityWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
         long minTicks,
         long bucketSpanTicks,
         int bucketCount,

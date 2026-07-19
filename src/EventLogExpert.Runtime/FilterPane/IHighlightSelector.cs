@@ -10,5 +10,7 @@ public interface IHighlightSelector
 {
     int ComputeHighlightKey(ImmutableList<SavedFilter> filters);
 
+    int ComputePredicatePlanKey(ImmutableList<SavedFilter> filters);
+
     SavedFilter[] Select(ImmutableList<SavedFilter> filters);
 }

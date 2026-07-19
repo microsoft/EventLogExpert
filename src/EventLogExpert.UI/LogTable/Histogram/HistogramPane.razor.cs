@@ -2,9 +2,11 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
+using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
@@ -14,6 +16,7 @@ using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
+using System.Collections.Immutable;
 using System.Globalization;
 
 namespace EventLogExpert.UI.LogTable.Histogram;
@@ -58,6 +61,8 @@ public sealed partial class HistogramPane
     private int _scanEpoch;
     private int _segmentGroupCount;
     private int[] _segmentHeights = [];
+    private SavedFilter[] _tieHighlightFilters = [];
+    private int _tiePlanKey;
     private TimeZoneInfo _timeZone = TimeZoneInfo.Utc;
     private int _viewportWidthPx;
     private int[] _visibleGroupCounts = [];
@@ -74,9 +79,13 @@ public sealed partial class HistogramPane
 
     [Inject] private IFilterLensCommands FilterLensCommands { get; init; } = null!;
 
+    [Inject] private IStateSelection<FilterPaneState, ImmutableList<SavedFilter>> Filters { get; init; } = null!;
+
     [Inject] private IFindMarkerSource FindMarkers { get; init; } = null!;
 
     [Inject] private IStateSelection<EventLogState, SelectionEntry?> Focus { get; init; } = null!;
+
+    [Inject] private IHighlightSelector HighlightSelector { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
@@ -169,6 +178,52 @@ public sealed partial class HistogramPane
         ApplyZoom(zoomIn ? ZoomInFactor : ZoomOutFactor, Math.Clamp(cursorFraction, 0, 1));
     }
 
+    internal static (string? CssName, string Description) ResolveGroupHighlight(
+        uint mask,
+        IReadOnlyList<SavedFilter> tieHighlightFilters)
+    {
+        bool hasUncolored = mask == 0 || (mask & 1u) != 0;
+        HighlightColor? winner = null;
+        int distinctColors = 0;
+
+        for (int bit = 1; bit <= 31; bit++)
+        {
+            if ((mask & (1u << bit)) == 0) { continue; }
+
+            if (bit - 1 >= tieHighlightFilters.Count) { return (null, "Mixed highlights"); }
+
+            HighlightColor color = tieHighlightFilters[bit - 1].Color;
+
+            if (color.ToCssName() is null)
+            {
+                hasUncolored = true;
+
+                continue;
+            }
+
+            if (winner is null)
+            {
+                winner = color;
+                distinctColors = 1;
+
+                continue;
+            }
+
+            if (winner.Value != color)
+            {
+                distinctColors++;
+
+                return (null, "Mixed highlights");
+            }
+        }
+
+        if (hasUncolored && distinctColors > 0) { return (null, "Mixed highlights"); }
+
+        return winner is { } highlight && distinctColors == 1
+            ? (highlight.ToCssName(), $"{HighlightColorDisplayName(highlight)} highlight")
+            : (null, "Uncolored");
+    }
+
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
         if (disposing)
@@ -178,6 +233,7 @@ public sealed partial class HistogramPane
             ActiveView.SelectedValueChanged -= OnActiveViewChanged;
             ActiveEventLogId.SelectedValueChanged -= OnActiveEventLogIdChanged;
             DimensionRequest.SelectedValueChanged -= OnDimensionRequestChanged;
+            Filters.SelectedValueChanged -= OnFiltersChanged;
             Focus.SelectedValueChanged -= OnFocusChanged;
             Settings.TimeZoneChanged -= OnTimeZoneChanged;
             FindMarkers.MarksChanged -= OnFindMarksChanged;
@@ -233,10 +289,12 @@ public sealed partial class HistogramPane
         ActiveOriginLog.Select(SelectActiveOriginLog);
         ActiveEventLogId.Select(state => state.ActiveEventLogId);
         Focus.Select(state => state.Focus);
+        Filters.Select(state => state.Filters);
         DimensionRequest.Select(state => state.DimensionRequest);
         ActiveView.SelectedValueChanged += OnActiveViewChanged;
         ActiveEventLogId.SelectedValueChanged += OnActiveEventLogIdChanged;
         Focus.SelectedValueChanged += OnFocusChanged;
+        Filters.SelectedValueChanged += OnFiltersChanged;
         DimensionRequest.SelectedValueChanged += OnDimensionRequestChanged;
         Settings.TimeZoneChanged += OnTimeZoneChanged;
         FindMarkers.MarksChanged += OnFindMarksChanged;
@@ -250,6 +308,7 @@ public sealed partial class HistogramPane
         }
 
         RefreshFindTicks();
+        RefreshTieFilters(rescanOnPredicateChange: false);
 
         base.OnInitialized();
     }
@@ -289,11 +348,44 @@ public sealed partial class HistogramPane
 
     private static string FormatCoordinate(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
+    private static string HighlightColorDisplayName(HighlightColor color)
+    {
+        string name = color.ToString();
+        var parts = new List<string>();
+        int start = 0;
+
+        for (int index = 1; index < name.Length; index++)
+        {
+            if (!char.IsUpper(name[index])) { continue; }
+
+            parts.Add(name[start..index]);
+            start = index;
+        }
+
+        parts.Add(name[start..]);
+
+        string joined = string.Join(" ", parts).ToLowerInvariant();
+
+        return joined.Length == 0 ? joined : char.ToUpperInvariant(joined[0]) + joined[1..];
+    }
+
     private static string? SelectActiveOriginLog(LogTableState state)
     {
         var activeTab = state.EventTables.FirstOrDefault(tab => tab.Id == state.ActiveEventLogId);
 
         return activeTab is { IsCombined: false } ? activeTab.LogName : null;
+    }
+
+    private static bool ShouldArmTie(SavedFilter[] filters)
+    {
+        if (filters.Length is 0 or > 31) { return false; }
+
+        foreach (SavedFilter filter in filters)
+        {
+            if (filter.Color != HighlightColor.None) { return true; }
+        }
+
+        return false;
     }
 
     private void AggregateAndRender(bool syncScrollbar = true)
@@ -553,14 +645,35 @@ public sealed partial class HistogramPane
         {
             int count = bin.GroupCounts[group];
 
-            if (count > 0) { parts.Add($"{count} {data.Groups[group].Label}"); }
+            if (count > 0)
+            {
+                string highlight = GroupHighlightText(group);
+                parts.Add(string.IsNullOrEmpty(highlight)
+                    ? $"{count} {data.Groups[group].Label}"
+                    : $"{count} {data.Groups[group].Label}, {highlight}");
+            }
         }
 
         return parts.Count == 0 ? string.Empty : $" ({string.Join(", ", parts)})";
     }
 
     private string GroupColorClass(int group) =>
+        _baseData is { GroupHighlightMasks: not null } ? "histogram-cat-hl" :
         _baseData is { } data && group < data.Groups.Count ? data.Groups[group].ColorClass : string.Empty;
+
+    private string? GroupHighlightCssName(int group)
+    {
+        if (_baseData?.GroupHighlightMasks is not { } masks || group >= masks.Length) { return null; }
+
+        return ResolveGroupHighlight(masks[group]).CssName;
+    }
+
+    private string GroupHighlightText(int group)
+    {
+        if (_baseData?.GroupHighlightMasks is not { } masks || group >= masks.Length) { return string.Empty; }
+
+        return ResolveGroupHighlight(masks[group]).Description;
+    }
 
     private void HandleKeyDown(KeyboardEventArgs args)
     {
@@ -639,6 +752,9 @@ public sealed partial class HistogramPane
         ApplyDimension(dimension, force: false);
     }
 
+    private void OnFiltersChanged(object? sender, ImmutableList<SavedFilter> filters) =>
+        _ = InvokeAsync(() => RefreshTieFilters(rescanOnPredicateChange: true));
+
     private void OnFindMarksChanged(object? sender, EventArgs args) => _ = InvokeAsync(() =>
     {
         if (_disposed) { return; }
@@ -708,6 +824,31 @@ public sealed partial class HistogramPane
             ? [.. ticks]
             : [];
 
+    private void RefreshTieFilters(bool rescanOnPredicateChange)
+    {
+        ImmutableList<SavedFilter> filters = Filters.Value;
+        SavedFilter[] selected = HighlightSelector.Select(filters);
+        int planKey = HighlightSelector.ComputePredicatePlanKey(filters);
+        bool predicateChanged = planKey != _tiePlanKey || ShouldArmTie(selected) != ShouldArmTie(_tieHighlightFilters);
+
+        _tieHighlightFilters = selected;
+        _tiePlanKey = planKey;
+
+        if (predicateChanged && rescanOnPredicateChange)
+        {
+            StartScan();
+
+            return;
+        }
+
+        if (_binCursor is { } cursor && _render is { } render && cursor < render.Bins.Count)
+        {
+            _binAnnouncement = BinCursorAnnouncement(render.Bins[cursor]);
+        }
+
+        StateHasChanged();
+    }
+
     private string RegionAria() =>
         _baseData is { } data ? HistogramSummary.RegionLabel(data, _timeZone) : "Timeline";
 
@@ -720,14 +861,36 @@ public sealed partial class HistogramPane
             : null;
     }
 
-    private async Task RunScanAsync(IEventColumnView view, HistogramDimension dimension, int epoch, CancellationToken token)
+    private (string? CssName, string Description) ResolveGroupHighlight(uint mask) =>
+        ResolveGroupHighlight(mask, _tieHighlightFilters);
+
+    private async Task RunScanAsync(
+        IEventColumnView view,
+        HistogramDimension dimension,
+        int epoch,
+        SavedFilter[] tieHighlightFilters,
+        int tiePlanKey,
+        bool useHighlightTie,
+        CancellationToken token)
     {
         HistogramData? data;
 
         try
         {
             // Domain is the view's own survivor span, so the bucketer's edge clamp can't pile off-window rows into false spikes.
-            data = await Task.Run(() => HistogramBuilder.Build(view, dimension, HistogramConstants.MaxBuckets, token), token);
+            data = await Task.Run(() =>
+            {
+                token.ThrowIfCancellationRequested();
+
+                if (useHighlightTie)
+                {
+                    byte[] highlightWinners = view.EnsureHighlightWinners(tieHighlightFilters, tiePlanKey, token);
+
+                    return HistogramBuilder.BuildWithHighlightTie(view, dimension, HistogramConstants.MaxBuckets, highlightWinners, token);
+                }
+
+                return HistogramBuilder.Build(view, dimension, HistogramConstants.MaxBuckets, token);
+            }, token);
         }
         catch (OperationCanceledException) { return; }
         catch (Exception e)
@@ -742,6 +905,8 @@ public sealed partial class HistogramPane
             await InvokeAsync(() =>
             {
                 if (_disposed || epoch != _scanEpoch || !ReferenceEquals(view, ActiveView.Value)) { return; }
+
+                if (useHighlightTie && tiePlanKey != _tiePlanKey) { return; }
 
                 _baseData = data;
                 ResolveFocusedTicks();
@@ -859,10 +1024,13 @@ public sealed partial class HistogramPane
         IEventColumnView view = ActiveView.Value;
         int epoch = ++_scanEpoch;
         HistogramDimension dimension = _dimension;
+        SavedFilter[] tieHighlightFilters = _tieHighlightFilters;
+        int tiePlanKey = _tiePlanKey;
+        bool useHighlightTie = ShouldArmTie(tieHighlightFilters);
         var cts = new CancellationTokenSource();
         _scanCts = cts;
 
-        _ = RunScanAsync(view, dimension, epoch, cts.Token);
+        _ = RunScanAsync(view, dimension, epoch, tieHighlightFilters, tiePlanKey, useHighlightTie, cts.Token);
     }
 
     // Invalidate any pan/zoom queued before an explicit navigation reset (undo, Fit, drag-select, tab switch): the higher generation makes their stale, schedule-time-stamped OnHistogramZoomed/OnHistogramPanned invocations no-op. Every caller is followed by a render (immediate sync-scroll render, or the rescan's after a tab switch) that publishes the new token to JS via applyView.

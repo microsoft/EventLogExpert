@@ -16,6 +16,39 @@ public sealed class FilterService : IFilterService
     /// <summary>Outer parallelism only kicks in when the combined work justifies the scheduling overhead.</summary>
     private const int OuterParallelTotalEventThreshold = 10_000;
 
+    public static byte[] ClassifyHighlightWinners(
+        IEventColumnReader reader,
+        IReadOnlyList<int> survivingOrder,
+        IReadOnlyList<SavedFilter> orderedColoredFilters,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+        ArgumentNullException.ThrowIfNull(survivingOrder);
+        ArgumentNullException.ThrowIfNull(orderedColoredFilters);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(orderedColoredFilters.Count, 31);
+
+        ColumnCompiledFilter[] compiledFilters = CompileHighlightColumnFilters(orderedColoredFilters);
+        byte[] winners = new byte[reader.Count];
+
+        foreach (int index in survivingOrder)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            EventLocator locator = reader.LocatorAt(index);
+
+            for (int ordinal = 0; ordinal < compiledFilters.Length; ordinal++)
+            {
+                if (compiledFilters[ordinal].Evaluate(reader, locator) != FilterMatch.Match) { continue; }
+
+                winners[index] = (byte)(ordinal + 1);
+
+                break;
+            }
+        }
+
+        return winners;
+    }
+
     public static IReadOnlyList<int> GetSurvivingOrder(IEventColumnReader reader, Filter filter)
     {
         ArgumentNullException.ThrowIfNull(reader);
@@ -138,6 +171,32 @@ public sealed class FilterService : IFilterService
             }
 
             compiledFilters.Add((columnCompiled, savedFilter.IsExcluded));
+        }
+
+        return compiledFilters;
+    }
+
+    private static ColumnCompiledFilter[] CompileHighlightColumnFilters(IReadOnlyList<SavedFilter> filters)
+    {
+        var compiledFilters = new ColumnCompiledFilter[filters.Count];
+
+        for (int index = 0; index < filters.Count; index++)
+        {
+            SavedFilter savedFilter = filters[index];
+
+            if (savedFilter.Compiled is null)
+            {
+                throw new InvalidOperationException("Highlight classification requires a non-null compiled filter.");
+            }
+
+            if (!FilterCompiler.TryCompileColumn(savedFilter.ComparisonText, out var columnCompiled, out var error))
+            {
+                throw new InvalidOperationException(
+                    $"Filter '{savedFilter.ComparisonText}' has a non-null AoS {nameof(SavedFilter.Compiled)} but failed " +
+                    $"column-direct compilation: {error}");
+            }
+
+            compiledFilters[index] = columnCompiled;
         }
 
         return compiledFilters;

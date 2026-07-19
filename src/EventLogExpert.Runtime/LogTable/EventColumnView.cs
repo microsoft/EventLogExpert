@@ -2,6 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Compilation;
+using EventLogExpert.Filtering.Persistence;
 using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Runtime.LogTable;
@@ -14,6 +16,7 @@ internal sealed class EventColumnView : IEventColumnView
     private readonly IEventColumnReader _reader;
 
     private Dictionary<ValueKey, int>? _byKey;
+    private HighlightWinnerCache? _highlightCache;
 
     private EventColumnView(IEventColumnReader reader, int[] order, int[] rankByPhysical, SortContext context)
     {
@@ -73,6 +76,32 @@ internal sealed class EventColumnView : IEventColumnView
             slotCounts,
             cancellationToken);
 
+    public void BucketTimeTicksByEventDataHResultWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventDataHResultWithTie(
+            _rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            fieldName,
+            eligibleProviders,
+            userDataErrorCodePaths,
+            targetCodes,
+            slotCounts,
+            cancellationToken);
+
     public void BucketTimeTicksByEventDataString(
         long minTicks,
         long bucketSpanTicks,
@@ -93,6 +122,52 @@ internal sealed class EventColumnView : IEventColumnView
             slotCounts,
             cancellationToken);
 
+    public void BucketTimeTicksByEventDataStringWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventDataStringWithTie(
+            _rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            candidateFields,
+            rawValueToSlot,
+            slotCount,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksByEventDataWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventDataWithTie(
+            _rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            fieldName,
+            targetCodes,
+            slotCounts,
+            cancellationToken);
+
     public void BucketTimeTicksByEventId(
         long minTicks,
         long bucketSpanTicks,
@@ -101,6 +176,25 @@ internal sealed class EventColumnView : IEventColumnView
         int[] slotCounts,
         CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByEventId(_rankByPhysical,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            targetIds,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksByEventIdWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventIdWithTie(_rankByPhysical,
+            highlightWinners,
+            slotColorMask,
             minTicks,
             bucketSpanTicks,
             bucketCount,
@@ -125,6 +219,27 @@ internal sealed class EventColumnView : IEventColumnView
             slotCounts,
             cancellationToken);
 
+    public void BucketTimeTicksByFieldWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventFieldId field,
+        string[] targetValues,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByFieldWithTie(_rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            field,
+            targetValues,
+            slotCounts,
+            cancellationToken);
+
     public void BucketTimeTicksBySeverity(
         long minTicks,
         long bucketSpanTicks,
@@ -132,6 +247,23 @@ internal sealed class EventColumnView : IEventColumnView
         int[] slotCounts,
         CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksBySeverity(_rankByPhysical,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksBySeverityWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksBySeverityWithTie(_rankByPhysical,
+            highlightWinners,
+            slotColorMask,
             minTicks,
             bucketSpanTicks,
             bucketCount,
@@ -166,6 +298,26 @@ internal sealed class EventColumnView : IEventColumnView
         IDictionary<string, int> counts,
         CancellationToken cancellationToken) =>
         _reader.CountFieldValues(_rankByPhysical, field, counts, cancellationToken);
+
+    public byte[] EnsureHighlightWinners(
+        IReadOnlyList<SavedFilter> orderedColoredFilters,
+        int planKey,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(orderedColoredFilters);
+
+        HighlightWinnerCache? cache = _highlightCache;
+
+        if (cache is { PlanKey: var key, Winners: var winners } && key == planKey && winners.Length == _reader.Count)
+        {
+            return winners;
+        }
+
+        byte[] fresh = FilterService.ClassifyHighlightWinners(_reader, _order, orderedColoredFilters, cancellationToken);
+        _highlightCache = new HighlightWinnerCache(planKey, fresh);
+
+        return fresh;
+    }
 
     public IEnumerable<ResolvedEvent> EnumerateDetail()
     {
@@ -298,7 +450,13 @@ internal sealed class EventColumnView : IEventColumnView
 
     // Re-sorts the same survivor set under a new context without re-reading the raw store (the reducers use this when the
     // effective default order flips between single- and multi-log).
-    internal EventColumnView WithContext(SortContext context) => Create(_reader, _order, context);
+    internal EventColumnView WithContext(SortContext context)
+    {
+        EventColumnView view = Create(_reader, _order, context);
+        view._highlightCache = _highlightCache;
+
+        return view;
+    }
 
     private Dictionary<ValueKey, int> BuildByKey()
     {
@@ -315,4 +473,6 @@ internal sealed class EventColumnView : IEventColumnView
 
         return map;
     }
+
+    private sealed record HighlightWinnerCache(int PlanKey, byte[] Winners);
 }

@@ -228,6 +228,15 @@
 
 .histogram-cat-other { fill: var(--text-secondary); }
 
+.histogram-cat-hl {
+    fill: var(--text-secondary);
+    stroke: var(--background-darkgray);
+    stroke-width: 0.75;
+    vector-effect: non-scaling-stroke;
+}
+
+.histogram-cat-hl[data-highlight] { fill: var(--hl-bg); }
+
 .histogram-bin-cursor {
     fill: none;
     stroke: var(--toggle-accent);
@@ -295,6 +304,21 @@
     .histogram-cat-2 { fill: url(#histogram-hatch-cat-2); }
 
     .histogram-cat-3 { fill: url(#histogram-hatch-cat-3); }
+
+    .histogram-cat-hl {
+        fill: CanvasText;
+        stroke: Canvas;
+    }
+
+    .histogram-cat-hl[data-stackpos="0"] { fill: url(#histogram-hatch-cat-0); }
+
+    .histogram-cat-hl[data-stackpos="1"] { fill: url(#histogram-hatch-cat-1); }
+
+    .histogram-cat-hl[data-stackpos="2"] { fill: url(#histogram-hatch-cat-2); }
+
+    .histogram-cat-hl[data-stackpos="3"] { fill: url(#histogram-hatch-cat-3); }
+
+    .histogram-cat-hl[data-stackpos="4"] { fill: url(#histogram-hatch-cat-4); }
 
     .histogram-find-marker { fill: Highlight; stroke: CanvasText; }
 }

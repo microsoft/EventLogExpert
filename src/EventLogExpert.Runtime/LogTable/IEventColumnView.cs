@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Persistence;
 using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Runtime.LogTable;
@@ -46,6 +47,19 @@ public interface IEventColumnView
         int[] slotCounts,
         CancellationToken cancellationToken);
 
+    void BucketTimeTicksByEventDataHResultWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
     /// <summary>Group-by EventData string variant keyed on the first usable named candidate field value.</summary>
     void BucketTimeTicksByEventDataString(
         long minTicks,
@@ -57,8 +71,41 @@ public interface IEventColumnView
         int[] slotCounts,
         CancellationToken cancellationToken);
 
+    void BucketTimeTicksByEventDataStringWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
+    void BucketTimeTicksByEventDataWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
     /// <summary>Group-by variant keyed on the numeric event id; (targetIds length + 1) slots per bin.</summary>
     void BucketTimeTicksByEventId(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
+    void BucketTimeTicksByEventIdWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
         long minTicks,
         long bucketSpanTicks,
         int bucketCount,
@@ -79,11 +126,31 @@ public interface IEventColumnView
         int[] slotCounts,
         CancellationToken cancellationToken);
 
+    void BucketTimeTicksByFieldWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventFieldId field,
+        string[] targetValues,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
     /// <summary>
     ///     Additively buckets this view's rows by UTC tick and severity slot; bucket-major
     ///     slotCounts[i*LevelSeverity.SlotCount + slot], out-of-domain ticks clamp to the end buckets.
     /// </summary>
     void BucketTimeTicksBySeverity(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
+    void BucketTimeTicksBySeverityWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
         long minTicks,
         long bucketSpanTicks,
         int bucketCount,
@@ -124,6 +191,11 @@ public interface IEventColumnView
     ///     logical value across logs); resolves the top-N group-by categories.
     /// </summary>
     void CountFieldValues(EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken);
+
+    byte[] EnsureHighlightWinners(
+        IReadOnlyList<SavedFilter> orderedColoredFilters,
+        int planKey,
+        CancellationToken cancellationToken);
 
     /// <summary>Full-detail rehydrate of every display row, in display order, for export and clipboard.</summary>
     IEnumerable<ResolvedEvent> EnumerateDetail();

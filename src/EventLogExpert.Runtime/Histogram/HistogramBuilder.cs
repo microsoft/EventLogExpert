@@ -30,6 +30,23 @@ public static class HistogramBuilder
         IEventColumnView view,
         HistogramDimension dimension,
         int maxBuckets,
+        CancellationToken cancellationToken) =>
+        Build(view, dimension, maxBuckets, useHighlightTie: false, highlightWinners: null, cancellationToken);
+
+    public static HistogramData? BuildWithHighlightTie(
+        IEventColumnView view,
+        HistogramDimension dimension,
+        int maxBuckets,
+        byte[] highlightWinners,
+        CancellationToken cancellationToken) =>
+        Build(view, dimension, maxBuckets, useHighlightTie: true, highlightWinners, cancellationToken);
+
+    private static HistogramData? Build(
+        IEventColumnView view,
+        HistogramDimension dimension,
+        int maxBuckets,
+        bool useHighlightTie,
+        byte[]? highlightWinners,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(view);
@@ -44,25 +61,49 @@ public static class HistogramBuilder
 
         if (dimension is HistogramDimension.LogonType or HistogramDimension.TicketEncryptionType)
         {
-            return BuildByEventData(view, ToEventDataFieldName(dimension), minTicks, maxTicks, bucketSpanTicks, bucketCount, cancellationToken);
+            return BuildByEventData(view,
+                ToEventDataFieldName(dimension),
+                minTicks,
+                maxTicks,
+                bucketSpanTicks,
+                bucketCount,
+                useHighlightTie,
+                highlightWinners,
+                cancellationToken);
         }
 
         if (dimension is HistogramDimension.ErrorCode)
         {
-            return BuildByErrorCode(view, minTicks, maxTicks, bucketSpanTicks, bucketCount, cancellationToken);
+            return BuildByErrorCode(view, minTicks, maxTicks, bucketSpanTicks, bucketCount, useHighlightTie, highlightWinners, cancellationToken);
         }
 
         if (dimension is HistogramDimension.ProcessImage or HistogramDimension.ParentProcessImage)
         {
-            return BuildByEventDataString(view, ProcessImageFieldNames(dimension), minTicks, maxTicks, bucketSpanTicks, bucketCount, cancellationToken);
+            return BuildByEventDataString(view,
+                ProcessImageFieldNames(dimension),
+                minTicks,
+                maxTicks,
+                bucketSpanTicks,
+                bucketCount,
+                useHighlightTie,
+                highlightWinners,
+                cancellationToken);
         }
 
-        (int[] slotCounts, int slotCount, IReadOnlyList<HistogramGroup> groups) = dimension switch
+        (int[] slotCounts, int slotCount, IReadOnlyList<HistogramGroup> groups, uint[]? groupHighlightMasks) = dimension switch
         {
-            HistogramDimension.Severity => ScanSeverity(view, minTicks, bucketSpanTicks, bucketCount, cancellationToken),
-            HistogramDimension.EventId => ScanByEventId(view, minTicks, bucketSpanTicks, bucketCount, cancellationToken),
-            HistogramDimension.Log => ScanByField(view, EventFieldId.OwningLog, OwningLogDisplay.DistinctShortNames, minTicks, bucketSpanTicks, bucketCount, cancellationToken),
-            _ => ScanByField(view, ToFieldId(dimension), static keys => keys, minTicks, bucketSpanTicks, bucketCount, cancellationToken)
+            HistogramDimension.Severity => ScanSeverity(view, minTicks, bucketSpanTicks, bucketCount, useHighlightTie, highlightWinners, cancellationToken),
+            HistogramDimension.EventId => ScanByEventId(view, minTicks, bucketSpanTicks, bucketCount, useHighlightTie, highlightWinners, cancellationToken),
+            HistogramDimension.Log => ScanByField(view,
+                EventFieldId.OwningLog,
+                OwningLogDisplay.DistinctShortNames,
+                minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                useHighlightTie,
+                highlightWinners,
+                cancellationToken),
+            _ => ScanByField(view, ToFieldId(dimension), static keys => keys, minTicks, bucketSpanTicks, bucketCount, useHighlightTie, highlightWinners, cancellationToken)
         };
 
         int total = 0;
@@ -77,7 +118,8 @@ public static class HistogramBuilder
             new DateTime(maxTicks, DateTimeKind.Utc),
             total,
             bucketSpanTicks,
-            groups);
+            groups,
+            groupHighlightMasks);
     }
 
     private static HistogramData BuildByErrorCode(
@@ -86,6 +128,8 @@ public static class HistogramBuilder
         long maxTicks,
         long bucketSpanTicks,
         int bucketCount,
+        bool useHighlightTie,
+        byte[]? highlightWinners,
         CancellationToken cancellationToken)
     {
         var counts = new Dictionary<long, int>();
@@ -114,7 +158,33 @@ public static class HistogramBuilder
 
         int slotCount = targetCodes.Length + 1;
         int[] slotCounts = new int[bucketCount * slotCount];
-        view.BucketTimeTicksByEventDataHResult(minTicks, bucketSpanTicks, bucketCount, ErrorCodeFieldName, s_updateProviders, s_updateErrorCodeUserDataPaths, targetCodes, slotCounts, cancellationToken);
+        uint[]? slotColorMask = useHighlightTie ? new uint[slotCount] : null;
+        if (slotColorMask is null)
+        {
+            view.BucketTimeTicksByEventDataHResult(minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                ErrorCodeFieldName,
+                s_updateProviders,
+                s_updateErrorCodeUserDataPaths,
+                targetCodes,
+                slotCounts,
+                cancellationToken);
+        }
+        else
+        {
+            view.BucketTimeTicksByEventDataHResultWithTie(RequireHighlightWinners(highlightWinners),
+                slotColorMask,
+                minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                ErrorCodeFieldName,
+                s_updateProviders,
+                s_updateErrorCodeUserDataPaths,
+                targetCodes,
+                slotCounts,
+                cancellationToken);
+        }
 
         int total = 0;
 
@@ -123,6 +193,7 @@ public static class HistogramBuilder
         // Key = the raw invariant code (stable toggle key); Label = the 8-digit hex form plus its curated HRESULT symbol.
         string[] keys = Array.ConvertAll(targetCodes, code => code.ToString(CultureInfo.InvariantCulture));
         string[] labels = Array.ConvertAll(targetCodes, FormatErrorCodeLabel);
+        IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories(keys, labels);
 
         return new HistogramData(
             slotCounts,
@@ -132,7 +203,8 @@ public static class HistogramBuilder
             maxUtc,
             total,
             bucketSpanTicks,
-            HistogramGroups.ForCategories(keys, labels))
+            groups,
+            FoldGroupMasks(slotColorMask, groups))
         {
             EventNoun = ErrorCodeEventNoun
         };
@@ -145,6 +217,8 @@ public static class HistogramBuilder
         long maxTicks,
         long bucketSpanTicks,
         int bucketCount,
+        bool useHighlightTie,
+        byte[]? highlightWinners,
         CancellationToken cancellationToken)
     {
         var counts = new Dictionary<long, int>();
@@ -171,7 +245,24 @@ public static class HistogramBuilder
 
         int slotCount = targetCodes.Length + 1;
         int[] slotCounts = new int[bucketCount * slotCount];
-        view.BucketTimeTicksByEventData(minTicks, bucketSpanTicks, bucketCount, fieldName, targetCodes, slotCounts, cancellationToken);
+        uint[]? slotColorMask = useHighlightTie ? new uint[slotCount] : null;
+
+        if (slotColorMask is null)
+        {
+            view.BucketTimeTicksByEventData(minTicks, bucketSpanTicks, bucketCount, fieldName, targetCodes, slotCounts, cancellationToken);
+        }
+        else
+        {
+            view.BucketTimeTicksByEventDataWithTie(RequireHighlightWinners(highlightWinners),
+                slotColorMask,
+                minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                fieldName,
+                targetCodes,
+                slotCounts,
+                cancellationToken);
+        }
 
         int total = 0;
 
@@ -183,6 +274,8 @@ public static class HistogramBuilder
             targetCodes,
             code => EventDataValueDecoder.TryDecodeLabel(fieldName, code) ?? code.ToString(CultureInfo.InvariantCulture));
 
+        IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories(keys, labels);
+
         return new HistogramData(
             slotCounts,
             slotCount,
@@ -191,7 +284,8 @@ public static class HistogramBuilder
             maxUtc,
             total,
             bucketSpanTicks,
-            HistogramGroups.ForCategories(keys, labels));
+            groups,
+            FoldGroupMasks(slotColorMask, groups));
     }
 
     private static HistogramData BuildByEventDataString(
@@ -201,6 +295,8 @@ public static class HistogramBuilder
         long maxTicks,
         long bucketSpanTicks,
         int bucketCount,
+        bool useHighlightTie,
+        byte[]? highlightWinners,
         CancellationToken cancellationToken)
     {
         var rawCounts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -244,12 +340,57 @@ public static class HistogramBuilder
         }
 
         int[] slotCounts = new int[bucketCount * slotCount];
-        view.BucketTimeTicksByEventDataString(minTicks, bucketSpanTicks, bucketCount, candidateFields, rawValueToSlot, slotCount, slotCounts, cancellationToken);
+        uint[]? slotColorMask = useHighlightTie ? new uint[slotCount] : null;
+
+        if (slotColorMask is null)
+        {
+            view.BucketTimeTicksByEventDataString(minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                candidateFields,
+                rawValueToSlot,
+                slotCount,
+                slotCounts,
+                cancellationToken);
+        }
+        else
+        {
+            view.BucketTimeTicksByEventDataStringWithTie(RequireHighlightWinners(highlightWinners),
+                slotColorMask,
+                minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                candidateFields,
+                rawValueToSlot,
+                slotCount,
+                slotCounts,
+                cancellationToken);
+        }
 
         int total = 0;
         foreach (int count in slotCounts) { total += count; }
 
-        return new HistogramData(slotCounts, slotCount, bucketCount, minUtc, maxUtc, total, bucketSpanTicks, HistogramGroups.ForCategories(topShortNames, topShortNames));
+        IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories(topShortNames, topShortNames);
+
+        return new HistogramData(slotCounts, slotCount, bucketCount, minUtc, maxUtc, total, bucketSpanTicks, groups, FoldGroupMasks(slotColorMask, groups));
+    }
+
+    private static uint[]? FoldGroupMasks(uint[]? slotColorMask, IReadOnlyList<HistogramGroup> groups)
+    {
+        if (slotColorMask is null) { return null; }
+
+        uint[] groupMasks = new uint[groups.Count];
+
+        for (int group = 0; group < groups.Count; group++)
+        {
+            uint mask = 0;
+
+            foreach (int slot in groups[group].SlotIndices) { mask |= slotColorMask[slot]; }
+
+            groupMasks[group] = mask;
+        }
+
+        return groupMasks;
     }
 
     private static string FormatErrorCodeLabel(long code)
@@ -263,10 +404,12 @@ public static class HistogramBuilder
     private static string? NormalizeProcessImage(string raw)
     {
         string trimmed = raw.Trim();
-        if (trimmed.Length >= 2 && trimmed[0] == '"' && trimmed[^1] == '"') { trimmed = trimmed[1..^1].Trim(); }
+
+        if (trimmed is ['"', _, ..] && trimmed[^1] == '"') { trimmed = trimmed[1..^1].Trim(); }
 
         int slash = trimmed.LastIndexOfAny(s_pathSeparators);
         string tail = slash >= 0 ? trimmed[(slash + 1)..] : trimmed;
+
         if (tail.Length == 0 || tail == "-") { return null; }
 
         return tail.ToLowerInvariant();
@@ -279,11 +422,16 @@ public static class HistogramBuilder
         _ => throw new ArgumentOutOfRangeException(nameof(dimension), dimension, "Dimension is not a process image field.")
     };
 
-    private static (int[] SlotCounts, int SlotCount, IReadOnlyList<HistogramGroup> Groups) ScanByEventId(
+    private static byte[] RequireHighlightWinners(byte[]? highlightWinners) =>
+        highlightWinners ?? throw new InvalidOperationException("Highlight winners must be captured before tie bucketing.");
+
+    private static (int[] SlotCounts, int SlotCount, IReadOnlyList<HistogramGroup> Groups, uint[]? GroupHighlightMasks) ScanByEventId(
         IEventColumnView view,
         long minTicks,
         long bucketSpanTicks,
         int bucketCount,
+        bool useHighlightTie,
+        byte[]? highlightWinners,
         CancellationToken cancellationToken)
     {
         var counts = new Dictionary<int, int>();
@@ -298,21 +446,45 @@ public static class HistogramBuilder
 
         int slotCount = targetIds.Length + 1;
         int[] slotCounts = new int[bucketCount * slotCount];
-        view.BucketTimeTicksByEventId(minTicks, bucketSpanTicks, bucketCount, targetIds, slotCounts, cancellationToken);
+        uint[]? slotColorMask = useHighlightTie ? new uint[slotCount] : null;
+
+        if (slotColorMask is null)
+        {
+            view.BucketTimeTicksByEventId(minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                targetIds,
+                slotCounts,
+                cancellationToken);
+        }
+        else
+        {
+            view.BucketTimeTicksByEventIdWithTie(RequireHighlightWinners(highlightWinners),
+                slotColorMask,
+                minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                targetIds,
+                slotCounts,
+                cancellationToken);
+        }
 
         string[] keys = Array.ConvertAll(targetIds, id => id.ToString(CultureInfo.InvariantCulture));
         string[] labels = Array.ConvertAll(targetIds, id => id.ToString(CultureInfo.CurrentCulture));
+        IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories(keys, labels);
 
-        return (slotCounts, slotCount, HistogramGroups.ForCategories(keys, labels));
+        return (slotCounts, slotCount, groups, FoldGroupMasks(slotColorMask, groups));
     }
 
-    private static (int[] SlotCounts, int SlotCount, IReadOnlyList<HistogramGroup> Groups) ScanByField(
+    private static (int[] SlotCounts, int SlotCount, IReadOnlyList<HistogramGroup> Groups, uint[]? GroupHighlightMasks) ScanByField(
         IEventColumnView view,
         EventFieldId field,
         Func<IReadOnlyList<string>, IReadOnlyList<string>> labelMapper,
         long minTicks,
         long bucketSpanTicks,
         int bucketCount,
+        bool useHighlightTie,
+        byte[]? highlightWinners,
         CancellationToken cancellationToken)
     {
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -327,23 +499,65 @@ public static class HistogramBuilder
 
         int slotCount = targetValues.Length + 1;
         int[] slotCounts = new int[bucketCount * slotCount];
-        view.BucketTimeTicksByField(minTicks, bucketSpanTicks, bucketCount, field, targetValues, slotCounts, cancellationToken);
+        uint[]? slotColorMask = useHighlightTie ? new uint[slotCount] : null;
 
-        return (slotCounts, slotCount, HistogramGroups.ForCategories(targetValues, labelMapper(targetValues)));
+        if (slotColorMask is null)
+        {
+            view.BucketTimeTicksByField(minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                field,
+                targetValues,
+                slotCounts,
+                cancellationToken);
+        }
+        else
+        {
+            view.BucketTimeTicksByFieldWithTie(RequireHighlightWinners(highlightWinners),
+                slotColorMask,
+                minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                field,
+                targetValues,
+                slotCounts,
+                cancellationToken);
+        }
+
+        IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories(targetValues, labelMapper(targetValues));
+
+        return (slotCounts, slotCount, groups, FoldGroupMasks(slotColorMask, groups));
     }
 
-    private static (int[] SlotCounts, int SlotCount, IReadOnlyList<HistogramGroup> Groups) ScanSeverity(
+    private static (int[] SlotCounts, int SlotCount, IReadOnlyList<HistogramGroup> Groups, uint[]? GroupHighlightMasks) ScanSeverity(
         IEventColumnView view,
         long minTicks,
         long bucketSpanTicks,
         int bucketCount,
+        bool useHighlightTie,
+        byte[]? highlightWinners,
         CancellationToken cancellationToken)
     {
         int slotCount = HistogramGroups.SeveritySlotCount;
         int[] slotCounts = new int[bucketCount * slotCount];
-        view.BucketTimeTicksBySeverity(minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
+        uint[]? slotColorMask = useHighlightTie ? new uint[slotCount] : null;
 
-        return (slotCounts, slotCount, HistogramGroups.Severity);
+        if (slotColorMask is null)
+        {
+            view.BucketTimeTicksBySeverity(minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
+        }
+        else
+        {
+            view.BucketTimeTicksBySeverityWithTie(RequireHighlightWinners(highlightWinners),
+                slotColorMask,
+                minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                slotCounts,
+                cancellationToken);
+        }
+
+        return (slotCounts, slotCount, HistogramGroups.Severity, FoldGroupMasks(slotColorMask, HistogramGroups.Severity));
     }
 
     private static string ToEventDataFieldName(HistogramDimension dimension) => dimension switch
