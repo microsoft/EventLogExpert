@@ -64,9 +64,9 @@
       "order": 3,
       "version": 1,
       "filters": [
-        { "color": "Blue", "comparison": { "property": "Source", "value": "Netlogon" }, "predicates": [ { "comparison": { "property": "Id", "value": "5823" } } ] },
-        { "color": "Orange", "comparison": { "property": "Source", "value": "Netlogon" }, "predicates": [ { "comparison": { "property": "Id", "value": "5719" } } ] },
-        { "color": "Red", "comparison": { "property": "Source", "value": "Netlogon" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5722", "5723" ] } } ] }
+        { "color": "LightBlue", "comparison": { "property": "Source", "value": "Netlogon" }, "predicates": [ { "comparison": { "property": "Id", "value": "5823" } } ] },
+        { "color": "LightOrange", "comparison": { "property": "Source", "value": "Netlogon" }, "predicates": [ { "comparison": { "property": "Id", "value": "5719" } } ] },
+        { "color": "LightRed", "comparison": { "property": "Source", "value": "Netlogon" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5722", "5723" ] } } ] }
       ]
     },
     {

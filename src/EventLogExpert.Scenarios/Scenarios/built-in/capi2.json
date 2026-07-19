@@ -4,7 +4,7 @@
     {
       "id": "capi2-pki-chain-failure-triage",
       "name": "PKI chain-build failure triage",
-      "purpose": "All failed certificate chain builds (Event ID 11) color-coded by root cause: untrusted root (Red), expired cert (Orange), revoked cert (Purple), CRL/OCSP server offline (DarkYellow), revocation status indeterminate (Yellow), partial chain / missing issuer (Blue), wrong EKU (Magenta), and invalid signature (DarkRed). Requires CAPI2 Operational logging enabled by an administrator (disabled by default).",
+      "purpose": "All failed certificate chain builds (Event ID 11) color-coded by root cause: untrusted root (LightRed), expired cert (LightOrange), revoked cert (LightPurple), CRL/OCSP server offline (LightTeal), revocation status indeterminate (LightYellow), partial chain / missing issuer (LightBlue), wrong EKU (LightMagenta), and invalid signature (LightPink). Requires CAPI2 Operational logging enabled by an administrator (disabled by default).",
       "group": "Security",
       "channels": [ "Microsoft-Windows-CAPI2/Operational" ],
       "requiresAdmin": true,
@@ -12,14 +12,14 @@
       "order": 0,
       "version": 1,
       "filters": [
-        { "color": "Red", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_UNTRUSTED_ROOT", "value": "true" } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_NOT_TIME_VALID", "value": "true" } } ] },
-        { "color": "Purple", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_REVOKED", "value": "true" } } ] },
-        { "color": "DarkYellow", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_OFFLINE_REVOCATION", "value": "true" } } ] },
-        { "color": "Yellow", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_REVOCATION_STATUS_UNKNOWN", "value": "true" } } ] },
-        { "color": "Blue", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_PARTIAL_CHAIN", "value": "true" } } ] },
-        { "color": "Magenta", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_NOT_VALID_FOR_USAGE", "value": "true" } } ] },
-        { "color": "DarkRed", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_NOT_SIGNATURE_VALID", "value": "true" } } ] }
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_UNTRUSTED_ROOT", "value": "true" } } ] },
+        { "color": "LightOrange", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_NOT_TIME_VALID", "value": "true" } } ] },
+        { "color": "LightPurple", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_REVOKED", "value": "true" } } ] },
+        { "color": "LightTeal", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_OFFLINE_REVOCATION", "value": "true" } } ] },
+        { "color": "LightYellow", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_REVOCATION_STATUS_UNKNOWN", "value": "true" } } ] },
+        { "color": "LightBlue", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_PARTIAL_CHAIN", "value": "true" } } ] },
+        { "color": "LightMagenta", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_NOT_VALID_FOR_USAGE", "value": "true" } } ] },
+        { "color": "LightPink", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_NOT_SIGNATURE_VALID", "value": "true" } } ] }
       ]
     },
     {
@@ -53,7 +53,7 @@
     {
       "id": "capi2-revocation-offline",
       "name": "Revocation service offline / unreachable",
-      "purpose": "Chain builds where revocation checking failed due to an unreachable CRL or OCSP responder, color-coded by sub-cause. DarkYellow: server definitively offline or response stale (CERT_TRUST_IS_OFFLINE_REVOCATION, 0x01000000), from a broken CDP URL, a firewall blocking port 80/443 to the CDP host, or an air-gapped machine. Yellow: revocation status indeterminate (CERT_TRUST_REVOCATION_STATUS_UNKNOWN, 0x00000040), which also fires when the certificate carries no CDP extension. Requires CAPI2 Operational logging enabled by an administrator.",
+      "purpose": "Chain builds where revocation checking failed due to an unreachable CRL or OCSP responder, color-coded by sub-cause. LightOrange: server definitively offline or response stale (CERT_TRUST_IS_OFFLINE_REVOCATION, 0x01000000), from a broken CDP URL, a firewall blocking port 80/443 to the CDP host, or an air-gapped machine. LightYellow: revocation status indeterminate (CERT_TRUST_REVOCATION_STATUS_UNKNOWN, 0x00000040), which also fires when the certificate carries no CDP extension. Requires CAPI2 Operational logging enabled by an administrator.",
       "group": "Security",
       "channels": [ "Microsoft-Windows-CAPI2/Operational" ],
       "requiresAdmin": true,
@@ -61,8 +61,8 @@
       "order": 3,
       "version": 1,
       "filters": [
-        { "color": "DarkYellow", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_OFFLINE_REVOCATION", "value": "true" } } ] },
-        { "color": "Yellow", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_REVOCATION_STATUS_UNKNOWN", "value": "true" } } ] }
+        { "color": "LightOrange", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_OFFLINE_REVOCATION", "value": "true" } } ] },
+        { "color": "LightYellow", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_REVOCATION_STATUS_UNKNOWN", "value": "true" } } ] }
       ]
     },
     {
@@ -110,7 +110,7 @@
     {
       "id": "capi2-signature-failures",
       "name": "Weak / invalid certificate signature",
-      "purpose": "Chain builds that failed due to signature issues, color-coded by sub-cause. DarkRed: signature cryptographically invalid (CERT_TRUST_IS_NOT_SIGNATURE_VALID, 0x00000008), from a tampered or corrupted cert or an issuer public-key mismatch. Pink: weak hash algorithm deprecated by Windows policy (CERT_TRUST_HAS_WEAK_SIGNATURE, 0x00100000), where SHA-1 or MD2/MD5 certs are now rejected; surfaces SHA-1 migration gaps in internal PKI. Requires CAPI2 Operational logging enabled by an administrator.",
+      "purpose": "Chain builds that failed due to signature issues, color-coded by sub-cause. LightRed: signature cryptographically invalid (CERT_TRUST_IS_NOT_SIGNATURE_VALID, 0x00000008), from a tampered or corrupted cert or an issuer public-key mismatch. LightPink: weak hash algorithm deprecated by Windows policy (CERT_TRUST_HAS_WEAK_SIGNATURE, 0x00100000), where SHA-1 or MD2/MD5 certs are now rejected; surfaces SHA-1 migration gaps in internal PKI. Requires CAPI2 Operational logging enabled by an administrator.",
       "group": "Security",
       "channels": [ "Microsoft-Windows-CAPI2/Operational" ],
       "requiresAdmin": true,
@@ -118,8 +118,8 @@
       "order": 7,
       "version": 1,
       "filters": [
-        { "color": "DarkRed", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_NOT_SIGNATURE_VALID", "value": "true" } } ] },
-        { "color": "Pink", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_HAS_WEAK_SIGNATURE", "value": "true" } } ] }
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_IS_NOT_SIGNATURE_VALID", "value": "true" } } ] },
+        { "color": "LightPink", "comparison": { "property": "Id", "value": "11" }, "predicates": [ { "comparison": { "property": "UserData", "userDataFieldName": "CertGetCertificateChain/CertificateChain/TrustStatus/ErrorStatus/@CERT_TRUST_HAS_WEAK_SIGNATURE", "value": "true" } } ] }
       ]
     }
   ]

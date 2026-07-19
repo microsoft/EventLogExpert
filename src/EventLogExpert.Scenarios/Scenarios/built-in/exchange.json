@@ -14,9 +14,9 @@
       "order": 0,
       "version": 1,
       "filters": [
-        { "color": "Yellow", "comparison": { "property": "Source", "value": "MSExchangeTransport" }, "predicates": [ { "comparison": { "property": "Id", "value": "15004" } } ] },
-        { "color": "Red", "comparison": { "property": "Source", "value": "MSExchangeTransport" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "15006", "15007" ] } } ] },
-        { "color": "Orange", "comparison": { "property": "Source", "value": "MSExchangeTransport" }, "predicates": [ { "comparison": { "property": "Id", "value": "1009" } } ] }
+        { "color": "LightYellow", "comparison": { "property": "Source", "value": "MSExchangeTransport" }, "predicates": [ { "comparison": { "property": "Id", "value": "15004" } } ] },
+        { "color": "LightRed", "comparison": { "property": "Source", "value": "MSExchangeTransport" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "15006", "15007" ] } } ] },
+        { "color": "LightOrange", "comparison": { "property": "Source", "value": "MSExchangeTransport" }, "predicates": [ { "comparison": { "property": "Id", "value": "1009" } } ] }
       ]
     },
     {

@@ -31,21 +31,21 @@
       "version": 1,
       "filters": [
         {
-          "color": "Red",
+          "color": "LightOrange",
           "comparison": { "property": "Source", "value": "Service Control Manager" },
           "predicates": [
             { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "7000", "7001", "7023", "7024" ] } }
           ]
         },
         {
-          "color": "Orange",
+          "color": "LightYellow",
           "comparison": { "property": "Source", "value": "Service Control Manager" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "7022" } }
           ]
         },
         {
-          "color": "DarkRed",
+          "color": "LightRed",
           "comparison": { "property": "Source", "value": "Service Control Manager" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "7026" } }
@@ -67,14 +67,14 @@
       "version": 1,
       "filters": [
         {
-          "color": "Red",
+          "color": "LightOrange",
           "comparison": { "property": "Source", "value": "Service Control Manager" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "7031" } }
           ]
         },
         {
-          "color": "DarkRed",
+          "color": "LightRed",
           "comparison": { "property": "Source", "value": "Service Control Manager" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "7034" } }
@@ -176,14 +176,14 @@
       "version": 1,
       "filters": [
         {
-          "color": "DarkRed",
+          "color": "LightPink",
           "comparison": { "property": "Source", "matchMode": "Many", "values": [ "Microsoft-Windows-WER-SystemErrorReporting", "BugCheck" ] },
           "predicates": [
             { "comparison": { "property": "Id", "value": "1001" } }
           ]
         },
         {
-          "color": "Yellow",
+          "color": "LightYellow",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-Power" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "41" } }
@@ -204,7 +204,7 @@
           ]
         },
         {
-          "color": "Green",
+          "color": "LightGreen",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-General" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "12" } }
@@ -226,7 +226,7 @@
       "version": 1,
       "filters": [
         {
-          "color": "Green",
+          "color": "LightGreen",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-General" },
           "predicates": [
             { "joinWithAny": false, "comparison": { "property": "Id", "value": "12" } },
@@ -235,7 +235,7 @@
           ]
         },
         {
-          "color": "Blue",
+          "color": "LightBlue",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-General" },
           "predicates": [
             { "joinWithAny": false, "comparison": { "property": "Id", "value": "13" } },
@@ -244,14 +244,14 @@
           ]
         },
         {
-          "color": "Teal",
+          "color": "LightTeal",
           "comparison": { "property": "Source", "value": "User32" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "1074" } }
           ]
         },
         {
-          "color": "Orange",
+          "color": "LightOrange",
           "comparison": { "property": "Source", "value": "EventLog" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "6008" } }
@@ -349,7 +349,7 @@
       "version": 1,
       "filters": [
         {
-          "color": "Yellow",
+          "color": "LightYellow",
           "comparison": { "property": "LogName", "value": "System" },
           "predicates": [
             { "joinWithAny": false, "comparison": { "property": "Source", "value": "Microsoft-Windows-Resource-Exhaustion-Detector" } },
@@ -357,7 +357,7 @@
           ]
         },
         {
-          "color": "DarkRed",
+          "color": "LightRed",
           "comparison": { "property": "LogName", "value": "Application" },
           "predicates": [
             { "joinWithAny": false, "comparison": { "property": "Source", "value": "Application Error" } },
@@ -365,7 +365,7 @@
           ]
         },
         {
-          "color": "Orange",
+          "color": "LightOrange",
           "comparison": { "property": "LogName", "value": "Application" },
           "predicates": [
             { "joinWithAny": false, "comparison": { "property": "Source", "value": "Application Hang" } },
@@ -373,7 +373,7 @@
           ]
         },
         {
-          "color": "Purple",
+          "color": "LightPurple",
           "comparison": { "property": "LogName", "value": "Application" },
           "predicates": [
             { "joinWithAny": false, "comparison": { "property": "Source", "value": "Windows Error Reporting" } },

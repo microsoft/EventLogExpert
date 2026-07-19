@@ -290,11 +290,11 @@
       "order": 10,
       "version": 1,
       "filters": [
-        { "color": "Green", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "value": "17126" } } ] },
-        { "color": "Blue", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "17147", "17148" ] } } ] },
-        { "color": "Orange", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "value": "18456" } } ] },
-        { "color": "Yellow", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "9002", "825" ] } } ] },
-        { "color": "DarkRed", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "823", "824" ] } } ] }
+        { "color": "LightGreen", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "value": "17126" } } ] },
+        { "color": "LightBlue", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "17147", "17148" ] } } ] },
+        { "color": "LightOrange", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "value": "18456" } } ] },
+        { "color": "LightYellow", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "9002", "825" ] } } ] },
+        { "color": "LightRed", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "823", "824" ] } } ] }
       ]
     },
     {
@@ -310,9 +310,9 @@
       "order": 11,
       "version": 1,
       "filters": [
-        { "color": "Green", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "18264", "18265" ] } } ] },
-        { "color": "Blue", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "value": "18267" } } ] },
-        { "color": "Red", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "value": "3041" } } ] }
+        { "color": "LightGreen", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "18264", "18265" ] } } ] },
+        { "color": "LightBlue", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "value": "18267" } } ] },
+        { "color": "LightRed", "comparison": { "property": "Source", "operator": "Contains", "value": "MSSQL" }, "predicates": [ { "comparison": { "property": "Id", "value": "3041" } } ] }
       ]
     }
   ]

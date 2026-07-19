@@ -79,28 +79,28 @@
       "version": 1,
       "filters": [
         {
-          "color": "Orange",
+          "color": "LightYellow",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
           "predicates": [
             { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1672", "1676" ] } }
           ]
         },
         {
-          "color": "Yellow",
+          "color": "LightTeal",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "5120" } }
           ]
         },
         {
-          "color": "Red",
+          "color": "LightOrange",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
           "predicates": [
             { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1069", "1205" ] } }
           ]
         },
         {
-          "color": "DarkRed",
+          "color": "LightRed",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-FailoverClustering" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "1135" } }
@@ -236,7 +236,7 @@
     {
       "id": "s2d-physical-disk-story",
       "name": "Storage Spaces physical disk story (by serial number)",
-      "purpose": "Full event history for one physical disk in a Storage Spaces / S2D pool by DriveSerial: IO failure (203, Red), failed while arriving (208, Red), SMART / impending failure (204, Orange), lost communication (205, Yellow), and disk arrival baseline (207, Blue). Replace 'DISK-SERIAL' with the value from Get-PhysicalDisk SerialNumber. Complements s2d-disk-volume-health which covers virtual disk issues.",
+      "purpose": "Full event history for one physical disk in a Storage Spaces / S2D pool by DriveSerial: IO failure (203, LightRed), failed while arriving (208, LightRed), SMART / impending failure (204, LightOrange), lost communication (205, LightYellow), and disk arrival baseline (207, LightBlue). Replace 'DISK-SERIAL' with the value from Get-PhysicalDisk SerialNumber. Complements s2d-disk-volume-health which covers virtual disk issues.",
       "group": "VirtualizationAndClustering",
       "channels": [ "Microsoft-Windows-StorageSpaces-Driver/Operational" ],
       "requiresAdmin": false,
@@ -246,10 +246,10 @@
       "order": 12,
       "version": 1,
       "filters": [
-        { "color": "Red", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "203", "208" ] }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "DriveSerial", "operator": "Contains", "value": "DISK-SERIAL" } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "204" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "DriveSerial", "operator": "Contains", "value": "DISK-SERIAL" } } ] },
-        { "color": "Yellow", "comparison": { "property": "Id", "value": "205" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "DriveSerial", "operator": "Contains", "value": "DISK-SERIAL" } } ] },
-        { "color": "Blue", "comparison": { "property": "Id", "value": "207" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "DriveSerial", "operator": "Contains", "value": "DISK-SERIAL" } } ] }
+        { "color": "LightRed", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "203", "208" ] }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "DriveSerial", "operator": "Contains", "value": "DISK-SERIAL" } } ] },
+        { "color": "LightOrange", "comparison": { "property": "Id", "value": "204" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "DriveSerial", "operator": "Contains", "value": "DISK-SERIAL" } } ] },
+        { "color": "LightYellow", "comparison": { "property": "Id", "value": "205" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "DriveSerial", "operator": "Contains", "value": "DISK-SERIAL" } } ] },
+        { "color": "LightBlue", "comparison": { "property": "Id", "value": "207" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "DriveSerial", "operator": "Contains", "value": "DISK-SERIAL" } } ] }
       ]
     }
   ]

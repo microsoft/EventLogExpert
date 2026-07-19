@@ -119,7 +119,7 @@
       "version": 1,
       "filters": [
         {
-          "color": "Orange",
+          "color": "LightOrange",
           "comparison": { "property": "LogName", "value": "System" },
           "predicates": [
             { "joinWithAny": false, "comparison": { "property": "Source", "value": "Volsnap" } },
@@ -127,7 +127,7 @@
           ]
         },
         {
-          "color": "Red",
+          "color": "LightRed",
           "comparison": { "property": "LogName", "value": "Application" },
           "predicates": [
             { "joinWithAny": false, "comparison": { "property": "Source", "value": "VSS" } },

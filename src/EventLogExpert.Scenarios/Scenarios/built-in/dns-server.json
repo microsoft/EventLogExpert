@@ -133,9 +133,9 @@
       "order": 8,
       "version": 1,
       "filters": [
-        { "color": "Green", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6001", "6002" ] } },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "6004" } },
-        { "color": "Red", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "150", "408", "4015" ] } }
+        { "color": "LightGreen", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6001", "6002" ] } },
+        { "color": "LightOrange", "comparison": { "property": "Id", "value": "6004" } },
+        { "color": "LightRed", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "150", "408", "4015" ] } }
       ]
     }
   ]
