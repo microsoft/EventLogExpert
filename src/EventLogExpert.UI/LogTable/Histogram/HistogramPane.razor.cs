@@ -261,6 +261,8 @@ public sealed partial class HistogramPane
         HistogramDimension.TaskCategory => "Task Category",
         HistogramDimension.TicketEncryptionType => "Ticket Encryption Type",
         HistogramDimension.ErrorCode => "Error Code",
+        HistogramDimension.ProcessImage => "Process Image",
+        HistogramDimension.ParentProcessImage => "Parent Process Image",
         _ => dimension.ToString()
     };
 
@@ -271,6 +273,12 @@ public sealed partial class HistogramPane
         HistogramDimension.ErrorCode => visibleRange
             ? "No update error codes in the visible range."
             : "No update error codes in this view.",
+        HistogramDimension.ProcessImage => visibleRange
+            ? "No process image names in the visible range."
+            : "No process image names in this view.",
+        HistogramDimension.ParentProcessImage => visibleRange
+            ? "No parent process image names in the visible range."
+            : "No parent process image names in this view.",
         _ => visibleRange
             ? "No events to chart in the current view."
             : $"No {DimensionLabel(dimension)} values in this view."

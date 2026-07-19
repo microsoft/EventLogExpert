@@ -104,6 +104,29 @@ internal sealed class CombinedColumnView : IEventColumnView
         }
     }
 
+    public void BucketTimeTicksByEventDataString(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.BucketTimeTicksByEventDataString(minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                candidateFields,
+                rawValueToSlot,
+                slotCount,
+                slotCounts,
+                cancellationToken);
+        }
+    }
+
     public void BucketTimeTicksByEventId(
         long minTicks,
         long bucketSpanTicks,
@@ -171,6 +194,14 @@ internal sealed class CombinedColumnView : IEventColumnView
                 userDataErrorCodePaths,
                 counts,
                 cancellationToken);
+        }
+    }
+
+    public void CountEventDataStringValues(string[] candidateFields, IDictionary<string, int> counts, CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.CountEventDataStringValues(candidateFields, counts, cancellationToken);
         }
     }
 

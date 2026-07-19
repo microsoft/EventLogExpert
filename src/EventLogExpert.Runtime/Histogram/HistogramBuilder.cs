@@ -15,6 +15,10 @@ public static class HistogramBuilder
     // and servicing providers so a generic errorCode field on an unrelated provider does not pollute the failure view.
     private const string ErrorCodeFieldName = "errorCode";
 
+    private static readonly string[] s_parentProcessImageFields = ["ParentProcessName", "ParentImage"];
+    private static readonly char[] s_pathSeparators = ['\\', '/'];
+    private static readonly string[] s_processImageFields = ["NewProcessName", "Image"];
+
     // Microsoft-Windows-Servicing stores its failure HRESULT in a UserData Cbs*ChangeState/ErrorCode leaf (a hex string)
     // rather than an EventData errorCode field, so the ErrorCode dimension also probes these curated storage-key paths for
     // an eligible row whose EventData lacks the code. CbsPackageInitiateChanges carries no ErrorCode and is not listed.
@@ -46,6 +50,11 @@ public static class HistogramBuilder
         if (dimension is HistogramDimension.ErrorCode)
         {
             return BuildByErrorCode(view, minTicks, maxTicks, bucketSpanTicks, bucketCount, cancellationToken);
+        }
+
+        if (dimension is HistogramDimension.ProcessImage or HistogramDimension.ParentProcessImage)
+        {
+            return BuildByEventDataString(view, ProcessImageFieldNames(dimension), minTicks, maxTicks, bucketSpanTicks, bucketCount, cancellationToken);
         }
 
         (int[] slotCounts, int slotCount, IReadOnlyList<HistogramGroup> groups) = dimension switch
@@ -185,6 +194,64 @@ public static class HistogramBuilder
             HistogramGroups.ForCategories(keys, labels));
     }
 
+    private static HistogramData BuildByEventDataString(
+        IEventColumnView view,
+        string[] candidateFields,
+        long minTicks,
+        long maxTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        CancellationToken cancellationToken)
+    {
+        var rawCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        view.CountEventDataStringValues(candidateFields, rawCounts, cancellationToken);
+
+        var minUtc = new DateTime(minTicks, DateTimeKind.Utc);
+        var maxUtc = new DateTime(maxTicks, DateTimeKind.Utc);
+
+        var byShortName = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach ((string raw, int count) in rawCounts)
+        {
+            string? shortName = NormalizeProcessImage(raw);
+            if (shortName is null) { continue; }
+
+            byShortName[shortName] = byShortName.TryGetValue(shortName, out int existing) ? existing + count : count;
+        }
+
+        if (byShortName.Count == 0)
+        {
+            return new HistogramData([], 0, bucketCount, minUtc, maxUtc, view.Count, bucketSpanTicks, []) { GroupingFieldAbsent = true };
+        }
+
+        string[] topShortNames = byShortName
+            .OrderByDescending(pair => pair.Value)
+            .ThenBy(pair => pair.Key, StringComparer.Ordinal)
+            .Take(HistogramConstants.MaxGroupByCategories)
+            .Select(pair => pair.Key)
+            .ToArray();
+
+        int slotCount = topShortNames.Length + 1;
+        int otherSlot = topShortNames.Length;
+
+        var shortNameToSlot = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (int index = 0; index < topShortNames.Length; index++) { shortNameToSlot[topShortNames[index]] = index; }
+
+        var rawValueToSlot = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (string raw in rawCounts.Keys)
+        {
+            string? shortName = NormalizeProcessImage(raw);
+            rawValueToSlot[raw] = shortName is not null && shortNameToSlot.TryGetValue(shortName, out int slot) ? slot : otherSlot;
+        }
+
+        int[] slotCounts = new int[bucketCount * slotCount];
+        view.BucketTimeTicksByEventDataString(minTicks, bucketSpanTicks, bucketCount, candidateFields, rawValueToSlot, slotCount, slotCounts, cancellationToken);
+
+        int total = 0;
+        foreach (int count in slotCounts) { total += count; }
+
+        return new HistogramData(slotCounts, slotCount, bucketCount, minUtc, maxUtc, total, bucketSpanTicks, HistogramGroups.ForCategories(topShortNames, topShortNames));
+    }
+
     private static string FormatErrorCodeLabel(long code)
     {
         string hex = "0x" + ((uint)code).ToString("X8", CultureInfo.InvariantCulture);
@@ -192,6 +259,25 @@ public static class HistogramBuilder
 
         return symbol is null ? hex : $"{hex} {symbol}";
     }
+
+    private static string? NormalizeProcessImage(string raw)
+    {
+        string trimmed = raw.Trim();
+        if (trimmed.Length >= 2 && trimmed[0] == '"' && trimmed[^1] == '"') { trimmed = trimmed[1..^1].Trim(); }
+
+        int slash = trimmed.LastIndexOfAny(s_pathSeparators);
+        string tail = slash >= 0 ? trimmed[(slash + 1)..] : trimmed;
+        if (tail.Length == 0 || tail == "-") { return null; }
+
+        return tail.ToLowerInvariant();
+    }
+
+    private static string[] ProcessImageFieldNames(HistogramDimension dimension) => dimension switch
+    {
+        HistogramDimension.ProcessImage => s_processImageFields,
+        HistogramDimension.ParentProcessImage => s_parentProcessImageFields,
+        _ => throw new ArgumentOutOfRangeException(nameof(dimension), dimension, "Dimension is not a process image field.")
+    };
 
     private static (int[] SlotCounts, int SlotCount, IReadOnlyList<HistogramGroup> Groups) ScanByEventId(
         IEventColumnView view,

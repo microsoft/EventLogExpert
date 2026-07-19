@@ -57,6 +57,18 @@ public interface IEventColumnReader
         int[] slotCounts,
         CancellationToken cancellationToken);
 
+    /// <summary>Bucket-by-EventData string variant keyed on the first usable named candidate field value.</summary>
+    void BucketTimeTicksByEventDataString(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken);
+
     /// <summary>Group-by variant keyed on the numeric event id; (<paramref name="targetIds" /> length + 1) slots per bin.</summary>
     void BucketTimeTicksByEventId(
         ReadOnlySpan<int> rankByPhysical,
@@ -122,6 +134,9 @@ public interface IEventColumnReader
     ///     string); ineligible-provider, absent-field, and zero/undecodable rows are omitted.
     /// </summary>
     void CountEventDataHResults(ReadOnlySpan<int> rankByPhysical, string fieldName, IReadOnlyCollection<string> eligibleProviders, IReadOnlyList<string> userDataErrorCodePaths, IDictionary<long, int> counts, CancellationToken cancellationToken);
+
+    /// <summary>Tallies survivors by the first usable string value from the named EventData candidate fields.</summary>
+    void CountEventDataStringValues(ReadOnlySpan<int> rankByPhysical, string[] candidateFields, IDictionary<string, int> counts, CancellationToken cancellationToken);
 
     /// <summary>
     ///     Group-by variant for a named EventData field of allowlisted numeric codes: tallies survivors by the field's

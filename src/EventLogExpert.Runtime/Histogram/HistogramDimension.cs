@@ -13,5 +13,7 @@ public enum HistogramDimension
     Log,
     LogonType,
     TicketEncryptionType,
-    ErrorCode
+    ErrorCode,
+    ProcessImage,
+    ParentProcessImage
 }

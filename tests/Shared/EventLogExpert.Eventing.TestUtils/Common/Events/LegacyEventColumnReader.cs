@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Structured;
 
 namespace EventLogExpert.Eventing.Common.Events;
@@ -66,7 +67,12 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
             {
                 for (int target = 0; target < targetCodes.Length; target++)
                 {
-                    if (targetCodes[target] == code) { slot = target; break; }
+                    if (targetCodes[target] == code)
+                    {
+                        slot = target;
+
+                        break;
+                    }
                 }
             }
 
@@ -114,6 +120,48 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
             for (int target = 0; target < targetCodes.Length; target++)
             {
                 if (targetCodes[target] == code) { slot = target; break; }
+            }
+
+            slotCounts[(clamped * slotCount) + slot]++;
+        }
+    }
+
+    public void BucketTimeTicksByEventDataString(
+        ReadOnlySpan<int> rankByPhysical,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(candidateFields);
+        ArgumentNullException.ThrowIfNull(rawValueToSlot);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        int otherSlot = slotCount - 1;
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            long bucket = (_events[index].TimeCreated.Ticks - minTicks) / bucketSpanTicks;
+            int clamped = bucket < 0 ? 0 : bucket >= bucketCount ? bucketCount - 1 : (int)bucket;
+            int slot = otherSlot;
+
+            for (int candidate = 0; candidate < candidateFields.Length; candidate++)
+            {
+                if (_events[index].EventData.TryGetRawValue(candidateFields[candidate], out EventProperty property)
+                    && property.Reference is string raw
+                    && EventColumnStore.IsUsableRawValue(raw))
+                {
+                    slot = rawValueToSlot.TryGetValue(raw, out int mapped) ? mapped : otherSlot;
+
+                    break;
+                }
             }
 
             slotCounts[(clamped * slotCount) + slot]++;
@@ -306,6 +354,30 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
             if (TryGetHResult(resolved, fieldName, userDataErrorCodePaths, out long code))
             {
                 counts[code] = counts.TryGetValue(code, out int existing) ? existing + 1 : 1;
+            }
+        }
+    }
+
+    public void CountEventDataStringValues(ReadOnlySpan<int> rankByPhysical, string[] candidateFields, IDictionary<string, int> counts, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(candidateFields);
+        ArgumentNullException.ThrowIfNull(counts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            for (int candidate = 0; candidate < candidateFields.Length; candidate++)
+            {
+                if (_events[index].EventData.TryGetRawValue(candidateFields[candidate], out EventProperty property)
+                    && property.Reference is string raw
+                    && EventColumnStore.IsUsableRawValue(raw))
+                {
+                    counts[raw] = counts.TryGetValue(raw, out int existing) ? existing + 1 : 1;
+
+                    break;
+                }
             }
         }
     }
