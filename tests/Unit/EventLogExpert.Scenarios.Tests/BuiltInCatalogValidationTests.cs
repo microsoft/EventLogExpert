@@ -163,32 +163,32 @@ public sealed class BuiltInCatalogValidationTests
     // needle). A misspelled needle in the refactored JSON fails here because the correctly-spelled payload cannot match a
     // mistyped filter needle - a defect that catalog compile/round-trip validation cannot detect.
     [Theory]
-    // lolbin-process-creation-by-name (Security 4688, NewProcessName): DarkRed / Red / Orange tiers.
-    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "mshta.exe", "DarkRed")]
-    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "wscript.exe", "DarkRed")]
-    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "cscript.exe", "DarkRed")]
-    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "rundll32.exe", "Red")]
-    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "regsvr32.exe", "Red")]
-    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "installutil.exe", "Red")]
-    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "certutil.exe", "Orange")]
-    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "bitsadmin.exe", "Orange")]
-    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "wmic.exe", "Orange")]
-    // sysmon-lolbin-initiated-network (Sysmon 3, Image): DarkRed / Red / Orange tiers.
-    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "mshta.exe", "DarkRed")]
-    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "wscript.exe", "DarkRed")]
-    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "cscript.exe", "DarkRed")]
-    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "powershell.exe", "Red")]
-    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "pwsh.exe", "Red")]
-    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "rundll32.exe", "Orange")]
-    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "regsvr32.exe", "Orange")]
-    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "certutil.exe", "Orange")]
-    // suspicious-ps-scriptblock-ioc-triage (PowerShell 4104, ScriptBlockText): Red / Orange content tiers (the Blue row
+    // lolbin-process-creation-by-name (Security 4688, NewProcessName): LightRed / LightOrange / LightYellow tiers.
+    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "mshta.exe", "LightRed")]
+    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "wscript.exe", "LightRed")]
+    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "cscript.exe", "LightRed")]
+    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "rundll32.exe", "LightOrange")]
+    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "regsvr32.exe", "LightOrange")]
+    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "installutil.exe", "LightOrange")]
+    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "certutil.exe", "LightYellow")]
+    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "bitsadmin.exe", "LightYellow")]
+    [InlineData("lolbin-process-creation-by-name", 4688, "NewProcessName", "wmic.exe", "LightYellow")]
+    // sysmon-lolbin-initiated-network (Sysmon 3, Image): LightRed / LightOrange / LightYellow tiers.
+    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "mshta.exe", "LightRed")]
+    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "wscript.exe", "LightRed")]
+    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "cscript.exe", "LightRed")]
+    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "powershell.exe", "LightOrange")]
+    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "pwsh.exe", "LightOrange")]
+    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "rundll32.exe", "LightYellow")]
+    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "regsvr32.exe", "LightYellow")]
+    [InlineData("sysmon-lolbin-initiated-network", 3, "Image", "certutil.exe", "LightYellow")]
+    // suspicious-ps-scriptblock-ioc-triage (PowerShell 4104, ScriptBlockText): LightRed / LightOrange content tiers (the Blue row
     // keys on Level, not a needle, so it is covered by the Level-defaulting-empty non-match implicitly).
-    [InlineData("suspicious-ps-scriptblock-ioc-triage", 4104, "ScriptBlockText", "FromBase64String", "Red")]
-    [InlineData("suspicious-ps-scriptblock-ioc-triage", 4104, "ScriptBlockText", "Invoke-Expression", "Red")]
-    [InlineData("suspicious-ps-scriptblock-ioc-triage", 4104, "ScriptBlockText", "DownloadString", "Orange")]
-    [InlineData("suspicious-ps-scriptblock-ioc-triage", 4104, "ScriptBlockText", "New-Object Net.WebClient", "Orange")]
-    [InlineData("suspicious-ps-scriptblock-ioc-triage", 4104, "ScriptBlockText", "Reflection.Assembly]::Load", "Orange")]
+    [InlineData("suspicious-ps-scriptblock-ioc-triage", 4104, "ScriptBlockText", "FromBase64String", "LightRed")]
+    [InlineData("suspicious-ps-scriptblock-ioc-triage", 4104, "ScriptBlockText", "Invoke-Expression", "LightRed")]
+    [InlineData("suspicious-ps-scriptblock-ioc-triage", 4104, "ScriptBlockText", "DownloadString", "LightOrange")]
+    [InlineData("suspicious-ps-scriptblock-ioc-triage", 4104, "ScriptBlockText", "New-Object Net.WebClient", "LightOrange")]
+    [InlineData("suspicious-ps-scriptblock-ioc-triage", 4104, "ScriptBlockText", "Reflection.Assembly]::Load", "LightOrange")]
     // encoded-powershell-commandline-field (Security 4688, CommandLine): single uncolored (None) row.
     [InlineData("encoded-powershell-commandline-field", 4688, "CommandLine", "-EncodedCommand", "None")]
     [InlineData("encoded-powershell-commandline-field", 4688, "CommandLine", "-enc ", "None")]
@@ -230,16 +230,16 @@ public sealed class BuiltInCatalogValidationTests
     // mshta.ex) or a tier re-expanded into same-colored single rows; this test rejects both by pinning Values + shape.
     [Theory]
     // lolbin-process-creation-by-name (Security 4688, NewProcessName)
-    [InlineData("lolbin-process-creation-by-name", 0, "DarkRed", "4688", "NewProcessName", new[] { "mshta.exe", "wscript.exe", "cscript.exe" })]
-    [InlineData("lolbin-process-creation-by-name", 1, "Red", "4688", "NewProcessName", new[] { "rundll32.exe", "regsvr32.exe", "installutil.exe" })]
-    [InlineData("lolbin-process-creation-by-name", 2, "Orange", "4688", "NewProcessName", new[] { "certutil.exe", "bitsadmin.exe", "wmic.exe" })]
+    [InlineData("lolbin-process-creation-by-name", 0, "LightRed", "4688", "NewProcessName", new[] { "mshta.exe", "wscript.exe", "cscript.exe" })]
+    [InlineData("lolbin-process-creation-by-name", 1, "LightOrange", "4688", "NewProcessName", new[] { "rundll32.exe", "regsvr32.exe", "installutil.exe" })]
+    [InlineData("lolbin-process-creation-by-name", 2, "LightYellow", "4688", "NewProcessName", new[] { "certutil.exe", "bitsadmin.exe", "wmic.exe" })]
     // sysmon-lolbin-initiated-network (Sysmon 3, Image)
-    [InlineData("sysmon-lolbin-initiated-network", 0, "DarkRed", "3", "Image", new[] { "mshta.exe", "wscript.exe", "cscript.exe" })]
-    [InlineData("sysmon-lolbin-initiated-network", 1, "Red", "3", "Image", new[] { "powershell.exe", "pwsh.exe" })]
-    [InlineData("sysmon-lolbin-initiated-network", 2, "Orange", "3", "Image", new[] { "rundll32.exe", "regsvr32.exe", "certutil.exe" })]
+    [InlineData("sysmon-lolbin-initiated-network", 0, "LightRed", "3", "Image", new[] { "mshta.exe", "wscript.exe", "cscript.exe" })]
+    [InlineData("sysmon-lolbin-initiated-network", 1, "LightOrange", "3", "Image", new[] { "powershell.exe", "pwsh.exe" })]
+    [InlineData("sysmon-lolbin-initiated-network", 2, "LightYellow", "3", "Image", new[] { "rundll32.exe", "regsvr32.exe", "certutil.exe" })]
     // suspicious-ps-scriptblock-ioc-triage (PowerShell 4104, ScriptBlockText) - rows 0/1 are Contains-Any; row 2 is the Level=Warning Blue row.
-    [InlineData("suspicious-ps-scriptblock-ioc-triage", 0, "Red", "4104", "ScriptBlockText", new[] { "FromBase64String", "Invoke-Expression" })]
-    [InlineData("suspicious-ps-scriptblock-ioc-triage", 1, "Orange", "4104", "ScriptBlockText", new[] { "DownloadString", "New-Object Net.WebClient", "Reflection.Assembly]::Load" })]
+    [InlineData("suspicious-ps-scriptblock-ioc-triage", 0, "LightRed", "4104", "ScriptBlockText", new[] { "FromBase64String", "Invoke-Expression" })]
+    [InlineData("suspicious-ps-scriptblock-ioc-triage", 1, "LightOrange", "4104", "ScriptBlockText", new[] { "DownloadString", "New-Object Net.WebClient", "Reflection.Assembly]::Load" })]
     // encoded-powershell-commandline-field (Security 4688, CommandLine) - single uncolored row
     [InlineData("encoded-powershell-commandline-field", 0, "None", "4688", "CommandLine", new[] { "-EncodedCommand", "-enc ", "FromBase64String", "IEX", "DownloadString", "-w hidden", "-nop" })]
     // lolbin-in-process-command-line (Security 4688, CommandLine) - single uncolored row, proxied-execution companion
@@ -350,13 +350,13 @@ public sealed class BuiltInCatalogValidationTests
     }
 
     [Theory]
-    [InlineData("EventLog", 6008, "Red")]
-    [InlineData("Microsoft-Windows-Kernel-Power", 41, "Red")]
-    [InlineData("User32", 1074, "Orange")]
-    [InlineData("EventLog", 6006, "Yellow")]
-    [InlineData("EventLog", 6005, "Green")]
-    [InlineData("Microsoft-Windows-WindowsUpdateClient", 19, "Green")]
-    [InlineData("Microsoft-Windows-WindowsUpdateClient", 43, "Teal")]
+    [InlineData("EventLog", 6008, "LightRed")]
+    [InlineData("Microsoft-Windows-Kernel-Power", 41, "LightRed")]
+    [InlineData("User32", 1074, "LightOrange")]
+    [InlineData("EventLog", 6006, "LightYellow")]
+    [InlineData("EventLog", 6005, "LightGreen")]
+    [InlineData("Microsoft-Windows-WindowsUpdateClient", 19, "LightGreen")]
+    [InlineData("Microsoft-Windows-WindowsUpdateClient", 43, "LightTeal")]
     public void RebootCrashCorrelation_MatchesEachProviderIdWithItsColor(string source, int id, string expectedColor)
     {
         var filterSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == "update-reboot-crash-correlation"));
@@ -415,11 +415,11 @@ public sealed class BuiltInCatalogValidationTests
     // Servicing events - including the failure event 3 - are logged at Level=Information, so the prior Level=Error
     // filter matched nothing. See files/real-log-validation-2026-07-17.md.
     [Theory]
-    [InlineData(3, "Red")]
-    [InlineData(4, "Yellow")]
-    [InlineData(13, "Yellow")]
-    [InlineData(2, "Green")]
-    [InlineData(9, "Green")]
+    [InlineData(3, "LightRed")]
+    [InlineData(4, "LightYellow")]
+    [InlineData(13, "LightYellow")]
+    [InlineData(2, "LightGreen")]
+    [InlineData(9, "LightGreen")]
     public void ServicingOutcomes_MatchesServicingEventByIdAtInformationLevel(int id, string expectedColor)
     {
         var filterSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == "windows-setup-servicing-errors"));
@@ -465,9 +465,9 @@ public sealed class BuiltInCatalogValidationTests
     // WUClient failures log at Level=Error and warnings at Level=Warning (manifest), so those buckets are level-keyed;
     // the success event 19 is Level=Information and so is keyed by id.
     [Theory]
-    [InlineData(19, "Information", "Green")]
-    [InlineData(20, "Error", "Red")]
-    [InlineData(16, "Warning", "Yellow")]
+    [InlineData(19, "Information", "LightGreen")]
+    [InlineData(20, "Error", "LightRed")]
+    [InlineData(16, "Warning", "LightYellow")]
     public void WindowsUpdateDiagnostics_KeysSuccessByIdFailuresAndWarningsByLevel(int id, string level, string expectedColor)
     {
         var filterSet = s_registry.BuildFilterSet(s_registry.Scenarios.Single(scenario => scenario.Id == "windows-update-diagnostics"));

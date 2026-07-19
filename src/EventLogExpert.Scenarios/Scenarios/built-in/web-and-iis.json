@@ -15,21 +15,21 @@
       "version": 1,
       "filters": [
         {
-          "color": "Red",
+          "color": "LightOrange",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-WAS" },
           "predicates": [
             { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5009", "5011", "5012" ] } }
           ]
         },
         {
-          "color": "DarkRed",
+          "color": "LightRed",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-WAS" },
           "predicates": [
             { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5002", "5057" ] } }
           ]
         },
         {
-          "color": "Orange",
+          "color": "LightYellow",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-WAS" },
           "predicates": [
             { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5021", "5186" ] } }

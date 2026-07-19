@@ -187,11 +187,11 @@
       "order": 12,
       "version": 1,
       "filters": [
-        { "color": "Green", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5000", "1001", "1117", "2000" ] } },
-        { "color": "Blue", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1000", "5007" ] } },
-        { "color": "Orange", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1002", "2001" ] } },
-        { "color": "Red", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1116", "5001" ] } },
-        { "color": "DarkRed", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1118", "1119" ] } }
+        { "color": "LightGreen", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "5000", "1001", "1117", "2000" ] } },
+        { "color": "LightBlue", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1000", "5007" ] } },
+        { "color": "LightYellow", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1002", "2001" ] } },
+        { "color": "LightOrange", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1116", "5001" ] } },
+        { "color": "LightRed", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "1118", "1119" ] } }
       ]
     }
   ]

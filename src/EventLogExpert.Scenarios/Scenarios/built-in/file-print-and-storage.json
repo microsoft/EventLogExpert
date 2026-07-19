@@ -257,15 +257,15 @@
       "order": 20,
       "version": 1,
       "filters": [
-        { "color": "Green", "comparison": { "property": "Id", "value": "5142" } },
-        { "color": "Blue", "comparison": { "property": "Id", "value": "5143" } },
-        { "color": "Red", "comparison": { "property": "Id", "value": "5144" } }
+        { "color": "LightGreen", "comparison": { "property": "Id", "value": "5142" } },
+        { "color": "LightBlue", "comparison": { "property": "Id", "value": "5143" } },
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "5144" } }
       ]
     },
     {
       "id": "print-jobs-by-printer",
       "name": "Print job story - one printer queue",
-      "purpose": "Successful print jobs (307, Green) and print failures (372, Red) for one specific printer queue. Replace 'PRINTER-NAME' with the printer name as it appears in the event (partial match). Event 307 EventData field param5 = printer; event 372 EventData field param3 = printer (classic spooler positional fields).",
+      "purpose": "Successful print jobs (307, LightGreen) and print failures (372, LightRed) for one specific printer queue. Replace 'PRINTER-NAME' with the printer name as it appears in the event (partial match). Event 307 EventData field param5 = printer; event 372 EventData field param3 = printer (classic spooler positional fields).",
       "group": "FilePrintAndStorage",
       "channels": [ "Microsoft-Windows-PrintService/Operational", "Microsoft-Windows-PrintService/Admin" ],
       "requiresAdmin": false,
@@ -275,14 +275,14 @@
       "order": 21,
       "version": 1,
       "filters": [
-        { "color": "Green", "comparison": { "property": "LogName", "value": "Microsoft-Windows-PrintService/Operational" }, "predicates": [ { "comparison": { "property": "Id", "value": "307" } }, { "comparison": { "property": "EventData", "eventDataFieldName": "param5", "operator": "Contains", "value": "PRINTER-NAME" } } ] },
-        { "color": "Red", "comparison": { "property": "LogName", "value": "Microsoft-Windows-PrintService/Admin" }, "predicates": [ { "comparison": { "property": "Id", "value": "372" } }, { "comparison": { "property": "EventData", "eventDataFieldName": "param3", "operator": "Contains", "value": "PRINTER-NAME" } } ] }
+        { "color": "LightGreen", "comparison": { "property": "LogName", "value": "Microsoft-Windows-PrintService/Operational" }, "predicates": [ { "comparison": { "property": "Id", "value": "307" } }, { "comparison": { "property": "EventData", "eventDataFieldName": "param5", "operator": "Contains", "value": "PRINTER-NAME" } } ] },
+        { "color": "LightRed", "comparison": { "property": "LogName", "value": "Microsoft-Windows-PrintService/Admin" }, "predicates": [ { "comparison": { "property": "Id", "value": "372" } }, { "comparison": { "property": "EventData", "eventDataFieldName": "param3", "operator": "Contains", "value": "PRINTER-NAME" } } ] }
       ]
     },
     {
       "id": "print-jobs-by-user",
       "name": "Print job story - one user",
-      "purpose": "Successful print jobs (307, Green) and print failures (372, Red) submitted by one user. Replace 'USERNAME' with the owner name as it appears in the event (partial match). Event 307 EventData field param3 = owner; event 372 EventData field param2 = owner (classic spooler positional fields).",
+      "purpose": "Successful print jobs (307, LightGreen) and print failures (372, LightRed) submitted by one user. Replace 'USERNAME' with the owner name as it appears in the event (partial match). Event 307 EventData field param3 = owner; event 372 EventData field param2 = owner (classic spooler positional fields).",
       "group": "FilePrintAndStorage",
       "channels": [ "Microsoft-Windows-PrintService/Operational", "Microsoft-Windows-PrintService/Admin" ],
       "requiresAdmin": false,
@@ -292,8 +292,8 @@
       "order": 22,
       "version": 1,
       "filters": [
-        { "color": "Green", "comparison": { "property": "LogName", "value": "Microsoft-Windows-PrintService/Operational" }, "predicates": [ { "comparison": { "property": "Id", "value": "307" } }, { "comparison": { "property": "EventData", "eventDataFieldName": "param3", "operator": "Contains", "value": "USERNAME" } } ] },
-        { "color": "Red", "comparison": { "property": "LogName", "value": "Microsoft-Windows-PrintService/Admin" }, "predicates": [ { "comparison": { "property": "Id", "value": "372" } }, { "comparison": { "property": "EventData", "eventDataFieldName": "param2", "operator": "Contains", "value": "USERNAME" } } ] }
+        { "color": "LightGreen", "comparison": { "property": "LogName", "value": "Microsoft-Windows-PrintService/Operational" }, "predicates": [ { "comparison": { "property": "Id", "value": "307" } }, { "comparison": { "property": "EventData", "eventDataFieldName": "param3", "operator": "Contains", "value": "USERNAME" } } ] },
+        { "color": "LightRed", "comparison": { "property": "LogName", "value": "Microsoft-Windows-PrintService/Admin" }, "predicates": [ { "comparison": { "property": "Id", "value": "372" } }, { "comparison": { "property": "EventData", "eventDataFieldName": "param2", "operator": "Contains", "value": "USERNAME" } } ] }
       ]
     }
   ]

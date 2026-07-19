@@ -513,7 +513,7 @@
     {
       "id": "lolbin-process-creation-by-name",
       "name": "LOLBin process creation (NewProcessName field)",
-      "purpose": "4688 process-creation events filtered on the NewProcessName EventData field, eliminating false positives from description-text matching. Color-coded by risk tier: scripting hosts with no legitimate standalone-execution use (DarkRed), binary-proxy loaders (Red), and download or indirect-execution utilities (Orange). Requires Audit Process Creation. ATT&CK T1218, T1202.",
+      "purpose": "4688 process-creation events filtered on the NewProcessName EventData field, eliminating false positives from description-text matching. Color-coded by risk tier: scripting hosts with no legitimate standalone-execution use (LightRed), binary-proxy loaders (LightOrange), and download or indirect-execution utilities (LightYellow). Requires Audit Process Creation. ATT&CK T1218, T1202.",
       "group": "ThreatsAndIncidentResponse",
       "channels": [ "Security" ],
       "requiresAdmin": true,
@@ -523,9 +523,9 @@
       "order": 37,
       "version": 1,
       "filters": [
-        { "color": "DarkRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "matchMode": "Many", "values": [ "mshta.exe", "wscript.exe", "cscript.exe" ] } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "matchMode": "Many", "values": [ "rundll32.exe", "regsvr32.exe", "installutil.exe" ] } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "matchMode": "Many", "values": [ "certutil.exe", "bitsadmin.exe", "wmic.exe" ] } } ] }
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "matchMode": "Many", "values": [ "mshta.exe", "wscript.exe", "cscript.exe" ] } } ] },
+        { "color": "LightOrange", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "matchMode": "Many", "values": [ "rundll32.exe", "regsvr32.exe", "installutil.exe" ] } } ] },
+        { "color": "LightYellow", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NewProcessName", "operator": "Contains", "matchMode": "Many", "values": [ "certutil.exe", "bitsadmin.exe", "wmic.exe" ] } } ] }
       ]
     },
     {
@@ -541,11 +541,11 @@
       "order": 38,
       "version": 1,
       "filters": [
-        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "winword.exe" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "excel.exe" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "powerpnt.exe" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "outlook.exe" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "onenote.exe" } } ] }
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "winword.exe" } } ] },
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "excel.exe" } } ] },
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "powerpnt.exe" } } ] },
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "outlook.exe" } } ] },
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "4688" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ParentProcessName", "operator": "Contains", "value": "onenote.exe" } } ] }
       ]
     },
     {
@@ -565,7 +565,7 @@
     {
       "id": "suspicious-ps-scriptblock-ioc-triage",
       "name": "PowerShell script block - IOC content triage",
-      "purpose": "Color-coded 4104 script-block triage: Red rows match ScriptBlockText containing in-memory decode-and-execute constructs (FromBase64String, Invoke-Expression); Orange rows match download cradles and in-memory assembly loading; the Blue row catches blocks flagged at Warning level by PowerShell's AMSI integration. Combines content-based field filtering with AMSI auto-flagging in one view. Requires PowerShell Script Block Logging. ATT&CK T1059.001, T1027.010, T1140, T1071.001.",
+      "purpose": "Color-coded 4104 script-block triage: LightRed rows match ScriptBlockText containing in-memory decode-and-execute constructs (FromBase64String, Invoke-Expression); LightOrange rows match download cradles and in-memory assembly loading; the LightBlue row catches blocks flagged at Warning level by PowerShell's AMSI integration. Combines content-based field filtering with AMSI auto-flagging in one view. Requires PowerShell Script Block Logging. ATT&CK T1059.001, T1027.010, T1140, T1071.001.",
       "group": "ThreatsAndIncidentResponse",
       "channels": [ "Microsoft-Windows-PowerShell/Operational" ],
       "requiresAdmin": false,
@@ -573,15 +573,15 @@
       "order": 40,
       "version": 1,
       "filters": [
-        { "color": "Red", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "matchMode": "Many", "values": [ "FromBase64String", "Invoke-Expression" ] } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "matchMode": "Many", "values": [ "DownloadString", "New-Object Net.WebClient", "Reflection.Assembly]::Load" ] } } ] },
-        { "color": "Blue", "comparison": { "property": "Level", "value": "Warning" }, "predicates": [ { "comparison": { "property": "Id", "value": "4104" } } ] }
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "matchMode": "Many", "values": [ "FromBase64String", "Invoke-Expression" ] } } ] },
+        { "color": "LightOrange", "comparison": { "property": "Id", "value": "4104" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "ScriptBlockText", "operator": "Contains", "matchMode": "Many", "values": [ "DownloadString", "New-Object Net.WebClient", "Reflection.Assembly]::Load" ] } } ] },
+        { "color": "LightBlue", "comparison": { "property": "Level", "value": "Warning" }, "predicates": [ { "comparison": { "property": "Id", "value": "4104" } } ] }
       ]
     },
     {
       "id": "sysmon-lolbin-initiated-network",
       "name": "Sysmon - LOLBin & script engine network connection",
-      "purpose": "Sysmon Event 3 network-connect events filtered to connections initiated by scripting hosts and Living-off-the-Land binaries. Color-coded by tier: scripting hosts with no legitimate outbound use (DarkRed), PowerShell variants (Red), and binary-proxy loaders (Orange). Requires Sysmon with NetworkConnect logging enabled. ATT&CK T1071.001, T1218, T1059.",
+      "purpose": "Sysmon Event 3 network-connect events filtered to connections initiated by scripting hosts and Living-off-the-Land binaries. Color-coded by tier: scripting hosts with no legitimate outbound use (LightRed), PowerShell variants (LightOrange), and binary-proxy loaders (LightYellow). Requires Sysmon with NetworkConnect logging enabled. ATT&CK T1071.001, T1218, T1059.",
       "group": "ThreatsAndIncidentResponse",
       "channels": [ "Microsoft-Windows-Sysmon/Operational" ],
       "requiresAdmin": false,
@@ -591,9 +591,9 @@
       "order": 41,
       "version": 1,
       "filters": [
-        { "color": "DarkRed", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "matchMode": "Many", "values": [ "mshta.exe", "wscript.exe", "cscript.exe" ] } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "matchMode": "Many", "values": [ "powershell.exe", "pwsh.exe" ] } } ] },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "matchMode": "Many", "values": [ "rundll32.exe", "regsvr32.exe", "certutil.exe" ] } } ] }
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "matchMode": "Many", "values": [ "mshta.exe", "wscript.exe", "cscript.exe" ] } } ] },
+        { "color": "LightOrange", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "matchMode": "Many", "values": [ "powershell.exe", "pwsh.exe" ] } } ] },
+        { "color": "LightYellow", "comparison": { "property": "Id", "value": "3" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "Image", "operator": "Contains", "matchMode": "Many", "values": [ "rundll32.exe", "regsvr32.exe", "certutil.exe" ] } } ] }
       ]
     },
     {

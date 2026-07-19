@@ -43,21 +43,21 @@
       "version": 1,
       "filters": [
         {
-          "color": "Green",
+          "color": "LightGreen",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-WindowsUpdateClient" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "19" } }
           ]
         },
         {
-          "color": "Yellow",
+          "color": "LightYellow",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-WindowsUpdateClient" },
           "predicates": [
             { "comparison": { "property": "Level", "value": "Warning" } }
           ]
         },
         {
-          "color": "Red",
+          "color": "LightRed",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-WindowsUpdateClient" },
           "predicates": [
             { "comparison": { "property": "Level", "value": "Error" } }
@@ -79,21 +79,21 @@
       "version": 1,
       "filters": [
         {
-          "color": "Red",
+          "color": "LightRed",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-Servicing" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "3" } }
           ]
         },
         {
-          "color": "Yellow",
+          "color": "LightYellow",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-Servicing" },
           "predicates": [
             { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "4", "13" ] } }
           ]
         },
         {
-          "color": "Green",
+          "color": "LightGreen",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-Servicing" },
           "predicates": [
             { "comparison": { "property": "Id", "matchMode": "Many", "values": [ "2", "9" ] } }
@@ -115,49 +115,49 @@
       "version": 1,
       "filters": [
         {
-          "color": "Red",
+          "color": "LightRed",
           "comparison": { "property": "Source", "value": "EventLog" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "6008" } }
           ]
         },
         {
-          "color": "Red",
+          "color": "LightRed",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-Kernel-Power" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "41" } }
           ]
         },
         {
-          "color": "Orange",
+          "color": "LightOrange",
           "comparison": { "property": "Source", "value": "User32" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "1074" } }
           ]
         },
         {
-          "color": "Yellow",
+          "color": "LightYellow",
           "comparison": { "property": "Source", "value": "EventLog" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "6006" } }
           ]
         },
         {
-          "color": "Green",
+          "color": "LightGreen",
           "comparison": { "property": "Source", "value": "EventLog" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "6005" } }
           ]
         },
         {
-          "color": "Green",
+          "color": "LightGreen",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-WindowsUpdateClient" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "19" } }
           ]
         },
         {
-          "color": "Teal",
+          "color": "LightTeal",
           "comparison": { "property": "Source", "value": "Microsoft-Windows-WindowsUpdateClient" },
           "predicates": [
             { "comparison": { "property": "Id", "value": "43" } }

@@ -90,15 +90,15 @@
       "order": 2,
       "version": 1,
       "filters": [
-        { "color": "Green", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6272", "6278" ] } },
-        { "color": "Red", "comparison": { "property": "Id", "value": "6273" } },
-        { "color": "Orange", "comparison": { "property": "Id", "value": "6274" } }
+        { "color": "LightGreen", "comparison": { "property": "Id", "matchMode": "Many", "values": [ "6272", "6278" ] } },
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "6273" } },
+        { "color": "LightOrange", "comparison": { "property": "Id", "value": "6274" } }
       ]
     },
     {
       "id": "nps-per-policy-access-triage",
       "name": "NPS access triage - one network policy",
-      "purpose": "Color-coded NPS grants (6272, Green) and denials (6273, Red) scoped to a single NetworkPolicyName. Replace 'POLICY-NAME' with a partial policy name (Contains match). Isolates VPN, Wi-Fi, or NAP policy decisions from a busy Security log.",
+      "purpose": "Color-coded NPS grants (6272, LightGreen) and denials (6273, LightRed) scoped to a single NetworkPolicyName. Replace 'POLICY-NAME' with a partial policy name (Contains match). Isolates VPN, Wi-Fi, or NAP policy decisions from a busy Security log.",
       "group": "NpsAndRras",
       "channels": [ "Security" ],
       "requiresAdmin": true,
@@ -108,14 +108,14 @@
       "order": 10,
       "version": 1,
       "filters": [
-        { "color": "Green", "comparison": { "property": "Id", "value": "6272" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NetworkPolicyName", "operator": "Contains", "value": "POLICY-NAME" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "6273" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NetworkPolicyName", "operator": "Contains", "value": "POLICY-NAME" } } ] }
+        { "color": "LightGreen", "comparison": { "property": "Id", "value": "6272" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NetworkPolicyName", "operator": "Contains", "value": "POLICY-NAME" } } ] },
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "6273" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NetworkPolicyName", "operator": "Contains", "value": "POLICY-NAME" } } ] }
       ]
     },
     {
       "id": "nps-per-nas-device-triage",
       "name": "NPS access triage - one NAS device",
-      "purpose": "Color-coded NPS grants (6272, Green) and denials (6273, Red) for a single NAS device identified by NASIdentifier. Replace 'NAS-HOSTNAME' with the device hostname or IP. Isolates one switch, wireless controller, or VPN gateway's RADIUS traffic.",
+      "purpose": "Color-coded NPS grants (6272, LightGreen) and denials (6273, LightRed) for a single NAS device identified by NASIdentifier. Replace 'NAS-HOSTNAME' with the device hostname or IP. Isolates one switch, wireless controller, or VPN gateway's RADIUS traffic.",
       "group": "NpsAndRras",
       "channels": [ "Security" ],
       "requiresAdmin": true,
@@ -125,14 +125,14 @@
       "order": 11,
       "version": 1,
       "filters": [
-        { "color": "Green", "comparison": { "property": "Id", "value": "6272" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NASIdentifier", "operator": "Contains", "value": "NAS-HOSTNAME" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "6273" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NASIdentifier", "operator": "Contains", "value": "NAS-HOSTNAME" } } ] }
+        { "color": "LightGreen", "comparison": { "property": "Id", "value": "6272" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NASIdentifier", "operator": "Contains", "value": "NAS-HOSTNAME" } } ] },
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "6273" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "NASIdentifier", "operator": "Contains", "value": "NAS-HOSTNAME" } } ] }
       ]
     },
     {
       "id": "nps-user-auth-story",
       "name": "NPS authentication story - one user",
-      "purpose": "All NPS access decisions for one user: granted (6272, Green) and denied (6273, Red). Replace 'USERNAME' with the SAMAccountName (partial match via Contains). Answers 'why can't this user connect?' without sifting through all accounts.",
+      "purpose": "All NPS access decisions for one user: granted (6272, LightGreen) and denied (6273, LightRed). Replace 'USERNAME' with the SAMAccountName (partial match via Contains). Answers 'why can't this user connect?' without sifting through all accounts.",
       "group": "NpsAndRras",
       "channels": [ "Security" ],
       "requiresAdmin": true,
@@ -142,14 +142,14 @@
       "order": 12,
       "version": 1,
       "filters": [
-        { "color": "Green", "comparison": { "property": "Id", "value": "6272" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "SubjectUserName", "operator": "Contains", "value": "USERNAME" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "6273" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "SubjectUserName", "operator": "Contains", "value": "USERNAME" } } ] }
+        { "color": "LightGreen", "comparison": { "property": "Id", "value": "6272" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "SubjectUserName", "operator": "Contains", "value": "USERNAME" } } ] },
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "6273" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "SubjectUserName", "operator": "Contains", "value": "USERNAME" } } ] }
       ]
     },
     {
       "id": "nps-per-endpoint-triage",
       "name": "NPS access triage - one endpoint (802.1x / CallingStationID)",
-      "purpose": "Color-coded NPS grants (6272, Green) and denials (6273, Red) for a specific client endpoint by CallingStationID (MAC address for 802.1x/Wi-Fi; IP or phone number for VPN). Replace 'MAC-ADDRESS' with a partial identifier. Answers 'why won't this device connect?' independently of user account or NAS.",
+      "purpose": "Color-coded NPS grants (6272, LightGreen) and denials (6273, LightRed) for a specific client endpoint by CallingStationID (MAC address for 802.1x/Wi-Fi; IP or phone number for VPN). Replace 'MAC-ADDRESS' with a partial identifier. Answers 'why won't this device connect?' independently of user account or NAS.",
       "group": "NpsAndRras",
       "channels": [ "Security" ],
       "requiresAdmin": true,
@@ -159,8 +159,8 @@
       "order": 13,
       "version": 1,
       "filters": [
-        { "color": "Green", "comparison": { "property": "Id", "value": "6272" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CallingStationID", "operator": "Contains", "value": "MAC-ADDRESS" } } ] },
-        { "color": "Red", "comparison": { "property": "Id", "value": "6273" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CallingStationID", "operator": "Contains", "value": "MAC-ADDRESS" } } ] }
+        { "color": "LightGreen", "comparison": { "property": "Id", "value": "6272" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CallingStationID", "operator": "Contains", "value": "MAC-ADDRESS" } } ] },
+        { "color": "LightRed", "comparison": { "property": "Id", "value": "6273" }, "predicates": [ { "comparison": { "property": "EventData", "eventDataFieldName": "CallingStationID", "operator": "Contains", "value": "MAC-ADDRESS" } } ] }
       ]
     },
     {
