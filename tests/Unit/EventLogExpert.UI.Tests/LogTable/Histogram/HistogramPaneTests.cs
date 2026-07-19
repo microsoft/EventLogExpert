@@ -15,6 +15,7 @@ using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.LogTable.Find;
 using EventLogExpert.UI.LogTable.Histogram;
 using Fluxor;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -158,6 +159,30 @@ public sealed class HistogramPaneTests : BunitContext
     }
 
     [Fact]
+    public async Task Render_WhenLegendHasLongLabel_WrapsVisibleValueInTitledSpan()
+    {
+        const string longLabel = "Microsoft-Windows-Servicing-CbsPackageChangeState";
+        IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories([longLabel], [longLabel], otherLabel: null);
+        var data = new HistogramData(
+            [1, 0],
+            2,
+            1,
+            new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2024, 1, 1, 1, 0, 0, DateTimeKind.Utc),
+            1,
+            TimeSpan.FromHours(1).Ticks,
+            groups);
+        var cut = Render<HistogramPane>();
+
+        await PublishBaseDataAsync(cut, data);
+
+        var label = cut.Find(".histogram-legend-label");
+        Assert.Equal(longLabel, label.TextContent);
+        Assert.Equal(longLabel, label.GetAttribute("title"));
+        Assert.Contains($"Hide {longLabel}", cut.Find(".histogram-legend-item").GetAttribute("aria-label"));
+    }
+
+    [Fact]
     public async Task Render_WhenStaleDimensionRequestArrivesAfterManualChange_DoesNotOverrideManualDimension()
     {
         _dimensionRequestValue = new HistogramDimensionRequest(HistogramDimension.EventId, 3);
@@ -168,6 +193,31 @@ public sealed class HistogramPaneTests : BunitContext
             Raise.Event<EventHandler<HistogramDimensionRequest?>>(_dimensionRequest, _dimensionRequestValue);
 
         cut.WaitForAssertion(() => Assert.Equal(HistogramDimension.Source, GetDimension(cut)));
+    }
+
+    [Fact]
+    public async Task Render_WhenTieModeIncludesCategoricalOther_RendersOtherAsRecessiveGray()
+    {
+        IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories(["alpha"], ["Alpha"], "Other");
+        var data = new HistogramData(
+            [1, 1],
+            2,
+            1,
+            new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2024, 1, 1, 1, 0, 0, DateTimeKind.Utc),
+            2,
+            TimeSpan.FromHours(1).Ticks,
+            groups,
+            [1u << 1, 1u << 1]);
+        var cut = Render<HistogramPane>();
+
+        await PublishBaseDataAsync(cut, data);
+
+        var otherButton = cut.FindAll(".histogram-legend-item").Single(button => button.TextContent == "Other");
+        var otherSwatch = otherButton.QuerySelector("rect");
+        Assert.Equal("Hide Other", otherButton.GetAttribute("aria-label"));
+        Assert.Equal("histogram-cat-other", otherSwatch?.GetAttribute("class"));
+        Assert.Null(otherSwatch?.GetAttribute("data-highlight"));
     }
 
     [Theory]
@@ -200,6 +250,24 @@ public sealed class HistogramPaneTests : BunitContext
         Assert.False(shouldArmTie);
     }
 
+    [Fact]
+    public void SourceFiles_DefineExtendedHistogramPaletteAndForcedColorHatches()
+    {
+        string razor = File.ReadAllText(ResolveRepoPath("src", "EventLogExpert.UI", "LogTable", "Histogram", "HistogramPane.razor"));
+        string css = File.ReadAllText(ResolveRepoPath("src", "EventLogExpert.UI", "LogTable", "Histogram", "HistogramPane.razor.css"));
+
+        for (int index = 4; index <= 7; index++)
+        {
+            Assert.Contains($".histogram-cat-{index}", css);
+        }
+
+        for (int index = 0; index <= 12; index++)
+        {
+            Assert.Contains($"id=\"histogram-hatch-cat-{index}\"", razor);
+            Assert.Contains($"data-stackpos=\"{index}\"", css);
+        }
+    }
+
     private static SavedFilter Filter(HighlightColor color) =>
         new() { Color = color, IsEnabled = true, ComparisonText = "Id == 1", Compiled = null! };
 
@@ -211,6 +279,38 @@ public sealed class HistogramPaneTests : BunitContext
 
         Assert.NotNull(field);
         return Assert.IsType<HistogramDimension>(field.GetValue(cut.Instance));
+    }
+
+    private static Task PublishBaseDataAsync(IRenderedComponent<HistogramPane> cut, HistogramData data)
+    {
+        var field = typeof(HistogramPane).GetField(
+            "_baseData",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        var stateHasChanged = typeof(ComponentBase).GetMethod(
+            "StateHasChanged",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(field);
+        Assert.NotNull(stateHasChanged);
+        field.SetValue(cut.Instance, data);
+        return cut.InvokeAsync(() => stateHasChanged.Invoke(cut.Instance, null));
+    }
+
+    private static string ResolveRepoPath(params string[] segments)
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "EventLogExpert.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+
+        string path = Path.Combine([directory.FullName, .. segments]);
+        Assert.True(File.Exists(path), $"Expected source file at {path} to exist.");
+
+        return path;
     }
 
     private static Task SelectDimensionAsync(IRenderedComponent<HistogramPane> cut, HistogramDimension dimension)

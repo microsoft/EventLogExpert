@@ -657,23 +657,31 @@ public sealed partial class HistogramPane
         return parts.Count == 0 ? string.Empty : $" ({string.Join(", ", parts)})";
     }
 
-    private string GroupColorClass(int group) =>
-        _baseData is { GroupHighlightMasks: not null } ? "histogram-cat-hl" :
-        _baseData is { } data && group < data.Groups.Count ? data.Groups[group].ColorClass : string.Empty;
+    private string GroupColorClass(int group)
+    {
+        if (_baseData is not { } data || group >= data.Groups.Count) { return string.Empty; }
+
+        if (IsCategoricalOther(data, group)) { return "histogram-cat-other"; }
+
+        return data.GroupHighlightMasks is not null ? "histogram-cat-hl" : data.Groups[group].ColorClass;
+    }
 
     private string? GroupHighlightCssName(int group)
     {
-        if (_baseData?.GroupHighlightMasks is not { } masks || group >= masks.Length) { return null; }
+        if (_baseData is not { } data || IsCategoricalOther(data, group) || data.GroupHighlightMasks is not { } masks || group >= masks.Length) { return null; }
 
         return ResolveGroupHighlight(masks[group]).CssName;
     }
 
     private string GroupHighlightText(int group)
     {
-        if (_baseData?.GroupHighlightMasks is not { } masks || group >= masks.Length) { return string.Empty; }
+        if (_baseData is not { } data || IsCategoricalOther(data, group) || data.GroupHighlightMasks is not { } masks || group >= masks.Length) { return string.Empty; }
 
         return ResolveGroupHighlight(masks[group]).Description;
     }
+
+    private static bool IsCategoricalOther(HistogramData data, int group) =>
+        group < data.Groups.Count && data.Groups[group].ColorClass == "histogram-cat-other";
 
     private void HandleKeyDown(KeyboardEventArgs args)
     {

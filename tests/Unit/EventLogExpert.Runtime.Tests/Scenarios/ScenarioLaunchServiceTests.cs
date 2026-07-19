@@ -82,7 +82,7 @@ public sealed class ScenarioLaunchServiceTests
         await service.LaunchAsync(scenario, dateWindow: null);
 
         dispatcher.Received(1).Dispatch(
-            Arg.Is<RequestHistogramDimensionAction>(action => action.Dimension == HistogramDimension.ErrorCode));
+            Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.ErrorCode));
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class ScenarioLaunchServiceTests
         await service.LaunchAsync(scenario, dateWindow: null);
 
         dispatcher.Received(1).Dispatch(
-            Arg.Is<RequestHistogramDimensionAction>(action => action.Dimension == HistogramDimension.EventId));
+            Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.EventId));
     }
 
     [Fact]
@@ -361,7 +361,7 @@ public sealed class ScenarioLaunchServiceTests
         await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
 
         dispatcher.Received(1).Dispatch(
-            Arg.Is<RequestHistogramDimensionAction>(action => action.Dimension == HistogramDimension.Log));
+            Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.Log));
     }
 
     [Fact]
@@ -383,7 +383,7 @@ public sealed class ScenarioLaunchServiceTests
         await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
 
         dispatcher.Received(1).Dispatch(
-            Arg.Is<RequestHistogramDimensionAction>(action => action.Dimension == HistogramDimension.Source));
+            Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.Source));
     }
 
     [Fact]
