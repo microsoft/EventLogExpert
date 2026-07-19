@@ -34,6 +34,24 @@ public sealed class HistogramGroupsTests
     }
 
     [Fact]
+    public void ForCategories_WhenOtherLabelIsNull_OmitsTheOtherGroup()
+    {
+        var groups = HistogramGroups.ForCategories(["a", "b"], ["A", "B"], otherLabel: null);
+
+        Assert.Equal(["A", "B"], groups.Select(group => group.Label));
+        Assert.DoesNotContain(groups, group => group.Key == "cat-other");
+    }
+
+    [Fact]
+    public void ForCategories_WhenOtherLabelIsSupplied_UsesItForTheOtherGroup()
+    {
+        var groups = HistogramGroups.ForCategories(["a"], ["A"], "Other (1 source)");
+
+        Assert.Equal("Other (1 source)", groups[0].Label);
+        Assert.Equal("cat-other", groups[0].Key);
+    }
+
+    [Fact]
     public void Severity_GroupKeysAreDistinct()
     {
         var keys = HistogramGroups.Severity.Select(group => group.Key).ToArray();

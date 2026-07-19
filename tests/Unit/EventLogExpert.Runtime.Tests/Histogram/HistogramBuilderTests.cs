@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.TestUtils;
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Tests.TestUtils;
@@ -23,7 +24,7 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.Severity, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal(1, data!.BinCount);
+        Assert.Equal(1, data.BinCount);
         Assert.Equal(LevelSeverity.SlotCount, data.SlotCount);
         Assert.Equal(LevelSeverity.SlotCount, data.SlotCounts.Length);
         Assert.Equal(3, data.SlotCounts[0]);
@@ -57,8 +58,8 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(combined, HistogramDimension.Source, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal("shared", data!.Groups[1].Label); // most frequent across both stores (5)
-        Assert.Equal(5, GroupTotal(data, 1));
+        Assert.Equal("shared", data!.Groups[0].Label); // most frequent across both stores (5)
+        Assert.Equal(5, GroupTotal(data, 0));
         Assert.Equal(7, data.Total);
     }
 
@@ -150,7 +151,7 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.Equal(2, data!.Total); // only the eligible failures contribute; successes and other providers are omitted
-        Assert.Equal(2, GroupTotal(data, 1));
+        Assert.Equal(2, GroupTotal(data, 0));
     }
 
     [Fact]
@@ -165,11 +166,11 @@ public sealed class HistogramBuilderTests
         Assert.NotNull(data);
         Assert.False(data!.GroupingFieldAbsent);
         Assert.Equal("error-code events", data.EventNoun);
-        Assert.Equal("0x800F081F CBS_E_SOURCE_MISSING", data.Groups[1].Label);
-        Assert.Equal("cat:2148468767", data.Groups[1].Key);
-        Assert.Equal(2, GroupTotal(data, 1));
-        Assert.Equal("0x800F0823 CBS_E_NEW_SERVICING_STACK_REQUIRED", data.Groups[2].Label);
-        Assert.Equal(1, GroupTotal(data, 2));
+        Assert.Equal("0x800F081F CBS_E_SOURCE_MISSING", data.Groups[0].Label);
+        Assert.Equal("cat:2148468767", data.Groups[0].Key);
+        Assert.Equal(2, GroupTotal(data, 0));
+        Assert.Equal("0x800F0823 CBS_E_NEW_SERVICING_STACK_REQUIRED", data.Groups[1].Label);
+        Assert.Equal(1, GroupTotal(data, 1));
         Assert.Equal(3, data.Total);
     }
 
@@ -182,7 +183,7 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ErrorCode, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal("0x80070005", data!.Groups[1].Label);
+        Assert.Equal("0x80070005", data!.Groups[0].Label);
     }
 
     [Fact]
@@ -194,10 +195,10 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.EventId, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal("1000", data!.Groups[1].Label);
-        Assert.Equal("2000", data.Groups[2].Label);
-        Assert.Equal("3000", data.Groups[3].Label);
-        Assert.Equal(3, GroupTotal(data, 1));
+        Assert.Equal("1000", data!.Groups[0].Label);
+        Assert.Equal("2000", data.Groups[1].Label);
+        Assert.Equal("3000", data.Groups[2].Label);
+        Assert.Equal(3, GroupTotal(data, 0));
         Assert.Equal(6, data.Total);
     }
 
@@ -213,9 +214,9 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         // Same file name AND parent folder ("logs"), so the parenthetical form also collides and both escalate to the full owning-log path.
-        Assert.Equal(@"C:\logs\Security.evtx", data!.Groups[1].Label);
-        Assert.Equal(@"D:\logs\Security.evtx", data.Groups[2].Label);
-        Assert.NotEqual(data.Groups[1].Label, data.Groups[2].Label);
+        Assert.Equal(@"C:\logs\Security.evtx", data!.Groups[0].Label);
+        Assert.Equal(@"D:\logs\Security.evtx", data.Groups[1].Label);
+        Assert.NotEqual(data.Groups[0].Label, data.Groups[1].Label);
     }
 
     [Fact]
@@ -230,15 +231,15 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.Log, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal(4, data!.Groups.Count); // Other + 3 distinct logs
-        Assert.Equal("Security.evtx (logsA)", data.Groups[1].Label); // colliding file names disambiguated by parent folder...
-        Assert.Equal("Security.evtx (logsB)", data.Groups[2].Label);
-        Assert.Equal("System", data.Groups[3].Label);
-        Assert.Equal(@"cat:C:\logsA\Security.evtx", data.Groups[1].Key); // ...while the toggle Key stays the raw owning-log path
-        Assert.NotEqual(data.Groups[1].Key, data.Groups[2].Key);
-        Assert.Equal(3, GroupTotal(data, 1));
-        Assert.Equal(2, GroupTotal(data, 2));
-        Assert.Equal(1, GroupTotal(data, 3));
+        Assert.Equal(3, data!.Groups.Count);
+        Assert.Equal("Security.evtx (logsA)", data.Groups[0].Label); // colliding file names disambiguated by parent folder...
+        Assert.Equal("Security.evtx (logsB)", data.Groups[1].Label);
+        Assert.Equal("System", data.Groups[2].Label);
+        Assert.Equal(@"cat:C:\logsA\Security.evtx", data.Groups[0].Key); // ...while the toggle Key stays the raw owning-log path
+        Assert.NotEqual(data.Groups[0].Key, data.Groups[1].Key);
+        Assert.Equal(3, GroupTotal(data, 0));
+        Assert.Equal(2, GroupTotal(data, 1));
+        Assert.Equal(1, GroupTotal(data, 2));
         Assert.Equal(6, data.Total);
     }
 
@@ -278,11 +279,11 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.False(data!.GroupingFieldAbsent);
-        Assert.Equal("Network", data.Groups[1].Label);
-        Assert.Equal("cat:3", data.Groups[1].Key);
-        Assert.Equal(3, GroupTotal(data, 1));
-        Assert.Equal("RemoteInteractive", data.Groups[2].Label);
-        Assert.Equal(2, GroupTotal(data, 2));
+        Assert.Equal("Network", data.Groups[0].Label);
+        Assert.Equal("cat:3", data.Groups[0].Key);
+        Assert.Equal(3, GroupTotal(data, 0));
+        Assert.Equal("RemoteInteractive", data.Groups[1].Label);
+        Assert.Equal(2, GroupTotal(data, 1));
     }
 
     [Fact]
@@ -293,8 +294,8 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.LogonType, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal("99", data!.Groups[1].Label);
-        Assert.Equal("cat:99", data.Groups[1].Key);
+        Assert.Equal("99", data!.Groups[0].Label);
+        Assert.Equal("cat:99", data.Groups[0].Key);
     }
 
     [Fact]
@@ -310,9 +311,9 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ParentProcessImage, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal("excel.exe", data.Groups[1].Label);
-        Assert.Equal("cat:excel.exe", data.Groups[1].Key);
-        Assert.Equal("winword.exe", data.Groups[2].Label);
+        Assert.Equal("excel.exe", data.Groups[0].Label);
+        Assert.Equal("cat:excel.exe", data.Groups[0].Key);
+        Assert.Equal("winword.exe", data.Groups[1].Label);
         Assert.Equal(2, data.Total);
     }
 
@@ -347,10 +348,10 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ProcessImage, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal(2, data.Groups.Count);
-        Assert.Equal("rundll32.exe", data.Groups[1].Label);
-        Assert.Equal("cat:rundll32.exe", data.Groups[1].Key);
-        Assert.Equal(2, GroupTotal(data, 1));
+        Assert.Single(data.Groups);
+        Assert.Equal("rundll32.exe", data.Groups[0].Label);
+        Assert.Equal("cat:rundll32.exe", data.Groups[0].Key);
+        Assert.Equal(2, GroupTotal(data, 0));
     }
 
     [Fact]
@@ -386,7 +387,7 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.False(data.GroupingFieldAbsent);
-        Assert.Equal("notepad.exe", data.Groups[1].Label);
+        Assert.Equal("notepad.exe", data.Groups[0].Label);
         Assert.Equal(1, data.Total);
     }
 
@@ -400,30 +401,66 @@ public sealed class HistogramBuilderTests
                 (@"C:\b\bravo.exe", 4),
                 (@"C:\c\charlie.exe", 3),
                 (@"C:\d\delta.exe", 2),
-                (@"C:\e\echo.exe", 1)));
+                (@"C:\e\echo.exe", 1),
+                (@"C:\f\foxtrot.exe", 1),
+                (@"C:\g\golf.exe", 1),
+                (@"C:\h\hotel.exe", 1),
+                (@"C:\i\india.exe", 1)));
 
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ProcessImage, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
         Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data.Groups.Count);
-        Assert.DoesNotContain(data.Groups, group => group.Label == "echo.exe");
+        Assert.Equal("Other (1 process)", data.Groups[0].Label);
+        Assert.DoesNotContain(data.Groups, group => group.Label == "india.exe");
         Assert.Equal(1, GroupTotal(data, 0));
-        Assert.Equal(15, data.Total);
+        Assert.Equal(19, data.Total);
+    }
+
+    [Fact]
+    public void Build_GroupByProcessImage_WhenAllProcessesShownAndRowsAreMissing_LabelsOtherPlainly()
+    {
+        var view = DisplayViewTestFactory.Build(
+            s_logId,
+            [
+                ProcessImageEvent(0, ("NewProcessName", @"C:\tools\cmd.exe")),
+                EventAt(1, nameof(SeverityLevel.Information))
+            ]);
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ProcessImage, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal("Other", data!.Groups[0].Label);
+        Assert.Equal("cmd.exe", data.Groups[1].Label);
+        Assert.Equal(1, GroupTotal(data, 0));
+        Assert.Equal(1, GroupTotal(data, 1));
+        Assert.Equal(2, data.Total);
     }
 
     [Fact]
     public void Build_GroupBySource_FoldsValuesBeyondTheTopCapIntoOther()
     {
-        var events = SourceEvents(("s1", 5), ("s2", 4), ("s3", 3), ("s4", 2), ("s5", 1), ("s6", 1));
+        var events = SourceEvents(
+            ("s01", 9),
+            ("s02", 8),
+            ("s03", 7),
+            ("s04", 6),
+            ("s05", 5),
+            ("s06", 4),
+            ("s07", 3),
+            ("s08", 2),
+            ("s09", 1),
+            ("s10", 1));
         var view = DisplayViewTestFactory.Build(s_logId, events);
 
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.Source, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data!.Groups.Count); // Other + top 4
-        Assert.DoesNotContain(data.Groups, group => group.Label is "s5" or "s6");
-        Assert.Equal(2, GroupTotal(data, 0)); // s5 + s6 fell into Other
-        Assert.Equal(16, data.Total);
+        Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data!.Groups.Count);
+        Assert.Equal("Other (2 sources)", data.Groups[0].Label);
+        Assert.DoesNotContain(data.Groups, group => group.Label is "s09" or "s10");
+        Assert.Equal(2, GroupTotal(data, 0));
+        Assert.Equal(46, data.Total);
     }
 
     [Fact]
@@ -435,16 +472,97 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.Source, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal(4, data!.Groups.Count); // Other + 3 categories
-        Assert.Equal("Other", data.Groups[0].Label);
-        Assert.Equal("apache", data.Groups[1].Label);
-        Assert.Equal("nginx", data.Groups[2].Label);
-        Assert.Equal("caddy", data.Groups[3].Label);
-        Assert.Equal(3, GroupTotal(data, 1));
-        Assert.Equal(2, GroupTotal(data, 2));
-        Assert.Equal(1, GroupTotal(data, 3));
-        Assert.Equal(0, GroupTotal(data, 0));
+        Assert.Equal(3, data!.Groups.Count);
+        Assert.Equal("apache", data.Groups[0].Label);
+        Assert.Equal("nginx", data.Groups[1].Label);
+        Assert.Equal("caddy", data.Groups[2].Label);
+        Assert.Equal(3, GroupTotal(data, 0));
+        Assert.Equal(2, GroupTotal(data, 1));
+        Assert.Equal(1, GroupTotal(data, 2));
         Assert.Equal(6, data.Total);
+    }
+
+    [Fact]
+    public void Build_GroupBySource_WhenEightDistinctValues_EmitsNoOtherGroup()
+    {
+        var events = SourceEvents(("s01", 8), ("s02", 7), ("s03", 6), ("s04", 5), ("s05", 4), ("s06", 3), ("s07", 2), ("s08", 1));
+        var view = DisplayViewTestFactory.Build(s_logId, events);
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.Source, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal(8, data!.Groups.Count);
+        Assert.DoesNotContain(data.Groups, group => group.Key == "cat-other");
+        Assert.Equal(9, data.SlotCount);
+    }
+
+    [Fact]
+    public void Build_GroupBySource_WhenNineDistinctValuesAndTieInactive_KeepsTopEightWithOther()
+    {
+        var events = SourceEvents(("s01", 9), ("s02", 8), ("s03", 7), ("s04", 6), ("s05", 5), ("s06", 4), ("s07", 3), ("s08", 2), ("s09", 1));
+        var view = DisplayViewTestFactory.Build(s_logId, events);
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.Source, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data!.Groups.Count);
+        Assert.Equal("Other (1 source)", data.Groups[0].Label);
+        Assert.DoesNotContain(data.Groups, group => group.Label == "s09");
+        Assert.Equal(1, GroupTotal(data, 0));
+    }
+
+    [Fact]
+    public void Build_GroupBySource_WhenThirteenDistinctValues_KeepsTopEightWithOther()
+    {
+        var events = SourceEvents(
+            ("s01", 13),
+            ("s02", 12),
+            ("s03", 11),
+            ("s04", 10),
+            ("s05", 9),
+            ("s06", 8),
+            ("s07", 7),
+            ("s08", 6),
+            ("s09", 5),
+            ("s10", 4),
+            ("s11", 3),
+            ("s12", 2),
+            ("s13", 1));
+        var view = DisplayViewTestFactory.Build(s_logId, events);
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.Source, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data!.Groups.Count);
+        Assert.Equal("Other (5 sources)", data.Groups[0].Label);
+        Assert.Equal(15, GroupTotal(data, 0));
+    }
+
+    [Fact]
+    public void Build_GroupBySource_WhenTwelveDistinctValuesAndTieInactive_KeepsTopEightWithOther()
+    {
+        var events = SourceEvents(
+            ("s01", 12),
+            ("s02", 11),
+            ("s03", 10),
+            ("s04", 9),
+            ("s05", 8),
+            ("s06", 7),
+            ("s07", 6),
+            ("s08", 5),
+            ("s09", 4),
+            ("s10", 3),
+            ("s11", 2),
+            ("s12", 1));
+        var view = DisplayViewTestFactory.Build(s_logId, events);
+
+        HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.Source, maxBuckets: 100, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data!.Groups.Count);
+        Assert.Equal("Other (4 sources)", data.Groups[0].Label);
+        Assert.DoesNotContain(data.Groups, group => group.Label is "s09" or "s10" or "s11" or "s12");
+        Assert.Equal(10, GroupTotal(data, 0));
     }
 
     [Fact]
@@ -456,10 +574,10 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.TicketEncryptionType, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal(2, data!.Groups.Count); // Other + a single RC4 band
-        Assert.Equal("RC4", data.Groups[1].Label);
-        Assert.Equal("cat:23", data.Groups[1].Key);
-        Assert.Equal(3, GroupTotal(data, 1));
+        Assert.Single(data!.Groups);
+        Assert.Equal("RC4", data.Groups[0].Label);
+        Assert.Equal("cat:23", data.Groups[0].Key);
+        Assert.Equal(3, GroupTotal(data, 0));
     }
 
     [Fact]
@@ -484,6 +602,83 @@ public sealed class HistogramBuilderTests
         Assert.Equal(1, data.SlotCounts[(int)SeverityLevel.Information]);
         Assert.Equal(4, data.Total);
     }
+
+    [Fact]
+    public void BuildWithHighlightTie_GroupBySource_WhenNineDistinctValues_EmitsNoOtherGroup()
+    {
+        var events = SourceEvents(("s01", 9), ("s02", 8), ("s03", 7), ("s04", 6), ("s05", 5), ("s06", 4), ("s07", 3), ("s08", 2), ("s09", 1));
+        var view = DisplayViewTestFactory.Build(s_logId, events);
+        SavedFilter filter = CreateFilter("Id == 0");
+        byte[] highlightWinners = view.EnsureHighlightWinners([filter], planKey: 1, CancellationToken.None);
+
+        HistogramData? data = HistogramBuilder.BuildWithHighlightTie(view, HistogramDimension.Source, maxBuckets: 100, highlightWinners, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal(9, data!.Groups.Count);
+        Assert.DoesNotContain(data.Groups, group => group.Key == "cat-other");
+        Assert.Equal(10, data.SlotCount);
+    }
+
+    [Fact]
+    public void BuildWithHighlightTie_GroupBySource_WhenThirteenDistinctValues_KeepsTopEightWithOther()
+    {
+        var events = SourceEvents(
+            ("s01", 13),
+            ("s02", 12),
+            ("s03", 11),
+            ("s04", 10),
+            ("s05", 9),
+            ("s06", 8),
+            ("s07", 7),
+            ("s08", 6),
+            ("s09", 5),
+            ("s10", 4),
+            ("s11", 3),
+            ("s12", 2),
+            ("s13", 1));
+        var view = DisplayViewTestFactory.Build(s_logId, events);
+        SavedFilter filter = CreateFilter("Id == 0");
+        byte[] highlightWinners = view.EnsureHighlightWinners([filter], planKey: 1, CancellationToken.None);
+
+        HistogramData? data = HistogramBuilder.BuildWithHighlightTie(view, HistogramDimension.Source, maxBuckets: 100, highlightWinners, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data!.Groups.Count);
+        Assert.Equal("Other (5 sources)", data.Groups[0].Label);
+        Assert.Equal(15, GroupTotal(data, 0));
+    }
+
+    [Fact]
+    public void BuildWithHighlightTie_GroupBySource_WhenTwelveDistinctValues_EmitsNoOtherGroup()
+    {
+        var events = SourceEvents(
+            ("s01", 12),
+            ("s02", 11),
+            ("s03", 10),
+            ("s04", 9),
+            ("s05", 8),
+            ("s06", 7),
+            ("s07", 6),
+            ("s08", 5),
+            ("s09", 4),
+            ("s10", 3),
+            ("s11", 2),
+            ("s12", 1));
+        var view = DisplayViewTestFactory.Build(s_logId, events);
+        SavedFilter filter = CreateFilter("Id == 0");
+        byte[] highlightWinners = view.EnsureHighlightWinners([filter], planKey: 1, CancellationToken.None);
+
+        HistogramData? data = HistogramBuilder.BuildWithHighlightTie(view, HistogramDimension.Source, maxBuckets: 100, highlightWinners, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.Equal(HistogramConstants.GraceGroupByCategories, data!.Groups.Count);
+        Assert.DoesNotContain(data.Groups, group => group.Key == "cat-other");
+        Assert.Equal(13, data.SlotCount);
+    }
+
+    private static SavedFilter CreateFilter(string text) =>
+        SavedFilter.TryCreate(text, color: HighlightColor.LightRed, isEnabled: true)
+        ?? throw new InvalidOperationException($"Failed to compile test filter '{text}'.");
 
     private static ResolvedEvent[] ErrorCodeEvents(params (string Source, object? ErrorCode, int Count)[] groups)
     {

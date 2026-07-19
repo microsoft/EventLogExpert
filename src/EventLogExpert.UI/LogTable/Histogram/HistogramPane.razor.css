@@ -55,6 +55,7 @@
     display: inline-flex;
     align-items: center;
     gap: 3px;
+    min-width: 0;
     padding: 0 2px;
     border: 1px solid transparent;
     border-radius: 2px;
@@ -62,6 +63,14 @@
     color: inherit;
     line-height: 1.3;
     cursor: pointer;
+}
+
+.histogram-legend-label {
+    max-width: 13rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .histogram-legend-item:hover { border-color: var(--background-darkgray); }
@@ -218,24 +227,41 @@
 
 .histogram-bar-error { fill: var(--clr-red); }
 
-.histogram-cat-0 { fill: #56b4e9; }
+.histogram-bar-segment {
+    stroke: var(--background-dark);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
 
-.histogram-cat-1 { fill: #e69f00; }
+.histogram-cat-0 { fill: light-dark(#0072b2, #56b4e9); }
 
-.histogram-cat-2 { fill: #009e73; }
+.histogram-cat-1 { fill: light-dark(#b66d00, #e69f00); }
 
-.histogram-cat-3 { fill: #cc79a7; }
+.histogram-cat-2 { fill: light-dark(#007a5a, #009e73); }
+
+.histogram-cat-3 { fill: light-dark(#a64f82, #cc79a7); }
+
+.histogram-cat-4 { fill: light-dark(#6f5aa8, #8e7cc3); }
+
+.histogram-cat-5 { fill: light-dark(#8f6a00, #f0e442); }
+
+.histogram-cat-6 { fill: light-dark(#8a3f00, #d55e00); }
+
+.histogram-cat-7 { fill: light-dark(#007983, #00a6b8); }
 
 .histogram-cat-other { fill: var(--text-secondary); }
 
 .histogram-cat-hl {
     fill: var(--text-secondary);
     stroke: var(--background-darkgray);
-    stroke-width: 0.75;
+    stroke-width: 1;
     vector-effect: non-scaling-stroke;
 }
 
-.histogram-cat-hl[data-highlight] { fill: var(--hl-bg); }
+.histogram-cat-hl[data-highlight] {
+    fill: var(--hl-bg);
+    stroke: var(--hl-fg);
+}
 
 .histogram-bin-cursor {
     fill: none;
@@ -294,8 +320,9 @@
 
     .histogram-bar-error { fill: url(#histogram-hatch-error); }
 
-    /* Forced colors drop the palette, so hatch each capped top-four category distinctly; Other stays a solid fill. */
     .histogram-cat-other { fill: CanvasText; }
+
+    .histogram-bar-segment { stroke: Canvas; }
 
     .histogram-cat-0 { fill: url(#histogram-hatch-cat-0); }
 
@@ -304,6 +331,14 @@
     .histogram-cat-2 { fill: url(#histogram-hatch-cat-2); }
 
     .histogram-cat-3 { fill: url(#histogram-hatch-cat-3); }
+
+    .histogram-cat-4 { fill: url(#histogram-hatch-cat-4); }
+
+    .histogram-cat-5 { fill: url(#histogram-hatch-cat-5); }
+
+    .histogram-cat-6 { fill: url(#histogram-hatch-cat-6); }
+
+    .histogram-cat-7 { fill: url(#histogram-hatch-cat-7); }
 
     .histogram-cat-hl {
         fill: CanvasText;
@@ -319,6 +354,22 @@
     .histogram-cat-hl[data-stackpos="3"] { fill: url(#histogram-hatch-cat-3); }
 
     .histogram-cat-hl[data-stackpos="4"] { fill: url(#histogram-hatch-cat-4); }
+
+    .histogram-cat-hl[data-stackpos="5"] { fill: url(#histogram-hatch-cat-5); }
+
+    .histogram-cat-hl[data-stackpos="6"] { fill: url(#histogram-hatch-cat-6); }
+
+    .histogram-cat-hl[data-stackpos="7"] { fill: url(#histogram-hatch-cat-7); }
+
+    .histogram-cat-hl[data-stackpos="8"] { fill: url(#histogram-hatch-cat-8); }
+
+    .histogram-cat-hl[data-stackpos="9"] { fill: url(#histogram-hatch-cat-9); }
+
+    .histogram-cat-hl[data-stackpos="10"] { fill: url(#histogram-hatch-cat-10); }
+
+    .histogram-cat-hl[data-stackpos="11"] { fill: url(#histogram-hatch-cat-11); }
+
+    .histogram-cat-hl[data-stackpos="12"] { fill: url(#histogram-hatch-cat-12); }
 
     .histogram-find-marker { fill: Highlight; stroke: CanvasText; }
 }

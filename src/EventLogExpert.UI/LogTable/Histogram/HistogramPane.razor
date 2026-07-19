@@ -48,7 +48,7 @@
                                 height="9"
                                 width="9">
                                 <rect class="@GroupColorClass(group)" data-highlight="@GroupHighlightCssName(group)" data-stackpos="@group" height="9" width="9"></rect>
-                            </svg>@info.Label
+                            </svg><span class="histogram-legend-label" title="@info.Label">@info.Label</span>
                         </button>
                     }
                 </div>
@@ -129,6 +129,45 @@
                             <line stroke="CanvasText" stroke-width="1" x1="0" x2="6" y1="0" y2="6"></line>
                             <line stroke="CanvasText" stroke-width="1" x1="0" x2="6" y1="6" y2="0"></line>
                         </pattern>
+                        <pattern height="8" id="histogram-hatch-cat-5" patternUnits="userSpaceOnUse" width="8">
+                            <rect fill="Canvas" height="8" width="8"></rect>
+                            <line stroke="CanvasText" stroke-width="1" x1="0" x2="8" y1="2" y2="2"></line>
+                            <line stroke="CanvasText" stroke-width="1" x1="0" x2="8" y1="6" y2="6"></line>
+                        </pattern>
+                        <pattern height="8" id="histogram-hatch-cat-6" patternUnits="userSpaceOnUse" width="8">
+                            <rect fill="Canvas" height="8" width="8"></rect>
+                            <line stroke="CanvasText" stroke-width="1" x1="2" x2="2" y1="0" y2="8"></line>
+                            <line stroke="CanvasText" stroke-width="1" x1="6" x2="6" y1="0" y2="8"></line>
+                        </pattern>
+                        <pattern height="8" id="histogram-hatch-cat-7" patternUnits="userSpaceOnUse" width="8">
+                            <rect fill="Canvas" height="8" width="8"></rect>
+                            <circle cx="4" cy="4" fill="CanvasText" r="1.5"></circle>
+                        </pattern>
+                        <pattern height="8" id="histogram-hatch-cat-8" patternUnits="userSpaceOnUse" width="8">
+                            <rect fill="Canvas" height="8" width="8"></rect>
+                            <line stroke="CanvasText" stroke-width="1" x1="0" x2="8" y1="0" y2="8"></line>
+                            <line stroke="CanvasText" stroke-width="1" x1="0" x2="4" y1="4" y2="8"></line>
+                            <line stroke="CanvasText" stroke-width="1" x1="4" x2="8" y1="0" y2="4"></line>
+                        </pattern>
+                        <pattern height="8" id="histogram-hatch-cat-9" patternUnits="userSpaceOnUse" width="8">
+                            <rect fill="Canvas" height="8" width="8"></rect>
+                            <line stroke="CanvasText" stroke-width="1" x1="0" x2="8" y1="8" y2="0"></line>
+                            <line stroke="CanvasText" stroke-width="1" x1="0" x2="4" y1="4" y2="0"></line>
+                            <line stroke="CanvasText" stroke-width="1" x1="4" x2="8" y1="8" y2="4"></line>
+                        </pattern>
+                        <pattern height="8" id="histogram-hatch-cat-10" patternUnits="userSpaceOnUse" width="8">
+                            <rect fill="Canvas" height="8" width="8"></rect>
+                            <path d="M0 4 H8 M4 0 V8" fill="none" stroke="CanvasText" stroke-width="1"></path>
+                        </pattern>
+                        <pattern height="8" id="histogram-hatch-cat-11" patternUnits="userSpaceOnUse" width="8">
+                            <rect fill="Canvas" height="8" width="8"></rect>
+                            <path d="M0 0 H8 V8 H0 Z" fill="none" stroke="CanvasText" stroke-width="1"></path>
+                            <circle cx="4" cy="4" fill="CanvasText" r="1"></circle>
+                        </pattern>
+                        <pattern height="8" id="histogram-hatch-cat-12" patternUnits="userSpaceOnUse" width="8">
+                            <rect fill="Canvas" height="8" width="8"></rect>
+                            <path d="M0 2 L2 4 L4 2 L6 4 L8 2 M0 6 L2 8 L4 6 L6 8 L8 6" fill="none" stroke="CanvasText" stroke-width="1"></path>
+                        </pattern>
                     </defs>
 
                     @for (int index = 0; index < barCount; index++)
@@ -152,7 +191,7 @@
 
                                 segmentTop -= height;
 
-                                <rect class="@GroupColorClass(group)"
+                                <rect class="histogram-bar-segment @GroupColorClass(group)"
                                     data-highlight="@GroupHighlightCssName(group)"
                                     data-stackpos="@group"
                                     height="@height"
