@@ -174,7 +174,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
             .When(m => m.OpenAt(
                 Arg.Any<double>(), Arg.Any<double>(), Arg.Any<IReadOnlyList<MenuItem>>(),
                 Arg.Any<bool>(), Arg.Any<bool>()))
-            .Do(call => items = call.Arg<IReadOnlyList<MenuItem>>());
+            .Do(call => items = call.ArgAt<IReadOnlyList<MenuItem>>(2));
 
         var cut = RenderGrouped(Collapsed(), Event(1, "Alpha"));
         cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs());
@@ -192,7 +192,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
             .When(m => m.OpenAt(
                 Arg.Any<double>(), Arg.Any<double>(), Arg.Any<IReadOnlyList<MenuItem>>(),
                 Arg.Any<bool>(), Arg.Any<bool>()))
-            .Do(call => items = call.Arg<IReadOnlyList<MenuItem>>());
+            .Do(call => items = call.ArgAt<IReadOnlyList<MenuItem>>(2));
 
         var cut = RenderGrouped(Collapsed(), Event(1, "Alpha"), Event(2, "Alpha"), Event(3, "Beta"));
         cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs());
@@ -200,7 +200,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         await items!.First(item => item.Label == "Select Group").OnClickAsync!();
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 2),
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c != null && c.Count == 2),
             Arg.Any<SelectionEntry?>());
     }
 
@@ -353,7 +353,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "PageDown"); // clamps to the last visible row (event 2)
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 1),
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c != null && c.Count == 1),
             Arg.Any<SelectionEntry?>());
         Assert.Equal(3, LastFocusedRow());
     }
@@ -368,7 +368,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowDown"); // land on the first event
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 1),
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c != null && c.Count == 1),
             Arg.Any<SelectionEntry?>());
     }
 
@@ -452,7 +452,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
             .When(m => m.OpenAt(
                 Arg.Any<double>(), Arg.Any<double>(), Arg.Any<IReadOnlyList<MenuItem>>(),
                 Arg.Any<bool>(), Arg.Any<bool>()))
-            .Do(call => items = call.Arg<IReadOnlyList<MenuItem>>());
+            .Do(call => items = call.ArgAt<IReadOnlyList<MenuItem>>(2));
 
         var cut = RenderGrouped(Collapsed(), Event(1, "Alpha"), Event(2, "Alpha"));
         cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs());
@@ -485,7 +485,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowRight"); // focus + select first child
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 1),
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c != null && c.Count == 1),
             Arg.Any<SelectionEntry?>());
         _logTableCommands.DidNotReceive().ToggleGroupCollapsed(Arg.Any<string>());
     }
@@ -503,7 +503,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowDown", shift: true); // skips the collapsed Beta header to event 4
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 4),
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c != null && c.Count == 4),
             Arg.Any<SelectionEntry?>());
     }
 
@@ -519,7 +519,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowUp", shift: true); // skips the collapsed Beta header to event 1
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 4),
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c != null && c.Count == 4),
             Arg.Any<SelectionEntry?>());
     }
 
@@ -558,7 +558,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowDown");
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 1 && c.Any(entry => entry.ReloadKey!.Value.RecordId == alpha.RecordId)),
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c != null && c.Count == 1 && c.Any(entry => entry.ReloadKey!.Value.RecordId == alpha.RecordId)),
             Arg.Any<SelectionEntry?>());
     }
 
@@ -682,7 +682,7 @@ public sealed class LogTablePaneGroupingTests : BunitContext
         Press(cut, "ArrowDown"); // selects the next event
 
         _eventLogCommands.Received(1).SetSelectedEvents(
-            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c.Count == 1),
+            Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c != null && c.Count == 1),
             Arg.Any<SelectionEntry?>());
     }
 

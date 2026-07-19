@@ -24,7 +24,8 @@ public sealed class ScenarioApplyServiceTests
         service.ApplyInApp(scenario, replace: false);
 
         dispatcher.Received(1).Dispatch(Arg.Is<MergeFiltersAction>(action =>
-            action.Filters.Count == expected.Count
+            action != null
+            && action.Filters.Count == expected.Count
             && action.Filters[0].ComparisonText == expected[0].ComparisonText));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<ReplaceFiltersAction>());
     }
@@ -39,7 +40,7 @@ public sealed class ScenarioApplyServiceTests
 
         MergeFiltersAction? captured = null;
         dispatcher.When(target => target.Dispatch(Arg.Any<MergeFiltersAction>()))
-            .Do(call => captured = (MergeFiltersAction)call[0]);
+            .Do(call => captured = call.ArgAt<MergeFiltersAction>(0));
 
         service.ApplyInApp(scenario, replace: false);
 
@@ -74,7 +75,8 @@ public sealed class ScenarioApplyServiceTests
         service.ApplyInApp(scenario, replace: true);
 
         dispatcher.Received(1).Dispatch(Arg.Is<ReplaceFiltersAction>(action =>
-            action.Filters.Count == expected.Count
+            action != null
+            && action.Filters.Count == expected.Count
             && action.Filters[0].ComparisonText == expected[0].ComparisonText));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<MergeFiltersAction>());
     }
@@ -89,7 +91,7 @@ public sealed class ScenarioApplyServiceTests
 
         ReplaceFiltersAction? captured = null;
         dispatcher.When(target => target.Dispatch(Arg.Any<ReplaceFiltersAction>()))
-            .Do(call => captured = (ReplaceFiltersAction)call[0]);
+            .Do(call => captured = call.ArgAt<ReplaceFiltersAction>(0));
 
         var seeded = FilterPaneReducers.ReduceMergeFilters(
             new FilterPaneState(),

@@ -48,7 +48,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<EventBufferedAction>(a =>
+            .Dispatch(Arg.Is<EventBufferedAction>(a => a != null &&
                 a.IsFull == true && a.UpdatedBuffer.Count == EventLogState.MaxNewEvents));
     }
 
@@ -71,7 +71,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<EventBufferedAction>(a =>
+            .Dispatch(Arg.Is<EventBufferedAction>(a => a != null &&
                 a.UpdatedBuffer.Count == 1 && a.UpdatedBuffer[0] == newEvent));
     }
 
@@ -118,7 +118,7 @@ public sealed class EffectsTests
         await effects.HandleAddEvent(new AddEventAction(newEvent), mockDispatcher);
 
         // Assert: raw is ingested unconditionally (Prepend) even though the filtered display append is skipped.
-        mockDispatcher.Received(1).Dispatch(Arg.Is<IngestRawEventsAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<IngestRawEventsAction>(a => a != null &&
             a.Mode == RawIngestMode.Prepend && a.EventsByLog.ContainsKey(logData.Id)));
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AppendTableEventsAction>());
     }
@@ -149,7 +149,7 @@ public sealed class EffectsTests
         // post-ingest store is visible when HandleAddEvent rebuilds the display view over it.
         mockDispatcher
             .When(d => d.Dispatch(Arg.Any<IngestRawEventsAction>()))
-            .Do(callInfo => rawState = RawEventStoreReducers.ReduceIngestRawEvents(rawState, callInfo.Arg<IngestRawEventsAction>()));
+            .Do(callInfo => rawState = RawEventStoreReducers.ReduceIngestRawEvents(rawState, callInfo.ArgAt<IngestRawEventsAction>(0)));
 
         var newEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
         var action = new AddEventAction(newEvent);
@@ -158,11 +158,11 @@ public sealed class EffectsTests
         await effects.HandleAddEvent(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<IngestRawEventsAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<IngestRawEventsAction>(a => a != null &&
             a.Mode == RawIngestMode.Prepend && a.EventsByLog.ContainsKey(logData.Id)));
 
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<AppendTableEventsAction>(a =>
+            .Dispatch(Arg.Is<AppendTableEventsAction>(a => a != null &&
                 a.LogId == logData.Id && a.View != null && a.View.Count == 1 && a.View.EnumerateDetail().First().Id == newEvent.Id));
 
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<DisplayReadyAction>());
@@ -198,9 +198,9 @@ public sealed class EffectsTests
 
         Received.InOrder(() =>
         {
-            mockDispatcher.Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading));
+            mockDispatcher.Dispatch(Arg.Is<SetFilterProgressAction>(a => a != null && a.IsLoading));
             mockDispatcher.Dispatch(Arg.Any<DisplayReadyAction>());
-            mockDispatcher.Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
+            mockDispatcher.Dispatch(Arg.Is<SetFilterProgressAction>(a => a != null && !a.IsLoading));
         });
     }
 
@@ -244,8 +244,8 @@ public sealed class EffectsTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => effects.HandleApplyFilter(action, mockDispatcher));
 
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading));
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => a != null && a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => a != null && !a.IsLoading));
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<DisplayReadyAction>());
     }
 
@@ -287,7 +287,7 @@ public sealed class EffectsTests
         // The pass-1 snapshot saw only event 200 at ContentVersion 0; the post-build re-check saw the
         // finalize rebuild at ContentVersion 1 and refiltered, so the published view reflects all three.
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<DisplayReadyAction>(a =>
+            .Dispatch(Arg.Is<DisplayReadyAction>(a => a != null &&
                 a.Views.ContainsKey(snapshotData.Id) &&
                 a.Views[snapshotData.Id].Count == finalizedRaw.Count &&
                 a.Views[snapshotData.Id].EnumerateDetail().Any(e => e.Id == 202)));
@@ -330,7 +330,7 @@ public sealed class EffectsTests
         // The pass-1 snapshot saw only event 100 at ContentVersion 0; the post-build re-check saw the
         // live-tail append at ContentVersion 1 and refiltered, so the published view includes event 101.
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<DisplayReadyAction>(a =>
+            .Dispatch(Arg.Is<DisplayReadyAction>(a => a != null &&
                 a.Views.ContainsKey(snapshotData.Id) &&
                 a.Views[snapshotData.Id].Count == liveTailRaw.Count &&
                 a.Views[snapshotData.Id].EnumerateDetail().Any(e => e.Id == 101)));
@@ -373,7 +373,7 @@ public sealed class EffectsTests
         // Assert: the raw store dropped the log during the off-thread build (the post-snapshot reads
         // return an empty store), so the post-build re-check finds it gone and DisplayReady omits its slice.
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<DisplayReadyAction>(a => !a.Views.ContainsKey(snapshotData.Id)));
+            .Dispatch(Arg.Is<DisplayReadyAction>(a => a != null && !a.Views.ContainsKey(snapshotData.Id)));
     }
 
     [Fact]
@@ -427,7 +427,7 @@ public sealed class EffectsTests
         // the live-tail rebuild at ContentVersion 1 and refiltered from current state, so the published view
         // reflects the updated row set (event 101), not the stale pass-1 rows.
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<DisplayReadyAction>(a =>
+            .Dispatch(Arg.Is<DisplayReadyAction>(a => a != null &&
                 a.Views.ContainsKey(snapshotData.Id) &&
                 a.Views[snapshotData.Id].Count == liveTailRaw.Count &&
                 a.Views[snapshotData.Id].EnumerateDetail().Any(e => e.Id == 101)));
@@ -487,12 +487,12 @@ public sealed class EffectsTests
         // so the slice is still stale and omitted, and a convergence pass is scheduled while the progress
         // spinner stays on (cleared later by the converging pass).
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<DisplayReadyAction>(a => !a.Views.ContainsKey(snapshotData.Id)));
+            .Dispatch(Arg.Is<DisplayReadyAction>(a => a != null && !a.Views.ContainsKey(snapshotData.Id)));
 
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<ConvergeFilterAction>(a => a.StaleIds.Contains(snapshotData.Id)));
+            .Dispatch(Arg.Is<ConvergeFilterAction>(a => a != null && a.StaleIds.Contains(snapshotData.Id)));
 
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<SetFilterProgressAction>(a => a != null && !a.IsLoading));
     }
 
     [Fact]
@@ -524,7 +524,7 @@ public sealed class EffectsTests
         var superseded = 0;
 
         mockDispatcher
-            .When(d => d.Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading)))
+            .When(d => d.Dispatch(Arg.Is<SetFilterProgressAction>(a => a != null && a.IsLoading)))
             .Do(_ =>
             {
                 if (Interlocked.Exchange(ref superseded, 1) == 0)
@@ -542,10 +542,10 @@ public sealed class EffectsTests
         await effects.HandleApplyFilter(new ApplyFilterAction(new Filter(null, [])), mockDispatcher);
 
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<DisplayReadyAction>(a => a.Views[logData.Id].EnumerateDetail().Any(e => e.Id == 100)));
+            .Dispatch(Arg.Is<DisplayReadyAction>(a => a != null && a.Views[logData.Id].EnumerateDetail().Any(e => e.Id == 100)));
 
         // The stale run's finally was suppressed by the token guard, so only the fresh run cleared the spinner.
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => a != null && !a.IsLoading));
     }
 
     [Fact]
@@ -569,7 +569,7 @@ public sealed class EffectsTests
             .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
             .Do(callInfo =>
             {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+                closeTasks.Add(effects.HandleCloseLog(callInfo.ArgAt<CloseLogAction>(0), mockDispatcher));
             });
 
         var xmlFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
@@ -578,8 +578,8 @@ public sealed class EffectsTests
         await effects.HandleApplyFilter(action, mockDispatcher);
 
         Assert.True(action.Filter.RequiresXml);
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => a != null && !a.IsLoading));
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<SetFilterProgressAction>(a => a != null && a.IsLoading));
 
         // Surface any HandleCloseLog faults before exiting the test.
         await Task.WhenAll(closeTasks);
@@ -637,7 +637,7 @@ public sealed class EffectsTests
             .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
             .Do(callInfo =>
             {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+                closeTasks.Add(effects.HandleCloseLog(callInfo.ArgAt<CloseLogAction>(0), mockDispatcher));
             });
 
         // Hook the FIRST OpenLogAction dispatch to land CloseAll synchronously, which bumps
@@ -671,7 +671,7 @@ public sealed class EffectsTests
         mockDispatcher.Received(1).Dispatch(Arg.Any<OpenLogAction>());
 
         // The cleanup CloseLog targets the log we already reopened (Log1).
-        mockDispatcher.Received().Dispatch(Arg.Is<CloseLogAction>(a => a.LogName == Constants.LogNameLog1));
+        mockDispatcher.Received().Dispatch(Arg.Is<CloseLogAction>(a => a != null && a.LogName == Constants.LogNameLog1));
 
         // Surface any HandleCloseLog faults before exiting the test.
         await Task.WhenAll(closeTasks);
@@ -734,7 +734,7 @@ public sealed class EffectsTests
             .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
             .Do(callInfo =>
             {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+                closeTasks.Add(effects.HandleCloseLog(callInfo.ArgAt<CloseLogAction>(0), mockDispatcher));
             });
 
         var xmlFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
@@ -789,7 +789,7 @@ public sealed class EffectsTests
             .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
             .Do(callInfo =>
             {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+                closeTasks.Add(effects.HandleCloseLog(callInfo.ArgAt<CloseLogAction>(0), mockDispatcher));
             });
 
         var xmlFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
@@ -869,7 +869,7 @@ public sealed class EffectsTests
             .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
             .Do(callInfo =>
             {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+                closeTasks.Add(effects.HandleCloseLog(callInfo.ArgAt<CloseLogAction>(0), mockDispatcher));
             });
 
         var xmlFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
@@ -891,7 +891,7 @@ public sealed class EffectsTests
 
         // OpenLog should now have been dispatched (only happens after the close await).
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<OpenLogAction>(a =>
+            .Dispatch(Arg.Is<OpenLogAction>(a => a != null &&
                 a.LogName == Constants.LogNameTestLog && a.LogPathType == LogPathType.Channel));
 
         // Surface any HandleCloseLog faults before exiting the test.
@@ -936,7 +936,7 @@ public sealed class EffectsTests
         var mockFilterService = Substitute.For<IFilterService>();
 
         mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
-            .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
+            .Returns(callInfo => callInfo.ArgAt<IEnumerable<ResolvedEvent>>(0).ToList());
 
         var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
         var mockServiceScope = Substitute.For<IServiceScope>();
@@ -972,7 +972,7 @@ public sealed class EffectsTests
             .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
             .Do(callInfo =>
             {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+                closeTasks.Add(effects.HandleCloseLog(callInfo.ArgAt<CloseLogAction>(0), mockDispatcher));
             });
 
         var xmlFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
@@ -987,7 +987,7 @@ public sealed class EffectsTests
 
         // Assert: SetSelectedEvents dispatched with exactly the restored event (RecordId=42).
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<SetSelectedEventsAction>(a =>
+            .Dispatch(Arg.Is<SetSelectedEventsAction>(a => a != null &&
                 a.Selection.Count() == 1 && a.Selection.First().ReloadKey!.Value.RecordId == 42));
 
         // Surface any HandleCloseLog faults before exiting the test.
@@ -1013,7 +1013,7 @@ public sealed class EffectsTests
             .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
             .Do(callInfo =>
             {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+                closeTasks.Add(effects.HandleCloseLog(callInfo.ArgAt<CloseLogAction>(0), mockDispatcher));
             });
 
         var xmlFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
@@ -1027,11 +1027,11 @@ public sealed class EffectsTests
         Assert.True(filter.RequiresXml);
 
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<CloseLogAction>(a =>
+            .Dispatch(Arg.Is<CloseLogAction>(a => a != null &&
                 a.LogName == Constants.LogNameTestLog && a.LogId == logData.Id));
 
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<OpenLogAction>(a =>
+            .Dispatch(Arg.Is<OpenLogAction>(a => a != null &&
                 a.LogName == Constants.LogNameTestLog && a.LogPathType == LogPathType.Channel));
 
         // Reload path returns early; no DisplayReady until LoadEvents fires.
@@ -1065,7 +1065,7 @@ public sealed class EffectsTests
             .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
             .Do(callInfo =>
             {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+                closeTasks.Add(effects.HandleCloseLog(callInfo.ArgAt<CloseLogAction>(0), mockDispatcher));
             });
 
         var xmlFilter1 = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
@@ -1094,7 +1094,7 @@ public sealed class EffectsTests
         // would not have happened if the round-2 guard had treated filter2's filter token
         // bump as supersession).
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<OpenLogAction>(a =>
+            .Dispatch(Arg.Is<OpenLogAction>(a => a != null &&
                 a.LogName == Constants.LogNameTestLog && a.LogPathType == LogPathType.Channel));
 
         // Surface any HandleCloseLog faults before exiting the test.
@@ -1137,7 +1137,7 @@ public sealed class EffectsTests
         var superseded = 0;
 
         mockDispatcher
-            .When(d => d.Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading)))
+            .When(d => d.Dispatch(Arg.Is<SetFilterProgressAction>(a => a != null && a.IsLoading)))
             .Do(_ =>
             {
                 if (Interlocked.Exchange(ref superseded, 1) == 0)
@@ -1153,7 +1153,7 @@ public sealed class EffectsTests
 
         // The stale filter-only run must NOT have dispatched its DisplayReady for id 999.
         mockDispatcher.DidNotReceive()
-            .Dispatch(Arg.Is<DisplayReadyAction>(a =>
+            .Dispatch(Arg.Is<DisplayReadyAction>(a => a != null &&
                 a.Views.ContainsKey(logData.Id) && a.Views[logData.Id].EnumerateDetail().Any(e => e.Id == 999)));
     }
 
@@ -1321,7 +1321,7 @@ public sealed class EffectsTests
         await mockLogWatcher.Received(1).RemoveLogAsync(Constants.LogNameTestLog);
 
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<Runtime.LogTable.CloseLogAction>(a =>
+            .Dispatch(Arg.Is<Runtime.LogTable.CloseLogAction>(a => a != null &&
                 a.LogId == logId));
     }
 
@@ -1396,9 +1396,9 @@ public sealed class EffectsTests
 
         // Assert: converged slice published, progress cleared, no further convergence scheduled.
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<DisplayReadyAction>(a => a.Views.ContainsKey(logData.Id)));
+            .Dispatch(Arg.Is<DisplayReadyAction>(a => a != null && a.Views.ContainsKey(logData.Id)));
 
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => a != null && !a.IsLoading));
 
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<ConvergeFilterAction>());
     }
@@ -1488,7 +1488,7 @@ public sealed class EffectsTests
 
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<DisplayReadyAction>());
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<ConvergeFilterAction>());
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => a != null && !a.IsLoading));
     }
 
     [Fact]
@@ -1531,7 +1531,7 @@ public sealed class EffectsTests
         await effects.HandleLoadEvents(action, mockDispatcher);
 
         // Assert: a pre-built display view for the finalized log is handed to the reducer.
-        mockDispatcher.Received(1).Dispatch(Arg.Is<UpdateTableAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<UpdateTableAction>(a => a != null &&
             a.LogId == logData.Id && a.View != null && a.View.Count == 2));
     }
 
@@ -1548,7 +1548,7 @@ public sealed class EffectsTests
 
         await effects.HandleLoadNewEvents(mockDispatcher);
 
-        mockDispatcher.Received(1).Dispatch(Arg.Is<IngestRawEventsAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<IngestRawEventsAction>(a => a != null &&
             a.Mode == RawIngestMode.Prepend && a.EventsByLog.ContainsKey(logData.Id)));
     }
 
@@ -1584,14 +1584,14 @@ public sealed class EffectsTests
         // visible in the store when the batch view is built.
         mockDispatcher
             .When(d => d.Dispatch(Arg.Any<IngestRawEventsAction>()))
-            .Do(callInfo => rawState = RawEventStoreReducers.ReduceIngestRawEvents(rawState, callInfo.Arg<IngestRawEventsAction>()));
+            .Do(callInfo => rawState = RawEventStoreReducers.ReduceIngestRawEvents(rawState, callInfo.ArgAt<IngestRawEventsAction>(0)));
 
         // Act
         await effects.HandleLoadNewEvents(mockDispatcher);
 
         // Assert
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<AppendTableEventsBatchAction>(a =>
+            .Dispatch(Arg.Is<AppendTableEventsBatchAction>(a => a != null &&
                 a.ViewsByLog.Count == 1 &&
                 a.ViewsByLog.ContainsKey(logData.Id) &&
                 a.ViewsByLog[logData.Id].Count == 2));
@@ -1599,7 +1599,7 @@ public sealed class EffectsTests
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<DisplayReadyAction>());
 
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<EventBufferedAction>(a =>
+            .Dispatch(Arg.Is<EventBufferedAction>(a => a != null &&
                 a.UpdatedBuffer.Count == 0 && a.IsFull == false));
     }
 
@@ -1628,7 +1628,7 @@ public sealed class EffectsTests
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AppendTableEventsBatchAction>());
 
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<EventBufferedAction>(a =>
+            .Dispatch(Arg.Is<EventBufferedAction>(a => a != null &&
                 a.UpdatedBuffer.Count == 0 && a.IsFull == false));
     }
 
@@ -1670,13 +1670,13 @@ public sealed class EffectsTests
         // single batch view is built.
         mockDispatcher
             .When(d => d.Dispatch(Arg.Any<IngestRawEventsAction>()))
-            .Do(callInfo => rawState = RawEventStoreReducers.ReduceIngestRawEvents(rawState, callInfo.Arg<IngestRawEventsAction>()));
+            .Do(callInfo => rawState = RawEventStoreReducers.ReduceIngestRawEvents(rawState, callInfo.ArgAt<IngestRawEventsAction>(0)));
 
         AppendTableEventsBatchAction? captured = null;
 
         mockDispatcher
             .When(dispatcher => dispatcher.Dispatch(Arg.Any<AppendTableEventsBatchAction>()))
-            .Do(call => captured = (AppendTableEventsBatchAction)call.Args()[0]);
+            .Do(call => captured = call.ArgAt<AppendTableEventsBatchAction>(0));
 
         // Act
         await effects.HandleLoadNewEvents(mockDispatcher);
@@ -2028,7 +2028,7 @@ public sealed class EffectsTests
         await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
 
         // A log that fails to open surfaces an error instead of a misleading empty final load, and never seeds the watcher.
-        dispatcher.Received().Dispatch(Arg.Is<SetResolverStatusAction>(a =>
+        dispatcher.Received().Dispatch(Arg.Is<SetResolverStatusAction>(a => a != null &&
             a.ResolverStatus.Contains("Error") && a.ResolverStatus.Contains(Constants.LogNameApplication)));
         Assert.Empty(dispatcher.ReceivedCalls().Select(call => call.GetArguments()[0]).OfType<LoadEventsAction>());
         watcher.DidNotReceive().AddLog(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>());
@@ -2049,7 +2049,7 @@ public sealed class EffectsTests
         await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
 
         // A read that stops on a Win32 error is surfaced as a failure, not dispatched as a successful final load.
-        dispatcher.Received().Dispatch(Arg.Is<SetResolverStatusAction>(a =>
+        dispatcher.Received().Dispatch(Arg.Is<SetResolverStatusAction>(a => a != null &&
             a.ResolverStatus.Contains("Error") && a.ResolverStatus.Contains(Constants.LogNameApplication)));
         Assert.Empty(dispatcher.ReceivedCalls().Select(call => call.GetArguments()[0]).OfType<LoadEventsAction>());
     }
@@ -2071,8 +2071,8 @@ public sealed class EffectsTests
 
         await effects.HandleOpenLog(action, mockDispatcher);
 
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddTableAction>(a => a.LogData.Id == logData.Id));
-        mockDispatcher.Received().Dispatch(Arg.Is<CloseLogAction>(a => a.LogId == logData.Id));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddTableAction>(a => a != null && a.LogData.Id == logData.Id));
+        mockDispatcher.Received().Dispatch(Arg.Is<CloseLogAction>(a => a != null && a.LogId == logData.Id));
     }
 
     [Fact]
@@ -2111,7 +2111,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<SetResolverStatusAction>(a =>
+            .Dispatch(Arg.Is<SetResolverStatusAction>(a => a != null &&
                 a.ResolverStatus.Contains("Error") && a.ResolverStatus.Contains(Constants.LogNameTestLog)));
     }
 
@@ -2133,7 +2133,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<SetResolverStatusAction>(a =>
+            .Dispatch(Arg.Is<SetResolverStatusAction>(a => a != null &&
                 a.ResolverStatus.Contains("Error")));
     }
 
@@ -2219,7 +2219,7 @@ public sealed class EffectsTests
 
         await effects.Filtering.HandleSetOrderBy(new SetOrderByAction(ColumnName.Source), mockDispatcher);
 
-        mockDispatcher.Received(1).Dispatch(Arg.Is<DisplayReadyAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<DisplayReadyAction>(a => a != null &&
             a.Version == 7 &&
             a.Views.ContainsKey(logData.Id) &&
             a.Views[logData.Id].HasContext(new SortContext(ColumnName.Source, true, null, false))));
@@ -2326,7 +2326,7 @@ public sealed class EffectsTests
 
         await effects.Filtering.HandleUpdateTable(mockDispatcher);
 
-        mockDispatcher.Received(1).Dispatch(Arg.Is<DisplayReadyAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<DisplayReadyAction>(a => a != null &&
             a.Version == 7 &&
             a.Views.ContainsKey(logData.Id) &&
             a.Views[logData.Id].HasContext(new SortContext(ColumnName.Source, true, null, false))));
@@ -2370,7 +2370,7 @@ public sealed class EffectsTests
         await effects.Filtering.HandleUpdateTable(mockDispatcher);
 
         var requested = new SortContext(ColumnName.Source, true, null, false);
-        mockDispatcher.Received(1).Dispatch(Arg.Is<DisplayReadyAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<DisplayReadyAction>(a => a != null &&
             a.Version == 3 &&
             a.Views.ContainsKey(logA.Id) && a.Views[logA.Id].HasContext(requested) &&
             a.Views.ContainsKey(logB.Id) && a.Views[logB.Id].HasContext(requested)));
@@ -2394,11 +2394,11 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<OpenLogAction>(a =>
+            .Dispatch(Arg.Is<OpenLogAction>(a => a != null &&
                 a.LogName == Constants.LogNameLog1 && a.LogPathType == LogPathType.Channel));
 
         mockDispatcher.Received(1)
-            .Dispatch(Arg.Is<OpenLogAction>(a =>
+            .Dispatch(Arg.Is<OpenLogAction>(a => a != null &&
                 a.LogName == Constants.LogNameLog2 && a.LogPathType == LogPathType.File));
     }
 
@@ -2561,7 +2561,7 @@ public sealed class EffectsTests
         var resolver = Substitute.For<IEventResolver>();
         resolver.ResolveEvent(Arg.Any<EventRecord>()).Returns(callInfo =>
         {
-            var record = callInfo.Arg<EventRecord>();
+            var record = callInfo.ArgAt<EventRecord>(0);
 
             if (resolveDelayMs is not null)
             {
@@ -2639,7 +2639,7 @@ public sealed class EffectsTests
             .Returns(new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>());
 
         mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
-            .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
+            .Returns(callInfo => callInfo.ArgAt<IEnumerable<ResolvedEvent>>(0).ToList());
 
         var mockLogger = Substitute.For<ITraceLogger>();
         var mockLogWatcherService = Substitute.For<ILogWatcherService>();
@@ -2762,7 +2762,7 @@ public sealed class EffectsTests
             .Returns(new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>());
 
         mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
-            .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
+            .Returns(callInfo => callInfo.ArgAt<IEnumerable<ResolvedEvent>>(0).ToList());
 
         var mockLogger = Substitute.For<ITraceLogger>();
         var mockLogWatcherService = Substitute.For<ILogWatcherService>();
@@ -2825,7 +2825,7 @@ public sealed class EffectsTests
             .Returns(new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>());
 
         mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
-            .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
+            .Returns(callInfo => callInfo.ArgAt<IEnumerable<ResolvedEvent>>(0).ToList());
 
         var mockLogger = Substitute.For<ITraceLogger>();
         var mockLogWatcherService = Substitute.For<ILogWatcherService>();

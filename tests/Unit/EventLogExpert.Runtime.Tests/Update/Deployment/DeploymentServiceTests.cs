@@ -77,8 +77,8 @@ public sealed class DeploymentServiceTests
         // NSubstitute's Received() doesn't reliably return configured values for IAsyncOperationWithProgress
         _ = mockPackageDeploymentService.Received(1)
             .AddPackageAsync(
-                Arg.Is<Uri>(uri => uri.LocalPath == Constants.DownloadPath),
-                Arg.Is<PackageDeploymentOptions>(opt =>
+                Arg.Is<Uri>(uri => uri != null && uri.LocalPath == Constants.DownloadPath),
+                Arg.Is<PackageDeploymentOptions>(opt => opt != null &&
                     opt.ForceUpdateFromAnyVersion == true &&
                     opt.ForceTargetAppShutdown == true &&
                     opt.DeferRegistrationWhenPackagesAreInUse == false));
@@ -133,11 +133,11 @@ public sealed class DeploymentServiceTests
 
         mockMainThreadService.InvokeOnMainThread(Arg.Any<Action>()).Returns(callInfo =>
         {
-            callInfo.Arg<Action>().Invoke();
+            callInfo.ArgAt<Action>(0).Invoke();
             return Task.CompletedTask;
         });
 
-        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.ArgAt<Func<Task>>(0)());
 
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
@@ -173,11 +173,11 @@ public sealed class DeploymentServiceTests
 
         mockMainThreadService.InvokeOnMainThread(Arg.Any<Action>()).Returns(callInfo =>
         {
-            callInfo.Arg<Action>().Invoke();
+            callInfo.ArgAt<Action>(0).Invoke();
             return Task.CompletedTask;
         });
 
-        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.ArgAt<Func<Task>>(0)());
 
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
@@ -215,11 +215,11 @@ public sealed class DeploymentServiceTests
 
         mockMainThreadService.InvokeOnMainThread(Arg.Any<Action>()).Returns(callInfo =>
         {
-            callInfo.Arg<Action>().Invoke();
+            callInfo.ArgAt<Action>(0).Invoke();
             return Task.CompletedTask;
         });
 
-        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.ArgAt<Func<Task>>(0)());
 
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
@@ -236,7 +236,7 @@ public sealed class DeploymentServiceTests
         await mockMainThreadService.Received(1).InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
         await mockAlertDialogService.Received(1).ShowAlert(
             Constants.UpdateFailureTitle,
-            Arg.Is<string>(msg => msg.Contains(testException.ToString())),
+            Arg.Is<string>(msg => msg != null && msg.Contains(testException.ToString())),
             Constants.UpdateFailureOk);
 
         mockAppTitleService.Received(1).SetProgressString(null);
@@ -263,11 +263,11 @@ public sealed class DeploymentServiceTests
 
         mockMainThreadService.InvokeOnMainThread(Arg.Any<Action>()).Returns(callInfo =>
         {
-            callInfo.Arg<Action>().Invoke();
+            callInfo.ArgAt<Action>(0).Invoke();
             return Task.CompletedTask;
         });
 
-        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.ArgAt<Func<Task>>(0)());
 
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
@@ -308,11 +308,11 @@ public sealed class DeploymentServiceTests
 
         mockMainThreadService.InvokeOnMainThread(Arg.Any<Action>()).Returns(callInfo =>
         {
-            callInfo.Arg<Action>().Invoke();
+            callInfo.ArgAt<Action>(0).Invoke();
             return Task.CompletedTask;
         });
 
-        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.ArgAt<Func<Task>>(0)());
 
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
@@ -349,8 +349,8 @@ public sealed class DeploymentServiceTests
         // NSubstitute's Received() doesn't reliably return configured values for IAsyncOperationWithProgress
         _ = mockPackageDeploymentService.Received(1)
             .AddPackageAsync(
-                Arg.Is<Uri>(uri => uri.LocalPath == Constants.DownloadPath),
-                Arg.Is<PackageDeploymentOptions>(opt =>
+                Arg.Is<Uri>(uri => uri != null && uri.LocalPath == Constants.DownloadPath),
+                Arg.Is<PackageDeploymentOptions>(opt => opt != null &&
                     opt.ForceUpdateFromAnyVersion == true &&
                     opt.ForceTargetAppShutdown == false &&
                     opt.DeferRegistrationWhenPackagesAreInUse == true));
@@ -420,11 +420,11 @@ public sealed class DeploymentServiceTests
 
         mockMainThreadService.InvokeOnMainThread(Arg.Any<Action>()).Returns(callInfo =>
         {
-            callInfo.Arg<Action>().Invoke();
+            callInfo.ArgAt<Action>(0).Invoke();
             return Task.CompletedTask;
         });
 
-        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.ArgAt<Func<Task>>(0)());
 
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
@@ -458,11 +458,11 @@ public sealed class DeploymentServiceTests
 
         mockMainThreadService.InvokeOnMainThread(Arg.Any<Action>()).Returns(callInfo =>
         {
-            callInfo.Arg<Action>().Invoke();
+            callInfo.ArgAt<Action>(0).Invoke();
             return Task.CompletedTask;
         });
 
-        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.ArgAt<Func<Task>>(0)());
 
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
@@ -478,7 +478,7 @@ public sealed class DeploymentServiceTests
         await mockMainThreadService.Received(1).InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
         await mockAlertDialogService.Received(1).ShowAlert(
             Constants.UpdateFailureTitle,
-            Arg.Is<string>(msg => msg.Contains(testException.ToString())),
+            Arg.Is<string>(msg => msg != null && msg.Contains(testException.ToString())),
             Constants.UpdateFailureOk);
 
         mockAppTitleService.Received(1).SetProgressString(null);
@@ -502,11 +502,11 @@ public sealed class DeploymentServiceTests
 
         mockMainThreadService.InvokeOnMainThread(Arg.Any<Action>()).Returns(callInfo =>
         {
-            callInfo.Arg<Action>().Invoke();
+            callInfo.ArgAt<Action>(0).Invoke();
             return Task.CompletedTask;
         });
 
-        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.ArgAt<Func<Task>>(0)());
 
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
@@ -543,11 +543,11 @@ public sealed class DeploymentServiceTests
 
         mockMainThreadService.InvokeOnMainThread(Arg.Any<Action>()).Returns(callInfo =>
         {
-            callInfo.Arg<Action>().Invoke();
+            callInfo.ArgAt<Action>(0).Invoke();
             return Task.CompletedTask;
         });
 
-        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.ArgAt<Func<Task>>(0)());
 
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
@@ -583,11 +583,11 @@ public sealed class DeploymentServiceTests
 
         mockMainThreadService.InvokeOnMainThread(Arg.Any<Action>()).Returns(callInfo =>
         {
-            callInfo.Arg<Action>().Invoke();
+            callInfo.ArgAt<Action>(0).Invoke();
             return Task.CompletedTask;
         });
 
-        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.ArgAt<Func<Task>>(0)());
 
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,

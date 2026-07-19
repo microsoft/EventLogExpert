@@ -185,7 +185,7 @@ public sealed class PartialLoadCoordinatorTests
     {
         var dispatched = new List<object>();
         var dispatcher = Substitute.For<IDispatcher>();
-        dispatcher.When(d => d.Dispatch(Arg.Any<object>())).Do(call => dispatched.Add(call.Arg<object>()));
+        dispatcher.When(d => d.Dispatch(Arg.Any<object>())).Do(call => dispatched.Add(call.ArgAt<object>(0)));
 
         var storeHolder = new StoreHolder();
         var rawState = Substitute.For<IState<RawEventStoreState>>();

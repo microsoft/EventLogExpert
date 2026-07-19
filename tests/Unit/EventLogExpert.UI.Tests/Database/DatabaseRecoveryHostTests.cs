@@ -41,14 +41,14 @@ public sealed class DatabaseRecoveryHostTests
         _mainThreadService.InvokeOnMainThread(Arg.Any<Action>())
             .Returns(call =>
             {
-                ((Action)call[0])();
+                call.ArgAt<Action>(0)();
                 return Task.CompletedTask;
             });
 
         _mainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>())
             .Returns(async call =>
             {
-                await ((Func<Task>)call[0])();
+                await call.ArgAt<Func<Task>>(0)();
             });
     }
 
@@ -273,7 +273,7 @@ public sealed class DatabaseRecoveryHostTests
                     return Task.FromException(dispatchFailure);
                 }
 
-                ((Action)call[0])();
+                call.ArgAt<Action>(0)();
                 return Task.CompletedTask;
             });
 

@@ -374,7 +374,7 @@ public sealed class CreateDatabaseTabTests : BunitContext
             .CreateAsync(default!, default!, default, default)
             .ReturnsForAnyArgs(callInfo =>
             {
-                var targetPath = callInfo.Arg<CreateDatabaseRequest>().TargetPath;
+                var targetPath = callInfo.ArgAt<CreateDatabaseRequest>(0).TargetPath;
                 File.WriteAllText(targetPath, string.Empty);
                 writtenDatabasePaths.Add(targetPath);
                 return Task.FromResult(new DatabaseToolsResult(DatabaseToolsOutcome.Succeeded, null, TimeSpan.Zero));

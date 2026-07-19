@@ -97,7 +97,7 @@ public sealed class UpdateServiceTests
 
         // Assert
         await mockAlertDialogService.Received(1)
-            .ShowAlert("Update Failure", Arg.Is<string>(s => s.Contains("Deployment failed")), "OK");
+            .ShowAlert("Update Failure", Arg.Is<string>(s => s != null && s.Contains("Deployment failed")), "OK");
     }
 
     [Fact]
@@ -217,7 +217,7 @@ public sealed class UpdateServiceTests
 
         // Assert
         await mockAlertDialogService.Received(1)
-            .ShowAlert("Update Failure", Arg.Is<string>(s => s.Contains("Network error")), "OK");
+            .ShowAlert("Update Failure", Arg.Is<string>(s => s != null && s.Contains("Network error")), "OK");
 
         mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
         mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
@@ -447,7 +447,7 @@ public sealed class UpdateServiceTests
         mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
 
         await mockAlertDialogService.Received(1)
-            .ShowAlert("Update Failure", Arg.Is<string>(s => s.Contains("No releases available")), "OK");
+            .ShowAlert("Update Failure", Arg.Is<string>(s => s != null && s.Contains("No releases available")), "OK");
     }
 
     [Fact]
@@ -807,7 +807,7 @@ public sealed class UpdateServiceTests
 
         // Assert
         await mockAlertDialogService.Received(1)
-            .ShowAlert(Arg.Is<string>(s => s.Contains("Release Notes")), Arg.Is<string>(s => s.Contains("Failed to get release notes")), "OK");
+            .ShowAlert(Arg.Is<string>(s => s != null && s.Contains("Release Notes")), Arg.Is<string>(s => s != null && s.Contains("Failed to get release notes")), "OK");
         Assert.Null(result);
     }
 

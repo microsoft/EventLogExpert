@@ -56,7 +56,7 @@ public sealed class ScenarioApplyIntegrationTests
 
         ApplyFilterAction? captured = null;
         dispatcher.When(target => target.Dispatch(Arg.Any<ApplyFilterAction>()))
-            .Do(call => captured = (ApplyFilterAction)call[0]);
+            .Do(call => captured = call.ArgAt<ApplyFilterAction>(0));
 
         await effects.HandleReplaceFilters(dispatcher);
 

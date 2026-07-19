@@ -102,7 +102,7 @@ public sealed class DetailsPaneTests : BunitContext
 
         cut.Find(".details-copy-event").Click();
 
-        _clipboard.Received(1).CopyTextAsync(Arg.Is<string>(text => text.Contains("LogonType: 3 (Network)")));
+        _clipboard.Received(1).CopyTextAsync(Arg.Is<string>(text => text != null && text.Contains("LogonType: 3 (Network)")));
     }
 
     [Fact]

@@ -76,7 +76,7 @@ public sealed class AttentionBannerTests : BunitContext
 
         _attentionBannerService.Received(1).DismissAttention();
         _errorBannerService.Received(1)
-            .ReportError("Databases", Arg.Is<string>(s => s.Contains("Failed to open databases")));
+            .ReportError("Databases", Arg.Is<string>(s => s != null && s.Contains("Failed to open databases")));
         Assert.NotNull(captured);
         Assert.Equal(BannerView.Error, captured.View);
     }
@@ -113,7 +113,7 @@ public sealed class AttentionBannerTests : BunitContext
 
         _attentionBannerService.Received(1).DismissAttention();
         _errorBannerService.Received(1)
-            .ReportError("Databases", Arg.Is<string>(s => s.Contains("modal boom")));
+            .ReportError("Databases", Arg.Is<string>(s => s != null && s.Contains("modal boom")));
         _traceLogger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
             h.ToString().Contains(nameof(AttentionBanner)) && h.ToString().Contains("modal boom")));
         Assert.NotNull(captured);

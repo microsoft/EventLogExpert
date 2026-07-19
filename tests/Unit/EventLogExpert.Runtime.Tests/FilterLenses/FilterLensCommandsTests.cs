@@ -27,7 +27,8 @@ public sealed class FilterLensCommandsTests
 
         new FilterLensCommands(dispatcher).RemoveLens(lens);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<RemoveFilterLensAction>(action => action.Lens == lens));
+        dispatcher.Received(1).Dispatch(Arg.Is<RemoveFilterLensAction>(action =>
+            action != null && action.Lens == lens));
     }
 
     [Theory]
@@ -44,6 +45,7 @@ public sealed class FilterLensCommandsTests
             new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc), TimeSpan.FromSeconds(seconds), TimeZoneInfo.Utc);
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null &&
             action.Lens.Label.EndsWith(expectedSuffix, StringComparison.Ordinal)));
     }
 
@@ -56,6 +58,7 @@ public sealed class FilterLensCommandsTests
         new FilterLensCommands(dispatcher).ShowEventsNearTime(anchor, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null &&
             action.Lens.Kind == LensKind.TimeWindow &&
             action.Lens.Window != null &&
             action.Lens.Window.IsEnabled &&
@@ -73,6 +76,7 @@ public sealed class FilterLensCommandsTests
             new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc), TimeSpan.FromSeconds(90), TimeZoneInfo.Utc);
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null &&
             action.Lens.Label.EndsWith("\u00b190s", StringComparison.Ordinal)));
     }
 
@@ -89,6 +93,7 @@ public sealed class FilterLensCommandsTests
         // Built with the same culture-sensitive ":T" the production label uses, so the assertion holds under any ambient
         // culture; the anchor renders in the +5 display zone (17:00:00), not UTC (12:00:00).
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null &&
             action.Lens.Label == $"Near {expectedAnchor:T} \u00b15m"));
     }
 
@@ -103,6 +108,7 @@ public sealed class FilterLensCommandsTests
             DateTime.MinValue, TimeSpan.FromSeconds(30), TimeZoneInfo.Utc);
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null &&
             action.Lens.Window!.After == DateTime.MinValue &&
             action.Lens.Window.Before == DateTime.MinValue.AddSeconds(30)));
     }
@@ -158,7 +164,8 @@ public sealed class FilterLensCommandsTests
         new FilterLensCommands(dispatcher).ShowEventsNearTime(
             new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc), TimeSpan.FromMinutes(5), TimeZoneInfo.Utc, "LogA");
 
-        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action => action.Lens.OriginLog == "LogA"));
+        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null && action.Lens.OriginLog == "LogA"));
     }
 
     [Fact]
@@ -170,6 +177,7 @@ public sealed class FilterLensCommandsTests
         new FilterLensCommands(dispatcher).ShowParentActivity(relatedActivityId);
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null &&
             action.Lens.Label == $"Parent Activity = {relatedActivityId}" &&
             action.Lens.ExcludeFilters.Count == 1 &&
             action.Lens.ExcludeFilters[0].Compiled != null &&
@@ -194,7 +202,8 @@ public sealed class FilterLensCommandsTests
 
         new FilterLensCommands(dispatcher).ShowParentActivity(Guid.NewGuid(), "LogA");
 
-        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action => action.Lens.OriginLog == "LogA"));
+        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null && action.Lens.OriginLog == "LogA"));
     }
 
     [Fact]
@@ -205,6 +214,7 @@ public sealed class FilterLensCommandsTests
         new FilterLensCommands(dispatcher).ShowRelatedByActivityId(Guid.NewGuid());
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null &&
             action.Lens.Kind == LensKind.Property &&
             action.Lens.ExcludeFilters.Count == 1 &&
             action.Lens.ExcludeFilters[0].IsExcluded &&
@@ -228,7 +238,8 @@ public sealed class FilterLensCommandsTests
 
         new FilterLensCommands(dispatcher).ShowRelatedByActivityId(Guid.NewGuid(), "LogA");
 
-        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action => action.Lens.OriginLog == "LogA"));
+        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null && action.Lens.OriginLog == "LogA"));
     }
 
     [Fact]
@@ -240,6 +251,7 @@ public sealed class FilterLensCommandsTests
         new FilterLensCommands(dispatcher).ShowRelatedByRelatedActivityId(id);
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null &&
             action.Lens.Label == $"Related Activity ID = {id}" &&
             action.Lens.ExcludeFilters.Count == 1 &&
             action.Lens.ExcludeFilters[0].IsExcluded &&
@@ -264,7 +276,8 @@ public sealed class FilterLensCommandsTests
 
         new FilterLensCommands(dispatcher).ShowRelatedByRelatedActivityId(Guid.NewGuid(), "LogA");
 
-        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action => action.Lens.OriginLog == "LogA"));
+        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null && action.Lens.OriginLog == "LogA"));
     }
 
     [Fact]
@@ -277,6 +290,7 @@ public sealed class FilterLensCommandsTests
         new FilterLensCommands(dispatcher).ShowTimeRange(start, end, TimeZoneInfo.Utc);
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null &&
             action.Lens.Kind == LensKind.TimeWindow &&
             action.Lens.Window != null &&
             action.Lens.Window.IsEnabled &&
@@ -294,6 +308,7 @@ public sealed class FilterLensCommandsTests
         new FilterLensCommands(dispatcher).ShowTimeRange(later, earlier, TimeZoneInfo.Utc);
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null &&
             action.Lens.Window!.After == earlier &&
             action.Lens.Window.Before == later));
     }
@@ -309,6 +324,7 @@ public sealed class FilterLensCommandsTests
             TimeZoneInfo.Utc,
             "LogA");
 
-        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action => action.Lens.OriginLog == "LogA"));
+        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null && action.Lens.OriginLog == "LogA"));
     }
 }

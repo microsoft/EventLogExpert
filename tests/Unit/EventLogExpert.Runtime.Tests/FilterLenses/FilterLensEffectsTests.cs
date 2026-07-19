@@ -43,7 +43,8 @@ public sealed class FilterLensEffectsTests
 
         await effects.HandleLogClosedByUser(new LogClosedByUserAction(EventLogId.Create(), "LogA"), dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<RemoveLensesForLogAction>(action => action.LogName == "LogA"));
+        dispatcher.Received(1).Dispatch(Arg.Is<RemoveLensesForLogAction>(action =>
+            action != null && action.LogName == "LogA"));
     }
 
     [Fact]
@@ -71,6 +72,7 @@ public sealed class FilterLensEffectsTests
         await effects.HandlePush(new PushFilterLensAction(lens), dispatcher);
 
         dispatcher.Received(1).Dispatch(Arg.Is<ApplyFilterAction>(action =>
+            action != null &&
             action.Filter.Filters.Count == 2 &&
             action.Filter.Filters.Count(filter => filter.IsExcluded) == 1 &&
             action.Filter.Filters.Count(filter => !filter.IsExcluded) == 1));

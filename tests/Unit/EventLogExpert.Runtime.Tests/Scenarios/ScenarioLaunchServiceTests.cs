@@ -37,7 +37,7 @@ public sealed class ScenarioLaunchServiceTests
 
         await service.LaunchAsync(scenario, dateWindow: null);
 
-        dispatcher.Received().Dispatch(Arg.Is<SetFilterDateRangeAction>(action => action.DateFilter == null));
+        dispatcher.Received().Dispatch(Arg.Is<SetFilterDateRangeAction>(action => action != null && action.DateFilter == null));
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public sealed class ScenarioLaunchServiceTests
         await service.LaunchAsync(scenario, dateWindow: null);
 
         dispatcher.Received(1)
-            .Dispatch(Arg.Is<RestoreFilterPaneStateAction>(action => ReferenceEquals(action.State, priorState)));
+            .Dispatch(Arg.Is<RestoreFilterPaneStateAction>(action => action != null && ReferenceEquals(action.State, priorState)));
     }
 
     private static (IScenarioLaunchService Service, IDispatcher Dispatcher, IMenuActionService Menu, ScenarioDefinition Scenario)

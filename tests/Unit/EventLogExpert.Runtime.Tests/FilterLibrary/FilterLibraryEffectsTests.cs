@@ -34,7 +34,7 @@ public sealed class FilterLibraryEffectsTests
                 bulkCalls++;
                 if (bulkCalls == 1)
                 {
-                    var list = (IReadOnlyList<LibraryEntry>)call[0];
+                    var list = call.ArgAt<IReadOnlyList<LibraryEntry>>(0);
                     return Task.FromResult<IReadOnlyList<LibraryEntryId>>(list.Select(e => e.Id).ToList());
                 }
 
@@ -94,9 +94,9 @@ public sealed class FilterLibraryEffectsTests
             dispatcher);
 
         // Did NOT update the filter set (duplicate).
-        await store.DidNotReceive().UpdateAsync(Arg.Is<LibraryEntry>(e => e.Id == filterSet.Id), Arg.Any<CancellationToken>());
+        await store.DidNotReceive().UpdateAsync(Arg.Is<LibraryEntry>(e => e != null && e.Id == filterSet.Id), Arg.Any<CancellationToken>());
         // But DID promote the source.
-        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e.Id == source.Id && e.Origin == LibraryEntryOrigin.UserSaved), Arg.Any<CancellationToken>());
+        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e != null && e.Id == source.Id && e.Origin == LibraryEntryOrigin.UserSaved), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -147,7 +147,7 @@ public sealed class FilterLibraryEffectsTests
             new AddFilterToExistingFilterSetAction(filterSet.Id, basic, SourceEntryId: null),
             Substitute.For<IDispatcher>());
 
-        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e.GetType() == typeof(LibraryEntryFilterSet)
+        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e != null && e.GetType() == typeof(LibraryEntryFilterSet)
             && ((LibraryEntryFilterSet)e).Id == filterSet.Id
             && ((LibraryEntryFilterSet)e).Filters.Count == 2
             && ((LibraryEntryFilterSet)e).Filters.Any(f => f.Mode == FilterMode.Advanced)
@@ -177,7 +177,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleAddFilterToNewFilterSet(new AddFilterToNewFilterSetAction("New", filter, SourceEntryId: null), dispatcher);
 
-        await store.Received(1).AddAsync(Arg.Is<LibraryEntry>(e => e.GetType() == typeof(LibraryEntryFilterSet)
+        await store.Received(1).AddAsync(Arg.Is<LibraryEntry>(e => e != null && e.GetType() == typeof(LibraryEntryFilterSet)
             && ((LibraryEntryFilterSet)e).Name == "New"
             && ((LibraryEntryFilterSet)e).Filters.Count == 1
             && ((LibraryEntryFilterSet)e).Filters[0].Id != filter.Id), Arg.Any<CancellationToken>());
@@ -193,7 +193,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleAddFilterToNewFilterSet(new AddFilterToNewFilterSetAction("New", filter, source.Id), dispatcher);
 
-        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e =>
+        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e != null &&
             e.Id == source.Id && e.Origin == LibraryEntryOrigin.UserSaved), Arg.Any<CancellationToken>());
     }
 
@@ -218,7 +218,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleAddLibraryEntry(new AddLibraryEntryAction(entry), dispatcher);
 
         await store.Received(1).AddAsync(Arg.Is(entry), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => ReferenceEquals(a.Entry, entry)));
+        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => a != null && ReferenceEquals(a.Entry, entry)));
     }
 
     [Fact]
@@ -252,8 +252,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleApplyLibraryEntry(new ApplyLibraryEntryAction(filterSet.Id), dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<MergeFiltersAction>(a => a.Filters.Count == 2));
-        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a.EntryId == filterSet.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<MergeFiltersAction>(a => a != null && a.Filters.Count == 2));
+        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a != null && a.EntryId == filterSet.Id));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<ReplaceFiltersAction>());
     }
 
@@ -265,8 +265,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleApplyLibraryEntry(new ApplyLibraryEntryAction(entry.Id), dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<MergeFiltersAction>(a => a.Filters.Count == 1));
-        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a.EntryId == entry.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<MergeFiltersAction>(a => a != null && a.Filters.Count == 1));
+        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a != null && a.EntryId == entry.Id));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<ReplaceFiltersAction>());
     }
 
@@ -304,7 +304,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleDeleteLibraryEntry(new DeleteLibraryEntryAction(id), dispatcher);
 
         await store.Received(1).DeleteAsync(Arg.Is(id), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntrySuccessAction>(a => a.EntryId == id));
+        dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntrySuccessAction>(a => a != null && a.EntryId == id));
     }
 
     [Fact]
@@ -338,7 +338,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
 
-        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list => list != null &&
             list.Count == 1 && list[0].Tags.SequenceEqual(new[] { "perf" })), Arg.Any<CancellationToken>());
     }
 
@@ -366,7 +366,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleDeleteTag(new DeleteTagAction("BUG"), dispatcher);
 
-        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list => list != null &&
             list.Count == 2 &&
             list.Any(e => e.Id == a.Id && e.Tags.SequenceEqual(new[] { "perf" })) &&
             list.Any(e => e.Id == b.Id && e.Tags.IsEmpty) &&
@@ -402,8 +402,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == a.Id));
-        dispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == b.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s != null && s.Entry.Id == a.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s != null && s.Entry.Id == b.Id));
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         announcer.Received(1).Announce("Removed tag 'bug' from 1 entry");
     }
@@ -466,7 +466,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleLoadLibrary(dispatcher);
 
         backslashMigrator.Received(1).BuildMigrationPlan(Arg.Any<IReadOnlyList<LibraryEntry>>());
-        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e.Name == "DNS"), Arg.Any<CancellationToken>());
+        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e != null && e.Name == "DNS"), Arg.Any<CancellationToken>());
         backslashMigrator.Received(1).MarkMigrationCompleted();
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibrarySuccessAction>());
     }
@@ -507,7 +507,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleLoadLibrary(dispatcher);
 
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryFailureAction>());
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.IsEmpty));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.IsEmpty));
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
@@ -609,7 +609,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleLoadLibrary(dispatcher);
 
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryStartedAction>());
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1 && a.Entries[0].Id == entry.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 1 && a.Entries[0].Id == entry.Id));
     }
 
     [Fact]
@@ -634,7 +634,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleLoadLibrary(dispatcher);
 
         await store.Received(1).AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1 && a.Entries[0].Id == migratedEntry.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 1 && a.Entries[0].Id == migratedEntry.Id));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());
         migrator.Received(1).MarkMigrationCompleted(sections);
         logger.ReceivedWithAnyArgs(1).Warning(default);
@@ -656,7 +656,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleLoadLibrary(dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.IsEmpty));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.IsEmpty));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());
         migrator.DidNotReceive().MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
         logger.ReceivedWithAnyArgs(1).Warning(default);
@@ -674,7 +674,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleLoadLibrary(dispatcher);
 
         await store.DidNotReceive().AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.IsEmpty));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.IsEmpty));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());
         migrator.Received(1).MarkMigrationCompleted(sections);
     }
@@ -694,9 +694,9 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleLoadLibrary(dispatcher);
 
-        await store.Received(1).AddRangeAsync(Arg.Is<IEnumerable<LibraryEntry>>(e => e.Count() == 1), Arg.Any<CancellationToken>());
+        await store.Received(1).AddRangeAsync(Arg.Is<IEnumerable<LibraryEntry>>(e => e != null && e.Count() == 1), Arg.Any<CancellationToken>());
         await store.Received(2).LoadAllAsync(Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1 && a.Entries[0].Id == migratedEntry.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 1 && a.Entries[0].Id == migratedEntry.Id));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());
         migrator.Received(1).MarkMigrationCompleted(sections);
     }
@@ -709,7 +709,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleLoadLibrary(dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.IsEmpty));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.IsEmpty));
         await store.DidNotReceive().AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>());
         migrator.Received(1).MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
     }
@@ -728,7 +728,7 @@ public sealed class FilterLibraryEffectsTests
         migrator.DidNotReceive().BuildEntriesFromLegacy();
         migrator.DidNotReceive().MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
         await store.DidNotReceive().AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.IsEmpty));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.IsEmpty));
     }
 
     [Fact]
@@ -764,9 +764,9 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleLoadLibrary(dispatcher);
 
         // Distinct filter content → migrated filter set is NOT deduped → AddRange called with it.
-        await store.Received(1).AddRangeAsync(Arg.Is<IEnumerable<LibraryEntry>>(e => e.Count() == 1 && e.First() is LibraryEntryFilterSet), Arg.Any<CancellationToken>());
+        await store.Received(1).AddRangeAsync(Arg.Is<IEnumerable<LibraryEntry>>(e => e != null && e.Count() == 1 && e.First() is LibraryEntryFilterSet), Arg.Any<CancellationToken>());
         migrator.Received(1).MarkMigrationCompleted(sections);
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 2));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 2));
     }
 
     [Fact]
@@ -796,7 +796,7 @@ public sealed class FilterLibraryEffectsTests
         // Bitmask still advances - the section is "complete" from the persistence perspective.
         migrator.Received(1).MarkMigrationCompleted(sections);
         // Loaded entries reflect the existing store (no duplicates).
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 2));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 2));
     }
 
     [Fact]
@@ -817,9 +817,9 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleLoadLibrary(dispatcher);
 
         // Only the non-overlapping entry is inserted.
-        await store.Received(1).AddRangeAsync(Arg.Is<IEnumerable<LibraryEntry>>(e => e.Count() == 1 && e.First().Id == newEntry.Id), Arg.Any<CancellationToken>());
+        await store.Received(1).AddRangeAsync(Arg.Is<IEnumerable<LibraryEntry>>(e => e != null && e.Count() == 1 && e.First().Id == newEntry.Id), Arg.Any<CancellationToken>());
         migrator.Received(1).MarkMigrationCompleted(sections);
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 2));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 2));
     }
 
     [Fact]
@@ -841,7 +841,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleLoadLibrary(dispatcher);
 
         migrator.DidNotReceive().MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1 && a.Entries[0].Id == existingEntry.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 1 && a.Entries[0].Id == existingEntry.Id));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());
     }
 
@@ -860,7 +860,7 @@ public sealed class FilterLibraryEffectsTests
         migrator.DidNotReceive().BuildEntriesFromLegacy();
         await store.DidNotReceive().AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>());
         migrator.DidNotReceive().MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 1));
     }
 
     [Fact]
@@ -879,7 +879,7 @@ public sealed class FilterLibraryEffectsTests
         migrator.Received(1).BuildEntriesFromLegacy();
         await store.DidNotReceive().AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>());
         migrator.Received(1).MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>());
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 1));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 1));
     }
 
     [Fact]
@@ -900,9 +900,9 @@ public sealed class FilterLibraryEffectsTests
 
         migrator.Received(1).ShouldRunMigration();
         migrator.Received(1).BuildEntriesFromLegacy();
-        await store.Received(1).AddRangeAsync(Arg.Is<IEnumerable<LibraryEntry>>(e => e.Count() == 1), Arg.Any<CancellationToken>());
+        await store.Received(1).AddRangeAsync(Arg.Is<IEnumerable<LibraryEntry>>(e => e != null && e.Count() == 1), Arg.Any<CancellationToken>());
         migrator.Received(1).MarkMigrationCompleted(sections);
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 2));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 2));
     }
 
     [Fact]
@@ -968,7 +968,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleRecordEntryApplied(new RecordEntryAppliedAction(entry.Id), dispatcher);
 
         await store.Received(1).TryBumpLastUsedIfNotFavoriteAsync(entry.Id, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a =>
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a => a != null &&
             a.Entry.Id == entry.Id && a.Entry.LastUsedUtc != null));
     }
 
@@ -1052,7 +1052,7 @@ public sealed class FilterLibraryEffectsTests
 
         // SQL-guarded delete no-ops if the row was concurrently promoted/favorited.
         await store.Received(1).TryDeleteAutoTrackedIfNotFavoriteAsync(Arg.Is(oldestId), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntrySuccessAction>(a => a.EntryId == oldestId));
+        dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntrySuccessAction>(a => a != null && a.EntryId == oldestId));
     }
 
     [Fact]
@@ -1088,7 +1088,7 @@ public sealed class FilterLibraryEffectsTests
 
         await store.Received(1).AddOrReturnExistingFilterAsync(Arg.Any<LibraryEntrySavedFilter>(), Arg.Any<CancellationToken>());
         await store.Received(1).TryBumpLastUsedIfNotFavoriteAsync(existing.Id, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a =>
+        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => a != null &&
             a.Entry.Id == existing.Id && a.Entry.LastUsedUtc != existing.LastUsedUtc));
     }
 
@@ -1159,7 +1159,7 @@ public sealed class FilterLibraryEffectsTests
         await store.DidNotReceive().TryDeleteAutoTrackedIfNotFavoriteAsync(Arg.Any<LibraryEntryId>(), Arg.Any<CancellationToken>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<DeleteLibraryEntrySuccessAction>());
         // Bump + AddSuccess dispatch still happen as part of the collision-bump path.
-        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => a.Entry.Id == alreadyInState.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => a != null && a.Entry.Id == alreadyInState.Id));
     }
 
     [Fact]
@@ -1179,7 +1179,7 @@ public sealed class FilterLibraryEffectsTests
         };
         var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [existing] });
         store.AddOrReturnExistingFilterAsync(Arg.Any<LibraryEntrySavedFilter>(), Arg.Any<CancellationToken>())
-            .Returns(call => (call.Arg<LibraryEntrySavedFilter>(), true));
+            .Returns(call => (call.ArgAt<LibraryEntrySavedFilter>(0), true));
 
         await effects.HandleRecordFilterApplied(new RecordFilterAppliedAction(basic), dispatcher);
 
@@ -1225,7 +1225,7 @@ public sealed class FilterLibraryEffectsTests
         store.AddOrReturnExistingFilterAsync(Arg.Any<LibraryEntrySavedFilter>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {
-                var candidate = call.Arg<LibraryEntrySavedFilter>();
+                var candidate = call.ArgAt<LibraryEntrySavedFilter>(0);
                 return (candidate, true);
             });
         var filter = SavedFilter.TryCreate("Level == 4");
@@ -1234,7 +1234,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleRecordFilterApplied(new RecordFilterAppliedAction(filter), dispatcher);
 
         await store.Received(1).AddOrReturnExistingFilterAsync(Arg.Any<LibraryEntrySavedFilter>(), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a =>
+        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => a != null &&
             a.Entry.GetType() == typeof(LibraryEntrySavedFilter)
                 && ((LibraryEntrySavedFilter)a.Entry).Origin == LibraryEntryOrigin.AutoTracked
                 && ((LibraryEntrySavedFilter)a.Entry).LastUsedUtc != null
@@ -1267,14 +1267,14 @@ public sealed class FilterLibraryEffectsTests
 
         var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [.. entries] });
         store.AddOrReturnExistingFilterAsync(Arg.Any<LibraryEntrySavedFilter>(), Arg.Any<CancellationToken>())
-            .Returns(call => (call.Arg<LibraryEntrySavedFilter>(), true));
+            .Returns(call => (call.ArgAt<LibraryEntrySavedFilter>(0), true));
         store.TryDeleteAutoTrackedIfNotFavoriteAsync(Arg.Any<LibraryEntryId>(), Arg.Any<CancellationToken>()).Returns(true);
 
         await effects.HandleRecordFilterApplied(new RecordFilterAppliedAction(newFilter), dispatcher);
 
         await store.Received(1).AddOrReturnExistingFilterAsync(Arg.Any<LibraryEntrySavedFilter>(), Arg.Any<CancellationToken>());
         await store.Received(1).TryDeleteAutoTrackedIfNotFavoriteAsync(Arg.Is(oldestId), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntrySuccessAction>(a => a.EntryId == oldestId));
+        dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntrySuccessAction>(a => a != null && a.EntryId == oldestId));
     }
 
     [Fact]
@@ -1317,7 +1317,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleRecordFilterApplied(new RecordFilterAppliedAction(filter), dispatcher);
 
         await store.Received(1).TryBumpLastUsedIfNotFavoriteAsync(existing.Id, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a =>
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a => a != null &&
             a.Entry.Id == existing.Id && a.Entry.LastUsedUtc != existing.LastUsedUtc));
         await store.DidNotReceive().AddOrReturnExistingFilterAsync(Arg.Any<LibraryEntrySavedFilter>(), Arg.Any<CancellationToken>());
     }
@@ -1343,7 +1343,7 @@ public sealed class FilterLibraryEffectsTests
 
         await store.Received(1).TryBumpLastUsedIfNotFavoriteAsync(existing.Id, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
         await store.DidNotReceive().AddOrReturnExistingFilterAsync(Arg.Any<LibraryEntrySavedFilter>(), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a => a.Entry.Id == existing.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a => a != null && a.Entry.Id == existing.Id));
     }
 
     [Fact]
@@ -1354,7 +1354,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
 
-        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list => list != null &&
             list.Count == 1 && list[0].Tags.SequenceEqual(new[] { "defect" })), Arg.Any<CancellationToken>());
     }
 
@@ -1385,7 +1385,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
 
-        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list => list != null &&
             list.Count == 1 && list[0] is LibraryEntryFilterSet && list[0].Tags.SequenceEqual(new[] { "defect" })), Arg.Any<CancellationToken>());
     }
 
@@ -1397,7 +1397,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
 
-        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list => list != null &&
             list.Count == 1 && list[0].Tags.SequenceEqual(new[] { "defect" })), Arg.Any<CancellationToken>());
         dispatcher.Received(1).Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
     }
@@ -1422,7 +1422,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("  BUG  ", "Defect "), dispatcher);
 
-        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list => list != null &&
             list.Count == 1 && list[0].Tags.SequenceEqual(new[] { "defect" })), Arg.Any<CancellationToken>());
     }
 
@@ -1436,7 +1436,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
 
-        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list => list != null &&
             list.Count == 2 &&
             list.Any(e => e.Id == a.Id && e.Tags.SequenceEqual(new[] { "defect", "perf" })) &&
             list.Any(e => e.Id == b.Id && e.Tags.SequenceEqual(new[] { "defect" })) &&
@@ -1453,7 +1453,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
 
-        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list =>
+        await store.Received(1).UpdateRangeAsync(Arg.Is<IReadOnlyList<LibraryEntry>>(list => list != null &&
             list.Count == 1 && list[0].Id == withTag.Id), Arg.Any<CancellationToken>());
     }
 
@@ -1469,8 +1469,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == a.Id));
-        dispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s.Entry.Id == b.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s != null && s.Entry.Id == a.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s != null && s.Entry.Id == b.Id));
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         announcer.Received(1).Announce("Renamed tag 'bug' to 'defect' in 1 entry");
     }
@@ -1526,8 +1526,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleReplaceWithLibraryEntry(new ReplaceWithLibraryEntryAction(filterSet.Id), dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<ReplaceFiltersAction>(a => a.Filters.Count == 2));
-        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a.EntryId == filterSet.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<ReplaceFiltersAction>(a => a != null && a.Filters.Count == 2));
+        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a != null && a.EntryId == filterSet.Id));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<MergeFiltersAction>());
     }
 
@@ -1539,8 +1539,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleReplaceWithLibraryEntry(new ReplaceWithLibraryEntryAction(entry.Id), dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<ReplaceFiltersAction>(a => a.Filters.Count == 1));
-        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a.EntryId == entry.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<ReplaceFiltersAction>(a => a != null && a.Filters.Count == 1));
+        dispatcher.Received(1).Dispatch(Arg.Is<RecordEntryAppliedAction>(a => a != null && a.EntryId == entry.Id));
     }
 
     [Fact]
@@ -1587,7 +1587,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleSaveEntry(new SaveEntryAction(entry.Id), dispatcher);
 
-        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e =>
+        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e != null &&
             e.Id == entry.Id && e.Origin == LibraryEntryOrigin.UserSaved), Arg.Any<CancellationToken>());
     }
 
@@ -1604,7 +1604,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleSaveEntry(new SaveEntryAction(staleEntry.Id), dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a =>
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a => a != null &&
             a.Entry.Id == staleEntry.Id &&
             a.Entry.Name == "NewName" &&
             a.Entry.Origin == LibraryEntryOrigin.UserSaved));
@@ -1633,7 +1633,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleSaveEntry(new SaveEntryAction(entry.Id), dispatcher);
 
         await store.Received(1).UpdateAsync(
-            Arg.Is<LibraryEntry>(e => e.Id == entry.Id && e.Origin == LibraryEntryOrigin.UserSaved),
+            Arg.Is<LibraryEntry>(e => e != null && e.Id == entry.Id && e.Origin == LibraryEntryOrigin.UserSaved),
             Arg.Any<CancellationToken>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
     }
@@ -1650,13 +1650,13 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleSaveFilterSet(new SaveFilterSetAction("My Preset", [f1, f2]), dispatcher);
 
-        await store.Received(1).AddAsync(Arg.Is<LibraryEntry>(e => e.GetType() == typeof(LibraryEntryFilterSet)
+        await store.Received(1).AddAsync(Arg.Is<LibraryEntry>(e => e != null && e.GetType() == typeof(LibraryEntryFilterSet)
             && ((LibraryEntryFilterSet)e).Name == "My Preset"
             && ((LibraryEntryFilterSet)e).Origin == LibraryEntryOrigin.UserSaved
             && ((LibraryEntryFilterSet)e).Filters.Count == 2
             && ((LibraryEntryFilterSet)e).Filters.All(f => !originalIds.Contains(f.Id))
             && ((LibraryEntryFilterSet)e).Filters.All(f => !f.IsEnabled)), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => a.Entry.GetType() == typeof(LibraryEntryFilterSet)));
+        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => a != null && a.Entry.GetType() == typeof(LibraryEntryFilterSet)));
     }
 
     [Fact]
@@ -1702,7 +1702,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleSavePaneAsFilterSet(new SavePaneAsFilterSetAction("Pane Preset"), dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(a =>
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(a => a != null &&
             a.Name == "Pane Preset" && a.Filters.Count == 1 && a.Filters[0] == f1));
     }
 
@@ -1738,7 +1738,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleSetIsFavorite(new SetIsFavoriteAction(filter.Id, IsFavorite: false), dispatcher);
 
-        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e =>
+        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e != null &&
             e.Id == filter.Id && !e.IsFavorite && e.LastUsedUtc != null), Arg.Any<CancellationToken>());
     }
 
@@ -1758,7 +1758,7 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleSetIsFavorite(new SetIsFavoriteAction(filterSet.Id, IsFavorite: false), dispatcher);
 
-        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e.Id == filterSet.Id && !e.IsFavorite && e.LastUsedUtc == null), Arg.Any<CancellationToken>());
+        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e != null && e.Id == filterSet.Id && !e.IsFavorite && e.LastUsedUtc == null), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -1773,9 +1773,9 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleSetIsFavorite(new SetIsFavoriteAction(entry.Id, IsFavorite: true), dispatcher);
 
-        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e =>
+        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e != null &&
             e.Id == entry.Id && e.IsFavorite && e.LastUsedUtc == null && e.Origin == LibraryEntryOrigin.UserSaved), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a =>
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a => a != null &&
             a.Entry.IsFavorite && a.Entry.LastUsedUtc == null && a.Entry.Origin == LibraryEntryOrigin.UserSaved));
     }
 
@@ -1799,7 +1799,7 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleUpdateLibraryEntry(new UpdateLibraryEntryAction(entry), dispatcher);
 
         await store.Received(1).UpdateAsync(Arg.Is(entry), Arg.Any<CancellationToken>());
-        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a => ReferenceEquals(a.Entry, entry)));
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(a => a != null && ReferenceEquals(a.Entry, entry)));
     }
 
     [Fact]
@@ -1940,7 +1940,7 @@ public sealed class FilterLibraryEffectsTests
         if (!storeWasSupplied)
         {
             store.LoadAllAsync(Arg.Any<CancellationToken>()).Returns([]);
-            store.UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>()).ReturnsForAnyArgs(ci => ((IReadOnlyList<LibraryEntry>)ci[0]).Select(e => e.Id).ToList());
+            store.UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>()).ReturnsForAnyArgs(ci => ci.ArgAt<IReadOnlyList<LibraryEntry>>(0).Select(e => e.Id).ToList());
         }
 
         var stateMock = Substitute.For<IState<FilterLibraryState>>();

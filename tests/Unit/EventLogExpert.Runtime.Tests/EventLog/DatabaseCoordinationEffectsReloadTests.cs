@@ -71,7 +71,7 @@ public sealed class DatabaseCoordinationEffectsReloadTests
         using var cts = new CancellationTokenSource();
         _dispatcher.When(d => d.Dispatch(Arg.Any<CloseLogAction>())).Do(call =>
         {
-            var action = (CloseLogAction)call.Args()[0];
+            var action = call.ArgAt<CloseLogAction>(0);
 
             if (action.LogName == "Application")
             {
@@ -103,7 +103,7 @@ public sealed class DatabaseCoordinationEffectsReloadTests
 
         _dispatcher.When(d => d.Dispatch(Arg.Any<CloseLogAction>())).Do(call =>
         {
-            var action = (CloseLogAction)call.Args()[0];
+            var action = call.ArgAt<CloseLogAction>(0);
             _closeCoordinator.CompleteCloseFor(action.LogId);
         });
 
@@ -165,7 +165,7 @@ public sealed class DatabaseCoordinationEffectsReloadTests
                 return;
             }
 
-            var action = (CloseLogAction)call.Args()[0];
+            var action = call.ArgAt<CloseLogAction>(0);
             _closeCoordinator.CompleteCloseFor(action.LogId);
         });
 
@@ -203,15 +203,15 @@ public sealed class DatabaseCoordinationEffectsReloadTests
 
         _dispatcher.When(d => d.Dispatch(Arg.Any<CloseLogAction>())).Do(call =>
         {
-            var action = (CloseLogAction)call.Args()[0];
+            var action = call.ArgAt<CloseLogAction>(0);
             _closeCoordinator.CompleteCloseFor(action.LogId);
         });
 
         var sut = CreateSut();
         await sut.ReloadAllActiveLogsAsync(Ct);
 
-        _dispatcher.Received(1).Dispatch(Arg.Is<CloseLogAction>(a => a.LogName == "Application"));
-        _dispatcher.Received(1).Dispatch(Arg.Is<CloseLogAction>(a => a.LogName == "C:/path/security.evtx"));
+        _dispatcher.Received(1).Dispatch(Arg.Is<CloseLogAction>(a => a != null && a.LogName == "Application"));
+        _dispatcher.Received(1).Dispatch(Arg.Is<CloseLogAction>(a => a != null && a.LogName == "C:/path/security.evtx"));
         _dispatcher.DidNotReceive().Dispatch(Arg.Any<CloseAllLogsAction>());
         _eventLogCommands.Received(1).OpenLog("Application", LogPathType.Channel, Arg.Any<CancellationToken>());
         _eventLogCommands.Received(1).OpenLog("C:/path/security.evtx", LogPathType.File, Arg.Any<CancellationToken>());

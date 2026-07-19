@@ -65,8 +65,8 @@ public sealed class DatabaseOperationCoordinatorTests
         _databases.Received(1).Toggle("c.db");
         _databases.Received(1).Toggle("d.db");
         _databases.Received(1).Toggle("e.db");
-        _errorBanners.Received(1).ReportError("Failed to Update Database", Arg.Is<string>(m => m.Contains("c.db", StringComparison.Ordinal)));
-        _errorBanners.Received(1).ReportError("Failed to Update Database", Arg.Is<string>(m => m.Contains("e.db", StringComparison.Ordinal)));
+        _errorBanners.Received(1).ReportError("Failed to Update Database", Arg.Is<string>(m => m != null && m.Contains("c.db", StringComparison.Ordinal)));
+        _errorBanners.Received(1).ReportError("Failed to Update Database", Arg.Is<string>(m => m != null && m.Contains("e.db", StringComparison.Ordinal)));
         _errorBanners.Received(2).ReportError("Failed to Update Database", Arg.Any<string>());
     }
 
@@ -136,7 +136,7 @@ public sealed class DatabaseOperationCoordinatorTests
 
         await _databases.Received(1).ImportAsync(
             Arg.Any<IEnumerable<string>>(),
-            Arg.Is<IReadOnlySet<string>>(s => !s.Contains("exists.db")),
+            Arg.Is<IReadOnlySet<string>>(s => s != null && !s.Contains("exists.db")),
             Arg.Any<CancellationToken>());
     }
 
@@ -158,7 +158,7 @@ public sealed class DatabaseOperationCoordinatorTests
         // Conflict defaults to Skip because overwriting is riskier than importing nothing.
         await _databases.Received(1).ImportAsync(
             Arg.Any<IEnumerable<string>>(),
-            Arg.Is<IReadOnlySet<string>>(s => s.Contains("exists.db")),
+            Arg.Is<IReadOnlySet<string>>(s => s != null && s.Contains("exists.db")),
             Arg.Any<CancellationToken>());
         _errorBanners.DidNotReceiveWithAnyArgs().ReportError(null!, null!);
     }
@@ -175,7 +175,7 @@ public sealed class DatabaseOperationCoordinatorTests
         var sut = CreateSut();
         var outcome = await sut.ImportAsync(cancellationToken: Ct);
 
-        _errorBanners.Received(1).ReportError("Import Failed", Arg.Is<string>(m => m.Contains("boom", StringComparison.Ordinal)));
+        _errorBanners.Received(1).ReportError("Import Failed", Arg.Is<string>(m => m != null && m.Contains("boom", StringComparison.Ordinal)));
         _infoBanners.DidNotReceiveWithAnyArgs().ReportInfoBanner(null!, null!, default);
         Assert.Equal(ImportOutcome.None, outcome);
     }
@@ -218,7 +218,7 @@ public sealed class DatabaseOperationCoordinatorTests
 
         _infoBanners.Received(1).ReportInfoBanner(
             "Import Successful",
-            Arg.Is<string>(m => m.Contains("1 database has successfully been imported", StringComparison.Ordinal)),
+            Arg.Is<string>(m => m != null && m.Contains("1 database has successfully been imported", StringComparison.Ordinal)),
             BannerSeverity.Info);
         Assert.Equal(1, outcome.ImportedCount);
     }
@@ -253,7 +253,7 @@ public sealed class DatabaseOperationCoordinatorTests
 
         await _databases.Received(1).ImportAsync(
             Arg.Any<IEnumerable<string>>(),
-            Arg.Is<IReadOnlySet<string>>(s => s.Contains("exists.db")),
+            Arg.Is<IReadOnlySet<string>>(s => s != null && s.Contains("exists.db")),
             Arg.Any<CancellationToken>());
     }
 
@@ -306,7 +306,7 @@ public sealed class DatabaseOperationCoordinatorTests
 
         await _databases.Received(1).ImportAsync(
             Arg.Any<IEnumerable<string>>(),
-            Arg.Is<IReadOnlySet<string>>(skipFileNames => skipFileNames.Contains("A.db")),
+            Arg.Is<IReadOnlySet<string>>(skipFileNames => skipFileNames != null && skipFileNames.Contains("A.db")),
             Arg.Any<CancellationToken>());
     }
 
@@ -379,7 +379,7 @@ public sealed class DatabaseOperationCoordinatorTests
         var sut = CreateSut();
         var outcome = await sut.ImportAsync(cancellationToken: Ct);
 
-        _errorBanners.Received(1).ReportError("Import Failed", Arg.Is<string>(m => m.Contains("A.db (bad)", StringComparison.Ordinal)));
+        _errorBanners.Received(1).ReportError("Import Failed", Arg.Is<string>(m => m != null && m.Contains("A.db (bad)", StringComparison.Ordinal)));
         _infoBanners.DidNotReceiveWithAnyArgs().ReportInfoBanner(null!, null!, default);
         Assert.Equal(0, outcome.ImportedCount);
         Assert.False(outcome.DatabaseStateChanged);
@@ -398,7 +398,7 @@ public sealed class DatabaseOperationCoordinatorTests
         Assert.Equal(1, outcome.ImportedCount);
         await _filePicker.DidNotReceiveWithAnyArgs().PickMultipleAsync(null!, null!);
         await _databases.Received(1).ImportAsync(
-            Arg.Is<IEnumerable<string>>(paths => paths.SequenceEqual(new[] { @"C:\out\A.db" })),
+            Arg.Is<IEnumerable<string>>(paths => paths != null && paths.SequenceEqual(new[] { @"C:\out\A.db" })),
             Arg.Any<IReadOnlySet<string>>(),
             Arg.Any<CancellationToken>());
         _databases.DidNotReceiveWithAnyArgs().Toggle(null!);
@@ -462,7 +462,7 @@ public sealed class DatabaseOperationCoordinatorTests
         _logReload.Received(1).ReopenAfterDatabaseRemoval(Arg.Any<IReadOnlyList<LogReopenInfo>>());
         _errorBanners.Received(1).ReportError(
             "Failed to Remove Database",
-            Arg.Is<string>(m => m.Contains("removal failed mid-flight", StringComparison.Ordinal)));
+            Arg.Is<string>(m => m != null && m.Contains("removal failed mid-flight", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -601,7 +601,7 @@ public sealed class DatabaseOperationCoordinatorTests
         Assert.True(outcome.Removed);
         Assert.True(outcome.LogsReopened);
         _logReload.Received(1).ReopenAfterDatabaseRemoval(
-            Arg.Is<IReadOnlyList<LogReopenInfo>>(l => l.Count == 1 && l[0].Name == "Application"));
+            Arg.Is<IReadOnlyList<LogReopenInfo>>(l => l != null && l.Count == 1 && l[0].Name == "Application"));
         _errorBanners.DidNotReceiveWithAnyArgs().ReportError(null!, null!);
     }
 
@@ -644,7 +644,7 @@ public sealed class DatabaseOperationCoordinatorTests
         Assert.Equal(2, stateChangeCount);
         _errorBanners.Received(1).ReportError(
             "Database Upgrade Failed",
-            Arg.Is<string>(m => m.Contains("upgrade body failed", StringComparison.Ordinal)));
+            Arg.Is<string>(m => m != null && m.Contains("upgrade body failed", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -691,8 +691,8 @@ public sealed class DatabaseOperationCoordinatorTests
         var sut = CreateSut();
         await sut.UpgradeDatabaseAsync("a.db", cancellationToken: Ct);
 
-        _errorBanners.Received(1).ReportError("Database Upgrade Failed", Arg.Is<string>(m => m.Contains("a.db", StringComparison.Ordinal) && m.Contains("schema-mismatch", StringComparison.Ordinal)));
-        _errorBanners.Received(1).ReportError("Database Upgrade Failed", Arg.Is<string>(m => m.Contains("b.db", StringComparison.Ordinal) && m.Contains("io-error", StringComparison.Ordinal)));
+        _errorBanners.Received(1).ReportError("Database Upgrade Failed", Arg.Is<string>(m => m != null && m.Contains("a.db", StringComparison.Ordinal) && m.Contains("schema-mismatch", StringComparison.Ordinal)));
+        _errorBanners.Received(1).ReportError("Database Upgrade Failed", Arg.Is<string>(m => m != null && m.Contains("b.db", StringComparison.Ordinal) && m.Contains("io-error", StringComparison.Ordinal)));
     }
 
     [Theory]
@@ -735,7 +735,7 @@ public sealed class DatabaseOperationCoordinatorTests
         Assert.False(sut.IsAnyUpgradeInFlight);
         Assert.False(sut.IsUpgradeInFlight("a.db"));
         await _databases.Received(1).UpgradeBatchAsync(
-            Arg.Is<IReadOnlyList<string>>(l => l.Count == 1 && l[0] == "a.db"),
+            Arg.Is<IReadOnlyList<string>>(l => l != null && l.Count == 1 && l[0] == "a.db"),
             Arg.Any<UpgradeProgressScope>(),
             Arg.Any<CancellationToken>());
     }
@@ -769,7 +769,7 @@ public sealed class DatabaseOperationCoordinatorTests
         Assert.False(wasInFlightDuringExit, "Exit event should fire after file is removed");
         Assert.False(sut.IsAnyUpgradeInFlight);
         await _databases.Received(1).UpgradeBatchAsync(
-            Arg.Is<IReadOnlyList<string>>(l => l.Count == 1 && l[0] == "a.db"),
+            Arg.Is<IReadOnlyList<string>>(l => l != null && l.Count == 1 && l[0] == "a.db"),
             UpgradeProgressScope.ManageDatabasesTriggered,
             Arg.Any<CancellationToken>());
     }
@@ -842,8 +842,8 @@ public sealed class DatabaseOperationCoordinatorTests
         var actual = await sut.UpgradeDatabasesAsync(["a.db", "b.db", "c.db"], UpgradeProgressScope.ManageDatabasesTriggered, Ct);
 
         Assert.Same(result, actual);
-        _errorBanners.Received(1).ReportError("Database Upgrade Failed", Arg.Is<string>(s => s.Contains("b.db") && s.Contains("schema mismatch")));
-        _errorBanners.Received(1).ReportError("Database Upgrade Failed", Arg.Is<string>(s => s.Contains("c.db") && s.Contains("io error")));
+        _errorBanners.Received(1).ReportError("Database Upgrade Failed", Arg.Is<string>(s => s != null && s.Contains("b.db") && s.Contains("schema mismatch")));
+        _errorBanners.Received(1).ReportError("Database Upgrade Failed", Arg.Is<string>(s => s != null && s.Contains("c.db") && s.Contains("io error")));
     }
 
     [Fact]
@@ -893,7 +893,7 @@ public sealed class DatabaseOperationCoordinatorTests
         Assert.NotNull(result);
         Assert.Empty(result.Succeeded);
         Assert.False(sut.IsAnyUpgradeInFlight);
-        _errorBanners.Received(1).ReportError("Database Upgrade Failed", Arg.Is<string>(s => s.Contains("disk full")));
+        _errorBanners.Received(1).ReportError("Database Upgrade Failed", Arg.Is<string>(s => s != null && s.Contains("disk full")));
     }
 
     private static DatabaseEntry CreateEntry(

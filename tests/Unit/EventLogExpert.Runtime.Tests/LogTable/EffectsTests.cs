@@ -30,6 +30,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
+            action != null &&
             action.LoadedColumns.Count == Enum.GetValues<ColumnName>().Length));
     }
 
@@ -51,6 +52,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
+            action != null &&
             action.ColumnWidths[ColumnName.Level] == 150));
     }
 
@@ -70,6 +72,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
+            action != null &&
             action.LoadedColumns[ColumnName.Source] == false &&
             action.LoadedColumns[ColumnName.EventId] == false));
     }
@@ -91,6 +94,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
+            action != null &&
             action.LoadedColumns[ColumnName.Level] == true &&
             action.LoadedColumns[ColumnName.DateAndTime] == true));
     }
@@ -108,6 +112,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
+            action != null &&
             action.ColumnOrder.SequenceEqual(s_columnDefaults.ColumnOrder)));
     }
 
@@ -124,6 +129,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
+            action != null &&
             action.ColumnWidths[ColumnName.Level] == s_columnDefaults.GetColumnWidth(ColumnName.Level)));
     }
 
@@ -142,6 +148,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
+            action != null &&
             action.ColumnOrder[0] == ColumnName.Source &&
             action.ColumnOrder[1] == ColumnName.Level));
     }
@@ -159,6 +166,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
+            action != null &&
             action.LoadedColumns.All(kvp => kvp.Value == false)));
     }
 
@@ -180,7 +188,7 @@ public sealed class EffectsTests
 
         // Assert
         _ = mockPreferencesProvider.Received(1).ColumnOrderPreference =
-            Arg.Is<IEnumerable<ColumnName>>(order => order.First() == ColumnName.Source);
+            Arg.Is<IEnumerable<ColumnName>>(order => order != null && order.First() == ColumnName.Source);
     }
 
     [Fact]
@@ -195,15 +203,17 @@ public sealed class EffectsTests
 
         // Assert
         _ = mockPreferencesProvider.Received(1).EnabledEventTableColumnsPreference =
-            Arg.Is<IEnumerable<ColumnName>>(c => c.SequenceEqual(s_columnDefaults.EnabledColumns));
+            Arg.Is<IEnumerable<ColumnName>>(columns =>
+                columns != null && columns.SequenceEqual(s_columnDefaults.EnabledColumns));
         _ = mockPreferencesProvider.Received(1).ColumnWidthsPreference =
-            Arg.Is<IDictionary<ColumnName, int>>(w => w.Count == 0);
+            Arg.Is<IDictionary<ColumnName, int>>(widths => widths != null && widths.Count == 0);
         _ = mockPreferencesProvider.Received(1).ColumnOrderPreference =
-            Arg.Is<IEnumerable<ColumnName>>(o => !o.Any());
+            Arg.Is<IEnumerable<ColumnName>>(order => order != null && !order.Any());
 
         var expectedWidths = s_columnDefaults.ColumnWidths.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
+            action != null &&
             action.ColumnWidths.Count == expectedWidths.Count &&
             action.ColumnWidths.All(kvp =>
                 expectedWidths.ContainsKey(kvp.Key) && expectedWidths[kvp.Key] == kvp.Value) &&
@@ -237,7 +247,7 @@ public sealed class EffectsTests
 
         // Assert
         _ = mockPreferencesProvider.Received(1).ColumnWidthsPreference =
-            Arg.Is<IDictionary<ColumnName, int>>(width => width[ColumnName.Level] == 200);
+            Arg.Is<IDictionary<ColumnName, int>>(width => width != null && width[ColumnName.Level] == 200);
     }
 
     [Fact]
@@ -260,6 +270,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
+            action != null &&
             action.LoadedColumns[ColumnName.Level] == true &&
             action.LoadedColumns[ColumnName.DateAndTime] == false &&
             action.LoadedColumns[ColumnName.Source] == true &&
@@ -285,6 +296,7 @@ public sealed class EffectsTests
         // Assert
         _ = mockPreferencesProvider.Received(1).EnabledEventTableColumnsPreference =
             Arg.Is<IEnumerable<ColumnName>>(columns =>
+                columns != null &&
                 columns.Contains(ColumnName.Source));
     }
 
@@ -306,6 +318,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
+            action != null &&
             action.LoadedColumns[ColumnName.Level] == true &&
             action.LoadedColumns[ColumnName.DateAndTime] == true &&
             action.LoadedColumns[ColumnName.Source] == true));
@@ -330,6 +343,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
+            action != null &&
             action.LoadedColumns[ColumnName.Level] == false &&
             action.LoadedColumns[ColumnName.DateAndTime] == true &&
             action.LoadedColumns[ColumnName.Source] == true));
@@ -355,6 +369,7 @@ public sealed class EffectsTests
         // Assert
         var _ = mockPreferencesProvider.Received(1).EnabledEventTableColumnsPreference =
             Arg.Is<IEnumerable<ColumnName>>(columns =>
+                columns != null &&
                 columns.Contains(ColumnName.Level) &&
                 columns.Contains(ColumnName.DateAndTime) &&
                 !columns.Contains(ColumnName.Source) &&
@@ -379,6 +394,7 @@ public sealed class EffectsTests
         // Assert
         _ = mockPreferencesProvider.Received(1).EnabledEventTableColumnsPreference =
             Arg.Is<IEnumerable<ColumnName>>(columns =>
+                columns != null &&
                 columns.Contains(ColumnName.Level) &&
                 columns.Contains(ColumnName.Source) &&
                 columns.Count() == 2);

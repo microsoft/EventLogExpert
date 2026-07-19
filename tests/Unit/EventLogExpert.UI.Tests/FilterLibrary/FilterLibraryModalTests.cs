@@ -80,7 +80,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         var existing = BuildSavedFilter("Existing");
         var incoming = BuildSavedFilter("Incoming") with { Id = existing.Id, Tags = [" Alpha ", "alpha", "Beta"] };
         LibraryEntry? added = null;
-        _commands.When(c => c.AddEntry(Arg.Any<LibraryEntry>())).Do(call => added = call.Arg<LibraryEntry>());
+        _commands.When(c => c.AddEntry(Arg.Any<LibraryEntry>())).Do(call => added = call.ArgAt<LibraryEntry>(0));
         var preflight = new ImportPreflight(
             [],
             [],
@@ -114,7 +114,7 @@ public sealed class FilterLibraryModalTests : BunitContext
             Tags = [" Alpha ", "alpha", "Beta"],
         };
         LibraryEntry? updated = null;
-        _commands.When(c => c.UpdateEntry(Arg.Any<LibraryEntry>())).Do(call => updated = call.Arg<LibraryEntry>());
+        _commands.When(c => c.UpdateEntry(Arg.Any<LibraryEntry>())).Do(call => updated = call.ArgAt<LibraryEntry>(0));
         var preflight = new ImportPreflight(
             [],
             [(existing, incoming)],
@@ -140,7 +140,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         var incomingA = BuildSavedFilter("IncomingA") with { Tags = [" Alpha "] };
         var incomingB = BuildSavedFilter("IncomingB") with { Tags = ["Beta"] };
         LibraryEntry? updated = null;
-        _commands.When(c => c.UpdateEntry(Arg.Any<LibraryEntry>())).Do(call => updated = call.Arg<LibraryEntry>());
+        _commands.When(c => c.UpdateEntry(Arg.Any<LibraryEntry>())).Do(call => updated = call.ArgAt<LibraryEntry>(0));
         var preflight = new ImportPreflight(
             [],
             [],
@@ -266,7 +266,7 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var component = Render<FilterLibraryModal>();
 
-        _modalCoordinator.Received().RegisterModal(Arg.Is<ModalRegistration>(r => r.InlineAlertHost == component.Instance));
+        _modalCoordinator.Received().RegisterModal(Arg.Is<ModalRegistration>(r => r != null && r.InlineAlertHost == component.Instance));
     }
 
     [Fact]
@@ -307,7 +307,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         var component = Render<FilterLibraryModal>();
 
         _modalCoordinator.Received(1).RegisterModal(Arg.Is<ModalRegistration>(r =>
-            r.InlineAlertHost == component.Instance));
+            r != null && r.InlineAlertHost == component.Instance));
     }
 
     [Fact]
@@ -699,7 +699,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         await bar.KeyDownAsync(new KeyboardEventArgs { Key = "Escape" });
 
         Assert.Equal(2, component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry").Length);
-        _announcements.Received().Announce(Arg.Is<string>(s => s.Contains("Tag filters cleared")));
+        _announcements.Received().Announce(Arg.Is<string>(s => s != null && s.Contains("Tag filters cleared")));
     }
 
     [Fact]
@@ -712,7 +712,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         var bar = component.Find(".library-tag-filter-bar");
         await bar.KeyDownAsync(new KeyboardEventArgs { Key = "Escape" });
 
-        _announcements.DidNotReceive().Announce(Arg.Is<string>(s => s.Contains("Tag filters cleared")));
+        _announcements.DidNotReceive().Announce(Arg.Is<string>(s => s != null && s.Contains("Tag filters cleared")));
     }
 
     [Fact]

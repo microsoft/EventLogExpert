@@ -63,7 +63,7 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
         Assert.Empty(await realStore.LoadAllAsync(TestContext.Current.CancellationToken));
         Assert.True(prefs.ContainsKey(FavoriteFiltersKey));
         Assert.False(prefs.ContainsKey(MigrationSectionsKey));
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.IsEmpty));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.IsEmpty));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());
     }
 
@@ -198,7 +198,7 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
         Assert.Equal(2, filterSet.Filters.Count);
         Assert.Equal(LibraryEntryOrigin.UserSaved, filterSet.Origin);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a.Entries.Count == 3));
+        dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 3));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryFailureAction>());
 
         Assert.True(prefs.ContainsKey(FavoriteFiltersKey));
