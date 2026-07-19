@@ -3,8 +3,10 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Persistence;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 namespace EventLogExpert.Runtime.LogTable;
 
@@ -24,6 +26,7 @@ internal sealed class CombinedColumnView : IEventColumnView
     private readonly Dictionary<EventLogId, EventColumnView> _byLog;
     private readonly ResolvedEventOrdering.CrossComparison _compare;
     private readonly int _count;
+    private readonly ConditionalWeakTable<byte[], CombinedHighlightWinners> _highlightWinnerHandles = [];
     private readonly Lock _indexGate = new();
     private readonly EventColumnView[] _views;
 
@@ -104,6 +107,37 @@ internal sealed class CombinedColumnView : IEventColumnView
         }
     }
 
+    public void BucketTimeTicksByEventDataHResultWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        byte[][] childWinners = ResolveChildHighlightWinners(highlightWinners);
+
+        for (int index = 0; index < _views.Length; index++)
+        {
+            _views[index].BucketTimeTicksByEventDataHResultWithTie(childWinners[index],
+                slotColorMask,
+                minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                fieldName,
+                eligibleProviders,
+                userDataErrorCodePaths,
+                targetCodes,
+                slotCounts,
+                cancellationToken);
+        }
+    }
+
     public void BucketTimeTicksByEventDataString(
         long minTicks,
         long bucketSpanTicks,
@@ -127,6 +161,62 @@ internal sealed class CombinedColumnView : IEventColumnView
         }
     }
 
+    public void BucketTimeTicksByEventDataStringWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        byte[][] childWinners = ResolveChildHighlightWinners(highlightWinners);
+
+        for (int index = 0; index < _views.Length; index++)
+        {
+            _views[index].BucketTimeTicksByEventDataStringWithTie(childWinners[index],
+                slotColorMask,
+                minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                candidateFields,
+                rawValueToSlot,
+                slotCount,
+                slotCounts,
+                cancellationToken);
+        }
+    }
+
+    public void BucketTimeTicksByEventDataWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        byte[][] childWinners = ResolveChildHighlightWinners(highlightWinners);
+
+        for (int index = 0; index < _views.Length; index++)
+        {
+            _views[index].BucketTimeTicksByEventDataWithTie(childWinners[index],
+                slotColorMask,
+                minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                fieldName,
+                targetCodes,
+                slotCounts,
+                cancellationToken);
+        }
+    }
+
     public void BucketTimeTicksByEventId(
         long minTicks,
         long bucketSpanTicks,
@@ -138,6 +228,31 @@ internal sealed class CombinedColumnView : IEventColumnView
         foreach (var view in _views)
         {
             view.BucketTimeTicksByEventId(minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                targetIds,
+                slotCounts,
+                cancellationToken);
+        }
+    }
+
+    public void BucketTimeTicksByEventIdWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        byte[][] childWinners = ResolveChildHighlightWinners(highlightWinners);
+
+        for (int index = 0; index < _views.Length; index++)
+        {
+            _views[index].BucketTimeTicksByEventIdWithTie(childWinners[index],
+                slotColorMask,
+                minTicks,
                 bucketSpanTicks,
                 bucketCount,
                 targetIds,
@@ -167,6 +282,33 @@ internal sealed class CombinedColumnView : IEventColumnView
         }
     }
 
+    public void BucketTimeTicksByFieldWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventFieldId field,
+        string[] targetValues,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        byte[][] childWinners = ResolveChildHighlightWinners(highlightWinners);
+
+        for (int index = 0; index < _views.Length; index++)
+        {
+            _views[index].BucketTimeTicksByFieldWithTie(childWinners[index],
+                slotColorMask,
+                minTicks,
+                bucketSpanTicks,
+                bucketCount,
+                field,
+                targetValues,
+                slotCounts,
+                cancellationToken);
+        }
+    }
+
     public void BucketTimeTicksBySeverity(
         long minTicks,
         long bucketSpanTicks,
@@ -177,6 +319,23 @@ internal sealed class CombinedColumnView : IEventColumnView
         foreach (var view in _views)
         {
             view.BucketTimeTicksBySeverity(minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
+        }
+    }
+
+    public void BucketTimeTicksBySeverityWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        byte[][] childWinners = ResolveChildHighlightWinners(highlightWinners);
+
+        for (int index = 0; index < _views.Length; index++)
+        {
+            _views[index].BucketTimeTicksBySeverityWithTie(childWinners[index], slotColorMask, minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
         }
     }
 
@@ -227,6 +386,24 @@ internal sealed class CombinedColumnView : IEventColumnView
         {
             view.CountFieldValues(field, counts, cancellationToken);
         }
+    }
+
+    public byte[] EnsureHighlightWinners(
+        IReadOnlyList<SavedFilter> orderedColoredFilters,
+        int planKey,
+        CancellationToken cancellationToken)
+    {
+        var childWinners = new byte[_views.Length][];
+
+        for (int index = 0; index < _views.Length; index++)
+        {
+            childWinners[index] = _views[index].EnsureHighlightWinners(orderedColoredFilters, planKey, cancellationToken);
+        }
+
+        byte[] handle = new byte[1];
+        _highlightWinnerHandles.Add(handle, new CombinedHighlightWinners(childWinners));
+
+        return handle;
     }
 
     public IEnumerable<ResolvedEvent> EnumerateDetail()
@@ -463,6 +640,11 @@ internal sealed class CombinedColumnView : IEventColumnView
         return best;
     }
 
+    private byte[][] ResolveChildHighlightWinners(byte[] handle) =>
+        _highlightWinnerHandles.TryGetValue(handle, out CombinedHighlightWinners? winners)
+            ? winners.ChildWinners
+            : throw new InvalidOperationException("Combined highlight winners must be captured before tie bucketing.");
+
     private EventColumnView Route(EventLocator locator) =>
         _byLog.TryGetValue(locator.LogId, out var view)
             ? view
@@ -483,4 +665,6 @@ internal sealed class CombinedColumnView : IEventColumnView
 
         return checkpoint * Stride;
     }
+
+    private sealed record CombinedHighlightWinners(byte[][] ChildWinners);
 }

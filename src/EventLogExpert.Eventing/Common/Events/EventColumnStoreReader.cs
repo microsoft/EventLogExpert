@@ -86,6 +86,50 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         _store.BucketTimeTicksByEventDataHResult(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, fieldName, eligibleProviders, userDataErrorCodePaths, targetCodes, slotCount, slotCounts, cancellationToken);
     }
 
+    public void BucketTimeTicksByEventDataHResultWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(fieldName);
+        ArgumentNullException.ThrowIfNull(eligibleProviders);
+        ArgumentNullException.ThrowIfNull(userDataErrorCodePaths);
+        ArgumentNullException.ThrowIfNull(targetCodes);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentNullException.ThrowIfNull(slotColorMask);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(highlightWinners.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketSpanTicks, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketCount, 1);
+
+        int slotCount = targetCodes.Length + 1;
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, bucketCount * slotCount);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotColorMask.Length, slotCount);
+
+        _store.BucketTimeTicksByEventDataHResultWithTie(rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            fieldName,
+            eligibleProviders,
+            userDataErrorCodePaths,
+            targetCodes,
+            slotCount,
+            slotCounts,
+            cancellationToken);
+    }
+
     public void BucketTimeTicksByEventDataString(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -109,6 +153,82 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         _store.BucketTimeTicksByEventDataString(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, candidateFields, rawValueToSlot, slotCount, slotCounts, cancellationToken);
     }
 
+    public void BucketTimeTicksByEventDataStringWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(candidateFields);
+        ArgumentNullException.ThrowIfNull(rawValueToSlot);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentNullException.ThrowIfNull(slotColorMask);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(highlightWinners.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketSpanTicks, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketCount, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCount, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, bucketCount * slotCount);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotColorMask.Length, slotCount);
+
+        _store.BucketTimeTicksByEventDataStringWithTie(rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            candidateFields,
+            rawValueToSlot,
+            slotCount,
+            slotCounts,
+            cancellationToken);
+    }
+
+    public void BucketTimeTicksByEventDataWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(fieldName);
+        ArgumentNullException.ThrowIfNull(targetCodes);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentNullException.ThrowIfNull(slotColorMask);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(highlightWinners.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketSpanTicks, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketCount, 1);
+
+        int slotCount = targetCodes.Length + 1;
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, bucketCount * slotCount);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotColorMask.Length, slotCount);
+
+        _store.BucketTimeTicksByEventDataWithTie(rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            fieldName,
+            targetCodes,
+            slotCount,
+            slotCounts,
+            cancellationToken);
+    }
+
     public void BucketTimeTicksByEventId(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -128,6 +248,41 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, bucketCount * slotCount);
 
         _store.BucketTimeTicksByEventId(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, targetIds, slotCount, slotCounts, cancellationToken);
+    }
+
+    public void BucketTimeTicksByEventIdWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(targetIds);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentNullException.ThrowIfNull(slotColorMask);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(highlightWinners.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketSpanTicks, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketCount, 1);
+
+        int slotCount = targetIds.Length + 1;
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, bucketCount * slotCount);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotColorMask.Length, slotCount);
+
+        _store.BucketTimeTicksByEventIdWithTie(rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            targetIds,
+            slotCount,
+            slotCounts,
+            cancellationToken);
     }
 
     public void BucketTimeTicksByField(
@@ -152,6 +307,43 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         _store.BucketTimeTicksByField(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, ToColumnField(field), targetValues, slotCount, slotCounts, cancellationToken);
     }
 
+    public void BucketTimeTicksByFieldWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventFieldId field,
+        string[] targetValues,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(targetValues);
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentNullException.ThrowIfNull(slotColorMask);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(highlightWinners.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketSpanTicks, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketCount, 1);
+
+        int slotCount = targetValues.Length + 1;
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, bucketCount * slotCount);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotColorMask.Length, slotCount);
+
+        _store.BucketTimeTicksByFieldWithTie(rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            ToColumnField(field),
+            targetValues,
+            slotCount,
+            slotCounts,
+            cancellationToken);
+    }
+
     public void BucketTimeTicksBySeverity(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -167,6 +359,28 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, bucketCount * LevelSeverity.SlotCount);
 
         _store.BucketTimeTicksBySeverity(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
+    }
+
+    public void BucketTimeTicksBySeverityWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentNullException.ThrowIfNull(slotColorMask);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(highlightWinners.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketSpanTicks, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bucketCount, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, bucketCount * LevelSeverity.SlotCount);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotColorMask.Length, LevelSeverity.SlotCount);
+
+        _store.BucketTimeTicksBySeverityWithTie(rankByPhysical, highlightWinners, slotColorMask, minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
     }
 
     public void CopyGuidColumn(EventFieldId field, Guid[] values, bool[] hasValue)

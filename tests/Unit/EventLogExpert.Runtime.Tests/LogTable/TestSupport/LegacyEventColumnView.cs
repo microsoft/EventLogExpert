@@ -3,6 +3,8 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Compilation;
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.LogTable;
 using System.Diagnostics.CodeAnalysis;
 
@@ -16,6 +18,8 @@ internal sealed class LegacyEventColumnView(
 {
     private readonly LegacyEventColumnReader _reader =
         new LegacyEventColumnReader(logId, generation, contentVersion, events);
+    private byte[]? _highlightWinners;
+    private int _highlightWinnersPlanKey;
 
     public int Count => _reader.Count;
 
@@ -27,17 +31,35 @@ internal sealed class LegacyEventColumnView(
     public void BucketTimeTicksByEventDataHResult(long minTicks, long bucketSpanTicks, int bucketCount, string fieldName, IReadOnlyCollection<string> eligibleProviders, IReadOnlyList<string> userDataErrorCodePaths, long[] targetCodes, int[] slotCounts, CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByEventDataHResult(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, fieldName, eligibleProviders, userDataErrorCodePaths, targetCodes, slotCounts, cancellationToken);
 
+    public void BucketTimeTicksByEventDataHResultWithTie(byte[] highlightWinners, uint[] slotColorMask, long minTicks, long bucketSpanTicks, int bucketCount, string fieldName, IReadOnlyCollection<string> eligibleProviders, IReadOnlyList<string> userDataErrorCodePaths, long[] targetCodes, int[] slotCounts, CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventDataHResultWithTie(AllSurvive(), highlightWinners, slotColorMask, minTicks, bucketSpanTicks, bucketCount, fieldName, eligibleProviders, userDataErrorCodePaths, targetCodes, slotCounts, cancellationToken);
+
     public void BucketTimeTicksByEventDataString(long minTicks, long bucketSpanTicks, int bucketCount, string[] candidateFields, IReadOnlyDictionary<string, int> rawValueToSlot, int slotCount, int[] slotCounts, CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByEventDataString(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, candidateFields, rawValueToSlot, slotCount, slotCounts, cancellationToken);
+
+    public void BucketTimeTicksByEventDataStringWithTie(byte[] highlightWinners, uint[] slotColorMask, long minTicks, long bucketSpanTicks, int bucketCount, string[] candidateFields, IReadOnlyDictionary<string, int> rawValueToSlot, int slotCount, int[] slotCounts, CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventDataStringWithTie(AllSurvive(), highlightWinners, slotColorMask, minTicks, bucketSpanTicks, bucketCount, candidateFields, rawValueToSlot, slotCount, slotCounts, cancellationToken);
+
+    public void BucketTimeTicksByEventDataWithTie(byte[] highlightWinners, uint[] slotColorMask, long minTicks, long bucketSpanTicks, int bucketCount, string fieldName, long[] targetCodes, int[] slotCounts, CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventDataWithTie(AllSurvive(), highlightWinners, slotColorMask, minTicks, bucketSpanTicks, bucketCount, fieldName, targetCodes, slotCounts, cancellationToken);
 
     public void BucketTimeTicksByEventId(long minTicks, long bucketSpanTicks, int bucketCount, int[] targetIds, int[] slotCounts, CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByEventId(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, targetIds, slotCounts, cancellationToken);
 
+    public void BucketTimeTicksByEventIdWithTie(byte[] highlightWinners, uint[] slotColorMask, long minTicks, long bucketSpanTicks, int bucketCount, int[] targetIds, int[] slotCounts, CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventIdWithTie(AllSurvive(), highlightWinners, slotColorMask, minTicks, bucketSpanTicks, bucketCount, targetIds, slotCounts, cancellationToken);
+
     public void BucketTimeTicksByField(long minTicks, long bucketSpanTicks, int bucketCount, EventFieldId field, string[] targetValues, int[] slotCounts, CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByField(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, field, targetValues, slotCounts, cancellationToken);
 
+    public void BucketTimeTicksByFieldWithTie(byte[] highlightWinners, uint[] slotColorMask, long minTicks, long bucketSpanTicks, int bucketCount, EventFieldId field, string[] targetValues, int[] slotCounts, CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByFieldWithTie(AllSurvive(), highlightWinners, slotColorMask, minTicks, bucketSpanTicks, bucketCount, field, targetValues, slotCounts, cancellationToken);
+
     public void BucketTimeTicksBySeverity(long minTicks, long bucketSpanTicks, int bucketCount, int[] slotCounts, CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksBySeverity(AllSurvive(), minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
+
+    public void BucketTimeTicksBySeverityWithTie(byte[] highlightWinners, uint[] slotColorMask, long minTicks, long bucketSpanTicks, int bucketCount, int[] slotCounts, CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksBySeverityWithTie(AllSurvive(), highlightWinners, slotColorMask, minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
 
     public void CountEventDataHResults(string fieldName, IReadOnlyCollection<string> eligibleProviders, IReadOnlyList<string> userDataErrorCodePaths, IDictionary<long, int> counts, CancellationToken cancellationToken) =>
         _reader.CountEventDataHResults(AllSurvive(), fieldName, eligibleProviders, userDataErrorCodePaths, counts, cancellationToken);
@@ -53,6 +75,19 @@ internal sealed class LegacyEventColumnView(
 
     public void CountFieldValues(EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken) =>
         _reader.CountFieldValues(AllSurvive(), field, counts, cancellationToken);
+
+    public byte[] EnsureHighlightWinners(IReadOnlyList<SavedFilter> orderedColoredFilters, int planKey, CancellationToken cancellationToken)
+    {
+        if (_highlightWinnersPlanKey == planKey && _highlightWinners is { Length: var length } && length == _reader.Count)
+        {
+            return _highlightWinners;
+        }
+
+        _highlightWinners = FilterService.ClassifyHighlightWinners(_reader, AllSurvive(), orderedColoredFilters, cancellationToken);
+        _highlightWinnersPlanKey = planKey;
+
+        return _highlightWinners;
+    }
 
     public IEnumerable<ResolvedEvent> EnumerateDetail()
     {

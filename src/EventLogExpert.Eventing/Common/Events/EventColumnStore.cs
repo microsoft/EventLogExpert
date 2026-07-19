@@ -353,6 +353,80 @@ public sealed class EventColumnStore
         }
     }
 
+    internal void BucketTimeTicksByEventDataHResultWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
+        long[] targetCodes,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        int otherSlot = targetCodes.Length;
+        Span<int> eligibleBuffer = eligibleProviders.Count <= MaxStackProviderNames
+            ? stackalloc int[eligibleProviders.Count]
+            : new int[eligibleProviders.Count];
+        ReadOnlySpan<int> eligible = ResolveEligibleSourceIndices(eligibleProviders, eligibleBuffer);
+        Span<int> userDataPathBuffer = userDataErrorCodePaths.Count <= MaxStackProviderNames
+            ? stackalloc int[userDataErrorCodePaths.Count]
+            : new int[userDataErrorCodePaths.Count];
+        ReadOnlySpan<int> userDataPathIndices = ResolveUserDataPathIndices(userDataErrorCodePaths, userDataPathBuffer);
+        int[] fieldIndexBySchema = NewSchemaFieldMemo();
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> timeColumn = chunk.TimeTicksColumn;
+            ReadOnlySpan<int> sourceColumn = chunk.PoolIndexColumn(EventColumnField.Source);
+
+            for (int row = 0; row < timeColumn.Length; row++)
+            {
+                int physical = offset + row;
+
+                if (rankByPhysical[physical] < 0) { continue; }
+
+                if (eligible.BinarySearch(sourceColumn[row]) < 0) { continue; }
+
+                if (!TryGetSealedEventDataHResult(chunk, row, fieldName, fieldIndexBySchema, out long code)
+                    && !TryGetSealedUserDataHResult(chunk, row, userDataPathIndices, out code)) { continue; }
+
+                int bucket = ToBucket(timeColumn[row], minTicks, bucketSpanTicks, bucketCount);
+                int slot = SlotForCode(code, targetCodes, otherSlot);
+                AddTieSlot(slotCounts, slotColorMask, highlightWinners, physical, bucket, slotCount, slot);
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        if (_sealedCount >= Count) { return; }
+
+        IReadOnlySet<string> eligibleNames = AsOrdinalSet(eligibleProviders);
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+
+            if (!eligibleNames.Contains(pending.Source)) { continue; }
+
+            if (!TryGetPendingEventDataHResult(pending, fieldName, out long code)
+                && !TryGetPendingUserDataHResult(pending, userDataErrorCodePaths, out code)) { continue; }
+
+            int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
+            int slot = SlotForCode(code, targetCodes, otherSlot);
+            AddTieSlot(slotCounts, slotColorMask, highlightWinners, index, bucket, slotCount, slot);
+        }
+    }
+
     internal void BucketTimeTicksByEventDataString(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -366,6 +440,7 @@ public sealed class EventColumnStore
     {
         int otherSlot = slotCount - 1;
         int[][] fieldIndexBySchemaPerCandidate = new int[candidateFields.Length][];
+
         for (int candidate = 0; candidate < candidateFields.Length; candidate++) { fieldIndexBySchemaPerCandidate[candidate] = NewSchemaFieldMemo(); }
 
         int offset = 0;
@@ -412,12 +487,138 @@ public sealed class EventColumnStore
                 if (TryGetPendingEventDataString(pending, candidateFields[candidate], out string? raw) && IsUsableRawValue(raw))
                 {
                     slot = rawValueToSlot.GetValueOrDefault(raw, otherSlot);
+
                     break;
                 }
             }
 
             int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
             slotCounts[(bucket * slotCount) + slot]++;
+        }
+    }
+
+    internal void BucketTimeTicksByEventDataStringWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        int otherSlot = slotCount - 1;
+        int[][] fieldIndexBySchemaPerCandidate = new int[candidateFields.Length][];
+
+        for (int candidate = 0; candidate < candidateFields.Length; candidate++) { fieldIndexBySchemaPerCandidate[candidate] = NewSchemaFieldMemo(); }
+
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> timeColumn = chunk.TimeTicksColumn;
+
+            for (int row = 0; row < timeColumn.Length; row++)
+            {
+                int physical = offset + row;
+
+                if (rankByPhysical[physical] < 0) { continue; }
+
+                int slot = otherSlot;
+
+                for (int candidate = 0; candidate < candidateFields.Length; candidate++)
+                {
+                    if (TryGetSealedEventDataString(chunk, row, candidateFields[candidate], fieldIndexBySchemaPerCandidate[candidate], out string? raw)
+                        && IsUsableRawValue(raw))
+                    {
+                        slot = rawValueToSlot.GetValueOrDefault(raw, otherSlot);
+
+                        break;
+                    }
+                }
+
+                int bucket = ToBucket(timeColumn[row], minTicks, bucketSpanTicks, bucketCount);
+                AddTieSlot(slotCounts, slotColorMask, highlightWinners, physical, bucket, slotCount, slot);
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+            int slot = otherSlot;
+
+            for (int candidate = 0; candidate < candidateFields.Length; candidate++)
+            {
+                if (TryGetPendingEventDataString(pending, candidateFields[candidate], out string? raw) && IsUsableRawValue(raw))
+                {
+                    slot = rawValueToSlot.GetValueOrDefault(raw, otherSlot);
+                    break;
+                }
+            }
+
+            int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
+            AddTieSlot(slotCounts, slotColorMask, highlightWinners, index, bucket, slotCount, slot);
+        }
+    }
+
+    internal void BucketTimeTicksByEventDataWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        int otherSlot = targetCodes.Length;
+        int[] fieldIndexBySchema = NewSchemaFieldMemo();
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> timeColumn = chunk.TimeTicksColumn;
+
+            for (int row = 0; row < timeColumn.Length; row++)
+            {
+                int physical = offset + row;
+
+                if (rankByPhysical[physical] < 0) { continue; }
+
+                int slot = TryGetSealedEventDataCode(chunk, row, fieldName, fieldIndexBySchema, out long code)
+                    ? SlotForCode(code, targetCodes, otherSlot)
+                    : otherSlot;
+                int bucket = ToBucket(timeColumn[row], minTicks, bucketSpanTicks, bucketCount);
+                AddTieSlot(slotCounts, slotColorMask, highlightWinners, physical, bucket, slotCount, slot);
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+            int slot = TryGetPendingEventDataCode(pending, fieldName, out long code)
+                ? SlotForCode(code, targetCodes, otherSlot)
+                : otherSlot;
+            int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
+            AddTieSlot(slotCounts, slotColorMask, highlightWinners, index, bucket, slotCount, slot);
         }
     }
 
@@ -459,6 +660,53 @@ public sealed class EventColumnStore
             ResolvedEvent pending = Pending(index);
             int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
             slotCounts[(bucket * slotCount) + SlotForIndex(pending.Id, targetIds, otherSlot)]++;
+        }
+    }
+
+    internal void BucketTimeTicksByEventIdWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        int otherSlot = targetIds.Length;
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> timeColumn = chunk.TimeTicksColumn;
+            ReadOnlySpan<int> idColumn = chunk.IdColumn;
+
+            for (int row = 0; row < timeColumn.Length; row++)
+            {
+                int physical = offset + row;
+
+                if (rankByPhysical[physical] < 0) { continue; }
+
+                int bucket = ToBucket(timeColumn[row], minTicks, bucketSpanTicks, bucketCount);
+                int slot = SlotForIndex(idColumn[row], targetIds, otherSlot);
+                AddTieSlot(slotCounts, slotColorMask, highlightWinners, physical, bucket, slotCount, slot);
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+            int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
+            int slot = SlotForIndex(pending.Id, targetIds, otherSlot);
+            AddTieSlot(slotCounts, slotColorMask, highlightWinners, index, bucket, slotCount, slot);
         }
     }
 
@@ -514,6 +762,61 @@ public sealed class EventColumnStore
         }
     }
 
+    internal void BucketTimeTicksByFieldWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventColumnField field,
+        string[] targetValues,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        int otherSlot = targetValues.Length;
+        int[] targetIndices = new int[targetValues.Length];
+
+        for (int slot = 0; slot < targetValues.Length; slot++)
+        {
+            targetIndices[slot] = _pool.TryGetIndex(targetValues[slot], out int index) ? index : int.MinValue;
+        }
+
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> timeColumn = chunk.TimeTicksColumn;
+            ReadOnlySpan<int> valueColumn = chunk.PoolIndexColumn(field);
+
+            for (int row = 0; row < timeColumn.Length; row++)
+            {
+                int physical = offset + row;
+
+                if (rankByPhysical[physical] < 0) { continue; }
+
+                int bucket = ToBucket(timeColumn[row], minTicks, bucketSpanTicks, bucketCount);
+                int slot = SlotForIndex(valueColumn[row], targetIndices, otherSlot);
+                AddTieSlot(slotCounts, slotColorMask, highlightWinners, physical, bucket, slotCount, slot);
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+            int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
+            int slot = SlotForString(PendingFieldValue(pending, field), targetValues, otherSlot);
+            AddTieSlot(slotCounts, slotColorMask, highlightWinners, index, bucket, slotCount, slot);
+        }
+    }
+
     internal void BucketTimeTicksBySeverity(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -557,6 +860,65 @@ public sealed class EventColumnStore
             ResolvedEvent pending = Pending(index);
             int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
             slotCounts[(bucket * SlotCount) + LevelSeverity.Slot(LevelSeverity.FromLevelName(pending.Level))]++;
+        }
+
+        return;
+
+        int SlotOf(int levelPoolIndex) =>
+            levelPoolIndex == criticalIndex ? (int)SeverityLevel.Critical :
+            levelPoolIndex == errorIndex ? (int)SeverityLevel.Error :
+            levelPoolIndex == warningIndex ? (int)SeverityLevel.Warning :
+            levelPoolIndex == informationIndex ? (int)SeverityLevel.Information :
+            levelPoolIndex == verboseIndex ? (int)SeverityLevel.Verbose : 0;
+    }
+
+    internal void BucketTimeTicksBySeverityWithTie(
+        ReadOnlySpan<int> rankByPhysical,
+        ReadOnlySpan<byte> highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken)
+    {
+        int criticalIndex = _pool.TryGetIndex(nameof(SeverityLevel.Critical), out int critical) ? critical : int.MinValue;
+        int errorIndex = _pool.TryGetIndex(nameof(SeverityLevel.Error), out int error) ? error : int.MinValue;
+        int warningIndex = _pool.TryGetIndex(nameof(SeverityLevel.Warning), out int warning) ? warning : int.MinValue;
+        int informationIndex = _pool.TryGetIndex(nameof(SeverityLevel.Information), out int information) ? information : int.MinValue;
+        int verboseIndex = _pool.TryGetIndex(nameof(SeverityLevel.Verbose), out int verbose) ? verbose : int.MinValue;
+
+        const int SlotCount = LevelSeverity.SlotCount;
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<long> timeColumn = chunk.TimeTicksColumn;
+            ReadOnlySpan<int> levelColumn = chunk.PoolIndexColumn(EventColumnField.Level);
+
+            for (int row = 0; row < timeColumn.Length; row++)
+            {
+                int physical = offset + row;
+
+                if (rankByPhysical[physical] < 0) { continue; }
+
+                int bucket = ToBucket(timeColumn[row], minTicks, bucketSpanTicks, bucketCount);
+                AddTieSlot(slotCounts, slotColorMask, highlightWinners, physical, bucket, SlotCount, SlotOf(levelColumn[row]));
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+            int bucket = ToBucket(pending.TimeCreated.Ticks, minTicks, bucketSpanTicks, bucketCount);
+            int slot = LevelSeverity.Slot(LevelSeverity.FromLevelName(pending.Level));
+            AddTieSlot(slotCounts, slotColorMask, highlightWinners, index, bucket, SlotCount, slot);
         }
 
         return;
@@ -1312,6 +1674,19 @@ public sealed class EventColumnStore
     /// </summary>
     internal EventColumnStore WithReloadGeneration(IReadOnlyList<ResolvedEvent> batch) =>
         Build(batch, Generation + 1, ContentVersion + 1);
+
+    private static void AddTieSlot(
+        int[] slotCounts,
+        uint[] slotColorMask,
+        ReadOnlySpan<byte> highlightWinners,
+        int physical,
+        int bucket,
+        int slotCount,
+        int slot)
+    {
+        slotCounts[(bucket * slotCount) + slot]++;
+        slotColorMask[slot] |= 1u << highlightWinners[physical];
+    }
 
     // A pending row's Source is a raw string (not yet pooled), so match it against a scan-local set built once per scan.
     // Always normalize to Ordinal so pending matching stays byte-identical to the sealed pool's ordinal lookup, regardless

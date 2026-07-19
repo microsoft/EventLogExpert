@@ -126,6 +126,32 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         }
     }
 
+    public void BucketTimeTicksByEventDataHResultWithTie(ReadOnlySpan<int> rankByPhysical, ReadOnlySpan<byte> highlightWinners, uint[] slotColorMask, long minTicks, long bucketSpanTicks, int bucketCount, string fieldName, IReadOnlyCollection<string> eligibleProviders, IReadOnlyList<string> userDataErrorCodePaths, long[] targetCodes, int[] slotCounts, CancellationToken cancellationToken)
+    {
+        BucketTimeTicksByEventDataHResult(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, fieldName, eligibleProviders, userDataErrorCodePaths, targetCodes, slotCounts, cancellationToken);
+
+        int otherSlot = targetCodes.Length;
+        IReadOnlySet<string> eligibleNames = AsOrdinalSet(eligibleProviders);
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent resolved = _events[index];
+
+            if (!eligibleNames.Contains(resolved.Source)) { continue; }
+            if (!TryGetHResult(resolved, fieldName, userDataErrorCodePaths, out long code)) { continue; }
+
+            int slot = otherSlot;
+            for (int target = 0; target < targetCodes.Length; target++)
+            {
+                if (targetCodes[target] == code) { slot = target; break; }
+            }
+
+            slotColorMask[slot] |= 1u << highlightWinners[index];
+        }
+    }
+
     public void BucketTimeTicksByEventDataString(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -168,6 +194,57 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         }
     }
 
+    public void BucketTimeTicksByEventDataStringWithTie(ReadOnlySpan<int> rankByPhysical, ReadOnlySpan<byte> highlightWinners, uint[] slotColorMask, long minTicks, long bucketSpanTicks, int bucketCount, string[] candidateFields, IReadOnlyDictionary<string, int> rawValueToSlot, int slotCount, int[] slotCounts, CancellationToken cancellationToken)
+    {
+        BucketTimeTicksByEventDataString(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, candidateFields, rawValueToSlot, slotCount, slotCounts, cancellationToken);
+
+        int otherSlot = slotCount - 1;
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            int slot = otherSlot;
+
+            for (int candidate = 0; candidate < candidateFields.Length; candidate++)
+            {
+                if (_events[index].EventData.TryGetRawValue(candidateFields[candidate], out EventProperty property)
+                    && property.Reference is string raw
+                    && EventColumnStore.IsUsableRawValue(raw))
+                {
+                    slot = rawValueToSlot.TryGetValue(raw, out int mapped) ? mapped : otherSlot;
+                    break;
+                }
+            }
+
+            slotColorMask[slot] |= 1u << highlightWinners[index];
+        }
+    }
+
+    public void BucketTimeTicksByEventDataWithTie(ReadOnlySpan<int> rankByPhysical, ReadOnlySpan<byte> highlightWinners, uint[] slotColorMask, long minTicks, long bucketSpanTicks, int bucketCount, string fieldName, long[] targetCodes, int[] slotCounts, CancellationToken cancellationToken)
+    {
+        BucketTimeTicksByEventData(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, fieldName, targetCodes, slotCounts, cancellationToken);
+
+        int otherSlot = targetCodes.Length;
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            int slot = otherSlot;
+
+            if (_events[index].EventData.TryGetValue(fieldName, out EventFieldValue value) && value.TryGetWholeNumber(out long code))
+            {
+                for (int target = 0; target < targetCodes.Length; target++)
+                {
+                    if (targetCodes[target] == code) { slot = target; break; }
+                }
+            }
+
+            slotColorMask[slot] |= 1u << highlightWinners[index];
+        }
+    }
+
     public void BucketTimeTicksByEventId(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -201,6 +278,27 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         }
     }
 
+    public void BucketTimeTicksByEventIdWithTie(ReadOnlySpan<int> rankByPhysical, ReadOnlySpan<byte> highlightWinners, uint[] slotColorMask, long minTicks, long bucketSpanTicks, int bucketCount, int[] targetIds, int[] slotCounts, CancellationToken cancellationToken)
+    {
+        BucketTimeTicksByEventId(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, targetIds, slotCounts, cancellationToken);
+
+        int otherSlot = targetIds.Length;
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            int slot = otherSlot;
+
+            for (int target = 0; target < targetIds.Length; target++)
+            {
+                if (_events[index].Id == targetIds[target]) { slot = target; break; }
+            }
+
+            slotColorMask[slot] |= 1u << highlightWinners[index];
+        }
+    }
+
     public void BucketTimeTicksByField(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -229,6 +327,21 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
         }
     }
 
+    public void BucketTimeTicksByFieldWithTie(ReadOnlySpan<int> rankByPhysical, ReadOnlySpan<byte> highlightWinners, uint[] slotColorMask, long minTicks, long bucketSpanTicks, int bucketCount, EventFieldId field, string[] targetValues, int[] slotCounts, CancellationToken cancellationToken)
+    {
+        BucketTimeTicksByField(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, field, targetValues, slotCounts, cancellationToken);
+
+        int otherSlot = targetValues.Length;
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            int slot = SlotForString(FieldValue(_events[index], field), targetValues, otherSlot);
+            slotColorMask[slot] |= 1u << highlightWinners[index];
+        }
+    }
+
     public void BucketTimeTicksBySeverity(
         ReadOnlySpan<int> rankByPhysical,
         long minTicks,
@@ -250,6 +363,19 @@ public sealed class LegacyEventColumnReader : IEventColumnReader
             int clamped = bucket < 0 ? 0 : bucket >= bucketCount ? bucketCount - 1 : (int)bucket;
             int slot = LevelSeverity.Slot(LevelSeverity.FromLevelName(_events[index].Level));
             slotCounts[(clamped * slotCount) + slot]++;
+        }
+    }
+
+    public void BucketTimeTicksBySeverityWithTie(ReadOnlySpan<int> rankByPhysical, ReadOnlySpan<byte> highlightWinners, uint[] slotColorMask, long minTicks, long bucketSpanTicks, int bucketCount, int[] slotCounts, CancellationToken cancellationToken)
+    {
+        BucketTimeTicksBySeverity(rankByPhysical, minTicks, bucketSpanTicks, bucketCount, slotCounts, cancellationToken);
+
+        for (int index = 0; index < _events.Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            int slot = LevelSeverity.Slot(LevelSeverity.FromLevelName(_events[index].Level));
+            slotColorMask[slot] |= 1u << highlightWinners[index];
         }
     }
 

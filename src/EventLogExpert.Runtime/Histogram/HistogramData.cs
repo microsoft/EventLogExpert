@@ -12,7 +12,8 @@ public sealed record HistogramData(
     DateTime MaxUtc,
     int Total,
     long BucketSpanTicks,
-    IReadOnlyList<HistogramGroup> Groups)
+    IReadOnlyList<HistogramGroup> Groups,
+    uint[]? GroupHighlightMasks = null)
 {
     // True when the selected group-by dimension is a named EventData field for which no row in the view yields a decodable
     // whole-number value (the field is absent from every row, or every occurrence is non-numeric or out of range), so the
