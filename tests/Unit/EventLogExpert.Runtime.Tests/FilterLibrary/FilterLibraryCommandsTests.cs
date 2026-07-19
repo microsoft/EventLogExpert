@@ -20,7 +20,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.AddEntry(entry);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntryAction>(a => ReferenceEquals(a.Entry, entry)));
+        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntryAction>(a => a != null && ReferenceEquals(a.Entry, entry)));
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.AddFilterToExistingFilterSet(filterSetId, filter, source);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<AddFilterToExistingFilterSetAction>(a =>
+        dispatcher.Received(1).Dispatch(Arg.Is<AddFilterToExistingFilterSetAction>(a => a != null &&
             a.FilterSetId == filterSetId && a.SourceEntryId == source && ReferenceEquals(a.Filter, filter)));
     }
 
@@ -49,7 +49,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.AddFilterToNewFilterSet("New", filter, sourceEntryId: null);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<AddFilterToNewFilterSetAction>(a =>
+        dispatcher.Received(1).Dispatch(Arg.Is<AddFilterToNewFilterSetAction>(a => a != null &&
             a.NewFilterSetName == "New" && a.SourceEntryId == null && ReferenceEquals(a.Filter, filter)));
     }
 
@@ -62,7 +62,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.ApplyEntry(id);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<ApplyLibraryEntryAction>(a => a.EntryId == id));
+        dispatcher.Received(1).Dispatch(Arg.Is<ApplyLibraryEntryAction>(a => a != null && a.EntryId == id));
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.DeleteEntry(id);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntryAction>(a => a.EntryId == id));
+        dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntryAction>(a => a != null && a.EntryId == id));
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.RecordFilterApplied(filter);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(a => ReferenceEquals(a.Filter, filter)));
+        dispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(a => a != null && ReferenceEquals(a.Filter, filter)));
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.ReplaceWithEntry(id);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<ReplaceWithLibraryEntryAction>(a => a.EntryId == id));
+        dispatcher.Received(1).Dispatch(Arg.Is<ReplaceWithLibraryEntryAction>(a => a != null && a.EntryId == id));
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.SaveEntry(id);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<SaveEntryAction>(a => a.EntryId == id));
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveEntryAction>(a => a != null && a.EntryId == id));
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.SaveFilterSet("My Preset", filters);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(a => a.Name == "My Preset" && a.Filters == filters));
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(a => a != null && a.Name == "My Preset" && a.Filters == filters));
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.SavePaneAsFilterSet("My Preset");
 
-        dispatcher.Received(1).Dispatch(Arg.Is<SavePaneAsFilterSetAction>(a => a.Name == "My Preset"));
+        dispatcher.Received(1).Dispatch(Arg.Is<SavePaneAsFilterSetAction>(a => a != null && a.Name == "My Preset"));
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.SetIsFavorite(id, isFavorite: true);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<SetIsFavoriteAction>(a => a.EntryId == id && a.IsFavorite));
+        dispatcher.Received(1).Dispatch(Arg.Is<SetIsFavoriteAction>(a => a != null && a.EntryId == id && a.IsFavorite));
     }
 
     [Fact]
@@ -174,7 +174,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.UpdateEntry(entry);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntryAction>(a => ReferenceEquals(a.Entry, entry)));
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntryAction>(a => a != null && ReferenceEquals(a.Entry, entry)));
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.RenameTag("bug", "defect");
 
-        dispatcher.Received(1).Dispatch(Arg.Is<RenameTagAction>(a => a.OldName == "bug" && a.NewName == "defect"));
+        dispatcher.Received(1).Dispatch(Arg.Is<RenameTagAction>(a => a != null && a.OldName == "bug" && a.NewName == "defect"));
     }
 
     [Fact]
@@ -196,7 +196,7 @@ public sealed class FilterLibraryCommandsTests
 
         sut.DeleteTag("bug");
 
-        dispatcher.Received(1).Dispatch(Arg.Is<DeleteTagAction>(a => a.Name == "bug"));
+        dispatcher.Received(1).Dispatch(Arg.Is<DeleteTagAction>(a => a != null && a.Name == "bug"));
     }
 
     private static LibraryEntry BuildEntry()

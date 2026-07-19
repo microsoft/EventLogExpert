@@ -878,7 +878,7 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(DatabaseStatus.Ready, entry.Status);
 
         preferences.Received().DisabledDatabasesPreference =
-            Arg.Is<List<string>>(disabled => disabled.Contains(Constants.TestDb1, StringComparer.OrdinalIgnoreCase));
+            Arg.Is<List<string>>(disabled => disabled != null && disabled.Contains(Constants.TestDb1, StringComparer.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -914,7 +914,7 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.True(entry.IsEnabled);
 
         preferences.DidNotReceive().DisabledDatabasesPreference =
-            Arg.Is<List<string>>(disabled => disabled.Contains(Constants.TestDb1, StringComparer.OrdinalIgnoreCase));
+            Arg.Is<List<string>>(disabled => disabled != null && disabled.Contains(Constants.TestDb1, StringComparer.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -952,7 +952,7 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(DatabaseStatus.Ready, entry.Status);
 
         preferences.DidNotReceive().DisabledDatabasesPreference =
-            Arg.Is<List<string>>(disabled => disabled.Contains(Constants.TestDb1, StringComparer.OrdinalIgnoreCase));
+            Arg.Is<List<string>>(disabled => disabled != null && disabled.Contains(Constants.TestDb1, StringComparer.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -2040,7 +2040,7 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.False(service.Entries[0].IsEnabled);
 
         preferences.Received(1).DisabledDatabasesPreference =
-            Arg.Is<IEnumerable<string>>(disabled => disabled.Contains(Constants.TestDb1));
+            Arg.Is<IEnumerable<string>>(disabled => disabled != null && disabled.Contains(Constants.TestDb1));
     }
 
     [Fact]

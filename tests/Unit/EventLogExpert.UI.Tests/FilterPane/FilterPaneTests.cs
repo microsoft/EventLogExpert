@@ -323,7 +323,7 @@ public sealed class FilterPaneTests : BunitContext
         await copyButton.ClickAsync(new MouseEventArgs());
 
         authoring.Received(1).ExportRows(
-            Arg.Is<IReadOnlyList<SavedFilter>>(rows => rows.Count == 1 && rows[0].IsEnabled),
+            Arg.Is<IReadOnlyList<SavedFilter>>(rows => rows != null && rows.Count == 1 && rows[0].IsEnabled),
             Arg.Any<IReadOnlyList<string>>());
     }
 

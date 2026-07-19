@@ -126,7 +126,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
             .Returns(new RemoveOutcome(RemoveOutcomeStatus.Confirmed, true, false));
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(true, null) };
         var component = RenderWithAlertSurface(alertSurface);
-
+
         await EnterSelectionModeAsync(component);
         var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
         await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
@@ -153,7 +153,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
             Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
         var component = RenderWithAlertSurface(alertSurface);
-
+
         await EnterSelectionModeAsync(component);
         var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
         await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
@@ -181,7 +181,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
 
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
         var component = RenderWithAlertSurface(alertSurface);
-
+
         await EnterSelectionModeAsync(component);
         await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
         var bulkRemove = component.Find(".manage-databases-bulk-strip .button-red");
@@ -264,7 +264,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
             .Returns(new RemoveOutcome(RemoveOutcomeStatus.Confirmed, true, false));
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(true, null) };
         var component = RenderWithAlertSurface(alertSurface);
-
+
         await EnterSelectionModeAsync(component);
         var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
         await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
@@ -273,7 +273,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var bulkRemove = component.Find(".manage-databases-bulk-strip .button-red");
         await component.InvokeAsync(() => bulkRemove.Click());
 
-        _announcementService.Received().Announce(Arg.Is<string>(s => s.Contains("a.db") && s.Contains("disk full")));
+        _announcementService.Received().Announce(Arg.Is<string>(s => s != null && s.Contains("a.db") && s.Contains("disk full")));
     }
 
     [Fact]
@@ -298,7 +298,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await component.InvokeAsync(() => upgradeBtn.Click());
 
         await _coordinator.Received(1).UpgradeDatabasesAsync(
-            Arg.Is<IReadOnlyList<string>>(l => l.Count == 2 && l.Contains("a.db") && l.Contains("b.db")),
+            Arg.Is<IReadOnlyList<string>>(l => l != null && l.Count == 2 && l.Contains("a.db") && l.Contains("b.db")),
             UpgradeProgressScope.ManageDatabasesTriggered,
             Arg.Any<CancellationToken>());
     }
@@ -440,7 +440,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         Assert.Equal("Upgrade 1", prompt.AcceptLabel);
 
         await _coordinator.Received(1).UpgradeDatabasesAsync(
-            Arg.Is<IReadOnlyList<string>>(l => l.Count == 1 && l.Contains("a.db")),
+            Arg.Is<IReadOnlyList<string>>(l => l != null && l.Count == 1 && l.Contains("a.db")),
             UpgradeProgressScope.ManageDatabasesTriggered,
             Arg.Any<CancellationToken>());
     }
@@ -1124,8 +1124,8 @@ public sealed class ManageDatabasesTabTests : BunitContext
 
         Assert.Equal(1, _databaseService.RestoreFromBackupCalls);
         Assert.False(component.Instance.HasDatabaseStateChanged);
-        _announcementService.Received(1).Announce(Arg.Is<string>(s => s.Contains("Could not restore")));
-        _announcementService.DidNotReceive().Announce(Arg.Is<string>(s => s.StartsWith("Restored ")));
+        _announcementService.Received(1).Announce(Arg.Is<string>(s => s != null && s.Contains("Could not restore")));
+        _announcementService.DidNotReceive().Announce(Arg.Is<string>(s => s != null && s.StartsWith("Restored ")));
     }
 
     [Fact]
@@ -1142,7 +1142,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
 
         Assert.Equal(1, _databaseService.RestoreFromBackupCalls);
         Assert.True(component.Instance.HasDatabaseStateChanged);
-        _announcementService.Received(1).Announce(Arg.Is<string>(s => s.StartsWith("Restored ")));
+        _announcementService.Received(1).Announce(Arg.Is<string>(s => s != null && s.StartsWith("Restored ")));
     }
 
     [Fact]
@@ -1160,7 +1160,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
                 .Invoke(component.Instance, [_databaseService.Entries[0]])!));
 
         Assert.Equal(0, _databaseService.RestoreFromBackupCalls);
-        _announcementService.Received(1).Announce(Arg.Is<string>(s => s.Contains("Cannot restore")));
+        _announcementService.Received(1).Announce(Arg.Is<string>(s => s != null && s.Contains("Cannot restore")));
     }
 
     [Fact]
@@ -1258,7 +1258,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
     {
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
-
+
         await EnterSelectionModeAsync(component);
         await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
 
@@ -1274,7 +1274,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
             Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready),
             Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
-
+
         await EnterSelectionModeAsync(component);
         var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
         await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
@@ -1294,7 +1294,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
     {
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
-
+
         await EnterSelectionModeAsync(component);
         await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
         Assert.True(component.Instance.HasBulkSelection);

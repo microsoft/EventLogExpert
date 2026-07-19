@@ -40,7 +40,7 @@ public sealed class ModalAlertDialogServiceTests
         // Assert
         Assert.Equal("typed-value", result);
         await host.Received(1).ShowInlineAlertAsync(
-            Arg.Is<InlineAlertRequest>(r => r.IsPrompt && r.Title == "Rename" && r.Message == "Enter new name"),
+            Arg.Is<InlineAlertRequest>(r => r != null && r.IsPrompt && r.Title == "Rename" && r.Message == "Enter new name"),
             Arg.Any<CancellationToken>());
     }
 
@@ -133,7 +133,7 @@ public sealed class ModalAlertDialogServiceTests
 
         var mainThread = Substitute.For<IMainThreadService>();
         mainThread.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>())
-            .Returns(call => ((Func<Task>)call[0])());
+            .Returns(call => call.ArgAt<Func<Task>>(0)());
 
         var sut = new AlertDialogService(
             coordinator,
@@ -415,6 +415,7 @@ public sealed class ModalAlertDialogServiceTests
         Assert.False(standaloneCalled);
         await host.Received(1).ShowInlineAlertAsync(
             Arg.Is<InlineAlertRequest>(r =>
+                r != null &&
                 r.Title == "Confirm" &&
                 r.Message == "Are you sure?" &&
                 r.AcceptLabel == "Yes" &&

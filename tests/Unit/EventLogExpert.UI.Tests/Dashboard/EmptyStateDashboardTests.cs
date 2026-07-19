@@ -118,7 +118,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.WaitForAssertion(() =>
         {
             _scenarioLaunch.Received(1)
-                .LaunchAsync(Arg.Is<ScenarioDefinition>(scenario => scenario.Id == "application-crashes"), null);
+                .LaunchAsync(Arg.Is<ScenarioDefinition>(scenario => scenario != null && scenario.Id == "application-crashes"), null);
             _announcer.Received(1).Announce(Arg.Any<string>());
         });
     }
@@ -136,7 +136,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.Find(ActiveDetailLaunch).Click();
 
         cut.WaitForAssertion(() =>
-            _announcer.Received(1).Announce(Arg.Is<string>(message => message.Contains("No channels"))));
+            _announcer.Received(1).Announce(Arg.Is<string>(message => message != null && message.Contains("No channels"))));
     }
 
     [Fact]
@@ -205,7 +205,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         FindLaunch(cut, "Open Application + System (live)").Click();
 
         cut.WaitForAssertion(() => _actions.Received(1).OpenLiveLogsAsync(
-            Arg.Is<IEnumerable<string>>(channels => channels.SequenceEqual(new[] { "Application", "System" })),
+            Arg.Is<IEnumerable<string>>(channels => channels != null && channels.SequenceEqual(new[] { "Application", "System" })),
             false));
     }
 

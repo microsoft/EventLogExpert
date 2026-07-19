@@ -41,6 +41,7 @@ public sealed class EffectsTests
         await sut.HandleLoadScenarioFavorites(_dispatcher);
 
         _dispatcher.Received(1).Dispatch(Arg.Is<LoadScenarioFavoritesSuccessAction>(action =>
+            action != null &&
             action.FavoriteScenarioIds.Contains("application-crashes") &&
             action.FavoriteScenarioIds.Contains("failed-services-at-boot")));
     }
@@ -69,7 +70,7 @@ public sealed class EffectsTests
         await _store.Received(1).AddAsync("application-crashes", Arg.Any<CancellationToken>());
         _announcer.Received(1).Announce("Added Application crashes to favorites");
         _dispatcher.Received(1).Dispatch(Arg.Is<SetScenarioFavoriteSuccessAction>(action =>
-            action.ScenarioId == "application-crashes" && action.IsFavorite));
+            action != null && action.ScenarioId == "application-crashes" && action.IsFavorite));
     }
 
     [Fact]
@@ -112,6 +113,6 @@ public sealed class EffectsTests
 
         await _store.Received(1).DeleteAsync("application-crashes", Arg.Any<CancellationToken>());
         _announcer.Received(1).Announce("Removed Application crashes from favorites");
-        _dispatcher.Received(1).Dispatch(Arg.Is<SetScenarioFavoriteSuccessAction>(action => !action.IsFavorite));
+        _dispatcher.Received(1).Dispatch(Arg.Is<SetScenarioFavoriteSuccessAction>(action => action != null && !action.IsFavorite));
     }
 }

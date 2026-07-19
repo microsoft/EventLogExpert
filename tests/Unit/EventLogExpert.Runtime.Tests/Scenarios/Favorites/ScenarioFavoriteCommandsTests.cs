@@ -29,6 +29,7 @@ public sealed class ScenarioFavoriteCommandsTests
         sut.SetFavorite("application-crashes", "Application crashes", isFavorite: true);
 
         dispatcher.Received(1).Dispatch(Arg.Is<SetScenarioFavoriteAction>(action =>
+            action != null &&
             action.ScenarioId == "application-crashes" &&
             action.ScenarioName == "Application crashes" &&
             action.IsFavorite));
@@ -43,6 +44,6 @@ public sealed class ScenarioFavoriteCommandsTests
         sut.SetFavorite("application-crashes", "Application crashes", isFavorite: false);
 
         dispatcher.Received(1).Dispatch(Arg.Is<SetScenarioFavoriteAction>(action =>
-            action.ScenarioId == "application-crashes" && !action.IsFavorite));
+            action != null && action.ScenarioId == "application-crashes" && !action.IsFavorite));
     }
 }

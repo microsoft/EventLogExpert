@@ -117,7 +117,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         var items = await CapturedMoreMenuItemsAsync(component);
         await items.First(i => i.Label == "Delete").OnClickAsync!.Invoke();
 
-        await _alerts.Received(1).ShowAlert("Delete from library?", Arg.Is<string>(m => m.Contains("filter set 'P' with 2 filters")), "Delete", "Cancel");
+        await _alerts.Received(1).ShowAlert("Delete from library?", Arg.Is<string>(m => m != null && m.Contains("filter set 'P' with 2 filters")), "Delete", "Cancel");
     }
 
     [Fact]
@@ -226,7 +226,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         Assert.NotNull(captured);
         Assert.Equal(entry.Id, captured.EntryId);
         Assert.True(captured.NewIsFavorite);
-        _announcements.Received(1).Announce(Arg.Is<string>(s => s.Contains("Marked X as favorite")));
+        _announcements.Received(1).Announce(Arg.Is<string>(s => s != null && s.Contains("Marked X as favorite")));
     }
 
     [Fact]
@@ -392,7 +392,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         await component.Find("button[aria-label='Remove tag bug']").ClickAsync(new MouseEventArgs());
 
         _commands.Received(1).SetEntryTags(entry.Id, Arg.Is<ImmutableList<string>>(
-            tags => tags.SequenceEqual(new[] { "perf" })));
+            tags => tags != null && tags.SequenceEqual(new[] { "perf" })));
         _announcements.Received(1).Announce("Removed tag 'bug' from X");
     }
 
@@ -459,7 +459,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         await items.First(i => i.Label == "Save to Library").OnClickAsync!.Invoke();
 
         Assert.True(invoked);
-        _announcements.Received(1).Announce(Arg.Is<string>(s => s.Contains("Saved X to library")));
+        _announcements.Received(1).Announce(Arg.Is<string>(s => s != null && s.Contains("Saved X to library")));
     }
 
     [Fact]
@@ -526,7 +526,7 @@ public sealed class LibraryEntryRowTests : BunitContext
     {
         IReadOnlyList<MenuItem>? captured = null;
         _menuService.WhenForAnyArgs(s => s.OpenAt(0, 0, null!, false, false))
-            .Do(call => captured = (IReadOnlyList<MenuItem>)call[2]!);
+            .Do(call => captured = call.ArgAt<IReadOnlyList<MenuItem>>(2));
         await component.Find("button[aria-label^='More actions for']").ClickAsync(new MouseEventArgs());
         Assert.NotNull(captured);
         return captured;

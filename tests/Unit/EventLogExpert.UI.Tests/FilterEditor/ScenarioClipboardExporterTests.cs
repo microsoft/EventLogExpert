@@ -35,7 +35,7 @@ public sealed class ScenarioClipboardExporterTests
 
         await _alertDialog.Received(1).ShowAlert(
             "Scenario JSON exported with warnings",
-            Arg.Is<string>(message => message.Contains("single-row color guardrail")),
+            Arg.Is<string>(message => message != null && message.Contains("single-row color guardrail")),
             "OK");
         _announcements.DidNotReceive().Announce(Arg.Any<string>());
     }

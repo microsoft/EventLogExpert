@@ -75,6 +75,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
+            x != null &&
             x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
     }
 
@@ -92,6 +93,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
+            x != null &&
             x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
     }
 
@@ -165,6 +167,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
+            x != null &&
             x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
     }
 
@@ -182,6 +185,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
+            x != null &&
             x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
     }
 
@@ -210,6 +214,7 @@ public sealed class EffectsTests
         // Assert
         var expectedAfter = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
+            x != null &&
             x.DateFilter != null &&
             x.DateFilter.After == expectedAfter &&
             x.DateFilter.Before == unrelatedBefore));
@@ -240,6 +245,7 @@ public sealed class EffectsTests
         // Assert
         var expectedBefore = new DateTime(2024, 1, 1, 15, 0, 0, DateTimeKind.Utc);
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
+            x != null &&
             x.DateFilter != null &&
             x.DateFilter.After == unrelatedAfter &&
             x.DateFilter.Before == expectedBefore));
@@ -281,6 +287,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
+            x != null &&
             x.DateFilter != null &&
             x.DateFilter.After == new DateTime(2024, 1, 1, 4, 0, 0, DateTimeKind.Utc) &&
             x.DateFilter.Before == new DateTime(2024, 1, 5, 22, 0, 0, DateTimeKind.Utc)));
@@ -301,6 +308,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
+            x != null &&
             x.DateFilter != null &&
             x.DateFilter.After == after &&
             x.DateFilter.Before == before));
@@ -323,6 +331,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
+            x != null &&
             x.DateFilter != null &&
             x.DateFilter.After == existingAfter &&
             x.DateFilter.Before == newBefore));
@@ -345,6 +354,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
+            x != null &&
             x.DateFilter != null &&
             x.DateFilter.After == newAfter &&
             x.DateFilter.Before == existingBefore));
@@ -362,6 +372,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
+            x != null &&
             x.DateFilter == null));
     }
 
@@ -482,6 +493,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<ApplyFilterAction>(x =>
+            x != null &&
             x.Filter.Filters.Count == 1 &&
             x.Filter.Filters[0].IsExcluded));
     }
@@ -505,6 +517,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<ApplyFilterAction>(x =>
+            x != null &&
             x.Filter.Filters.Count == 1 &&
             x.Filter.Filters[0].ComparisonText == FilterTestConstants.FilterIdEquals100));
     }

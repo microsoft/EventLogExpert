@@ -145,7 +145,7 @@ public sealed class LibrarySavedTabHeaderTests : BunitContext
         Assert.NotNull(captured);
         Assert.Equal("My New", captured.Name);
         Assert.Equal(LibraryEntryOrigin.UserSaved, captured.Origin);
-        _announcements.Received().Announce(Arg.Is<string>(s => s.Contains("My New")));
+        _announcements.Received().Announce(Arg.Is<string>(s => s != null && s.Contains("My New")));
         Assert.NotNull(component.Find(".library-saved-tab-new-button"));
     }
 

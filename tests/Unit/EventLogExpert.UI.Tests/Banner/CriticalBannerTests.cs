@@ -44,7 +44,7 @@ public sealed class CriticalBannerTests : BunitContext
         component.Find("aside.banner-critical .banner-actions button:contains('Copy details')").Click();
 
         await _clipboardService.Received(1)
-            .CopyTextAsync(Arg.Is<string>(s => s.Contains("InvalidOperationException") && s.Contains("kaboom")));
+            .CopyTextAsync(Arg.Is<string>(s => s != null && s.Contains("InvalidOperationException") && s.Contains("kaboom")));
 
         Assert.Single(component.FindAll("aside.banner-critical .banner-feedback .banner-chip"));
     }

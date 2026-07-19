@@ -58,7 +58,7 @@ public sealed class ActivationDispatcherTests
         var dialogService = Substitute.For<IAlertDialogService>();
         var mainThread = Substitute.For<IMainThreadService>();
         mainThread.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>())
-            .Returns(callInfo => callInfo.Arg<Func<Task>>().Invoke());
+            .Returns(callInfo => callInfo.ArgAt<Func<Task>>(0).Invoke());
 
         var (dispatcher, channel) = CreateDispatcher(dialogService: dialogService, mainThread: mainThread);
         var alertOrderedBeforeOpen = false;
@@ -94,7 +94,7 @@ public sealed class ActivationDispatcherTests
     {
         var mainThread = Substitute.For<IMainThreadService>();
         mainThread.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>())
-            .Returns(callInfo => callInfo.Arg<Func<Task>>().Invoke());
+            .Returns(callInfo => callInfo.ArgAt<Func<Task>>(0).Invoke());
 
         var (dispatcher, channel) = CreateDispatcher(mainThread: mainThread);
         var openBatchInvoked = false;
@@ -123,7 +123,7 @@ public sealed class ActivationDispatcherTests
     {
         var mainThread = Substitute.For<IMainThreadService>();
         mainThread.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>())
-            .Returns(callInfo => callInfo.Arg<Func<Task>>().Invoke());
+            .Returns(callInfo => callInfo.ArgAt<Func<Task>>(0).Invoke());
 
         var (dispatcher, channel) = CreateDispatcher(mainThread: mainThread);
         IEnumerable<(string Path, LogPathType Type)>? capturedPaths = null;
@@ -244,7 +244,7 @@ public sealed class ActivationDispatcherTests
         {
             // Default: run on-thread to keep tests deterministic.
             resolvedMainThread.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>())
-                .Returns(callInfo => callInfo.Arg<Func<Task>>().Invoke());
+                .Returns(callInfo => callInfo.ArgAt<Func<Task>>(0).Invoke());
         }
 
         var dispatcher = new ActivationDispatcher(

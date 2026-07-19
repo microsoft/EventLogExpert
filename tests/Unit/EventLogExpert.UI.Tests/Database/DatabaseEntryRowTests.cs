@@ -114,7 +114,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         await component.Find(".db-entry-row").TriggerEventAsync("oncontextmenu",
             new MouseEventArgs { ClientX = 100, ClientY = 200 });
 
-        _menuService.Received(1).OpenAt(100, 200, Arg.Is<IReadOnlyList<MenuItem>>(items => items.Count == 1));
+        _menuService.Received(1).OpenAt(100, 200, Arg.Is<IReadOnlyList<MenuItem>>(items => items != null && items.Count == 1));
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var entry = MakeEntry(DatabaseStatus.Ready, "MyProvider.db");
         IReadOnlyList<MenuItem>? capturedItems = null;
         _menuService.When(s => s.OpenAt(Arg.Any<double>(), Arg.Any<double>(), Arg.Any<IReadOnlyList<MenuItem>>(), Arg.Any<bool>(), Arg.Any<bool>()))
-            .Do(call => capturedItems = call.Arg<IReadOnlyList<MenuItem>>());
+            .Do(call => capturedItems = call.ArgAt<IReadOnlyList<MenuItem>>(2));
 
         var component = RenderRow(entry);
         await component.Find(".db-entry-row").TriggerEventAsync("oncontextmenu", new MouseEventArgs());
