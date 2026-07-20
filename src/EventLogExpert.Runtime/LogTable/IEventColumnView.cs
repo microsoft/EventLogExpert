@@ -192,6 +192,14 @@ public interface IEventColumnView
     /// </summary>
     void CountFieldValues(EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken);
 
+    /// <summary>
+    ///     Precomputes the highlight "winners" for <paramref name="orderedColoredFilters" /> and returns an OPAQUE,
+    ///     view-specific handle. The result is NOT guaranteed to be a per-row array - a combined view returns a small sentinel
+    ///     handle - so callers MUST NOT index into it or assume its <c>Length</c> equals the row count; it may only be passed
+    ///     back to the <c>*WithTie</c> bucketing APIs on the SAME view instance. <paramref name="planKey" /> lets
+    ///     implementations cache the underlying winner data and skip recomputation while the coloured-filter predicate set is
+    ///     unchanged (the returned handle itself is not guaranteed to be reused).
+    /// </summary>
     byte[] EnsureHighlightWinners(
         IReadOnlyList<SavedFilter> orderedColoredFilters,
         int planKey,
@@ -203,8 +211,7 @@ public interface IEventColumnView
     ResolvedEvent GetDetail(EventLocator locator);
 
     /// <summary>
-    ///     Lean single-row rehydrate (grid scalars plus Description) for the row addressed by <paramref name="locator" />
-    ///     .
+    ///     Lean single-row rehydrate (grid scalars plus Description) for the row addressed by <paramref name="locator" />.
     /// </summary>
     ResolvedEvent GetDetailLean(EventLocator locator);
 

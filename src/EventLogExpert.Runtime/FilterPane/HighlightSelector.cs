@@ -37,20 +37,16 @@ internal sealed class HighlightSelector : IHighlightSelector
         var hash = new HashCode();
         int eligibleCount = 0;
 
-        for (int position = 0; position < filters.Count; position++)
+        foreach (var filter in filters)
         {
-            var filter = filters[position];
-
             if (filter is not { IsEnabled: true, IsExcluded: false }) { continue; }
 
             if (filter.Compiled is null) { continue; }
 
             if (!Enum.IsDefined(filter.Color)) { continue; }
 
+            hash.Add(eligibleCount);
             hash.Add(filter.ComparisonText, StringComparer.Ordinal);
-            hash.Add(filter.IsExcluded);
-            hash.Add(filter.IsEnabled);
-            hash.Add(position);
             eligibleCount++;
         }
 
