@@ -21,9 +21,9 @@ internal sealed class ScenarioQueryService(BuiltInScenarioRegistry registry, ICh
         return [.._registry.Scenarios.Where(scenario => scenario.Channels.Any(loaded.Contains))];
     }
 
-    public LivePresence GetLivePresence()
+    public async Task<LivePresence> GetLivePresenceAsync()
     {
-        var readiness = _readinessService.GetReadinessAsync(CatalogChannels()).GetAwaiter().GetResult();
+        var readiness = await _readinessService.GetReadinessAsync(CatalogChannels());
 
         return readiness.Any(channel => channel.Presence == ChannelPresence.Unknown)
             ? new LivePresence(false, FrozenSet<string>.Empty)

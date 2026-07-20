@@ -48,7 +48,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         _scenarioLaunch.LaunchAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>())
             .Returns(new ScenarioLaunchResult(1, 0, 0));
         _scenarioQuery.GetSplashScenarios().Returns([]);
-        _scenarioQuery.GetLivePresence()
+        _scenarioQuery.GetLivePresenceAsync()
             .Returns(new LivePresence(true, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "System" }));
         _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
             .Returns(
@@ -203,7 +203,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailLaunch_WhenChannelNotOnHost_IsDisabledWithOfflineNote()
     {
-        _scenarioQuery.GetLivePresence()
+        _scenarioQuery.GetLivePresenceAsync()
             .Returns(new LivePresence(true, new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
@@ -234,7 +234,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailLaunch_WhenOneRequiredChannelMissing_IsDisabledWithOfflineNote()
     {
-        _scenarioQuery.GetLivePresence()
+        _scenarioQuery.GetLivePresenceAsync()
             .Returns(new LivePresence(true, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "System" }));
         _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
             .Returns(
@@ -260,7 +260,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailLaunch_WhenPresenceUnknown_StaysLaunchable()
     {
-        _scenarioQuery.GetLivePresence()
+        _scenarioQuery.GetLivePresenceAsync()
             .Returns(new LivePresence(false, new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
