@@ -8,14 +8,26 @@ public static class EvtxFolderEnumerator
     private const string EvtxSearchPattern = "*.evtx";
     private const string OpenFolderFailedTitle = "Open Folder Failed";
 
-    public static EvtxEnumerationResult EnumerateEvtxTopLevel(string folderPath)
+    public static EvtxEnumerationResult EnumerateEvtxTopLevel(string folderPath, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
 
         try
         {
-            var files = Directory.EnumerateFiles(folderPath, EvtxSearchPattern, SearchOption.TopDirectoryOnly)
-                .ToList();
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var files = new List<string>();
+
+            foreach (var file in Directory.EnumerateFiles(folderPath, EvtxSearchPattern, SearchOption.TopDirectoryOnly))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                files.Add(file);
+            }
+
+            // A folder that yields no matches never enters the loop body, and Directory.EnumerateFiles has no overload that
+            // observes the token mid-scan, so re-check here: cancellation requested while the directory was being walked is
+            // then surfaced as OperationCanceledException rather than a normal Empty/Success result.
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (files.Count == 0)
             {
