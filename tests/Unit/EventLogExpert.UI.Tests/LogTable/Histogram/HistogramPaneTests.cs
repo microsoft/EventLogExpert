@@ -142,6 +142,31 @@ public sealed class HistogramPaneTests : BunitContext
     }
 
     [Fact]
+    public async Task FilterRefresh_WhenPredicatePlanChangesButTieStaysUnarmed_DoesNotReadActiveViewForScan()
+    {
+        // Both filter sets are eligible but uncoloured (HighlightColor.None), so highlight-tie is never armed
+        // and the histogram output is independent of the predicates. A plan-key change (7 -> 8) while tie stays
+        // unarmed must update UI state only - it must not trigger a background rescan (which would read ActiveView).
+        SavedFilter firstUncoloured = Filter(HighlightColor.None);
+        SavedFilter secondUncoloured = Filter(HighlightColor.None);
+        _highlightSelector.Select(Arg.Any<ImmutableList<SavedFilter>>()).Returns([firstUncoloured], [secondUncoloured]);
+        _highlightSelector.ComputePredicatePlanKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(7, 8);
+        var cut = Render<HistogramPane>();
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
+
+        // Wait for the resize scan's two ActiveView.Value reads (sync StartScan + post-scan continuation) to
+        // settle before clearing, so a late continuation read is not miscounted against the change under test.
+        cut.WaitForAssertion(() => _ = _activeView.Received(2).Value);
+        _activeView.ClearReceivedCalls();
+
+        _filters.SelectedValueChanged +=
+            Raise.Event<EventHandler<ImmutableList<SavedFilter>>>(_filters, ImmutableList.Create(secondUncoloured));
+        await cut.InvokeAsync(() => { });
+
+        _ = _activeView.DidNotReceive().Value;
+    }
+
+    [Fact]
     public void Render_WhenDimensionRequestExists_AppliesRequestedDimensionOnMount()
     {
         _dimensionRequestValue = new HistogramDimensionRequest(HistogramDimension.Log, 1);

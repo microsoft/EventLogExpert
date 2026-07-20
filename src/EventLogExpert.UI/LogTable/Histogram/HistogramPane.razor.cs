@@ -837,12 +837,15 @@ public sealed partial class HistogramPane
         ImmutableList<SavedFilter> filters = Filters.Value;
         SavedFilter[] selected = HighlightSelector.Select(filters);
         int planKey = HighlightSelector.ComputePredicatePlanKey(filters);
-        bool predicateChanged = planKey != _tiePlanKey || ShouldArmTie(selected) != ShouldArmTie(_tieHighlightFilters);
+
+        bool wasArmed = ShouldArmTie(_tieHighlightFilters);
+        bool willArm = ShouldArmTie(selected);
+        bool rescanNeeded = wasArmed != willArm || (planKey != _tiePlanKey && (wasArmed || willArm));
 
         _tieHighlightFilters = selected;
         _tiePlanKey = planKey;
 
-        if (predicateChanged && rescanOnPredicateChange)
+        if (rescanNeeded && rescanOnPredicateChange)
         {
             StartScan();
 
