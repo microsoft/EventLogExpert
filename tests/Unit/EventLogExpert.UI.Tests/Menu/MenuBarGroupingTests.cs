@@ -2,7 +2,9 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
@@ -10,12 +12,14 @@ using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Menu;
 using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Tests.Menu;
 
@@ -30,6 +34,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     private readonly IStateSelection<HistogramState, bool> _histogramVisible = Substitute.For<IStateSelection<HistogramState, bool>>();
     private readonly List<IStateSelection<LogTableState, bool>> _logTableSelections = [];
     private readonly IMenuService _menuService = Substitute.For<IMenuService>();
+    private readonly IChannelReadinessService _readinessService = Substitute.For<IChannelReadinessService>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
     private readonly ICurrentVersionProvider _versionProvider = Substitute.For<ICurrentVersionProvider>();
 
@@ -44,6 +49,7 @@ public sealed class MenuBarGroupingTests : BunitContext
         Services.AddSingleton(_histogramVisible);
         Services.AddTransient<IStateSelection<LogTableState, bool>>(_ => CreateLogTableSelection());
         Services.AddSingleton(_menuService);
+        Services.AddSingleton(_readinessService);
         Services.AddSingleton(_settings);
         Services.AddSingleton(_versionProvider);
 
@@ -53,6 +59,9 @@ public sealed class MenuBarGroupingTests : BunitContext
         JSInterop.SetupModule("./_content/EventLogExpert.UI/Menu/MenuAnchor.js")
             .Setup<MenuAnchorRect>("getMenuElementRect", _ => true)
             .SetResult(new MenuAnchorRect(0, 0, 0, 0, 0, 0));
+        _readinessService.GetReadinessAsync(Arg.Any<CancellationToken>()).Returns([]);
+        _readinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(call => ReadinessFor(call.Arg<IEnumerable<string>>()!));
     }
 
     [Fact]
@@ -83,6 +92,58 @@ public sealed class MenuBarGroupingTests : BunitContext
         await Item(items, "Close All").OnClickAsync!();
 
         await _actions.DidNotReceive().CloseAllLogsAsync();
+    }
+
+    [Fact]
+    public async Task File_LiveSecurity_WhenRequiresElevation_RendersStatusAndStaysClickable()
+    {
+        SetReadiness(
+            new ChannelReadiness(LogChannelNames.SecurityLog, ChannelPresence.Present, ChannelEnablement.Enabled)
+            {
+                Access = ChannelAccess.RequiresElevation
+            });
+
+        var live = LiveItems(await OpenMenu("File"));
+        var security = Item(live, LogChannelNames.SecurityLog);
+
+        Assert.True(security.IsEnabled);
+        Assert.Equal("(elevate)", security.StatusText);
+    }
+
+    [Fact]
+    public async Task File_OtherLogs_WhenChannelDisabled_RendersStatusAndStaysClickable()
+    {
+        const string channel = "Microsoft-Windows-Test/Operational";
+        SetReadiness(new ChannelReadiness(channel, ChannelPresence.Present, ChannelEnablement.Disabled));
+        var live = LiveItems(await OpenMenu("File"));
+
+        var otherLogs = Item(live, "Other Logs");
+        var children = await otherLogs.ChildrenLoader!();
+        var testFolder = Item(Item(Item(children, "Microsoft").Children!, "Windows").Children!, "Test");
+        var operational = Item(testFolder.Children!, "Operational");
+
+        Assert.True(operational.IsEnabled);
+        Assert.Equal("(disabled)", operational.StatusText);
+
+        await operational.OnClickAsync!();
+
+        await _actions.Received(1).OpenLiveLogAsync(channel, false);
+    }
+
+    [Fact]
+    public async Task File_OtherLogs_WhenStateRequiresElevation_RendersStatusAndStaysClickable()
+    {
+        SetReadiness(
+            new ChannelReadiness(LogChannelNames.StateLog, ChannelPresence.Present, ChannelEnablement.Disabled)
+            {
+                Access = ChannelAccess.RequiresElevation
+            });
+        var live = LiveItems(await OpenMenu("File"));
+
+        var state = Item(await Item(live, "Other Logs").ChildrenLoader!(), LogChannelNames.StateLog);
+
+        Assert.True(state.IsEnabled);
+        Assert.Equal("(elevate)", state.StatusText);
     }
 
     [Fact]
@@ -196,6 +257,14 @@ public sealed class MenuBarGroupingTests : BunitContext
     private static MenuItem Item(IReadOnlyList<MenuItem> items, string label) =>
         items.Single(item => item.Label == label);
 
+    private static IReadOnlyList<MenuItem> LiveItems(IReadOnlyList<MenuItem> fileItems) =>
+        Item(Item(fileItems, "Open").Children!, "Live").Children!;
+
+    private static ImmutableArray<ChannelReadiness> ReadinessFor(IEnumerable<string> channels) =>
+    [
+        .. channels.Select(channel => new ChannelReadiness(channel, ChannelPresence.Present, ChannelEnablement.Unknown))
+    ];
+
     // Distinct substitute per selection; Value applies its own projection to _logTableState.
     private IStateSelection<LogTableState, bool> CreateLogTableSelection()
     {
@@ -229,4 +298,18 @@ public sealed class MenuBarGroupingTests : BunitContext
     }
 
     private Task<IReadOnlyList<MenuItem>> OpenViewMenu() => OpenMenu("View");
+
+    private void SetReadiness(params ChannelReadiness[] readiness)
+    {
+        _readinessService.GetReadinessAsync(Arg.Any<CancellationToken>()).Returns([.. readiness]);
+        _readinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var requested = call.Arg<IEnumerable<string>>()!.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                return readiness
+                    .Where(channel => requested.Contains(channel.Channel))
+                    .ToImmutableArray();
+            });
+    }
 }

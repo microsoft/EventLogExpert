@@ -2,9 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
-using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Menu;
@@ -45,6 +45,8 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
     private bool _isBusy;
     private LivePresence _livePresence = new(false, FrozenSet<string>.Empty);
     private bool _pendingTabFocus;
+    private IReadOnlyDictionary<string, ChannelReadiness> _readinessByChannel =
+        new Dictionary<string, ChannelReadiness>(StringComparer.OrdinalIgnoreCase);
     private SidebarTabs<SplashCategory>? _sidebarTabs;
     private IReadOnlyList<ScenarioDefinition>? _splashScenarios;
     private IReadOnlyList<(SplashCategory Tab, string Label)> _tabs = [];
@@ -54,6 +56,8 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
     [Inject] private IAnnouncementService Announcer { get; init; } = null!;
+
+    [Inject] private IChannelReadinessService ChannelReadinessService { get; init; } = null!;
 
     [Inject] private IScenarioFavoriteCommands FavoriteCommands { get; init; } = null!;
 
@@ -69,7 +73,11 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
     [Inject] private IScenarioQueryService ScenarioQuery { get; init; } = null!;
 
-    [Inject] private ICurrentVersionProvider Version { get; init; } = null!;
+    private bool SecurityRequiresElevation =>
+        _readinessByChannel.GetValueOrDefault(
+            LogChannelNames.SecurityLog,
+            new ChannelReadiness(LogChannelNames.SecurityLog, ChannelPresence.Unknown, ChannelEnablement.Unknown))
+            .Access == ChannelAccess.RequiresElevation;
 
     internal static string ScenarioIcon(ScenarioGroup group) => group switch
     {
@@ -131,10 +139,11 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
     protected override async Task OnInitializedAsync()
     {
-        // Both the catalog and the host channel set are read once, off the UI thread; the presence snapshot warms the
-        // probe cache that GetSplashScenarios no longer touches now that it returns the full catalog.
         (_splashScenarios, _livePresence) = await Task.Run(
             () => (ScenarioQuery.GetSplashScenarios(), ScenarioQuery.GetLivePresence()));
+
+        var readiness = await ChannelReadinessService.GetReadinessAsync(CatalogChannels(_splashScenarios));
+        _readinessByChannel = readiness.ToDictionary(channel => channel.Channel, StringComparer.OrdinalIgnoreCase);
         RebuildCategories();
 
         if (_categories.Count > 0 && !_categories.Any(category => category.Category.Equals(_activeCategory)))
@@ -144,6 +153,13 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
         await base.OnInitializedAsync();
     }
+
+    private static IEnumerable<string> CatalogChannels(IReadOnlyList<ScenarioDefinition>? scenarios) =>
+        scenarios is null
+            ? []
+            : scenarios
+                .SelectMany(static scenario => scenario.Channels.Concat(scenario.OptionalChannels))
+                .Distinct(StringComparer.OrdinalIgnoreCase);
 
     private static string? DescribeFolderLaunch(ScenarioDefinition scenario, ScenarioFolderLaunchResult result)
     {
@@ -165,6 +181,21 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
     private static string DescribeLaunch(ScenarioDefinition scenario, ScenarioLaunchResult result)
     {
+        if (!result.ChannelOutcomes.IsDefaultOrEmpty)
+        {
+            var failedOutcomes = result.ChannelOutcomes
+                .Where(outcome => outcome.Outcome is ChannelLaunchOutcome.AccessDenied
+                    or ChannelLaunchOutcome.NotPresent
+                    or ChannelLaunchOutcome.Failed)
+                .Select(DescribeLaunchOutcome)
+                .ToList();
+
+            if (failedOutcomes.Count > 0)
+            {
+                return $"{scenario.Name} could not open every required channel. {string.Join(" ", failedOutcomes)}";
+            }
+        }
+
         if (result.Opened == 0)
         {
             return $"No channels could be opened for {scenario.Name}.";
@@ -175,12 +206,29 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
             : $"Opened {scenario.Name}.";
     }
 
+    private static string DescribeLaunchOutcome(ChannelOutcome outcome) => outcome.Outcome switch
+    {
+        ChannelLaunchOutcome.AccessDenied =>
+            $"{outcome.Channel}: access denied - needs elevation, or open from a saved .evtx.",
+        ChannelLaunchOutcome.NotPresent =>
+            $"{outcome.Channel}: not present on this computer - open from a saved .evtx.",
+        ChannelLaunchOutcome.Failed =>
+            $"{outcome.Channel}: failed to open - open from a saved .evtx.",
+        _ => $"{outcome.Channel}: {outcome.Outcome}."
+    };
+
     private static string FolderFilesWord(int count) => count == 1 ? "1 file" : $"{count} files";
 
     private static string FolderLogsWord(int count) => count == 1 ? "1 log" : $"{count} logs";
 
     private static string FolderMissingNote(ImmutableArray<string> missing) =>
         missing.IsDefaultOrEmpty ? string.Empty : $" Not found: {string.Join(", ", missing)}.";
+
+    private static bool HasReactiveFolderFallback(ScenarioLaunchResult result) =>
+        !result.ChannelOutcomes.IsDefaultOrEmpty &&
+        result.ChannelOutcomes.Any(outcome => outcome.Outcome is ChannelLaunchOutcome.AccessDenied
+            or ChannelLaunchOutcome.NotPresent
+            or ChannelLaunchOutcome.Failed);
 
     private void ClearFilter() => FilterCommands.ClearAllFilters();
 
@@ -192,46 +240,76 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
                 .OrderBy(scenario => scenario.Priority)
                 .ThenBy(scenario => scenario.Order);
 
+    private IReadOnlyList<ChannelReadiness> GetChannelReadiness(ScenarioDefinition scenario) =>
+    [
+        .. scenario.Channels.Select(channel =>
+            _readinessByChannel.GetValueOrDefault(
+                channel,
+                new ChannelReadiness(channel, ChannelPresence.Unknown, ChannelEnablement.Unknown)))
+    ];
+
     private bool IsFavored(ScenarioDefinition scenario) =>
         ScenarioFavorites.Value.FavoriteScenarioIds.Contains(scenario.Id);
 
-    // A scenario is "live present" when the host exposes one of its channels. When the channel set could not be read
-    // (Unknown), every scenario stays launchable so a probe failure never falsely reports a scenario offline.
     private bool IsLivePresent(ScenarioDefinition scenario) =>
-        !_livePresence.Known || scenario.Channels.Any(_livePresence.Present.Contains);
+        !_livePresence.Known || scenario.Channels.All(_livePresence.Present.Contains);
 
     private bool IsScenarioDisabled(ScenarioDefinition scenario) =>
-        (scenario.RequiresAdmin && !Version.IsAdmin) || !IsLivePresent(scenario);
+        _livePresence.Known &&
+        !scenario.Channels.All(channel => _livePresence.Present.Contains(channel) && AccessAllowsLaunch(channel));
+
+    // Analytic/Debug channels never have their access evaluated (NotEvaluated), so they must not be
+    // treated as blocked; only a genuine RequiresElevation or a read-failure Unknown disables launch.
+    private bool AccessAllowsLaunch(string channel) =>
+        _readinessByChannel.GetValueOrDefault(
+            channel,
+            new ChannelReadiness(channel, ChannelPresence.Unknown, ChannelEnablement.Unknown))
+            .Access is ChannelAccess.Accessible or ChannelAccess.NotEvaluated;
 
     private Task LaunchScenarioAsync(ScenarioDefinition scenario) =>
         RunGuardedAsync(async () =>
         {
             var result = await ScenarioLaunch.LaunchAsync(scenario, null);
-            Announcer.Announce(DescribeLaunch(scenario, result));
+            var message = DescribeLaunch(scenario, result);
+
+            if (HasReactiveFolderFallback(result))
+            {
+                await AlertDialogService.ShowErrorAlert(
+                    "Launch scenario",
+                    message,
+                    "Open from folder",
+                    () => LaunchScenarioFromFolderCoreAsync(scenario));
+            }
+            else
+            {
+                Announcer.Announce(message);
+            }
         });
 
     private Task LaunchScenarioFromFolderAsync(ScenarioDefinition scenario) =>
-        RunGuardedAsync(async () =>
+        RunGuardedAsync(() => LaunchScenarioFromFolderCoreAsync(scenario));
+
+    private async Task LaunchScenarioFromFolderCoreAsync(ScenarioDefinition scenario)
+    {
+        var result = await ScenarioLaunch.LaunchFromFolderAsync(scenario, null, _lifetimeCts.Token);
+
+        if (DescribeFolderLaunch(scenario, result) is not { } message) { return; }
+
+        // A launch that opens logs is self-evident (the workspace changes) and only needs the screen-reader detail;
+        // the outcomes that leave the dashboard unchanged need a visible dialog so a sighted user sees them.
+        switch (result.Outcome)
         {
-            var result = await ScenarioLaunch.LaunchFromFolderAsync(scenario, null, _lifetimeCts.Token);
-
-            if (DescribeFolderLaunch(scenario, result) is not { } message) { return; }
-
-            // A launch that opens logs is self-evident (the workspace changes) and only needs the screen-reader detail;
-            // the outcomes that leave the dashboard unchanged need a visible dialog so a sighted user sees them.
-            switch (result.Outcome)
-            {
-                case ScenarioFolderOutcome.Completed:
-                    Announcer.Announce(message);
-                    break;
-                case ScenarioFolderOutcome.Error:
-                    await AlertDialogService.ShowErrorAlert("Open from folder", message);
-                    break;
-                default:
-                    await AlertDialogService.ShowAlert("Open from folder", message, "OK");
-                    break;
-            }
-        });
+            case ScenarioFolderOutcome.Completed:
+                Announcer.Announce(message);
+                break;
+            case ScenarioFolderOutcome.Error:
+                await AlertDialogService.ShowErrorAlert("Open from folder", message);
+                break;
+            default:
+                await AlertDialogService.ShowAlert("Open from folder", message, "OK");
+                break;
+        }
+    }
 
     private async void OnFavoritesChanged(object? _, ImmutableHashSet<string> __)
     {

@@ -3,10 +3,10 @@
 
 using AngleSharp.Dom;
 using Bunit;
+using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
-using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Menu;
@@ -32,6 +32,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     private readonly IMenuActionService _actions = Substitute.For<IMenuActionService>();
     private readonly IAlertDialogService _alertDialog = Substitute.For<IAlertDialogService>();
     private readonly IAnnouncementService _announcer = Substitute.For<IAnnouncementService>();
+    private readonly IChannelReadinessService _channelReadinessService = Substitute.For<IChannelReadinessService>();
     private readonly IScenarioFavoriteCommands _favoriteCommands = Substitute.For<IScenarioFavoriteCommands>();
     private readonly IState<ScenarioFavoritesState> _favorites = Substitute.For<IState<ScenarioFavoritesState>>();
     private readonly IStateSelection<ScenarioFavoritesState, ImmutableHashSet<string>> _favoritesSelection =
@@ -41,7 +42,6 @@ public sealed class EmptyStateDashboardTests : BunitContext
     private readonly IFilterPaneCommands _filterCommands = Substitute.For<IFilterPaneCommands>();
     private readonly IScenarioLaunchService _scenarioLaunch = Substitute.For<IScenarioLaunchService>();
     private readonly IScenarioQueryService _scenarioQuery = Substitute.For<IScenarioQueryService>();
-    private readonly ICurrentVersionProvider _version = Substitute.For<ICurrentVersionProvider>();
 
     public EmptyStateDashboardTests()
     {
@@ -50,6 +50,14 @@ public sealed class EmptyStateDashboardTests : BunitContext
         _scenarioQuery.GetSplashScenarios().Returns([]);
         _scenarioQuery.GetLivePresence()
             .Returns(new LivePresence(true, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "System" }));
+        _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(
+            [
+                new ChannelReadiness("System", ChannelPresence.Present, ChannelEnablement.Enabled)
+                {
+                    Access = ChannelAccess.Accessible
+                }
+            ]);
         _favorites.Value.Returns(new ScenarioFavoritesState());
         _favoritesSelection.Value.Returns(ImmutableHashSet<string>.Empty);
 
@@ -63,7 +71,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         Services.AddSingleton(_filterCommands);
         Services.AddSingleton(_scenarioLaunch);
         Services.AddSingleton(_scenarioQuery);
-        Services.AddSingleton(_version);
+        Services.AddSingleton(_channelReadinessService);
         Services.AddFluxor(options => options.ScanAssemblies(typeof(EmptyStateDashboard).Assembly));
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
@@ -130,6 +138,69 @@ public sealed class EmptyStateDashboardTests : BunitContext
     }
 
     [Fact]
+    public void DetailLaunch_WhenAccessDenied_ShowsFolderFallbackAction()
+    {
+        _scenarioLaunch.LaunchAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>())
+            .Returns(new ScenarioLaunchResult(1, 0, 1)
+            {
+                ChannelOutcomes = [new ChannelOutcome("System", ChannelLaunchOutcome.AccessDenied)]
+            });
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
+
+        cut.Find(ActiveDetailLaunch).Click();
+
+        cut.WaitForAssertion(() => _alertDialog.Received(1).ShowErrorAlert(
+            "Launch scenario",
+            Arg.Is<string>(message => message != null && message.Contains("access denied")),
+            "Open from folder",
+            Arg.Any<Func<Task>>()));
+    }
+
+    [Fact]
+    public void DetailLaunch_WhenChannelAccessDenied_IsDisabledWithBlockedNote()
+    {
+        _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(
+            [
+                new ChannelReadiness("System", ChannelPresence.Present, ChannelEnablement.Enabled)
+                {
+                    Access = ChannelAccess.RequiresElevation
+                }
+            ]);
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
+
+        Assert.Equal("true", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
+        var blockedNote = cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable");
+        Assert.Contains("blocked", blockedNote.TextContent, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void DetailLaunch_WhenChannelAccessNotEvaluated_StaysLaunchable()
+    {
+        _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(
+            [
+                new ChannelReadiness("System", ChannelPresence.Present, ChannelEnablement.Enabled)
+                {
+                    Access = ChannelAccess.NotEvaluated
+                }
+            ]);
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
+
+        Assert.Equal("false", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
+        Assert.Empty(cut.FindAll(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable"));
+    }
+
+    [Fact]
     public void DetailLaunch_WhenChannelNotOnHost_IsDisabledWithOfflineNote()
     {
         _scenarioQuery.GetLivePresence()
@@ -140,7 +211,8 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
 
         Assert.Equal("true", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
-        Assert.NotEmpty(cut.FindAll(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable"));
+        var offlineNote = cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable");
+        Assert.Contains("not on this computer", offlineNote.TextContent, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -157,6 +229,32 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.WaitForAssertion(() =>
             _announcer.Received(1).Announce(Arg.Is<string>(message => message != null && message.Contains("No channels"))));
+    }
+
+    [Fact]
+    public void DetailLaunch_WhenOneRequiredChannelMissing_IsDisabledWithOfflineNote()
+    {
+        _scenarioQuery.GetLivePresence()
+            .Returns(new LivePresence(true, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "System" }));
+        _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(
+            [
+                new ChannelReadiness("System", ChannelPresence.Present, ChannelEnablement.Enabled)
+                {
+                    Access = ChannelAccess.Accessible
+                }
+            ]);
+        _scenarioQuery.GetSplashScenarios().Returns(
+        [
+            Scenario("application-crashes", "Application crashes") with { Channels = ["System", "Missing"] }
+        ]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
+
+        Assert.Equal("true", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
+        var note = cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable");
+        Assert.Contains("not on this computer", note.TextContent, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -177,6 +275,20 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.WaitForAssertion(() => _scenarioLaunch.Received(1)
             .LaunchAsync(Arg.Is<ScenarioDefinition>(scenario => scenario != null && scenario.Id == "application-crashes"), null));
+    }
+
+    [Fact]
+    public void DetailLaunch_WhenScenarioRequiresAdminButLivePresent_StaysLaunchable()
+    {
+        _scenarioQuery.GetSplashScenarios().Returns(
+        [
+            Scenario("security", "Security", requiresAdmin: true)
+        ]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
+
+        Assert.Equal("false", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
     }
 
     [Fact]
@@ -226,6 +338,40 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.Find(ActiveDetailOpenFolder).Click();
 
         cut.WaitForAssertion(() => _alertDialog.Received(1).ShowAlert("Open from folder", Arg.Any<string>(), "OK"));
+    }
+
+    [Fact]
+    public void DetailReadiness_WhenChannelDisabled_ShowsDisabledStatus()
+    {
+        _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns([new ChannelReadiness("System", ChannelPresence.Present, ChannelEnablement.Disabled)]);
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+
+        cut.WaitForAssertion(() =>
+            Assert.Contains("Disabled", cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__channel-readiness").TextContent));
+    }
+
+    [Fact]
+    public void DetailReadiness_WhenChannelRequiresElevation_ShowsAccessStatus()
+    {
+        _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(
+            [
+                new ChannelReadiness("System", ChannelPresence.Present, ChannelEnablement.Enabled)
+                {
+                    Access = ChannelAccess.RequiresElevation
+                }
+            ]);
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+
+        cut.WaitForAssertion(() =>
+            Assert.Contains(
+                "Access denied (Needs elevation)",
+                cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__channel-readiness").TextContent));
     }
 
     [Fact]
@@ -295,7 +441,8 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.WaitForAssertion(() => _actions.Received(1).OpenLiveLogsAsync(
             Arg.Is<IEnumerable<string>>(channels => channels != null && channels.SequenceEqual(new[] { "Application", "System" })),
-            false));
+            false,
+            showInlineAlerts: true));
     }
 
     [Fact]
@@ -335,28 +482,45 @@ public sealed class EmptyStateDashboardTests : BunitContext
     }
 
     [Fact]
-    public void Security_WhenAdmin_InvokesOpen()
+    public void Security_WhenAccessDenied_IsAriaDisabledWithReason()
     {
-        _version.IsAdmin.Returns(true);
+        _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(
+            [
+                new ChannelReadiness("Security", ChannelPresence.Present, ChannelEnablement.Enabled)
+                {
+                    Access = ChannelAccess.RequiresElevation
+                }
+            ]);
+
+        var cut = Render<EmptyStateDashboard>();
+
+        cut.WaitForAssertion(() =>
+        {
+            var security = FindLaunch(cut, "Open Security (live)");
+            Assert.Equal("true", security.GetAttribute("aria-disabled"));
+            var reasonId = security.GetAttribute("aria-describedby");
+            Assert.False(string.IsNullOrEmpty(reasonId));
+            Assert.Contains("Access denied", cut.Find($"#{reasonId}").TextContent, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    [Fact]
+    public void Security_WhenAccessible_InvokesOpen()
+    {
+        _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(
+            [
+                new ChannelReadiness("Security", ChannelPresence.Present, ChannelEnablement.Enabled)
+                {
+                    Access = ChannelAccess.Accessible
+                }
+            ]);
 
         var cut = Render<EmptyStateDashboard>();
         FindLaunch(cut, "Open Security (live)").Click();
 
         cut.WaitForAssertion(() => _actions.Received(1).OpenLiveLogAsync("Security", false));
-    }
-
-    [Fact]
-    public void Security_WhenNotAdmin_IsAriaDisabledWithReason()
-    {
-        _version.IsAdmin.Returns(false);
-
-        var cut = Render<EmptyStateDashboard>();
-        var security = FindLaunch(cut, "Open Security (live)");
-        var reasonId = security.GetAttribute("aria-describedby");
-
-        Assert.Equal("true", security.GetAttribute("aria-disabled"));
-        Assert.False(string.IsNullOrEmpty(reasonId));
-        Assert.Contains("administrator", cut.Find($"#{reasonId}").TextContent, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

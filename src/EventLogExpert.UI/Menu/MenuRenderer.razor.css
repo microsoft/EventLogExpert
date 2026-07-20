@@ -59,6 +59,13 @@
     font-size: 0.9em;
 }
 
+.menu-status {
+    flex: 0 0 auto;
+    margin-left: 6px;
+    color: var(--clr-yellow);
+    font-size: 0.85em;
+}
+
 .menu-arrow {
     flex: 0 0 auto;
     margin-left: 12px;

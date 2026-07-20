@@ -64,7 +64,7 @@ public sealed class MenuRendererTests : BunitContext
     [Fact]
     public void MenuRenderer_WithDisabledItemAndReason_AnnouncesReasonAndParticipatesInRovingFocus()
     {
-        const string reason = "No cached filters yet — apply a Basic or Advanced filter to populate.";
+        const string reason = "No cached filters yet - apply a Basic or Advanced filter to populate.";
         var items = new[]
         {
             MenuItem.Item("Cached", () => { }, isEnabled: false, disabledReason: reason),
@@ -107,6 +107,24 @@ public sealed class MenuRendererTests : BunitContext
         Assert.Null(listItem.GetAttribute("title"));
         Assert.Equal("0", listItem.GetAttribute("tabindex"));
         Assert.Empty(listItem.QuerySelectorAll("span.visually-hidden"));
+    }
+
+    [Fact]
+    public async Task MenuRenderer_WithEnabledStatus_RendersVisibleTagAndAllowsActivation()
+    {
+        bool actionInvoked = false;
+        var items = new[]
+        {
+            MenuItem.Item("Operational", () => actionInvoked = true, statusText: "(disabled)"),
+        };
+
+        var component = Render<MenuRenderer>(parameters => parameters.Add(p => p.Items, items));
+
+        await component.Find("li.menu-item").ClickAsync(new());
+
+        Assert.True(actionInvoked);
+        Assert.Equal("(disabled)", component.Find(".menu-status").TextContent);
+        Assert.Null(component.Find("li.menu-item").GetAttribute("aria-disabled"));
     }
 
     [Fact]

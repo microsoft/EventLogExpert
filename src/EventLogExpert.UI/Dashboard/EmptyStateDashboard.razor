@@ -48,7 +48,7 @@
                 OnClick="OpenSystemAsync">
                 <span>System (live)</span>
             </ChromelessButton>
-            @if (Version.IsAdmin)
+            @if (!SecurityRequiresElevation)
             {
                 <ChromelessButton aria-label="Open Security (live)"
                     CssClass="empty-dashboard__launch"
@@ -92,7 +92,8 @@
             <SidebarTabs @bind-ActiveTab="_activeCategory" @ref="_sidebarTabs" TablistAriaLabel="Scenario categories" Tabs="_tabs" TTab="SplashCategory">
                 <TabContent Context="category">
                     <ScenarioBrowserPanel IsBusy="_isBusy"
-                        IsFavored="IsFavored"
+                    GetChannelReadiness="GetChannelReadiness"
+                    IsFavored="IsFavored"
                         IsLivePresent="IsLivePresent"
                         IsScenarioDisabled="IsScenarioDisabled"
                         OnLaunch="LaunchScenarioAsync"
@@ -106,5 +107,5 @@
         }
     </div>
 
-    <span class="empty-dashboard__sr-only" id="@ElevationReasonId">Requires running as administrator.</span>
+    <span class="empty-dashboard__sr-only" id="@ElevationReasonId">Access denied (Needs elevation)</span>
 </section>

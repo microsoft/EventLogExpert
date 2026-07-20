@@ -1,3 +1,5 @@
+@using EventLogExpert.Eventing.Readers
+@using EventLogExpert.Runtime.Scenarios
 @using EventLogExpert.Scenarios.Catalog
 <div aria-labelledby="@_nameId" class="scenario-detail" role="region">
     <p class="scenario-detail__eyebrow">
@@ -9,21 +11,26 @@
     <div class="scenario-detail__facts">
         <div class="scenario-detail__fact">
             <span class="scenario-detail__fact-label">Logs</span>
-            <span class="scenario-detail__fact-value">@string.Join(", ", Scenario.Channels)</span>
+            @foreach (var readiness in DisplayReadiness)
+            {
+                <span class="scenario-detail__channel-readiness">
+                    <span class="scenario-detail__fact-value">@readiness.Channel</span>
+                    <span class="scenario-detail__status">@PresenceLabel(readiness.Presence)</span>
+                    @if (readiness.Enablement != ChannelEnablement.Enabled)
+                    {
+                        <span class="scenario-detail__status">@EnablementLabel(readiness.Enablement)</span>
+                    }
+                    @if (readiness.Access == ChannelAccess.RequiresElevation)
+                    {
+                        <span class="scenario-detail__status">Access denied (Needs elevation)</span>
+                    }
+                </span>
+            }
             @if (!Scenario.OptionalChannels.IsDefaultOrEmpty)
             {
                 <span class="scenario-detail__fact-muted">Also if present: @string.Join(", ", Scenario.OptionalChannels)</span>
             }
         </div>
-        @if (Scenario.RequiresAdmin)
-        {
-            <div class="scenario-detail__fact">
-                <span class="scenario-detail__admin-badge" id="@_adminBadgeId">
-                    <i aria-hidden="true" class="bi bi-shield-lock"></i>
-                    <span>Live launch requires administrator.</span>
-                </span>
-            </div>
-        }
         @if (FilterLines.Count > 0)
         {
             <div class="scenario-detail__fact">
@@ -47,13 +54,19 @@
             This log is not on this computer. Use Open from folder to analyze an exported copy.
         </p>
     }
+    else if (IsDisabled)
+    {
+        <p class="scenario-detail__unavailable" id="@_offlineId">
+            Live access to this log is blocked. Use Open from folder to analyze an exported copy.
+        </p>
+    }
     <div class="scenario-detail__actions">
         <ChromelessButton aria-label="@(IsFavored ? $"Remove {Scenario.Name} from favorites" : $"Add {Scenario.Name} to favorites")"
             aria-pressed="@(IsFavored ? "true" : "false")"
             CssClass="scenario-detail__star"
             IconClass="@(IsFavored ? "bi bi-star-fill" : "bi bi-star")"
             OnClick="OnToggleFavorite" />
-        <ChromelessButton aria-describedby="@((IsDisabled && !IsLivePresent) ? _offlineId : (IsDisabled ? _adminBadgeId : null))"
+        <ChromelessButton aria-describedby="@(IsDisabled ? _offlineId : null)"
             aria-disabled="@(IsDisabled ? "true" : "false")"
             CssClass="scenario-detail__launch"
             Disabled="@IsBusy"

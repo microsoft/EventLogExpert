@@ -27,6 +27,7 @@
             @if (Selected is not null)
             {
                 <ScenarioDetail IsBusy="IsBusy"
+                    ChannelReadiness="GetChannelReadiness(Selected)"
                     IsDisabled="IsScenarioDisabled(Selected)"
                     IsFavored="IsFavored(Selected)"
                     IsLivePresent="IsLivePresent(Selected)"
