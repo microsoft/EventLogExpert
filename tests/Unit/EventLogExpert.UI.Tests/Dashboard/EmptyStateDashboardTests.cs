@@ -182,7 +182,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailOpenFromFolder_WhenCompleted_AnnouncesWithoutAlert()
     {
-        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>())
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>())
             .Returns(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.Completed, Opened = 1, Matched = 1 });
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
@@ -201,7 +201,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailOpenFromFolder_WhenError_ShowsErrorAlert()
     {
-        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>())
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>())
             .Returns(ScenarioFolderLaunchResult.Error("access denied"));
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
@@ -216,7 +216,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailOpenFromFolder_WhenNoMatchingLogs_ShowsVisibleAlert()
     {
-        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>())
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>())
             .Returns(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.NoMatchingLogs });
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 

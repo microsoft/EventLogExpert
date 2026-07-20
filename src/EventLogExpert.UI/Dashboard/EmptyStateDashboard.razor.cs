@@ -37,6 +37,7 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
         "group-policy-processing-errors"
     ];
 
+    private readonly CancellationTokenSource _lifetimeCts = new();
     private readonly Dictionary<SplashCategory, ScenarioDefinition?> _selectedByCategory = new();
 
     private SplashCategory _activeCategory;
@@ -100,6 +101,8 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
         if (disposing)
         {
             Favorites.SelectedValueChanged -= OnFavoritesChanged;
+            await _lifetimeCts.CancelAsync();
+            _lifetimeCts.Dispose();
         }
 
         await base.DisposeAsyncCore(disposing);
@@ -210,7 +213,7 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
     private Task LaunchScenarioFromFolderAsync(ScenarioDefinition scenario) =>
         RunGuardedAsync(async () =>
         {
-            var result = await ScenarioLaunch.LaunchFromFolderAsync(scenario, null);
+            var result = await ScenarioLaunch.LaunchFromFolderAsync(scenario, null, _lifetimeCts.Token);
 
             if (DescribeFolderLaunch(scenario, result) is not { } message) { return; }
 

@@ -62,7 +62,10 @@ internal sealed class ScenarioLaunchService(
         return new ScenarioLaunchResult(result.Opened, result.Empty, result.Failed);
     }
 
-    public async Task<ScenarioFolderLaunchResult> LaunchFromFolderAsync(ScenarioDefinition scenario, DateFilter? dateWindow)
+    public async Task<ScenarioFolderLaunchResult> LaunchFromFolderAsync(
+        ScenarioDefinition scenario,
+        DateFilter? dateWindow,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(scenario);
 
@@ -79,23 +82,50 @@ internal sealed class ScenarioLaunchService(
 
         if (folder is null) { return ScenarioFolderLaunchResult.Cancelled; }
 
-        switch (_folderEnumerator.EnumerateTopLevel(folder))
+        FolderMatch match;
+
+        try
         {
-            case EvtxFolderScanResult.AccessDenied denied:
-                return ScenarioFolderLaunchResult.Error(denied.Message);
-            case EvtxFolderScanResult.IoError ioError:
-                return ScenarioFolderLaunchResult.Error(ioError.Message);
-            case EvtxFolderScanResult.Empty:
-                return new ScenarioFolderLaunchResult
-                {
-                    Outcome = ScenarioFolderOutcome.NoMatchingLogs,
-                    MissingChannels = AllTargetChannels(scenario)
-                };
-            case EvtxFolderScanResult.Files files:
-                return await OpenMatchedLogsAsync(scenario, dateWindow, await ScanAndMatchAsync(files.Paths, scenario));
-            default:
-                return ScenarioFolderLaunchResult.Error("The folder could not be read.");
+            var scan = await Task.Run(
+                () => _folderEnumerator.EnumerateTopLevel(folder, cancellationToken), cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            switch (scan)
+            {
+                case EvtxFolderScanResult.AccessDenied denied:
+                    return ScenarioFolderLaunchResult.Error(denied.Message);
+                case EvtxFolderScanResult.IoError ioError:
+                    return ScenarioFolderLaunchResult.Error(ioError.Message);
+                case EvtxFolderScanResult.Empty:
+                    return new ScenarioFolderLaunchResult
+                    {
+                        Outcome = ScenarioFolderOutcome.NoMatchingLogs,
+                        MissingChannels = AllTargetChannels(scenario)
+                    };
+                case EvtxFolderScanResult.Files files:
+                    match = await ScanAndMatchAsync(files.Paths, scenario, cancellationToken);
+
+                    // The parallel probe can finish before it observes a late cancellation; re-check here so a scan
+                    // cancelled while probing does not fall through to opening logs or dispatching filters.
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    break;
+                default:
+                    return ScenarioFolderLaunchResult.Error("The folder could not be read.");
+            }
         }
+        catch (OperationCanceledException)
+        {
+            return ScenarioFolderLaunchResult.Cancelled;
+        }
+
+        // A late cancellation (for example, dashboard disposal) can land in the synchronous gap between the in-try
+        // recheck and the commit. Gate it here WITHOUT throwing so a cancelled scan never dispatches filters or opens
+        // logs, while a genuine fault surfacing from the open still propagates (the commit stays outside the catch).
+        if (cancellationToken.IsCancellationRequested) { return ScenarioFolderLaunchResult.Cancelled; }
+
+        return await OpenMatchedLogsAsync(scenario, dateWindow, match);
     }
 
     private static ImmutableArray<string> AllTargetChannels(ScenarioDefinition scenario) =>
@@ -185,19 +215,27 @@ internal sealed class ScenarioLaunchService(
         };
     }
 
-    private async Task<FolderMatch> ScanAndMatchAsync(ImmutableArray<string> files, ScenarioDefinition scenario)
+    private async Task<FolderMatch> ScanAndMatchAsync(
+        ImmutableArray<string> files,
+        ScenarioDefinition scenario,
+        CancellationToken cancellationToken)
     {
         var probed = new ConcurrentBag<(string Path, EvtxChannelReadResult Result)>();
 
         await Parallel.ForEachAsync(
             files,
-            new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
-            (file, _) =>
+            new ParallelOptions
             {
+                MaxDegreeOfParallelism = Environment.ProcessorCount,
+                CancellationToken = cancellationToken
+            },
+            (file, token) =>
+            {
+                token.ThrowIfCancellationRequested();
                 probed.Add((file, _channelReader.ReadChannel(file)));
 
                 return ValueTask.CompletedTask;
-            });
+            }).ConfigureAwait(false);
 
         var targets = TargetChannelSet(scenario);
         var matched = new List<(string Path, string Channel)>();

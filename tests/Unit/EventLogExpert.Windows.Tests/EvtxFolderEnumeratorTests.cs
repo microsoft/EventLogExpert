@@ -10,12 +10,7 @@ namespace EventLogExpert.Windows.Tests;
 
 public sealed class EvtxFolderEnumeratorTests : IDisposable
 {
-    private readonly string _tempRoot;
-
-    public EvtxFolderEnumeratorTests()
-    {
-        _tempRoot = EvtxFolderFixtures.CreateTempTestFolder();
-    }
+    private readonly string _tempRoot = EvtxFolderFixtures.CreateTempTestFolder();
 
     public void Dispose()
     {
@@ -30,7 +25,7 @@ public sealed class EvtxFolderEnumeratorTests : IDisposable
         EvtxFolderFixtures.WriteEmptyFile(sub, "nested.evtx");
         EvtxFolderFixtures.WriteEmptyFile(_tempRoot, "top.evtx");
 
-        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(_tempRoot);
+        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(_tempRoot, TestContext.Current.CancellationToken);
 
         var success = Assert.IsType<EvtxEnumerationResult.Success>(result);
         Assert.Single(success.Files);
@@ -40,7 +35,7 @@ public sealed class EvtxFolderEnumeratorTests : IDisposable
     [Fact]
     public void EnumerateTopLevel_OnEmptyFolder_ReturnsEmptyVariant()
     {
-        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(_tempRoot);
+        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(_tempRoot, TestContext.Current.CancellationToken);
 
         Assert.IsType<EvtxEnumerationResult.Empty>(result);
     }
@@ -53,7 +48,7 @@ public sealed class EvtxFolderEnumeratorTests : IDisposable
         EvtxFolderFixtures.WriteEmptyFile(_tempRoot, "ignored.txt");
         EvtxFolderFixtures.WriteEmptyFile(_tempRoot, "ignored.log");
 
-        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(_tempRoot);
+        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(_tempRoot, TestContext.Current.CancellationToken);
 
         var success = Assert.IsType<EvtxEnumerationResult.Success>(result);
         Assert.Equal(2, success.Files.Count);
@@ -75,7 +70,7 @@ public sealed class EvtxFolderEnumeratorTests : IDisposable
         Directory.CreateDirectory(longPathPrefixed);
         EvtxFolderFixtures.WriteEmptyFile(longPathPrefixed, "longpath.evtx");
 
-        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(longPathPrefixed);
+        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(longPathPrefixed, TestContext.Current.CancellationToken);
 
         var success = Assert.IsType<EvtxEnumerationResult.Success>(result);
         Assert.Single(success.Files);
@@ -87,7 +82,7 @@ public sealed class EvtxFolderEnumeratorTests : IDisposable
     {
         var nonexistent = Path.Combine(_tempRoot, "does-not-exist");
 
-        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(nonexistent);
+        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(nonexistent, TestContext.Current.CancellationToken);
 
         Assert.IsType<EvtxEnumerationResult.IoError>(result);
     }
@@ -95,14 +90,25 @@ public sealed class EvtxFolderEnumeratorTests : IDisposable
     [Fact]
     public void EnumerateTopLevel_RejectsNullOrWhitespace()
     {
-        Assert.Throws<ArgumentException>(() => EvtxFolderEnumerator.EnumerateEvtxTopLevel(""));
-        Assert.Throws<ArgumentException>(() => EvtxFolderEnumerator.EnumerateEvtxTopLevel("   "));
+        Assert.Throws<ArgumentException>(() => EvtxFolderEnumerator.EnumerateEvtxTopLevel("", TestContext.Current.CancellationToken));
+        Assert.Throws<ArgumentException>(() => EvtxFolderEnumerator.EnumerateEvtxTopLevel("   ", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public void EnumerateTopLevel_WithCancelledToken_ThrowsOperationCanceled()
+    {
+        EvtxFolderFixtures.WriteEmptyFile(_tempRoot, "a.evtx");
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(
+            () => EvtxFolderEnumerator.EnumerateEvtxTopLevel(_tempRoot, cts.Token));
     }
 
     [Fact]
     public void ToAlertCopy_OnEmpty_ReturnsNull()
     {
-        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(_tempRoot);
+        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(_tempRoot, TestContext.Current.CancellationToken);
 
         Assert.Null(EvtxFolderEnumerator.ToAlertCopy(result));
     }
@@ -111,7 +117,7 @@ public sealed class EvtxFolderEnumeratorTests : IDisposable
     public void ToAlertCopy_OnSuccess_ReturnsNull()
     {
         EvtxFolderFixtures.WriteEmptyFile(_tempRoot, "a.evtx");
-        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(_tempRoot);
+        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(_tempRoot, TestContext.Current.CancellationToken);
 
         Assert.Null(EvtxFolderEnumerator.ToAlertCopy(result));
     }
