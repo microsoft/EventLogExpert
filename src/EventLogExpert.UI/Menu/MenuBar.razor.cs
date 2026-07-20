@@ -351,11 +351,13 @@ public sealed partial class MenuBar
             .ToList();
 
         var readiness = await ChannelReadinessService.GetReadinessAsync(logNames);
-        _readinessByChannel = readiness
-            .Concat(snapshot)
-            .GroupBy(channel => channel.Channel, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
-            .ToDictionary(channel => channel.Channel, StringComparer.OrdinalIgnoreCase);
+
+        var readinessByChannel = new Dictionary<string, ChannelReadiness>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var channel in snapshot) { readinessByChannel[channel.Channel] = channel; }
+        foreach (var channel in readiness) { readinessByChannel[channel.Channel] = channel; }
+
+        _readinessByChannel = readinessByChannel;
 
         return readiness
             .OrderBy(channel => channel.Channel, StringComparer.OrdinalIgnoreCase)
