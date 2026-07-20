@@ -109,10 +109,17 @@ public sealed class HistogramPaneTests : BunitContext
         _highlightSelector.ComputePredicatePlanKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(7);
         var cut = Render<HistogramPane>();
         await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
+
+        // The resize starts a background scan that reads ActiveView.Value twice: once synchronously at StartScan (before
+        // this await returns) and once in its post-scan continuation (the "did the view change mid-scan?" check). Wait for
+        // that second read so the continuation's read is not miscounted against the colour-only change under test (it
+        // otherwise races ClearReceivedCalls under load). The markup never reads ActiveView.Value, so the count is exact.
+        cut.WaitForAssertion(() => _ = _activeView.Received(2).Value);
         _activeView.ClearReceivedCalls();
 
         _filters.SelectedValueChanged +=
             Raise.Event<EventHandler<ImmutableList<SavedFilter>>>(_filters, ImmutableList.Create(blue));
+        await cut.InvokeAsync(() => { });
 
         _ = _activeView.DidNotReceive().Value;
     }

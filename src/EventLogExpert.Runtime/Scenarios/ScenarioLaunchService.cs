@@ -142,7 +142,6 @@ internal sealed class ScenarioLaunchService(
 
     private static string FilesWord(int count) => count == 1 ? "1 file" : $"{count} files";
 
-#pragma warning disable CS8524
     private static HistogramDimension MapTimelineDimension(ScenarioTimelineDimension dimension) => dimension switch
     {
         ScenarioTimelineDimension.Severity => HistogramDimension.Severity,
@@ -155,9 +154,9 @@ internal sealed class ScenarioLaunchService(
         ScenarioTimelineDimension.TicketEncryptionType => HistogramDimension.TicketEncryptionType,
         ScenarioTimelineDimension.ErrorCode => HistogramDimension.ErrorCode,
         ScenarioTimelineDimension.ProcessImage => HistogramDimension.ProcessImage,
-        ScenarioTimelineDimension.ParentProcessImage => HistogramDimension.ParentProcessImage
+        ScenarioTimelineDimension.ParentProcessImage => HistogramDimension.ParentProcessImage,
+        _ => throw new ArgumentOutOfRangeException(nameof(dimension), dimension, null)
     };
-#pragma warning restore CS8524
 
     private static ImmutableArray<string> MissingChannels(ScenarioDefinition scenario, ImmutableArray<string> matchedChannels)
     {

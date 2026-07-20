@@ -250,6 +250,59 @@ public sealed class HighlightSelectorTests
     }
 
     [Fact]
+    public void ComputePredicatePlanKey_WhenEligibleFiltersReordered_ReturnsDifferentKey()
+    {
+        // Arrange
+        var eligibleFirst = FilterBuilder.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+
+        var eligibleSecond = FilterBuilder.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals200,
+            HighlightColor.Blue,
+            true);
+
+        // Act + Assert - winner resolution is order-sensitive, so swapping the relative order of two
+        // eligible predicates must change the plan key even though the eligible set is identical.
+        Assert.NotEqual(
+            s_selector.ComputePredicatePlanKey(ImmutableList.Create(eligibleFirst, eligibleSecond)),
+            s_selector.ComputePredicatePlanKey(ImmutableList.Create(eligibleSecond, eligibleFirst)));
+    }
+
+    [Fact]
+    public void ComputePredicatePlanKey_WhenIneligibleFiltersShiftEligiblePositions_ReturnsSameKey()
+    {
+        // Arrange
+        var eligibleFirst = FilterBuilder.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+
+        var eligibleSecond = FilterBuilder.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals200,
+            HighlightColor.Blue,
+            true);
+
+        var disabled = FilterBuilder.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals999,
+            HighlightColor.Green);
+
+        int baselineKey = s_selector.ComputePredicatePlanKey(
+            ImmutableList.Create(eligibleFirst, eligibleSecond));
+
+        // Act + Assert - inserting an ineligible (disabled) filter before or between the eligible
+        // filters shifts their absolute indexes but not their relative order, so the plan key must not change.
+        Assert.Equal(
+            baselineKey,
+            s_selector.ComputePredicatePlanKey(ImmutableList.Create(disabled, eligibleFirst, eligibleSecond)));
+
+        Assert.Equal(
+            baselineKey,
+            s_selector.ComputePredicatePlanKey(ImmutableList.Create(eligibleFirst, disabled, eligibleSecond)));
+    }
+
+    [Fact]
     public void ComputePredicatePlanKey_WhenOnlyColorChanges_ReturnsSameKey()
     {
         var red = FilterBuilder.CreateTestFilter(
