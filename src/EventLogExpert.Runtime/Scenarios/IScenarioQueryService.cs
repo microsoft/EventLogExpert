@@ -12,7 +12,7 @@ public interface IScenarioQueryService
     IReadOnlyList<ScenarioDefinition> GetInAppScenarios(IReadOnlyCollection<string> loadedLogNames);
 
     /// <summary>A snapshot of which channels exist on this host, for gating live launches.</summary>
-    LivePresence GetLivePresence();
+    Task<LivePresence> GetLivePresenceAsync();
 
     /// <summary>Every channel-presence scenario in the catalog, regardless of local availability.</summary>
     IReadOnlyList<ScenarioDefinition> GetSplashScenarios();

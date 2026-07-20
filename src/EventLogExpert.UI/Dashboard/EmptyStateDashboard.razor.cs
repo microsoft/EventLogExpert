@@ -139,8 +139,8 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
     protected override async Task OnInitializedAsync()
     {
-        (_splashScenarios, _livePresence) = await Task.Run(
-            () => (ScenarioQuery.GetSplashScenarios(), ScenarioQuery.GetLivePresence()));
+        _splashScenarios = await Task.Run(ScenarioQuery.GetSplashScenarios);
+        _livePresence = await ScenarioQuery.GetLivePresenceAsync();
 
         var readiness = await ChannelReadinessService.GetReadinessAsync(CatalogChannels(_splashScenarios));
         _readinessByChannel = readiness.ToDictionary(channel => channel.Channel, StringComparer.OrdinalIgnoreCase);

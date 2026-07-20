@@ -18,12 +18,6 @@ public interface IMenuActionService
 
     Task ExportEventsAsync(ExportFormat format);
 
-    /// <summary>
-    ///     Returns the names of every event log channel known to the host. Cached on first call; subsequent calls return
-    ///     immediately.
-    /// </summary>
-    Task<IReadOnlyList<string>> GetOtherLogNamesAsync();
-
     void LoadNewEvents();
 
     Task<bool> OpenDatabaseToolsAsync();

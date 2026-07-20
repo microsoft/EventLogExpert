@@ -55,7 +55,6 @@ public sealed class MauiMenuActionService(
     ICurrentVersionProvider currentVersionProvider,
     ITraceLogger traceLogger,
     IFolderPickerService folderPickerService,
-    IChannelReadinessService channelReadinessService,
     IState<EventLogState> eventLogState,
     IState<LogTableState> logTableState,
     ILogTableColumnDefaultsProvider columnDefaults,
@@ -63,7 +62,6 @@ public sealed class MauiMenuActionService(
     IExportProgressBannerService exportProgressBannerService,
     IFileSaveService fileSaveService) : IMenuActionService, IDisposable
 {
-    private readonly IChannelReadinessService _channelReadinessService = channelReadinessService;
     private readonly IClipboardService _clipboardService = clipboardService;
     private readonly ILogTableColumnDefaultsProvider _columnDefaults = columnDefaults;
     private readonly ICurrentVersionProvider _currentVersionProvider = currentVersionProvider;
@@ -261,18 +259,6 @@ public sealed class MauiMenuActionService(
                 "Ok",
                 AlertPresentation.Banner);
         }
-    }
-
-    public async Task<IReadOnlyList<string>> GetOtherLogNamesAsync()
-    {
-        var readiness = await _channelReadinessService.GetReadinessAsync();
-
-        return
-        [
-            .. readiness
-                .Select(channel => channel.Channel)
-                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-        ];
     }
 
     public void LoadNewEvents() => _eventLogCommands.LoadNewEvents();
@@ -534,8 +520,8 @@ public sealed class MauiMenuActionService(
             if (showInlineAlerts)
             {
                 await _dialogService.ShowAlert(
-                    "Access denied",
-                    "Access denied - needs elevation.",
+                    "Log requires elevation",
+                    "Please relaunch with \"Run as Administrator\" to open this log",
                     "Ok");
             }
 

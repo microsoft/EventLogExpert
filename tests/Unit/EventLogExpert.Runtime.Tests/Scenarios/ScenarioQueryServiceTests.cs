@@ -43,26 +43,26 @@ public sealed class ScenarioQueryServiceTests
     }
 
     [Fact]
-    public void GetLivePresence_WhenChannelsReadable_IsKnownWithChannels()
+    public async Task GetLivePresenceAsync_WhenChannelsReadable_IsKnownWithChannels()
     {
         var service = new ScenarioQueryService(
             ScenarioTestData.Registry(ScenarioTestData.Single("system", "System", 1000)),
             ReadinessService([new ChannelReadiness("System", ChannelPresence.Present, ChannelEnablement.Enabled)]));
 
-        var presence = service.GetLivePresence();
+        var presence = await service.GetLivePresenceAsync();
 
         Assert.True(presence.Known);
         Assert.Contains("System", presence.Present);
     }
 
     [Fact]
-    public void GetLivePresence_WhenChannelsUnreadable_IsUnknown()
+    public async Task GetLivePresenceAsync_WhenChannelsUnreadable_IsUnknown()
     {
         var service = new ScenarioQueryService(
             ScenarioTestData.Registry(ScenarioTestData.Single("system", "System", 1000)),
             ReadinessService([new ChannelReadiness("System", ChannelPresence.Unknown, ChannelEnablement.Unknown)]));
 
-        var presence = service.GetLivePresence();
+        var presence = await service.GetLivePresenceAsync();
 
         Assert.False(presence.Known);
         Assert.Empty(presence.Present);
