@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.Common.Files;
+using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Histogram;
@@ -226,7 +227,7 @@ internal sealed class ScenarioLaunchService(
             files,
             new ParallelOptions
             {
-                MaxDegreeOfParallelism = Environment.ProcessorCount,
+                MaxDegreeOfParallelism = ConcurrencyLimits.MaxBackgroundIoParallelism,
                 CancellationToken = cancellationToken
             },
             (file, token) =>
