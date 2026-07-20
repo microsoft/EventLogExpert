@@ -44,7 +44,7 @@ internal sealed class OpenLogEffects(
     // EvtNext batch: benchmarked Win11 throughput sweet spot; 512 regresses.
     private const int ReadBatchSize = 256;
 
-    private static readonly int s_maxGlobalConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
+    private static readonly int s_maxGlobalConcurrency = ConcurrencyLimits.MaxBackgroundIoParallelism;
     private static readonly PrioritySemaphore s_resolutionGate = new(s_maxGlobalConcurrency);
 
     private readonly LogCloseCoordinator _closeCoordinator = closeCoordinator;
