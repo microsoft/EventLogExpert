@@ -133,6 +133,16 @@ internal enum EvtChannelConfigPropertyId
     EvtChannelConfigIsolation = 1,
     EvtChannelConfigType = 2,
     EvtChannelConfigOwningPublisher = 3,
+    EvtChannelConfigClassicEventlog = 4,
+    EvtChannelConfigAccess = 5,
+}
+
+public enum EvtChannelType
+{
+    Admin = 0,
+    Operational = 1,
+    Analytic = 2,
+    Debug = 3,
 }
 
 internal enum EvtVariantType

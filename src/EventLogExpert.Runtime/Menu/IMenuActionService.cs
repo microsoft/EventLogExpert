@@ -38,9 +38,15 @@ public interface IMenuActionService
 
     Task OpenLiveLogAsync(string logName, bool combineLog);
 
-    Task<OpenLogsBatchResult> OpenLiveLogsAsync(IEnumerable<string> logNames, bool combineLog);
+    Task<OpenLogsBatchResult> OpenLiveLogsAsync(
+        IEnumerable<string> logNames,
+        bool combineLog,
+        bool showInlineAlerts = true);
 
-    Task<OpenLogsBatchResult> OpenLogFilesAsync(IEnumerable<string> filePaths, bool combineLog);
+    Task<OpenLogsBatchResult> OpenLogFilesAsync(
+        IEnumerable<string> filePaths,
+        bool combineLog,
+        bool showInlineAlerts = true);
 
     Task<bool> OpenSettingsAsync();
 

@@ -17,6 +17,7 @@ using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.UI.DatabaseTools;
@@ -54,6 +55,7 @@ public sealed class MauiMenuActionService(
     ICurrentVersionProvider currentVersionProvider,
     ITraceLogger traceLogger,
     IFolderPickerService folderPickerService,
+    IChannelReadinessService channelReadinessService,
     IState<EventLogState> eventLogState,
     IState<LogTableState> logTableState,
     ILogTableColumnDefaultsProvider columnDefaults,
@@ -61,6 +63,7 @@ public sealed class MauiMenuActionService(
     IExportProgressBannerService exportProgressBannerService,
     IFileSaveService fileSaveService) : IMenuActionService, IDisposable
 {
+    private readonly IChannelReadinessService _channelReadinessService = channelReadinessService;
     private readonly IClipboardService _clipboardService = clipboardService;
     private readonly ILogTableColumnDefaultsProvider _columnDefaults = columnDefaults;
     private readonly ICurrentVersionProvider _currentVersionProvider = currentVersionProvider;
@@ -75,7 +78,6 @@ public sealed class MauiMenuActionService(
     private readonly IFilterPaneCommands _filterPaneCommands = filterPaneCommands;
     private readonly IFolderPickerService _folderPickerService = folderPickerService;
     private readonly IHistogramCommands _histogramCommands = histogramCommands;
-    private readonly SemaphoreSlim _logNamesLock = new(1, 1);
     private readonly ILogTableCommands _logTableCommands = logTableCommands;
     private readonly IState<LogTableState> _logTableState = logTableState;
     private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
@@ -83,7 +85,6 @@ public sealed class MauiMenuActionService(
     private readonly ITraceLogger _traceLogger = traceLogger;
     private readonly IUpdateService _updateService = updateService;
 
-    private IReadOnlyList<string>? _cachedLogNames;
     private CancellationTokenSource _cancellationTokenSource = new();
     private bool _disposed;
     private int _exportInFlight;
@@ -125,7 +126,6 @@ public sealed class MauiMenuActionService(
             // Already disposed - continue tearing down remaining resources.
         }
 
-        _logNamesLock.Dispose();
         _cancellationTokenSource.Dispose();
     }
 
@@ -199,7 +199,7 @@ public sealed class MauiMenuActionService(
                     // starting; dismissing the picker never reaches here, so it stays silent. The finished
                     // flag turns a late Cancel click into a clean no-op.
                     _exportProgress.Begin(
-                        "Exporting events…", () => { if (!Volatile.Read(ref finished)) { cancellation.Cancel(); } });
+                        "Exporting events...", () => { if (!Volatile.Read(ref finished)) { cancellation.Cancel(); } });
 
                     await _eventTableExporter.ExportAsync(
                         stream, format, events, columns, timeZone, includeDescription: true, token);
@@ -265,26 +265,14 @@ public sealed class MauiMenuActionService(
 
     public async Task<IReadOnlyList<string>> GetOtherLogNamesAsync()
     {
-        if (_cachedLogNames is not null) { return _cachedLogNames; }
+        var readiness = await _channelReadinessService.GetReadinessAsync();
 
-        await _logNamesLock.WaitAsync();
-
-        try
-        {
-            if (_cachedLogNames is not null) { return _cachedLogNames; }
-
-            _cachedLogNames = await Task.Run<IReadOnlyList<string>>(() =>
-                EventLogSession.GlobalSession.GetLogNames()
-                    .Where(name => !LogChannelMethods.HardCodedLiveChannels.Contains(name))
-                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                    .ToList());
-
-            return _cachedLogNames;
-        }
-        finally
-        {
-            _logNamesLock.Release();
-        }
+        return
+        [
+            .. readiness
+                .Select(channel => channel.Channel)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+        ];
     }
 
     public void LoadNewEvents() => _eventLogCommands.LoadNewEvents();
@@ -356,72 +344,43 @@ public sealed class MauiMenuActionService(
     public Task OpenIssueAsync() => OpenBrowserAsync("https://github.com/microsoft/EventLogExpert/issues/new");
 
     public Task OpenLiveLogAsync(string logName, bool combineLog) =>
-        OpenLogsBatchCoreAsync([(logName, LogPathType.Channel)], combineLog);
+        OpenLogsBatchCoreAsync([(logName, LogPathType.Channel)], combineLog, showInlineAlerts: true);
 
-    public Task<OpenLogsBatchResult> OpenLiveLogsAsync(IEnumerable<string> logNames, bool combineLog)
+    public Task<OpenLogsBatchResult> OpenLiveLogsAsync(
+        IEnumerable<string> logNames,
+        bool combineLog,
+        bool showInlineAlerts = true)
     {
         ArgumentNullException.ThrowIfNull(logNames);
 
-        return OpenLogsBatchCoreAsync(logNames.Select(name => (name, LogPathType.Channel)), combineLog);
+        return OpenLogsBatchCoreAsync(logNames.Select(name => (name, LogPathType.Channel)), combineLog, showInlineAlerts);
     }
 
     public async Task<OpenLogStatus> OpenLogAsync(string logPath, LogPathType pathType, bool combineLog = false)
     {
-        if (string.IsNullOrWhiteSpace(logPath) ||
-            (combineLog && _eventLogState.Value.IsLogOpen(logPath))) { return OpenLogStatus.Skipped; }
+        var outcome = await OpenLogWithOutcomeAsync(logPath, pathType, combineLog, showInlineAlerts: true);
 
-        EventLogInformation? eventLogInformation;
-
-        try
+        return outcome.Outcome switch
         {
-            eventLogInformation = EventLogSession.GlobalSession.GetLogInformation(logPath, pathType);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            await _dialogService.ShowAlert(
-                "Log requires elevation",
-                "Please relaunch with \"Run as Administrator\" to open this log",
-                "Ok");
-
-            return OpenLogStatus.Failed;
-        }
-        catch (Exception ex)
-        {
-            await _dialogService.ShowAlert("Failed to open Log", $"Exception: {ex.Message}", "Ok");
-
-            return OpenLogStatus.Failed;
-        }
-
-        if (eventLogInformation.RecordCount is null or <= 0)
-        {
-            return OpenLogStatus.Empty;
-        }
-
-        if (!combineLog)
-        {
-            await _cancellationTokenSource.CancelAsync();
-            _dispatcher.Dispatch(new CloseAllLogsAction());
-        }
-
-        if (_cancellationTokenSource.IsCancellationRequested)
-        {
-            _cancellationTokenSource = new CancellationTokenSource();
-        }
-
-        _eventLogCommands.OpenLog(logPath, pathType, _cancellationTokenSource.Token);
-
-        return OpenLogStatus.Opened;
+            ChannelLaunchOutcome.Opened => OpenLogStatus.Opened,
+            ChannelLaunchOutcome.Empty => OpenLogStatus.Empty,
+            ChannelLaunchOutcome.Skipped => OpenLogStatus.Skipped,
+            _ => OpenLogStatus.Failed
+        };
     }
 
-    public Task<OpenLogsBatchResult> OpenLogFilesAsync(IEnumerable<string> filePaths, bool combineLog)
+    public Task<OpenLogsBatchResult> OpenLogFilesAsync(
+        IEnumerable<string> filePaths,
+        bool combineLog,
+        bool showInlineAlerts = true)
     {
         ArgumentNullException.ThrowIfNull(filePaths);
 
-        return OpenLogsBatchCoreAsync(filePaths.Select(path => (path, LogPathType.File)), combineLog);
+        return OpenLogsBatchCoreAsync(filePaths.Select(path => (path, LogPathType.File)), combineLog, showInlineAlerts);
     }
 
     public Task OpenLogsBatchAsync(IEnumerable<(string Path, LogPathType Type)> logs, bool combineLog) =>
-        OpenLogsBatchCoreAsync(logs, combineLog);
+        OpenLogsBatchCoreAsync(logs, combineLog, showInlineAlerts: true);
 
     public Task<bool> OpenSettingsAsync() =>
         TryOpenModalAsync(_modalCoordinator.OpenSettingsAsync, nameof(SettingsModal));
@@ -491,11 +450,13 @@ public sealed class MauiMenuActionService(
 
     private async Task<OpenLogsBatchResult> OpenLogsBatchCoreAsync(
         IEnumerable<(string Path, LogPathType Type)> logs,
-        bool combineLog)
+        bool combineLog,
+        bool showInlineAlerts)
     {
         ArgumentNullException.ThrowIfNull(logs);
 
         List<string>? emptyDisplayNames = null;
+        List<ChannelOutcome>? channelOutcomes = null;
         var combineForCall = combineLog;
         var opened = 0;
         var failed = 0;
@@ -503,21 +464,28 @@ public sealed class MauiMenuActionService(
 
         foreach (var (path, type) in logs)
         {
-            // Only Opened consumed the close-existing semantics; Skipped/Failed/Empty did not,
-            // so combineForCall must NOT flip until a real open happens.
-            switch (await OpenLogAsync(path, type, combineForCall))
+            var outcome = await OpenLogWithOutcomeAsync(path, type, combineForCall, showInlineAlerts);
+
+            if (type == LogPathType.Channel)
             {
-                case OpenLogStatus.Opened:
+                (channelOutcomes ??= []).Add(outcome);
+            }
+
+            switch (outcome.Outcome)
+            {
+                case ChannelLaunchOutcome.Opened:
                     opened++;
                     combineForCall = true;
                     break;
-                case OpenLogStatus.Empty:
+                case ChannelLaunchOutcome.Empty:
                     (emptyDisplayNames ??= []).Add(GetEmptyLogDisplayName(path, type));
                     break;
-                case OpenLogStatus.Failed:
+                case ChannelLaunchOutcome.AccessDenied:
+                case ChannelLaunchOutcome.NotPresent:
+                case ChannelLaunchOutcome.Failed:
                     failed++;
                     break;
-                case OpenLogStatus.Skipped:
+                case ChannelLaunchOutcome.Skipped:
                     skipped++;
                     break;
             }
@@ -537,7 +505,83 @@ public sealed class MauiMenuActionService(
             emptyDisplayNames?.Count ?? 0,
             failed,
             skipped,
-            emptyDisplayNames?.ToImmutableArray() ?? []);
+            emptyDisplayNames?.ToImmutableArray() ?? [])
+        {
+            ChannelOutcomes = channelOutcomes?.ToImmutableArray() ?? []
+        };
+    }
+
+    private async Task<ChannelOutcome> OpenLogWithOutcomeAsync(
+        string logPath,
+        LogPathType pathType,
+        bool combineLog,
+        bool showInlineAlerts)
+    {
+        if (string.IsNullOrWhiteSpace(logPath) ||
+            (combineLog && _eventLogState.Value.IsLogOpen(logPath)))
+        {
+            return new ChannelOutcome(logPath, ChannelLaunchOutcome.Skipped);
+        }
+
+        EventLogInformation? eventLogInformation;
+
+        try
+        {
+            eventLogInformation = EventLogSession.GlobalSession.GetLogInformation(logPath, pathType);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            if (showInlineAlerts)
+            {
+                await _dialogService.ShowAlert(
+                    "Access denied",
+                    "Access denied - needs elevation.",
+                    "Ok");
+            }
+
+            return new ChannelOutcome(logPath, ChannelLaunchOutcome.AccessDenied);
+        }
+        catch (FileNotFoundException)
+        {
+            if (showInlineAlerts)
+            {
+                await _dialogService.ShowAlert(
+                    "Failed to open Log",
+                    $"The log {logPath} was not found.",
+                    "Ok");
+            }
+
+            return new ChannelOutcome(logPath, ChannelLaunchOutcome.NotPresent);
+        }
+        catch (Exception ex)
+        {
+            if (showInlineAlerts)
+            {
+                await _dialogService.ShowAlert("Failed to open Log", $"Exception: {ex.Message}", "Ok");
+            }
+
+            return new ChannelOutcome(logPath, ChannelLaunchOutcome.Failed);
+        }
+
+        if (eventLogInformation.RecordCount is null or <= 0)
+        {
+            return new ChannelOutcome(logPath, ChannelLaunchOutcome.Empty);
+        }
+
+        if (!combineLog)
+        {
+            await _cancellationTokenSource.CancelAsync();
+            _dispatcher.Dispatch(new CloseAllLogsAction());
+        }
+
+        if (_cancellationTokenSource.IsCancellationRequested)
+        {
+            _cancellationTokenSource = new CancellationTokenSource();
+        }
+
+        _eventLogCommands.OpenLog(logPath, pathType, _cancellationTokenSource.Token);
+
+        return new ChannelOutcome(logPath, ChannelLaunchOutcome.Opened);
     }
 
     private async Task<bool> TryOpenModalAsync(Func<Task<ModalOpenResult<bool>>> open, string modalName)

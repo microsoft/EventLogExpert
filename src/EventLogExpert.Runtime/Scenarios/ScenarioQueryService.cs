@@ -6,10 +6,10 @@ using System.Collections.Frozen;
 
 namespace EventLogExpert.Runtime.Scenarios;
 
-internal sealed class ScenarioQueryService(BuiltInScenarioRegistry registry, IChannelPresenceProbe presenceProbe)
+internal sealed class ScenarioQueryService(BuiltInScenarioRegistry registry, IChannelReadinessService readinessService)
     : IScenarioQueryService
 {
-    private readonly IChannelPresenceProbe _presenceProbe = presenceProbe;
+    private readonly IChannelReadinessService _readinessService = readinessService;
     private readonly BuiltInScenarioRegistry _registry = registry;
 
     public IReadOnlyList<ScenarioDefinition> GetInAppScenarios(IReadOnlyCollection<string> loadedLogNames)
@@ -23,15 +23,25 @@ internal sealed class ScenarioQueryService(BuiltInScenarioRegistry registry, ICh
 
     public LivePresence GetLivePresence()
     {
-        var present = _presenceProbe.TryGetPresentChannels();
+        var readiness = _readinessService.GetReadinessAsync(CatalogChannels()).GetAwaiter().GetResult();
 
-        return present is null
+        return readiness.Any(channel => channel.Presence == ChannelPresence.Unknown)
             ? new LivePresence(false, FrozenSet<string>.Empty)
-            : new LivePresence(true, present);
+            : new LivePresence(
+                true,
+                readiness
+                    .Where(channel => channel.Presence == ChannelPresence.Present)
+                    .Select(channel => channel.Channel)
+                    .ToFrozenSet(StringComparer.OrdinalIgnoreCase));
     }
 
     public IReadOnlyList<ScenarioDefinition> GetSplashScenarios() =>
     [
         .._registry.Scenarios.Where(scenario => scenario.Gating == ScenarioGating.ChannelPresence)
     ];
+
+    private IEnumerable<string> CatalogChannels() =>
+        _registry.Scenarios
+            .SelectMany(static scenario => scenario.Channels.Concat(scenario.OptionalChannels))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
 }

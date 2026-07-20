@@ -48,9 +48,9 @@ internal sealed class ScenarioLaunchService(
         _dispatcher.Dispatch(new ReplaceFiltersAction(filters));
         _dispatcher.Dispatch(new SetFilterDateRangeAction(dateWindow));
 
-        var result = await _menuActionService.OpenLiveLogsAsync(scenario.Channels, combineLog);
+        var result = await _menuActionService.OpenLiveLogsAsync(scenario.Channels, combineLog, showInlineAlerts: false);
 
-        if (result.Opened == 0 && !combineLog)
+        if (!combineLog && (result.Opened == 0 || HasDegradedRequiredChannel(scenario, result.ChannelOutcomes)))
         {
             _dispatcher.Dispatch(new CloseAllLogsAction());
             _dispatcher.Dispatch(new RestoreFilterPaneStateAction(priorFilterState));
@@ -68,7 +68,10 @@ internal sealed class ScenarioLaunchService(
             }
         }
 
-        return new ScenarioLaunchResult(result.Opened, result.Empty, result.Failed);
+        return new ScenarioLaunchResult(result.Opened, result.Empty, result.Failed)
+        {
+            ChannelOutcomes = result.ChannelOutcomes
+        };
     }
 
     public async Task<ScenarioFolderLaunchResult> LaunchFromFolderAsync(
@@ -142,6 +145,21 @@ internal sealed class ScenarioLaunchService(
 
     private static string FilesWord(int count) => count == 1 ? "1 file" : $"{count} files";
 
+    private static bool HasDegradedRequiredChannel(
+        ScenarioDefinition scenario,
+        ImmutableArray<ChannelOutcome> channelOutcomes)
+    {
+        if (channelOutcomes.IsDefaultOrEmpty) { return false; }
+
+        HashSet<string> requiredChannels = new(scenario.Channels, StringComparer.OrdinalIgnoreCase);
+
+        return channelOutcomes.Any(outcome =>
+            requiredChannels.Contains(outcome.Channel) &&
+            outcome.Outcome is ChannelLaunchOutcome.AccessDenied
+                or ChannelLaunchOutcome.NotPresent
+                or ChannelLaunchOutcome.Failed);
+    }
+
     private static HistogramDimension MapTimelineDimension(ScenarioTimelineDimension dimension) => dimension switch
     {
         ScenarioTimelineDimension.Severity => HistogramDimension.Severity,
@@ -201,7 +219,7 @@ internal sealed class ScenarioLaunchService(
         _dispatcher.Dispatch(new ReplaceFiltersAction(_registry.BuildFilterSet(scenario)));
         _dispatcher.Dispatch(new SetFilterDateRangeAction(dateWindow));
 
-        var result = await _menuActionService.OpenLogFilesAsync(match.Paths, combineLog: false);
+        var result = await _menuActionService.OpenLogFilesAsync(match.Paths, combineLog: false, showInlineAlerts: false);
 
         var missing = MissingChannels(scenario, match.MatchedChannels);
 

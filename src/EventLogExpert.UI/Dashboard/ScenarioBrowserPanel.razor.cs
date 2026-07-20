@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
@@ -16,6 +17,9 @@ public sealed partial class ScenarioBrowserPanel : IAsyncDisposable
     private string? _pendingFocusId;
     private ElementReference _scenarioBrowserRootRef;
     private IJSObjectReference? _scrollSuppressorModule;
+
+    [Parameter][EditorRequired]
+    public Func<ScenarioDefinition, IReadOnlyList<ChannelReadiness>> GetChannelReadiness { get; set; } = static _ => [];
 
     [Parameter] public bool IsBusy { get; set; }
 

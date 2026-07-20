@@ -50,6 +50,11 @@
 
                     <span class="menu-label">@item.Label</span>
 
+                    @if (!string.IsNullOrEmpty(item.StatusText))
+                    {
+                        <span class="menu-status">@item.StatusText</span>
+                    }
+
                     @if (hasReason)
                     {
                         <span class="visually-hidden" id="@reasonId">@item.DisabledReason</span>
@@ -84,7 +89,7 @@
                                         role="menuitem"
                                         tabindex="-1">
                                         <span class="menu-check"></span>
-                                        <span class="menu-label">Loading…</span>
+                                        <span class="menu-label">Loading...</span>
                                     </li>
                                 </ul>
                             }

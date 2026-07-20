@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Versioning;
@@ -11,6 +12,7 @@ using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
@@ -34,6 +36,8 @@ public sealed partial class MenuBar
     private IJSObjectReference? _menuAnchorModule;
     private ElementReference _menuBarRootRef;
     private long _openRequestId;
+    private IReadOnlyDictionary<string, ChannelReadiness> _readinessByChannel =
+        new Dictionary<string, ChannelReadiness>(StringComparer.OrdinalIgnoreCase);
     private IJSObjectReference? _scrollSuppressorModule;
 
     [Inject] private IMenuActionService Actions { get; init; } = null!;
@@ -41,6 +45,8 @@ public sealed partial class MenuBar
     private TopLevel? ActiveBar { get; set; }
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
+
+    [Inject] private IChannelReadinessService ChannelReadinessService { get; init; } = null!;
 
     [Inject]
     private IStateSelection<EventLogState, bool> ContinuouslyUpdate { get; init; } = null!;
@@ -134,6 +140,11 @@ public sealed partial class MenuBar
         base.OnInitialized();
     }
 
+    private static string? ReadinessStatusText(ChannelReadiness readiness) =>
+        readiness.Access == ChannelAccess.RequiresElevation
+            ? "(elevate)"
+            : readiness.Enablement == ChannelEnablement.Disabled ? "(disabled)" : null;
+
     private IReadOnlyList<MenuItem> BuildEdit()
     {
         var defaultCopyFormat = Settings.CopyFormat;
@@ -186,8 +197,6 @@ public sealed partial class MenuBar
 
     private IReadOnlyList<MenuItem> BuildOpenSubMenu(bool combineLog)
     {
-        bool isAdmin = CurrentVersionProvider.IsAdmin;
-
         return
         [
             MenuItem.Item("File", () => Actions.OpenFileAsync(combineLog), combineLog ? null : "Ctrl+O"),
@@ -195,36 +204,39 @@ public sealed partial class MenuBar
             MenuItem.SubMenu("Live",
             [
                 MenuItem.Item(LogChannelNames.ApplicationLog,
-                    () => Actions.OpenLiveLogAsync(LogChannelNames.ApplicationLog, combineLog)),
+                    () => Actions.OpenLiveLogAsync(LogChannelNames.ApplicationLog, combineLog),
+                    statusText: ReadinessStatusText(LogChannelNames.ApplicationLog)),
                 MenuItem.Item(LogChannelNames.SystemLog,
-                    () => Actions.OpenLiveLogAsync(LogChannelNames.SystemLog, combineLog)),
+                    () => Actions.OpenLiveLogAsync(LogChannelNames.SystemLog, combineLog),
+                    statusText: ReadinessStatusText(LogChannelNames.SystemLog)),
                 MenuItem.Item(LogChannelNames.SecurityLog,
                     () => Actions.OpenLiveLogAsync(LogChannelNames.SecurityLog, combineLog),
-                    isEnabled: isAdmin),
+                    statusText: ReadinessStatusText(LogChannelNames.SecurityLog)),
                 MenuItem.AsyncSubMenu(
                     "Other Logs",
-                    async () => BuildOtherLogsTree(await Actions.GetOtherLogNamesAsync(), combineLog, isAdmin)),
+                    async () => BuildOtherLogsTree(await GetOtherLogReadinessAsync(), combineLog)),
             ]),
         ];
     }
 
-    private IReadOnlyList<MenuItem> BuildOtherLogsTree(IReadOnlyList<string> logNames, bool combineLog, bool isAdmin)
+    private IReadOnlyList<MenuItem> BuildOtherLogsTree(
+        IReadOnlyList<ChannelReadiness> channelReadiness,
+        bool combineLog)
     {
         var rootChildren = new List<MenuItem>();
         var folderMap = new Dictionary<string, List<MenuItem>>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var logName in logNames)
+        foreach (var readiness in channelReadiness)
         {
+            var logName = readiness.Channel;
             var path = LogChannelMethods.GetMenuPath(logName);
 
             if (path.Count == 0) { continue; }
 
             var log = path[^1];
-            var logIsEnabled = isAdmin || !LogChannelNames.AdminOnlyLiveChannels.Contains(logName);
-
             var logMenuItem = MenuItem.Item(log,
                 () => Actions.OpenLiveLogAsync(logName, combineLog),
-                isEnabled: logIsEnabled);
+                statusText: ReadinessStatusText(readiness));
 
             if (path.Count == 1)
             {
@@ -328,6 +340,26 @@ public sealed partial class MenuBar
         {
             await Actions.CloseAllLogsAsync();
         }
+    }
+
+    private async Task<IReadOnlyList<ChannelReadiness>> GetOtherLogReadinessAsync()
+    {
+        var snapshot = await ChannelReadinessService.GetReadinessAsync();
+        var logNames = snapshot
+            .Select(channel => channel.Channel)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var readiness = await ChannelReadinessService.GetReadinessAsync(logNames);
+        _readinessByChannel = readiness
+            .Concat(snapshot)
+            .GroupBy(channel => channel.Channel, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToDictionary(channel => channel.Channel, StringComparer.OrdinalIgnoreCase);
+
+        return readiness
+            .OrderBy(channel => channel.Channel, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private void InvalidatePendingOpen() => Interlocked.Increment(ref _openRequestId);
@@ -466,9 +498,25 @@ public sealed partial class MenuBar
 
     private async Task PrewarmOtherLogNamesAsync()
     {
-        try { await Actions.GetOtherLogNamesAsync(); }
-        catch { /* prewarm best-effort */ }
+        try
+        {
+            var readiness = await ChannelReadinessService.GetReadinessAsync();
+            _readinessByChannel = readiness.ToDictionary(
+                channel => channel.Channel,
+                StringComparer.OrdinalIgnoreCase);
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception exception)
+        {
+            _ = exception;
+        }
     }
+
+    private string? ReadinessStatusText(string channel) =>
+        _readinessByChannel.TryGetValue(channel, out var readiness)
+            ? ReadinessStatusText(readiness)
+            : null;
 
     private sealed record TopLevel(string Label, Func<IReadOnlyList<MenuItem>> BuildItems);
 }

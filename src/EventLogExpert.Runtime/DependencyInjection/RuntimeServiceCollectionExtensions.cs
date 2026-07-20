@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.DependencyInjection;
+using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Configuration;
 using EventLogExpert.Logging.Routing;
@@ -273,7 +274,11 @@ public static class RuntimeServiceCollectionExtensions
             // aggregates every registered IScenarioSource (PR1 ships only the built-in source).
             services.AddSingleton<IScenarioSource, BuiltInScenarioSource>();
             services.AddSingleton<BuiltInScenarioRegistry>();
-            services.AddSingleton<IChannelPresenceProbe, ChannelPresenceProbe>();
+            services.AddSingleton<IChannelConfigReader>(static sp =>
+                new EventLogChannelConfigReader(CategoryLogger(sp, LogCategories.EventLog)));
+            services.AddSingleton<ChannelPresenceProbe>();
+            services.AddSingleton<IChannelPresenceProbe>(static sp => sp.GetRequiredService<ChannelPresenceProbe>());
+            services.AddSingleton<IChannelReadinessService>(static sp => sp.GetRequiredService<ChannelPresenceProbe>());
             services.AddSingleton<IEvtxChannelReader, EvtxChannelReader>();
             services.AddSingleton<IScenarioQueryService, ScenarioQueryService>();
             services.AddSingleton<IScenarioLaunchService, ScenarioLaunchService>();

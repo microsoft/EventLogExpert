@@ -2,9 +2,11 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Dashboard;
 
@@ -15,16 +17,7 @@ public sealed class ScenarioDetailTests : BunitContext
     public ScenarioDetailTests() => JSInterop.Mode = JSRuntimeMode.Loose;
 
     [Fact]
-    public void AdminBadge_WhenNotRequiresAdmin_IsAbsent()
-    {
-        var cut = Render<ScenarioDetail>(parameters => parameters
-            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes")));
-
-        Assert.Empty(cut.FindAll(".scenario-detail__admin-badge"));
-    }
-
-    [Fact]
-    public void AdminBadge_WhenRequiresAdmin_IsRendered()
+    public void AdminBadge_WhenRequiresAdmin_IsAbsent()
     {
         var cut = Render<ScenarioDetail>(parameters => parameters
             .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes") with
@@ -32,10 +25,21 @@ public sealed class ScenarioDetailTests : BunitContext
                 RequiresAdmin = true
             }));
 
-        var badge = cut.Find(".scenario-detail__admin-badge");
+        Assert.Empty(cut.FindAll(".scenario-detail__admin-badge"));
+        Assert.DoesNotContain("administrator", cut.Markup, StringComparison.OrdinalIgnoreCase);
+    }
 
-        Assert.Contains("Live launch requires administrator", badge.TextContent);
-        Assert.NotEmpty(cut.FindAll(".scenario-detail__admin-badge .bi-shield-lock"));
+    [Fact]
+    public void BlockedNote_WhenDisabledAndLivePresent_IsShown()
+    {
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
+            .Add(detail => detail.IsDisabled, true)
+            .Add(detail => detail.IsLivePresent, true));
+
+        var note = cut.Find(".scenario-detail__unavailable");
+        Assert.Contains("blocked", note.TextContent, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Open from folder", note.TextContent);
     }
 
     [Fact]
@@ -47,9 +51,26 @@ public sealed class ScenarioDetailTests : BunitContext
                 Channels = ["Application", "System"]
             }));
 
-        var values = cut.FindAll(".scenario-detail__fact-value");
+        var values = cut.FindAll(".scenario-detail__channel-readiness .scenario-detail__fact-value");
 
-        Assert.Contains(values, value => value.TextContent == "Application, System");
+        Assert.Contains(values, value => value.TextContent == "Application");
+        Assert.Contains(values, value => value.TextContent == "System");
+    }
+
+    [Fact]
+    public void Facts_WhenAccessRequiresElevation_ShowsAccessStatus()
+    {
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("security", "Security") with { Channels = ["Security"] })
+            .Add(detail => detail.ChannelReadiness,
+            [
+                new ChannelReadiness("Security", ChannelPresence.Present, ChannelEnablement.Enabled)
+                {
+                    Access = ChannelAccess.RequiresElevation
+                }
+            ]));
+
+        Assert.Contains("Access denied (Needs elevation)", cut.Find(".scenario-detail__channel-readiness").TextContent);
     }
 
     [Fact]
@@ -152,7 +173,7 @@ public sealed class ScenarioDetailTests : BunitContext
     }
 
     [Fact]
-    public void Launch_WhenAdminGated_IsGuardedAndDescribesAdminBadge()
+    public void Launch_WhenDisabledAndLivePresent_IsGuardedWithBlockedNote()
     {
         bool launched = false;
 
@@ -165,12 +186,11 @@ public sealed class ScenarioDetailTests : BunitContext
             .Add(detail => detail.OnLaunch, () => launched = true));
 
         var launch = cut.Find(".scenario-detail__launch");
-        var describedBy = launch.GetAttribute("aria-describedby");
+        var note = cut.Find(".scenario-detail__unavailable");
 
         Assert.Equal("true", launch.GetAttribute("aria-disabled"));
-        Assert.False(string.IsNullOrEmpty(describedBy));
-        Assert.Contains("administrator", cut.Find($"#{describedBy}").TextContent, StringComparison.OrdinalIgnoreCase);
-        Assert.Empty(cut.FindAll(".scenario-detail__unavailable"));
+        Assert.Equal(note.Id, launch.GetAttribute("aria-describedby"));
+        Assert.Contains("Open from folder", note.TextContent);
 
         launch.Click();
 
@@ -213,17 +233,6 @@ public sealed class ScenarioDetailTests : BunitContext
         launch.Click();
 
         Assert.False(launched);
-    }
-
-    [Fact]
-    public void OfflineNote_WhenLivePresent_IsAbsent()
-    {
-        var cut = Render<ScenarioDetail>(parameters => parameters
-            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
-            .Add(detail => detail.IsDisabled, true)
-            .Add(detail => detail.IsLivePresent, true));
-
-        Assert.Empty(cut.FindAll(".scenario-detail__unavailable"));
     }
 
     [Fact]

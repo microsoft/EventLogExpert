@@ -38,9 +38,11 @@ public sealed record MenuItem
     ///     Optional explanation surfaced to assistive tech (and as a hover title) when <see cref="IsEnabled" /> is
     ///     <c>false</c>. Items with a non-null reason participate in roving focus and type-ahead so keyboard / screen-reader
     ///     users can discover that the option exists; activation is still blocked. Use for "not available because X" cases
-    ///     where users need to know the option is there (e.g., "Cached — empty: add filters first").
+    ///     where users need to know the option is there (e.g., "Cached - empty: add filters first").
     /// </summary>
     public string? DisabledReason { get; init; }
+
+    public string? StatusText { get; init; }
 
     /// <summary>
     ///     True when the item should participate in roving focus / type-ahead. Enabled items are always focusable;
@@ -57,7 +59,8 @@ public sealed record MenuItem
         bool? isChecked = null,
         bool isEnabled = true,
         bool isDanger = false,
-        string? disabledReason = null) =>
+        string? disabledReason = null,
+        string? statusText = null) =>
         new()
         {
             Label = label,
@@ -67,6 +70,7 @@ public sealed record MenuItem
             IsEnabled = isEnabled,
             IsDanger = isDanger,
             DisabledReason = disabledReason,
+            StatusText = statusText,
         };
 
     public static MenuItem Item(
@@ -75,7 +79,8 @@ public sealed record MenuItem
         string? shortcut = null,
         bool? isChecked = null,
         bool isEnabled = true,
-        string? disabledReason = null) =>
+        string? disabledReason = null,
+        string? statusText = null) =>
         Item(
             label,
             () => { onClick(); return Task.CompletedTask; },
@@ -83,7 +88,8 @@ public sealed record MenuItem
             isChecked,
             isEnabled,
             isDanger: false,
-            disabledReason);
+            disabledReason,
+            statusText);
 
     public static MenuItem SubMenu(string label, IReadOnlyList<MenuItem> children, bool isEnabled = true) =>
         new() { Label = label, Children = children, IsEnabled = isEnabled };

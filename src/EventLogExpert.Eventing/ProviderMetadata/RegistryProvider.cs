@@ -27,7 +27,7 @@ internal sealed class RegistryProvider(ITraceLogger? logger = null) : ILegacyMes
 
         foreach (var logSubKeyName in eventLogKey.GetSubKeyNames())
         {
-            if (LogChannelNames.AdminOnlyLiveChannels.Contains(logSubKeyName))
+            if (LogChannelNames.RegistrySkipChannels.Contains(logSubKeyName))
             {
                 continue;
             }
@@ -83,7 +83,5 @@ internal sealed class RegistryProvider(ITraceLogger? logger = null) : ILegacyMes
         return [];
     }
 
-    private class OpenEventLogRegistryKeyFailedException(string msg) : Exception(msg)
-    {
-    }
+    private class OpenEventLogRegistryKeyFailedException(string msg) : Exception(msg);
 }
