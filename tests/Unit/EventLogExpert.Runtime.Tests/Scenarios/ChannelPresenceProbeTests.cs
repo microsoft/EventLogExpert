@@ -33,6 +33,24 @@ public sealed class ChannelPresenceProbeTests
     }
 
     [Fact]
+    public void GetPresentChannels_DoesNotEnrichChannelConfig()
+    {
+        var config = ConfigReader(new Dictionary<string, ChannelConfig>
+        {
+            ["System"] = new(true, ChannelAccess.Accessible, EvtChannelType.Admin)
+        });
+        var probe = new ChannelPresenceProbe(
+            Logger(),
+            config,
+            ["System"],
+            static () => ["System"]);
+
+        _ = probe.GetPresentChannels();
+
+        config.DidNotReceive().ReadConfig(Arg.Any<string>());
+    }
+
+    [Fact]
     public void GetPresentChannels_ReadsOnceThenCaches()
     {
         var calls = 0;

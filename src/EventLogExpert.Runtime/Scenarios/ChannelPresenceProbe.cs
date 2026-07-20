@@ -157,7 +157,6 @@ internal sealed class ChannelPresenceProbe : IChannelPresenceProbe, IChannelRead
         if (loaded is not null)
         {
             _presentChannels = loaded;
-            EnrichConfig(_eagerConfigChannels);
         }
 
         return loaded;
@@ -177,9 +176,9 @@ internal sealed class ChannelPresenceProbe : IChannelPresenceProbe, IChannelRead
             var presentChannels = EnsurePresentChannels();
             ImmutableArray<string> targets = requested ?? [.. (presentChannels ?? s_empty).OrderBy(channel => channel, StringComparer.OrdinalIgnoreCase)];
 
-            if (presentChannels is not null && requested is not null)
+            if (presentChannels is not null)
             {
-                EnrichConfig(targets);
+                EnrichConfig(requested is not null ? targets : _eagerConfigChannels);
             }
 
             return

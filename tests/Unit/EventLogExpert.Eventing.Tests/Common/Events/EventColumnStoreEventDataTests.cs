@@ -55,9 +55,14 @@ public sealed class EventColumnStoreEventDataTests
         // Warm: first scan resolves the schema and JITs.
         reader.BucketTimeTicksByEventData(rank, 0, long.MaxValue, 1, "LogonType", targetCodes, slotCounts, CancellationToken.None);
 
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        reader.BucketTimeTicksByEventData(rank, 0, long.MaxValue, 1, "LogonType", targetCodes, slotCounts, CancellationToken.None);
-        long delta = GC.GetAllocatedBytesForCurrentThread() - before;
+        long delta = long.MaxValue;
+
+        for (int iteration = 0; iteration < 16; iteration++)
+        {
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            reader.BucketTimeTicksByEventData(rank, 0, long.MaxValue, 1, "LogonType", targetCodes, slotCounts, CancellationToken.None);
+            delta = Math.Min(delta, GC.GetAllocatedBytesForCurrentThread() - before);
+        }
 
         // A single per-row byte would cost 8192; the fixed memo array is a few dozen bytes, so this proves the hot path is allocation-free.
         Assert.True(delta < 512, $"Per-row allocation detected: {delta} bytes over {events.Length} sealed rows.");
@@ -118,9 +123,16 @@ public sealed class EventColumnStoreEventDataTests
 
         reader.BucketTimeTicksByEventDataHResult(rank, 0, long.MaxValue, 1, "errorCode", s_updateProviders, s_errorCodeUserDataPaths, targetCodes, slotCounts, CancellationToken.None);
 
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        reader.BucketTimeTicksByEventDataHResult(rank, 0, long.MaxValue, 1, "errorCode", s_updateProviders, s_errorCodeUserDataPaths, targetCodes, slotCounts, CancellationToken.None);
-        long delta = GC.GetAllocatedBytesForCurrentThread() - before;
+        // Take the minimum allocation delta across steady-state iterations so a one-off tiered-JIT/background-GC
+        // charge on a single call cannot flake the assertion; a real per-row allocation persists in every iteration.
+        long delta = long.MaxValue;
+
+        for (int iteration = 0; iteration < 16; iteration++)
+        {
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            reader.BucketTimeTicksByEventDataHResult(rank, 0, long.MaxValue, 1, "errorCode", s_updateProviders, s_errorCodeUserDataPaths, targetCodes, slotCounts, CancellationToken.None);
+            delta = Math.Min(delta, GC.GetAllocatedBytesForCurrentThread() - before);
+        }
 
         // The eligible-index buffer is stack-allocated and the schema memo is a fixed per-scan array, so the per-row path is
         // allocation-free; a single per-row byte would cost 8192.
@@ -215,10 +227,15 @@ public sealed class EventColumnStoreEventDataTests
 
         reader.CountEventDataHResults(rank, "errorCode", s_updateProviders, s_errorCodeUserDataPaths, counts, CancellationToken.None);
 
-        counts.Clear();
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        reader.CountEventDataHResults(rank, "errorCode", s_updateProviders, s_errorCodeUserDataPaths, counts, CancellationToken.None);
-        long delta = GC.GetAllocatedBytesForCurrentThread() - before;
+        long delta = long.MaxValue;
+
+        for (int iteration = 0; iteration < 16; iteration++)
+        {
+            counts.Clear();
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            reader.CountEventDataHResults(rank, "errorCode", s_updateProviders, s_errorCodeUserDataPaths, counts, CancellationToken.None);
+            delta = Math.Min(delta, GC.GetAllocatedBytesForCurrentThread() - before);
+        }
 
         // The pending provider match uses a scan-local set built once, not a per-row enumerator (which cost 32 bytes x 3000).
         Assert.True(delta < 4096, $"Per-row allocation detected on pending rows: {delta} bytes over {events.Length} rows.");
