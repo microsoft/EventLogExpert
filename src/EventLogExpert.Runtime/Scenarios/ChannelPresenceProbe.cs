@@ -55,7 +55,8 @@ internal sealed class ChannelPresenceProbe : IChannelPresenceProbe, IChannelRead
         Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return GetReadinessCore(channels: null);
+
+            return GetReadinessCore(channels: null, cancellationToken);
         }, cancellationToken);
 
     public Task<ImmutableArray<ChannelReadiness>> GetReadinessAsync(
@@ -67,7 +68,8 @@ internal sealed class ChannelPresenceProbe : IChannelPresenceProbe, IChannelRead
         return Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return GetReadinessCore(channels);
+
+            return GetReadinessCore(channels, cancellationToken);
         }, cancellationToken);
     }
 
@@ -127,10 +129,12 @@ internal sealed class ChannelPresenceProbe : IChannelPresenceProbe, IChannelRead
         _ => ChannelEnablement.Unknown
     };
 
-    private void EnrichConfig(IEnumerable<string> channels)
+    private void EnrichConfig(IEnumerable<string> channels, CancellationToken cancellationToken)
     {
         foreach (var channel in channels)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (string.IsNullOrWhiteSpace(channel) || _config.ContainsKey(channel)) { continue; }
 
             try
@@ -162,14 +166,14 @@ internal sealed class ChannelPresenceProbe : IChannelPresenceProbe, IChannelRead
         return loaded;
     }
 
-    private ImmutableArray<ChannelReadiness> GetReadinessCore(IEnumerable<string>? channels)
+    private ImmutableArray<ChannelReadiness> GetReadinessCore(IEnumerable<string>? channels, CancellationToken cancellationToken)
     {
         var requested = channels?
             .Where(channel => !string.IsNullOrWhiteSpace(channel))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToImmutableArray();
 
-        _gate.Wait();
+        _gate.Wait(cancellationToken);
 
         try
         {
@@ -178,8 +182,12 @@ internal sealed class ChannelPresenceProbe : IChannelPresenceProbe, IChannelRead
 
             if (presentChannels is not null)
             {
-                EnrichConfig(requested is not null ? targets : _eagerConfigChannels);
+                EnrichConfig(requested is not null ? targets : _eagerConfigChannels, cancellationToken);
             }
+
+            // EnrichConfig only checks the token between channels; re-check here so a cancellation that lands during
+            // the final (or only) config read still cancels the readiness op instead of returning a stale result.
+            cancellationToken.ThrowIfCancellationRequested();
 
             return
             [
