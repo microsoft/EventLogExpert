@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
-using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Export;
 using EventLogExpert.Runtime.FilterPane;
@@ -50,8 +49,6 @@ public sealed partial class MenuBar
 
     [Inject]
     private IStateSelection<EventLogState, bool> ContinuouslyUpdate { get; init; } = null!;
-
-    [Inject] private ICurrentVersionProvider CurrentVersionProvider { get; init; } = null!;
 
     [Inject]
     private IStateSelection<FilterPaneState, bool> FilterPaneIsEnabled { get; init; } = null!;

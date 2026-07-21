@@ -48,8 +48,6 @@ public sealed class EmptyStateDashboardTests : BunitContext
         _scenarioLaunch.LaunchAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>())
             .Returns(new ScenarioLaunchResult(1, 0, 0));
         _scenarioQuery.GetSplashScenarios().Returns([]);
-        _scenarioQuery.GetLivePresenceAsync()
-            .Returns(new LivePresence(true, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "System" }));
         _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
             .Returns(
             [
@@ -203,8 +201,8 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailLaunch_WhenChannelNotOnHost_IsDisabledWithOfflineNote()
     {
-        _scenarioQuery.GetLivePresenceAsync()
-            .Returns(new LivePresence(true, new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
+        _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns([new ChannelReadiness("System", ChannelPresence.Absent, ChannelEnablement.Unknown)]);
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
         var cut = Render<EmptyStateDashboard>();
@@ -234,8 +232,6 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailLaunch_WhenOneRequiredChannelMissing_IsDisabledWithOfflineNote()
     {
-        _scenarioQuery.GetLivePresenceAsync()
-            .Returns(new LivePresence(true, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "System" }));
         _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
             .Returns(
             [
@@ -260,8 +256,8 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailLaunch_WhenPresenceUnknown_StaysLaunchable()
     {
-        _scenarioQuery.GetLivePresenceAsync()
-            .Returns(new LivePresence(false, new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
+        _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns([new ChannelReadiness("System", ChannelPresence.Unknown, ChannelEnablement.Unknown)]);
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
         var cut = Render<EmptyStateDashboard>();
