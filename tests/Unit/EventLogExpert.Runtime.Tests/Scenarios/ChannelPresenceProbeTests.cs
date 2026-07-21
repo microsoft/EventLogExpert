@@ -88,6 +88,44 @@ public sealed class ChannelPresenceProbeTests
     }
 
     [Fact]
+    public async Task GetReadinessAsync_HonorsCancellationDuringEnrichment()
+    {
+        using var cts = new CancellationTokenSource();
+        var config = Substitute.For<IChannelConfigReader>();
+        config.ReadConfig("First").Returns(_ =>
+        {
+            cts.Cancel();
+
+            return new ChannelConfig(true, ChannelAccess.Accessible, EvtChannelType.Admin);
+        });
+
+        var probe = new ChannelPresenceProbe(Logger(), config, [], static () => ["First", "Second"]);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => probe.GetReadinessAsync(["First", "Second"], cts.Token));
+
+        config.DidNotReceive().ReadConfig("Second");
+    }
+
+    [Fact]
+    public async Task GetReadinessAsync_HonorsCancellationDuringFinalConfigRead()
+    {
+        using var cts = new CancellationTokenSource();
+        var config = Substitute.For<IChannelConfigReader>();
+        config.ReadConfig("Only").Returns(_ =>
+        {
+            cts.Cancel();
+
+            return new ChannelConfig(true, ChannelAccess.Accessible, EvtChannelType.Admin);
+        });
+
+        var probe = new ChannelPresenceProbe(Logger(), config, [], static () => ["Only"]);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => probe.GetReadinessAsync(["Only"], cts.Token));
+    }
+
+    [Fact]
     public async Task GetReadinessAsync_ParameterlessDoesNotEnrichNonCatalogChannels()
     {
         var config = ConfigReader(new Dictionary<string, ChannelConfig>
