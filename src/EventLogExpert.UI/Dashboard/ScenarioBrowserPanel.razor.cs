@@ -21,6 +21,9 @@ public sealed partial class ScenarioBrowserPanel : IAsyncDisposable
     [Parameter][EditorRequired]
     public Func<ScenarioDefinition, IReadOnlyList<ChannelReadiness>> GetChannelReadiness { get; set; } = static _ => [];
 
+    [Parameter][EditorRequired]
+    public Func<ScenarioDefinition, IReadOnlyList<ChannelReadiness>> GetOptionalChannelReadiness { get; set; } = static _ => [];
+
     [Parameter] public bool IsBusy { get; set; }
 
     [Parameter][EditorRequired] public Func<ScenarioDefinition, bool> IsFavored { get; set; } = static _ => false;

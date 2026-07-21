@@ -1,6 +1,20 @@
 @using EventLogExpert.Eventing.Readers
 @using EventLogExpert.Runtime.Scenarios
 @using EventLogExpert.Scenarios.Catalog
+@{
+    RenderFragment StatusTags(ChannelReadiness readiness) =>
+        @<text>
+             <span class="scenario-detail__status">@PresenceLabel(readiness.Presence)</span>
+             @if (readiness.Enablement != ChannelEnablement.Enabled)
+             {
+                 <span class="scenario-detail__status">@EnablementLabel(readiness.Enablement)</span>
+             }
+             @if (readiness.Access == ChannelAccess.RequiresElevation)
+             {
+                 <span class="scenario-detail__status">Access denied (Needs elevation)</span>
+             }
+    </text>;
+}
 <div aria-labelledby="@_nameId" class="scenario-detail" role="region">
     <p class="scenario-detail__eyebrow">
         <i aria-hidden="true" class="bi @EmptyStateDashboard.ScenarioIcon(Scenario.Group)"></i>
@@ -15,20 +29,20 @@
             {
                 <span class="scenario-detail__channel-readiness">
                     <span class="scenario-detail__fact-value">@readiness.Channel</span>
-                    <span class="scenario-detail__status">@PresenceLabel(readiness.Presence)</span>
-                    @if (readiness.Enablement != ChannelEnablement.Enabled)
-                    {
-                        <span class="scenario-detail__status">@EnablementLabel(readiness.Enablement)</span>
-                    }
-                    @if (readiness.Access == ChannelAccess.RequiresElevation)
-                    {
-                        <span class="scenario-detail__status">Access denied (Needs elevation)</span>
-                    }
+                    @StatusTags(readiness)
                 </span>
             }
-            @if (!Scenario.OptionalChannels.IsDefaultOrEmpty)
+            @if (DisplayOptionalReadiness.Count > 0)
             {
-                <span class="scenario-detail__fact-muted">Also if present: @string.Join(", ", Scenario.OptionalChannels)</span>
+                <span class="scenario-detail__fact-muted">Also if present:</span>
+
+                @foreach (var readiness in DisplayOptionalReadiness)
+                {
+                    <span class="scenario-detail__channel-readiness scenario-detail__channel-readiness--optional">
+                        <span class="scenario-detail__fact-value">@readiness.Channel</span>
+                        @StatusTags(readiness)
+                    </span>
+                }
             }
         </div>
         @if (FilterLines.Count > 0)
@@ -51,13 +65,13 @@
     @if (IsDisabled && !IsLivePresent)
     {
         <p class="scenario-detail__unavailable" id="@_offlineId">
-            This log is not on this computer. Use Open from folder to analyze an exported copy.
+            One or more of these logs are not on this computer. Use Open from folder to analyze an exported copy.
         </p>
     }
     else if (IsDisabled)
     {
         <p class="scenario-detail__unavailable" id="@_offlineId">
-            Live access to this log is blocked. Use Open from folder to analyze an exported copy.
+            Live access to one or more of these logs is blocked. Use Open from folder to analyze an exported copy.
         </p>
     }
     <div class="scenario-detail__actions">

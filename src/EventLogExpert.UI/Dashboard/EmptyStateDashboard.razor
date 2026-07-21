@@ -91,9 +91,10 @@
         {
             <SidebarTabs @bind-ActiveTab="_activeCategory" @ref="_sidebarTabs" TablistAriaLabel="Scenario categories" Tabs="_tabs" TTab="SplashCategory">
                 <TabContent Context="category">
-                    <ScenarioBrowserPanel IsBusy="_isBusy"
-                    GetChannelReadiness="GetChannelReadiness"
-                    IsFavored="IsFavored"
+                    <ScenarioBrowserPanel GetChannelReadiness="GetChannelReadiness"
+                        GetOptionalChannelReadiness="GetOptionalChannelReadiness"
+                        IsBusy="_isBusy"
+                        IsFavored="IsFavored"
                         IsLivePresent="IsLivePresent"
                         IsScenarioDisabled="IsScenarioDisabled"
                         OnLaunch="LaunchScenarioAsync"

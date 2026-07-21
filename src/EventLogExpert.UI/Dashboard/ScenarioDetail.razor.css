@@ -84,6 +84,10 @@
     gap: 0.4rem;
 }
 
+.scenario-detail__channel-readiness--optional {
+    opacity: 0.85;
+}
+
 .scenario-detail__status {
     display: inline-flex;
     align-items: center;

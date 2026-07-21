@@ -83,6 +83,26 @@ public sealed class ScenarioDetailTests : BunitContext
     }
 
     [Fact]
+    public void Facts_WhenOptionalChannelReadinessProvided_ShowsOptionalStatus()
+    {
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes") with
+            {
+                Channels = ["Application"],
+                OptionalChannels = ["Security"]
+            })
+            .Add(detail => detail.OptionalChannelReadiness,
+            [
+                new ChannelReadiness("Security", ChannelPresence.Absent, ChannelEnablement.Unknown)
+            ]));
+
+        var optional = cut.Find(".scenario-detail__channel-readiness--optional");
+
+        Assert.Contains("Security", optional.TextContent);
+        Assert.Contains("Not present", optional.TextContent);
+    }
+
+    [Fact]
     public void Facts_WhenOptionalChannelsPresent_ShowsAlsoIfPresentLine()
     {
         var cut = Render<ScenarioDetail>(parameters => parameters
@@ -92,9 +112,11 @@ public sealed class ScenarioDetailTests : BunitContext
                 OptionalChannels = ["Setup", "Security"]
             }));
 
-        Assert.Equal(
-            "Also if present: Setup, Security",
-            cut.Find(".scenario-detail__fact-muted").TextContent);
+        Assert.Equal("Also if present:", cut.Find(".scenario-detail__fact-muted").TextContent);
+
+        var optional = cut.FindAll(".scenario-detail__channel-readiness--optional .scenario-detail__fact-value");
+        Assert.Contains(optional, value => value.TextContent == "Setup");
+        Assert.Contains(optional, value => value.TextContent == "Security");
     }
 
     [Fact]

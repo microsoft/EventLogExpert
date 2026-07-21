@@ -31,16 +31,24 @@ public sealed partial class ScenarioDetail
 
     [Parameter] public EventCallback OnToggleFavorite { get; set; }
 
+    [Parameter] public IReadOnlyList<ChannelReadiness> OptionalChannelReadiness { get; set; } = [];
+
     [Parameter][EditorRequired] public ScenarioDefinition Scenario { get; set; } = null!;
 
+    private IReadOnlyList<ChannelReadiness> DisplayOptionalReadiness =>
+        OptionalChannelReadiness.Count > 0 ? OptionalChannelReadiness :
+        Scenario.OptionalChannels.IsDefaultOrEmpty ? [] :
+        [
+            .. Scenario.OptionalChannels.Select(channel =>
+                new ChannelReadiness(channel, ChannelPresence.Unknown, ChannelEnablement.Unknown))
+        ];
+
     private IReadOnlyList<ChannelReadiness> DisplayReadiness =>
-        ChannelReadiness.Count > 0
-            ? ChannelReadiness
-            :
-            [
-                .. Scenario.Channels.Select(channel =>
-                    new ChannelReadiness(channel, ChannelPresence.Unknown, ChannelEnablement.Unknown))
-            ];
+        ChannelReadiness.Count > 0 ? ChannelReadiness :
+        [
+            .. Scenario.Channels.Select(channel =>
+                new ChannelReadiness(channel, ChannelPresence.Unknown, ChannelEnablement.Unknown))
+        ];
 
     private IReadOnlyList<FilterLine> FilterLines
     {
