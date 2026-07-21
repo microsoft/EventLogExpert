@@ -3,6 +3,8 @@
 
 using EventLogExpert.Eventing.Interop;
 using Microsoft.Win32.SafeHandles;
+using System.Buffers;
+using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
 
@@ -31,15 +33,45 @@ internal sealed class Win32ChannelAccessNative : IChannelAccessNative
     {
         fixed (byte* privilegeSetPointer = privilegeSet)
         {
-            return NativeMethods.AccessCheck(
-                securityDescriptor,
-                token,
-                desiredAccess,
-                ref genericMapping,
-                (IntPtr)privilegeSetPointer,
-                ref privilegeSetLength,
-                out grantedAccess,
-                out accessStatus);
+            if (NativeMethods.AccessCheck(
+                    securityDescriptor,
+                    token,
+                    desiredAccess,
+                    ref genericMapping,
+                    (IntPtr)privilegeSetPointer,
+                    ref privilegeSetLength,
+                    out grantedAccess,
+                    out accessStatus))
+            {
+                return true;
+            }
+
+            if (Marshal.GetLastWin32Error() != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
+            {
+                return false;
+            }
+        }
+
+        byte[] rentedPrivilegeSet = ArrayPool<byte>.Shared.Rent((int)privilegeSetLength);
+
+        try
+        {
+            fixed (byte* resizedPrivilegeSetPointer = rentedPrivilegeSet)
+            {
+                return NativeMethods.AccessCheck(
+                    securityDescriptor,
+                    token,
+                    desiredAccess,
+                    ref genericMapping,
+                    (IntPtr)resizedPrivilegeSetPointer,
+                    ref privilegeSetLength,
+                    out grantedAccess,
+                    out accessStatus);
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rentedPrivilegeSet);
         }
     }
 

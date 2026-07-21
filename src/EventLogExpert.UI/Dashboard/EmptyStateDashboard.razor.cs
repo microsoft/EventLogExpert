@@ -230,6 +230,14 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
             or ChannelLaunchOutcome.NotPresent
             or ChannelLaunchOutcome.Failed);
 
+    // Analytic/Debug channels never have their access evaluated (NotEvaluated), so they must not be
+    // treated as blocked; only a genuine RequiresElevation or a read-failure Unknown disables launch.
+    private bool AccessAllowsLaunch(string channel) =>
+        _readinessByChannel.GetValueOrDefault(
+            channel,
+            new ChannelReadiness(channel, ChannelPresence.Unknown, ChannelEnablement.Unknown))
+            .Access is ChannelAccess.Accessible or ChannelAccess.NotEvaluated;
+
     private void ClearFilter() => FilterCommands.ClearAllFilters();
 
     private IEnumerable<ScenarioDefinition> FavoriteScenarios() =>
@@ -241,12 +249,10 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
                 .ThenBy(scenario => scenario.Order);
 
     private IReadOnlyList<ChannelReadiness> GetChannelReadiness(ScenarioDefinition scenario) =>
-    [
-        .. scenario.Channels.Select(channel =>
-            _readinessByChannel.GetValueOrDefault(
-                channel,
-                new ChannelReadiness(channel, ChannelPresence.Unknown, ChannelEnablement.Unknown)))
-    ];
+        ReadinessFor(scenario.Channels);
+
+    private IReadOnlyList<ChannelReadiness> GetOptionalChannelReadiness(ScenarioDefinition scenario) =>
+        scenario.OptionalChannels.IsDefaultOrEmpty ? [] : ReadinessFor(scenario.OptionalChannels);
 
     private bool IsFavored(ScenarioDefinition scenario) =>
         ScenarioFavorites.Value.FavoriteScenarioIds.Contains(scenario.Id);
@@ -257,14 +263,6 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
     private bool IsScenarioDisabled(ScenarioDefinition scenario) =>
         _livePresence.Known &&
         !scenario.Channels.All(channel => _livePresence.Present.Contains(channel) && AccessAllowsLaunch(channel));
-
-    // Analytic/Debug channels never have their access evaluated (NotEvaluated), so they must not be
-    // treated as blocked; only a genuine RequiresElevation or a read-failure Unknown disables launch.
-    private bool AccessAllowsLaunch(string channel) =>
-        _readinessByChannel.GetValueOrDefault(
-            channel,
-            new ChannelReadiness(channel, ChannelPresence.Unknown, ChannelEnablement.Unknown))
-            .Access is ChannelAccess.Accessible or ChannelAccess.NotEvaluated;
 
     private Task LaunchScenarioAsync(ScenarioDefinition scenario) =>
         RunGuardedAsync(async () =>
@@ -340,6 +338,14 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
     private Task OpenSecurityAsync() => RunGuardedAsync(() => Actions.OpenLiveLogAsync(LogChannelNames.SecurityLog, false));
 
     private Task OpenSystemAsync() => RunGuardedAsync(() => Actions.OpenLiveLogAsync(LogChannelNames.SystemLog, false));
+
+    private IReadOnlyList<ChannelReadiness> ReadinessFor(IEnumerable<string> channels) =>
+    [
+        .. channels.Select(channel =>
+            _readinessByChannel.GetValueOrDefault(
+                channel,
+                new ChannelReadiness(channel, ChannelPresence.Unknown, ChannelEnablement.Unknown)))
+    ];
 
     private void RebuildCategories()
     {

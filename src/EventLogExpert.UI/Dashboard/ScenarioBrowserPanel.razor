@@ -26,14 +26,15 @@
         <div class="scenario-browser__detail">
             @if (Selected is not null)
             {
-                <ScenarioDetail IsBusy="IsBusy"
-                    ChannelReadiness="GetChannelReadiness(Selected)"
+                <ScenarioDetail ChannelReadiness="GetChannelReadiness(Selected)"
+                    IsBusy="IsBusy"
                     IsDisabled="IsScenarioDisabled(Selected)"
                     IsFavored="IsFavored(Selected)"
                     IsLivePresent="IsLivePresent(Selected)"
                     OnLaunch="() => OnLaunch.InvokeAsync(Selected)"
                     OnLaunchFromFolder="() => OnLaunchFromFolder.InvokeAsync(Selected)"
                     OnToggleFavorite="() => OnToggleFavorite.InvokeAsync(Selected)"
+                    OptionalChannelReadiness="GetOptionalChannelReadiness(Selected)"
                     Scenario="Selected" />
             }
         </div>
