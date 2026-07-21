@@ -3,8 +3,6 @@
 
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Scenarios.Catalog;
-using NSubstitute;
-using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.Tests.Scenarios;
 
@@ -15,7 +13,7 @@ public sealed class ScenarioQueryServiceTests
     {
         var registry = ScenarioTestData.Registry(ScenarioTestData.Single("system", "System", 1000));
 
-        var service = new ScenarioQueryService(registry, ReadinessService([]));
+        var service = new ScenarioQueryService(registry);
 
         Assert.Empty(service.GetInAppScenarios(["Application"]));
     }
@@ -27,7 +25,7 @@ public sealed class ScenarioQueryServiceTests
             ScenarioTestData.Single("system", "System", 1000),
             ScenarioTestData.Single("application", "Application", 1001));
 
-        var service = new ScenarioQueryService(registry, ReadinessService([]));
+        var service = new ScenarioQueryService(registry);
 
         Assert.Equal(["system"], service.GetInAppScenarios(["system"]).Select(scenario => scenario.Id));
     }
@@ -37,35 +35,9 @@ public sealed class ScenarioQueryServiceTests
     {
         var registry = ScenarioTestData.Registry(ScenarioTestData.Combined("combined", "System", "Security"));
 
-        var service = new ScenarioQueryService(registry, ReadinessService([]));
+        var service = new ScenarioQueryService(registry);
 
         Assert.Single(service.GetInAppScenarios(["Security"]));
-    }
-
-    [Fact]
-    public async Task GetLivePresenceAsync_WhenChannelsReadable_IsKnownWithChannels()
-    {
-        var service = new ScenarioQueryService(
-            ScenarioTestData.Registry(ScenarioTestData.Single("system", "System", 1000)),
-            ReadinessService([new ChannelReadiness("System", ChannelPresence.Present, ChannelEnablement.Enabled)]));
-
-        var presence = await service.GetLivePresenceAsync();
-
-        Assert.True(presence.Known);
-        Assert.Contains("System", presence.Present);
-    }
-
-    [Fact]
-    public async Task GetLivePresenceAsync_WhenChannelsUnreadable_IsUnknown()
-    {
-        var service = new ScenarioQueryService(
-            ScenarioTestData.Registry(ScenarioTestData.Single("system", "System", 1000)),
-            ReadinessService([new ChannelReadiness("System", ChannelPresence.Unknown, ChannelEnablement.Unknown)]));
-
-        var presence = await service.GetLivePresenceAsync();
-
-        Assert.False(presence.Known);
-        Assert.Empty(presence.Present);
     }
 
     [Fact]
@@ -75,7 +47,7 @@ public sealed class ScenarioQueryServiceTests
             ScenarioTestData.Single("channel-gated", "System", 1000),
             ScenarioTestData.Single("source-gated", "Application", 1001) with { Gating = ScenarioGating.SourceRegistration });
 
-        var service = new ScenarioQueryService(registry, ReadinessService([]));
+        var service = new ScenarioQueryService(registry);
 
         Assert.Equal(["channel-gated"], service.GetSplashScenarios().Select(scenario => scenario.Id));
     }
@@ -86,22 +58,13 @@ public sealed class ScenarioQueryServiceTests
         var registry = ScenarioTestData.Registry(
             ScenarioTestData.Single("present", "System", 1000),
             ScenarioTestData.Single("absent", "Microsoft-Windows-DNS-Client/Operational", 1014));
-        var service = new ScenarioQueryService(
-            registry,
-            ReadinessService([new ChannelReadiness("System", ChannelPresence.Present, ChannelEnablement.Enabled)]));
+
+        var service = new ScenarioQueryService(registry);
 
         var ids = service.GetSplashScenarios().Select(scenario => scenario.Id).ToHashSet();
 
         Assert.Contains("present", ids);
         Assert.Contains("absent", ids);
         Assert.Equal(2, ids.Count);
-    }
-
-    private static IChannelReadinessService ReadinessService(ImmutableArray<ChannelReadiness> readiness)
-    {
-        var service = Substitute.For<IChannelReadinessService>();
-        service.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>()).Returns(readiness);
-
-        return service;
     }
 }
