@@ -27,52 +27,52 @@
     <section aria-labelledby="empty-dashboard-quickstart-heading" class="empty-dashboard__section">
         <h2 class="empty-dashboard__heading" id="empty-dashboard-quickstart-heading">Quick Launch</h2>
         <div class="empty-dashboard__launchbar">
-            <ChromelessButton aria-label="Open Application + System (live)"
-                CssClass="empty-dashboard__launch empty-dashboard__launch--primary"
+            <ChromelessButton CssClass="empty-dashboard__launch empty-dashboard__launch--primary"
                 Disabled="@_isBusy"
                 IconClass="bi bi-collection"
-                OnClick="OpenApplicationAndSystemAsync">
+                OnClick="OpenApplicationAndSystemAsync"
+                aria-label="Open Application + System (live)">
                 <span>Application + System (live)</span>
             </ChromelessButton>
-            <ChromelessButton aria-label="Open Application (live)"
-                CssClass="empty-dashboard__launch"
+            <ChromelessButton CssClass="empty-dashboard__launch"
                 Disabled="@_isBusy"
                 IconClass="bi bi-window"
-                OnClick="OpenApplicationAsync">
+                OnClick="OpenApplicationAsync"
+                aria-label="Open Application (live)">
                 <span>Application (live)</span>
             </ChromelessButton>
-            <ChromelessButton aria-label="Open System (live)"
-                CssClass="empty-dashboard__launch"
+            <ChromelessButton CssClass="empty-dashboard__launch"
                 Disabled="@_isBusy"
                 IconClass="bi bi-pc-display"
-                OnClick="OpenSystemAsync">
+                OnClick="OpenSystemAsync"
+                aria-label="Open System (live)">
                 <span>System (live)</span>
             </ChromelessButton>
             @if (!SecurityRequiresElevation)
             {
-                <ChromelessButton aria-label="Open Security (live)"
-                    CssClass="empty-dashboard__launch"
+                <ChromelessButton CssClass="empty-dashboard__launch"
                     Disabled="@_isBusy"
                     IconClass="bi bi-shield-lock"
-                    OnClick="OpenSecurityAsync">
+                    OnClick="OpenSecurityAsync"
+                    aria-label="Open Security (live)">
                     <span>Security (live)</span>
                 </ChromelessButton>
             }
             else
             {
-                <ChromelessButton aria-describedby="@ElevationReasonId"
+                <ChromelessButton CssClass="empty-dashboard__launch empty-dashboard__launch--disabled"
+                    IconClass="bi bi-shield-lock"
+                    aria-describedby="@ElevationReasonId"
                     aria-disabled="true"
-                    aria-label="Open Security (live)"
-                    CssClass="empty-dashboard__launch empty-dashboard__launch--disabled"
-                    IconClass="bi bi-shield-lock">
+                    aria-label="Open Security (live)">
                     <span>Security (live)</span>
                 </ChromelessButton>
             }
             <span aria-hidden="true" class="empty-dashboard__launch-divider"></span>
-            <ChromelessButton aria-label="Open Log file..." CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-file-earmark-text" OnClick="OpenFileAsync">
+            <ChromelessButton CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-file-earmark-text" OnClick="OpenFileAsync" aria-label="Open Log file...">
                 <span>Log file...</span>
             </ChromelessButton>
-            <ChromelessButton aria-label="Open Folder..." CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-folder2-open" OnClick="OpenFolderAsync">
+            <ChromelessButton CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-folder2-open" OnClick="OpenFolderAsync" aria-label="Open Folder...">
                 <span>Folder...</span>
             </ChromelessButton>
         </div>
@@ -89,14 +89,16 @@
         }
         else
         {
-            <SidebarTabs @bind-ActiveTab="_activeCategory" @ref="_sidebarTabs" TablistAriaLabel="Scenario categories" Tabs="_tabs" TTab="SplashCategory">
+            <SidebarTabs TTab="SplashCategory" TablistAriaLabel="Scenario categories" Tabs="_tabs" @bind-ActiveTab="_activeCategory" @ref="_sidebarTabs">
                 <TabContent Context="category">
-                    <ScenarioBrowserPanel GetChannelReadiness="GetChannelReadiness"
+                    <ScenarioBrowserPanel CanEnableChannels="ChannelEnable.CanEnable"
+                        GetChannelReadiness="GetChannelReadiness"
                         GetOptionalChannelReadiness="GetOptionalChannelReadiness"
                         IsBusy="_isBusy"
                         IsFavored="IsFavored"
                         IsLivePresent="IsLivePresent"
                         IsScenarioDisabled="IsScenarioDisabled"
+                        OnEnableChannel="EnableChannelAsync"
                         OnLaunch="LaunchScenarioAsync"
                         OnLaunchFromFolder="LaunchScenarioFromFolderAsync"
                         OnSelect="scenario => Select(category, scenario)"

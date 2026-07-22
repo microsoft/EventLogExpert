@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Scenarios;
@@ -15,6 +16,8 @@ public sealed partial class ScenarioDetail
     private readonly string _nameId = ComponentId.NewUnique().Value;
     private readonly string _offlineId = ComponentId.NewUnique().Value;
 
+    [Parameter] public bool CanEnableChannels { get; set; }
+
     [Parameter] public IReadOnlyList<ChannelReadiness> ChannelReadiness { get; set; } = [];
 
     [Parameter] public bool IsBusy { get; set; }
@@ -24,6 +27,8 @@ public sealed partial class ScenarioDetail
     [Parameter] public bool IsFavored { get; set; }
 
     [Parameter] public bool IsLivePresent { get; set; } = true;
+
+    [Parameter] public EventCallback<string> OnEnableChannel { get; set; }
 
     [Parameter] public EventCallback OnLaunch { get; set; }
 
@@ -76,12 +81,24 @@ public sealed partial class ScenarioDetail
         _ => "Enablement unknown"
     };
 
+    private static bool IsSystemChannel(string channel) =>
+        string.Equals(channel, LogChannelNames.ApplicationLog, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(channel, LogChannelNames.SystemLog, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(channel, LogChannelNames.SecurityLog, StringComparison.OrdinalIgnoreCase);
+
     private static string PresenceLabel(ChannelPresence presence) => presence switch
     {
         ChannelPresence.Present => "Present",
         ChannelPresence.Absent => "Not present",
         _ => "Presence unknown"
     };
+
+    // A disabled required channel can be enabled in place only when it is actually present and is not one of the classic
+    // system logs (Application/System/Security), which Windows does not allow toggling.
+    private bool CanOfferEnable(ChannelReadiness readiness) =>
+        readiness.Presence == ChannelPresence.Present &&
+        readiness.Enablement == ChannelEnablement.Disabled &&
+        !IsSystemChannel(readiness.Channel);
 
     private async Task LaunchAsync()
     {

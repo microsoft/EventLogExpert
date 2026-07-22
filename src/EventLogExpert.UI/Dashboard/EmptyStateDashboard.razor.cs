@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Writers;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.EventLog;
@@ -11,6 +12,7 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Scenarios.Catalog;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Modal;
 using Fluxor;
 using Fluxor.Blazor.Web.Components;
@@ -56,6 +58,8 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
     [Inject] private IAnnouncementService Announcer { get; init; } = null!;
+
+    [Inject] private IChannelEnableService ChannelEnable { get; init; } = null!;
 
     [Inject] private IChannelReadinessService ChannelReadinessService { get; init; } = null!;
 
@@ -141,9 +145,7 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
     {
         _splashScenarios = await Task.Run(ScenarioQuery.GetSplashScenarios);
 
-        var readiness = await ChannelReadinessService.GetReadinessAsync(CatalogChannels(_splashScenarios));
-        _readinessByChannel = readiness.ToDictionary(channel => channel.Channel, StringComparer.OrdinalIgnoreCase);
-        _livePresence = LivePresence.FromReadiness(readiness);
+        await RefreshReadinessAsync();
         RebuildCategories();
 
         if (_categories.Count > 0 && !_categories.Any(category => category.Category.Equals(_activeCategory)))
@@ -160,6 +162,15 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
             : scenarios
                 .SelectMany(static scenario => scenario.Channels.Concat(scenario.OptionalChannels))
                 .Distinct(StringComparer.OrdinalIgnoreCase);
+
+    private static string DescribeEnableFailure(string channel, ChannelEnableResult result) => result.Outcome switch
+    {
+        ChannelEnableOutcome.AccessDenied =>
+            $"Enabling \"{channel}\" was denied. Administrator rights are required, and the log's security settings must allow the change.",
+        ChannelEnableOutcome.NotFound => $"The \"{channel}\" log is not registered on this computer.",
+        ChannelEnableOutcome.NotElevated => $"Run EventLogExpert as administrator to enable \"{channel}\".",
+        _ => $"The \"{channel}\" log could not be enabled (error {result.Win32Error})."
+    };
 
     private static string? DescribeFolderLaunch(ScenarioDefinition scenario, ScenarioFolderLaunchResult result)
     {
@@ -239,6 +250,40 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
             .Access is ChannelAccess.Accessible or ChannelAccess.NotEvaluated;
 
     private void ClearFilter() => FilterCommands.ClearAllFilters();
+
+    private Task EnableChannelAsync(string channel) =>
+        RunGuardedAsync(async () =>
+        {
+            bool isAnalyticOrDebug = _readinessByChannel.TryGetValue(channel, out var current)
+                && current.Access == ChannelAccess.NotEvaluated;
+
+            if (!await EnableChannelConfirmation.ConfirmAsync(AlertDialogService, channel, isAnalyticOrDebug))
+            {
+                return;
+            }
+
+            var result = await ChannelEnable.EnableAsync(channel);
+
+            if (result.Outcome is not (ChannelEnableOutcome.Enabled or ChannelEnableOutcome.AlreadyEnabled))
+            {
+                await AlertDialogService.ShowErrorAlert("Enable log", DescribeEnableFailure(channel, result));
+
+                return;
+            }
+
+            // The committed change is authoritative; re-run the full readiness fetch (never a single-channel probe,
+            // which would make LivePresence treat one channel as the complete set) so the pill reflects real state.
+            await RefreshReadinessAsync();
+
+            if (!_readinessByChannel.TryGetValue(channel, out var refreshed)
+                || refreshed.Enablement != ChannelEnablement.Enabled)
+            {
+                await AlertDialogService.ShowAlert(
+                    "Enable log",
+                    $"\"{channel}\" was enabled, but its status could not be confirmed. Refresh to re-check.",
+                    "OK");
+            }
+        });
 
     private IEnumerable<ScenarioDefinition> FavoriteScenarios() =>
         _splashScenarios is null
@@ -411,6 +456,13 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
         _activeCategory = _categories[0].Category;
         _pendingTabFocus = true;
+    }
+
+    private async Task RefreshReadinessAsync()
+    {
+        var readiness = await ChannelReadinessService.GetReadinessAsync(CatalogChannels(_splashScenarios));
+        _readinessByChannel = readiness.ToDictionary(channel => channel.Channel, StringComparer.OrdinalIgnoreCase);
+        _livePresence = LivePresence.FromReadiness(readiness);
     }
 
     private async Task RunGuardedAsync(Func<Task> action)

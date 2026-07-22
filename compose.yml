@@ -13,6 +13,7 @@ x-base: &base
   environment:
     NUGET_PACKAGES: C:/nuget-packages
     EVENTLOG_CONTAINER: "1"
+    EVENTLOG_ALLOW_CHANNEL_MUTATION: "1"
   volumes:
     - type: bind
       source: .
