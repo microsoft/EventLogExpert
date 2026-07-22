@@ -17,6 +17,14 @@ throws `InvalidOperationException` when the `EVENTLOG_CONTAINER` environment var
 missing. This is the **second gate** — even if the runsettings filter is bypassed, the fixture
 ensures tests fail loudly rather than silently polluting your local Application event log.
 
+A small number of tests make an **irreversible machine-wide mutation**. The current example is the
+channel-enable round-trip in `Writers/ChannelConfigWriterIntegrationTests`, which enables a real
+disabled analytic/debug channel (enabling such a channel can clear its records). These require a
+**third gate**: the `EVENTLOG_ALLOW_CHANNEL_MUTATION` environment variable. `compose.yml` and the
+CI workflow set it automatically because those environments are ephemeral. Setting
+`EVENTLOG_CONTAINER=1` alone (including via the host opt-in below) deliberately does **not** run
+these tests, so a developer host is never mutated.
+
 ### To run integration tests
 
 Use the provided script, which handles Docker daemon mode switching automatically.

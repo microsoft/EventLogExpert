@@ -18,6 +18,8 @@ public sealed partial class ScenarioBrowserPanel : IAsyncDisposable
     private ElementReference _scenarioBrowserRootRef;
     private IJSObjectReference? _scrollSuppressorModule;
 
+    [Parameter] public bool CanEnableChannels { get; set; }
+
     [Parameter][EditorRequired]
     public Func<ScenarioDefinition, IReadOnlyList<ChannelReadiness>> GetChannelReadiness { get; set; } = static _ => [];
 
@@ -31,6 +33,8 @@ public sealed partial class ScenarioBrowserPanel : IAsyncDisposable
     [Parameter][EditorRequired] public Func<ScenarioDefinition, bool> IsLivePresent { get; set; } = static _ => true;
 
     [Parameter][EditorRequired] public Func<ScenarioDefinition, bool> IsScenarioDisabled { get; set; } = static _ => false;
+
+    [Parameter] public EventCallback<string> OnEnableChannel { get; set; }
 
     [Parameter] public EventCallback<ScenarioDefinition> OnLaunch { get; set; }
 

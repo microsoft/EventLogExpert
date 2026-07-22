@@ -50,4 +50,13 @@ internal readonly record struct EvtVariant
     [FieldOffset(0)] internal readonly nint XmlValArr;
     [FieldOffset(8)] internal readonly uint Count;
     [FieldOffset(12)] internal readonly uint Type;
+
+    // Zero the whole 16-byte union (including the padding between BooleanVal and Count) before setting the
+    // Boolean, so no indeterminate bytes reach the native EvtSetChannelConfigProperty call.
+    internal EvtVariant(bool booleanValue)
+    {
+        this = default;
+        BooleanVal = booleanValue ? 1 : 0;
+        Type = (uint)EvtVariantType.Boolean;
+    }
 }

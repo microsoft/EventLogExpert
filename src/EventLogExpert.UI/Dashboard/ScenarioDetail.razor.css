@@ -98,6 +98,35 @@
     color: var(--text-secondary);
 }
 
+.scenario-detail__enable {
+    align-self: center;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--border-divider);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.scenario-detail__enable:hover:not(:disabled),
+.scenario-detail__enable:focus-visible {
+    background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
+}
+
+.scenario-detail__enable:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.scenario-detail__enable-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    color: color-mix(in srgb, var(--text-secondary) 85%, transparent);
+}
+
 .scenario-detail__admin-badge {
     display: inline-flex;
     align-items: center;

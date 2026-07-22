@@ -43,6 +43,121 @@ public sealed class ScenarioDetailTests : BunitContext
     }
 
     [Fact]
+    public void EnableButton_WhenAdminAndDisabledRequiredChannelPresent_IsShown()
+    {
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("test", "Test") with { Channels = ["Microsoft-Windows-Sample/Operational"] })
+            .Add(detail => detail.CanEnableChannels, true)
+            .Add(detail => detail.ChannelReadiness,
+            [
+                new ChannelReadiness("Microsoft-Windows-Sample/Operational", ChannelPresence.Present, ChannelEnablement.Disabled)
+            ]));
+
+        Assert.Single(cut.FindAll(".scenario-detail__enable"));
+        Assert.Empty(cut.FindAll(".scenario-detail__enable-hint"));
+    }
+
+    [Fact]
+    public void EnableButton_WhenChannelAbsent_IsAbsent()
+    {
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("test", "Test") with { Channels = ["Microsoft-Windows-Sample/Operational"] })
+            .Add(detail => detail.CanEnableChannels, true)
+            .Add(detail => detail.ChannelReadiness,
+            [
+                new ChannelReadiness("Microsoft-Windows-Sample/Operational", ChannelPresence.Absent, ChannelEnablement.Disabled)
+            ]));
+
+        Assert.Empty(cut.FindAll(".scenario-detail__enable"));
+        Assert.Empty(cut.FindAll(".scenario-detail__enable-hint"));
+    }
+
+    [Fact]
+    public void EnableButton_WhenChannelEnabled_IsAbsent()
+    {
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("test", "Test") with { Channels = ["Microsoft-Windows-Sample/Operational"] })
+            .Add(detail => detail.CanEnableChannels, true)
+            .Add(detail => detail.ChannelReadiness,
+            [
+                new ChannelReadiness("Microsoft-Windows-Sample/Operational", ChannelPresence.Present, ChannelEnablement.Enabled)
+            ]));
+
+        Assert.Empty(cut.FindAll(".scenario-detail__enable"));
+    }
+
+    [Fact]
+    public void EnableButton_WhenClicked_InvokesOnEnableChannelWithChannel()
+    {
+        string? captured = null;
+
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("test", "Test") with { Channels = ["Microsoft-Windows-Sample/Operational"] })
+            .Add(detail => detail.CanEnableChannels, true)
+            .Add(detail => detail.ChannelReadiness,
+            [
+                new ChannelReadiness("Microsoft-Windows-Sample/Operational", ChannelPresence.Present, ChannelEnablement.Disabled)
+            ])
+            .Add(detail => detail.OnEnableChannel, channel => captured = channel));
+
+        cut.Find(".scenario-detail__enable").Click();
+
+        Assert.Equal("Microsoft-Windows-Sample/Operational", captured);
+    }
+
+    [Fact]
+    public void EnableButton_WhenOnlyOptionalChannelDisabled_IsAbsent()
+    {
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("test", "Test") with
+            {
+                Channels = ["Microsoft-Windows-Sample/Operational"],
+                OptionalChannels = ["Microsoft-Windows-Other/Operational"]
+            })
+            .Add(detail => detail.CanEnableChannels, true)
+            .Add(detail => detail.ChannelReadiness,
+            [
+                new ChannelReadiness("Microsoft-Windows-Sample/Operational", ChannelPresence.Present, ChannelEnablement.Enabled)
+            ])
+            .Add(detail => detail.OptionalChannelReadiness,
+            [
+                new ChannelReadiness("Microsoft-Windows-Other/Operational", ChannelPresence.Present, ChannelEnablement.Disabled)
+            ]));
+
+        Assert.Empty(cut.FindAll(".scenario-detail__enable"));
+    }
+
+    [Fact]
+    public void EnableButton_WhenSystemChannelDisabled_IsAbsent()
+    {
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("test", "Test") with { Channels = ["Application"] })
+            .Add(detail => detail.CanEnableChannels, true)
+            .Add(detail => detail.ChannelReadiness,
+            [
+                new ChannelReadiness("Application", ChannelPresence.Present, ChannelEnablement.Disabled)
+            ]));
+
+        Assert.Empty(cut.FindAll(".scenario-detail__enable"));
+        Assert.Empty(cut.FindAll(".scenario-detail__enable-hint"));
+    }
+
+    [Fact]
+    public void EnableHint_WhenNotAdminAndDisabledRequiredChannelPresent_IsShown()
+    {
+        var cut = Render<ScenarioDetail>(parameters => parameters
+            .Add(detail => detail.Scenario, Scenario("test", "Test") with { Channels = ["Microsoft-Windows-Sample/Operational"] })
+            .Add(detail => detail.CanEnableChannels, false)
+            .Add(detail => detail.ChannelReadiness,
+            [
+                new ChannelReadiness("Microsoft-Windows-Sample/Operational", ChannelPresence.Present, ChannelEnablement.Disabled)
+            ]));
+
+        Assert.Empty(cut.FindAll(".scenario-detail__enable"));
+        Assert.Contains("start EventLogExpert as administrator", cut.Find(".scenario-detail__enable-hint").TextContent);
+    }
+
+    [Fact]
     public void Facts_ShowsRequiredChannels()
     {
         var cut = Render<ScenarioDetail>(parameters => parameters

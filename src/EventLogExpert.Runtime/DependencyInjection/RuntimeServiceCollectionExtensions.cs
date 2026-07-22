@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.DependencyInjection;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Writers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Configuration;
 using EventLogExpert.Logging.Routing;
@@ -276,9 +277,12 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<BuiltInScenarioRegistry>();
             services.AddSingleton<IChannelConfigReader>(static sp =>
                 new EventLogChannelConfigReader(CategoryLogger(sp, LogCategories.EventLog)));
+            services.AddSingleton<IChannelConfigWriter>(static sp =>
+                new ChannelConfigWriter(CategoryLogger(sp, LogCategories.EventLog)));
             services.AddSingleton<ChannelPresenceProbe>();
             services.AddSingleton<IChannelPresenceProbe>(static sp => sp.GetRequiredService<ChannelPresenceProbe>());
             services.AddSingleton<IChannelReadinessService>(static sp => sp.GetRequiredService<ChannelPresenceProbe>());
+            services.AddSingleton<IChannelEnableService, ChannelEnableService>();
             services.AddSingleton<IEvtxChannelReader, EvtxChannelReader>();
             services.AddSingleton<IScenarioQueryService, ScenarioQueryService>();
             services.AddSingleton<IScenarioLaunchService, ScenarioLaunchService>();

@@ -409,6 +409,20 @@ internal static partial class NativeMethods
         out int bufferUsed,
         out int propertyCount);
 
+    /// <summary>Persists the channel configuration changes made with EvtSetChannelConfigProperty (requires elevation)</summary>
+    [LibraryImport(EventLogApi, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool EvtSaveChannelConfig(EvtHandle channelConfig, int flags);
+
+    /// <summary>Sets the specified channel configuration property on the in-memory config handle</summary>
+    [LibraryImport(EventLogApi, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool EvtSetChannelConfigProperty(
+        EvtHandle channelConfig,
+        EvtChannelConfigPropertyId propertyId,
+        int flags,
+        in EvtVariant propertyValue);
+
     /// <summary>
     ///     Creates a subscription that will receive current and future events from a channel or log file that match the
     ///     specified query criteria

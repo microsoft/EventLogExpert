@@ -30,6 +30,25 @@
                 <span class="scenario-detail__channel-readiness">
                     <span class="scenario-detail__fact-value">@readiness.Channel</span>
                     @StatusTags(readiness)
+                    @if (CanOfferEnable(readiness))
+                    {
+                        @if (CanEnableChannels)
+                        {
+                            <button class="scenario-detail__enable"
+                                disabled="@IsBusy"
+                                @onclick="() => OnEnableChannel.InvokeAsync(readiness.Channel)"
+                                type="button">
+                                Enable channel
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="scenario-detail__enable-hint">
+                                <i aria-hidden="true" class="bi bi-shield-lock"></i>
+                                This instance is not elevated. Close it, start EventLogExpert as administrator, then return to enable this channel.
+                            </span>
+                        }
+                    }
                 </span>
             }
             @if (DisplayOptionalReadiness.Count > 0)
@@ -75,24 +94,24 @@
         </p>
     }
     <div class="scenario-detail__actions">
-        <ChromelessButton aria-label="@(IsFavored ? $"Remove {Scenario.Name} from favorites" : $"Add {Scenario.Name} to favorites")"
-            aria-pressed="@(IsFavored ? "true" : "false")"
-            CssClass="scenario-detail__star"
+        <ChromelessButton CssClass="scenario-detail__star"
             IconClass="@(IsFavored ? "bi bi-star-fill" : "bi bi-star")"
-            OnClick="OnToggleFavorite" />
-        <ChromelessButton aria-describedby="@(IsDisabled ? _offlineId : null)"
-            aria-disabled="@(IsDisabled ? "true" : "false")"
-            CssClass="scenario-detail__launch"
+            OnClick="OnToggleFavorite"
+            aria-label="@(IsFavored ? $"Remove {Scenario.Name} from favorites" : $"Add {Scenario.Name} to favorites")"
+            aria-pressed="@(IsFavored ? "true" : "false")" />
+        <ChromelessButton CssClass="scenario-detail__launch"
             Disabled="@IsBusy"
             IconClass="bi bi-play-fill"
-            OnClick="LaunchAsync">
+            OnClick="LaunchAsync"
+            aria-describedby="@(IsDisabled ? _offlineId : null)"
+            aria-disabled="@(IsDisabled ? "true" : "false")">
             <span>Launch</span>
         </ChromelessButton>
-        <ChromelessButton aria-label="@($"Open {Scenario.Name} from a folder of exported logs")"
-            CssClass="scenario-detail__open-folder"
+        <ChromelessButton CssClass="scenario-detail__open-folder"
             Disabled="@IsBusy"
             IconClass="bi bi-folder2-open"
-            OnClick="LaunchFromFolderAsync">
+            OnClick="LaunchFromFolderAsync"
+            aria-label="@($"Open {Scenario.Name} from a folder of exported logs")">
             <span>Open from folder</span>
         </ChromelessButton>
     </div>

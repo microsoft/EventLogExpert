@@ -4,6 +4,7 @@
 using AngleSharp.Dom;
 using Bunit;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Writers;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
@@ -32,6 +33,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     private readonly IMenuActionService _actions = Substitute.For<IMenuActionService>();
     private readonly IAlertDialogService _alertDialog = Substitute.For<IAlertDialogService>();
     private readonly IAnnouncementService _announcer = Substitute.For<IAnnouncementService>();
+    private readonly IChannelEnableService _channelEnable = Substitute.For<IChannelEnableService>();
     private readonly IChannelReadinessService _channelReadinessService = Substitute.For<IChannelReadinessService>();
     private readonly IScenarioFavoriteCommands _favoriteCommands = Substitute.For<IScenarioFavoriteCommands>();
     private readonly IState<ScenarioFavoritesState> _favorites = Substitute.For<IState<ScenarioFavoritesState>>();
@@ -70,6 +72,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         Services.AddSingleton(_scenarioLaunch);
         Services.AddSingleton(_scenarioQuery);
         Services.AddSingleton(_channelReadinessService);
+        Services.AddSingleton(_channelEnable);
         Services.AddFluxor(options => options.ScanAssemblies(typeof(EmptyStateDashboard).Assembly));
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
@@ -382,6 +385,49 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.WaitForAssertion(() =>
             _favoriteCommands.Received(1).SetFavorite("application-crashes", "Application crashes", true));
+    }
+
+    [Fact]
+    public void EnableChannel_WhenConfirmCancelled_DoesNotInvokeService()
+    {
+        _channelEnable.CanEnable.Returns(true);
+        _alertDialog.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), "Enable", "Cancel").Returns(false);
+        _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns([new ChannelReadiness("Microsoft-Windows-Sample/Operational", ChannelPresence.Present, ChannelEnablement.Disabled)]);
+        _scenarioQuery.GetSplashScenarios()
+            .Returns([Scenario("test", "Test") with { Channels = ["Microsoft-Windows-Sample/Operational"] }]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() =>
+            Assert.NotEmpty(cut.FindAll(".sidebar-tabs-tabpanel.active .scenario-detail__enable")));
+        cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__enable").Click();
+
+        _channelEnable.DidNotReceive().EnableAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void EnableChannel_WhenConfirmedAndEnabled_InvokesServiceAndRefreshesReadiness()
+    {
+        _channelEnable.CanEnable.Returns(true);
+        _channelEnable.EnableAsync("Microsoft-Windows-Sample/Operational", Arg.Any<CancellationToken>())
+            .Returns(new ChannelEnableResult(ChannelEnableOutcome.Enabled, 0));
+        _alertDialog.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), "Enable", "Cancel").Returns(true);
+        _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(
+                [new ChannelReadiness("Microsoft-Windows-Sample/Operational", ChannelPresence.Present, ChannelEnablement.Disabled)],
+                [new ChannelReadiness("Microsoft-Windows-Sample/Operational", ChannelPresence.Present, ChannelEnablement.Enabled)]);
+        _scenarioQuery.GetSplashScenarios()
+            .Returns([Scenario("test", "Test") with { Channels = ["Microsoft-Windows-Sample/Operational"] }]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() =>
+            Assert.NotEmpty(cut.FindAll(".sidebar-tabs-tabpanel.active .scenario-detail__enable")));
+        cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__enable").Click();
+
+        cut.WaitForAssertion(() =>
+            _channelEnable.Received(1).EnableAsync("Microsoft-Windows-Sample/Operational", Arg.Any<CancellationToken>()));
+        cut.WaitForAssertion(() =>
+            Assert.Empty(cut.FindAll(".sidebar-tabs-tabpanel.active .scenario-detail__enable")));
     }
 
     [Fact]
