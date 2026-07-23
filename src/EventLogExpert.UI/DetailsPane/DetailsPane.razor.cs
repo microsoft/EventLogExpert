@@ -143,15 +143,6 @@ public sealed partial class DetailsPane
         base.OnInitialized();
     }
 
-    // Only Error/Warning get a coloured severity dot, mirroring the log table's level colouring exactly (LevelSeverity +
-    // GetLevelClass); Critical/Information/Verbose/unknown show no dot, matching the table's neutral treatment there.
-    private static string? SeverityDot(SeverityLevel? severity) => severity switch
-    {
-        SeverityLevel.Error => "error",
-        SeverityLevel.Warning => "warning",
-        _ => null
-    };
-
     private async Task CopyEventAsync()
     {
         if (_model is { } model)

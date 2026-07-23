@@ -57,6 +57,28 @@ public sealed class DetailsPaneTests : BunitContext
     }
 
     [Fact]
+    public void CollapseToggle_ControlsTheDetailsBody()
+    {
+        var cut = SelectAndRender(EventWithData(("LogonType", 3)));
+
+        Assert.Equal("details-body", cut.Find("#details-header").GetAttribute("aria-controls"));
+        Assert.NotNull(cut.Find("#details-body"));
+    }
+
+    [Fact]
+    public void CollapsedPane_HidesTabsAndCopyButKeepsToggleAndLabel()
+    {
+        var cut = SelectAndRender(EventWithData(("LogonType", 3)));
+
+        cut.Find("#details-header").Click();
+
+        Assert.NotNull(cut.Find("#details-header"));
+        Assert.Empty(cut.FindAll(".details-tabs"));
+        Assert.Empty(cut.FindAll(".details-copy-event"));
+        Assert.Equal("Details", cut.Find(".details-headerbar-label").TextContent.Trim());
+    }
+
+    [Fact]
     public void CollapsedPane_ReopensOnNextSelection_WhenPreferenceOn()
     {
         _preferences.DisplayPaneSelectionPreference.Returns(true);
@@ -103,6 +125,14 @@ public sealed class DetailsPaneTests : BunitContext
         cut.Find(".details-copy-event").Click();
 
         _clipboard.Received(1).CopyTextAsync(Arg.Is<string>(text => text != null && text.Contains("LogonType: 3 (Network)")));
+    }
+
+    [Fact]
+    public void CopyEvent_IsNotAChildOfTheTablist()
+    {
+        var cut = SelectAndRender(EventWithData(("LogonType", 3)));
+
+        Assert.Empty(cut.Find("[role=tablist]").QuerySelectorAll(".details-copy-event"));
     }
 
     [Fact]
@@ -165,6 +195,15 @@ public sealed class DetailsPaneTests : BunitContext
         var button = Assert.Single(cut.FindAll(".details-correlation-action"));
 
         Assert.Contains("Show related events", button.TextContent);
+    }
+
+    [Fact]
+    public void ExpandedPane_RenamesReaderTabToDetails_AndDropsStandaloneLabel()
+    {
+        var cut = SelectAndRender(EventWithData(("LogonType", 3)));
+
+        Assert.Equal("Details", cut.FindAll(".details-tab")[0].TextContent.Trim());
+        Assert.Empty(cut.FindAll(".details-headerbar-label"));
     }
 
     [Fact]
@@ -231,26 +270,26 @@ public sealed class DetailsPaneTests : BunitContext
         Assert.Equal("true", cut.Find(".details-pane").GetAttribute("data-toggle"));
     }
 
-    [Theory]
-    [InlineData("Critical")]
-    [InlineData("Information")]
-    [InlineData("Verbose")]
-    [InlineData("Audit Success")]
-    public void SeverityDot_AbsentForNonErrorWarningLevels(string level)
+    [Fact]
+    public void SeverityIcon_AbsentForUnknownLevel()
     {
-        var cut = SelectAndRender(BaseEvent() with { Level = level });
+        var cut = SelectAndRender(BaseEvent() with { Level = "Audit Success" });
 
-        Assert.Empty(cut.FindAll(".details-severity-dot"));
+        Assert.Empty(cut.FindAll(".details-summary-level .level-icon"));
     }
 
     [Theory]
-    [InlineData("Error", "error")]
-    [InlineData("Warning", "warning")]
-    public void SeverityDot_ColoredForErrorAndWarning(string level, string expected)
+    [InlineData("Critical", "bi-exclamation-octagon-fill")]
+    [InlineData("Error", "bi-exclamation-circle")]
+    [InlineData("Warning", "bi-exclamation-triangle")]
+    [InlineData("Information", "bi-info-circle")]
+    [InlineData("Verbose", "bi-circle")]
+    public void SeverityIcon_ShownWithDistinctShapeForKnownLevels(string level, string expectedGlyph)
     {
         var cut = SelectAndRender(BaseEvent() with { Level = level });
 
-        Assert.Equal(expected, cut.Find(".details-severity-dot").GetAttribute("data-severity"));
+        var icon = cut.Find(".details-summary-level .level-icon");
+        Assert.Contains(expectedGlyph, icon.GetAttribute("class"));
     }
 
     [Fact]

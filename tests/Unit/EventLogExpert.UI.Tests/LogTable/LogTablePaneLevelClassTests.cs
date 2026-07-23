@@ -7,15 +7,15 @@ namespace EventLogExpert.UI.Tests.LogTable;
 
 public sealed class LogTablePaneLevelClassTests
 {
-    // Pins the level -> icon/colour class mapping after it was refactored to consume the shared
-    // LevelSeverity.FromLevelName parse: Error/Warning keep their colour class, Information is icon-only, and
-    // Critical/Verbose/miscased/unknown fall through to "" exactly as the pre-refactor case-sensitive switch did.
+    // Pins the level -> icon/colour class mapping (delegates to the shared SeverityIcon map via
+    // LevelSeverity.FromLevelName): every known level gets a distinct shape; Error/Warning/Critical/Verbose add a
+    // colour class, Information is icon-only; miscased/unknown parse to null and fall through to "".
     [Theory]
+    [InlineData("Critical", "bi bi-exclamation-octagon-fill critical")]
     [InlineData("Error", "bi bi-exclamation-circle error")]
     [InlineData("Warning", "bi bi-exclamation-triangle warning")]
     [InlineData("Information", "bi bi-info-circle")]
-    [InlineData("Critical", "")]
-    [InlineData("Verbose", "")]
+    [InlineData("Verbose", "bi bi-circle verbose")]
     [InlineData("error", "")]
     [InlineData("Audit Success", "")]
     [InlineData("", "")]

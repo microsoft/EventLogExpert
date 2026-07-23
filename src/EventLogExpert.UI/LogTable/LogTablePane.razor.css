@@ -45,10 +45,6 @@ tr {
     user-select: none;
 }
 
-.error { color: var(--clr-red); }
-
-.warning { color: var(--clr-yellow); }
-
 .table-row { cursor: pointer; }
 
 .table-row.selected {
@@ -58,9 +54,7 @@ tr {
        mode) can still tell which row is selected. */
     box-shadow: inset 3px 0 0 var(--clr-statusbar);
 
-    & span.error { color: var(--accent-on-fill); }
-
-    & span.warning { color: var(--accent-on-fill); }
+    & .level-icon { color: var(--accent-on-fill); }
 }
 
 /* Single rule applies any highlight color via the [data-highlight] palette
@@ -74,9 +68,7 @@ tr {
     color: var(--hl-fg);
     box-shadow: inset 3px 0 0 var(--hl-fg);
 
-    & span.error { color: var(--hl-fg); }
-
-    & span.warning { color: var(--hl-fg); }
+    & .level-icon { color: var(--hl-fg); }
 }
 
 /* Selected + highlighted rows: stack both cues so neither state is lost.
@@ -104,9 +96,7 @@ tr {
         box-shadow: inset 3px 0 0 MarkText;
         forced-color-adjust: none;
 
-        & span.error { color: MarkText; }
-
-        & span.warning { color: MarkText; }
+        & .level-icon { color: MarkText; }
     }
 
     .table-row.selected[data-highlight] {
