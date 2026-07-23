@@ -30,7 +30,6 @@ using System.Collections.Immutable;
 using System.Globalization;
 using Application = Microsoft.Maui.Controls.Application;
 using IDispatcher = Fluxor.IDispatcher;
-using MauiFilePicker = Microsoft.Maui.Storage.FilePicker;
 
 namespace EventLogExpert.Adapters.Menu;
 
@@ -54,6 +53,7 @@ public sealed class MauiMenuActionService(
     IUpdateService updateService,
     ICurrentVersionProvider currentVersionProvider,
     ITraceLogger traceLogger,
+    IFilePickerService filePickerService,
     IFolderPickerService folderPickerService,
     IState<EventLogState> eventLogState,
     IState<LogTableState> logTableState,
@@ -71,6 +71,7 @@ public sealed class MauiMenuActionService(
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IEventTableExporter _eventTableExporter = eventTableExporter;
     private readonly IExportProgressBannerService _exportProgress = exportProgressBannerService;
+    private readonly IFilePickerService _filePickerService = filePickerService;
     private readonly IFileSaveService _fileSaveService = fileSaveService;
     private readonly IFilterLibraryCommands _filterLibraryCommands = filterLibraryCommands;
     private readonly IFilterPaneCommands _filterPaneCommands = filterPaneCommands;
@@ -271,23 +272,22 @@ public sealed class MauiMenuActionService(
 
     public async Task OpenFileAsync(bool combineLog)
     {
-        var options = new PickOptions
+        IReadOnlyList<string> paths;
+
+        try
         {
-            FileTypes = new FilePickerFileType(
-                new Dictionary<DevicePlatform, IEnumerable<string>> { { DevicePlatform.WinUI, [".evtx"] } })
-        };
+            paths = await _filePickerService.PickMultipleAsync("Open Event Logs", [".evtx"]);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await _dialogService.ShowAlert("Open File Failed", ex.Message, "Ok");
 
-        var files = await MauiFilePicker.Default.PickMultipleAsync(options);
+            return;
+        }
 
-        if (!files.Any()) { return; }
+        if (paths.Count == 0) { return; }
 
-        var paths = files
-            .OfType<FileResult>()
-            .Where(file => !string.IsNullOrEmpty(file.FullPath))
-            .Select(file => (file.FullPath, LogPathType.File))
-            .ToList();
-
-        await OpenLogsBatchAsync(paths, combineLog);
+        await OpenLogsBatchAsync(paths.Select(path => (path, LogPathType.File)), combineLog);
     }
 
     public async Task OpenFolderAsync(bool combineLog)
