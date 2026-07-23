@@ -16,6 +16,7 @@ using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.LogTable.Grouping;
 using Fluxor;
@@ -143,14 +144,7 @@ public sealed partial class LogTablePane
         return new ItemsProviderResult<DisplayRow>(window, totalCount);
     }
 
-    internal static string GetLevelClass(string level) =>
-        LevelSeverity.FromLevelName(level) switch
-        {
-            SeverityLevel.Error => "bi bi-exclamation-circle error",
-            SeverityLevel.Warning => "bi bi-exclamation-triangle warning",
-            SeverityLevel.Information => "bi bi-info-circle",
-            _ => string.Empty,
-        };
+    internal static string GetLevelClass(string level) => SeverityIcon.CssClass(LevelSeverity.FromLevelName(level));
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {

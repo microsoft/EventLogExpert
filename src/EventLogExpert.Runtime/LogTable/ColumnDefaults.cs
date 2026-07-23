@@ -37,7 +37,7 @@ internal sealed class ColumnDefaults : ILogTableColumnDefaultsProvider
     private static readonly FrozenDictionary<ColumnName, int> s_widths = new Dictionary<ColumnName, int>
     {
         [ColumnName.RecordId] = 90,
-        [ColumnName.Level] = 100,
+        [ColumnName.Level] = 115,
         [ColumnName.DateAndTime] = 160,
         [ColumnName.ActivityId] = 270,
         [ColumnName.Log] = 100,

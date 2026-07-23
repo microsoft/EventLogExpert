@@ -3,20 +3,8 @@
 <div class="details-pane" data-toggle="@IsExpanded" hidden="@(_selectedEvent is null)">
     <div class="details-resizer"></div>
 
-    <ChromelessButton aria-expanded="@IsExpanded"
-        aria-label="@(_isExpanded ? "Collapse details" : "Expand details")"
-        CssClass="flex-space-between"
-        id="details-header"
-        OnClick="ToggleMenu">
-        <span>Details</span>
-
-        <span class="menu-toggle" data-rotate="@IsExpanded">
-            <i class="bi bi-caret-up"></i>
-        </span>
-    </ChromelessButton>
-
-    <div class="details-body">
-        @if (_model is not null)
+    <div class="details-headerbar">
+        @if (_isExpanded && _model is not null)
         {
             <div aria-label="Event detail views" class="details-tabs" role="tablist">
                 <button aria-controls="details-tabpanel-reader"
@@ -27,7 +15,7 @@
                     @onclick="() => SetTab(DetailsTab.Reader)"
                     role="tab"
                     type="button">
-                    Reader
+                    Details
                 </button>
                 <button aria-controls="details-tabpanel-xml"
                     aria-selected="@(_activeTab == DetailsTab.Xml ? "true" : "false")"
@@ -39,13 +27,36 @@
                     type="button">
                     XML
                 </button>
+            </div>
+        }
+        else
+        {
+            <span class="details-headerbar-label">Details</span>
+        }
 
+        <div class="details-headerbar-actions">
+            @if (_isExpanded && _model is not null)
+            {
                 <button aria-label="Copy event to clipboard" class="details-copy-event" @onclick="CopyEventAsync" type="button">
                     <i class="bi bi-clipboard"></i>
                     <span class="details-copy-event-label">Copy event</span>
                 </button>
-            </div>
+            }
+            <Button CssClass="menu-toggle"
+                IconClass="bi bi-caret-up"
+                IconOnly
+                OnClick="ToggleMenu"
+                aria-controls="details-body"
+                aria-expanded="@IsExpanded"
+                aria-label="@(_isExpanded ? "Collapse details" : "Expand details")"
+                data-rotate="@IsExpanded"
+                id="details-header" />
+        </div>
+    </div>
 
+    <div class="details-body" id="details-body">
+        @if (_model is not null)
+        {
             <div aria-labelledby="details-tab-reader" class="details-reader" hidden="@(_activeTab != DetailsTab.Reader)" id="details-tabpanel-reader" role="tabpanel">
                 @if (_activeTab == DetailsTab.Reader)
                 {
@@ -56,9 +67,9 @@
                                 @if (!string.IsNullOrEmpty(_model.Level))
                                 {
                                     <span class="details-summary-level">
-                                        @if (SeverityDot(_model.Severity) is { } severity)
+                                        @if (SeverityIcon.CssClass(_model.Severity) is { Length: > 0 } levelIcon)
                                         {
-                                            <span aria-hidden="true" class="details-severity-dot" data-severity="@severity" title="@($"Severity: {_model.Level}")"></span>
+                                            <span aria-hidden="true" class="level-icon @levelIcon" title="@($"Severity: {_model.Level}")"></span>
                                         }
                                         @_model.Level
                                     </span>
@@ -211,25 +222,25 @@
                         </div>
                     </div>
                 }
-                </div>
+            </div>
 
-                <p aria-labelledby="details-tab-xml" class="details-xml" hidden="@(_activeTab != DetailsTab.Xml)" id="details-tabpanel-xml" role="tabpanel">
-                    @if (_activeTab == DetailsTab.Xml)
+            <p aria-labelledby="details-tab-xml" class="details-xml" hidden="@(_activeTab != DetailsTab.Xml)" id="details-tabpanel-xml" role="tabpanel">
+                @if (_activeTab == DetailsTab.Xml)
+                {
+                    @if (_resolvedXml is null)
                     {
-                        @if (_resolvedXml is null)
-                        {
-                            <text>Resolving XML...</text>
-                        }
-                        else if (_resolvedXml.Length > 0)
-                        {
-                            @GetXmlForDisplay()
-                        }
-                        else
-                        {
-                            <text>No XML available for this event.</text>
-                        }
+                        <text>Resolving XML...</text>
                     }
-                </p>
+                    else if (_resolvedXml.Length > 0)
+                    {
+                        @GetXmlForDisplay()
+                    }
+                    else
+                    {
+                        <text>No XML available for this event.</text>
+                    }
+                }
+            </p>
         }
     </div>
 </div>

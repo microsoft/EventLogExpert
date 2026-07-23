@@ -15,7 +15,8 @@
     }
 }
 
-.details-pane[data-toggle="false"] ::deep > :not(#details-header) { display: none; }
+.details-pane[data-toggle="false"] ::deep .details-body,
+.details-pane[data-toggle="false"] ::deep .details-resizer { display: none; }
 
 .details-resizer {
     position: absolute;
@@ -30,22 +31,41 @@
     cursor: n-resize;
 }
 
-.details-pane ::deep #details-header {
-    appearance: none;
-    padding: 0;
-    border: 0;
-    font: inherit;
-    text-align: left;
-    color: inherit;
-    background: none;
-    user-select: none;
-    cursor: pointer;
+.details-headerbar {
+    container: details-headerbar / inline-size;
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 0.5rem;
+    border-bottom: 1px solid var(--border-divider);
+}
+
+/* Narrow pane: drop the "Copy event" text (its aria-label stays) so the toggle + tabs + copy icon keep to one
+   row instead of clipping under the pane's overflow:hidden; flex-wrap above is the last-resort safety. */
+@container details-headerbar (max-width: 22rem) {
+    .details-copy-event-label { display: none; }
+}
+
+.details-headerbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.details-headerbar-label {
+    padding: 5px 0;
+    color: var(--text-primary);
+    font-weight: 600;
 }
 
 .details-body {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow: hidden;
 }
 
@@ -54,8 +74,6 @@
     flex: 0 0 auto;
     align-items: center;
     gap: 2px;
-    padding: 0 0.5rem;
-    border-bottom: 1px solid var(--border-divider);
 }
 
 .details-tab {
@@ -142,17 +160,7 @@
     font-size: 13px;
 }
 
-.details-severity-dot {
-    width: 8px;
-    height: 8px;
-    flex: 0 0 auto;
-    border-radius: 50%;
-    background: var(--text-secondary);
-}
-
-.details-severity-dot[data-severity="error"] { background: var(--clr-red); }
-
-.details-severity-dot[data-severity="warning"] { background: var(--clr-yellow); }
+.details-summary-level .level-icon { margin-inline-end: 0; }
 
 .details-grid {
     display: grid;
@@ -281,7 +289,6 @@
     align-items: center;
     gap: 0.35rem;
     height: 24px;
-    margin-left: auto;
     padding: 0 0.55rem;
     border: 0;
     border-radius: 4px;

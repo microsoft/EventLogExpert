@@ -47,9 +47,9 @@
                     @oncontextmenu:stopPropagation="true"
                     role="gridcell">
 
-                    @if (capturedColumn == ColumnName.Level)
+                    @if (capturedColumn == ColumnName.Level && GetLevelClass(row.Lean.Level) is { Length: > 0 } levelIcon)
                     {
-                        <span aria-hidden="true" class="@GetLevelClass(row.Lean.Level)"></span>
+                        <span aria-hidden="true" class="level-icon @levelIcon"></span>
                     }
 
                     @FindableCell((EventTableColumnFormatter.GetCellText(row.Lean, capturedColumn, _timeZoneSettings), isCurrentFindMatch))
