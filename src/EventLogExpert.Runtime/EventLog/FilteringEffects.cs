@@ -4,7 +4,6 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.FilterProgress;
@@ -21,7 +20,6 @@ internal sealed class FilteringEffects(
     IState<EventLogState> eventLogState,
     IState<RawEventStoreState> rawEventStore,
     IState<LogTableState> logTableState,
-    IFilterService filterService,
     [FromKeyedServices(LogCategories.EventLog)] ITraceLogger logger,
     LogCloseCoordinator closeCoordinator,
     EventLogConcurrencyState concurrencyState,
@@ -31,53 +29,30 @@ internal sealed class FilteringEffects(
     private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
     private readonly TimeSpan _convergenceDelay = convergenceDelay ?? TimeSpan.FromMilliseconds(250);
     private readonly IState<EventLogState> _eventLogState = eventLogState;
-    private readonly IFilterService _filterService = filterService;
-    private readonly ITraceLogger _logger = logger;
     private readonly IState<LogTableState> _logTableState = logTableState;
+    private readonly ITraceLogger _logger = logger;
     private readonly IState<RawEventStoreState> _rawEventStore = rawEventStore;
 
     [EffectMethod]
     public Task HandleAddEvent(AddEventAction action, IDispatcher dispatcher)
     {
-        if (!_eventLogState.Value.OpenLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog))
+        // The non-live-tail buffering is handled atomically by ReduceAddEvent; this effect only drives the
+        // continuously-update live tail (ingest the new event, rebuild its display).
+        if (!_eventLogState.Value.ContinuouslyUpdate ||
+            !_eventLogState.Value.OpenLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog))
         {
             return Task.CompletedTask;
         }
 
-        if (_eventLogState.Value.ContinuouslyUpdate)
+        var newEventsByLog = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
-            // Raw ingest is unconditional even when the filter hides the event; only the display rebuild is filter-gated.
-            dispatcher.Dispatch(new IngestRawEventsAction(
-                new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [owningLog.Id] = [action.NewEvent] },
-                RawIngestMode.Prepend));
-
-            // Skip the rebuild when the new event is hidden: the view is unchanged, so avoid the version churn.
-            var filteredNew = _filterService.GetFilteredEvents(
-                [action.NewEvent],
-                _eventLogState.Value.AppliedFilter);
-
-            if (filteredNew.Count > 0 &&
-                _rawEventStore.Value.ByLog.TryGetValue(owningLog.Id, out var store))
-            {
-                var view = DisplayViewBuilder.Build(
-                    store, owningLog.Id, _eventLogState.Value.AppliedFilter, _logTableState.Value.SortContext);
-
-                dispatcher.Dispatch(new AppendTableEventsAction(owningLog.Id) { View = view });
-            }
-
-            return Task.CompletedTask;
-        }
-
-        var updatedBuffer = new List<ResolvedEvent>(_eventLogState.Value.NewEventBuffer.Count + 1)
-        {
-            action.NewEvent
+            [owningLog.Id] = [action.NewEvent]
         };
 
-        updatedBuffer.AddRange(_eventLogState.Value.NewEventBuffer);
-
-        var full = updatedBuffer.Count >= EventLogState.MaxNewEvents;
-
-        dispatcher.Dispatch(new EventBufferedAction(updatedBuffer.AsReadOnly(), full));
+        // Ingest before the rebuild: the filter-gated build runs in the continuation so it reads the post-ingest store
+        // (inlining here would lag the tail by one event). Live tail owns no buffer.
+        dispatcher.Dispatch(new IngestRawEventsAction(newEventsByLog, RawIngestMode.Prepend));
+        dispatcher.Dispatch(new RebuildDisplayViewsAction(newEventsByLog, BufferEntriesToConsume: null));
 
         return Task.CompletedTask;
     }
@@ -198,8 +173,7 @@ internal sealed class FilteringEffects(
     {
         if (action.ContinuouslyUpdate)
         {
-            LogReloadEffects.ProcessNewEventBuffer(
-                _eventLogState.Value, _rawEventStore, _logTableState, dispatcher, _filterService);
+            LogReloadEffects.ProcessNewEventBuffer(_eventLogState.Value, dispatcher);
         }
 
         return Task.CompletedTask;

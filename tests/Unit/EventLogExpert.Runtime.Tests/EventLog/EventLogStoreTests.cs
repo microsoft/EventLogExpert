@@ -20,16 +20,18 @@ public sealed class EventLogStoreTests
     public void BufferedEventsWorkflow_ShouldHandleCorrectly()
     {
         // Arrange
-        var state = new EventLogState { ContinuouslyUpdate = false };
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
 
-        var events = new List<ResolvedEvent>
+        var state = new EventLogState
         {
-            FilterEventBuilder.CreateTestEvent(100),
-            FilterEventBuilder.CreateTestEvent(200)
+            ContinuouslyUpdate = false,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
+                .Add(Constants.LogNameTestLog, new OpenLogInfo(logData.Id, LogPathType.Channel))
         };
 
-        // Act: Buffer events
-        state = Reducers.ReduceEventBuffered(state, new EventBufferedAction(events, false));
+        // Act: buffer two events additively (newest first).
+        state = Reducers.ReduceAddEvent(state, new AddEventAction(FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog)));
+        state = Reducers.ReduceAddEvent(state, new AddEventAction(FilterEventBuilder.CreateTestEvent(200, logName: Constants.LogNameTestLog)));
 
         // Assert
         Assert.Equal(2, state.NewEventBuffer.Count);
@@ -258,6 +260,96 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
+    public void ReduceAddEvent_TwoSequentialEvents_BothPreservedNewestFirst()
+    {
+        // Arrange
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var state = new EventLogState
+        {
+            ContinuouslyUpdate = false,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
+                .Add(Constants.LogNameTestLog, new OpenLogInfo(logData.Id, LogPathType.Channel))
+        };
+
+        var first = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
+        var second = FilterEventBuilder.CreateTestEvent(200, logName: Constants.LogNameTestLog);
+
+        // Act: each add composes against current state, so the second cannot clobber the first (the pre-fix whole-buffer
+        // effect write could).
+        state = Reducers.ReduceAddEvent(state, new AddEventAction(first));
+        state = Reducers.ReduceAddEvent(state, new AddEventAction(second));
+
+        // Assert
+        Assert.Equal(2, state.NewEventBuffer.Count);
+        Assert.Same(second, state.NewEventBuffer[0]);
+        Assert.Same(first, state.NewEventBuffer[1]);
+    }
+
+    [Fact]
+    public void ReduceAddEvent_WhenContinuouslyUpdating_DoesNotBuffer()
+    {
+        // Arrange
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var state = new EventLogState
+        {
+            ContinuouslyUpdate = true,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
+                .Add(Constants.LogNameTestLog, new OpenLogInfo(logData.Id, LogPathType.Channel))
+        };
+
+        // Act
+        var result = Reducers.ReduceAddEvent(
+            state, new AddEventAction(FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog)));
+
+        // Assert: buffering is the live-tail effect's job when continuously updating, not the reducer's.
+        Assert.Same(state, result);
+        Assert.Empty(result.NewEventBuffer);
+    }
+
+    [Fact]
+    public void ReduceAddEvent_WhenLogNotOpen_DoesNotBuffer()
+    {
+        // Arrange
+        var state = new EventLogState { ContinuouslyUpdate = false };
+
+        // Act
+        var result = Reducers.ReduceAddEvent(
+            state, new AddEventAction(FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog)));
+
+        // Assert
+        Assert.Same(state, result);
+        Assert.Empty(result.NewEventBuffer);
+    }
+
+    [Fact]
+    public void ReduceAddEvent_WhenLogOpenAndNotContinuouslyUpdating_PrependsEventAndRecomputesFull()
+    {
+        // Arrange: buffer already at MaxNewEvents - 1 so the next add flips the full flag.
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var existing = Enumerable.Range(0, EventLogState.MaxNewEvents - 1)
+            .Select(i => FilterEventBuilder.CreateTestEvent(i, logName: Constants.LogNameTestLog))
+            .ToList();
+
+        var state = new EventLogState
+        {
+            ContinuouslyUpdate = false,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
+                .Add(Constants.LogNameTestLog, new OpenLogInfo(logData.Id, LogPathType.Channel)),
+            NewEventBuffer = existing
+        };
+
+        var newEvent = FilterEventBuilder.CreateTestEvent(9999, logName: Constants.LogNameTestLog);
+
+        // Act
+        var result = Reducers.ReduceAddEvent(state, new AddEventAction(newEvent));
+
+        // Assert: prepended (newest first) and the full flag recomputed.
+        Assert.Equal(EventLogState.MaxNewEvents, result.NewEventBuffer.Count);
+        Assert.Same(newEvent, result.NewEventBuffer[0]);
+        Assert.True(result.NewEventBufferIsFull);
+    }
+
+    [Fact]
     public void ReduceApplyFilter_WhenFilterChanged_ShouldUpdateFilter()
     {
         // Arrange
@@ -423,40 +515,42 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
-    public void ReduceEventBuffered_ShouldUpdateBufferAndFullFlag()
+    public void ReduceLoadEventsPartial_WhenLogIdDoesNotMatch_ShouldReturnStateUnchanged()
     {
         // Arrange
         var state = new EventLogState();
 
-        var events = new List<ResolvedEvent>
-        {
-            FilterEventBuilder.CreateTestEvent(100),
-            FilterEventBuilder.CreateTestEvent(200)
-        };
+        state = Reducers.ReduceOpenLog(state,
+            new OpenLogAction(Constants.LogNameTestLog, LogPathType.Channel));
 
-        var action = new EventBufferedAction(events, true);
+        var staleLogData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
 
-        // Act
-        var newState = Reducers.ReduceEventBuffered(state, action);
+        // Act: stale partial with mismatched ID
+        var newState = Reducers.ReduceLoadEventsPartial(state,
+            new LoadEventsPartialAction(staleLogData, events));
 
-        // Assert
-        Assert.Equal(2, newState.NewEventBuffer.Count);
-        Assert.True(newState.NewEventBufferIsFull);
+        // Assert: state unchanged, original log preserved with its ID
+        var originalId = state.OpenLogs[Constants.LogNameTestLog].Id;
+        Assert.NotEqual(originalId, staleLogData.Id);
+        Assert.Same(state, newState);
+        Assert.Equal(originalId, newState.OpenLogs[Constants.LogNameTestLog].Id);
     }
 
     [Fact]
-    public void ReduceEventBuffered_WhenNotFull_ShouldSetFullFlagFalse()
+    public void ReduceLoadEventsPartial_WhenLogNotInOpenLogs_ShouldReturnStateUnchanged()
     {
-        // Arrange
-        var state = new EventLogState { NewEventBufferIsFull = true };
-        var events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
-        var action = new EventBufferedAction(events, false);
+        // Arrange: no logs open
+        var state = new EventLogState();
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
 
         // Act
-        var newState = Reducers.ReduceEventBuffered(state, action);
+        var newState = Reducers.ReduceLoadEventsPartial(state,
+            new LoadEventsPartialAction(logData, events));
 
         // Assert
-        Assert.False(newState.NewEventBufferIsFull);
+        Assert.Same(state, newState);
     }
 
     [Fact]
@@ -496,45 +590,6 @@ public sealed class EventLogStoreTests
         // Assert: state unchanged, log NOT resurrected
         Assert.Same(state, newState);
         Assert.Equal(0, newState.OpenLogCount);
-    }
-
-    [Fact]
-    public void ReduceLoadEventsPartial_WhenLogIdDoesNotMatch_ShouldReturnStateUnchanged()
-    {
-        // Arrange
-        var state = new EventLogState();
-
-        state = Reducers.ReduceOpenLog(state,
-            new OpenLogAction(Constants.LogNameTestLog, LogPathType.Channel));
-
-        var staleLogData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
-
-        // Act: stale partial with mismatched ID
-        var newState = Reducers.ReduceLoadEventsPartial(state,
-            new LoadEventsPartialAction(staleLogData, events));
-
-        // Assert: state unchanged, original log preserved with its ID
-        var originalId = state.OpenLogs[Constants.LogNameTestLog].Id;
-        Assert.NotEqual(originalId, staleLogData.Id);
-        Assert.Same(state, newState);
-        Assert.Equal(originalId, newState.OpenLogs[Constants.LogNameTestLog].Id);
-    }
-
-    [Fact]
-    public void ReduceLoadEventsPartial_WhenLogNotInOpenLogs_ShouldReturnStateUnchanged()
-    {
-        // Arrange: no logs open
-        var state = new EventLogState();
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
-
-        // Act
-        var newState = Reducers.ReduceLoadEventsPartial(state,
-            new LoadEventsPartialAction(logData, events));
-
-        // Assert
-        Assert.Same(state, newState);
     }
 
     [Fact]
@@ -640,6 +695,21 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
+    public void ReduceSelectEvent_WhenMultiSelectAndEventAlreadySelected_ShouldRemoveEvent()
+    {
+        // Arrange
+        var selection = Entry(0);
+        var state = new EventLogState { Selection = [selection] };
+        var action = new SelectEventAction(selection, true);
+
+        // Act
+        var newState = Reducers.ReduceSelectEvent(state, action);
+
+        // Assert
+        Assert.Empty(newState.Selection);
+    }
+
+    [Fact]
     public void ReduceSelectEvent_WhenMultiSelect_ShouldAddToExisting()
     {
         // Arrange
@@ -655,21 +725,6 @@ public sealed class EventLogStoreTests
         Assert.Equal(2, newState.Selection.Count);
         Assert.Contains(existing, newState.Selection);
         Assert.Contains(incoming, newState.Selection);
-    }
-
-    [Fact]
-    public void ReduceSelectEvent_WhenMultiSelectAndEventAlreadySelected_ShouldRemoveEvent()
-    {
-        // Arrange
-        var selection = Entry(0);
-        var state = new EventLogState { Selection = [selection] };
-        var action = new SelectEventAction(selection, true);
-
-        // Act
-        var newState = Reducers.ReduceSelectEvent(state, action);
-
-        // Assert
-        Assert.Empty(newState.Selection);
     }
 
     [Fact]
