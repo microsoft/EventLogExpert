@@ -6,8 +6,8 @@ using EventLogExpert.Runtime.Common.Files;
 
 namespace EventLogExpert.Adapters.FilePicker;
 
-/// <summary>MAUI adapter that delegates to <see cref="WinUiFolderPicker.PickFolderAsync"/>.</summary>
 internal sealed class MauiFolderPickerService : IFolderPickerService
 {
-    public Task<string?> PickFolderAsync() => WinUiFolderPicker.PickFolderAsync();
+    public Task<string?> PickFolderAsync() =>
+        MainThread.InvokeOnMainThreadAsync(() => Win32FileDialogService.PickFolderAsync("Select Folder"));
 }
