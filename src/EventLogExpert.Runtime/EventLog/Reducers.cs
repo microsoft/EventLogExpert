@@ -19,6 +19,27 @@ internal sealed class Reducers
         ImmutableDictionary<string, ImmutableHashSet<string>>.Empty;
 
     [ReducerMethod]
+    public static EventLogState ReduceAddEvent(EventLogState state, AddEventAction action)
+    {
+        // Buffer additively in the reducer so concurrent adds and the flush's consume compose against current state (a
+        // stale whole-buffer effect write could clobber them). Continuously-update buffers nothing; HandleAddEvent drives
+        // the live tail.
+        if (state.ContinuouslyUpdate || !state.OpenLogs.ContainsKey(action.NewEvent.OwningLog))
+        {
+            return state;
+        }
+
+        var buffer = new List<ResolvedEvent>(state.NewEventBuffer.Count + 1) { action.NewEvent };
+        buffer.AddRange(state.NewEventBuffer);
+
+        return state with
+        {
+            NewEventBuffer = buffer.AsReadOnly(),
+            NewEventBufferIsFull = buffer.Count >= EventLogState.MaxNewEvents
+        };
+    }
+
+    [ReducerMethod]
     public static EventLogState ReduceApplyFilter(EventLogState state, ApplyFilterAction action)
     {
         if (!action.Filter.HasFilteringChangedFrom(state.AppliedFilter))
@@ -75,10 +96,6 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceEventBuffered(EventLogState state, EventBufferedAction action) =>
-        state with { NewEventBuffer = action.UpdatedBuffer, NewEventBufferIsFull = action.IsFull };
-
-    [ReducerMethod]
     public static EventLogState ReduceLoadEvents(EventLogState state, LoadEventsAction action)
     {
         if (!state.OpenLogs.TryGetValue(action.LogData.Name, out var existing) ||
@@ -129,6 +146,23 @@ internal sealed class Reducers
         {
             NamesByLog = newNamesByLog,
             LoadedLogNames = RecomputeLoadedLogNames(newNamesByLog, state.LoadedLogNames)
+        };
+    }
+
+    [ReducerMethod]
+    public static EventLogState ReduceNewEventBufferConsumed(EventLogState state, NewEventBufferConsumedAction action)
+    {
+        if (action.ConsumedEvents.Count == 0) { return state; }
+
+        // Remove only the captured entries by reference identity, so an event a watcher buffered during the flush
+        // (prepended after the snapshot) survives. Mirrors ReduceCloseLog's filtered removal + IsFull recompute.
+        var consumed = new HashSet<object>(action.ConsumedEvents, ReferenceEqualityComparer.Instance);
+        var remaining = state.NewEventBuffer.Where(bufferedEvent => !consumed.Contains(bufferedEvent)).ToList();
+
+        return state with
+        {
+            NewEventBuffer = remaining,
+            NewEventBufferIsFull = remaining.Count >= EventLogState.MaxNewEvents
         };
     }
 

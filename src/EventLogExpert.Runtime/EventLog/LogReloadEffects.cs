@@ -75,12 +75,44 @@ internal sealed class LogReloadEffects(
         return Task.CompletedTask;
     }
 
-    internal static void ProcessNewEventBuffer(
-        EventLogState state,
-        IState<RawEventStoreState> rawEventStore,
-        IState<LogTableState> logTableState,
-        IDispatcher dispatcher,
-        IFilterService filterService)
+    [EffectMethod]
+    public Task HandleRebuildDisplayViews(RebuildDisplayViewsAction action, IDispatcher dispatcher)
+    {
+        // Continuation of the IngestRawEventsAction dispatched just before it, so these reads see the post-ingest store. Do
+        // not inline back into the producer effect: a same-effect read would see the stale pre-ingest store (the fixed bug).
+        var raw = _rawEventStore.Value.ByLog;
+        var filter = _eventLogState.Value.AppliedFilter;
+        var context = _logTableState.Value.SortContext;
+        var viewsByLog = new Dictionary<EventLogId, EventColumnView>(action.NewEventsByLog.Count);
+
+        foreach (var (logId, newEvents) in action.NewEventsByLog)
+        {
+            // Existence check before filter work: skip a log a concurrent close dropped without filtering it, and rebuild
+            // only when a new event survives the filter so a fully hidden batch doesn't churn the view.
+            if (raw.TryGetValue(logId, out var store) &&
+                _filterService.GetFilteredEvents(newEvents, filter).Count > 0)
+            {
+                viewsByLog[logId] = DisplayViewBuilder.Build(store, logId, filter, context);
+            }
+        }
+
+        if (viewsByLog.Count > 0)
+        {
+            dispatcher.Dispatch(new AppendTableEventsBatchAction { ViewsByLog = viewsByLog });
+        }
+
+        // Consume only after a successful rebuild (unreachable if it threw above), so a build failure preserves the count.
+        // Consuming the captured snapshot - not a blanket clear - keeps a mid-flush event; skip the dispatch when nothing
+        // was captured (an all-filtered rebuild still consumes its non-empty snapshot).
+        if (action.BufferEntriesToConsume is { Count: > 0 } bufferEntriesToConsume)
+        {
+            dispatcher.Dispatch(new NewEventBufferConsumedAction(bufferEntriesToConsume));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    internal static void ProcessNewEventBuffer(EventLogState state, IDispatcher dispatcher)
     {
         var grouped = new Dictionary<EventLogId, List<ResolvedEvent>>();
 
@@ -106,29 +138,9 @@ internal sealed class LogReloadEffects(
             dispatcher.Dispatch(new IngestRawEventsAction(rawByLog, RawIngestMode.Prepend));
         }
 
-        var postIngestRaw = rawEventStore.Value.ByLog;
-        var context = logTableState.Value.SortContext;
-        var filter = state.AppliedFilter;
-        var viewsByLog = new Dictionary<EventLogId, EventColumnView>(grouped.Count);
-
-        foreach (var (logId, events) in grouped)
-        {
-            // Rebuild a log's display only when a buffered event survives the filter, so a fully hidden batch doesn't
-            // churn the view or its version.
-            var filtered = filterService.GetFilteredEvents(events, filter);
-
-            if (filtered.Count > 0 && postIngestRaw.TryGetValue(logId, out var store))
-            {
-                viewsByLog[logId] = DisplayViewBuilder.Build(store, logId, filter, context);
-            }
-        }
-
-        if (viewsByLog.Count > 0)
-        {
-            dispatcher.Dispatch(new AppendTableEventsBatchAction { ViewsByLog = viewsByLog });
-        }
-
-        dispatcher.Dispatch(new EventBufferedAction([], false));
+        // Continuation runs after the ingest, so it reads the post-ingest store and consumes exactly this snapshot by
+        // identity. Atomic reducer buffering (ReduceAddEvent) keeps an event buffered concurrently with the flush alive.
+        dispatcher.Dispatch(new RebuildDisplayViewsAction(rawByLog, BufferEntriesToConsume: state.NewEventBuffer));
     }
 
     private static void RestoreSelection(
@@ -165,7 +177,4 @@ internal sealed class LogReloadEffects(
         SelectionEntry? focused = focusEntry ?? (restored.Count > 0 ? restored[^1] : null);
         dispatcher.Dispatch(new SetSelectedEventsAction(restored, focused));
     }
-
-    private void ProcessNewEventBuffer(EventLogState state, IDispatcher dispatcher) =>
-        ProcessNewEventBuffer(state, _rawEventStore, _logTableState, dispatcher, _filterService);
 }
