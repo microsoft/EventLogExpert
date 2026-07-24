@@ -182,7 +182,6 @@ public sealed class MauiMenuActionService(
         }
 
         CancellationTokenSource cancellation = new();
-        bool finished = false;
         string? savedPath = null;
         Exception? failure = null;
         bool canceled = false;
@@ -192,22 +191,22 @@ public sealed class MauiMenuActionService(
             savedPath = await _fileSaveService.SaveStreamingAsync(
                 suggestedFileName,
                 fileTypes,
-                async (stream, token) =>
+                async (stream, _) =>
                 {
-                    // Begin only once the picker has returned a destination and the streaming write is
-                    // starting; dismissing the picker never reaches here, so it stays silent. The finished
-                    // flag turns a late Cancel click into a clean no-op.
+                    // Begin only once the picker has returned a destination and the streaming write is starting;
+                    // dismissing the picker never reaches here, so it stays silent. A Cancel click can race export
+                    // teardown (the CTS is disposed in the finally), so guard the narrow disposed-CTS window.
                     _exportProgress.Begin(
-                        "Exporting events...", () => { if (!Volatile.Read(ref finished)) { cancellation.Cancel(); } });
+                        "Exporting events...",
+                        () => { try { cancellation.Cancel(); } catch (ObjectDisposedException) { /* Teardown disposed the CTS; a late Cancel is a no-op. */ } });
 
+                    // Cancellation gates the WRITE only: ExportAsync throws per-row on Cancel, so AtomicFileWriter
+                    // discards the temp. SaveStreamingAsync gets CancellationToken.None, so once the write completes
+                    // the atomic commit is unconditional - a late Cancel can no longer discard a fully-written export.
                     await _eventTableExporter.ExportAsync(
-                        stream, format, events, columns, timeZone, includeDescription: true, token);
-
-                    // The streaming write is done; stop honoring Cancel before SaveStreamingAsync runs its
-                    // post-write cancel gates, so a late Cancel can't abort an already-written export's commit.
-                    Volatile.Write(ref finished, true);
+                        stream, format, events, columns, timeZone, includeDescription: true, cancellation.Token);
                 },
-                cancellation.Token);
+                CancellationToken.None);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
@@ -219,8 +218,6 @@ public sealed class MauiMenuActionService(
         }
         finally
         {
-            Volatile.Write(ref finished, true);
-
             // End() raises StateChanged; isolate it so a throwing subscriber can never skip the CTS
             // disposal or the in-flight reset, which would otherwise wedge every later export.
             try
