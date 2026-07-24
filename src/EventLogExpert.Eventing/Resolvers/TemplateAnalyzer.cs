@@ -84,17 +84,37 @@ internal sealed class TemplateAnalyzer
         return MatchesPropertyCount(template, eventPropertyCount);
     }
 
+    // Windows synthesizes "%1".."%N" <data> names for classic positional insertion strings; no real names exist
+    // and Event Viewer shows those fields positionally. Only a template whose EVERY node is such a placeholder is
+    // treated as classic and relabeled "Parameter N" (in BuildInfo); any real name or unnamed/raw node leaves it
+    // untouched (fail closed).
+    private static bool AllFieldNamesSynthetic(List<(string name, string outType, string map)> elements)
+    {
+        bool anySynthetic = false;
+
+        foreach (var (name, _, _) in elements)
+        {
+            if (!IsSyntheticFieldName(name)) { return false; }
+
+            anySynthetic = true;
+        }
+
+        return anySynthetic;
+    }
+
     private static TemplateInfo BuildInfo(
         List<(string name, string outType, string map)> elements,
         HashSet<string> lengthProviderNames)
     {
+        bool normalize = AllFieldNamesSynthetic(elements);
+
         var allNamesArray = new string[elements.Count];
         var allOutTypesArray = new string[elements.Count];
         var allMapsArray = new string[elements.Count];
 
         for (int i = 0; i < elements.Count; i++)
         {
-            allNamesArray[i] = elements[i].name;
+            allNamesArray[i] = NormalizedName(elements[i].name, normalize);
             allOutTypesArray[i] = elements[i].outType;
             allMapsArray[i] = elements[i].map;
         }
@@ -126,11 +146,13 @@ internal sealed class TemplateAnalyzer
         var visibleMapsArray = new string[visibleCount];
         int write = 0;
 
-        foreach (var (name, outType, map) in elements)
+        for (int i = 0; i < elements.Count; i++)
         {
+            var (name, outType, map) = elements[i];
+
             if (string.IsNullOrEmpty(name) || !lengthProviderNames.Contains(name))
             {
-                visibleNamesArray[write] = name;
+                visibleNamesArray[write] = allNamesArray[i];
                 visibleOutTypesArray[write] = outType;
                 visibleMapsArray[write] = map;
                 write++;
@@ -145,6 +167,25 @@ internal sealed class TemplateAnalyzer
 
         return new TemplateInfo(visibleMetadata, new TemplateFieldSchema(allNames, visibleNames));
     }
+
+    private static string FormatSyntheticFieldName(string name) => string.Concat("Parameter ", name.AsSpan(1));
+
+    // Canonical positive ordinal: '%' + a leading-zero-free ASCII-digit run ("%1".."%N", not "%0"/"%01"). ASCII
+    // range checks (not char.IsDigit) keep Unicode digits out of both the gate and the label.
+    private static bool IsSyntheticFieldName(string name)
+    {
+        if (name.Length < 2 || name[0] != '%' || name[1] is < '1' or > '9') { return false; }
+
+        for (int i = 2; i < name.Length; i++)
+        {
+            if (name[i] is < '0' or > '9') { return false; }
+        }
+
+        return true;
+    }
+
+    private static string NormalizedName(string name, bool normalize) =>
+        normalize && IsSyntheticFieldName(name) ? FormatSyntheticFieldName(name) : name;
 
     private static TemplateInfo Parse(ReadOnlySpan<char> template)
     {
