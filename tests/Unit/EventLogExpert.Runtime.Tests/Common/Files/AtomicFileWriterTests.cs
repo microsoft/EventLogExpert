@@ -108,6 +108,26 @@ public sealed class AtomicFileWriterTests : IDisposable
             () => AtomicFileWriter.WriteAsync("barefilename.log", WriteText("x"), TestContext.Current.CancellationToken));
 
     [Fact]
+    public async Task WriteAsync_NoneToken_CommitsCompletedWriteEvenWhenASeparateSourceIsCancelled()
+    {
+        // Mirrors ExportEventsAsync: the write is scoped to a caller CTS, but AtomicFileWriter receives None, so a
+        // Cancel that lands after the content is written cannot abort the atomic commit - the completed file is saved.
+        var destination = Destination();
+        using var cancellation = new CancellationTokenSource();
+
+        Func<Stream, CancellationToken, Task> writeThenCancelSeparate = async (stream, _) =>
+        {
+            await stream.WriteAsync(Encoding.UTF8.GetBytes("exported"), TestContext.Current.CancellationToken);
+            await cancellation.CancelAsync();
+        };
+
+        await AtomicFileWriter.WriteAsync(destination, writeThenCancelSeparate, CancellationToken.None);
+
+        Assert.Equal("exported", await File.ReadAllTextAsync(destination, TestContext.Current.CancellationToken));
+        Assert.Empty(LeakedTempFiles());
+    }
+
+    [Fact]
     public async Task WriteAsync_NullWriteContent_ThrowsArgumentNullException() =>
         await Assert.ThrowsAsync<ArgumentNullException>(
             () => AtomicFileWriter.WriteAsync(Destination(), null!, TestContext.Current.CancellationToken));

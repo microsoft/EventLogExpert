@@ -22,6 +22,21 @@ public sealed class EventTableExporterTests
     private static readonly TimeZoneInfo s_utc = TimeZoneInfo.Utc;
 
     [Fact]
+    public async Task ExportAsync_CancelledToken_ThrowsAndWritesNothing()
+    {
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+        EventTableExporter exporter = new(new TabularExportWriter());
+        using MemoryStream stream = new();
+
+        // A Cancel during the export must throw so AtomicFileWriter discards the temp; nothing is written.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => exporter.ExportAsync(
+            stream, ExportFormat.Csv, BuildView(s_events), s_columns, s_utc, includeDescription: false, cancellation.Token));
+
+        Assert.Equal(0, stream.Length);
+    }
+
+    [Fact]
     public async Task ExportAsync_Csv_ExcludeDescription_OmitsColumn()
     {
         ResolvedEvent[] events = [new("Log", LogPathType.Channel) { Id = 1, Source = "Alpha", Description = "Ignored" }];
