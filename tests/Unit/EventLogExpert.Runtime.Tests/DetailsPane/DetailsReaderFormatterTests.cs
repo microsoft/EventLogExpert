@@ -242,6 +242,15 @@ public sealed class DetailsReaderFormatterTests
         Assert.False(model.EventData[3].IsMonospace);
     }
 
+    [Fact]
+    public void BuildModel_SyntheticPercentName_UsesParameterLabel()
+    {
+        // A Windows-synthesized "%1" placeholder (e.g. CAPI2 4192) surfaces as "Parameter 1", matching Event Viewer.
+        DetailsField field = Assert.Single(Model(EventDataTestFactory.CreateEventWithData(("%1", "MsSense.exe"))).EventData);
+
+        Assert.Equal("Parameter 1", field.Label);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("warning")]
