@@ -77,7 +77,8 @@ internal sealed class ScenarioLaunchService(
     public async Task<ScenarioFolderLaunchResult> LaunchFromFolderAsync(
         ScenarioDefinition scenario,
         DateFilter? dateWindow,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Func<ScenarioFolderPhase, Task>? onPhase = null)
     {
         ArgumentNullException.ThrowIfNull(scenario);
 
@@ -93,6 +94,10 @@ internal sealed class ScenarioLaunchService(
         }
 
         if (folder is null) { return ScenarioFolderLaunchResult.Cancelled; }
+
+        // A real folder was chosen, so the cancellable enumeration/probe scan is about to start. Signal Scanning here
+        // (not before the picker) so a caller shows its Cancel affordance only once cancellation is meaningful.
+        if (onPhase is not null) { await onPhase(ScenarioFolderPhase.Scanning); }
 
         FolderMatch match;
 
@@ -135,6 +140,14 @@ internal sealed class ScenarioLaunchService(
         // A late cancellation (for example, dashboard disposal) can land in the synchronous gap between the in-try
         // recheck and the commit. Gate it here WITHOUT throwing so a cancelled scan never dispatches filters or opens
         // logs, while a genuine fault surfacing from the open still propagates (the commit stays outside the catch).
+        if (cancellationToken.IsCancellationRequested) { return ScenarioFolderLaunchResult.Cancelled; }
+
+        // The scan matched logs and is committing to open them; signal Opening so a caller can drop its Cancel
+        // affordance (the open is not cancellable). Gate on a nonempty match so Opening is never reported for an
+        // outcome that opens nothing, then recheck cancellation -- independently of whether a callback was supplied --
+        // so a cancellation that lands while the callback runs still wins before any filter dispatch or open.
+        if (match.Paths.Count > 0 && onPhase is not null) { await onPhase(ScenarioFolderPhase.Opening); }
+
         if (cancellationToken.IsCancellationRequested) { return ScenarioFolderLaunchResult.Cancelled; }
 
         return await OpenMatchedLogsAsync(scenario, dateWindow, match);

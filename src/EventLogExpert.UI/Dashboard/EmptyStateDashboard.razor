@@ -1,6 +1,6 @@
 @inherits FluxorComponent
 
-<section aria-labelledby="empty-dashboard-title" class="empty-dashboard" role="region">
+<section aria-labelledby="empty-dashboard-title" class="empty-dashboard" @ref="_dashboardRoot" role="region" tabindex="-1">
     <header class="empty-dashboard__masthead">
         <div class="empty-dashboard__brand">
             <span aria-hidden="true" class="empty-dashboard__brand-mark"><i class="bi bi-journal-text"></i></span>
@@ -10,6 +10,26 @@
             </div>
         </div>
         <div class="empty-dashboard__masthead-actions">
+            @if (_scanningScenario is { } scanning)
+            {
+                <div class="empty-dashboard__chip empty-dashboard__chip--scanning" role="status">
+                    <i aria-hidden="true" class="bi bi-arrow-repeat loader-spin"></i>
+                    @if (_openingLogs)
+                    {
+                        <span class="empty-dashboard__chip-text">Opening logs for @scanning.Name...</span>
+                    }
+                    else if (_cancelRequested)
+                    {
+                        <span class="empty-dashboard__chip-text">Cancelling folder scan for @scanning.Name...</span>
+                    }
+                    else
+                    {
+                        <span class="empty-dashboard__chip-text">Scanning @scanning.Name folder for logs...</span>
+
+                        <Button OnClick="CancelFolderScan" aria-label="@($"Cancel folder scan for {scanning.Name}")" @ref="_cancelScanButton">Cancel</Button>
+                    }
+                </div>
+            }
             @if (FilterApplied.Value)
             {
                 <div class="empty-dashboard__chip" role="status">

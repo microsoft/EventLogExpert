@@ -61,6 +61,16 @@
     color: var(--clr-yellow);
 }
 
+/* Progress accent for the folder-scan chip, distinct from the yellow filter-applied warning chip.
+   Placed after the base rules so it wins on equal specificity when both classes are present. */
+.empty-dashboard__chip--scanning {
+    border-left-color: var(--clr-statusbar);
+}
+
+.empty-dashboard__chip--scanning > .bi {
+    color: var(--clr-statusbar);
+}
+
 .empty-dashboard__chip-text {
     color: var(--text-primary);
 }

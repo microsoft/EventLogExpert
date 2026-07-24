@@ -13,6 +13,8 @@ using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Common;
+using EventLogExpert.UI.Focus;
+using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.Modal;
 using Fluxor;
 using Fluxor.Blazor.Web.Components;
@@ -43,12 +45,21 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
     private readonly Dictionary<SplashCategory, ScenarioDefinition?> _selectedByCategory = new();
 
     private SplashCategory _activeCategory;
+    private bool _cancelRequested;
+    private Button? _cancelScanButton;
     private List<(SplashCategory Category, string Label, IReadOnlyList<ScenarioDefinition> Scenarios)> _categories = [];
+    private ElementReference _dashboardRoot;
+    private bool _disposed;
+    private CancellationTokenSource? _folderLaunchCts;
     private bool _isBusy;
     private LivePresence _livePresence = new(false, FrozenSet<string>.Empty);
+    private bool _openingLogs;
+    private bool _pendingCancelFocus;
+    private bool _pendingScanEndFocus;
     private bool _pendingTabFocus;
     private IReadOnlyDictionary<string, ChannelReadiness> _readinessByChannel =
         new Dictionary<string, ChannelReadiness>(StringComparer.OrdinalIgnoreCase);
+    private ScenarioDefinition? _scanningScenario;
     private SidebarTabs<SplashCategory>? _sidebarTabs;
     private IReadOnlyList<ScenarioDefinition>? _splashScenarios;
     private IReadOnlyList<(SplashCategory Tab, string Label)> _tabs = [];
@@ -112,6 +123,7 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
     {
         if (disposing)
         {
+            _disposed = true;
             Favorites.SelectedValueChanged -= OnFavoritesChanged;
             await _lifetimeCts.CancelAsync();
             _lifetimeCts.Dispose();
@@ -122,7 +134,21 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_pendingTabFocus && _sidebarTabs is not null)
+        if (_pendingCancelFocus)
+        {
+            _pendingCancelFocus = false;
+
+            if (_cancelScanButton is not null) { await ElementFocus.SafelyAsync(_cancelScanButton.Element); }
+        }
+        else if (_pendingScanEndFocus)
+        {
+            _pendingScanEndFocus = false;
+
+            var focused = _sidebarTabs is not null && await _sidebarTabs.FocusActiveTabAsync();
+
+            if (!focused) { await ElementFocus.SafelyAsync(_dashboardRoot); }
+        }
+        else if (_pendingTabFocus && _sidebarTabs is not null)
         {
             _pendingTabFocus = false;
 
@@ -249,6 +275,20 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
             new ChannelReadiness(channel, ChannelPresence.Unknown, ChannelEnablement.Unknown))
             .Access is ChannelAccess.Accessible or ChannelAccess.NotEvaluated;
 
+    private void CancelFolderScan()
+    {
+        // No-op once the scan has committed to opening or a cancel is already in flight. The null-field guard plus the
+        // null-before-Dispose ordering in the finally means Cancel() is never called on a disposed source.
+        if (_openingLogs || _cancelRequested || _folderLaunchCts is null) { return; }
+
+        _cancelRequested = true;
+        _pendingCancelFocus = false;
+        _pendingTabFocus = false;
+        _pendingScanEndFocus = true;
+        _folderLaunchCts.Cancel();
+        StateHasChanged();
+    }
+
     private void ClearFilter() => FilterCommands.ClearAllFilters();
 
     private Task EnableChannelAsync(string channel) =>
@@ -321,7 +361,7 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
                     "Launch scenario",
                     message,
                     "Open from folder",
-                    () => LaunchScenarioFromFolderCoreAsync(scenario));
+                    () => LaunchScenarioFromFolderAsync(scenario));
             }
             else
             {
@@ -334,9 +374,43 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
     private async Task LaunchScenarioFromFolderCoreAsync(ScenarioDefinition scenario)
     {
-        var result = await ScenarioLaunch.LaunchFromFolderAsync(scenario, null, _lifetimeCts.Token);
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts.Token);
+        _folderLaunchCts = cts;
+        var scanStarted = false;
+        ScenarioFolderLaunchResult result;
 
-        if (DescribeFolderLaunch(scenario, result) is not { } message) { return; }
+        try
+        {
+            result = await ScenarioLaunch.LaunchFromFolderAsync(scenario, null, cts.Token, OnFolderScanPhaseAsync);
+        }
+        finally
+        {
+            if (ReferenceEquals(_folderLaunchCts, cts)) { _folderLaunchCts = null; }
+
+            cts.Dispose();
+
+            if (_scanningScenario is not null)
+            {
+                // Hide the scan chip before any result dialog. The banner-retry path does not run in the dashboard's
+                // event loop, so it will not auto-render; the explicit render is required there. Clear the scan-end
+                // focus intent too, so an Opening-set request cannot steal focus from a result modal opened below.
+                _scanningScenario = null;
+                _openingLogs = false;
+                _cancelRequested = false;
+                _pendingCancelFocus = false;
+                _pendingScanEndFocus = false;
+
+                await SafeInvokeAsync(StateHasChanged);
+            }
+        }
+
+        if (DescribeFolderLaunch(scenario, result) is not { } message)
+        {
+            // Cancelled: no dialog takes focus and the Cancel chip that had focus is gone, so restore it.
+            if (scanStarted) { RestoreFocusAfterScan(); }
+
+            return;
+        }
 
         // A launch that opens logs is self-evident (the workspace changes) and only needs the screen-reader detail;
         // the outcomes that leave the dashboard unchanged need a visible dialog so a sighted user sees them.
@@ -346,12 +420,44 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
                 Announcer.Announce(message);
                 break;
             case ScenarioFolderOutcome.Error:
+                // ShowErrorAlert surfaces a banner, which does not capture focus; restore it so a scan that showed the
+                // Cancel chip does not strand keyboard focus on <body>.
+                if (scanStarted) { RestoreFocusAfterScan(); }
+
                 await AlertDialogService.ShowErrorAlert("Open from folder", message);
                 break;
             default:
+                // ShowAlert opens a focus-capturing modal, so it owns focus; issuing a restore here would fight it.
                 await AlertDialogService.ShowAlert("Open from folder", message, "OK");
                 break;
         }
+
+        // Runs on the UI dispatcher via SafeInvokeAsync and must never throw out of onPhase: it executes outside the
+        // service's cancellation catch, so an escaping teardown exception would surface a normal launch as a fault.
+        async Task OnFolderScanPhaseAsync(ScenarioFolderPhase phase) =>
+            await SafeInvokeAsync(() =>
+            {
+                switch (phase)
+                {
+                    case ScenarioFolderPhase.Scanning:
+                        scanStarted = true;
+                        _scanningScenario = scenario;
+                        _openingLogs = false;
+                        _cancelRequested = false;
+                        _pendingTabFocus = false;
+                        _pendingScanEndFocus = false;
+                        _pendingCancelFocus = true;
+                        break;
+                    case ScenarioFolderPhase.Opening:
+                        _openingLogs = true;
+                        _pendingCancelFocus = false;
+                        _pendingTabFocus = false;
+                        _pendingScanEndFocus = true;
+                        break;
+                }
+
+                StateHasChanged();
+            });
     }
 
     private async void OnFavoritesChanged(object? _, ImmutableHashSet<string> __)
@@ -465,14 +571,49 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
         _livePresence = LivePresence.FromReadiness(readiness);
     }
 
+    private void RestoreFocusAfterScan()
+    {
+        if (_disposed) { return; }
+
+        _pendingCancelFocus = false;
+        _pendingTabFocus = false;
+        _pendingScanEndFocus = true;
+        StateHasChanged();
+    }
+
     private async Task RunGuardedAsync(Func<Task> action)
     {
         if (_isBusy) { return; }
 
         _isBusy = true;
 
-        try { await action(); }
-        finally { _isBusy = false; }
+        try
+        {
+            // Render immediately (inside the try, so the finally still clears _isBusy if this ever threw) so the
+            // busy-gated controls disable right away. On a normal button click Blazor auto-renders at the first await
+            // inside the action, but the banner-retry path runs outside the dashboard's event loop and gets no
+            // automatic render, so without this the controls would stay visibly enabled during the folder picker.
+            await SafeInvokeAsync(StateHasChanged);
+            await action();
+        }
+        finally
+        {
+            _isBusy = false;
+
+            // Re-render after clearing the busy flag for the same non-event-loop reason, so the controls re-enable.
+            await SafeInvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task SafeInvokeAsync(Action render)
+    {
+        if (_disposed) { return; }
+
+        // Matches the OnFavoritesChanged teardown pattern: a render can race the dashboard unmounting when a folder
+        // launch opens logs; treat disposal and cancellation as expected.
+        try { await InvokeAsync(render); }
+        catch (ObjectDisposedException) { }
+        catch (OperationCanceledException) { }
     }
 
     private IReadOnlyList<ScenarioDefinition> ScenariosFor(SplashCategory category)
