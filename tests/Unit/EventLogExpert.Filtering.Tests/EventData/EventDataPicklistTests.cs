@@ -47,6 +47,16 @@ public sealed class EventDataPicklistTests : IDisposable
     }
 
     [Fact]
+    public void GetEventDataFieldNames_ReturnsParameterLabelsForSyntheticPlaceholders()
+    {
+        // The synthetic "%1".."%N" names (e.g. CAPI2 4192) reach the field picker as the friendly "Parameter N".
+        var snapshot = new object();
+        var events = new[] { EventDataTestFactory.CreateEventWithData(("%1", "MsSense.exe"), ("%2", "CodeSigning")) };
+
+        Assert.Equal(["Parameter 1", "Parameter 2"], EventPropertyValuesCache.GetEventDataFieldNames(snapshot, events));
+    }
+
+    [Fact]
     public void GetEventDataFieldValues_DifferentFields_ProduceDifferentLists()
     {
         var snapshot = new object();
