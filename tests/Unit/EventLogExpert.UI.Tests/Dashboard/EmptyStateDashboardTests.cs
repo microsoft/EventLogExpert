@@ -293,7 +293,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailOpenFromFolder_WhenCompleted_AnnouncesWithoutAlert()
     {
-        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>())
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
             .Returns(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.Completed, Opened = 1, Matched = 1 });
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
@@ -312,7 +312,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailOpenFromFolder_WhenError_ShowsErrorAlert()
     {
-        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>())
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
             .Returns(ScenarioFolderLaunchResult.Error("access denied"));
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
@@ -327,7 +327,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailOpenFromFolder_WhenNoMatchingLogs_ShowsVisibleAlert()
     {
-        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>())
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
             .Returns(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.NoMatchingLogs });
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
@@ -451,6 +451,212 @@ public sealed class EmptyStateDashboardTests : BunitContext
         RaiseFavoritesChanged(cut, "application-crashes");
 
         cut.WaitForAssertion(() => Assert.Contains("Favorites", TabLabels(cut)));
+    }
+
+    [Fact]
+    public void FolderScan_WhenCancelClicked_CancelsTokenAndShowsCancellingWithoutDialog()
+    {
+        var release = new TaskCompletionSource<ScenarioFolderLaunchResult>();
+        CancellationToken captured = default;
+        _scenarioLaunch
+            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .Returns(async ci =>
+            {
+                captured = ci.Arg<CancellationToken>();
+                await ci.Arg<Func<ScenarioFolderPhase, Task>>()!(ScenarioFolderPhase.Scanning);
+
+                return await release.Task;
+            });
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailOpenFolder)));
+        cut.Find(ActiveDetailOpenFolder).Click();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".empty-dashboard__chip--scanning button")));
+
+        cut.Find(".empty-dashboard__chip--scanning button").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var chip = cut.Find(".empty-dashboard__chip--scanning");
+            Assert.Contains("Cancelling", chip.TextContent);
+            Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning button"));
+        });
+        Assert.True(captured.IsCancellationRequested);
+
+        // The service ultimately reports Cancelled; no result dialog is shown for a user cancellation.
+        release.SetResult(ScenarioFolderLaunchResult.Cancelled);
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning")));
+        _alertDialog.DidNotReceive().ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+        _alertDialog.DidNotReceive().ShowErrorAlert("Open from folder", Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task FolderScan_WhenLaunchedFromReactiveBannerRetry_GuardsScanAndReenablesButtons()
+    {
+        // A live launch that cannot open its channels raises a banner whose retry opens from a folder. That retry runs
+        // outside the dashboard's event loop, so it must route through RunGuardedAsync (setting _isBusy while the scan
+        // runs) AND RunGuardedAsync must render on completion to re-enable the busy-gated controls.
+        _scenarioLaunch.LaunchAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>())
+            .Returns(new ScenarioLaunchResult(0, 0, 1)
+            {
+                ChannelOutcomes = [new ChannelOutcome("System", ChannelLaunchOutcome.NotPresent)]
+            });
+
+        Func<Task>? retry = null;
+        _alertDialog.ShowErrorAlert("Launch scenario", Arg.Any<string>(), "Open from folder", Arg.Any<Func<Task>?>())
+            .Returns(call =>
+            {
+                retry = call.Arg<Func<Task>>();
+
+                return Task.CompletedTask;
+            });
+
+        var pickerGate = new TaskCompletionSource();
+        var release = new TaskCompletionSource<ScenarioFolderLaunchResult>();
+        _scenarioLaunch
+            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .Returns(async ci =>
+            {
+                // Simulate the native folder picker being open before any phase is reported.
+                await pickerGate.Task;
+                await ci.Arg<Func<ScenarioFolderPhase, Task>>()!(ScenarioFolderPhase.Scanning);
+
+                return await release.Task;
+            });
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
+
+        cut.Find(ActiveDetailLaunch).Click();
+        cut.WaitForAssertion(() => Assert.NotNull(retry));
+
+        var retried = cut.InvokeAsync(() => retry!());
+
+        // During the picker (before any phase) the guard must already have disabled the busy-gated controls, even though
+        // the scan chip is not shown yet. If the retry bypassed RunGuardedAsync, or RunGuardedAsync did not render on
+        // _isBusy=true, the open-folder button would still be enabled here.
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning"));
+            Assert.True(cut.Find(ActiveDetailOpenFolder).HasAttribute("disabled"));
+        });
+
+        // The picker returns; Scanning surfaces the chip while the scan runs, controls still disabled.
+        pickerGate.SetResult();
+        cut.WaitForAssertion(() =>
+        {
+            Assert.NotEmpty(cut.FindAll(".empty-dashboard__chip--scanning"));
+            Assert.True(cut.Find(ActiveDetailOpenFolder).HasAttribute("disabled"));
+        });
+
+        release.SetResult(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.NoMatchingLogs });
+        await retried;
+
+        // The completion render re-enables the busy-gated control on this non-event-loop path.
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning"));
+            Assert.False(cut.Find(ActiveDetailOpenFolder).HasAttribute("disabled"));
+        });
+    }
+
+    [Fact]
+    public void FolderScan_WhenOpeningPhase_RelabelsAndDropsCancelButton()
+    {
+        var release = new TaskCompletionSource<ScenarioFolderLaunchResult>();
+        _scenarioLaunch
+            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .Returns(async ci =>
+            {
+                var onPhase = ci.Arg<Func<ScenarioFolderPhase, Task>>()!;
+                await onPhase(ScenarioFolderPhase.Scanning);
+                await onPhase(ScenarioFolderPhase.Opening);
+
+                return await release.Task;
+            });
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailOpenFolder)));
+        cut.Find(ActiveDetailOpenFolder).Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var chip = cut.Find(".empty-dashboard__chip--scanning");
+            Assert.Contains("Opening logs", chip.TextContent);
+            Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning button"));
+        });
+
+        release.SetResult(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.Completed, Opened = 1, Matched = 1 });
+    }
+
+    [Fact]
+    public void FolderScan_WhenScanning_ShowsMastheadCancelChip()
+    {
+        var release = new TaskCompletionSource<ScenarioFolderLaunchResult>();
+        _scenarioLaunch
+            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .Returns(async ci =>
+            {
+                await ci.Arg<Func<ScenarioFolderPhase, Task>>()!(ScenarioFolderPhase.Scanning);
+
+                return await release.Task;
+            });
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailOpenFolder)));
+        Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning"));
+
+        cut.Find(ActiveDetailOpenFolder).Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var chip = cut.Find(".empty-dashboard__chip--scanning");
+            Assert.Contains("Scanning", chip.TextContent);
+            Assert.Contains("Application crashes", chip.TextContent);
+            Assert.NotEmpty(cut.FindAll(".empty-dashboard__chip--scanning button"));
+        });
+
+        release.SetResult(ScenarioFolderLaunchResult.Cancelled);
+    }
+
+    [Fact]
+    public void FolderScan_WhenUserReselectsScenario_CancelChipRemainsInMasthead()
+    {
+        var release = new TaskCompletionSource<ScenarioFolderLaunchResult>();
+        _scenarioLaunch
+            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .Returns(async ci =>
+            {
+                await ci.Arg<Func<ScenarioFolderPhase, Task>>()!(ScenarioFolderPhase.Scanning);
+
+                return await release.Task;
+            });
+        _scenarioQuery.GetSplashScenarios().Returns(
+        [
+            Scenario("crash-a", "Crash A", group: ScenarioGroup.SqlServer, order: 0),
+            Scenario("crash-b", "Crash B", group: ScenarioGroup.SqlServer, order: 1)
+        ]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.Equal("Crash A", cut.Find(ActiveDetailName).TextContent));
+
+        cut.Find(ActiveDetailOpenFolder).Click();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".empty-dashboard__chip--scanning")));
+
+        // Reselecting a different scenario changes the detail pane but must not hide the masthead scan chip.
+        cut.FindAll(ActiveOption).First(option => option.TextContent.Contains("Crash B")).Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal("Crash B", cut.Find(ActiveDetailName).TextContent);
+            Assert.NotEmpty(cut.FindAll(".empty-dashboard__chip--scanning"));
+        });
+
+        release.SetResult(ScenarioFolderLaunchResult.Cancelled);
     }
 
     [Fact]

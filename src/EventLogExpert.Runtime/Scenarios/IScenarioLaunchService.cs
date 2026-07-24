@@ -21,7 +21,13 @@ public interface IScenarioLaunchService
     ///     works even for logs not present on the local host. The folder enumeration and per-file channel probe run off the
     ///     caller's thread and honor <paramref name="cancellationToken" />, returning
     ///     <see cref="ScenarioFolderOutcome.Cancelled" /> if the scan is abandoned before any log is opened.
+    ///     <paramref name="onPhase" />, when supplied, is invoked as the operation crosses each
+    ///     <see cref="ScenarioFolderPhase" /> boundary so a caller can show a cancellable busy indicator only while
+    ///     cancellation is still meaningful.
     /// </summary>
     Task<ScenarioFolderLaunchResult> LaunchFromFolderAsync(
-        ScenarioDefinition scenario, DateFilter? dateWindow, CancellationToken cancellationToken = default);
+        ScenarioDefinition scenario,
+        DateFilter? dateWindow,
+        CancellationToken cancellationToken = default,
+        Func<ScenarioFolderPhase, Task>? onPhase = null);
 }

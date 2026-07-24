@@ -19,6 +19,46 @@ namespace EventLogExpert.Runtime.Tests.Scenarios;
 public sealed class ScenarioLaunchServiceTests
 {
     [Fact]
+    public async Task LaunchAsync_ActivatingScenarioWithTimelineDimension_DispatchesDimensionRequest()
+    {
+        var (service, dispatcher, _, scenario) = Create(
+            new OpenLogsBatchResult(1, 0, 0, 0, []),
+            activatesTimeline: true,
+            timelineDimension: ScenarioTimelineDimension.ErrorCode);
+
+        await service.LaunchAsync(scenario, dateWindow: null);
+
+        dispatcher.Received(1).Dispatch(
+            Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.ErrorCode));
+    }
+
+    [Fact]
+    public async Task LaunchAsync_ActivatingScenarioWithTimelineDimension_WhenAlreadyVisible_DispatchesDimensionRequest()
+    {
+        var (service, dispatcher, _, scenario) = Create(
+            new OpenLogsBatchResult(1, 0, 0, 0, []),
+            activatesTimeline: true,
+            timelineVisible: true,
+            timelineDimension: ScenarioTimelineDimension.EventId);
+
+        await service.LaunchAsync(scenario, dateWindow: null);
+
+        dispatcher.Received(1).Dispatch(
+            Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.EventId));
+    }
+
+    [Fact]
+    public async Task LaunchAsync_ActivatingScenarioWithoutTimelineDimension_DoesNotDispatchDimensionRequest()
+    {
+        var (service, dispatcher, _, scenario) =
+            Create(new OpenLogsBatchResult(1, 0, 0, 0, []), activatesTimeline: true);
+
+        await service.LaunchAsync(scenario, dateWindow: null);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RequestHistogramDimensionAction>());
+    }
+
+    [Fact]
     public async Task LaunchAsync_ActivatingScenario_WhenTimelineAlreadyVisible_DoesNotReshow()
     {
         var (service, _, menu, scenario) =
@@ -58,46 +98,6 @@ public sealed class ScenarioLaunchServiceTests
         await service.LaunchAsync(scenario, dateWindow: null);
 
         menu.DidNotReceive().SetHistogramVisible(Arg.Any<bool>());
-    }
-
-    [Fact]
-    public async Task LaunchAsync_ActivatingScenarioWithoutTimelineDimension_DoesNotDispatchDimensionRequest()
-    {
-        var (service, dispatcher, _, scenario) =
-            Create(new OpenLogsBatchResult(1, 0, 0, 0, []), activatesTimeline: true);
-
-        await service.LaunchAsync(scenario, dateWindow: null);
-
-        dispatcher.DidNotReceive().Dispatch(Arg.Any<RequestHistogramDimensionAction>());
-    }
-
-    [Fact]
-    public async Task LaunchAsync_ActivatingScenarioWithTimelineDimension_DispatchesDimensionRequest()
-    {
-        var (service, dispatcher, _, scenario) = Create(
-            new OpenLogsBatchResult(1, 0, 0, 0, []),
-            activatesTimeline: true,
-            timelineDimension: ScenarioTimelineDimension.ErrorCode);
-
-        await service.LaunchAsync(scenario, dateWindow: null);
-
-        dispatcher.Received(1).Dispatch(
-            Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.ErrorCode));
-    }
-
-    [Fact]
-    public async Task LaunchAsync_ActivatingScenarioWithTimelineDimension_WhenAlreadyVisible_DispatchesDimensionRequest()
-    {
-        var (service, dispatcher, _, scenario) = Create(
-            new OpenLogsBatchResult(1, 0, 0, 0, []),
-            activatesTimeline: true,
-            timelineVisible: true,
-            timelineDimension: ScenarioTimelineDimension.EventId);
-
-        await service.LaunchAsync(scenario, dateWindow: null);
-
-        dispatcher.Received(1).Dispatch(
-            Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.EventId));
     }
 
     [Fact]
@@ -344,6 +344,86 @@ public sealed class ScenarioLaunchServiceTests
     }
 
     [Fact]
+    public async Task LaunchFromFolderAsync_ActivatingScenarioWithTimelineDimension_DispatchesDimensionRequest()
+    {
+        var (service, dispatcher, menu, picker, enumerator, reader, scenario) =
+            CreateFolder(FolderScenario() with
+            {
+                ActivatesTimeline = true,
+                TimelineDimension = ScenarioTimelineDimension.Log
+            });
+        picker.PickFolderAsync().Returns("C:\\bundle");
+        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
+        menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
+
+        await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+
+        dispatcher.Received(1).Dispatch(
+            Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.Log));
+    }
+
+    [Fact]
+    public async Task LaunchFromFolderAsync_ActivatingScenarioWithTimelineDimension_WhenAlreadyVisible_DispatchesDimensionRequest()
+    {
+        var (service, dispatcher, menu, picker, enumerator, reader, scenario) =
+            CreateFolder(
+                FolderScenario() with
+                {
+                    ActivatesTimeline = true,
+                    TimelineDimension = ScenarioTimelineDimension.Source
+                },
+                timelineVisible: true);
+        picker.PickFolderAsync().Returns("C:\\bundle");
+        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
+        menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
+
+        await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+
+        dispatcher.Received(1).Dispatch(
+            Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.Source));
+    }
+
+    [Fact]
+    public async Task LaunchFromFolderAsync_ActivatingScenarioWithoutTimelineDimension_DoesNotDispatchDimensionRequest()
+    {
+        var (service, dispatcher, menu, picker, enumerator, reader, scenario) =
+            CreateFolder(FolderScenario() with { ActivatesTimeline = true });
+        picker.PickFolderAsync().Returns("C:\\bundle");
+        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
+        menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
+
+        await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RequestHistogramDimensionAction>());
+    }
+
+    [Fact]
+    public async Task LaunchFromFolderAsync_CancelledDuringEnumeration_ReportsScanningButNotOpening()
+    {
+        var (service, _, _, picker, enumerator, _, scenario) = CreateFolder(FolderScenario());
+        using var cts = new CancellationTokenSource();
+        picker.PickFolderAsync().Returns("C:\\bundle");
+        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                cts.Cancel();
+
+                return EvtxFolderScanResult.Empty.Instance;
+            });
+        var phases = new List<ScenarioFolderPhase>();
+
+        var result = await service.LaunchFromFolderAsync(
+            scenario, dateWindow: null, cts.Token, phase => { phases.Add(phase); return Task.CompletedTask; });
+
+        // Scanning is emitted before enumeration, so a mid-scan cancellation leaves it already reported; Opening is not.
+        Assert.Equal(ScenarioFolderOutcome.Cancelled, result.Outcome);
+        Assert.Equal([ScenarioFolderPhase.Scanning], phases);
+    }
+
+    [Fact]
     public async Task LaunchFromFolderAsync_CancelledDuringEnumeration_ReturnsCancelledWithoutOpening()
     {
         var (service, dispatcher, menu, picker, enumerator, _, scenario) = CreateFolder(FolderScenario());
@@ -410,63 +490,6 @@ public sealed class ScenarioLaunchServiceTests
     }
 
     [Fact]
-    public async Task LaunchFromFolderAsync_ActivatingScenarioWithoutTimelineDimension_DoesNotDispatchDimensionRequest()
-    {
-        var (service, dispatcher, menu, picker, enumerator, reader, scenario) =
-            CreateFolder(FolderScenario() with { ActivatesTimeline = true });
-        picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
-        reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
-        menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
-
-        await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
-
-        dispatcher.DidNotReceive().Dispatch(Arg.Any<RequestHistogramDimensionAction>());
-    }
-
-    [Fact]
-    public async Task LaunchFromFolderAsync_ActivatingScenarioWithTimelineDimension_DispatchesDimensionRequest()
-    {
-        var (service, dispatcher, menu, picker, enumerator, reader, scenario) =
-            CreateFolder(FolderScenario() with
-            {
-                ActivatesTimeline = true,
-                TimelineDimension = ScenarioTimelineDimension.Log
-            });
-        picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
-        reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
-        menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
-
-        await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
-
-        dispatcher.Received(1).Dispatch(
-            Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.Log));
-    }
-
-    [Fact]
-    public async Task LaunchFromFolderAsync_ActivatingScenarioWithTimelineDimension_WhenAlreadyVisible_DispatchesDimensionRequest()
-    {
-        var (service, dispatcher, menu, picker, enumerator, reader, scenario) =
-            CreateFolder(
-                FolderScenario() with
-                {
-                    ActivatesTimeline = true,
-                    TimelineDimension = ScenarioTimelineDimension.Source
-                },
-                timelineVisible: true);
-        picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
-        reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
-        menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
-
-        await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
-
-        dispatcher.Received(1).Dispatch(
-            Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.Source));
-    }
-
-    [Fact]
     public async Task LaunchFromFolderAsync_CompletedWithUnreadableFile_PlumbsUnreadableCount()
     {
         var (service, _, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
@@ -511,23 +534,6 @@ public sealed class ScenarioLaunchServiceTests
     }
 
     [Fact]
-    public async Task LaunchFromFolderAsync_MatchedButNoneOpened_RollsBackAndReturnsNoLogsOpened()
-    {
-        var (service, dispatcher, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
-        picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
-        reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
-        menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(0, 1, 0, 0, []));
-
-        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
-
-        Assert.Equal(ScenarioFolderOutcome.NoLogsOpened, result.Outcome);
-        Assert.Equal(1, result.Empty);
-        dispatcher.Received(1).Dispatch(Arg.Any<CloseAllLogsAction>());
-        menu.DidNotReceive().SetHistogramVisible(Arg.Any<bool>());
-    }
-
-    [Fact]
     public async Task LaunchFromFolderAsync_MatchOpened_ReturnsCompletedAndAppliesFiltersToMatchedFiles()
     {
         var (service, dispatcher, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
@@ -552,6 +558,23 @@ public sealed class ScenarioLaunchServiceTests
             Arg.Is<IEnumerable<string>>(paths => paths != null && paths.Single() == "C:\\bundle\\System.evtx"),
             combineLog: false,
             showInlineAlerts: false);
+    }
+
+    [Fact]
+    public async Task LaunchFromFolderAsync_MatchedButNoneOpened_RollsBackAndReturnsNoLogsOpened()
+    {
+        var (service, dispatcher, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
+        picker.PickFolderAsync().Returns("C:\\bundle");
+        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
+        menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(0, 1, 0, 0, []));
+
+        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(ScenarioFolderOutcome.NoLogsOpened, result.Outcome);
+        Assert.Equal(1, result.Empty);
+        dispatcher.Received(1).Dispatch(Arg.Any<CloseAllLogsAction>());
+        menu.DidNotReceive().SetHistogramVisible(Arg.Any<bool>());
     }
 
     [Fact]
@@ -606,6 +629,81 @@ public sealed class ScenarioLaunchServiceTests
 
         Assert.Equal(ScenarioFolderOutcome.Error, result.Outcome);
         Assert.Equal("picker boom", result.Message);
+    }
+
+    [Fact]
+    public async Task LaunchFromFolderAsync_WhenCancelledDuringOpeningPhase_ReturnsCancelledWithoutOpening()
+    {
+        var (service, dispatcher, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
+        using var cts = new CancellationTokenSource();
+        picker.PickFolderAsync().Returns("C:\\bundle");
+        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
+        menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
+
+        // A cancellation that lands while the Opening callback runs must win: the post-callback recheck returns Cancelled
+        // before any filter dispatch or log open.
+        var result = await service.LaunchFromFolderAsync(
+            scenario,
+            dateWindow: null,
+            cts.Token,
+            phase =>
+            {
+                if (phase == ScenarioFolderPhase.Opening) { cts.Cancel(); }
+
+                return Task.CompletedTask;
+            });
+
+        Assert.Equal(ScenarioFolderOutcome.Cancelled, result.Outcome);
+        await menu.DidNotReceive().OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<bool>(), Arg.Any<bool>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<ReplaceFiltersAction>());
+    }
+
+    [Fact]
+    public async Task LaunchFromFolderAsync_WhenNoChannelMatch_ReportsScanningButNotOpening()
+    {
+        var (service, _, _, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
+        picker.PickFolderAsync().Returns("C:\\bundle");
+        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\other.evtx"]));
+        reader.ReadChannel("C:\\bundle\\other.evtx").Returns(EvtxChannelReadResult.FromChannel("Application"));
+        var phases = new List<ScenarioFolderPhase>();
+
+        var result = await service.LaunchFromFolderAsync(
+            scenario, dateWindow: null, TestContext.Current.CancellationToken, phase => { phases.Add(phase); return Task.CompletedTask; });
+
+        // Zero matched paths never open anything, so Opening (gated on a nonempty match) is never reported.
+        Assert.Equal(ScenarioFolderOutcome.NoMatchingLogs, result.Outcome);
+        Assert.Equal([ScenarioFolderPhase.Scanning], phases);
+    }
+
+    [Fact]
+    public async Task LaunchFromFolderAsync_WhenPickerCancelled_ReportsNoPhase()
+    {
+        var (service, _, _, picker, _, _, scenario) = CreateFolder(FolderScenario());
+        picker.PickFolderAsync().Returns((string?)null);
+        var phases = new List<ScenarioFolderPhase>();
+
+        await service.LaunchFromFolderAsync(
+            scenario, dateWindow: null, TestContext.Current.CancellationToken, phase => { phases.Add(phase); return Task.CompletedTask; });
+
+        Assert.Empty(phases);
+    }
+
+    [Fact]
+    public async Task LaunchFromFolderAsync_WhenScanMatchesAndOpens_ReportsScanningThenOpening()
+    {
+        var (service, _, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
+        picker.PickFolderAsync().Returns("C:\\bundle");
+        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
+        menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
+        var phases = new List<ScenarioFolderPhase>();
+
+        var result = await service.LaunchFromFolderAsync(
+            scenario, dateWindow: null, TestContext.Current.CancellationToken, phase => { phases.Add(phase); return Task.CompletedTask; });
+
+        Assert.Equal(ScenarioFolderOutcome.Completed, result.Outcome);
+        Assert.Equal([ScenarioFolderPhase.Scanning, ScenarioFolderPhase.Opening], phases);
     }
 
     [Theory]
