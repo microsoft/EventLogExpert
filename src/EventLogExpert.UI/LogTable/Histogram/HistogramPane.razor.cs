@@ -369,6 +369,9 @@ public sealed partial class HistogramPane
         return joined.Length == 0 ? joined : char.ToUpperInvariant(joined[0]) + joined[1..];
     }
 
+    private static bool IsCategoricalOther(HistogramData data, int group) =>
+        group < data.Groups.Count && data.Groups[group].ColorClass == "histogram-cat-other";
+
     private static string? SelectActiveOriginLog(LogTableState state)
     {
         var activeTab = state.EventTables.FirstOrDefault(tab => tab.Id == state.ActiveEventLogId);
@@ -534,8 +537,6 @@ public sealed partial class HistogramPane
         return labels;
     }
 
-    private int BarsAreaHeight() => Math.Max(0, _plotHeightPx - AxisReservePx);
-
     private string BarTooltip(HistogramRenderBin bin)
     {
         var start = ToDisplay(new DateTime(bin.StartTicks, DateTimeKind.Utc));
@@ -546,6 +547,8 @@ public sealed partial class HistogramPane
 
         return $"{bin.Total} {_baseData?.EventNoun ?? "events"}{GroupBreakdown(bin)}, {startText} - {endText}";
     }
+
+    private int BarsAreaHeight() => Math.Max(0, _plotHeightPx - AxisReservePx);
 
     private string BinCursorAnnouncement(HistogramRenderBin bin)
     {
@@ -679,9 +682,6 @@ public sealed partial class HistogramPane
 
         return ResolveGroupHighlight(masks[group]).Description;
     }
-
-    private static bool IsCategoricalOther(HistogramData data, int group) =>
-        group < data.Groups.Count && data.Groups[group].ColorClass == "histogram-cat-other";
 
     private void HandleKeyDown(KeyboardEventArgs args)
     {
@@ -827,6 +827,14 @@ public sealed partial class HistogramPane
         if (_render is { } render && _baseData is { } data) { ComputeSegmentHeights(render, data.Groups.Count); }
     }
 
+    // Refresh the cached assertive-region bin readout against the current (post-filter-change) state. The cached string
+    // embeds the highlight description, so it must be re-derived on every highlight change (disarm, plan change, or a
+    // color-only edit that does not rescan) or it can keep announcing a stale highlight after the cursor is dismissed.
+    private void RefreshBinAnnouncement() =>
+        _binAnnouncement = _binCursor is { } cursor && _render is { } render && cursor < render.Bins.Count
+            ? BinCursorAnnouncement(render.Bins[cursor])
+            : string.Empty;
+
     private void RefreshFindTicks() =>
         _findTicks = FindMarkers.Owner == ActiveEventLogId.Value && FindMarkers.Ticks is { Count: > 0 } ticks
             ? [.. ticks]
@@ -847,16 +855,23 @@ public sealed partial class HistogramPane
 
         if (rescanNeeded && rescanOnPredicateChange)
         {
+            // The rescan will republish _baseData, but until it lands the current masks were resolved against the OLD
+            // eligible list. Invalidate them synchronously so a render in the gap does not map stale ordinals through
+            // the new filters (masks are non-null only when the prior state was armed).
+            if (_baseData is { GroupHighlightMasks: not null } data)
+            {
+                _baseData = data with { GroupHighlightMasks = null };
+            }
+
+            RefreshBinAnnouncement();
+            StateHasChanged();
+
             StartScan();
 
             return;
         }
 
-        if (_binCursor is { } cursor && _render is { } render && cursor < render.Bins.Count)
-        {
-            _binAnnouncement = BinCursorAnnouncement(render.Bins[cursor]);
-        }
-
+        RefreshBinAnnouncement();
         StateHasChanged();
     }
 
@@ -915,7 +930,7 @@ public sealed partial class HistogramPane
         {
             await InvokeAsync(() =>
             {
-                if (_disposed || epoch != _scanEpoch || !ReferenceEquals(view, ActiveView.Value)) { return; }
+                if (_disposed || token.IsCancellationRequested || epoch != _scanEpoch || !ReferenceEquals(view, ActiveView.Value)) { return; }
 
                 if (useHighlightTie && tiePlanKey != _tiePlanKey) { return; }
 
@@ -1030,10 +1045,14 @@ public sealed partial class HistogramPane
         _scanCts?.Dispose();
         _scanCts = null;
 
+        // Bump the epoch on every supersede -- even when we bail below for a zero-size viewport -- so a prior scan whose
+        // UI publication is already queued is rejected by RunScanAsync's epoch guard and cannot restore stale data (for
+        // example, re-arm masks that a disarm just cleared).
+        int epoch = ++_scanEpoch;
+
         if (_viewportWidthPx <= 0 || _plotHeightPx <= 0) { return; }
 
         IEventColumnView view = ActiveView.Value;
-        int epoch = ++_scanEpoch;
         HistogramDimension dimension = _dimension;
         SavedFilter[] tieHighlightFilters = _tieHighlightFilters;
         int tiePlanKey = _tiePlanKey;

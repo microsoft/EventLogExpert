@@ -101,6 +101,78 @@ public sealed class HistogramPaneTests : BunitContext
     }
 
     [Fact]
+    public async Task FilterRefresh_WhenColorOnlyEditWithNoActiveCursor_ClearsStaleBinAnnouncement()
+    {
+        // Red -> blue keeps the tie armed AND the same predicate-plan key (color is excluded from the plan key), so no
+        // rescan occurs. The non-rescan tail must still drop the stale "Light red" announcement when no cursor is active.
+        SavedFilter red = Filter(HighlightColor.LightRed);
+        SavedFilter blue = Filter(HighlightColor.LightBlue);
+        _highlightSelector.Select(Arg.Any<ImmutableList<SavedFilter>>()).Returns([blue]);
+        _highlightSelector.ComputePredicatePlanKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(7);
+        var cut = Render<HistogramPane>();
+
+        SetPrivateField(cut, "_tieHighlightFilters", new[] { red });
+        SetPrivateField(cut, "_binCursor", null);
+        SetPrivateField(cut, "_binAnnouncement", "2 events (1 Alpha, Light red highlight)");
+        await cut.InvokeAsync(() => { });
+        Assert.Contains("Light red", GetPrivateField<string>(cut, "_binAnnouncement"));
+
+        _filters.SelectedValueChanged +=
+            Raise.Event<EventHandler<ImmutableList<SavedFilter>>>(_filters, ImmutableList.Create(blue));
+        await cut.InvokeAsync(() => { });
+
+        Assert.Equal(string.Empty, GetPrivateField<string>(cut, "_binAnnouncement"));
+    }
+
+    [Fact]
+    public async Task FilterRefresh_WhenDisarmedWithNoActiveCursor_ClearsStaleBinAnnouncement()
+    {
+        SavedFilter red = Filter(HighlightColor.LightRed);
+        _highlightSelector.Select(Arg.Any<ImmutableList<SavedFilter>>()).Returns([]);
+        _highlightSelector.ComputePredicatePlanKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(7);
+        var cut = Render<HistogramPane>();
+
+        // A prior armed bin readout was cached, then the cursor was dismissed (Escape) which leaves the text behind.
+        SetPrivateField(cut, "_tieHighlightFilters", new[] { red });
+        SetPrivateField(cut, "_binCursor", null);
+        SetPrivateField(cut, "_binAnnouncement", "2 events (1 Alpha, Light red highlight)");
+        await cut.InvokeAsync(() => { });
+        Assert.Contains("highlight", GetPrivateField<string>(cut, "_binAnnouncement"));
+
+        _filters.SelectedValueChanged +=
+            Raise.Event<EventHandler<ImmutableList<SavedFilter>>>(_filters, ImmutableList<SavedFilter>.Empty);
+        await cut.InvokeAsync(() => { });
+
+        Assert.Equal(string.Empty, GetPrivateField<string>(cut, "_binAnnouncement"));
+    }
+
+    [Fact]
+    public async Task FilterRefresh_WhenDisarmed_ClearsGroupHighlightMasksSynchronously()
+    {
+        // Arm on init, disarm on the filter change. Keep the viewport at 0 (never resize) so StartScan no-ops and cannot
+        // publish mask-free data on its own -- the synchronous mask clear in RefreshTieFilters is the only mutation.
+        SavedFilter red = Filter(HighlightColor.LightRed);
+        _highlightSelector.Select(Arg.Any<ImmutableList<SavedFilter>>()).Returns([]);
+        _highlightSelector.ComputePredicatePlanKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(7);
+        var cut = Render<HistogramPane>();
+
+        SetPrivateField(cut, "_tieHighlightFilters", new[] { red });
+        await PublishBaseDataAsync(cut, ArmedCategoryData());
+
+        // Non-vacuous: the armed legend swatch renders the highlight class.
+        cut.WaitForAssertion(() => Assert.Equal("histogram-cat-hl", AlphaSwatchClass(cut)));
+
+        _filters.SelectedValueChanged +=
+            Raise.Event<EventHandler<ImmutableList<SavedFilter>>>(_filters, ImmutableList<SavedFilter>.Empty);
+        await cut.InvokeAsync(() => { });
+
+        // histogram-cat-hl comes only from GroupHighlightMasks; with no scan publishing (viewport 0), its disappearance
+        // proves the synchronous clear ran.
+        cut.WaitForAssertion(() => Assert.NotEqual("histogram-cat-hl", AlphaSwatchClass(cut)));
+        Assert.Null(GetPrivateField<HistogramData>(cut, "_baseData").GroupHighlightMasks);
+    }
+
+    [Fact]
     public async Task FilterRefresh_WhenOnlyHighlightColorChanges_DoesNotReadActiveViewForScan()
     {
         SavedFilter red = Filter(HighlightColor.LightRed);
@@ -122,23 +194,6 @@ public sealed class HistogramPaneTests : BunitContext
         await cut.InvokeAsync(() => { });
 
         _ = _activeView.DidNotReceive().Value;
-    }
-
-    [Fact]
-    public async Task FilterRefresh_WhenPredicatePlanChanges_ReadsActiveViewForScan()
-    {
-        SavedFilter red = Filter(HighlightColor.LightRed);
-        SavedFilter blue = Filter(HighlightColor.LightBlue);
-        _highlightSelector.Select(Arg.Any<ImmutableList<SavedFilter>>()).Returns([red], [blue]);
-        _highlightSelector.ComputePredicatePlanKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(7, 8);
-        var cut = Render<HistogramPane>();
-        await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
-        _activeView.ClearReceivedCalls();
-
-        _filters.SelectedValueChanged +=
-            Raise.Event<EventHandler<ImmutableList<SavedFilter>>>(_filters, ImmutableList.Create(blue));
-
-        _ = _activeView.Received().Value;
     }
 
     [Fact]
@@ -164,6 +219,28 @@ public sealed class HistogramPaneTests : BunitContext
         await cut.InvokeAsync(() => { });
 
         _ = _activeView.DidNotReceive().Value;
+    }
+
+    [Fact]
+    public async Task FilterRefresh_WhenPredicatePlanChanges_ReadsActiveViewForScan()
+    {
+        SavedFilter red = Filter(HighlightColor.LightRed);
+        SavedFilter blue = Filter(HighlightColor.LightBlue);
+        _highlightSelector.Select(Arg.Any<ImmutableList<SavedFilter>>()).Returns([red], [blue]);
+        _highlightSelector.ComputePredicatePlanKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(7, 8);
+        var cut = Render<HistogramPane>();
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
+
+        // Wait for the resize scan's two ActiveView.Value reads (sync StartScan + post-scan continuation) to settle
+        // before clearing, so the continuation's late read is not miscounted against the plan-change rescan under test.
+        cut.WaitForAssertion(() => _ = _activeView.Received(2).Value);
+        _activeView.ClearReceivedCalls();
+
+        _filters.SelectedValueChanged +=
+            Raise.Event<EventHandler<ImmutableList<SavedFilter>>>(_filters, ImmutableList.Create(blue));
+
+        // The plan-change rescan dispatches via InvokeAsync; wait for its ActiveView.Value read rather than checking eagerly.
+        cut.WaitForAssertion(() => _ = _activeView.Received().Value);
     }
 
     [Fact]
@@ -300,6 +377,37 @@ public sealed class HistogramPaneTests : BunitContext
         }
     }
 
+    [Fact]
+    public async Task StartScan_WhenViewportZero_BumpsScanEpochToSupersedeQueuedPublish()
+    {
+        // A zero-size viewport makes StartScan bail without launching a scan, but it must still bump the epoch so a prior
+        // scan whose UI publication is already queued is rejected and cannot restore stale (for example, armed) data.
+        var cut = Render<HistogramPane>();
+        int before = GetPrivateField<int>(cut, "_scanEpoch");
+
+        await cut.InvokeAsync(() => InvokePrivate(cut, "StartScan"));
+
+        Assert.Equal(before + 1, GetPrivateField<int>(cut, "_scanEpoch"));
+    }
+
+    private static string? AlphaSwatchClass(IRenderedComponent<HistogramPane> cut) =>
+        cut.FindAll(".histogram-legend-item")
+            .Single(button => button.TextContent == "Alpha")
+            .QuerySelector("rect")?
+            .GetAttribute("class");
+
+    private static HistogramData ArmedCategoryData() =>
+        new(
+            [1, 1],
+            2,
+            1,
+            new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2024, 1, 1, 1, 0, 0, DateTimeKind.Utc),
+            2,
+            TimeSpan.FromHours(1).Ticks,
+            HistogramGroups.ForCategories(["alpha"], ["Alpha"], "Other"),
+            [1u << 1, 1u << 1]);
+
     private static SavedFilter Filter(HighlightColor color) =>
         new() { Color = color, IsEnabled = true, ComparisonText = "Id == 1", Compiled = null! };
 
@@ -311,6 +419,20 @@ public sealed class HistogramPaneTests : BunitContext
 
         Assert.NotNull(field);
         return Assert.IsType<HistogramDimension>(field.GetValue(cut.Instance));
+    }
+
+    private static T GetPrivateField<T>(IRenderedComponent<HistogramPane> cut, string name)
+    {
+        var field = typeof(HistogramPane).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return Assert.IsType<T>(field.GetValue(cut.Instance));
+    }
+
+    private static void InvokePrivate(IRenderedComponent<HistogramPane> cut, string name)
+    {
+        var method = typeof(HistogramPane).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method.Invoke(cut.Instance, null);
     }
 
     private static Task PublishBaseDataAsync(IRenderedComponent<HistogramPane> cut, HistogramData data)
@@ -350,5 +472,12 @@ public sealed class HistogramPaneTests : BunitContext
         var select = cut.FindComponent<ValueSelect<HistogramDimension>>();
 
         return cut.InvokeAsync(() => select.Instance.UpdateValue(dimension));
+    }
+
+    private static void SetPrivateField(IRenderedComponent<HistogramPane> cut, string name, object? value)
+    {
+        var field = typeof(HistogramPane).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field.SetValue(cut.Instance, value);
     }
 }
