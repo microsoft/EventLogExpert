@@ -16,6 +16,7 @@ internal sealed class ModalCoordinator : IModalCoordinator, IDisposable
     private ModalRegistration? _activeRegistration;
     private ModalSession? _activeSession;
     private bool _disposed;
+    private ModalId _inFlightCloseModalId;
     private TaskCompletionSource<bool>? _inFlightCloseTcs;
 
     public ModalCoordinator(IModalService modalService)
@@ -109,7 +110,9 @@ internal sealed class ModalCoordinator : IModalCoordinator, IDisposable
                 return false;
             }
 
-            if (_inFlightCloseTcs is not null)
+            if (_inFlightCloseTcs is not null
+                && activeRegistration is not null
+                && _inFlightCloseModalId == activeRegistration.ModalId)
             {
                 inFlight = _inFlightCloseTcs.Task;
             }
@@ -122,6 +125,7 @@ internal sealed class ModalCoordinator : IModalCoordinator, IDisposable
                 snapshot = activeRegistration;
                 newTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 _inFlightCloseTcs = newTcs;
+                _inFlightCloseModalId = activeRegistration.ModalId;
             }
         }
 
@@ -146,7 +150,14 @@ internal sealed class ModalCoordinator : IModalCoordinator, IDisposable
         }
         finally
         {
-            lock (_stateLock) { _inFlightCloseTcs = null; }
+            lock (_stateLock)
+            {
+                if (ReferenceEquals(_inFlightCloseTcs, newTcs))
+                {
+                    _inFlightCloseTcs = null;
+                    _inFlightCloseModalId = ModalId.None;
+                }
+            }
         }
     }
 

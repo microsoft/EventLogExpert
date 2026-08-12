@@ -137,32 +137,6 @@ public sealed class ModalCoordinatorCloseTests
     }
 
     [Fact]
-    public async Task RequestCloseActiveAsync_CriticalScope_RejectsOtherModalActivationEvenWithEscInFlight()
-    {
-        var service = new ModalService();
-        using var sut = new ModalCoordinator(service);
-        _ = sut.PushAsync<DummyModal, bool>();
-        ModalId id = service.ActiveModalId;
-        var handlerReached = new TaskCompletionSource();
-        var releaseHandler = new TaskCompletionSource<bool>();
-        sut.RegisterModal(TestRegistration(id, async _ =>
-        {
-            handlerReached.SetResult();
-            return await releaseHandler.Task;
-        }, ModalScope.Critical));
-
-        Task<bool> escCall = sut.RequestCloseActiveAsync(ModalCloseReason.EscKey);
-        await handlerReached.Task;
-
-        bool omaResult = await sut.RequestCloseActiveAsync(ModalCloseReason.OtherModalActivation);
-
-        Assert.False(omaResult);
-
-        releaseHandler.SetResult(true);
-        await escCall;
-    }
-
-    [Fact]
     public async Task RequestCloseActiveAsync_CriticalScopeAndOtherModalActivation_RejectsWithoutCallingHandler()
     {
         var service = new ModalService();
@@ -200,6 +174,32 @@ public sealed class ModalCoordinatorCloseTests
 
         Assert.True(result);
         Assert.Equal(1, handlerCallCount);
+    }
+
+    [Fact]
+    public async Task RequestCloseActiveAsync_CriticalScope_RejectsOtherModalActivationEvenWithEscInFlight()
+    {
+        var service = new ModalService();
+        using var sut = new ModalCoordinator(service);
+        _ = sut.PushAsync<DummyModal, bool>();
+        ModalId id = service.ActiveModalId;
+        var handlerReached = new TaskCompletionSource();
+        var releaseHandler = new TaskCompletionSource<bool>();
+        sut.RegisterModal(TestRegistration(id, async _ =>
+        {
+            handlerReached.SetResult();
+            return await releaseHandler.Task;
+        }, ModalScope.Critical));
+
+        Task<bool> escCall = sut.RequestCloseActiveAsync(ModalCloseReason.EscKey);
+        await handlerReached.Task;
+
+        bool omaResult = await sut.RequestCloseActiveAsync(ModalCloseReason.OtherModalActivation);
+
+        Assert.False(omaResult);
+
+        releaseHandler.SetResult(true);
+        await escCall;
     }
 
     [Fact]
@@ -366,6 +366,49 @@ public sealed class ModalCoordinatorCloseTests
 
         Assert.True(result);
         Assert.Equal(0, handlerCallCount);
+    }
+
+    [Fact]
+    public async Task RequestCloseActiveAsync_StaleInFlightCloseFromForceClosedModal_RunsNewModalsOwnVeto()
+    {
+        var service = new ModalService();
+        using var sut = new ModalCoordinator(service);
+
+        // Modal A opens and its close handler blocks in-flight.
+        _ = sut.PushAsync<DummyModal, bool>();
+        ModalId idA = service.ActiveModalId;
+        var aHandlerReached = new TaskCompletionSource();
+        var releaseA = new TaskCompletionSource<bool>();
+        sut.RegisterModal(TestRegistration(idA, async _ =>
+        {
+            aHandlerReached.SetResult();
+            return await releaseA.Task;
+        }));
+
+        Task<bool> closeA = sut.RequestCloseActiveAsync(ModalCloseReason.UserDismiss);
+        await aHandlerReached.Task;
+
+        // A is force-closed while its close is still in-flight; B opens in its place.
+        sut.ForceCloseActive();
+        _ = sut.PushAsync<OtherModal, bool>();
+        ModalId idB = service.ActiveModalId;
+        Assert.NotEqual(idA, idB);
+
+        int bHandlerCalls = 0;
+        sut.RegisterModal(TestRegistration(idB, _ =>
+        {
+            bHandlerCalls++;
+            return Task.FromResult(false);
+        }));
+
+        // B's close must invoke B's own veto, not coalesce onto A's stale in-flight close.
+        bool bClose = await sut.RequestCloseActiveAsync(ModalCloseReason.UserDismiss);
+
+        Assert.Equal(1, bHandlerCalls);
+        Assert.False(bClose);
+
+        releaseA.SetResult(true);
+        await closeA;
     }
 
     [Fact]
