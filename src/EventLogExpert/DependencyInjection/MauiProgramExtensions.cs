@@ -88,8 +88,7 @@ internal static class MauiProgramExtensions
         {
             services.AddSingleton<EventExportCoordinator>();
             services.AddSingleton<MauiMenuActionService>();
-            services.AddSingleton<IMenuActionService>(static provider =>
-                provider.GetRequiredService<MauiMenuActionService>());
+            services.Forward<IMenuActionService, MauiMenuActionService>();
 
             return services;
         }

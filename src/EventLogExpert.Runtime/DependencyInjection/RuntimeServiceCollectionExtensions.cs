@@ -74,8 +74,8 @@ public static class RuntimeServiceCollectionExtensions
             ActivatorUtilities.CreateInstance<DatabaseRecoveryService>(sp, CategoryLogger(sp, LogCategories.Database)));
 
         services.AddSingleton<DatabaseService>();
-        services.AddSingleton<IDatabaseService>(static sp => sp.GetRequiredService<DatabaseService>());
-        services.AddSingleton<IActiveDatabases>(static sp => sp.GetRequiredService<DatabaseService>());
+        services.Forward<IDatabaseService, DatabaseService>();
+        services.Forward<IActiveDatabases, DatabaseService>();
 
         services.AddSingleton<IDatabaseOperationCoordinator>(static sp =>
             ActivatorUtilities.CreateInstance<DatabaseOperationCoordinator>(sp, CategoryLogger(sp, LogCategories.Database)));
@@ -121,6 +121,7 @@ public static class RuntimeServiceCollectionExtensions
             AddDatabaseServices(services);
             AddExportServices(services);
 
+            // Commands
             services.AddSingleton<IEventLogCommands, EventLogCommands>();
             services.AddSingleton<IFilterLensCommands, FilterLensCommands>();
             services.AddSingleton<IFilterLibraryCommands, FilterLibraryCommands>();
@@ -129,10 +130,12 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<ILogTableCommands, LogTableCommands>();
             services.AddSingleton<IScenarioFavoriteCommands, ScenarioFavoriteCommands>();
 
+            // Queries
             services.AddSingleton<IEventLogQueries, EventLogQueries>();
             services.AddSingleton<ILogTableQueries, LogTableQueries>();
             services.AddSingleton<IFilterPaneQueries, FilterPaneQueries>();
 
+            // Coordinators and concurrency
             services.AddSingleton<LogCloseCoordinator>();
             services.AddSingleton<EventLogConcurrencyState>();
             services.AddSingleton<XmlReloadCoordinator>();
@@ -140,74 +143,62 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<FilteredLogPresenceCoordinator>();
             services.AddSingleton<IEventLogReaderFactory, EventLogReaderFactory>();
 
+            // Ordered-view engine
             services.AddSingleton<OrderedViewWriter>(static _ => new OrderedViewWriter());
             services.AddSingleton<ViewRequestIssuer>();
             services.AddSingleton<OrderedViewDispatchBridge>();
             services.AddSingleton<IOrderedViewSource, OrderedViewSource>();
 
+            // Read-model sources
             services.AddSingleton<IFilterLensSource, FilterLensSource>();
-
             services.AddSingleton<IOpenLogsPresenceSource, OpenLogsPresenceSource>();
             services.AddSingleton<IHistogramVisibilitySource, HistogramVisibilitySource>();
             services.AddSingleton<IFilterAppliedSource, FilterAppliedSource>();
-
             services.AddSingleton<IEventFocusSource, EventFocusSource>();
             services.AddSingleton<IActiveEventLogSource, ActiveEventLogSource>();
             services.AddSingleton<IEventSelectionSource, EventSelectionSource>();
-
             services.AddSingleton<IRevealFocusSource, RevealFocusSource>();
-
-            services.AddSingleton<GroupCollapseNotifier>();
-            services.AddSingleton<IGroupCollapseNotifier>(sp => sp.GetRequiredService<GroupCollapseNotifier>());
-
             services.AddSingleton<IHistogramDimensionRequestSource, HistogramDimensionRequestSource>();
             services.AddSingleton<IActiveFiltersSource, ActiveFiltersSource>();
-
             services.AddSingleton<IFilteredDateRangeSource, FilteredDateRangeSource>();
             services.AddSingleton<ILoadedLogNamesSource, LoadedLogNamesSource>();
-
             services.AddSingleton<ILibraryEntriesSource, LibraryEntriesSource>();
-
             services.AddSingleton<ILibraryLoadStatusSource, LibraryLoadStatusSource>();
-
-            services.AddSingleton<TagBulkUpdateFailedNotifier>();
-            services.AddSingleton<ITagBulkUpdateFailedNotifier>(sp => sp.GetRequiredService<TagBulkUpdateFailedNotifier>());
-
-            services.AddSingleton<ClearAllFiltersNotifier>();
-            services.AddSingleton<IClearAllFiltersNotifier>(sp => sp.GetRequiredService<ClearAllFiltersNotifier>());
-            services.AddSingleton<SetFilterDateRangeSucceededNotifier>();
-            services.AddSingleton<ISetFilterDateRangeSucceededNotifier>(sp => sp.GetRequiredService<SetFilterDateRangeSucceededNotifier>());
-
             services.AddSingleton<IScenarioFavoritesSource, ScenarioFavoritesSource>();
-
             services.AddSingleton<ILogTabBarSource, LogTabBarSource>();
-
             services.AddSingleton<IStatusBarSource, StatusBarSource>();
 
+            // Change notifiers (concrete raises; interface subscribes; one shared instance)
+            services.AddSingleton<GroupCollapseNotifier>();
+            services.Forward<IGroupCollapseNotifier, GroupCollapseNotifier>();
+            services.AddSingleton<TagBulkUpdateFailedNotifier>();
+            services.Forward<ITagBulkUpdateFailedNotifier, TagBulkUpdateFailedNotifier>();
+            services.AddSingleton<ClearAllFiltersNotifier>();
+            services.Forward<IClearAllFiltersNotifier, ClearAllFiltersNotifier>();
+            services.AddSingleton<SetFilterDateRangeSucceededNotifier>();
+            services.Forward<ISetFilterDateRangeSucceededNotifier, SetFilterDateRangeSucceededNotifier>();
+
+            // Indicators, resolvers, formatters, and selectors
             services.AddSingleton<DisplayIndicatorGate>();
             services.AddSingleton<IEventDetailResolver, EventDetailResolver>();
-
             services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
-
             services.AddSingleton<IEventCopyFormatter, EventCopyFormatter>();
-
             services.AddSingleton<IHighlightSelector, HighlightSelector>();
             services.AddSingleton<ILogTableColumnDefaultsProvider, ColumnDefaults>();
             services.AddSingleton<ILogReloadCoordinator, DatabaseCoordinationEffects>();
 
+            // Application shell: title, banners, and announcements
             services.AddSingleton<IAppTitleService, AppTitleService>();
-
             services.AddSingleton<BannerService>();
-            services.AddSingleton<IAttentionBannerService>(static sp => sp.GetRequiredService<BannerService>());
-            services.AddSingleton<IProgressBannerService>(static sp => sp.GetRequiredService<BannerService>());
-            services.AddSingleton<ICriticalErrorService>(static sp => sp.GetRequiredService<BannerService>());
-            services.AddSingleton<IErrorBannerService>(static sp => sp.GetRequiredService<BannerService>());
-            services.AddSingleton<IInfoBannerService>(static sp => sp.GetRequiredService<BannerService>());
-
+            services.Forward<IAttentionBannerService, BannerService>();
+            services.Forward<IProgressBannerService, BannerService>();
+            services.Forward<ICriticalErrorService, BannerService>();
+            services.Forward<IErrorBannerService, BannerService>();
+            services.Forward<IInfoBannerService, BannerService>();
             services.AddSingleton<IExportProgressBannerService, ExportProgressBannerService>();
-
             services.AddSingleton<IAnnouncementService, AnnouncementService>();
 
+            // Logging
             services.Configure<LoggingOptions>(LoggingOptions.ApplyShippedDefaults);
             services.AddSingleton(static sp =>
             {
@@ -247,6 +238,7 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<ILogWatcherService, LogWatcherService>();
             services.AddSingleton<ISettingsService, SettingsService>();
 
+            // Update and deployment
             services.AddSingleton<ICurrentVersionProvider, CurrentVersionProvider>();
             services.AddSingleton<IDeploymentService, DeploymentService>();
             services.AddSingleton<IGitHubService, GitHubService>();
@@ -254,9 +246,11 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IPackageVersionProvider, PackageVersionProvider>();
             services.AddSingleton<IUpdateService, UpdateService>();
 
+            // Database tools
             services.AddDatabaseToolsServices();
             services.TryAddSingleton<IDatabaseToolsService, DatabaseToolsService>();
 
+            // Scenarios and channels
             services.AddSingleton<IScenarioSource, BuiltInScenarioSource>();
             services.AddSingleton<BuiltInScenarioRegistry>();
             services.AddSingleton<IChannelConfigReader>(static sp =>
@@ -264,8 +258,8 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IChannelConfigWriter>(static sp =>
                 new ChannelConfigWriter(CategoryLogger(sp, LogCategories.EventLog)));
             services.AddSingleton<ChannelPresenceProbe>();
-            services.AddSingleton<IChannelPresenceProbe>(static sp => sp.GetRequiredService<ChannelPresenceProbe>());
-            services.AddSingleton<IChannelReadinessService>(static sp => sp.GetRequiredService<ChannelPresenceProbe>());
+            services.Forward<IChannelPresenceProbe, ChannelPresenceProbe>();
+            services.Forward<IChannelReadinessService, ChannelPresenceProbe>();
             services.AddSingleton<IChannelEnableService, ChannelEnableService>();
             services.AddSingleton<IEvtxChannelReader, EvtxChannelReader>();
             services.AddSingleton<IScenarioQueryService, ScenarioQueryService>();
