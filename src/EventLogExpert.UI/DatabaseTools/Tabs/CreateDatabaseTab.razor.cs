@@ -6,9 +6,9 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.Eventing.OfflineImaging.Wim;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
+using EventLogExpert.UI.Alerts;
 using Microsoft.AspNetCore.Components;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -94,7 +94,6 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
         var source = string.IsNullOrWhiteSpace(_sourcePath) ? null : _sourcePath.Trim();
         var wimIndex = _wimIndex is > 0 ? _wimIndex : null;
 
-        // Only user-marked folders force Directory; image files must auto-detect from extension.
         var imageKind = IsMarkedFolderImage ? OfflineImageKind.Directory : (OfflineImageKind?)null;
 
         return new(
@@ -108,7 +107,6 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
             Overwrite: _overwriteConfirmedFor is not null && string.Equals(_overwriteConfirmedFor, _targetPath.Trim(), StringComparison.Ordinal));
     }
 
-    // The confirmed overwrite target is snapshotted so edits during the prompt cannot inherit it.
     protected override async Task<bool> ConfirmBeforeDispatchAsync()
     {
         _overwriteConfirmedFor = null;
@@ -192,7 +190,6 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
                 }
                 else if (_imageEditions.All(edition => edition.Index != _wimIndex))
                 {
-                    // A loaded matching index is preserved; otherwise show the first edition as visible confirmation.
                     _wimIndex = _imageEditions[0].Index;
                 }
             }
@@ -248,8 +245,6 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
         if (!string.IsNullOrEmpty(path)) { _targetPath = path; }
     }
 
-    // Directory.Exists can block for seconds on an unresponsive UNC path; the source box re-renders on every keystroke, so
-    // the folder-existence check runs off the UI thread and only its cached result drives the markup.
     private async Task RefreshSourceIsDirectoryAsync(string path)
     {
         string trimmed = path.Trim();

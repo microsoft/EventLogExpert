@@ -2,10 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.Menu;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Keyboard;
 using EventLogExpert.UI.Menu;
+using EventLogExpert.UI.Modal;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -38,10 +38,10 @@ public sealed class MenuHostRegistryTests
     }
 
     [Fact]
-    public void AddEventLogUiServices_RegistersIMenuHostRegistry()
+    public void AddEventLogUIServices_RegistersIMenuHostRegistry()
     {
         var services = new ServiceCollection();
-        services.AddEventLogUiServices();
+        services.AddEventLogUIServices();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IMenuHostRegistry>();
@@ -50,13 +50,13 @@ public sealed class MenuHostRegistryTests
     }
 
     [Fact]
-    public async Task AddEventLogUiServices_RegistersKeyboardShortcutService()
+    public async Task AddEventLogUIServices_RegistersKeyboardShortcutService()
     {
         var services = new ServiceCollection();
         services.AddSingleton(Substitute.For<IMenuActionService>());
         services.AddSingleton(Substitute.For<IModalCoordinator>());
         services.AddSingleton(Substitute.For<ISettingsService>());
-        services.AddEventLogUiServices();
+        services.AddEventLogUIServices();
 
         await using var provider = services.BuildServiceProvider();
         var service = provider.GetRequiredService<KeyboardShortcutService>();

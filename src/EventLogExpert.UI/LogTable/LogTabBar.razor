@@ -1,12 +1,23 @@
-@inherits FluxorComponent
+@inherits AppStateComponentBase
+@{
+    var presentation = Source.Current;
 
-<div class="log-tab-bar" hidden="@(LogTableState.Value.EventTables.Count <= 1)" @ref="_logTabBarRootRef">
+    if (!ReferenceEquals(presentation, _renderedPresentation))
+    {
+        _tabRows = BuildTabRows(presentation);
+        _renderedPresentation = presentation;
+    }
+
+    var tabRows = _tabRows;
+}
+
+<div class="log-tab-bar" hidden="@(!presentation.HasMultipleTabs)" @ref="_logTabBarRootRef">
     <div class="tab-row">
-        @foreach (var row in _tabRows)
+        @foreach (var row in tabRows)
         {
             if (row is AllLogsRow allLogs)
             {
-                <div class="@GetActiveTab(allLogs.Header)" @oncontextmenu="OpenAllLogsMenu"
+                <div class="@GetActiveTab(presentation, allLogs.Header)" @oncontextmenu="OpenAllLogsMenu"
                     @oncontextmenu:preventDefault="true"
                     @oncontextmenu:stopPropagation="true"
                     title="@GetTabTooltip(allLogs.Header)">
@@ -14,14 +25,14 @@
                         @onmousedown="e => OnTabMouseDown(e, allLogs.Header)"
                         role="button"
                         tabindex="0">
-                        @GetTabName(allLogs.Header)
+                        @GetTabName(presentation, allLogs.Header)
                     </span>
                 </div>
             }
             else if (row is GroupRow group)
             {
                 <div class="tab-group">
-                    <div class="@GetActiveTab(group.Header) group-header" @oncontextmenu="args => OpenGroupHeaderMenu(args, group.Group)"
+                    <div class="@GetActiveTab(presentation, group.Header) group-header" @oncontextmenu="args => OpenGroupHeaderMenu(args, group.Group)"
                         @oncontextmenu:preventDefault="true"
                         @oncontextmenu:stopPropagation="true"
                         title="@GetTabTooltip(group.Header)">
@@ -36,7 +47,7 @@
                             @onmousedown="e => OnTabMouseDown(e, group.Header)"
                             role="button"
                             tabindex="0">
-                            @GetTabName(group.Header)
+                            @GetTabName(presentation, group.Header)
                         </span>
                         <i aria-label="Close group"
                             class="bi bi-x"
@@ -46,9 +57,9 @@
                             tabindex="0">
                         </i>
                     </div>
-                    @foreach (var member in VisibleMembers(group))
+                    @foreach (var member in VisibleMembers(presentation, group))
                     {
-                        <div class="@GetTabClass(member, true)" @oncontextmenu="args => OpenMemberMenu(args, member, group.Group)"
+                        <div class="@GetTabClass(presentation, member, true)" @oncontextmenu="args => OpenMemberMenu(args, member, group.Group)"
                             @oncontextmenu:preventDefault="true"
                             @oncontextmenu:stopPropagation="true"
                             title="@GetTabTooltip(member)">
@@ -59,10 +70,10 @@
                                 tabindex="@(member.IsLoading ? -1 : 0)">
                                 @if (member.IsLoading)
                                 {
-                                    <i aria-label="Loading" class="spinner-border loader-spin" role="status"></i>
+                                    <i aria-label="Loading" class="loader-spin spinner-border" role="status"></i>
                                     @:&nbsp;
                                 }
-                                @GetTabName(member)
+                                @GetTabName(presentation, member)
                             </span>
                             <i aria-label="Close log"
                                 class="bi bi-x"
@@ -77,7 +88,7 @@
             }
             else if (row is StandaloneRow standalone)
             {
-                <div class="@GetActiveTab(standalone.Tab)" @oncontextmenu="args => OpenStandaloneMenu(args, standalone.Tab)"
+                <div class="@GetActiveTab(presentation, standalone.Tab)" @oncontextmenu="args => OpenStandaloneMenu(args, standalone.Tab)"
                     @oncontextmenu:preventDefault="true"
                     @oncontextmenu:stopPropagation="true"
                     title="@GetTabTooltip(standalone.Tab)">
@@ -88,10 +99,10 @@
                         tabindex="@(standalone.Tab.IsLoading ? -1 : 0)">
                         @if (standalone.Tab.IsLoading)
                         {
-                            <i aria-label="Loading" class="spinner-border loader-spin" role="status"></i>
+                            <i aria-label="Loading" class="loader-spin spinner-border" role="status"></i>
                             @:&nbsp;
                         }
-                        @GetTabName(standalone.Tab)
+                        @GetTabName(presentation, standalone.Tab)
                     </span>
                     <i aria-label="Close log"
                         class="bi bi-x"

@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Menu;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;

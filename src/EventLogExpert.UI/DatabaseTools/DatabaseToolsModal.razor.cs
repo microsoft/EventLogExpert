@@ -2,12 +2,12 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.EventLog;
-using EventLogExpert.Runtime.Modal;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.DatabaseTools.Tabs;
+using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.DatabaseTools;
@@ -120,7 +120,6 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
                 if (!closeAnyway.Accepted) { return false; }
             }
 
-            // Async prompts can race Manage-tab upgrades; re-check before closing.
             if (_manageTab is { IsUpgradeInFlight: true }) { return false; }
         }
 
@@ -139,7 +138,6 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
             if (!confirm.Accepted) { return false; }
         }
 
-        // Covers upgrades started during the running-operation prompt.
         if (_manageTab is { IsUpgradeInFlight: true }) { return false; }
 
         return true;

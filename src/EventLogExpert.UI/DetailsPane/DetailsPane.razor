@@ -1,4 +1,8 @@
-@inherits FluxorComponent
+@inherits AppStateComponentBase
+
+@{
+    bool showsLiveModel = _model is not null && _selectedHandle == EventFocus.Current?.CurrentHandle;
+}
 
 <div class="details-pane" data-toggle="@IsExpanded" hidden="@(_selectedEvent is null)">
     <div class="details-resizer"></div>
@@ -35,7 +39,7 @@
         }
 
         <div class="details-headerbar-actions">
-            @if (_isExpanded && _model is not null)
+            @if (_isExpanded && showsLiveModel)
             {
                 <button aria-label="Copy event to clipboard" class="details-copy-event" @onclick="CopyEventAsync" type="button">
                     <i class="bi bi-clipboard"></i>
@@ -57,8 +61,12 @@
     <div class="details-body" id="details-body">
         @if (_model is not null)
         {
-            <div aria-labelledby="details-tab-reader" class="details-reader" hidden="@(_activeTab != DetailsTab.Reader)" id="details-tabpanel-reader" role="tabpanel">
-                @if (_activeTab == DetailsTab.Reader)
+            <div aria-labelledby="details-tab-reader"
+                class="details-reader"
+                hidden="@(_activeTab != DetailsTab.Reader)"
+                id="details-tabpanel-reader"
+                role="tabpanel">
+                @if (_activeTab == DetailsTab.Reader && showsLiveModel)
                 {
                     <div class="details-reader-layout">
                         <div class="reader-rail">
@@ -87,8 +95,6 @@
                                 </dl>
                             }
 
-                            @* Capture the render-time non-null event so the button closures act on the event that was
-                               displayed when clicked, never on a newer/null selection read from the mutable field. *@
                             @if (_selectedEvent is { } correlationEvent && (correlationEvent.ActivityId.HasValue || correlationEvent.RelatedActivityId.HasValue))
                             {
                                 <section class="details-correlation">
@@ -225,7 +231,7 @@
             </div>
 
             <p aria-labelledby="details-tab-xml" class="details-xml" hidden="@(_activeTab != DetailsTab.Xml)" id="details-tabpanel-xml" role="tabpanel">
-                @if (_activeTab == DetailsTab.Xml)
+                @if (_activeTab == DetailsTab.Xml && showsLiveModel)
                 {
                     @if (_resolvedXml is null)
                     {

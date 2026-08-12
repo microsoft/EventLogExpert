@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using Bunit;
-using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -13,6 +12,10 @@ namespace EventLogExpert.UI.Tests.Menu;
 
 public sealed class MenuHostHandoffTests : BunitContext
 {
+    private const int PollDelayMilliseconds = 25;
+
+    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(2);
+
     private readonly FakeMenuService _menuService = new();
     private readonly BunitJSModuleInterop _overlayModule;
 
@@ -23,7 +26,7 @@ public sealed class MenuHostHandoffTests : BunitContext
 
         Services.AddBannerHostDependencies();
         Services.AddSingleton<IMenuService>(_menuService);
-        Services.AddEventLogUiServices();
+        Services.AddEventLogUIServices();
     }
 
     [Fact]
@@ -89,11 +92,11 @@ public sealed class MenuHostHandoffTests : BunitContext
 
     private async Task WaitForJsInvocationAsync(string identifier)
     {
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+        var deadline = DateTime.UtcNow + s_testTimeout;
         while (DateTime.UtcNow < deadline)
         {
             if (_overlayModule.Invocations.Any(i => i.Identifier == identifier)) { return; }
-            await Task.Delay(25, TestContext.Current.CancellationToken);
+            await Task.Delay(PollDelayMilliseconds, TestContext.Current.CancellationToken);
         }
         Assert.Fail($"Expected '{identifier}' JS interop call did not occur within timeout. Observed: [{string.Join(",", _overlayModule.Invocations.Select(i => i.Identifier))}]");
     }

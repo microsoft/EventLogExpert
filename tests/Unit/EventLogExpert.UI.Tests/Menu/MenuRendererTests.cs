@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using Bunit;
-using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 
@@ -12,8 +11,6 @@ public sealed class MenuRendererTests : BunitContext
 {
     public MenuRendererTests()
     {
-        // MenuRenderer issues `JSRuntime.InvokeVoidAsync("focusElement", ...)` after render to move
-        // DOM focus; loose mode no-ops the call so the assertion can run synchronously.
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
@@ -53,10 +50,8 @@ public sealed class MenuRendererTests : BunitContext
         Assert.Equal("true", disabled.GetAttribute("aria-disabled"));
         Assert.Null(disabled.GetAttribute("aria-describedby"));
         Assert.Null(disabled.GetAttribute("title"));
-        // Without a reason the item must not steal initial focus from the next focusable entry.
         Assert.Equal("-1", disabled.GetAttribute("tabindex"));
 
-        // Initial focus lands on the next focusable item, not the silently-disabled one.
         var enabled = component.FindAll("li.menu-item")[1];
         Assert.Equal("0", enabled.GetAttribute("tabindex"));
     }
@@ -81,15 +76,11 @@ public sealed class MenuRendererTests : BunitContext
         Assert.False(string.IsNullOrEmpty(describedBy));
         Assert.StartsWith("menu-item-reason-", describedBy);
 
-        // Hidden span carries the reason text and matches the aria-describedby id so screen readers
-        // announce the explanation when keyboard focus reaches the entry.
         var hiddenSpan = disabled.QuerySelector($"span#{describedBy}");
         Assert.NotNull(hiddenSpan);
         Assert.Contains("visually-hidden", hiddenSpan!.ClassName ?? string.Empty);
         Assert.Equal(reason, hiddenSpan.TextContent);
 
-        // Informative-disabled item is the first focusable entry, so initial focus lands there
-        // (sighted users see the title tooltip; AT users hear "Cached, dimmed, <reason>").
         Assert.Equal("0", disabled.GetAttribute("tabindex"));
         Assert.Equal("-1", component.FindAll("li.menu-item")[1].GetAttribute("tabindex"));
     }

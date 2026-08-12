@@ -1,8 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Runtime.Banner;
-
 namespace EventLogExpert.UI.Banner;
 
 public interface IBannerCycleStateService

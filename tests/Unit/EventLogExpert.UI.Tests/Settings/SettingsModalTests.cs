@@ -4,11 +4,10 @@
 using Bunit;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.DetailsPane;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Tests.TestUtils;
-using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -36,7 +35,6 @@ public sealed class SettingsModalTests : BunitContext
         Services.AddSingleton(_modalCoordinator);
         Services.AddSingleton(_modalService);
         Services.AddSingleton(_settings);
-        Services.AddFluxor(options => options.ScanAssemblies(typeof(SettingsModal).Assembly));
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
@@ -52,6 +50,15 @@ public sealed class SettingsModalTests : BunitContext
     }
 
     [Fact]
+    public async Task SettingsModal_OnSaveSuccess_AnnouncesSettingsSaved()
+    {
+        var component = Render<SettingsModal>();
+        await component.InvokeAsync(() => component.Instance.InvokeOnSaveAsyncForTests());
+
+        _announcementService.Received(1).Announce("Settings saved");
+    }
+
+    [Fact]
     public async Task SettingsModal_OnSave_PersistsStagedVerboseResolution()
     {
         _settings.VerboseResolution.Returns(false);
@@ -61,16 +68,6 @@ public sealed class SettingsModalTests : BunitContext
         await component.InvokeAsync(() => component.Instance.InvokeOnSaveAsyncForTests());
 
         _settings.Received().VerboseResolution = true;
-    }
-
-    [Fact]
-    public async Task SettingsModal_OnSaveSuccess_AnnouncesSettingsSaved()
-    {
-        var component = Render<SettingsModal>();
-        // Internal test-only forwarder bypasses ModalChrome footer markup coupling.
-        await component.InvokeAsync(() => component.Instance.InvokeOnSaveAsyncForTests());
-
-        _announcementService.Received(1).Announce("Settings saved");
     }
 
     [Fact]

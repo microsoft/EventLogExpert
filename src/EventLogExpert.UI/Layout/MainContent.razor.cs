@@ -3,24 +3,23 @@
 
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Histogram;
-using Fluxor;
-using Fluxor.Blazor.Web.Components;
+using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.Layout;
 
-public sealed partial class MainContent : FluxorComponent
+public sealed partial class MainContent : AppStateComponentBase
 {
     [Inject]
-    private IStateSelection<EventLogState, bool> HasActiveLogs { get; init; } = null!;
+    private IHistogramVisibilitySource HistogramVisibilitySource { get; init; } = null!;
 
     [Inject]
-    private IStateSelection<HistogramState, bool> HistogramVisible { get; init; } = null!;
+    private IOpenLogsPresenceSource OpenLogsSource { get; init; } = null!;
 
     protected override void OnInitialized()
     {
-        HasActiveLogs.Select(state => state.OpenLogCount > 0);
-        HistogramVisible.Select(state => state.IsVisible);
+        ObserveSource(OpenLogsSource);
+        ObserveSource(HistogramVisibilitySource);
         base.OnInitialized();
     }
 }

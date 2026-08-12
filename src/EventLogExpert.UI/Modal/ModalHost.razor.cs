@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Runtime.Modal;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.Modal;

@@ -2,12 +2,12 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Focus;
@@ -20,6 +20,8 @@ namespace EventLogExpert.UI.DatabaseTools.Tabs;
 
 public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 {
+    private const int MaxListedFileNames = 5;
+
     private static readonly TimeSpan s_cancelTimeout = TimeSpan.FromSeconds(30);
 
     private readonly Dictionary<string, bool> _pendingToggles = new(StringComparer.OrdinalIgnoreCase);
@@ -130,12 +132,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         await FocusRestoreAsync(_selectButton);
     }
 
-    /// <summary>
-    ///     Save wrapper invoked by <see cref="DatabaseToolsModal" /> on the unsaved-changes close prompt and by the
-    ///     inline Save button. Returns true on success or no-op; false when blocked by an in-flight upgrade or when the
-    ///     coordinator apply faulted. Sets <see cref="HasDatabaseStateChanged" /> bookkeeping when active state actually
-    ///     changed.
-    /// </summary>
     internal async Task<bool> ApplyPendingTogglesAsync()
     {
         if (IsUpgradeBlocked) { return false; }
@@ -207,8 +203,8 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private static string BuildBulkPlainMessage(IReadOnlyList<string> fileNames)
     {
-        var list = string.Join(", ", fileNames.Take(5));
-        var more = fileNames.Count > 5 ? $", and {fileNames.Count - 5} more" : string.Empty;
+        var list = string.Join(", ", fileNames.Take(MaxListedFileNames));
+        var more = fileNames.Count > MaxListedFileNames ? $", and {fileNames.Count - MaxListedFileNames} more" : string.Empty;
 
         return $"Are you sure you want to remove these {fileNames.Count} databases? ({list}{more})";
     }
@@ -233,7 +229,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private async Task AnnounceBulkUpgradeOutcomeAsync(UpgradeBatchResult? result, int attempted)
     {
-        // Gate-denied (singleton upgrade gate held by another caller).
         if (result is null)
         {
             if (AlertSurface is null) { return; }
@@ -253,10 +248,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             return;
         }
 
-        // Exception-fallback: coordinator's RunOperationAsync<T> returns an empty
-        // result on a thrown exception. The error banner already fired upstream;
-        // suppress the success-shaped announcement that would otherwise read
-        // "Upgraded 0 databases" alongside it.
         if (attempted > 0
             && result.Succeeded.Count == 0
             && result.Failed.Count == 0
@@ -329,10 +320,10 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private string BuildCancelThenRemoveMessage(IReadOnlyList<string> fileNames, IReadOnlyList<string> upgradingFiles)
     {
-        var upgradingList = string.Join(", ", upgradingFiles.Take(5));
-        var moreUpgrading = upgradingFiles.Count > 5 ? $", and {upgradingFiles.Count - 5} more" : string.Empty;
-        var fileList = string.Join(", ", fileNames.Take(5));
-        var moreFiles = fileNames.Count > 5 ? $", and {fileNames.Count - 5} more" : string.Empty;
+        var upgradingList = string.Join(", ", upgradingFiles.Take(MaxListedFileNames));
+        var moreUpgrading = upgradingFiles.Count > MaxListedFileNames ? $", and {upgradingFiles.Count - MaxListedFileNames} more" : string.Empty;
+        var fileList = string.Join(", ", fileNames.Take(MaxListedFileNames));
+        var moreFiles = fileNames.Count > MaxListedFileNames ? $", and {fileNames.Count - MaxListedFileNames} more" : string.Empty;
 
         string baseMessage = $"Upgrade in progress for: {upgradingList}{moreUpgrading}. " +
             $"This will cancel the upgrade batch(es) \u2014 which may include other files not in your selection \u2014 " +
@@ -394,9 +385,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             }
         }
 
-        // Coordinator-only - adding IsFileInAnyKnownBatch here would 30s-hang on background batches
-        // (no UpgradeStateChanged event ever fires to re-trigger). pendingBatches + stillAlive below
-        // already gate Remove via UpgradeBatchCompleted.
         void StateChangedHandler()
         {
             if (!fileNames.Any(f => Coordinator.IsUpgradeInFlight(f)))
@@ -412,8 +400,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         {
             foreach (var (batchId, files) in batchToFiles)
             {
-                // stillAlive includes IsFileInAnyKnownBatch so pendingBatches stays unset for
-                // pre-progress / queued files until the real UpgradeBatchCompleted fires.
                 bool stillAlive = files.Any(file =>
                 {
                     var entry = DatabaseService.Entries.FirstOrDefault(
@@ -546,8 +532,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private async Task FocusAfterBulkUpgradeAsync()
     {
-        // After clean-success auto-exit, the bulk strip is gone; focus the Select
-        // button so keyboard users have a stable anchor.
         if (!_isSelectionModeActive)
         {
             await FocusRestoreAsync(_selectButton);
@@ -577,8 +561,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         await FocusRestoreAsync(_importButton);
     }
 
-    // Lookup by batch membership (active + queued) for the cancel-then-remove flow. Distinct from
-    // GetUpgradeProgressForEntry, which matches by CurrentEntryName for per-row display only.
     private CancellableBatch? GetCancellableBatchForFile(string fileName)
     {
         var manage = ProgressBannerService.ManageDatabasesProgress;
@@ -773,8 +755,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         await AnnounceBulkUpgradeOutcomeAsync(result, eligible.Count);
 
-        // Auto-exit only on a fully-clean batch: any partial-failure/cancellation
-        // leaves the relevant rows selected so the user can retry or inspect.
         bool cleanSuccess = result is not null
             && result.Failed.Count == 0
             && result.Cancelled.Count == 0
@@ -813,9 +793,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             UpdateSelectionAnnouncement();
         }
 
-        // Always recompute when any selection exists: a row's status / backup /
-        // upgrade state can change in-place (classification completion, backup
-        // restore, upgrade finished) without changing the entry list itself.
         if (_selectedForBulk.Count > 0)
         {
             RecomputeEligibleCount();
@@ -828,10 +805,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         foreach (var key in deadRefs) { _rowRefs.Remove(key); }
 
-        // When the entries list collapses to zero, the Select button and entry rows
-        // disappear from the DOM; restore focus to Import so keyboard users don't lose
-        // their anchor. Exit selection mode in the same step so the bulk strip doesn't
-        // render above an empty-state placeholder.
         if (currentNames.Count == 0)
         {
             if (_isSelectionModeActive)
@@ -1044,8 +1017,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             _focusRestorationTarget = (anchorFileName, completeTarget);
         }
 
-        // Auto-exit on a fully-clean bulk delete only: any failure leaves the
-        // failed rows selected so the user can retry without re-selecting them.
         if (_isSelectionModeActive && succeeded.Count > 0 && failed.Count == 0)
         {
             ExitSelectionMode();
