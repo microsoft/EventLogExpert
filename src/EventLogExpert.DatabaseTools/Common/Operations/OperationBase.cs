@@ -15,13 +15,13 @@ namespace EventLogExpert.DatabaseTools.Common.Operations;
 
 internal abstract class OperationBase
 {
+    protected static readonly TimeSpan DefaultFilterRegexTimeout = TimeSpan.FromSeconds(5);
     private static readonly string[] s_databaseFileSuffixes = ["", "-wal", "-shm"];
 
     private string _providerDetailFormat = "{0, -14} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8} {6, 8}";
 
     public string? FailureSummary { get; private set; }
 
-    // Clearing SQLite pools releases Windows file handles before deleting the partial database.
     protected static async Task CleanupPartialDatabaseAsync(
         ITraceLogger logger,
         ProviderDbContext? dbContext,
@@ -54,7 +54,8 @@ internal abstract class OperationBase
         }
     }
 
-    // Recompile infinite-timeout regexes so hostile patterns cannot hang the operation.
+    protected static Regex? EnsureBoundedTimeout(Regex? regex) => EnsureBoundedTimeout(regex, DefaultFilterRegexTimeout);
+
     protected static Regex? EnsureBoundedTimeout(Regex? regex, TimeSpan defaultTimeout)
     {
         if (regex is null) { return null; }
@@ -77,7 +78,6 @@ internal abstract class OperationBase
         IReadOnlySet<string>? excludeProviderNames = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        // Async iterator bridge: synchronous provider reads share an IAsyncEnumerable consumer path.
         await Task.CompletedTask;
 
         foreach (var providerName in GetLocalProviderNames(regex))

@@ -12,21 +12,13 @@ using EventLogExpert.Filtering.TestUtils;
 
 namespace EventLogExpert.Filtering.Tests.Compilation;
 
-/// <summary>
-///     Differential parity gate asserting <see cref="FilterService.GetSurvivingOrder" /> over a real
-///     <c>EventColumnStore</c> reader returns exactly the AoS oracle survivor set (
-///     <c>MatchesFilters &amp;&amp; MatchesDateFilter</c>) for every battery filter.
-/// </summary>
 public sealed class FilterServiceColumnSurvivorTests
 {
     private static readonly DateTime s_baseTime = new(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc);
-
-    private static readonly IReadOnlyList<ResolvedEvent> s_corpus = BuildCorpus();
-
+    private static readonly IReadOnlyList<ResolvedEvent> s_sample = BuildSample();
     private static readonly IEventColumnReader s_reader =
-        EventColumnStore.Build(s_corpus, generation: 0, contentVersion: 0).CreateReader(EventLogId.Create());
+        EventColumnStore.Build(s_sample, generation: 0, contentVersion: 0).CreateReader(EventLogId.Create());
 
-    // The filter combos exercised against the oracle. Names are xUnit-serializable; ResolveFilter maps each to a Filter.
     public static TheoryData<string> Battery =>
     [
         "empty-no-filters",
@@ -58,10 +50,10 @@ public sealed class FilterServiceColumnSurvivorTests
 
         var expected = new HashSet<int>();
 
-        for (var index = 0; index < s_corpus.Count; index++)
+        for (var index = 0; index < s_sample.Count; index++)
         {
-            if (s_corpus[index].MatchesFilters(filter.Filters) &&
-                s_corpus[index].MatchesDateFilter(filter.DateFilter))
+            if (s_sample[index].MatchesFilters(filter.Filters) &&
+                s_sample[index].MatchesDateFilter(filter.DateFilter))
             {
                 expected.Add(index);
             }
@@ -79,17 +71,15 @@ public sealed class FilterServiceColumnSurvivorTests
     [Fact]
     public void GetSurvivingOrder_WhenDateRange_IncludesBothBoundariesInclusive()
     {
-        DateTime after = s_corpus[2].TimeCreated;
-        DateTime before = s_corpus[7].TimeCreated;
+        DateTime after = s_sample[2].TimeCreated;
+        DateTime before = s_sample[7].TimeCreated;
         var filter = new Filter(EnabledDate(after, before), []);
 
         var survivors = new HashSet<int>(FilterService.GetSurvivingOrder(s_reader, filter));
 
-        // Both endpoints are inclusive: the row exactly at After (2) and the row exactly at Before (7) survive.
         Assert.Contains(2, survivors);
         Assert.Contains(7, survivors);
 
-        // Rows immediately outside the range do not.
         Assert.DoesNotContain(1, survivors);
         Assert.DoesNotContain(8, survivors);
     }
@@ -100,13 +90,12 @@ public sealed class FilterServiceColumnSurvivorTests
         SavedFilter exclude = Exclude("UserData[\"Secret\"] == \"hidden\"");
         CompiledFilter compiled = exclude.Compiled!;
 
-        Assert.Equal(FilterMatch.Unknown, Oracle(compiled, s_corpus[7]));
-        Assert.Equal(FilterMatch.Match, Oracle(compiled, s_corpus[8]));
-        Assert.Equal(FilterMatch.Unknown, Oracle(compiled, s_corpus[9]));
+        Assert.Equal(FilterMatch.Unknown, Oracle(compiled, s_sample[7]));
+        Assert.Equal(FilterMatch.Match, Oracle(compiled, s_sample[8]));
+        Assert.Equal(FilterMatch.Unknown, Oracle(compiled, s_sample[9]));
 
         var survivors = new HashSet<int>(FilterService.GetSurvivingOrder(s_reader, new Filter(null, [exclude])));
 
-        // Exclude hides only the decisive Match (8); the Unknown rows (7, 9) stay visible.
         Assert.DoesNotContain(8, survivors);
         Assert.Contains(7, survivors);
         Assert.Contains(9, survivors);
@@ -118,15 +107,12 @@ public sealed class FilterServiceColumnSurvivorTests
         SavedFilter include = Include("UserData[\"Secret\"] == \"hidden\"");
         CompiledFilter compiled = include.Compiled!;
 
-        // Precondition: the tri-state oracle yields Unknown for the truncated (7) and incomplete-absent (9) rows and a
-        // decisive Match for the complete row (8). Without this the "keeps visible" assertion below would be vacuous.
-        Assert.Equal(FilterMatch.Unknown, Oracle(compiled, s_corpus[7]));
-        Assert.Equal(FilterMatch.Match, Oracle(compiled, s_corpus[8]));
-        Assert.Equal(FilterMatch.Unknown, Oracle(compiled, s_corpus[9]));
+        Assert.Equal(FilterMatch.Unknown, Oracle(compiled, s_sample[7]));
+        Assert.Equal(FilterMatch.Match, Oracle(compiled, s_sample[8]));
+        Assert.Equal(FilterMatch.Unknown, Oracle(compiled, s_sample[9]));
 
         var survivors = new HashSet<int>(FilterService.GetSurvivingOrder(s_reader, new Filter(null, [include])));
 
-        // Include keeps a row on Match OR Unknown; all three UserData rows survive.
         Assert.Contains(7, survivors);
         Assert.Contains(8, survivors);
         Assert.Contains(9, survivors);
@@ -136,7 +122,7 @@ public sealed class FilterServiceColumnSurvivorTests
     {
         for (var position = 0; position < survivors.Count; position++)
         {
-            Assert.InRange(survivors[position], 0, s_corpus.Count - 1);
+            Assert.InRange(survivors[position], 0, s_sample.Count - 1);
 
             if (position > 0)
             {
@@ -147,9 +133,8 @@ public sealed class FilterServiceColumnSurvivorTests
         }
     }
 
-    private static IReadOnlyList<ResolvedEvent> BuildCorpus() =>
+    private static IReadOnlyList<ResolvedEvent> BuildSample() =>
     [
-        // 0-4: scalar events driving the include/exclude scalar, contains, multi-equals and date arms.
         FilterEventBuilder.CreateTestEvent(
             id: 100, source: "TestSource", level: "Error", computerName: "SERVER01",
             timeCreated: s_baseTime.AddMinutes(0)),
@@ -166,13 +151,11 @@ public sealed class FilterServiceColumnSurvivorTests
             id: 100, source: "TestSource", level: "Information", computerName: "WORKSTATION",
             timeCreated: s_baseTime.AddMinutes(4)),
 
-        // 5-6: EventData events for the presence-required named-field (exact and wildcard) arms.
         EventDataTestFactory.CreateEventWithData(("User", "admin"))
             with { Id = 500, TimeCreated = s_baseTime.AddMinutes(5) },
         EventDataTestFactory.CreateEventWithData(("User", "guest"))
             with { Id = 600, TimeCreated = s_baseTime.AddMinutes(6) },
 
-        // 7: UserData present, truncated, and non-matching -> tri-state Unknown on '==' (the truncated tail could differ).
         new ResolvedEvent("TestLog", LogPathType.Channel)
         {
             Id = 700,
@@ -180,7 +163,6 @@ public sealed class FilterServiceColumnSurvivorTests
             UserData = [new UserDataField("Secret", ["hid"], IsTruncated: true)]
         },
 
-        // 8: UserData present and complete -> decisive Match on '=='.
         new ResolvedEvent("TestLog", LogPathType.Channel)
         {
             Id = 800,
@@ -188,7 +170,6 @@ public sealed class FilterServiceColumnSurvivorTests
             UserData = [new UserDataField("Secret", ["hidden"], IsTruncated: false)]
         },
 
-        // 9: UserDataIncomplete with the probed path absent -> keep-visible Unknown on '=='.
         new ResolvedEvent("TestLog", LogPathType.Channel)
         {
             Id = 900,

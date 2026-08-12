@@ -8,10 +8,6 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.DatabaseTools.ShowProviders;
 
-/// <summary>
-///     Lists provider details from either local providers (<see cref="ShowProvidersRequest.SourcePath" /> = null) or
-///     a specified source (.db / .evtx / folder). Streams output as each provider is resolved.
-/// </summary>
 internal sealed class ShowProvidersOperation(ShowProvidersRequest request) : OperationBase, IDatabaseToolsOperation
 {
     private const int HeaderBatchSize = 100;
@@ -21,8 +17,7 @@ internal sealed class ShowProvidersOperation(ShowProvidersRequest request) : Ope
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken)
     {
-        // Defensive recompile if input has Regex.InfiniteMatchTimeout (otherwise catch below is dead).
-        var filterRegex = EnsureBoundedTimeout(request.FilterRegex, TimeSpan.FromSeconds(5));
+        var filterRegex = EnsureBoundedTimeout(request.FilterRegex);
 
         // Buffer first batch to size the column widths (mirrors CreateDatabaseOperation). Lives outside
         // the try so the cancellation arm can flush partial output the user has been waiting on.

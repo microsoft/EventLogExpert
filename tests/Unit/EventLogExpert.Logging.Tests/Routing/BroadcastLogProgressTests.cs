@@ -10,7 +10,7 @@ namespace EventLogExpert.Logging.Tests.Routing;
 public sealed class BroadcastLogProgressTests
 {
     [Fact]
-    public void Report_EachSinkAppliesItsOwnLevel_ReproducingTheUiAllFileWarningSplit()
+    public void Report_EachSinkAppliesItsOwnLevel_ReproducingTheUIAllFileWarningSplit()
     {
         var ui = new RecordingSink(_ => LogLevel.Information);
         var file = new RecordingSink(_ => LogLevel.Warning);
