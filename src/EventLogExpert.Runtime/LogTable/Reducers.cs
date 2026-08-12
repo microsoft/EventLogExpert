@@ -3,8 +3,11 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Histogram;
+using EventLogExpert.Runtime.LogTable.OrderedView;
 using Fluxor;
 using System.Collections.Immutable;
 
@@ -23,15 +26,12 @@ internal sealed class Reducers
             IsLoading = true
         };
 
-        var counts = state.EventCountByLog.SetItem(newTable.Id, 0);
-
         if (state.EventTables.IsEmpty)
         {
             return ResetGroupCollapseIfActiveChanged(
                 state with
                 {
                     EventTables = state.EventTables.Add(newTable),
-                    EventCountByLog = counts,
                     ActiveEventLogId = newTable.Id
                 },
                 state.ActiveEventLogId);
@@ -41,144 +41,43 @@ internal sealed class Reducers
 
         if (combinedTable is not null)
         {
-            return state with
+            // later, by which time the served view it needed to record is already gone.
+            return RetainServedView(state, state with
             {
                 EventTables = state.EventTables.Add(newTable),
-                EventCountByLog = counts
-            };
+            });
         }
 
         combinedTable = new LogView(EventLogId.Create()) { GroupId = LogTabGroupId.AllLogs };
 
-        return ResetGroupCollapseIfActiveChanged(
+        return RetainServedView(state, ResetGroupCollapseIfActiveChanged(
             state with
             {
                 EventTables = state.EventTables
                     .Add(combinedTable)
                     .Add(newTable),
-                EventCountByLog = counts,
                 ActiveEventLogId = combinedTable.Id
             },
-            state.ActiveEventLogId);
-    }
-
-    [ReducerMethod]
-    public static LogTableState ReduceAppendTableEvents(LogTableState state, AppendTableEventsAction action)
-    {
-        var table = state.EventTables.FirstOrDefault(t => action.LogId == t.Id);
-
-        if (table is null || table.IsCombined || action.View is null) { return state; }
-
-        var view = action.View;
-
-        int postCount = state.PerLogEvents.ContainsKey(table.Id) ?
-            state.PerLogEvents.Count :
-            state.PerLogEvents.Count + 1;
-
-        var context = EffectiveSortContext(
-            state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending, postCount, state.TimelineVisible);
-
-        var perLog = SetLog(state.PerLogEvents, table.Id, view, context);
-        perLog = ReconcileToLogCount(perLog, state);
-        var updatedTable = SetComputerNameIfFirstEvent(table, view);
-        var counts = state.EventCountByLog.SetItem(table.Id, view.Count);
-
-        return state with
-        {
-            PerLogEvents = perLog,
-            EventTables = ReferenceEquals(updatedTable, table) ?
-                state.EventTables :
-                state.EventTables.Replace(table, updatedTable),
-            EventCountByLog = counts
-        };
-    }
-
-    [ReducerMethod]
-    public static LogTableState ReduceAppendTableEventsBatch(
-        LogTableState state,
-        AppendTableEventsBatchAction action)
-    {
-        if (action.ViewsByLog.Count == 0) { return state; }
-
-        // Skip batches for closed logs: avoid resurrecting events and stale counts.
-        bool changed = false;
-        var perLog = state.PerLogEvents;
-        var perLogVersion = state.PerLogListVersion;
-        var counts = state.EventCountByLog;
-        var updatedTables = state.EventTables;
-
-        // Count new logs first so appends use the post-batch sort context (no boundary re-sort).
-        int newLogs = 0;
-
-        foreach (var (logId, _) in action.ViewsByLog)
-        {
-            if (perLog.ContainsKey(logId)) { continue; }
-
-            var table = state.EventTables.FirstOrDefault(t => t.Id == logId);
-
-            if (table is not null && !table.IsCombined) { newLogs++; }
-        }
-
-        var context = EffectiveSortContext(
-            state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending, perLog.Count + newLogs, state.TimelineVisible);
-
-        foreach (var (logId, view) in action.ViewsByLog)
-        {
-            var table = updatedTables.FirstOrDefault(t => t.Id == logId);
-
-            if (table is null || table.IsCombined) { continue; }
-
-            if (action.VersionByLog.TryGetValue(logId, out var version))
-            {
-                perLogVersion = perLogVersion.SetItem(
-                    logId,
-                    perLogVersion.TryGetValue(logId, out var existingVersion) ? Math.Min(existingVersion, version) : version);
-            }
-            else
-            {
-                perLogVersion = perLogVersion.Remove(logId);
-            }
-
-            perLog = SetLog(perLog, logId, view, context);
-            counts = counts.SetItem(logId, view.Count);
-            changed = true;
-
-            var updatedTable = SetComputerNameIfFirstEvent(table, view);
-
-            if (!ReferenceEquals(updatedTable, table))
-            {
-                updatedTables = updatedTables.Replace(table, updatedTable);
-            }
-        }
-
-        if (!changed) { return state; }
-
-        perLog = ReconcileToLogCount(perLog, state);
-
-        return state with
-        {
-            PerLogEvents = perLog,
-            PerLogListVersion = perLogVersion,
-            EventTables = updatedTables,
-            EventCountByLog = counts
-        };
+            state.ActiveEventLogId));
     }
 
     [ReducerMethod]
     public static LogTableState ReduceApplyFilter(LogTableState state, ApplyFilterAction action) =>
-        state with { DisplayListVersion = state.DisplayListVersion + 1 };
+        RetainServedView(state, state with
+            {
+                AppliedFilter = action.Filter.HasFilteringChangedFrom(state.AppliedFilter) ?
+                    action.Filter :
+                    state.AppliedFilter
+            });
 
     [ReducerMethod(typeof(CloseAllLogsAction))]
     public static LogTableState ReduceCloseAll(LogTableState state) =>
-        ResetGroupCollapse(state with
+        ResetGroupCollapse((state with
         {
             EventTables = [],
             Groups = [],
-            PerLogEvents = ImmutableDictionary<EventLogId, EventColumnView>.Empty,
-            PerLogListVersion = ImmutableDictionary<EventLogId, int>.Empty,
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty,
             ActiveEventLogId = null
-        });
+        }).WithClearedOrderedViewRetention());
 
     [ReducerMethod]
     public static LogTableState ReduceCloseLog(LogTableState state, CloseLogAction action)
@@ -190,24 +89,17 @@ internal sealed class Reducers
         var (groups, healedTables) = RemoveLogFromGroups(state.Groups, state.EventTables, action.LogId);
         var remainingTables = healedTables.RemoveAll(table => table.Id == action.LogId);
 
-        var counts = state.EventCountByLog.Remove(action.LogId);
-        var perLog = ReconcileToLogCount(state.PerLogEvents.Remove(action.LogId), state);
-        var perLogVersion = state.PerLogListVersion.Remove(action.LogId);
-
         int perLogTabsRemaining = remainingTables.Count(table => !table.IsCombined);
 
         if (perLogTabsRemaining == 0)
         {
             return ResetGroupCollapseIfActiveChanged(
-                state with
+                (state with
                 {
                     EventTables = [],
                     Groups = [],
-                    PerLogEvents = ImmutableDictionary<EventLogId, EventColumnView>.Empty,
-                    PerLogListVersion = ImmutableDictionary<EventLogId, int>.Empty,
-                    EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty,
                     ActiveEventLogId = null
-                },
+                }).WithClearedOrderedViewRetention(),
                 state.ActiveEventLogId);
         }
 
@@ -215,82 +107,32 @@ internal sealed class Reducers
             ? remainingTables.RemoveAll(table => table.GroupId?.IsAll == true)
             : remainingTables;
 
+        var finalTableIds = finalTables.Select(table => table.Id).ToHashSet();
+
         var updated = state with
         {
             EventTables = finalTables,
             Groups = groups,
-            PerLogEvents = perLog,
-            PerLogListVersion = perLogVersion,
-            EventCountByLog = counts
+            RetainedOrderedViews = state.RetainedOrderedViews.RemoveRange(
+                state.RetainedOrderedViews.Keys.Where(id => !finalTableIds.Contains(id))),
         };
 
-        return ResetGroupCollapseIfActiveChanged(RepairActiveTab(updated, null), state.ActiveEventLogId);
+        return RetainServedView(state, ResetGroupCollapseIfActiveChanged(RepairActiveTab(updated, null), state.ActiveEventLogId));
     }
 
     [ReducerMethod]
-    public static LogTableState ReduceDisplayReady(
-        LogTableState state,
-        DisplayReadyAction action)
+    public static LogTableState ReduceIngestRawEvents(LogTableState state, IngestRawEventsAction action)
     {
-        if (action.Version != state.DisplayListVersion) { return state; }
-
-        var flipped = state with
-        {
-            OrderBy = state.RequestedOrderBy,
-            IsDescending = state.RequestedIsDescending,
-            GroupBy = state.RequestedGroupBy,
-            IsGroupDescending = state.RequestedIsGroupDescending
-        };
-
-        // Skip log ids absent from EventTables: log closed while filter ran.
-        var tablesById = state.EventTables
-            .Where(table => !table.IsCombined)
-            .ToDictionary(table => table.Id);
-
-        // The views were built under the requested context; heal any that pre-date it.
-        int postCount = 0;
-
-        foreach (var (logId, _) in tablesById)
-        {
-            if (action.Views.ContainsKey(logId) || state.PerLogEvents.ContainsKey(logId)) { postCount++; }
-        }
-
-        var context = EffectiveSortContext(
-            flipped.OrderBy, flipped.IsDescending, flipped.GroupBy, flipped.IsGroupDescending, postCount, flipped.TimelineVisible);
-        var perLogBuilder = ImmutableDictionary.CreateBuilder<EventLogId, EventColumnView>();
-        var perLogVersion = state.PerLogListVersion;
-        var counts = state.EventCountByLog;
         var tables = state.EventTables;
 
-        foreach (var (logId, table) in tablesById)
+        foreach (var (logId, events) in action.EventsByLog)
         {
-            if (action.Views.TryGetValue(logId, out var view))
-            {
-                perLogBuilder[logId] = view.HasContext(context) ? view : view.WithContext(context);
-                perLogVersion = perLogVersion.SetItem(logId, action.Version);
-                counts = counts.SetItem(logId, view.Count);
+            if (events.Count <= 0) { continue; }
 
-                var updatedTable = SetComputerNameIfFirstEvent(table, view);
-
-                if (!ReferenceEquals(updatedTable, table)) { tables = tables.Replace(table, updatedTable); }
-            }
-            else if (state.PerLogEvents.TryGetValue(logId, out var existingView))
-            {
-                perLogBuilder[logId] = existingView.HasContext(context) ?
-                    existingView :
-                    existingView.WithContext(context);
-            }
+            tables = LatchComputerNameForLog(tables, logId, events);
         }
 
-        var result = flipped with
-        {
-            PerLogEvents = ReconcileToLogCount(perLogBuilder.ToImmutable(), flipped),
-            PerLogListVersion = perLogVersion,
-            EventTables = tables,
-            EventCountByLog = counts
-        };
-
-        return state.RequestedGroupBy != state.GroupBy ? ResetGroupCollapse(result) : result;
+        return ReferenceEquals(tables, state.EventTables) ? state : state with { EventTables = tables };
     }
 
     [ReducerMethod]
@@ -305,36 +147,42 @@ internal sealed class Reducers
             ColumnOrder = action.ColumnOrder
         };
 
-        bool liveGroupHidden = updated.GroupBy is { } liveGroup && IsHidden(liveGroup);
         bool requestedGroupHidden = updated.RequestedGroupBy is { } requestedGroup && IsHidden(requestedGroup);
 
-        if (!liveGroupHidden && !requestedGroupHidden) { return updated; }
+        if (!requestedGroupHidden) { return updated; }
 
-        var result = updated;
+        var result = updated with { RequestedGroupBy = null, RequestedIsGroupDescending = false };
 
-        if (requestedGroupHidden)
-        {
-            result = result with { RequestedGroupBy = null, RequestedIsGroupDescending = false };
-        }
-
-        if (liveGroupHidden)
-        {
-            result = result with
-            {
-                GroupBy = null,
-                IsGroupDescending = false,
-                GroupsCollapsedByDefault = false,
-                GroupCollapseOverrides = ImmutableHashSet.Create<string>(StringComparer.Ordinal),
-                PerLogEvents = ResortAllLogs(
-                    updated.PerLogEvents,
-                    EffectiveSortContext(updated.OrderBy, updated.IsDescending, null, false, updated.PerLogEvents.Count, updated.TimelineVisible))
-            };
-        }
-
-        return result;
+        return RetainServedView(state, result);
 
         bool IsHidden(ColumnName column) =>
             !action.LoadedColumns.TryGetValue(column, out bool isVisible) || !isVisible;
+    }
+
+    [ReducerMethod]
+    public static LogTableState ReduceLoadEvents(LogTableState state, LoadEventsAction action)
+    {
+        var table = state.EventTables.FirstOrDefault(candidate => action.LogData.Id == candidate.Id);
+
+        if (table is null || table.IsCombined) { return state; }
+
+        var finalized = SetComputerNameFromRawEvents(table, action.Events);
+
+        if (finalized.IsLoading) { finalized = finalized with { IsLoading = false }; }
+
+        return ReferenceEquals(finalized, table) ?
+            state :
+            state with { EventTables = state.EventTables.Replace(table, finalized) };
+    }
+
+    [ReducerMethod]
+    public static LogTableState ReduceLoadEventsPartial(LogTableState state, LoadEventsPartialAction action)
+    {
+        if (action.Events.Count == 0) { return state; }
+
+        var tables = LatchComputerNameForLog(state.EventTables, action.LogData.Id, action.Events);
+
+        return ReferenceEquals(tables, state.EventTables) ? state : state with { EventTables = tables };
     }
 
     [ReducerMethod]
@@ -352,7 +200,7 @@ internal sealed class Reducers
                 RemoveLogFromGroups(state.Groups, state.EventTables, action.TabId);
             var ungrouped = state with { Groups = ungroupedGroups, EventTables = ungroupedTables };
 
-            return ResetGroupCollapseIfActiveChanged(RepairActiveTab(ungrouped, null), state.ActiveEventLogId);
+            return RetainServedView(state, ResetGroupCollapseIfActiveChanged(RepairActiveTab(ungrouped, null), state.ActiveEventLogId));
         }
 
         var target = state.Groups.FirstOrDefault(group => group.Id == action.TargetGroupId);
@@ -364,8 +212,8 @@ internal sealed class Reducers
         var headerId = tables.FirstOrDefault(table => table.GroupId == action.TargetGroupId)?.Id;
         var updated = state with { Groups = updatedGroups, EventTables = tables };
 
-        return ResetGroupCollapseIfActiveChanged(
-            RedirectActiveToGroupIfHidden(RepairActiveTab(updated, headerId)), state.ActiveEventLogId);
+        return RetainServedView(state, ResetGroupCollapseIfActiveChanged(
+            RedirectActiveToGroupIfHidden(RepairActiveTab(updated, headerId)), state.ActiveEventLogId));
     }
 
     [ReducerMethod]
@@ -385,7 +233,67 @@ internal sealed class Reducers
         var tables = prunedTables.Insert(childIndex, header);
         var updated = state with { Groups = prunedGroups.Add(group), EventTables = tables };
 
-        return ResetGroupCollapseIfActiveChanged(RepairActiveTab(updated, header.Id), state.ActiveEventLogId);
+        return RetainServedView(state, ResetGroupCollapseIfActiveChanged(RepairActiveTab(updated, header.Id), state.ActiveEventLogId));
+    }
+
+    [ReducerMethod]
+    public static LogTableState ReduceOrderedViewDisplayFaulted(LogTableState state, OrderedViewDisplayFaultedAction action)
+    {
+        if (action.Identity is { } faulted && faulted != state.ViewIdentity) { return state; }
+
+        return RetainServedView(state, state with
+            {
+                OrderedViewDisplayEnabled = false,
+                ActiveOrderedView = null,
+                FaultCause = Describe(action.Fault)
+            });
+    }
+
+    [ReducerMethod(typeof(OrderedViewDisplayRecoveredAction))]
+    public static LogTableState ReduceOrderedViewDisplayRecovered(
+        LogTableState state) =>
+        state.OrderedViewDisplayEnabled ?
+            state :
+            state with
+            {
+                OrderedViewDisplayEnabled = true,
+                FaultCause = null
+            };
+
+    [ReducerMethod]
+    public static LogTableState ReduceOrderedViewUpdated(LogTableState state, OrderedViewUpdatedAction action)
+    {
+        LogTableState next = action.Update switch
+        {
+            OrderedViewReady view
+                when view.SnapshotVersion > state.LastPublishedSnapshotVersion
+                    && view.Sequence >= state.HighestInvalidationSequence
+                    && view.Identity == state.ViewIdentity =>
+                AdoptEngineOrdering(state,
+                    state with
+                    {
+                        ActiveOrderedView = view,
+                        LastPublishedSnapshotVersion = view.SnapshotVersion,
+
+                        OrderedViewDisplayEnabled = true,
+                        FaultCause = null
+                    }),
+            OrderedViewCleared invalidation
+                when invalidation.SnapshotVersion > state.LastPublishedSnapshotVersion
+                    && invalidation.Sequence >= state.HighestInvalidationSequence
+                    && invalidation.Identity == state.ViewIdentity =>
+                RetainServedView(state, state with
+                    {
+                        ActiveOrderedView = null,
+                        LastPublishedSnapshotVersion = invalidation.SnapshotVersion,
+
+                        OrderedViewDisplayEnabled = true,
+                        FaultCause = null
+                    }),
+            _ => state
+        };
+
+        return next;
     }
 
     [ReducerMethod]
@@ -396,7 +304,7 @@ internal sealed class Reducers
         var (groups, tables) = RemoveLogFromGroups(state.Groups, state.EventTables, action.TabId);
         var updated = state with { Groups = groups, EventTables = tables };
 
-        return ResetGroupCollapseIfActiveChanged(RepairActiveTab(updated, null), state.ActiveEventLogId);
+        return RetainServedView(state, ResetGroupCollapseIfActiveChanged(RepairActiveTab(updated, null), state.ActiveEventLogId));
     }
 
     [ReducerMethod]
@@ -443,9 +351,9 @@ internal sealed class Reducers
 
         if (activeTable is null) { return state; }
 
-        return ResetGroupCollapseIfActiveChanged(
+        return RetainServedView(state, ResetGroupCollapseIfActiveChanged(
             state with { ActiveEventLogId = activeTable.Id },
-            state.ActiveEventLogId);
+            state.ActiveEventLogId));
     }
 
     [ReducerMethod]
@@ -473,12 +381,11 @@ internal sealed class Reducers
     {
         if (state.RequestedGroupBy == action.GroupBy) { return state; }
 
-        return state with
+        return RetainServedView(state, state with
         {
             RequestedGroupBy = action.GroupBy,
-            RequestedIsGroupDescending = false,
-            DisplayListVersion = state.DisplayListVersion + 1
-        };
+            RequestedIsGroupDescending = false
+        });
     }
 
     [ReducerMethod]
@@ -486,34 +393,24 @@ internal sealed class Reducers
     {
         if (state.TimelineVisible == action.IsVisible) { return state; }
 
-        // A single log with no explicit sort takes its default order from timeline visibility, so bump the display version
-        // only when that republish will actually follow (see FilteringEffects.HandleSetHistogramVisible). Bumping on a
-        // combined or explicitly sorted toggle would reject an in-flight republish carrying the pre-bump version with no replacement.
-        bool willResort = state.PerLogEvents.Count == 1 &&
-            state.RequestedOrderBy is null &&
-            state.RequestedGroupBy is null;
-
-        return state with
+        return RetainServedView(state, state with
         {
-            TimelineVisible = action.IsVisible,
-            DisplayListVersion = willResort ? state.DisplayListVersion + 1 : state.DisplayListVersion
-        };
+            TimelineVisible = action.IsVisible
+        });
     }
 
     [ReducerMethod]
     public static LogTableState ReduceSetOrderBy(LogTableState state, SetOrderByAction action) =>
-        state.RequestedOrderBy.Equals(action.OrderBy) ?
+        RetainServedView(state, state.RequestedOrderBy.Equals(action.OrderBy) ?
             state with
             {
                 RequestedOrderBy = null,
-                RequestedIsDescending = true,
-                DisplayListVersion = state.DisplayListVersion + 1
+                RequestedIsDescending = true
             } :
             state with
             {
-                RequestedOrderBy = action.OrderBy,
-                DisplayListVersion = state.DisplayListVersion + 1
-            };
+                RequestedOrderBy = action.OrderBy
+            });
 
     [ReducerMethod]
     public static LogTableState ReduceSetTabGroupCollapsed(LogTableState state, SetTabGroupCollapsedAction action)
@@ -524,9 +421,9 @@ internal sealed class Reducers
 
         var updated = state with { Groups = state.Groups.Replace(group, group with { IsCollapsed = action.Collapsed }) };
 
-        return action.Collapsed
-            ? ResetGroupCollapseIfActiveChanged(RedirectActiveToGroupIfHidden(updated), state.ActiveEventLogId)
-            : updated;
+        return action.Collapsed ?
+            RetainServedView(state, ResetGroupCollapseIfActiveChanged(RedirectActiveToGroupIfHidden(updated), state.ActiveEventLogId)) :
+            updated;
     }
 
     [ReducerMethod]
@@ -549,93 +446,105 @@ internal sealed class Reducers
     {
         if (state.RequestedGroupBy is null) { return state; }
 
-        return state with
+        return RetainServedView(state, state with
         {
-            RequestedIsGroupDescending = !state.RequestedIsGroupDescending,
-            DisplayListVersion = state.DisplayListVersion + 1
-        };
-    }
-
-    [ReducerMethod]
-    public static LogTableState ReduceToggleLoading(LogTableState state, ToggleLoadingAction action)
-    {
-        var table = state.EventTables.FirstOrDefault(table => table.Id == action.LogId);
-
-        if (table is null) { return state; }
-
-        return state with
-        {
-            EventTables = state.EventTables
-                .Remove(table)
-                .Add(table with { IsLoading = !table.IsLoading })
-        };
+            RequestedIsGroupDescending = !state.RequestedIsGroupDescending
+        });
     }
 
     [ReducerMethod(typeof(ToggleSortingAction))]
     public static LogTableState ReduceToggleSorting(LogTableState state) =>
-        state with
+        RetainServedView(state, state with
         {
-            RequestedIsDescending = !state.RequestedIsDescending,
-            DisplayListVersion = state.DisplayListVersion + 1
-        };
+            RequestedIsDescending = !state.RequestedIsDescending
+        });
 
     [ReducerMethod]
-    public static LogTableState ReduceUpdateTable(LogTableState state, UpdateTableAction action)
+    public static LogTableState ReduceViewRequestInvalidated(LogTableState state, ViewRequestInvalidatedAction action) =>
+        action.Sequence <= state.HighestInvalidationSequence ?
+            state :
+            state with
+            {
+                HighestInvalidationSequence = action.Sequence,
+
+                RetainedOrderedViews = state.ServingOrderedView is { } served ?
+                    state.RetainOnly(served) :
+                    state.RetainedOrderedViews,
+                ActiveOrderedView = null
+            };
+
+    private static LogTableState AdoptEngineOrdering(LogTableState prior, LogTableState adopted)
     {
-        var table = state.EventTables.FirstOrDefault(t => action.LogId == t.Id);
+        if (!prior.HasPendingSortChange && prior.SortContext == prior.CommittedSortContext) { return adopted; }
 
-        if (table is null || table.IsCombined || action.View is null) { return state; }
-
-        var view = action.View;
-
-        int postCount = state.PerLogEvents.ContainsKey(table.Id) ?
-            state.PerLogEvents.Count :
-            state.PerLogEvents.Count + 1;
-
-        var context = EffectiveSortContext(
-            state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending, postCount, state.TimelineVisible);
-
-        // Always store the finalize view: built over the just-rebuilt raw store, its reader (and every locator it hands
-        // out) addresses the current generation, so a pre-finalize view would strand selection.
-        var perLog = SetLog(state.PerLogEvents, table.Id, view, context);
-        var perLogVersion = state.PerLogListVersion.SetItem(table.Id, action.Version);
-
-        perLog = ReconcileToLogCount(perLog, state);
-        var updatedTable = SetComputerNameIfFirstEvent(table, view) with { IsLoading = false };
-        var counts = state.EventCountByLog.SetItem(table.Id, view.Count);
-
-        return state with
+        var flipped = adopted with
         {
-            PerLogEvents = perLog,
-            PerLogListVersion = perLogVersion,
-            EventTables = state.EventTables.Replace(table, updatedTable),
-            EventCountByLog = counts
+            OrderBy = adopted.RequestedOrderBy,
+            IsDescending = adopted.RequestedIsDescending,
+            GroupBy = adopted.RequestedGroupBy,
+            IsGroupDescending = adopted.RequestedIsGroupDescending,
+            CommittedEffectiveOrderBy = ResolvedEventOrdering.ResolveDefaultOrderBy(
+                adopted.RequestedOrderBy,
+                adopted.RequestedGroupBy,
+                adopted.DisplayedLogCount,
+                adopted.TimelineVisible)
         };
+
+        return prior.RequestedGroupBy != prior.GroupBy ? ResetGroupCollapse(flipped) : flipped;
     }
 
-    private static SortContext EffectiveSortContext(
-        ColumnName? orderBy,
-        bool isDescending,
-        ColumnName? groupBy,
-        bool isGroupDescending,
-        int logCount,
-        bool timelineVisible) =>
-        new(ResolvedEventOrdering.ResolveDefaultOrderBy(orderBy, groupBy, logCount, timelineVisible),
-            isDescending,
-            groupBy,
-            isGroupDescending);
+    private static string Describe(Exception fault)
+    {
+        const int MessageLimit = 200;
 
-    private static ImmutableDictionary<EventLogId, EventColumnView> ReconcileToLogCount(
-        ImmutableDictionary<EventLogId, EventColumnView> perLog,
-        LogTableState state) =>
-        ResortAllLogs(perLog,
-            EffectiveSortContext(
-                state.OrderBy,
-                state.IsDescending,
-                state.GroupBy,
-                state.IsGroupDescending,
-                perLog.Count,
-                state.TimelineVisible));
+        string message = fault.Message ?? string.Empty;
+
+        if (message.Length <= MessageLimit) { return $"{fault.GetType().Name}: {message}"; }
+
+        int cut = MessageLimit;
+
+        if (char.IsHighSurrogate(message[cut - 1])) { cut--; }
+
+        return $"{fault.GetType().Name}: {message[..cut]}...";
+    }
+
+    private static string? FirstNonEmptyComputerName(IReadOnlyList<ResolvedEvent> events)
+    {
+        for (int index = 0; index < events.Count; index++)
+        {
+            string candidate = events[index].ComputerName;
+
+            if (!string.IsNullOrEmpty(candidate)) { return candidate; }
+        }
+
+        return null;
+    }
+
+    private static ImmutableList<LogView> LatchComputerNameForLog(
+        ImmutableList<LogView> tables,
+        EventLogId logId,
+        IReadOnlyList<ResolvedEvent> events)
+    {
+        int index = 0;
+
+        foreach (var table in tables)
+        {
+            if (table.Id != logId)
+            {
+                index++;
+
+                continue;
+            }
+
+            if (table.IsCombined || !string.IsNullOrEmpty(table.ComputerName)) { return tables; }
+
+            return FirstNonEmptyComputerName(events) is { } resolved ?
+                tables.SetItem(index, table with { ComputerName = resolved }) :
+                tables;
+        }
+
+        return tables;
+    }
 
     private static LogTableState RedirectActiveToGroupIfHidden(LogTableState state)
     {
@@ -716,45 +625,15 @@ internal sealed class Reducers
         EventLogId? previousActiveId) =>
         updated.ActiveEventLogId == previousActiveId ? updated : ResetGroupCollapse(updated);
 
-    private static ImmutableDictionary<EventLogId, EventColumnView> ResortAllLogs(
-        ImmutableDictionary<EventLogId, EventColumnView> perLog,
-        SortContext context)
+    private static LogTableState RetainServedView(LogTableState prior, LogTableState next) =>
+        prior.ServingOrderedView is { } served && next.ServingOrderedView is null ?
+            next with { RetainedOrderedViews = next.RetainOnly(served) } :
+            next;
+
+    private static LogView SetComputerNameFromRawEvents(LogView table, IReadOnlyList<ResolvedEvent> events)
     {
-        if (perLog.IsEmpty) { return perLog; }
+        if (!string.IsNullOrEmpty(table.ComputerName)) { return table; }
 
-        var builder = perLog.ToBuilder();
-
-        foreach (var (logId, view) in perLog)
-        {
-            if (!view.HasContext(context)) { builder[logId] = view.WithContext(context); }
-        }
-
-        return builder.ToImmutable();
+        return FirstNonEmptyComputerName(events) is { } resolved ? table with { ComputerName = resolved } : table;
     }
-
-    private static LogView SetComputerNameIfFirstEvent(LogView table, EventColumnView view)
-    {
-        if (!string.IsNullOrEmpty(table.ComputerName) || view.Count == 0) { return table; }
-
-        // The first displayed event's ComputerName may be empty (resolver miss); scan display order for the first
-        // non-empty one, matching the AoS reducer.
-        for (int i = 0; i < view.Count; i++)
-        {
-            var candidate = view.GetDetailLean(view.LocatorAt(i));
-
-            if (!string.IsNullOrEmpty(candidate.ComputerName))
-            {
-                return table with { ComputerName = candidate.ComputerName };
-            }
-        }
-
-        return table;
-    }
-
-    private static ImmutableDictionary<EventLogId, EventColumnView> SetLog(
-        ImmutableDictionary<EventLogId, EventColumnView> perLog,
-        EventLogId logId,
-        EventColumnView view,
-        SortContext context) =>
-        perLog.SetItem(logId, view.HasContext(context) ? view : view.WithContext(context));
 }

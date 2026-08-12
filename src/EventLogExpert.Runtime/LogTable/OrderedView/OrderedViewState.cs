@@ -1,0 +1,600 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Common.Events;
+using System.Collections.Immutable;
+using System.Runtime.InteropServices;
+
+namespace EventLogExpert.Runtime.LogTable.OrderedView;
+
+internal sealed record RebuildRequest(
+    long Generation,
+    Func<EventLocator, IEventColumnReader, bool> Predicate,
+    SortContext Context,
+    IReadOnlyDictionary<EventLogId, int> RequestedGeneration,
+    bool Hold,
+    RowCoverage Coverage,
+    IReaderResolver BeginResolver,
+    FrozenScope Scope,
+    long ScopeVersion,
+    EventLogId? SingleLog);
+
+internal sealed class OrderedViewState
+{
+    internal const int DefaultBulkBuildThreshold = 50_000;
+    private readonly Dictionary<EventLogId, int> _activeGeneration = [];
+    private readonly Dictionary<LogGeneration, IEventColumnReader> _latestReaders = [];
+    private readonly LiveReaderResolver _liveResolver;
+    private readonly Dictionary<EventLogId, int> _requestedGeneration = [];
+    private readonly OrderedViewScopeState _scopeState = new();
+
+    private SortContext _activeContext = new(null, false, null, false);
+    private ImmutableHashSet<LogGeneration> _adoptedInScope = [];
+    private FrozenScope _adoptedScope;
+    private OrderedViewSnapshot _current = OrderedViewSnapshot.Empty;
+    private long _generation;
+    private bool _holdIngest;
+    private ChunkedOrderIndex _index;
+    private Func<EventLocator, IEventColumnReader, bool> _predicate = static (_, _) => true;
+    private long _publishVersion;
+    private SortContext _requestedContext = new(null, false, null, false);
+    private Func<EventLocator, IEventColumnReader, bool> _requestedPredicate = static (_, _) => true;
+
+    internal OrderedViewState()
+    {
+        _liveResolver = new LiveReaderResolver(_latestReaders);
+        _index = new ChunkedOrderIndex(OrderKeyComparerFactory.Create(_activeContext, _liveResolver));
+        _adoptedScope = _scopeState.Freeze();
+    }
+
+    public ImmutableHashSet<LogGeneration> AdoptedInScope => _adoptedInScope;
+
+    public OrderedViewSnapshot Current => Volatile.Read(ref _current);
+
+    public long Generation => Volatile.Read(ref _generation);
+
+    public int RowCount => _scopeState.FreezeCoverage().RowCount;
+
+    public long ScopeVersion => _scopeState.ScopeVersion;
+
+    internal int TrackedGenerationCount => _requestedGeneration.Count;
+
+    internal int TrackedReaderCount => _latestReaders.Count;
+
+    public static ChunkedOrderIndex BuildIndex(RebuildRequest request) => BuildIndex(request, CancellationToken.None);
+
+    public static ChunkedOrderIndex BuildIndex(RebuildRequest request, CancellationToken cancellationToken) =>
+        BuildIndex(request, cancellationToken, DefaultBulkBuildThreshold);
+
+    public RebuildRequest BeginRebuild(Func<EventLocator, IEventColumnReader, bool> newPredicate, SortContext newContext, bool? hold = null)
+    {
+        _requestedPredicate = newPredicate;
+        _requestedContext = newContext;
+
+        if (hold == true) { _holdIngest = true; }
+
+        return CaptureRequest();
+    }
+
+    public RebuildRequest BeginReset(EventLogId logId, int newGeneration)
+    {
+        if (!_requestedGeneration.TryGetValue(logId, out int current) || newGeneration > current)
+        {
+            _requestedGeneration[logId] = newGeneration;
+        }
+
+        return CaptureRequest();
+    }
+
+    public bool CanRestampAdopted(
+        IReadOnlyCollection<EventLogId> scopeLogs,
+        IReadOnlyDictionary<EventLogId, IEventColumnReader> scopeReaders)
+    {
+        if (_holdIngest) { return false; }
+
+        if (!_scopeState.ScopeEquals(scopeLogs)) { return false; }
+
+        foreach ((EventLogId logId, IEventColumnReader reader) in scopeReaders)
+        {
+            if (!_adoptedScope.Includes(logId)) { return false; }
+
+            if (!_activeGeneration.TryGetValue(logId, out int active) || active != reader.Generation) { return false; }
+
+            if (_scopeState.Coverage(new LogGeneration(logId, reader.Generation)) < reader.Count) { return false; }
+        }
+
+        return true;
+    }
+
+    public RebuildRequest CaptureScopeReseed() => CaptureRequest();
+
+    public OrderedViewSnapshot Clear()
+    {
+        Interlocked.Increment(ref _generation);
+        _latestReaders.Clear();
+        _activeGeneration.Clear();
+        _requestedGeneration.Clear();
+        _scopeState.Reset();
+        _adoptedScope = _scopeState.Freeze();
+        _predicate = static (_, _) => true;
+        _requestedPredicate = static (_, _) => true;
+        _activeContext = new SortContext(null, false, null, false);
+        _requestedContext = new SortContext(null, false, null, false);
+        _holdIngest = false;
+        _index = new ChunkedOrderIndex(OrderKeyComparerFactory.Create(_activeContext, _liveResolver));
+
+        return PublishWith(FreezeReaders());
+    }
+
+    public bool CoversSameGenerations(IReadOnlyDictionary<EventLogId, IEventColumnReader> scopeReaders)
+    {
+        foreach ((EventLogId logId, IEventColumnReader reader) in scopeReaders)
+        {
+            if (_requestedGeneration.TryGetValue(logId, out int requested) && reader.Generation != requested)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public void NotifyRebuildFailed(RebuildRequest request)
+    {
+        if (request.Hold && Volatile.Read(ref _generation) == request.Generation) { _holdIngest = false; }
+    }
+
+    public OrderedViewSnapshot Publish() => PublishWith(FreezeReaders());
+
+    public bool ReconcileLog(EventLogId logId, IEventColumnReader reader)
+    {
+        if (!TryAdmitReader(logId, reader, out LogGeneration readerKey, out bool sameCountReplace)) { return false; }
+
+        int from = _scopeState.Coverage(readerKey);
+
+        _scopeState.AdvanceCoverage(readerKey, reader.Count);
+
+        bool mutated = false;
+
+        if (_adoptedScope.Includes(logId) && !_holdIngest && IsCurrent(readerKey, _activeGeneration))
+        {
+            for (int index = from; index < reader.Count; index++)
+            {
+                var locator = new EventLocator(logId, reader.Generation, index);
+
+                if (_predicate(locator, reader))
+                {
+                    _index.Insert(new OrderKey(locator));
+                    mutated = true;
+                }
+            }
+        }
+
+        bool displaysThisGeneration = reader.Count > 0 &&
+            _adoptedScope.Includes(logId) &&
+            _activeGeneration.TryGetValue(logId, out int active) &&
+            active == reader.Generation;
+
+        return mutated ||
+            (displaysThisGeneration && !_adoptedInScope.Contains(readerKey)) ||
+            (displaysThisGeneration && sameCountReplace);
+    }
+
+    public bool ReconcileScopeReaders(IReadOnlyDictionary<EventLogId, IEventColumnReader> scopeReaders)
+    {
+        bool advanced = false;
+
+        foreach ((EventLogId logId, IEventColumnReader reader) in scopeReaders)
+        {
+            if (SeedScopeReader(logId, reader)) { advanced = true; }
+        }
+
+        return advanced;
+    }
+
+    public RebuildRequest RemoveLog(EventLogId logId)
+    {
+        _scopeState.Remove(logId);
+        _requestedGeneration.Remove(logId);
+
+        return CaptureRequest();
+    }
+
+    public void RestoreRequestedFromAdopted()
+    {
+        _requestedContext = _activeContext;
+        _requestedPredicate = _predicate;
+    }
+
+    public bool SeedScopeReader(EventLogId logId, IEventColumnReader reader)
+    {
+        bool admitted = TryAdmitReader(logId, reader, out LogGeneration readerKey, out _);
+
+        if ((admitted || _latestReaders.ContainsKey(readerKey)) &&
+            reader.Generation > _requestedGeneration.GetValueOrDefault(logId, int.MinValue))
+        {
+            _requestedGeneration[logId] = reader.Generation;
+        }
+
+        if (!admitted) { return false; }
+
+        int covered = _scopeState.Coverage(readerKey);
+
+        _scopeState.AdvanceCoverage(readerKey, reader.Count);
+
+        return reader.Count > covered;
+    }
+
+    public void SupersedeInFlight() => Interlocked.Increment(ref _generation);
+
+    public bool TryAdoptRebuild(RebuildRequest request, ChunkedOrderIndex rebuilt)
+    {
+        if (Volatile.Read(ref _generation) != request.Generation) { return false; }
+
+        IReaderResolver commitResolver = FreezeReaders();
+        rebuilt.RebindInsertComparer(OrderKeyComparerFactory.Create(request.Context, commitResolver));
+
+        try
+        {
+            foreach (LogGeneration key in _scopeState.Keys)
+            {
+                if (!request.Scope.Includes(key.LogId)) { continue; }
+
+                if (!IsCurrent(key, _requestedGeneration)) { continue; }
+
+                int from = request.Coverage.CoverageOf(key);
+                int to = _scopeState.Coverage(key);
+
+                for (int index = from; index < to; index++)
+                {
+                    var locator = new EventLocator(key.LogId, key.Generation, index);
+
+                    if (request.Predicate(locator, commitResolver.Resolve(locator)))
+                    {
+                        rebuilt.Insert(new OrderKey(locator));
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Abort leaves live state intact, but must not leave ingest gated: clear the hold so rows resume (safe under
+            // pure delegation; the fast-path work owns richer re-key recovery).
+            _holdIngest = false;
+
+            throw;
+        }
+
+        _activeGeneration.Clear();
+
+        foreach (var entry in _requestedGeneration) { _activeGeneration[entry.Key] = entry.Value; }
+
+        _adoptedScope = request.Scope;
+        _index = rebuilt;
+        _predicate = request.Predicate;
+        _activeContext = request.Context;
+        _holdIngest = false;
+
+        _scopeState.EvictOutOfScope(_adoptedScope, _activeGeneration);
+        EvictGenerationsOutOfScope();
+
+        PruneReleasedReaders();
+        _index.RebindInsertComparer(OrderKeyComparerFactory.Create(_activeContext, _liveResolver));
+        PublishWith(FreezeReaders());
+
+        return true;
+    }
+
+    public bool TrySetActiveScope(IReadOnlyCollection<EventLogId> scopeLogs, long scopeVersion)
+    {
+        if (!_scopeState.TrySetScope(scopeLogs, scopeVersion)) { return false; }
+
+        Interlocked.Increment(ref _generation);
+
+        return true;
+    }
+
+    internal static ChunkedOrderIndex BuildIndex(RebuildRequest request, CancellationToken cancellationToken, int bulkThreshold)
+    {
+        if (TryBuildBulk(request, cancellationToken, bulkThreshold) is { } bulk) { return bulk; }
+
+        var rebuilt = new ChunkedOrderIndex(OrderKeyComparerFactory.Create(request.Context, request.BeginResolver));
+        int examined = 0;
+
+        foreach ((LogGeneration key, int covered) in request.Coverage.Entries)
+        {
+            if (!request.Scope.Includes(key.LogId)) { continue; }
+
+            if (!IsCurrent(key, request.RequestedGeneration)) { continue; }
+
+            for (int index = 0; index < covered; index++)
+            {
+                if ((examined++ & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
+                var locator = new EventLocator(key.LogId, key.Generation, index);
+
+                if (request.Predicate(locator, request.BeginResolver.Resolve(locator)))
+                {
+                    rebuilt.Insert(new OrderKey(locator));
+                }
+            }
+        }
+
+        return rebuilt;
+    }
+
+    private static ChunkedOrderIndex BuildCombinedBulk(
+        RebuildRequest request,
+        CancellationToken cancellationToken,
+        List<(LogGeneration Key, int Covered)> keys,
+        IComparer<OrderKey> comparer)
+    {
+        var runKeys = new List<LogGeneration>(keys.Count);
+        var runs = new List<int[]>(keys.Count);
+        long totalSurvivors = 0;
+
+        foreach ((LogGeneration key, int covered) in keys)
+        {
+            IEventColumnReader reader = request.BeginResolver.Resolve(new EventLocator(key.LogId, key.Generation, 0));
+            int[] run = SortLogSurvivors(request, cancellationToken, key, covered, reader);
+
+            if (run.Length == 0) { continue; }
+
+            runKeys.Add(key);
+            runs.Add(run);
+            totalSurvivors += run.Length;
+        }
+
+        var merged = new OrderKey[totalSurvivors];
+        var cursors = new int[runs.Count];
+        var queue = new PriorityQueue<int, OrderKey>(comparer);
+
+        for (int run = 0; run < runs.Count; run++)
+        {
+            if ((run & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
+            queue.Enqueue(run, HeadKey(runKeys[run], runs[run], 0));
+        }
+
+        int emitted = 0;
+
+        while (queue.TryDequeue(out int run, out OrderKey head))
+        {
+            if ((emitted & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
+            merged[emitted++] = head;
+            int next = ++cursors[run];
+
+            if (next < runs[run].Length) { queue.Enqueue(run, HeadKey(runKeys[run], runs[run], next)); }
+        }
+
+        return ChunkedOrderIndex.FromSortedRun(merged, comparer, cancellationToken);
+    }
+
+    private static ChunkedOrderIndex BuildSingleLogBulk(
+        RebuildRequest request, CancellationToken cancellationToken, LogGeneration key, int covered, IComparer<OrderKey> comparer)
+    {
+        IEventColumnReader reader = request.BeginResolver.Resolve(new EventLocator(key.LogId, key.Generation, 0));
+        int[] sortedIndices = SortLogSurvivors(request, cancellationToken, key, covered, reader);
+
+        var sortedOrder = new OrderKey[sortedIndices.Length];
+
+        for (int display = 0; display < sortedIndices.Length; display++)
+        {
+            if ((display & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
+            sortedOrder[display] = new OrderKey(new EventLocator(key.LogId, key.Generation, sortedIndices[display]));
+        }
+
+        return ChunkedOrderIndex.FromSortedRun(sortedOrder, comparer, cancellationToken);
+    }
+
+    private static List<(LogGeneration Key, int Covered)> CollectInScopeCurrentKeys(
+        RebuildRequest request, CancellationToken cancellationToken)
+    {
+        var keys = new List<(LogGeneration, int)>();
+        int scanned = 0;
+
+        foreach ((LogGeneration key, int covered) in request.Coverage.Entries)
+        {
+            if ((scanned++ & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
+            if (!request.Scope.Includes(key.LogId)) { continue; }
+
+            if (!IsCurrent(key, request.RequestedGeneration)) { continue; }
+
+            keys.Add((key, covered));
+        }
+
+        return keys;
+    }
+
+    private static OrderKey HeadKey(LogGeneration key, int[] run, int cursor) =>
+        new(new EventLocator(key.LogId, key.Generation, run[cursor]));
+
+    private static bool IsCurrent(in LogGeneration key, IReadOnlyDictionary<EventLogId, int> generation) =>
+        generation.TryGetValue(key.LogId, out int current) && key.Generation == current;
+
+    private static int[] SortLogSurvivors(
+        RebuildRequest request, CancellationToken cancellationToken, LogGeneration key, int covered, IEventColumnReader reader)
+    {
+        var survivors = new List<int>(covered);
+
+        for (int index = 0; index < covered; index++)
+        {
+            if ((index & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
+            var locator = new EventLocator(key.LogId, key.Generation, index);
+
+            if (request.Predicate(locator, reader)) { survivors.Add(index); }
+        }
+
+        return ColumnDirectSort.SortColumnDirect(
+            reader,
+            CollectionsMarshal.AsSpan(survivors),
+            request.Context.OrderBy,
+            request.Context.IsDescending,
+            request.Context.GroupBy,
+            request.Context.IsGroupDescending,
+            cancellationToken);
+    }
+
+    private static ChunkedOrderIndex? TryBuildBulk(RebuildRequest request, CancellationToken cancellationToken, int bulkThreshold)
+    {
+        List<(LogGeneration Key, int Covered)> keys = CollectInScopeCurrentKeys(request, cancellationToken);
+
+        long totalCovered = 0;
+        int summed = 0;
+
+        foreach ((LogGeneration _, int covered) in keys)
+        {
+            if ((summed++ & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
+            totalCovered += covered;
+        }
+
+        if (totalCovered < bulkThreshold) { return null; }
+
+        IComparer<OrderKey> comparer = OrderKeyComparerFactory.Create(request.Context, request.BeginResolver);
+
+        return keys.Count switch
+        {
+            1 => BuildSingleLogBulk(request, cancellationToken, keys[0].Key, keys[0].Covered, comparer),
+            >= 2 => BuildCombinedBulk(request, cancellationToken, keys, comparer),
+            _ => null
+        };
+    }
+
+    private ImmutableHashSet<LogGeneration> BuildAdoptedInScope()
+    {
+        var builder = ImmutableHashSet.CreateBuilder<LogGeneration>();
+
+        foreach ((EventLogId logId, int generation) in _activeGeneration)
+        {
+            var key = new LogGeneration(logId, generation);
+
+            if (_adoptedScope.Includes(logId) &&
+                _latestReaders.TryGetValue(key, out IEventColumnReader? reader) &&
+                reader.Count > 0)
+            {
+                builder.Add(key);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private RebuildRequest CaptureRequest()
+    {
+        long generation = Interlocked.Increment(ref _generation);
+        var generationSnapshot = new Dictionary<EventLogId, int>(_requestedGeneration);
+
+        return new RebuildRequest(
+            generation,
+            _requestedPredicate,
+            _requestedContext,
+            generationSnapshot,
+            _holdIngest,
+            _scopeState.FreezeCoverage(),
+            FreezeReaders(),
+            _scopeState.Freeze(),
+            _scopeState.ScopeVersion,
+            _scopeState.SingleLog);
+    }
+
+    private void EvictGenerationsOutOfScope()
+    {
+        HashSet<EventLogId>? evicted = null;
+
+        foreach (EventLogId logId in _activeGeneration.Keys)
+        {
+            if (!_adoptedScope.Includes(logId)) { (evicted ??= []).Add(logId); }
+        }
+
+        foreach (EventLogId logId in _requestedGeneration.Keys)
+        {
+            if (!_adoptedScope.Includes(logId)) { (evicted ??= []).Add(logId); }
+        }
+
+        if (evicted is null) { return; }
+
+        foreach (EventLogId logId in evicted)
+        {
+            _activeGeneration.Remove(logId);
+            _requestedGeneration.Remove(logId);
+        }
+    }
+
+    private FrozenReaderResolver FreezeReaders() =>
+        new(new Dictionary<LogGeneration, IEventColumnReader>(_latestReaders));
+
+    private void PruneReleasedReaders()
+    {
+        List<LogGeneration>? released = null;
+
+        foreach (LogGeneration key in _latestReaders.Keys)
+        {
+            if (!_adoptedScope.Includes(key.LogId) ||
+                !_activeGeneration.TryGetValue(key.LogId, out int active) ||
+                key.Generation < active)
+            {
+                (released ??= []).Add(key);
+            }
+        }
+
+        if (released is null) { return; }
+
+        foreach (LogGeneration key in released)
+        {
+            _scopeState.RecordGenerationSeen(key.LogId, key.Generation);
+            _latestReaders.Remove(key);
+        }
+    }
+
+    private OrderedViewSnapshot PublishWith(IReaderResolver frozenResolver)
+    {
+        _adoptedInScope = BuildAdoptedInScope();
+
+        OrderedViewSnapshot snapshot = _index.Publish(OrderKeyComparerFactory.Create(_activeContext, frozenResolver), ++_publishVersion);
+        Volatile.Write(ref _current, snapshot);
+
+        return snapshot;
+    }
+
+    private bool TryAdmitReader(
+        EventLogId logId, IEventColumnReader reader, out LogGeneration readerKey, out bool sameCountReplace)
+    {
+        readerKey = new LogGeneration(logId, reader.Generation);
+        sameCountReplace = false;
+
+        if (!_scopeState.Includes(logId)) { return false; }
+
+        bool reestablishing = !_requestedGeneration.ContainsKey(logId) && !_activeGeneration.ContainsKey(logId);
+
+        if (reestablishing && !_scopeState.IsAtOrAboveGenerationFloor(logId, reader.Generation)) { return false; }
+
+        if (_latestReaders.TryGetValue(readerKey, out var existing))
+        {
+            bool strictlyNewer = reader.Count > existing.Count ||
+                (reader.Count == existing.Count && reader.ContentVersion > existing.ContentVersion);
+
+            if (!strictlyNewer) { return false; }
+
+            sameCountReplace = reader.Count == existing.Count;
+        }
+
+        _latestReaders[readerKey] = reader;
+
+        if (!_requestedGeneration.ContainsKey(logId)) { _requestedGeneration[logId] = reader.Generation; }
+
+        if (reader.Count > 0 &&
+            !_activeGeneration.ContainsKey(logId) &&
+            _requestedGeneration.GetValueOrDefault(logId, reader.Generation) == reader.Generation)
+        {
+            _activeGeneration[logId] = reader.Generation;
+        }
+
+        return true;
+    }
+}

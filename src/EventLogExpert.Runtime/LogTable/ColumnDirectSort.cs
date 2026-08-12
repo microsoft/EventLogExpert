@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.Common.Events;
 
 namespace EventLogExpert.Runtime.LogTable;
 
-internal static partial class ResolvedEventOrdering
+internal static class ColumnDirectSort
 {
     internal static int[] SortColumnDirect(
         IEventColumnReader reader,
@@ -13,28 +13,24 @@ internal static partial class ResolvedEventOrdering
         ColumnName? orderBy,
         bool isDescending,
         ColumnName? groupBy,
-        bool isGroupDescending)
+        bool isGroupDescending,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(reader);
 
-        int[] result = survivors.ToArray();
+        int[] result = [.. survivors];
 
         if (result.Length < 2) { return result; }
 
-        var keys = ColumnDirectKeys.Materialize(reader, orderBy, groupBy);
+        var keys = ColumnDirectKeys.Materialize(reader, orderBy, groupBy, cancellationToken);
         Comparison<int> comparison = keys.BuildComparison(orderBy, isDescending, groupBy, isGroupDescending);
+        cancellationToken.ThrowIfCancellationRequested();
         Array.Sort(result, comparison);
+        cancellationToken.ThrowIfCancellationRequested();
 
         return result;
     }
 
-    /// <summary>
-    ///     The flat, physical-row-indexed columns the sort chain reads: numeric columns as value + present flags, the
-    ///     ActivityId column as Guid + present flags, and string columns as a precomputed ordinal rank per row (pooled columns
-    ///     share one ranking scoped to the distinct pool indices those columns actually use; Keywords is dense-ranked from its
-    ///     joined text). OwningLog and RecordId are always materialized because every tie-break chain reads them; DateAndTime
-    ///     is materialized only when the selected chain reads it.
-    /// </summary>
     private sealed class ColumnDirectKeys
     {
         private static readonly int s_columnCount = Enum.GetValues<ColumnName>().Length;
@@ -65,25 +61,21 @@ internal static partial class ResolvedEventOrdering
 
         private int Count { get; }
 
-        internal static ColumnDirectKeys Materialize(IEventColumnReader reader, ColumnName? orderBy, ColumnName? groupBy)
+        internal static ColumnDirectKeys Materialize(
+            IEventColumnReader reader, ColumnName? orderBy, ColumnName? groupBy, CancellationToken cancellationToken)
         {
             var keys = new ColumnDirectKeys(reader.Count);
 
-            // RecordId and OwningLog feed every chain's tie-break, so always materialize them. DateAndTime is read only by
-            // the ungrouped default chain, an explicit DateAndTime order, or a grouped chain's within-fallback, so skip its
-            // column copy for an ungrouped sort with an explicit non-DateAndTime order.
-            keys.MaterializeColumn(reader, ColumnName.RecordId);
-            keys.MaterializeOwningLog(reader);
+            keys.MaterializeColumn(reader, ColumnName.RecordId, cancellationToken);
+            keys.MaterializeOwningLog(reader, cancellationToken);
 
-            if (groupBy is not null || orderBy is null) { keys.MaterializeColumn(reader, ColumnName.DateAndTime); }
+            if (groupBy is not null || orderBy is null) { keys.MaterializeColumn(reader, ColumnName.DateAndTime, cancellationToken); }
 
-            if (orderBy is { } orderColumn) { keys.MaterializeColumn(reader, orderColumn); }
+            if (orderBy is { } orderColumn) { keys.MaterializeColumn(reader, orderColumn, cancellationToken); }
 
-            if (groupBy is { } groupColumn) { keys.MaterializeColumn(reader, groupColumn); }
+            if (groupBy is { } groupColumn) { keys.MaterializeColumn(reader, groupColumn, cancellationToken); }
 
-            // Rank OwningLog and any pooled order/group column over ONLY the distinct pool indices they use, so the ordinal
-            // string sort costs O(used distinct) rather than O(whole pool).
-            keys.RankPooledColumns(reader);
+            keys.RankPooledColumns(reader, cancellationToken);
 
             return keys;
         }
@@ -104,22 +96,26 @@ internal static partial class ResolvedEventOrdering
 
             if (orderBy is null)
             {
-                return isDescending
-                    ? (a, b) => WithIndexTieBreak(DefaultChain(b, a), a, b)
-                    : (a, b) => WithIndexTieBreak(DefaultChain(a, b), a, b);
+                return isDescending ?
+                    (a, b) => WithIndexTieBreak(DefaultChain(b, a), a, b) :
+                    (a, b) => WithIndexTieBreak(DefaultChain(a, b), a, b);
             }
 
             ColumnName orderColumn = orderBy.Value;
 
-            return isDescending
-                ? (a, b) => WithIndexTieBreak(OrderedChain(b, a, orderColumn), a, b)
-                : (a, b) => WithIndexTieBreak(OrderedChain(a, b, orderColumn), a, b);
+            return isDescending ?
+                (a, b) => WithIndexTieBreak(OrderedChain(b, a, orderColumn), a, b) :
+                (a, b) => WithIndexTieBreak(OrderedChain(a, b, orderColumn), a, b);
         }
 
-        private static void CollectUsedPoolIndices(int[] rawPoolIndices, bool[] seen, List<int> used)
+        private static void CollectUsedPoolIndices(int[] rawPoolIndices, bool[] seen, List<int> used, CancellationToken cancellationToken)
         {
+            int scanned = 0;
+
             foreach (int poolIndex in rawPoolIndices)
             {
+                if ((scanned++ & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
                 if (poolIndex >= 0 && !seen[poolIndex])
                 {
                     seen[poolIndex] = true;
@@ -130,20 +126,29 @@ internal static partial class ResolvedEventOrdering
 
         private static int CompareRank(int[] rank, int a, int b) => rank[a].CompareTo(rank[b]);
 
-        private static int[] DenseRank(string[] values, int[] rankByPosition)
+        private static int[] DenseRank(string[] values, int[] rankByPosition, CancellationToken cancellationToken)
         {
             int length = values.Length;
             var order = new int[length];
 
-            for (int index = 0; index < length; index++) { order[index] = index; }
+            for (int index = 0; index < length; index++)
+            {
+                if ((index & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
+                order[index] = index;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
             Array.Sort(order, (x, y) => string.Compare(values[x], values[y], StringComparison.Ordinal));
+            cancellationToken.ThrowIfCancellationRequested();
 
             int rank = 0;
             rankByPosition[order[0]] = 0;
 
             for (int position = 1; position < length; position++)
             {
+                if ((position & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
                 if (!string.Equals(values[order[position]], values[order[position - 1]], StringComparison.Ordinal))
                 {
                     rank++;
@@ -155,8 +160,6 @@ internal static partial class ResolvedEventOrdering
             return order;
         }
 
-        // The final deterministic tie-break: physical index ascending, applied after the whole chain and never swapped,
-        // so both a descending chain and its ascending index tie-break agree on a strict total order.
         private static int WithIndexTieBreak(int chain, int a, int b) => chain != 0 ? chain : a.CompareTo(b);
 
         private int CompareColumn(ColumnName column, int a, int b) => column switch
@@ -182,7 +185,6 @@ internal static partial class ResolvedEventOrdering
         {
             bool[] has = _numericHas[(int)column]!;
 
-            // Absent sorts first, reproducing Nullable.Compare's null-low ordering (always-present columns fill true).
             if (!has[a] || !has[b]) { return has[a] == has[b] ? 0 : (has[a] ? 1 : -1); }
 
             long[] values = _numericValues[(int)column]!;
@@ -230,8 +232,10 @@ internal static partial class ResolvedEventOrdering
             return isDescending ? -Math.Sign(within) : within;
         }
 
-        private void MaterializeColumn(IEventColumnReader reader, ColumnName column)
+        private void MaterializeColumn(IEventColumnReader reader, ColumnName column, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             switch (column)
             {
                 case ColumnName.RecordId:
@@ -245,7 +249,7 @@ internal static partial class ResolvedEventOrdering
                     MaterializeGuid(reader, column);
                     break;
                 case ColumnName.Keywords:
-                    MaterializeKeywords(reader);
+                    MaterializeKeywords(reader, cancellationToken);
                     break;
                 default:
                     MaterializePooled(reader, column);
@@ -264,20 +268,21 @@ internal static partial class ResolvedEventOrdering
             _guidHas[(int)column] = has;
         }
 
-        private void MaterializeKeywords(IEventColumnReader reader)
+        private void MaterializeKeywords(IEventColumnReader reader, CancellationToken cancellationToken)
         {
             if (_stringRank[(int)ColumnName.Keywords] is not null) { return; }
 
-            // Keywords is a joined string, not a single pooled column, so fall back to per-row text then dense-rank it.
             var values = new string[Count];
 
             for (int index = 0; index < Count; index++)
             {
+                if ((index & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
                 values[index] = reader.GetField(reader.LocatorAt(index), EventFieldId.KeywordsDisplay).AsString();
             }
 
             var rankByRow = new int[Count];
-            DenseRank(values, rankByRow);
+            DenseRank(values, rankByRow, cancellationToken);
             _stringRank[(int)ColumnName.Keywords] = rankByRow;
         }
 
@@ -292,8 +297,11 @@ internal static partial class ResolvedEventOrdering
             _numericHas[(int)column] = has;
         }
 
-        private void MaterializeOwningLog(IEventColumnReader reader) =>
+        private void MaterializeOwningLog(IEventColumnReader reader, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             reader.CopyPoolIndexColumn(EventFieldId.OwningLog, _owningLogRank);
+        }
 
         private void MaterializePooled(IEventColumnReader reader, ColumnName column)
         {
@@ -302,7 +310,6 @@ internal static partial class ResolvedEventOrdering
             var poolIndices = new int[Count];
             reader.CopyPoolIndexColumn(ColumnFieldMap.ToFieldId(column), poolIndices);
 
-            // Store the raw pool indices; RankPooledColumns converts them to ranks once the used-index set is known.
             _stringRank[(int)column] = poolIndices;
             _pooledColumns.Add((int)column);
         }
@@ -310,56 +317,63 @@ internal static partial class ResolvedEventOrdering
         private int OrderedChain(int a, int b, ColumnName orderColumn) =>
             WithTieBreak(CompareColumn(orderColumn, a, b), a, b);
 
-        private void RankFromPoolIndices(int[] poolIndices, int[] rankByRow)
+        private void RankFromPoolIndices(int[] poolIndices, int[] rankByRow, CancellationToken cancellationToken)
         {
             for (int index = 0; index < poolIndices.Length; index++)
             {
+                if ((index & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
                 int poolIndex = poolIndices[index];
                 rankByRow[index] = poolIndex < 0 ? _nullRank : _rankByPoolIndex[poolIndex];
             }
         }
 
-        private void RankPooledColumns(IEventColumnReader reader)
+        private void RankPooledColumns(IEventColumnReader reader, CancellationToken cancellationToken)
         {
             IReadOnlyList<string?> pool = reader.Pool;
             int poolCount = pool.Count;
             _rankByPoolIndex = poolCount == 0 ? [] : new int[poolCount];
 
-            // Gather only the distinct pool indices the touched pooled columns actually use (OwningLog plus any pooled
-            // order/group column), so the ordinal sort below runs over that small set instead of the whole pool.
             var seen = new bool[poolCount];
             var used = new List<int>();
-            CollectUsedPoolIndices(_owningLogRank, seen, used);
+            CollectUsedPoolIndices(_owningLogRank, seen, used, cancellationToken);
 
-            foreach (int columnIndex in _pooledColumns) { CollectUsedPoolIndices(_stringRank[columnIndex]!, seen, used); }
+            foreach (int columnIndex in _pooledColumns) { CollectUsedPoolIndices(_stringRank[columnIndex]!, seen, used, cancellationToken); }
 
             if (used.Count == 0)
             {
-                // Every touched pooled value is absent, so the rows tie on it; a null reads as the empty string.
                 _nullRank = -1;
             }
             else
             {
                 var usedStrings = new string[used.Count];
 
-                for (int index = 0; index < used.Count; index++) { usedStrings[index] = pool[used[index]] ?? string.Empty; }
+                for (int index = 0; index < used.Count; index++)
+                {
+                    if ((index & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
+                    usedStrings[index] = pool[used[index]] ?? string.Empty;
+                }
 
                 var rankByPosition = new int[used.Count];
-                int[] order = DenseRank(usedStrings, rankByPosition);
+                int[] order = DenseRank(usedStrings, rankByPosition, cancellationToken);
 
-                for (int index = 0; index < used.Count; index++) { _rankByPoolIndex[used[index]] = rankByPosition[index]; }
+                for (int index = 0; index < used.Count; index++)
+                {
+                    if ((index & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
-                // Absent (-1) reads as "". It shares rank 0 when "" is among the used values (the ordinal minimum);
-                // otherwise it sorts below every present value.
+                    _rankByPoolIndex[used[index]] = rankByPosition[index];
+                }
+
                 _nullRank = usedStrings[order[0]].Length == 0 ? 0 : -1;
             }
 
-            RankFromPoolIndices(_owningLogRank, _owningLogRank);
+            RankFromPoolIndices(_owningLogRank, _owningLogRank, cancellationToken);
 
             foreach (int columnIndex in _pooledColumns)
             {
                 int[] columnRanks = _stringRank[columnIndex]!;
-                RankFromPoolIndices(columnRanks, columnRanks);
+                RankFromPoolIndices(columnRanks, columnRanks, cancellationToken);
             }
         }
 
