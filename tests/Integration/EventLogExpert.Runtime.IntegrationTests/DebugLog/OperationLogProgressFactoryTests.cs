@@ -35,7 +35,7 @@ public sealed class OperationLogProgressFactoryTests : IDisposable
     }
 
     [Fact]
-    public void Create_NullUiProgress_Throws()
+    public void Create_NullUIProgress_Throws()
     {
         var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), LogLevel.Information);
         using var fileSink = new FileLogSink(_testLogPath, policy, DebugLogFormatter.Format);

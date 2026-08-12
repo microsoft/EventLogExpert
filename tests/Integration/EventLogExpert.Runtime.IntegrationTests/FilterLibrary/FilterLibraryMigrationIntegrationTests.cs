@@ -126,10 +126,6 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
     [Fact]
     public async Task Migration_CorruptGroupsLegacyData_FirstLoadMigratesFavorites_SecondLoadRetriesGroupsButStillFails_NoDuplicateFavoriteInsertion()
     {
-        // Behavior verified: with per-section flag check + DedupMigrationEntriesAgainstExisting, partial-success
-        // migration retries on every launch (Groups bit unset → ShouldRunMigration true), but the already-completed
-        // Favorites section is skipped in BuildEntriesFromLegacy AND dedup defends against re-insertion if the bit
-        // somehow regressed. The corrupt Groups JSON is preserved indefinitely for a future fix.
         var dbPath = CreateTempDatabasePath();
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
 
@@ -151,13 +147,9 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
         await effects.HandleLoadLibrary(dispatcher);
         await effects.HandleLoadLibrary(dispatcher);
 
-        // Both loads invoke the migrator because ShouldRunMigration stays true while Groups remains unmigrated.
         spyMigrator.Received(2).BuildEntriesFromLegacy();
-        // Favorite migrated exactly once (dedup prevents duplicate on retry).
         Assert.Single(await store.LoadAllAsync(TestContext.Current.CancellationToken));
-        // Bitmask: Favorites (1) | Recents (4) = 5; Groups (2) stays unset because the JSON is still corrupt.
         Assert.Equal("5", prefs.GetString(MigrationSectionsKey));
-        // Corrupt Groups JSON preserved for future fix attempt.
         Assert.True(prefs.ContainsKey(SavedGroupsKey));
     }
 
@@ -241,7 +233,7 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
 
         backslashMigrator ??= Substitute.For<IBackslashNameMigrator>();
 
-        return new Effects(store, libraryState, paneState, migrator, backslashMigrator, Substitute.For<IAnnouncementService>(), Substitute.For<ITraceLogger>());
+        return new Effects(store, libraryState, paneState, migrator, backslashMigrator, Substitute.For<IAnnouncementService>(), Substitute.For<ITraceLogger>(), new TagBulkUpdateFailedNotifier(Substitute.For<ITraceLogger>()));
     }
 
     private string CreateTempDatabasePath()

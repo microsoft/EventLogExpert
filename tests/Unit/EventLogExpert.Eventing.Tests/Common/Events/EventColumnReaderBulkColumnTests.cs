@@ -8,14 +8,6 @@ using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Tests.Common.Events;
 
-/// <summary>
-///     Validates the bulk column materializers on <see cref="IEventColumnReader" /> (
-///     <see cref="IEventColumnReader.CopyInt64Column" />, <see cref="IEventColumnReader.CopyGuidColumn" />,
-///     <see cref="IEventColumnReader.CopyPoolIndexColumn" />, and <see cref="IEventColumnReader.Pool" />) against the
-///     per-row <see cref="IEventColumnReader.GetField" /> oracle for a sealed store, an all-pending store, and a mixed
-///     store whose pending tail introduces pooled strings the sealed pool never interned. The legacy adapter answers the
-///     same API, so both backends are checked.
-/// </summary>
 public sealed class EventColumnReaderBulkColumnTests
 {
     private const long ContentVersion = 42;
@@ -34,28 +26,18 @@ public sealed class EventColumnReaderBulkColumnTests
     private static readonly DateTime s_time = new(2021, 6, 15, 10, 20, 30, DateTimeKind.Utc);
 
     [Fact]
-    public void BulkColumns_LegacyReader_MatchGetFieldForEveryRow()
-    {
-        ResolvedEvent[] corpus = BuildCorpus();
-
-        AssertBulkColumnParity(new LegacyEventColumnReader(s_logId, Generation, ContentVersion, corpus));
-    }
-
-    [Fact]
     public void BulkColumns_MixedStore_WithNovelPendingPoolStrings_MatchGetFieldForEveryRow()
     {
-        ResolvedEvent[] sealedCorpus = BuildCorpus();
-        ResolvedEvent[] pendingCorpus = BuildNovelPendingCorpus();
-        EventColumnStore store = EventColumnStore.Build(sealedCorpus, Generation, ContentVersion).Append(pendingCorpus);
+        ResolvedEvent[] sealedSample = BuildSample();
+        ResolvedEvent[] pendingSample = BuildNovelPendingSample();
+        EventColumnStore store = EventColumnStore.Build(sealedSample, Generation, ContentVersion).Append(pendingSample);
 
-        Assert.Equal(sealedCorpus.Length, store.SealedCount);
-        Assert.Equal(sealedCorpus.Length + pendingCorpus.Length, store.Count);
+        Assert.Equal(sealedSample.Length, store.SealedCount);
+        Assert.Equal(sealedSample.Length + pendingSample.Length, store.Count);
 
         var reader = new EventColumnStoreReader(s_logId, store);
         AssertBulkColumnParity(reader);
 
-        // A pending Source the sealed pool never interned must resolve through the pool extension, i.e. to an index at or
-        // beyond the sealed pool's distinct count.
         var poolIndices = new int[store.Count];
         reader.CopyPoolIndexColumn(EventFieldId.Source, poolIndices);
         int novelIndex = poolIndices[store.Count - 1];
@@ -67,8 +49,8 @@ public sealed class EventColumnReaderBulkColumnTests
     [Fact]
     public void BulkColumns_PendingStore_MatchGetFieldForEveryRow()
     {
-        ResolvedEvent[] corpus = BuildCorpus();
-        EventColumnStore store = EventColumnStore.Build([], Generation, ContentVersion).Append(corpus);
+        ResolvedEvent[] sample = BuildSample();
+        EventColumnStore store = EventColumnStore.Build([], Generation, ContentVersion).Append(sample);
 
         Assert.Equal(0, store.SealedCount);
 
@@ -78,10 +60,10 @@ public sealed class EventColumnReaderBulkColumnTests
     [Fact]
     public void BulkColumns_SealedStore_MatchGetFieldForEveryRow()
     {
-        ResolvedEvent[] corpus = BuildCorpus();
-        EventColumnStore store = EventColumnStore.Build(corpus, Generation, ContentVersion);
+        ResolvedEvent[] sample = BuildSample();
+        EventColumnStore store = EventColumnStore.Build(sample, Generation, ContentVersion);
 
-        Assert.Equal(corpus.Length, store.SealedCount);
+        Assert.Equal(sample.Length, store.SealedCount);
 
         AssertBulkColumnParity(new EventColumnStoreReader(s_logId, store));
     }
@@ -89,25 +71,25 @@ public sealed class EventColumnReaderBulkColumnTests
     [Fact]
     public void BulkColumns_WrongStorageKind_Throws()
     {
-        ResolvedEvent[] corpus = BuildCorpus();
-        var reader = new EventColumnStoreReader(s_logId, EventColumnStore.Build(corpus, Generation, ContentVersion));
+        ResolvedEvent[] sample = BuildSample();
+        var reader = new EventColumnStoreReader(s_logId, EventColumnStore.Build(sample, Generation, ContentVersion));
 
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => reader.CopyInt64Column(EventFieldId.Level, new long[corpus.Length], new bool[corpus.Length]));
+            () => reader.CopyInt64Column(EventFieldId.Level, new long[sample.Length], new bool[sample.Length]));
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => reader.CopyGuidColumn(EventFieldId.Id, new Guid[corpus.Length], new bool[corpus.Length]));
+            () => reader.CopyGuidColumn(EventFieldId.Id, new Guid[sample.Length], new bool[sample.Length]));
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => reader.CopyPoolIndexColumn(EventFieldId.RecordId, new int[corpus.Length]));
+            () => reader.CopyPoolIndexColumn(EventFieldId.RecordId, new int[sample.Length]));
     }
 
     [Fact]
     public void CopyPoolIndexColumn_KeywordsDisplay_Throws()
     {
-        ResolvedEvent[] corpus = BuildCorpus();
-        var reader = new EventColumnStoreReader(s_logId, EventColumnStore.Build(corpus, Generation, ContentVersion));
+        ResolvedEvent[] sample = BuildSample();
+        var reader = new EventColumnStoreReader(s_logId, EventColumnStore.Build(sample, Generation, ContentVersion));
 
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => reader.CopyPoolIndexColumn(EventFieldId.KeywordsDisplay, new int[corpus.Length]));
+            () => reader.CopyPoolIndexColumn(EventFieldId.KeywordsDisplay, new int[sample.Length]));
     }
 
     private static void AssertBulkColumnParity(IEventColumnReader reader)
@@ -190,7 +172,28 @@ public sealed class EventColumnReaderBulkColumnTests
         }
     }
 
-    private static ResolvedEvent[] BuildCorpus() =>
+    private static ResolvedEvent[] BuildNovelPendingSample() =>
+    [
+        new ResolvedEvent("NovelPendingLog", LogPathType.Channel)
+        {
+            Id = 500,
+            TimeCreated = s_time.AddHours(1),
+            Level = "NovelPendingLevel",
+            ComputerName = "NovelPendingHost",
+            Source = "NovelPendingSource",
+            TaskCategory = "NovelPendingTask",
+            LogName = "NovelPendingName",
+            Description = "NovelPendingDescription",
+            Xml = "<NovelPendingXml />",
+            UserId = new SecurityIdentifier("S-1-5-21-9-9-9-9999"),
+            RecordId = 900L,
+            ActivityId = Guid.Parse("55555555-5555-5555-5555-555555555555"),
+            ProcessId = 909,
+            ThreadId = 808
+        }
+    ];
+
+    private static ResolvedEvent[] BuildSample() =>
     [
         new ResolvedEvent("Security", LogPathType.Channel)
         {
@@ -211,7 +214,6 @@ public sealed class EventColumnReaderBulkColumnTests
             Keywords = ["Audit Success", "Classic"]
         },
 
-        // Absent nullables, null UserId, empty pooled fields.
         new ResolvedEvent("Application", LogPathType.Channel)
         {
             Id = 1000,
@@ -219,7 +221,6 @@ public sealed class EventColumnReaderBulkColumnTests
             Level = "Error"
         },
 
-        // Shares pooled values with the first row (dedups in the pool) but distinct scalars.
         new ResolvedEvent("Security", LogPathType.Channel)
         {
             Id = 7,
@@ -246,28 +247,6 @@ public sealed class EventColumnReaderBulkColumnTests
             RecordId = 101L,
             ActivityId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
             ThreadId = 22
-        }
-    ];
-
-    private static ResolvedEvent[] BuildNovelPendingCorpus() =>
-    [
-        // Pooled strings that never appear in BuildCorpus, so the sealed pool cannot index them.
-        new ResolvedEvent("NovelPendingLog", LogPathType.Channel)
-        {
-            Id = 500,
-            TimeCreated = s_time.AddHours(1),
-            Level = "NovelPendingLevel",
-            ComputerName = "NovelPendingHost",
-            Source = "NovelPendingSource",
-            TaskCategory = "NovelPendingTask",
-            LogName = "NovelPendingName",
-            Description = "NovelPendingDescription",
-            Xml = "<NovelPendingXml />",
-            UserId = new SecurityIdentifier("S-1-5-21-9-9-9-9999"),
-            RecordId = 900L,
-            ActivityId = Guid.Parse("55555555-5555-5555-5555-555555555555"),
-            ProcessId = 909,
-            ThreadId = 808
         }
     ];
 }

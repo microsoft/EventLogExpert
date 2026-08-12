@@ -13,7 +13,6 @@ namespace EventLogExpert.Filtering.Compilation;
 
 public sealed class FilterService : IFilterService
 {
-    /// <summary>Outer parallelism only kicks in when the combined work justifies the scheduling overhead.</summary>
     private const int OuterParallelTotalEventThreshold = 10_000;
 
     public static byte[] ClassifyHighlightWinners(
@@ -47,6 +46,22 @@ public sealed class FilterService : IFilterService
         }
 
         return winners;
+    }
+
+    public static Func<IEventColumnReader, EventLocator, bool> CompileSurvivorPredicate(Filter filter)
+    {
+        if (!filter.IsFilteringEnabled) { return static (_, _) => true; }
+
+        var compiledFilters = CompileColumnFilters(filter.Filters);
+
+        var dateFilter = filter.DateFilter;
+        var dateEnabled = dateFilter?.IsEnabled is true;
+        var after = dateFilter?.After;
+        var before = dateFilter?.Before;
+
+        return (reader, locator) =>
+            MatchesCompiledFilters(reader, locator, compiledFilters) &&
+            (!dateEnabled || MatchesDateRange(reader, locator, after, before));
     }
 
     public static IReadOnlyList<int> GetSurvivingOrder(IEventColumnReader reader, Filter filter)
@@ -91,8 +106,6 @@ public sealed class FilterService : IFilterService
         IReadOnlyList<(EventLogId Id, IReadOnlyList<ResolvedEvent> Events)> logs,
         Filter filter)
     {
-        // Single log, no filters, or trivial total work: sequential per-log (inner PLINQ still
-        // engages for >=10k events on a single large log).
         if (logs.Count <= 1 ||
             !filter.IsFilteringEnabled ||
             !ShouldParallelizeAcrossLogs(logs))
@@ -100,8 +113,6 @@ public sealed class FilterService : IFilterService
             return BuildSequentialResult(logs, filter);
         }
 
-        // Multi-log heavy work: parallelize across logs, sequential within each log to avoid
-        // oversubscribing the thread pool.
         var results = new IReadOnlyList<ResolvedEvent>[logs.Count];
 
         try
@@ -123,7 +134,6 @@ public sealed class FilterService : IFilterService
 
         for (var index = 0; index < logs.Count; index++)
         {
-            // Add() (not the indexer) preserves duplicate-key failure parity with the sequential path.
             filtered.Add(logs[index].Id, results[index]);
         }
 
@@ -139,7 +149,6 @@ public sealed class FilterService : IFilterService
             return events as IReadOnlyList<ResolvedEvent> ?? [.. events];
         }
 
-        // PLINQ scheduling overhead exceeds the benefit below this threshold.
         if (events is IReadOnlyCollection<ResolvedEvent> { Count: < 10_000 } collection)
         {
             return FilterEventsSequential(collection, filter);
@@ -159,8 +168,6 @@ public sealed class FilterService : IFilterService
 
         foreach (var savedFilter in filters)
         {
-            // A null AoS Compiled is skipped without touching the isEmpty/isFiltered decision. Skipping at compile time
-            // is equivalent to the row oracle's per-event `continue` before the exclude/include arms.
             if (savedFilter.Compiled is null) { continue; }
 
             if (!FilterCompiler.TryCompileColumn(savedFilter.ComparisonText, out var columnCompiled, out var error))
@@ -225,7 +232,6 @@ public sealed class FilterService : IFilterService
 
             if (isExcluded)
             {
-                // Exclude hides only on a decisive Match; Unknown and NoMatch keep the row visible.
                 if (match == FilterMatch.Match) { return false; }
 
                 continue;
@@ -233,7 +239,6 @@ public sealed class FilterService : IFilterService
 
             isEmpty = false;
 
-            // Include keeps the row on a Match OR an Unknown; only a decisive NoMatch fails to satisfy it.
             if (match != FilterMatch.NoMatch) { isFiltered = true; }
         }
 
@@ -248,7 +253,6 @@ public sealed class FilterService : IFilterService
     {
         reader.GetField(locator, EventFieldId.TimeCreated).TryGetDateTime(out var timeCreated);
 
-        // Lifted nullable comparison mirrors the row oracle: a null After or Before makes the arm false.
         return timeCreated >= after && timeCreated <= before;
     }
 
@@ -259,7 +263,6 @@ public sealed class FilterService : IFilterService
 
         foreach (var data in logs)
         {
-            // If we can't cheaply size a log, assume the work is non-trivial and opt in to parallelism.
             if (data.Events is not IReadOnlyCollection<ResolvedEvent> collection)
             {
                 return true;

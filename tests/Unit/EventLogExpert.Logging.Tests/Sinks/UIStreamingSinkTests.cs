@@ -7,13 +7,13 @@ using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Logging.Tests.Sinks;
 
-public sealed class UiStreamingSinkTests
+public sealed class UIStreamingSinkTests
 {
     [Fact]
     public void Emit_AtOrAboveMinimum_ReportsTheRecord()
     {
         var captured = new List<LogRecord>();
-        var sink = new UiStreamingSink(new CapturingProgress(captured), LogLevel.Information);
+        var sink = new UIStreamingSink(new CapturingProgress(captured), LogLevel.Information);
         var record = new LogRecord(DateTime.UtcNow, LogLevel.Warning, "warn");
 
         sink.Emit(record);
@@ -25,7 +25,7 @@ public sealed class UiStreamingSinkTests
     public void Emit_BelowMinimum_ReportsNothing()
     {
         var captured = new List<LogRecord>();
-        var sink = new UiStreamingSink(new CapturingProgress(captured), LogLevel.Information);
+        var sink = new UIStreamingSink(new CapturingProgress(captured), LogLevel.Information);
 
         sink.Emit(new LogRecord(DateTime.UtcNow, LogLevel.Debug, "debug"));
 
@@ -35,7 +35,7 @@ public sealed class UiStreamingSinkTests
     [Fact]
     public void MinimumLevelFor_ReturnsTheConfiguredLevel_RegardlessOfCategory()
     {
-        var sink = new UiStreamingSink(new CapturingProgress([]), LogLevel.Trace);
+        var sink = new UIStreamingSink(new CapturingProgress([]), LogLevel.Trace);
 
         Assert.Equal(LogLevel.Trace, sink.MinimumLevelFor("DatabaseTools.Create"));
         Assert.Equal(LogLevel.Trace, sink.MinimumLevelFor("App"));
@@ -43,12 +43,12 @@ public sealed class UiStreamingSinkTests
 
     [Fact]
     public void Constructor_NullProgress_Throws() =>
-        Assert.Throws<ArgumentNullException>(static () => new UiStreamingSink(null!, LogLevel.Information));
+        Assert.Throws<ArgumentNullException>(static () => new UIStreamingSink(null!, LogLevel.Information));
 
     [Fact]
     public void Emit_NullRecord_Throws()
     {
-        var sink = new UiStreamingSink(new CapturingProgress([]), LogLevel.Information);
+        var sink = new UIStreamingSink(new CapturingProgress([]), LogLevel.Information);
 
         Assert.Throws<ArgumentNullException>(() => sink.Emit(null!));
     }

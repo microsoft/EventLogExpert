@@ -11,6 +11,10 @@ namespace EventLogExpert.Windows.Tests.Elevation;
 
 public sealed class ElevatedHelperProcessHostTests
 {
+    private const int LoopSettleDelayMilliseconds = 50;
+
+    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(5);
+
     [Fact]
     public async Task AcceptAndVerifyClientPidAsync_WhenClientPidMatches_ReturnsWithoutError()
     {
@@ -39,7 +43,7 @@ public sealed class ElevatedHelperProcessHostTests
 
         await client.ConnectAsync(ct);
 
-        await acceptTask.WaitAsync(TimeSpan.FromSeconds(5), ct);
+        await acceptTask.WaitAsync(s_testTimeout, ct);
 
         Assert.True(server.IsConnected);
     }
@@ -60,8 +64,6 @@ public sealed class ElevatedHelperProcessHostTests
 
         using var loopCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-        // Expected PID = 0 never matches a real process; loop should disconnect after each connection and keep
-        // waiting until the deadline cancels the loop.
         var acceptTask = ElevatedHelperProcessHost.AcceptAndVerifyClientPidAsync(
             server,
             expectedPid: 0,
@@ -73,7 +75,7 @@ public sealed class ElevatedHelperProcessHostTests
             await client1.ConnectAsync(ct);
         }
 
-        await Task.Delay(50, ct);
+        await Task.Delay(LoopSettleDelayMilliseconds, ct);
         loopCts.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => acceptTask);

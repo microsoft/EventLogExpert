@@ -3,7 +3,6 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
-    <PlatformTarget>x64</PlatformTarget>
     <AssemblyName>eventdbtool</AssemblyName>
   </PropertyGroup>
 
