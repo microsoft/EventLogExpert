@@ -3,4 +3,11 @@
 
 namespace EventLogExpert.Runtime.LogTable;
 
-public sealed record SetAllGroupsCollapsedAction(bool Collapsed);
+public enum PresentationState
+{
+    Current,
+
+    Updating,
+
+    Faulted
+}

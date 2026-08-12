@@ -2,10 +2,11 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Runtime.Common.Sources;
 
 namespace EventLogExpert.Runtime.LogTable;
 
-public sealed record AppendTableEventsAction(EventLogId LogId)
+public interface IActiveEventLogSource : IChangeNotifier
 {
-    internal EventColumnView? View { get; init; }
+    EventLogId? Current { get; }
 }

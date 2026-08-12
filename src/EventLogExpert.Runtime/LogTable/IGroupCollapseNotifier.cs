@@ -3,4 +3,7 @@
 
 namespace EventLogExpert.Runtime.LogTable;
 
-public sealed record SetAllGroupsCollapsedAction(bool Collapsed);
+public interface IGroupCollapseNotifier
+{
+    event Action Requested;
+}

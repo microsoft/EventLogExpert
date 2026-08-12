@@ -6,35 +6,27 @@ using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Filtering.Persistence;
 using System.Diagnostics.CodeAnalysis;
 
-namespace EventLogExpert.Runtime.LogTable;
+namespace EventLogExpert.Runtime.LogTable.OrderedView;
 
-internal sealed class EventColumnView : IEventColumnView
+internal sealed class OrderedColumnView : IEventColumnView
 {
-    private readonly SortContext _context;
-    private readonly int[] _order;
-    private readonly int[] _rankByPhysical;
     private readonly IEventColumnReader _reader;
+    private readonly OrderedViewSnapshot _snapshot;
 
     private Dictionary<ValueKey, int>? _byKey;
     private HighlightWinnerCache? _highlightCache;
+    private PhysicalProjection? _projection;
 
-    private EventColumnView(IEventColumnReader reader, int[] order, int[] rankByPhysical, SortContext context)
+    internal OrderedColumnView(OrderedViewSnapshot snapshot, IEventColumnReader reader)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(reader);
+
+        _snapshot = snapshot;
         _reader = reader;
-        _order = order;
-        _rankByPhysical = rankByPhysical;
-        _context = context;
     }
 
-    public int Count => _order.Length;
-
-    internal SortContext Context => _context;
-
-    internal IEventColumnReader Reader => _reader;
-
-    // The filter-surviving physical rows, used by WithContext to re-sort in place; the survivor set is order-independent,
-    // so the current display order is a valid re-sort input.
-    internal ReadOnlySpan<int> Survivors => _order;
+    public int Count => _snapshot.Count;
 
     public void BucketTimeTicksByEventData(
         long minTicks,
@@ -45,7 +37,7 @@ internal sealed class EventColumnView : IEventColumnView
         int[] slotCounts,
         CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByEventData(
-            _rankByPhysical,
+            RankByPhysical(),
             minTicks,
             bucketSpanTicks,
             bucketCount,
@@ -65,7 +57,7 @@ internal sealed class EventColumnView : IEventColumnView
         int[] slotCounts,
         CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByEventDataHResult(
-            _rankByPhysical,
+            RankByPhysical(),
             minTicks,
             bucketSpanTicks,
             bucketCount,
@@ -89,7 +81,7 @@ internal sealed class EventColumnView : IEventColumnView
         int[] slotCounts,
         CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByEventDataHResultWithTie(
-            _rankByPhysical,
+            RankByPhysical(),
             highlightWinners,
             slotColorMask,
             minTicks,
@@ -112,7 +104,7 @@ internal sealed class EventColumnView : IEventColumnView
         int[] slotCounts,
         CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByEventDataString(
-            _rankByPhysical,
+            RankByPhysical(),
             minTicks,
             bucketSpanTicks,
             bucketCount,
@@ -134,7 +126,7 @@ internal sealed class EventColumnView : IEventColumnView
         int[] slotCounts,
         CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByEventDataStringWithTie(
-            _rankByPhysical,
+            RankByPhysical(),
             highlightWinners,
             slotColorMask,
             minTicks,
@@ -157,7 +149,7 @@ internal sealed class EventColumnView : IEventColumnView
         int[] slotCounts,
         CancellationToken cancellationToken) =>
         _reader.BucketTimeTicksByEventDataWithTie(
-            _rankByPhysical,
+            RankByPhysical(),
             highlightWinners,
             slotColorMask,
             minTicks,
@@ -175,7 +167,8 @@ internal sealed class EventColumnView : IEventColumnView
         int[] targetIds,
         int[] slotCounts,
         CancellationToken cancellationToken) =>
-        _reader.BucketTimeTicksByEventId(_rankByPhysical,
+        _reader.BucketTimeTicksByEventId(
+            RankByPhysical(),
             minTicks,
             bucketSpanTicks,
             bucketCount,
@@ -192,7 +185,8 @@ internal sealed class EventColumnView : IEventColumnView
         int[] targetIds,
         int[] slotCounts,
         CancellationToken cancellationToken) =>
-        _reader.BucketTimeTicksByEventIdWithTie(_rankByPhysical,
+        _reader.BucketTimeTicksByEventIdWithTie(
+            RankByPhysical(),
             highlightWinners,
             slotColorMask,
             minTicks,
@@ -210,7 +204,8 @@ internal sealed class EventColumnView : IEventColumnView
         string[] targetValues,
         int[] slotCounts,
         CancellationToken cancellationToken) =>
-        _reader.BucketTimeTicksByField(_rankByPhysical,
+        _reader.BucketTimeTicksByField(
+            RankByPhysical(),
             minTicks,
             bucketSpanTicks,
             bucketCount,
@@ -229,7 +224,8 @@ internal sealed class EventColumnView : IEventColumnView
         string[] targetValues,
         int[] slotCounts,
         CancellationToken cancellationToken) =>
-        _reader.BucketTimeTicksByFieldWithTie(_rankByPhysical,
+        _reader.BucketTimeTicksByFieldWithTie(
+            RankByPhysical(),
             highlightWinners,
             slotColorMask,
             minTicks,
@@ -246,7 +242,8 @@ internal sealed class EventColumnView : IEventColumnView
         int bucketCount,
         int[] slotCounts,
         CancellationToken cancellationToken) =>
-        _reader.BucketTimeTicksBySeverity(_rankByPhysical,
+        _reader.BucketTimeTicksBySeverity(
+            RankByPhysical(),
             minTicks,
             bucketSpanTicks,
             bucketCount,
@@ -261,7 +258,8 @@ internal sealed class EventColumnView : IEventColumnView
         int bucketCount,
         int[] slotCounts,
         CancellationToken cancellationToken) =>
-        _reader.BucketTimeTicksBySeverityWithTie(_rankByPhysical,
+        _reader.BucketTimeTicksBySeverityWithTie(
+            RankByPhysical(),
             highlightWinners,
             slotColorMask,
             minTicks,
@@ -276,28 +274,19 @@ internal sealed class EventColumnView : IEventColumnView
         IReadOnlyList<string> userDataErrorCodePaths,
         IDictionary<long, int> counts,
         CancellationToken cancellationToken) =>
-        _reader.CountEventDataHResults(_rankByPhysical, fieldName, eligibleProviders, userDataErrorCodePaths, counts, cancellationToken);
+        _reader.CountEventDataHResults(RankByPhysical(), fieldName, eligibleProviders, userDataErrorCodePaths, counts, cancellationToken);
 
-    public void CountEventDataStringValues(
-        string[] candidateFields,
-        IDictionary<string, int> counts,
-        CancellationToken cancellationToken) =>
-        _reader.CountEventDataStringValues(_rankByPhysical, candidateFields, counts, cancellationToken);
+    public void CountEventDataStringValues(string[] candidateFields, IDictionary<string, int> counts, CancellationToken cancellationToken) =>
+        _reader.CountEventDataStringValues(RankByPhysical(), candidateFields, counts, cancellationToken);
 
-    public void CountEventDataValues(
-        string fieldName,
-        IDictionary<long, int> counts,
-        CancellationToken cancellationToken) =>
-        _reader.CountEventDataValues(_rankByPhysical, fieldName, counts, cancellationToken);
+    public void CountEventDataValues(string fieldName, IDictionary<long, int> counts, CancellationToken cancellationToken) =>
+        _reader.CountEventDataValues(RankByPhysical(), fieldName, counts, cancellationToken);
 
     public void CountEventIds(IDictionary<int, int> counts, CancellationToken cancellationToken) =>
-        _reader.CountEventIds(_rankByPhysical, counts, cancellationToken);
+        _reader.CountEventIds(RankByPhysical(), counts, cancellationToken);
 
-    public void CountFieldValues(
-        EventFieldId field,
-        IDictionary<string, int> counts,
-        CancellationToken cancellationToken) =>
-        _reader.CountFieldValues(_rankByPhysical, field, counts, cancellationToken);
+    public void CountFieldValues(EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken) =>
+        _reader.CountFieldValues(RankByPhysical(), field, counts, cancellationToken);
 
     public byte[] EnsureHighlightWinners(
         IReadOnlyList<SavedFilter> orderedColoredFilters,
@@ -306,24 +295,36 @@ internal sealed class EventColumnView : IEventColumnView
     {
         ArgumentNullException.ThrowIfNull(orderedColoredFilters);
 
-        HighlightWinnerCache? cache = _highlightCache;
+        HighlightWinnerCache? cache = Volatile.Read(ref _highlightCache);
 
         if (cache is { PlanKey: var key, Winners: var winners } && key == planKey && winners.Length == _reader.Count)
         {
             return winners;
         }
 
-        byte[] fresh = FilterService.ClassifyHighlightWinners(_reader, _order, orderedColoredFilters, cancellationToken);
-        _highlightCache = new HighlightWinnerCache(planKey, fresh);
+        byte[] fresh = FilterService.ClassifyHighlightWinners(_reader, Projection().Order, orderedColoredFilters, cancellationToken);
+        Volatile.Write(ref _highlightCache, new HighlightWinnerCache(planKey, fresh));
 
         return fresh;
     }
 
     public IEnumerable<ResolvedEvent> EnumerateDetail()
     {
-        foreach (int physical in _order)
+        int count = _snapshot.Count;
+
+        for (int display = 0; display < count; display++)
         {
-            yield return _reader.GetDetail(_reader.LocatorAt(physical));
+            yield return _reader.GetDetail(_snapshot.At(display).Locator);
+        }
+    }
+
+    public IEnumerable<ResolvedEvent> EnumerateDetailLean()
+    {
+        int count = _snapshot.Count;
+
+        for (int display = 0; display < count; display++)
+        {
+            yield return _reader.GetDetailLean(_snapshot.At(display).Locator);
         }
     }
 
@@ -331,18 +332,11 @@ internal sealed class EventColumnView : IEventColumnView
 
     public ResolvedEvent GetDetailLean(EventLocator locator) => _reader.GetDetailLean(locator);
 
-    public string GroupKeyAt(EventLocator locator, ColumnName column) =>
-        ResolvedEventGroupKey.For(_reader, locator, column);
+    public string GroupKeyAt(EventLocator locator, ColumnName column) => ResolvedEventGroupKey.For(_reader, locator, column);
 
-    public EventLocator LocatorAt(int displayIndex) => _reader.LocatorAt(_order[displayIndex]);
+    public EventLocator LocatorAt(int index) => _snapshot.At(index).Locator;
 
-    public int Rank(EventLocator locator) =>
-        locator.LogId == _reader.LogId
-        && locator.Generation == _reader.Generation
-        && locator.Index >= 0
-        && locator.Index < _rankByPhysical.Length
-            ? _rankByPhysical[locator.Index]
-            : -1;
+    public int Rank(EventLocator locator) => _snapshot.RankOf(new OrderKey(locator));
 
     public EventLocator? ResolveByKey(ValueKey key)
     {
@@ -352,7 +346,6 @@ internal sealed class EventColumnView : IEventColumnView
         {
             byKey = BuildByKey();
 
-            // First writer wins; a racing reader either sees null (and builds its own discarded copy) or a complete map.
             byKey = Interlocked.CompareExchange(ref _byKey, byKey, null) ?? byKey;
         }
 
@@ -361,13 +354,14 @@ internal sealed class EventColumnView : IEventColumnView
 
     public IReadOnlyList<DisplayRow> Slice(int start, int count)
     {
-        int clampedStart = Math.Clamp(start, 0, _order.Length);
-        int clampedCount = Math.Clamp(count, 0, _order.Length - clampedStart);
+        int total = _snapshot.Count;
+        int clampedStart = Math.Clamp(start, 0, total);
+        int clampedCount = Math.Clamp(count, 0, total - clampedStart);
         List<DisplayRow> rows = new(clampedCount);
 
         for (int offset = 0; offset < clampedCount; offset++)
         {
-            EventLocator locator = LocatorAt(clampedStart + offset);
+            EventLocator locator = _snapshot.At(clampedStart + offset).Locator;
             rows.Add(new DisplayRow(locator, _reader.GetDetailLean(locator)));
         }
 
@@ -376,10 +370,7 @@ internal sealed class EventColumnView : IEventColumnView
 
     public bool TryGetDetail(EventLocator locator, [NotNullWhen(true)] out ResolvedEvent? detail)
     {
-        if (locator.LogId == _reader.LogId
-            && locator.Generation == _reader.Generation
-            && locator.Index >= 0
-            && locator.Index < _reader.Count)
+        if (AddressesReader(locator))
         {
             detail = _reader.GetDetail(locator);
 
@@ -393,10 +384,7 @@ internal sealed class EventColumnView : IEventColumnView
 
     public bool TryGetTimeTicks(EventLocator locator, out long ticks)
     {
-        if (locator.LogId == _reader.LogId
-            && locator.Generation == _reader.Generation
-            && locator.Index >= 0
-            && locator.Index < _reader.Count)
+        if (AddressesReader(locator))
         {
             ticks = _reader.GetTimeTicks(locator);
 
@@ -409,70 +397,58 @@ internal sealed class EventColumnView : IEventColumnView
     }
 
     public bool TryGetTimeTicksRange(out long minTicks, out long maxTicks, CancellationToken cancellationToken) =>
-        _reader.TryGetTimeTicksRange(_rankByPhysical, out minTicks, out maxTicks, cancellationToken);
+        _reader.TryGetTimeTicksRange(RankByPhysical(), out minTicks, out maxTicks, cancellationToken);
 
-    /// <summary>
-    ///     Builds a view over the filter-surviving <paramref name="survivors" />, sorted into display order, with the
-    ///     physical-to-display inverse used by <see cref="Rank" />.
-    /// </summary>
-    internal static EventColumnView Create(
-        IEventColumnReader reader,
-        ReadOnlySpan<int> survivors,
-        ColumnName? orderBy,
-        bool isDescending,
-        ColumnName? groupBy,
-        bool isGroupDescending) =>
-        Create(reader, survivors, new SortContext(orderBy, isDescending, groupBy, isGroupDescending));
-
-    /// <summary>
-    ///     Live-path overload: sorts under <paramref name="context" /> and retains it so the reducers can detect (
-    ///     <see cref="HasContext" />) and repair (<see cref="WithContext" />) a stale sort without re-reading the raw store.
-    /// </summary>
-    internal static EventColumnView Create(IEventColumnReader reader, ReadOnlySpan<int> survivors, SortContext context)
-    {
-        ArgumentNullException.ThrowIfNull(reader);
-
-        int[] order = ResolvedEventOrdering.SortColumnDirect(
-            reader, survivors, context.OrderBy, context.IsDescending, context.GroupBy, context.IsGroupDescending);
-
-        int[] rankByPhysical = new int[reader.Count];
-        Array.Fill(rankByPhysical, -1);
-
-        for (int display = 0; display < order.Length; display++)
-        {
-            rankByPhysical[order[display]] = display;
-        }
-
-        return new EventColumnView(reader, order, rankByPhysical, context);
-    }
-
-    internal bool HasContext(SortContext context) => _context.Equals(context);
-
-    // Re-sorts the same survivor set under a new context without re-reading the raw store (the reducers use this when the
-    // effective default order flips between single- and multi-log).
-    internal EventColumnView WithContext(SortContext context)
-    {
-        EventColumnView view = Create(_reader, _order, context);
-        view._highlightCache = _highlightCache;
-
-        return view;
-    }
+    private bool AddressesReader(in EventLocator locator) =>
+        locator.LogId == _reader.LogId
+        && locator.Generation == _reader.Generation
+        && locator.Index >= 0
+        && locator.Index < _reader.Count;
 
     private Dictionary<ValueKey, int> BuildByKey()
     {
-        var map = new Dictionary<ValueKey, int>(_order.Length);
+        int count = _snapshot.Count;
+        var map = new Dictionary<ValueKey, int>(count);
 
-        foreach (int physical in _order)
+        for (int display = 0; display < count; display++)
         {
-            // First survivor wins on a duplicate key; null-RecordId rows never produce a key, so they stay unresolvable.
-            if (ValueKey.TryCreate(_reader.GetDetailLean(_reader.LocatorAt(physical)), out ValueKey key))
+            EventLocator locator = _snapshot.At(display).Locator;
+
+            if (ValueKey.TryCreate(_reader.GetDetailLean(locator), out ValueKey key))
             {
-                map.TryAdd(key, physical);
+                map.TryAdd(key, locator.Index);
             }
         }
 
         return map;
     }
+
+    private PhysicalProjection Projection()
+    {
+        var projection = Volatile.Read(ref _projection);
+
+        if (projection is not null) { return projection; }
+
+        int displayCount = _snapshot.Count;
+        int[] order = new int[displayCount];
+        int[] rankByPhysical = new int[_reader.Count];
+        Array.Fill(rankByPhysical, -1);
+
+        for (int display = 0; display < displayCount; display++)
+        {
+            int physical = _snapshot.At(display).Locator.Index;
+            order[display] = physical;
+            rankByPhysical[physical] = display;
+        }
+
+        projection = new PhysicalProjection(order, rankByPhysical);
+
+        return Interlocked.CompareExchange(ref _projection, projection, null) ?? projection;
+    }
+
+    private int[] RankByPhysical() => Projection().RankByPhysical;
+
+    private sealed record PhysicalProjection(int[] Order, int[] RankByPhysical);
 
     private sealed record HighlightWinnerCache(int PlanKey, byte[] Winners);
 }

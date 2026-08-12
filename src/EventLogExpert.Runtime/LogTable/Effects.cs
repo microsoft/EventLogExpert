@@ -10,10 +10,12 @@ internal sealed class Effects(
     ILogTablePreferencesProvider preferencesProvider,
     IState<LogTableState> logTableState,
     ILogTableColumnDefaultsProvider columnDefaults,
-    IColumnResetMigrator columnResetMigrator)
+    IColumnResetMigrator columnResetMigrator,
+    GroupCollapseNotifier groupCollapseNotifier)
 {
     private readonly ILogTableColumnDefaultsProvider _columnDefaults = columnDefaults;
     private readonly IColumnResetMigrator _columnResetMigrator = columnResetMigrator;
+    private readonly GroupCollapseNotifier _groupCollapseNotifier = groupCollapseNotifier;
     private readonly IState<LogTableState> _logTableState = logTableState;
     private readonly ILogTablePreferencesProvider _preferencesProvider = preferencesProvider;
 
@@ -41,7 +43,6 @@ internal sealed class Effects(
     [EffectMethod]
     public Task HandleReorderColumn(ReorderColumnAction action, IDispatcher dispatcher)
     {
-        // Read from post-reducer state to avoid race conditions with rapid reorder actions
         _preferencesProvider.ColumnOrderPreference = _logTableState.Value.ColumnOrder;
 
         return Task.CompletedTask;
@@ -68,10 +69,17 @@ internal sealed class Effects(
         return Task.CompletedTask;
     }
 
+    [EffectMethod(typeof(SetAllGroupsCollapsedAction))]
+    public Task HandleSetAllGroupsCollapsed(IDispatcher dispatcher)
+    {
+        _groupCollapseNotifier.Raise();
+
+        return Task.CompletedTask;
+    }
+
     [EffectMethod]
     public Task HandleSetColumnWidth(SetColumnWidthAction action, IDispatcher dispatcher)
     {
-        // Read from post-reducer state to avoid race conditions
         _preferencesProvider.ColumnWidthsPreference = new Dictionary<ColumnName, int>(_logTableState.Value.ColumnWidths);
 
         return Task.CompletedTask;
@@ -110,7 +118,6 @@ internal sealed class Effects(
             return _columnDefaults.ColumnOrder;
         }
 
-        // Start with saved order, then append any new columns not in saved order
         var allColumns = Enum.GetValues<ColumnName>().ToHashSet();
         var ordered = savedOrder.Where(allColumns.Contains).ToList();
         var missing = _columnDefaults.ColumnOrder.Where(c => !ordered.Contains(c));

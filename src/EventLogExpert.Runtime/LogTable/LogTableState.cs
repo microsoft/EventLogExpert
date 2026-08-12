@@ -2,9 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
-using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Runtime.LogTable.OrderedView;
 using Fluxor;
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 
@@ -13,27 +13,28 @@ namespace EventLogExpert.Runtime.LogTable;
 [FeatureState]
 public sealed record LogTableState
 {
-    internal ImmutableDictionary<EventLogId, EventColumnView> PerLogEvents { get; init; } =
-        ImmutableDictionary<EventLogId, EventColumnView>.Empty;
-
     public ImmutableList<LogView> EventTables { get; init; } = [];
 
     public ImmutableList<LogTabGroup> Groups { get; init; } = [];
 
-    public IEventColumnView DisplayedEvents =>
-        PerLogEvents.IsEmpty
-            ? CombinedColumnView.Empty
-            : PerLogEvents.Count == 1
-                ? SingleLogDisplayList()
-                : AllLogsView();
-
-    /// <summary>An empty view sentinel for the UI to bind when no tab is active.</summary>
-    public static IEventColumnView EmptyView => CombinedColumnView.Empty;
-
-    public ImmutableDictionary<EventLogId, int> EventCountByLog { get; init; } =
-        ImmutableDictionary<EventLogId, int>.Empty;
+    public static IEventColumnView EmptyView => EmptyColumnView.Instance;
 
     public EventLogId? ActiveEventLogId { get; init; }
+
+    internal OrderedViewReady? ActiveOrderedView { get; init; }
+
+    internal ImmutableDictionary<EventLogId, OrderedViewReady> RetainedOrderedViews { get; init; } =
+        ImmutableDictionary<EventLogId, OrderedViewReady>.Empty;
+
+    internal Filter AppliedFilter { get; init; } = new(null, []);
+
+    internal string? FaultCause { get; init; }
+
+    internal bool OrderedViewDisplayEnabled { get; init; } = true;
+
+    internal long HighestInvalidationSequence { get; init; }
+
+    internal long LastPublishedSnapshotVersion { get; init; } = -1;
 
     public ImmutableDictionary<ColumnName, bool> Columns { get; init; } = ImmutableDictionary<ColumnName, bool>.Empty;
 
@@ -50,11 +51,6 @@ public sealed record LogTableState
 
     public bool IsGroupDescending { get; init; }
 
-    /// <summary>
-    ///     Mirrors the timeline pane's visibility (kept in sync through <c>SetHistogramVisibleAction</c>). A single log
-    ///     with no explicit sort defaults to Date/Time order while the timeline is shown, so the table reads in the same order
-    ///     as the time axis, and to Record ID order while it is hidden. Combined views are unaffected (always Date/Time).
-    /// </summary>
     public bool TimelineVisible { get; init; }
 
     internal ColumnName? RequestedOrderBy { get; init; }
@@ -65,18 +61,82 @@ public sealed record LogTableState
 
     internal bool RequestedIsGroupDescending { get; init; }
 
-    internal int DisplayListVersion { get; init; }
-
     public bool GroupsCollapsedByDefault { get; init; }
 
     public ImmutableHashSet<string> GroupCollapseOverrides { get; init; } =
         ImmutableHashSet.Create<string>(StringComparer.Ordinal);
 
+    internal int DisplayedLogCount => EventTables.Count(table => !table.IsCombined);
+
     internal SortContext SortContext =>
-        new(ResolvedEventOrdering.ResolveDefaultOrderBy(RequestedOrderBy, RequestedGroupBy, PerLogEvents.Count, TimelineVisible),
+        new(ResolvedEventOrdering.ResolveDefaultOrderBy(RequestedOrderBy, RequestedGroupBy, DisplayedLogCount, TimelineVisible),
             RequestedIsDescending,
             RequestedGroupBy,
             RequestedIsGroupDescending);
+
+    internal ColumnName? CommittedEffectiveOrderBy { get; init; }
+
+    internal SortContext CommittedSortContext =>
+        new(CommittedEffectiveOrderBy,
+            IsDescending,
+            GroupBy,
+            IsGroupDescending);
+
+    private ImmutableArray<EventLogId> ActiveScope()
+    {
+        LogView? active = null;
+
+        foreach (LogView tab in EventTables)
+        {
+            if (tab.Id == ActiveEventLogId)
+            {
+                active = tab;
+
+                break;
+            }
+        }
+
+        if (active is null) { return []; }
+
+        if (active.GroupId is not { } groupId) { return [active.Id]; }
+
+        if (groupId.IsAll)
+        {
+            var openLogs = new List<EventLogId>(EventTables.Count);
+
+            foreach (LogView tab in EventTables)
+            {
+                if (!tab.IsCombined) { openLogs.Add(tab.Id); }
+            }
+
+            return Canonical(openLogs);
+        }
+
+        foreach (LogTabGroup candidate in Groups)
+        {
+            if (candidate.Id == groupId) { return Canonical([.. candidate.MemberIds]); }
+        }
+
+        return [];
+    }
+
+    private static ImmutableArray<EventLogId> Canonical(List<EventLogId> logIds)
+    {
+        logIds.Sort(static (left, right) => left.Value.CompareTo(right.Value));
+
+        return [.. logIds];
+    }
+
+    private ViewIdentity BuildViewIdentity() =>
+        new(ActiveEventLogId,
+            ActiveScope(),
+            RequestedOrderBy,
+            RequestedIsDescending,
+            RequestedGroupBy,
+            RequestedIsGroupDescending,
+            TimelineVisible,
+            DisplayedLogCount > 1,
+            AppliedFilter);
 
     internal bool HasPendingSortChange =>
         RequestedOrderBy != OrderBy ||
@@ -84,110 +144,210 @@ public sealed record LogTableState
         RequestedGroupBy != GroupBy ||
         RequestedIsGroupDescending != IsGroupDescending;
 
-    internal ImmutableDictionary<EventLogId, int> PerLogListVersion { get; init; } =
-        ImmutableDictionary<EventLogId, int>.Empty;
+    private static readonly ConditionalWeakTable<LogTableState, ViewIdentity> s_ViewIdentitys = [];
 
-    private static readonly object s_allLogsKey = new();
+    internal ViewIdentity ViewIdentity =>
+        s_ViewIdentitys.GetValue(this, static state => state.BuildViewIdentity());
 
-    private static readonly ConditionalWeakTable<
-        ImmutableDictionary<EventLogId, EventColumnView>,
-        ConcurrentDictionary<object, CombinedColumnView>> s_viewsByGeneration = [];
-
-    public IEventColumnView DisplayedEventsForTab(LogView tab)
+    internal bool OrderingIsStale
     {
-        if (tab.GroupId is null) { return EventsForLog(tab.Id); }
+        get
+        {
+            var activeTable = EventTables.FirstOrDefault(table => table.Id == ActiveEventLogId);
 
-        if (tab.GroupId.Value.IsAll) { return DisplayedEvents; }
+            if (activeTable is null) { return false; }
+
+            if (activeTable.GroupId is null) { return OrderingIsStaleForLog(activeTable.Id); }
+
+            if (IsCombinedOrderedViewCurrent(activeTable) && ActiveOrderedView != null) { return false; }
+
+            if (!activeTable.GroupId.Value.IsAll &&
+                Groups.All(candidate => candidate.Id != activeTable.GroupId.Value))
+            {
+                return false;
+            }
+
+            return IsRetainedViewServable(activeTable.Id) &&
+                RetainedOrderedViews[activeTable.Id].Config != SortContext;
+        }
+    }
+
+    private bool OrderingIsStaleForLog(EventLogId logId)
+    {
+        if (IsOrderedViewServing(logId) && ActiveOrderedView != null) { return false; }
+
+        return IsRetainedViewServable(logId) &&
+            RetainedOrderedViews[logId].Config != SortContext;
+    }
+
+    public IEventColumnView DisplayedEventsForTab(LogView tab) =>
+        RoutedReadyForTab(tab)?.View ?? EmptyColumnView.Instance;
+
+    internal ViewContentToken ContentTokenForTab(LogView tab) =>
+        RoutedReadyForTab(tab)?.ContentToken ?? ViewContentToken.Empty;
+
+    private OrderedViewReady? RoutedReadyForTab(LogView tab)
+    {
+        if (tab.GroupId is null) { return RoutedReadyForLog(tab.Id); }
+
+        if (tab.GroupId.Value.IsAll)
+        {
+            return IsCombinedOrderedViewCurrent(tab) && ActiveOrderedView != null ?
+                ActiveOrderedView :
+                RetainedReadyFor(tab.Id);
+        }
 
         var group = Groups.FirstOrDefault(candidate => candidate.Id == tab.GroupId.Value);
 
-        return group is null ? CombinedColumnView.Empty : GroupView(group);
+        if (group is null) { return null; }
+
+        return IsCombinedOrderedViewCurrent(tab) && ActiveOrderedView != null ?
+            ActiveOrderedView :
+            RetainedReadyFor(tab.Id);
     }
 
-    private IEventColumnView AllLogsView() =>
-        InnerCache().GetOrAdd(
-            s_allLogsKey,
-            static (_, perLog) => new CombinedColumnView([.. perLog.Values], perLog.Values.First().Context),
-            PerLogEvents);
+    internal IEventColumnView EventsForLog(EventLogId logId) =>
+        RoutedReadyForLog(logId)?.View ?? EmptyColumnView.Instance;
 
-    private IEventColumnView GroupView(LogTabGroup group)
+    private OrderedViewReady? RoutedReadyForLog(EventLogId logId)
     {
-        EventColumnView? firstPresent = null;
-        int presentCount = 0;
-
-        foreach (var memberId in group.MemberIds)
+        if (IsOrderedViewServing(logId) && ActiveOrderedView != null)
         {
-            if (PerLogEvents.TryGetValue(memberId, out var view))
-            {
-                firstPresent ??= view;
-                presentCount++;
-            }
+            return ActiveOrderedView;
         }
 
-        if (presentCount == 0) { return CombinedColumnView.Empty; }
-
-        if (presentCount == 1) { return firstPresent!; }
-
-        return InnerCache().GetOrAdd(
-            group.MemberIds,
-            static (_, args) => BuildGroupView(args.PerLogEvents, args.MemberIds),
-            (PerLogEvents, group.MemberIds));
+        return RetainedReadyFor(logId);
     }
 
-    private static CombinedColumnView BuildGroupView(
-        ImmutableDictionary<EventLogId, EventColumnView> perLog,
-        ImmutableHashSet<EventLogId> memberIds)
+    internal ImmutableDictionary<EventLogId, OrderedViewReady> RetainOnly(OrderedViewReady served)
     {
-        var views = new List<EventColumnView>(memberIds.Count);
+        if (served.Identity?.ActiveLogId is not { } servedTabId) { return RetainedOrderedViews; }
 
-        foreach (var memberId in memberIds)
+        var openTabIds = EventTables.Select(table => table.Id).ToHashSet();
+
+        var pruned = RetainedOrderedViews;
+
+        foreach (var tabId in RetainedOrderedViews.Keys)
         {
-            if (perLog.TryGetValue(memberId, out var view)) { views.Add(view); }
+            if (!openTabIds.Contains(tabId)) { pruned = pruned.Remove(tabId); }
         }
 
-        return new CombinedColumnView(views, views[0].Context);
+        return openTabIds.Contains(servedTabId) ? pruned.SetItem(servedTabId, served) : pruned;
     }
 
-    private ConcurrentDictionary<object, CombinedColumnView> InnerCache() =>
-        s_viewsByGeneration.GetValue(
-            PerLogEvents, static _ => new ConcurrentDictionary<object, CombinedColumnView>());
+    internal LogTableState WithClearedOrderedViewRetention() =>
+        this with
+        {
+            ActiveOrderedView = null,
+            RetainedOrderedViews = ImmutableDictionary<EventLogId, OrderedViewReady>.Empty
+        };
 
-    // Caller guarantees PerLogEvents.Count == 1. Use the struct enumerator, not LINQ .Values.First(), to avoid boxing
-    // on this render-path read.
-    private EventColumnView SingleLogDisplayList()
-    {
-        using var enumerator = PerLogEvents.GetEnumerator();
-        enumerator.MoveNext();
+    private OrderedViewReady? RetainedReadyFor(EventLogId tabId) =>
+        IsRetainedViewServable(tabId) ? RetainedOrderedViews[tabId] : null;
 
-        return enumerator.Current.Value;
-    }
+    internal bool IsRetainedViewServable(EventLogId tabId) =>
+        tabId == ActiveEventLogId &&
+        RetainedOrderedViews.TryGetValue(tabId, out var retained) &&
+        retained.Identity is { } identity &&
+        identity.Scope.SequenceEqual(ActiveScope()) &&
+        retained.Config == CommittedSortContext &&
+        !retained.Filter.HasFilteringChangedFrom(AppliedFilter);
 
-    public IEventColumnView EventsForLog(EventLogId logId) =>
-        PerLogEvents.TryGetValue(logId, out var view) ? view : CombinedColumnView.Empty;
+    internal bool IsOrderedViewServing(EventLogId logId) =>
+        OrderedViewDisplayEnabled &&
+        ActiveOrderedView != null &&
+        ActiveOrderedView.SingleLogId == logId &&
+        logId == ActiveEventLogId &&
+        !HasPendingSortChange &&
+        ActiveOrderedView.Config == SortContext &&
+        !ActiveOrderedView.Filter.HasFilteringChangedFrom(AppliedFilter);
+
+    // is not serving simply falls back to its retained-or-empty view. The tab must be the active one (the engine holds exactly one
+    // scope - the active tab's), and the view must have been published for the identity this state is asking for. That
+    // identity CARRIES the active tab's resolved scope, so identity equality already proves the engine's scope is exactly this
+    // tab's membership - no separate AllLogs/group set comparison is needed. Grouped display routes under exactly the fence
+    // ungrouped already uses: HasPendingSortChange covers the group members, and SortContext is built from the requested
+    // pair, so !HasPendingSortChange with Config == SortContext proves the routed view was ordered under the very GroupBy
+    // the pane is about to group it by (see LogTablePane.RebuildGroupedRowView).
+    private bool IsCombinedOrderedViewCurrent(LogView tab) =>
+        OrderedViewDisplayEnabled &&
+        ActiveOrderedView != null &&
+        tab.Id == ActiveEventLogId &&
+        !HasPendingSortChange &&
+        ActiveOrderedView.Identity == ViewIdentity &&
+        ActiveOrderedView.Config == SortContext &&
+
+        // SEMANTIC, not `==`: Filter's record equality is reference-based on its collections, while the identity above
+        // compares filters semantically. A reference check here would reject a view whose identity already matched -
+        // e.g. re-applying an equivalent filter built from fresh collections - and park the display on the fallback view
+        // with no further request to repair it.
+        !ActiveOrderedView.Filter.HasFilteringChangedFrom(AppliedFilter);
 
     public IEventColumnView GetActiveDisplayedEvents()
     {
         var activeTable = EventTables.FirstOrDefault(table => table.Id == ActiveEventLogId);
 
-        return activeTable is null ? CombinedColumnView.Empty : DisplayedEventsForTab(activeTable);
+        return activeTable is null ? EmptyColumnView.Instance : DisplayedEventsForTab(activeTable);
     }
 
-    public IReadOnlyList<ColumnName> GetOrderedEnabledColumns(ILogTableColumnDefaultsProvider columnDefaults)
+    internal PresentationState PresentationState
+    {
+        get
+        {
+            var activeTable = EventTables.FirstOrDefault(table => table.Id == ActiveEventLogId);
+
+            if (activeTable is null) { return PresentationState.Current; }
+
+            if (activeTable.GroupId is { IsAll: false } groupId &&
+                Groups.All(candidate => candidate.Id != groupId))
+            {
+                return PresentationState.Current;
+            }
+
+            if (!OrderedViewDisplayEnabled) { return PresentationState.Faulted; }
+
+            return ServingOrderedView != null ? PresentationState.Current : PresentationState.Updating;
+        }
+    }
+
+    internal OrderedViewReady? ServingOrderedView
+    {
+        get
+        {
+            if (ActiveOrderedView is null) { return null; }
+
+            var activeTable = EventTables.FirstOrDefault(table => table.Id == ActiveEventLogId);
+
+            if (activeTable is null) { return null; }
+
+            bool serving = activeTable.GroupId is null ?
+                IsOrderedViewServing(activeTable.Id) :
+                IsCombinedOrderedViewCurrent(activeTable);
+
+            return serving ? ActiveOrderedView : null;
+        }
+    }
+
+    public IReadOnlyList<ColumnName> GetOrderedEnabledColumns(ILogTableColumnDefaultsProvider columnDefaults) =>
+        ResolveOrderedEnabledColumns(Columns, ColumnOrder, columnDefaults);
+
+    public static IReadOnlyList<ColumnName> ResolveOrderedEnabledColumns(
+        ImmutableDictionary<ColumnName, bool> columns,
+        ImmutableList<ColumnName> columnOrder,
+        ILogTableColumnDefaultsProvider columnDefaults)
     {
         ArgumentNullException.ThrowIfNull(columnDefaults);
 
-        var enabledColumns = Columns
+        var enabledColumns = columns
             .Where(column => column.Value)
             .Select(column => column.Key)
             .ToHashSet();
 
-        var order = ColumnOrder.IsEmpty ? columnDefaults.ColumnOrder : ColumnOrder;
+        var order = columnOrder.IsEmpty ? columnDefaults.ColumnOrder : columnOrder;
 
         HashSet<ColumnName> present = [];
         List<ColumnName> ordered = [];
 
-        // De-duplicate while preserving first occurrence: a persisted ColumnOrder may contain duplicates
-        // that would otherwise become duplicate export headers (rejected by TabularExportWriter).
         foreach (var column in order)
         {
             if (enabledColumns.Contains(column) && present.Add(column))
@@ -196,8 +356,6 @@ public sealed record LogTableState
             }
         }
 
-        // Append any enabled column missing from the active order (e.g. enabled but absent from a persisted
-        // ColumnOrder) so it is never silently dropped from the table or an export.
         foreach (var column in columnDefaults.ColumnOrder)
         {
             if (enabledColumns.Contains(column) && present.Add(column))
@@ -211,52 +369,4 @@ public sealed record LogTableState
 
     public bool IsGroupCollapsed(string groupKey) =>
         GroupsCollapsedByDefault ^ GroupCollapseOverrides.Contains(groupKey);
-
-    // Each call must carry a single log's events (one OwningLog).
-    internal LogTableState WithLogEvents(EventLogId logId, params ResolvedEvent[] events)
-    {
-        for (int i = 1; i < events.Length; i++)
-        {
-            if (!string.Equals(events[i].OwningLog, events[0].OwningLog, StringComparison.Ordinal))
-            {
-                throw new ArgumentException("All events must share one OwningLog.", nameof(events));
-            }
-        }
-
-        int newCount = PerLogEvents.ContainsKey(logId) ? PerLogEvents.Count : PerLogEvents.Count + 1;
-
-        var context = new SortContext(
-            ResolvedEventOrdering.ResolveDefaultOrderBy(OrderBy, GroupBy, newCount, TimelineVisible),
-            IsDescending,
-            GroupBy,
-            IsGroupDescending);
-
-        var builder = PerLogEvents.ToBuilder();
-        builder[logId] = BuildUnfilteredView(logId, events, context);
-
-        foreach (var (id, view) in PerLogEvents)
-        {
-            if (id != logId && !view.HasContext(context))
-            {
-                builder[id] = view.WithContext(context);
-            }
-        }
-
-        return this with { PerLogEvents = builder.ToImmutable() };
-    }
-
-    // Seeds a display view directly from unfiltered events (test/reconcile helper); with no filter every physical row
-    // survives.
-    private static EventColumnView BuildUnfilteredView(
-        EventLogId logId,
-        IReadOnlyList<ResolvedEvent> events,
-        SortContext context)
-    {
-        var reader = EventColumnStore.Build(events, 0, 0).CreateReader(logId);
-        int[] survivors = new int[reader.Count];
-
-        for (int i = 0; i < survivors.Length; i++) { survivors[i] = i; }
-
-        return EventColumnView.Create(reader, survivors, context);
-    }
 }
