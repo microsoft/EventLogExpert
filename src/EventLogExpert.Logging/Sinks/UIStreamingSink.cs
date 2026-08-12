@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Logging.Sinks;
 
-public sealed class UiStreamingSink(IProgress<LogRecord> progress, LogLevel minimumLevel) : ILogSink
+public sealed class UIStreamingSink(IProgress<LogRecord> progress, LogLevel minimumLevel) : ILogSink
 {
     private readonly IProgress<LogRecord> _progress = progress ?? throw new ArgumentNullException(nameof(progress));
 

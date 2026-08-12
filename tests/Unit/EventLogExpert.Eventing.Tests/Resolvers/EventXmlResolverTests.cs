@@ -9,6 +9,8 @@ namespace EventLogExpert.Eventing.Tests.Resolvers;
 
 public sealed class EventXmlResolverTests
 {
+    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(5);
+
     [Fact]
     public async Task ClearAll_RemovesEveryEntry()
     {
@@ -42,11 +44,9 @@ public sealed class EventXmlResolverTests
 
         resolver.ClearXmlCacheForLog("A");
 
-        // B is untouched.
         await resolver.GetXmlAsync(evtB1, TestContext.Current.CancellationToken);
         Assert.Equal(3, getResolveCallCount());
 
-        // A entries were evicted; both are re-resolved.
         await resolver.GetXmlAsync(evtA1, TestContext.Current.CancellationToken);
         await resolver.GetXmlAsync(evtA2, TestContext.Current.CancellationToken);
         Assert.Equal(5, getResolveCallCount());
@@ -55,7 +55,6 @@ public sealed class EventXmlResolverTests
     [Fact]
     public async Task GetXmlAsync_AtCapacity_EvictsLeastRecentlyUsed()
     {
-        // Initial = max = 2, so eviction kicks in once we exceed 2 entries.
         var resolver = CreateBoundedTrackingResolver(
             key => $"<xml log='{key.OwningLog}' id='{key.RecordId}'/>",
             out var getResolveCallCount,
@@ -68,16 +67,13 @@ public sealed class EventXmlResolverTests
 
         await resolver.GetXmlAsync(evtA, TestContext.Current.CancellationToken);
         await resolver.GetXmlAsync(evtB, TestContext.Current.CancellationToken);
-        // Touch A so B becomes the least-recently-used entry.
         await resolver.GetXmlAsync(evtA, TestContext.Current.CancellationToken);
         await resolver.GetXmlAsync(evtC, TestContext.Current.CancellationToken);
 
-        // A and C should still be cached (B was evicted as LRU); A re-request must not re-resolve.
         await resolver.GetXmlAsync(evtA, TestContext.Current.CancellationToken);
         await resolver.GetXmlAsync(evtC, TestContext.Current.CancellationToken);
         Assert.Equal(3, getResolveCallCount());
 
-        // Re-requesting B triggers another resolve since it was evicted.
         await resolver.GetXmlAsync(evtB, TestContext.Current.CancellationToken);
         Assert.Equal(4, getResolveCallCount());
     }
@@ -89,7 +85,7 @@ public sealed class EventXmlResolverTests
         var resolver = CreateTrackingResolver(
             _ =>
             {
-                gate.Wait(TimeSpan.FromSeconds(5));
+                gate.Wait(s_testTimeout);
 
                 return "<xml/>";
             },

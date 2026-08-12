@@ -8,6 +8,8 @@ namespace EventLogExpert.ElevationHelper.IntegrationTests.Ipc;
 
 public sealed class IpcMessageWriterTests
 {
+    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(2);
+
     [Fact]
     public async Task DisposeAsync_CalledTwice_DoesNotThrow()
     {
@@ -58,7 +60,7 @@ public sealed class IpcMessageWriterTests
 
         var disposeTask = writer.DisposeAsync().AsTask();
 
-        var completed = await Task.WhenAny(secondWrite, Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken));
+        var completed = await Task.WhenAny(secondWrite, Task.Delay(s_testTimeout, TestContext.Current.CancellationToken));
         Assert.Same(secondWrite, completed);
 
         stream.ReleaseFirstWrite();

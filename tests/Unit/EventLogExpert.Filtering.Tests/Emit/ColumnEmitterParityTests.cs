@@ -11,15 +11,6 @@ using EventLogExpert.Filtering.Tests.TestUtils;
 
 namespace EventLogExpert.Filtering.Tests.Emit;
 
-/// <summary>
-///     Differential parity gate for the column-direct backend. Every battery expression is compiled by both backends;
-///     for each synthetic corpus event the column tri-state result must equal the row oracle (
-///     <c>Evaluate ?? (Predicate ? Match : NoMatch)</c>). Running the column emitter over the row-backed
-///     <see cref="LegacyEventColumnReader" /> isolates the emitter-arm logic; the store parity tests already prove the
-///     real column store reads identically to the legacy reader, so column-over-store equals column-over-legacy
-///     transitively. The corpus deliberately exercises every null/absence case (null UserId, absent nullable ids,
-///     empty/present Xml, multi-value EventData with an absent named field, present + truncated + absent UserData paths).
-/// </summary>
 public sealed class ColumnEmitterParityTests
 {
     private static readonly ResolvedEvent s_eventDataOther =
@@ -31,6 +22,7 @@ public sealed class ColumnEmitterParityTests
         ("Path", @"C:\Windows\System32\cmd.exe"),
         ("Dup", "first"),
         ("Dup", "second"));
+
     private static readonly ResolvedEvent s_readerEnablerEvent = new("TestLog", LogPathType.Channel)
     {
         Id = 700,
@@ -54,7 +46,7 @@ public sealed class ColumnEmitterParityTests
             new UserDataField("Trunc", ["y"], IsTruncated: true)
         ]
     };
-    private static readonly IReadOnlyList<ResolvedEvent> s_corpus =
+    private static readonly IReadOnlyList<ResolvedEvent> s_sample =
     [
         FilterTestFixtures.FullyPopulated,
         FilterTestFixtures.NoNullables,
@@ -68,37 +60,23 @@ public sealed class ColumnEmitterParityTests
         s_userDataIncompleteEvent,
         s_readerEnablerEvent
     ];
+    private static readonly IEventColumnReader s_reader = EventColumnStore
+        .Build([.. s_sample], generation: 1, contentVersion: 1)
+        .CreateReader(EventLogId.Create());
 
-    // Index 1 is FilterTestFixtures.NoNullables: the null-UserId + absent-nullable-ids event that drives the null-vs-present asymmetry.
-
-    // Multi-value EventData: typed values (Int64/bool), a duplicate name (first-wins), and a probed-absent name ("Missing").
-
-    private static readonly LegacyEventColumnReader s_reader =
-        new(EventLogId.Create(), generation: 1, contentVersion: 1, s_corpus);
-
-    // UserDataIncomplete: an absent key yields a keep-visible truncated (not decisive-absent) result.
-
-    /// <summary>
-    ///     The parity battery, each expression tagged with the arm it exercises and the null/absence case(s) it
-    ///     exercises. Every expression compiles on both backends and is differentially checked against all eleven corpus
-    ///     events.
-    /// </summary>
     public static TheoryData<string> DifferentialBattery =>
     [
-        // AndNode / OrNode: lazy tri-state combine (2/3-way, nested, short-circuit).
         "Id == 100 && Source == \"TestSource\"",
         "Id == 100 || Id == 200",
         "(Id == 100 || Id == 200) && Level == \"Error\"",
         "Id == 100 && Source == \"TestSource\" && Level == \"Error\" && ComputerName == \"SERVER01\"",
         "Id == 100 || Id == 200 || Id == 300 || Id == 400",
 
-        // NotNode: general !inner lifted (over scalar, string, and nullable comparisons).
         "!(Id == 100)",
         "!(Source == \"TestSource\")",
         "!(ProcessId == 4)",
         "!(ProcessId != 4)",
 
-        // ComparisonNode typed scalar: Id (non-nullable) and nullable ids.
         "Id == 100",
         "Id != 100",
         "Id > 100",
@@ -116,7 +94,6 @@ public sealed class ColumnEmitterParityTests
         "ActivityId == \"11111111-2222-3333-4444-555555555555\"",
         "ActivityId != \"11111111-2222-3333-4444-555555555555\"",
 
-        // ComparisonNode string-form: string props (always String kind), Id/nullable-id ToString ("" branch).
         "Source == \"TestSource\"",
         "Source != \"TestSource\"",
         "ComputerName == \"SERVER01\"",
@@ -126,11 +103,9 @@ public sealed class ColumnEmitterParityTests
         "ProcessId.ToString() == \"4\"",
         "ProcessId.ToString() != \"4\"",
 
-        // UserId string-form (presence-required): the paired null-guard folds into a single UserId comparison.
         "UserId != null && UserId.Value == \"S-1-5-18\"",
         "UserId != null && UserId.Value != \"S-1-5-18\"",
 
-        // ContainsNode: string props, numeric-id ToString form, UserId (presence-required), and the NOT(UserId.Contains) special.
         "Source.Contains(\"Test\")",
         "Source.Contains(\"test\", StringComparison.OrdinalIgnoreCase)",
         "Description.Contains(\"error occurred\", StringComparison.OrdinalIgnoreCase)",
@@ -140,7 +115,6 @@ public sealed class ColumnEmitterParityTests
         "UserId != null && UserId.Value.Contains(\"S-1-5\", StringComparison.OrdinalIgnoreCase)",
         "UserId != null && !UserId.Value.Contains(\"S-1-5-99\", StringComparison.OrdinalIgnoreCase)",
 
-        // ComparisonNode null-literal (EmitNullComparison): nullable ids, UserId, string props, Id.
         "ProcessId == null",
         "ProcessId != null",
         "ThreadId == null",
@@ -154,10 +128,6 @@ public sealed class ColumnEmitterParityTests
         "Id == null",
         "Id != null",
 
-        // MultiEqualsNode: Int (Id), String (Level, Source), nullable-int absent guard (ProcessId), the
-        // presence-required UserId arm (exercised over the null-UserId corpus event), and the RecordId/ActivityId
-        // dispatch. All reachable via the ordinary array-contains path (Lowerer.ResolveFieldOrToString ->
-        // PropertyResolver), NOT the UserId null-guard collapse.
         "(new[] {\"100\", \"200\"}).Contains(Id.ToString())",
         "(new[] {\"Error\", \"Warning\"}).Contains(Level.ToString())",
         "(new[] {\"TestSource\", \"OtherSource\"}).Contains(Source)",
@@ -166,8 +136,6 @@ public sealed class ColumnEmitterParityTests
         "(new[] {\"1234567890123\", \"999\"}).Contains(RecordId.ToString())",
         "(new[] {\"11111111-2222-3333-4444-555555555555\"}).Contains(ActivityId.ToString())",
 
-        // Multi-select honoring the operator over scalar strings: Is Any Of / Contains Any / Is None Of / Contains
-        // None, including presence-required UserId (corpus[1] NoNullables has a null UserId) and Opcode.
         "(new[] {\"Test\", \"Other\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))",
         "!(new[] {\"TestSource\"}).Contains(Source)",
         "!(new[] {\"Test\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))",
@@ -178,7 +146,6 @@ public sealed class ColumnEmitterParityTests
         "!(new[] {\"S-1-5-99\"}).Contains(UserId)",
         "!(new[] {\"S-1-5-99\"}).Any(e => UserId.Contains(e, StringComparison.OrdinalIgnoreCase))",
 
-        // EventData exact-name (presence-required, all ops; typed coercion; duplicate-name first-wins; absent name).
         "EventData[\"User\"] == \"admin\"",
         "EventData[\"User\"] != \"admin\"",
         "EventData[\"User\"] != \"other\"",
@@ -194,7 +161,6 @@ public sealed class ColumnEmitterParityTests
         "EventData[\"Missing\"] == \"x\"",
         "EventData[\"Missing\"] != \"x\"",
 
-        // UserData exact-path (tri-state via the shared UserDataMatch core): present, truncated, incomplete, absent, nested.
         "UserData[\"Foo\"] == \"adminvalue\"",
         "UserData[\"Foo\"] != \"adminvalue\"",
         "UserData[\"Foo\"].Contains(\"admin\", StringComparison.OrdinalIgnoreCase)",
@@ -208,21 +174,15 @@ public sealed class ColumnEmitterParityTests
         "UserData[\"Absent\"] == \"x\"",
         "UserData[\"Foo/Bar\"] == \"x\"",
 
-        // Mixed UserData + scalar: tri-state combine of a decisive scalar arm with a tri-state UserData arm.
         "Id == 100 && UserData[\"Foo\"] == \"adminvalue\"",
         "Id == 999 || UserData[\"Foo\"] == \"adminvalue\"",
         "Id == 100 && Xml.Contains(\"data\")",
 
-        // P2-4b Keywords.Any (three lowered shapes): positive over corpus[0] (Keywords [Audit, System]), negative
-        // elsewhere. The ordinal MatchAnyOf shape with lowercase needles matches nothing; the "System" shape matches corpus[0].
         "Keywords.Any(e => string.Equals(e, \"Audit\", StringComparison.OrdinalIgnoreCase))",
         "Keywords.Any(e => e.Contains(\"audit\", StringComparison.OrdinalIgnoreCase))",
         "Keywords.Any(e => (new[] {\"audit\", \"system\"}).Contains(e))",
         "Keywords.Any(e => (new[] {\"System\", \"Nope\"}).Contains(e))",
 
-        // P2-4b wildcard EventData field names (positional enumeration over corpus[6] rich EventData): exact-op equality
-        // AND inequality, Contains, MultiEquals, the non-first duplicate ("Du*" must reach the 2nd Dup -> "second"), and
-        // empty-match globs.
         "EventData[\"Us*\"] == \"admin\"",
         "EventData[\"Us*\"] != \"admin\"",
         "EventData[\"Pat*\"].Contains(\"cmd\", StringComparison.OrdinalIgnoreCase)",
@@ -232,9 +192,6 @@ public sealed class ColumnEmitterParityTests
         "EventData[\"*zzz*\"] == \"x\"",
         "EventData[\"*cert*\"] == \"x\"",
 
-        // Opcode (pooled string) + RelatedActivityId (nullable Guid): the reader-enabler fields. Opcode exercises the
-        // string-form, Contains, and MultiEquals(String) arms; RelatedActivityId exercises the typed-Guid, ToString
-        // Contains/MultiEquals, and null-comparison arms. corpus[10] sets both; every other event leaves them empty/null.
         "Opcode == \"Start\"",
         "Opcode != \"Start\"",
         "Opcode.Contains(\"tar\", StringComparison.OrdinalIgnoreCase)",
@@ -246,8 +203,6 @@ public sealed class ColumnEmitterParityTests
         "RelatedActivityId.ToString().Contains(\"aaaa\", StringComparison.OrdinalIgnoreCase)",
         "(new[] {\"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\"}).Contains(RelatedActivityId.ToString())",
 
-        // P2-4b glob UserData paths (tri-state): present match on corpus[8] Foo, truncated Trunc -> Unknown, and the
-        // incomplete-tail Unknown over corpus[9] (UserDataIncomplete, no path matches -> keep-visible Unknown).
         "UserData[\"*oo\"] == \"adminvalue\"",
         "UserData[\"Tr*\"].Contains(\"y\")",
         "(new[] {\"zzz\", \"admin\"}).Any(e => UserData[\"*oo\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
@@ -257,7 +212,7 @@ public sealed class ColumnEmitterParityTests
 
     [Theory]
     [MemberData(nameof(DifferentialBattery))]
-    public void ColumnBackend_MatchesRowOracle_AcrossCorpus(string expression)
+    public void ColumnBackend_MatchesRowOracle_AcrossSample(string expression)
     {
         Assert.True(
             FilterParser.TryCompile(expression, out CompiledFilter? row, out var rowError),
@@ -268,20 +223,17 @@ public sealed class ColumnEmitterParityTests
 
         Assert.Equal(row.RequiresXml, column.RequiresXml);
 
-        for (var index = 0; index < s_corpus.Count; index++)
+        for (var index = 0; index < s_sample.Count; index++)
         {
-            FilterMatch expected = Oracle(row, s_corpus[index]);
+            FilterMatch expected = Oracle(row, s_sample[index]);
             FilterMatch actual = column.Evaluate(s_reader, s_reader.LocatorAt(index));
 
             Assert.True(
                 expected == actual,
-                $"Divergence at corpus[{index}] for '{expression}': row={expected}, column={actual}.");
+                $"Divergence at sample[{index}] for '{expression}': row={expected}, column={actual}.");
         }
     }
 
-    // Absolute (not differential) oracle for EventData Contains-Any: first-needle match, second-needle match,
-    // present-but-no-needle NoMatch, and an ABSENT named field NoMatch (presence-required). Also pins the wildcard
-    // field-name path. Exact results on BOTH backends catch a same-direction emitter bug the differential battery can't.
     [Fact]
     public void EventDataContainsAny_Absolute_MatchesAnyNeedleAndRequiresPresence()
     {
@@ -325,15 +277,12 @@ public sealed class ColumnEmitterParityTests
             s_eventDataRich,
             FilterMatch.NoMatch);
 
-        // A typed EventData value (Code = 5L) is coerced to string for the substring test.
         AssertBothBackends(
             "(new[] {\"5\", \"zzz\"}).Any(e => EventData[\"Code\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
             s_eventDataRich,
             FilterMatch.Match);
     }
 
-    // MultiContains on Xml is reachable only via Advanced text (Xml is text-only in Basic), but the compiled filter
-    // must still flag RequiresXml on both backends so the columnar reader materializes Xml before evaluation.
     [Fact]
     public void MultiContains_OnXml_FlagsRequiresXmlOnBothBackends()
     {
@@ -348,8 +297,6 @@ public sealed class ColumnEmitterParityTests
         Assert.True(column.RequiresXml);
     }
 
-    // Presence-required UserId: an absent UserId is NoMatch for ALL FOUR Many operators on BOTH backends. Locks the
-    // negation-presence invariant so "is none of" / "contains none" don't wrongly match a missing UserId.
     [Fact]
     public void MultiSelectOperators_AbsentUserId_IsNoMatchForAllFourOperators()
     {
@@ -367,8 +314,6 @@ public sealed class ColumnEmitterParityTests
             FilterMatch.NoMatch);
     }
 
-    // Multi-select honoring the operator over a scalar string field: exact (not differential) results pin the four Many
-    // shapes (Is Any Of / Contains Any / Is None Of / Contains None) on BOTH backends.
     [Fact]
     public void MultiSelectOperators_Absolute_OverScalarString()
     {
@@ -396,7 +341,6 @@ public sealed class ColumnEmitterParityTests
             otherSource,
             FilterMatch.Match);
 
-        // Second-element match: the "any of" must scan the whole list, not just element 0.
         AssertBothBackends("(new[] {\"Nope\", \"OtherSource\"}).Contains(Source)", otherSource, FilterMatch.Match);
         AssertBothBackends(
             "(new[] {\"Nope\", \"Other\"}).Any(e => Source.Contains(e, StringComparison.OrdinalIgnoreCase))",
@@ -409,8 +353,6 @@ public sealed class ColumnEmitterParityTests
             FilterMatch.NoMatch);
     }
 
-    // Absolute (not differential) oracle for the Opcode reader-enabler field: exact match results pin the string-compare
-    // semantics on BOTH backends, so a same-direction bug in both emitters cannot pass.
     [Fact]
     public void OpcodeEquals_Absolute_MatchesOnlyTheExactValue()
     {
@@ -424,16 +366,12 @@ public sealed class ColumnEmitterParityTests
         AssertBothBackends("Opcode.Contains(\"top\", StringComparison.OrdinalIgnoreCase)", stop, FilterMatch.Match);
     }
 
-    // A nullable numeric '!=' on an absent field is Match (typed lift), unlike the presence-required UserId arms.
     [Fact]
     public void ProcessIdNotEquals_OverAbsentProcessId_IsMatch()
     {
         AssertBothBackends("ProcessId != 5", FilterTestFixtures.NoNullables, FilterMatch.Match);
     }
 
-    // Absolute oracle for the RelatedActivityId reader-enabler field: the typed-Guid equality and the null comparison must
-    // distinguish a specific Guid, a different Guid, absent (null), and present-but-Guid.Empty (the has-value flag makes
-    // Guid.Empty a real value, NOT the same as absent).
     [Fact]
     public void RelatedActivityIdComparisons_Absolute_DistinguishGuidNullAndEmpty()
     {
@@ -455,10 +393,6 @@ public sealed class ColumnEmitterParityTests
         AssertBothBackends("RelatedActivityId != null", eventEmpty, FilterMatch.Match);
     }
 
-    // Absolute oracle for UserData Contains-Any (tri-state via the shared UserDataMatch.MultiContains core): needle match,
-    // second-needle match, complete-present no-match (NoMatch), an absent path (decisive NoMatch), and a TRUNCATED
-    // non-match (Unknown - the elided tail could contain a needle). Pins the tri-state on BOTH backends so a
-    // Unknown->NoMatch regression in the shared core cannot pass the differential battery. Also pins the wildcard path.
     [Fact]
     public void UserDataContainsAny_Absolute_TriStateAcrossPresentAbsentTruncated()
     {
@@ -475,33 +409,27 @@ public sealed class ColumnEmitterParityTests
             s_userDataPresentTruncated,
             FilterMatch.NoMatch);
 
-        // "Absent" is not present and the event is not UserDataIncomplete: decisive absent -> NoMatch.
         AssertBothBackends(
             "(new[] {\"admin\"}).Any(e => UserData[\"Absent\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
             s_userDataPresentTruncated,
             FilterMatch.NoMatch);
 
-        // "Trunc" is truncated and no visible needle matches -> Unknown (keep-visible; the hidden tail could match).
         AssertBothBackends(
             "(new[] {\"zzz\", \"nomatch\"}).Any(e => UserData[\"Trunc\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
             s_userDataPresentTruncated,
             FilterMatch.Unknown);
 
-        // Wildcard path resolves to "Foo": match pinned.
         AssertBothBackends(
             "(new[] {\"admin\"}).Any(e => UserData[\"*oo\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
             s_userDataPresentTruncated,
             FilterMatch.Match);
 
-        // An ABSENT path on an INCOMPLETE UserData event cannot be decided absent -> Unknown (keep-visible), unlike the
-        // decisive NoMatch an absent path yields on a complete event.
         AssertBothBackends(
             "(new[] {\"anything\"}).Any(e => UserData[\"Absent\"].Contains(e, StringComparison.OrdinalIgnoreCase))",
             s_userDataIncompleteEvent,
             FilterMatch.Unknown);
     }
 
-    // UserId '==' on an absent UserId is NoMatch (presence-required).
     [Fact]
     public void UserIdEquals_OverNullUserId_IsNoMatch()
     {
@@ -511,7 +439,6 @@ public sealed class ColumnEmitterParityTests
             FilterMatch.NoMatch);
     }
 
-    // NOT(UserId.Contains) is presence-required, so an absent UserId is NoMatch (not the naive !inner Match).
     [Fact]
     public void UserIdNotContains_OverNullUserId_IsNoMatch()
     {
@@ -521,7 +448,6 @@ public sealed class ColumnEmitterParityTests
             FilterMatch.NoMatch);
     }
 
-    // UserId '!=' on an absent UserId is NoMatch (presence-required), the asymmetry counterpart to ProcessId != 5.
     [Fact]
     public void UserIdNotEquals_OverNullUserId_IsNoMatch()
     {
@@ -540,7 +466,7 @@ public sealed class ColumnEmitterParityTests
             FilterParser.TryCompileColumn(expression, out ColumnCompiledFilter? column, out var columnError),
             $"Column backend failed to compile '{expression}': {columnError}");
 
-        var reader = new LegacyEventColumnReader(EventLogId.Create(), generation: 1, contentVersion: 1, [resolvedEvent]);
+        var reader = EventColumnStore.Build([resolvedEvent], generation: 1, contentVersion: 1).CreateReader(EventLogId.Create());
 
         Assert.Equal(expected, Oracle(row, resolvedEvent));
         Assert.Equal(expected, column.Evaluate(reader, reader.LocatorAt(0)));

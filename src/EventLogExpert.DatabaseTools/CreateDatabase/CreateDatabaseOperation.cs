@@ -7,7 +7,6 @@ using EventLogExpert.Eventing.OfflineImaging.Iso;
 using EventLogExpert.Eventing.OfflineImaging.VirtualDisk;
 using EventLogExpert.Eventing.OfflineImaging.Wim;
 using EventLogExpert.Eventing.OfflineImaging.Workspace;
-using EventLogExpert.Eventing.ProviderMetadata;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Database.Hashing;
@@ -21,12 +20,9 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 {
     private const int BatchSize = 100;
 
-    // SQLite at rest may include main, WAL, and SHM files; overwrite backup/restore must move all three together.
     private static readonly string[] s_databaseFileSuffixes = ["", "-wal", "-shm"];
 
-    // Set only after every sidecar backup moves; restore must not delete unmoved originals after a torn backup.
     private bool _overwriteBackupCompleted;
-
     private bool _overwriteBackupTaken;
 
     internal enum CreateDatabaseMode { Local, FileSource, OfflineImage }
@@ -43,7 +39,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             return DatabaseToolsOutcome.Failed;
         }
 
-        // Any stale .bak sidecar may be the sole surviving copy after an interrupted overwrite and must block retry.
         foreach (var suffix in s_databaseFileSuffixes)
         {
             var backupPath = request.TargetPath + suffix + ".bak";
@@ -69,7 +64,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             return DatabaseToolsOutcome.Failed;
         }
 
-        // Fail fast on destination ACL/CFA denial before expensive scan or extraction work begins.
         string targetDirectory = Path.GetDirectoryName(Path.GetFullPath(request.TargetPath)) ?? request.TargetPath;
         string? targetBlocked = OfflineScratch.ProbeWritable(targetDirectory);
 
@@ -98,7 +92,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             logger.Information($"{FormatSkippedProvidersMessage(excludeProviderNames.Count, request.SkipProvidersInFile)}");
         }
 
-        var filterRegex = EnsureBoundedTimeout(request.FilterRegex, TimeSpan.FromSeconds(5));
+        var filterRegex = EnsureBoundedTimeout(request.FilterRegex);
 
         var outcome = await CreateCoreAsync();
 
@@ -120,7 +114,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         var firstByIdentity = new Dictionary<ProviderIdentity, ProviderDetails>();
 #endif
 
-        // Create DbContext only after the first provider so failed scans leave no empty database.
         ProviderDbContext? dbContext = null;
         OfflineWimImage? wimImage = null;
         OfflineIsoImage? isoImage = null;
@@ -133,7 +126,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             string? effectiveOfflineImagePath = request.OfflineImagePath;
             OfflineImageKind? kind = mode == CreateDatabaseMode.OfflineImage ? ResolveImageKind(request) : null;
 
-            // WIM apply ignores cooperative cancellation on denied writes, so probe scratch ACLs before native extraction.
             if (kind is OfflineImageKind.Wim or OfflineImageKind.Iso)
             {
                 string? scratchBlocked = OfflineScratch.ProbeWritable(OfflineScratch.Root);
@@ -191,7 +183,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 effectiveOfflineImagePath = wimImage!.ExtractedRoot;
             }
 
-            // Offline providers already carry image provenance; only local builds read host provenance.
             IAsyncEnumerable<ProviderDetails> providersToAdd;
             SourceOsProvenance? sourceOsProvenance;
 
@@ -335,13 +326,11 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         {
             if (dbContext is not null) { await dbContext.DisposeAsync(); }
 
-            // Dispose extracted WIM after SaveChanges because persisted rows may still read from it.
             wimImage?.Dispose();
             isoImage?.Dispose();
             vhdxImage?.Dispose();
         }
 
-        // Never delete target files after a torn overwrite backup; they may be unmoved originals.
         async Task CleanupPartialUnlessUnmovedOriginalAsync()
         {
             if (_overwriteBackupTaken && !_overwriteBackupCompleted) { return; }
@@ -350,12 +339,10 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
         }
 
-        // Back up the old database before the writable context opens or creates target files.
         ProviderDbContext GetOrCreateContext()
         {
             if (request.Overwrite && !_overwriteBackupTaken && File.Exists(request.TargetPath))
             {
-                // Set before moving so a torn backup still enters restore.
                 _overwriteBackupTaken = true;
                 TakeOverwriteBackup();
                 _overwriteBackupCompleted = true;
@@ -383,10 +370,8 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
     internal static bool ValidateOfflineImageRequest(CreateDatabaseRequest request, ITraceLogger logger)
     {
-        // Kind-ambiguous validation errors are attributed to the Offline root; each resolved kind uses its fine category.
         ITraceLogger offlineLogger = logger.ForCategory(LogCategories.Offline);
 
-        // Reject orphan WIM options so the command cannot silently fall back to local providers.
         if (string.IsNullOrWhiteSpace(request.OfflineImagePath))
         {
             if (request.ImageKind is not null)
@@ -487,7 +472,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                     return false;
                 }
 
-                // Validator cannot mount ISO just to list choices; extraction reports bad indices after mount.
                 if (request.WimIndex is null)
                 {
                     isoLogger.Error(
@@ -693,7 +677,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         buffer.Clear();
     }
 
-    // Clear pools and remove aborted-build sidecars before restoring backups.
     private void RestoreOverwriteBackups(ITraceLogger logger)
     {
         var mainBackup = request.TargetPath + ".bak";
@@ -702,14 +685,12 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         {
             SqliteConnection.ClearAllPools();
 
-            // Only delete files after a complete backup; otherwise they may be unmoved originals.
             if (_overwriteBackupCompleted)
             {
                 foreach (var suffix in s_databaseFileSuffixes)
                 {
                     var newFile = request.TargetPath + suffix;
 
-                    // Never delete the main file unless its snapshot exists to take its place.
                     if (suffix.Length == 0 && !File.Exists(mainBackup)) { continue; }
 
                     if (File.Exists(newFile)) { File.Delete(newFile); }
@@ -731,7 +712,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
     }
 
-    // Stale-backup preflight guarantees every .bak move targets a free path.
     private void TakeOverwriteBackup()
     {
         foreach (var suffix in s_databaseFileSuffixes)
@@ -815,7 +795,6 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         Func<TModel, TModel, bool> areEquivalent)
         where TIdentity : notnull
     {
-        // Compare distinct identities both ways because the hash drops exact duplicate rows.
         var firstByIdentity = new Dictionary<TIdentity, TModel>(first.Count);
 
         foreach (TModel model in first) { firstByIdentity[identityOf(model)] = model; }

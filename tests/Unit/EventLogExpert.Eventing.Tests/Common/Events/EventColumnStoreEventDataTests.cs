@@ -17,74 +17,22 @@ public sealed class EventColumnStoreEventDataTests
     private static readonly string[] s_errorCodeUserDataPaths = ["CbsPackageChangeState/ErrorCode", "CbsUpdateChangeState/ErrorCode"];
 
     [Fact]
-    public void BucketTimeTicksByEventData_ClassifiesRowsByCodeWithOtherForNonTargets()
-    {
-        IEventColumnReader reader = ReaderFor(
-            Event("LogonType", 3L),
-            Event("LogonType", 3L),
-            Event("LogonType", 10L),
-            Event("LogonType", 7L)); // 7 is not a target -> Other
-
-        long[] targetCodes = [3, 10];
-        int slotCount = targetCodes.Length + 1;
-        int[] slotCounts = new int[slotCount];
-        reader.BucketTimeTicksByEventData(AllSurvive(reader.Count), 0, long.MaxValue, 1, "LogonType", targetCodes, slotCounts, CancellationToken.None);
-
-        Assert.Equal(2, slotCounts[0]); // code 3
-        Assert.Equal(1, slotCounts[1]); // code 10
-        Assert.Equal(1, slotCounts[2]); // Other (code 7)
-    }
-
-    [Fact]
-    public void BucketTimeTicksByEventData_IsAllocationFreeOnSealedRows()
-    {
-        // EventColumnStore.Build seals the whole batch. One schema means the field-index memo resolves once, so the
-        // per-row path performs no allocation; only the fixed per-scan memo array (int[schemaCount]) is charged.
-        var events = new ResolvedEvent[8192];
-
-        for (int index = 0; index < events.Length; index++)
-        {
-            events[index] = Event("LogonType", index % 3 == 0 ? 3L : 10L, index);
-        }
-
-        IEventColumnReader reader = EventColumnStore.Build(events, generation: 0, contentVersion: 0).CreateReader(s_logId);
-        int[] rank = AllSurvive(reader.Count);
-        long[] targetCodes = [3, 10];
-        int[] slotCounts = new int[targetCodes.Length + 1];
-
-        // Warm: first scan resolves the schema and JITs.
-        reader.BucketTimeTicksByEventData(rank, 0, long.MaxValue, 1, "LogonType", targetCodes, slotCounts, CancellationToken.None);
-
-        long delta = long.MaxValue;
-
-        for (int iteration = 0; iteration < 16; iteration++)
-        {
-            long before = GC.GetAllocatedBytesForCurrentThread();
-            reader.BucketTimeTicksByEventData(rank, 0, long.MaxValue, 1, "LogonType", targetCodes, slotCounts, CancellationToken.None);
-            delta = Math.Min(delta, GC.GetAllocatedBytesForCurrentThread() - before);
-        }
-
-        // A single per-row byte would cost 8192; the fixed memo array is a few dozen bytes, so this proves the hot path is allocation-free.
-        Assert.True(delta < 512, $"Per-row allocation detected: {delta} bytes over {events.Length} sealed rows.");
-    }
-
-    [Fact]
     public void BucketTimeTicksByEventDataHResult_ChartsServicingUserDataErrorCode_OmitsSuccessEmptyAndNoLeaf()
     {
         IEventColumnReader reader = ReaderFor(
             ServicingEvent("CbsPackageChangeState/ErrorCode", "0x800f0816"),
             ServicingEvent("CbsUpdateChangeState/ErrorCode", "0x800F0922"),
-            ServicingEvent("CbsPackageChangeState/ErrorCode", "0x0"),          // success
-            ServicingEvent("CbsUpdateChangeState/ErrorCode", ""),               // empty (event 7)
-            ServicingEvent("CbsPackageInitiateChanges/Client", "CbsTask"));     // no ErrorCode leaf (event 1)
+            ServicingEvent("CbsPackageChangeState/ErrorCode", "0x0"),
+            ServicingEvent("CbsUpdateChangeState/ErrorCode", ""),
+            ServicingEvent("CbsPackageInitiateChanges/Client", "CbsTask"));
 
         long[] targetCodes = [0x800F0816L, 0x800F0922L];
         int[] slotCounts = new int[targetCodes.Length + 1];
         reader.BucketTimeTicksByEventDataHResult(AllSurvive(reader.Count), 0, long.MaxValue, 1, "errorCode", s_updateProviders, s_errorCodeUserDataPaths, targetCodes, slotCounts, CancellationToken.None);
 
-        Assert.Equal(1, slotCounts[0]); // 0x800F0816 (CbsPackageChangeState)
-        Assert.Equal(1, slotCounts[1]); // 0x800F0922 (CbsUpdateChangeState)
-        Assert.Equal(0, slotCounts[2]); // success, empty, and the no-ErrorCode-leaf row are omitted
+        Assert.Equal(1, slotCounts[0]);
+        Assert.Equal(1, slotCounts[1]);
+        Assert.Equal(0, slotCounts[2]);
     }
 
     [Fact]
@@ -103,7 +51,7 @@ public sealed class EventColumnStoreEventDataTests
 
         Assert.Equal(1, slotCounts[0]);
         Assert.Equal(1, slotCounts[1]);
-        Assert.Equal(1, slotCounts[2]); // Other holds only 0x80070005; the zero and ineligible rows are omitted, not bucketed
+        Assert.Equal(1, slotCounts[2]);
     }
 
     [Fact]
@@ -123,8 +71,6 @@ public sealed class EventColumnStoreEventDataTests
 
         reader.BucketTimeTicksByEventDataHResult(rank, 0, long.MaxValue, 1, "errorCode", s_updateProviders, s_errorCodeUserDataPaths, targetCodes, slotCounts, CancellationToken.None);
 
-        // Take the minimum allocation delta across steady-state iterations so a one-off tiered-JIT/background-GC
-        // charge on a single call cannot flake the assertion; a real per-row allocation persists in every iteration.
         long delta = long.MaxValue;
 
         for (int iteration = 0; iteration < 16; iteration++)
@@ -134,8 +80,6 @@ public sealed class EventColumnStoreEventDataTests
             delta = Math.Min(delta, GC.GetAllocatedBytesForCurrentThread() - before);
         }
 
-        // The eligible-index buffer is stack-allocated and the schema memo is a fixed per-scan array, so the per-row path is
-        // allocation-free; a single per-row byte would cost 8192.
         Assert.True(delta < 512, $"Per-row allocation detected: {delta} bytes over {events.Length} sealed rows.");
     }
 
@@ -167,10 +111,56 @@ public sealed class EventColumnStoreEventDataTests
     }
 
     [Fact]
+    public void BucketTimeTicksByEventData_ClassifiesRowsByCodeWithOtherForNonTargets()
+    {
+        IEventColumnReader reader = ReaderFor(
+            Event("LogonType", 3L),
+            Event("LogonType", 3L),
+            Event("LogonType", 10L),
+            Event("LogonType", 7L));
+
+        long[] targetCodes = [3, 10];
+        int slotCount = targetCodes.Length + 1;
+        int[] slotCounts = new int[slotCount];
+        reader.BucketTimeTicksByEventData(AllSurvive(reader.Count), 0, long.MaxValue, 1, "LogonType", targetCodes, slotCounts, CancellationToken.None);
+
+        Assert.Equal(2, slotCounts[0]);
+        Assert.Equal(1, slotCounts[1]);
+        Assert.Equal(1, slotCounts[2]);
+    }
+
+    [Fact]
+    public void BucketTimeTicksByEventData_IsAllocationFreeOnSealedRows()
+    {
+        var events = new ResolvedEvent[8192];
+
+        for (int index = 0; index < events.Length; index++)
+        {
+            events[index] = Event("LogonType", index % 3 == 0 ? 3L : 10L, index);
+        }
+
+        IEventColumnReader reader = EventColumnStore.Build(events, generation: 0, contentVersion: 0).CreateReader(s_logId);
+        int[] rank = AllSurvive(reader.Count);
+        long[] targetCodes = [3, 10];
+        int[] slotCounts = new int[targetCodes.Length + 1];
+
+        reader.BucketTimeTicksByEventData(rank, 0, long.MaxValue, 1, "LogonType", targetCodes, slotCounts, CancellationToken.None);
+
+        long delta = long.MaxValue;
+
+        for (int iteration = 0; iteration < 16; iteration++)
+        {
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            reader.BucketTimeTicksByEventData(rank, 0, long.MaxValue, 1, "LogonType", targetCodes, slotCounts, CancellationToken.None);
+            delta = Math.Min(delta, GC.GetAllocatedBytesForCurrentThread() - before);
+        }
+
+        Assert.True(delta < 512, $"Per-row allocation detected: {delta} bytes over {events.Length} sealed rows.");
+    }
+
+    [Fact]
     public void CountEventDataHResults_CaseInsensitiveAllowlist_IsNormalizedToOrdinal()
     {
-        // A caller-supplied OrdinalIgnoreCase set must be normalized to ordinal so pending matching stays case-sensitive like
-        // the sealed pool lookup; otherwise a case-variant provider would match pending rows but not sealed rows.
         var caseInsensitive = new HashSet<string>([WuClient], StringComparer.OrdinalIgnoreCase);
         ResolvedEvent[] events =
         [
@@ -199,7 +189,7 @@ public sealed class EventColumnStoreEventDataTests
     {
         IEventColumnReader reader = ReaderFor(
             UpdateEvent(WuClient, "0x800F081F"),
-            UpdateEvent(WuClient, "2148468767")); // decimal spelling of 0x800F081F
+            UpdateEvent(WuClient, "2148468767"));
 
         var counts = new Dictionary<long, int>();
         reader.CountEventDataHResults(AllSurvive(reader.Count), "errorCode", s_updateProviders, s_errorCodeUserDataPaths, counts, CancellationToken.None);
@@ -211,7 +201,6 @@ public sealed class EventColumnStoreEventDataTests
     [Fact]
     public void CountEventDataHResults_IsAllocationFreeOnPendingRows()
     {
-        // Stay below TargetChunkSize so Append leaves every row pending (unsealed), exercising the pending provider-match path.
         var events = new ResolvedEvent[3000];
 
         for (int index = 0; index < events.Length; index++)
@@ -237,7 +226,6 @@ public sealed class EventColumnStoreEventDataTests
             delta = Math.Min(delta, GC.GetAllocatedBytesForCurrentThread() - before);
         }
 
-        // The pending provider match uses a scan-local set built once, not a per-row enumerator (which cost 32 bytes x 3000).
         Assert.True(delta < 4096, $"Per-row allocation detected on pending rows: {delta} bytes over {events.Length} rows.");
     }
 
@@ -272,7 +260,6 @@ public sealed class EventColumnStoreEventDataTests
     [Fact]
     public void CountEventDataHResults_ServicingUserData_OmitsNonTargetErrorCodePath()
     {
-        // The dimension keys on the two curated Cbs* paths, not any */ErrorCode leaf; an unlisted template is omitted.
         IEventColumnReader reader = ReaderFor(
             ServicingEvent("SomeOtherTemplate/ErrorCode", "0x800f0816"),
             ServicingEvent("CbsPackageChangeState/ErrorCode", "0x800F0922"));
@@ -288,14 +275,12 @@ public sealed class EventColumnStoreEventDataTests
     [Fact]
     public void CountEventDataHResults_ServicingUserData_PathMatchIsOrdinal_SealedAndPendingOmitCaseVariant()
     {
-        // Storage keys are canonical, so the sealed pool-index compare is exact; the pending mirror must be ordinal too,
-        // or a case-variant path would chart on one store but not the other. Both must omit it.
         foreach (bool sealRows in new[] { true, false })
         {
-            ResolvedEvent[] corpus = [ServicingEvent("cbspackagechangestate/errorcode", "0x800f0816")];
+            ResolvedEvent[] sample = [ServicingEvent("cbspackagechangestate/errorcode", "0x800f0816")];
             EventColumnStore store = sealRows
-                ? EventColumnStore.Build(corpus, generation: 0, contentVersion: 0)
-                : EventColumnStore.Build([], generation: 0, contentVersion: 0).Append(corpus);
+                ? EventColumnStore.Build(sample, generation: 0, contentVersion: 0)
+                : EventColumnStore.Build([], generation: 0, contentVersion: 0).Append(sample);
             IEventColumnReader reader = store.CreateReader(s_logId);
 
             var counts = new Dictionary<long, int>();
@@ -308,14 +293,12 @@ public sealed class EventColumnStoreEventDataTests
     [Fact]
     public void CountEventDataHResults_ServicingUserData_ResolvesTargetPathInternedInLaterChunk()
     {
-        // The target UserData path is interned only by the final row, which lands in a later sealed chunk (Build chunks at
-        // 4096 rows); resolving it once against the shared store pool must still find it so the multi-chunk scan charts it.
         const int chunkSize = 4096;
         var events = new ResolvedEvent[chunkSize + 1];
 
         for (int index = 0; index < chunkSize; index++)
         {
-            events[index] = UpdateEvent(WuClient, 0, index); // WUClient success rows fill the first chunk (no Servicing path)
+            events[index] = UpdateEvent(WuClient, 0, index);
         }
 
         events[chunkSize] = ServicingEvent("CbsPackageChangeState/ErrorCode", "0x800f0816", chunkSize);
@@ -334,15 +317,15 @@ public sealed class EventColumnStoreEventDataTests
     {
         foreach (bool sealRows in new[] { true, false })
         {
-            ResolvedEvent[] corpus =
+            ResolvedEvent[] sample =
             [
                 ServicingEvent("CbsPackageChangeState/ErrorCode", "0x800f0816"),
                 ServicingEvent("CbsUpdateChangeState/ErrorCode", "0x800F0922", 1),
                 ServicingEvent("CbsPackageChangeState/ErrorCode", "0x0", 2)
             ];
             EventColumnStore store = sealRows
-                ? EventColumnStore.Build(corpus, generation: 0, contentVersion: 0)
-                : EventColumnStore.Build([], generation: 0, contentVersion: 0).Append(corpus);
+                ? EventColumnStore.Build(sample, generation: 0, contentVersion: 0)
+                : EventColumnStore.Build([], generation: 0, contentVersion: 0).Append(sample);
             IEventColumnReader reader = store.CreateReader(s_logId);
 
             var counts = new Dictionary<long, int>();
@@ -377,10 +360,6 @@ public sealed class EventColumnStoreEventDataTests
     [Fact]
     public void CountEventDataStringValues_NonStringReferenceRejectedConsistently()
     {
-        // An exotic EventData reference (a boxed Int64 here; EvtVariantType.Handle -> EvtHandle in the wild) renders as
-        // EventFieldValueKind.String while the row is pending (FromProperty stringifies unrecognized references) but seals
-        // as StoredFieldKind.StringForm. The dimension groups only genuine native strings, so such a value must be rejected
-        // on BOTH paths - never grouped in the live view and then dropped (or the reverse) once its chunk seals.
         ResolvedEvent schemaCarrier = new ResolvedEvent("TestLog", LogPathType.Channel) { Id = 4688, TimeCreated = new DateTime(0, DateTimeKind.Utc) }
             .WithEventData(("NewProcessName", "placeholder"));
         ResolvedEvent exoticReferenceEvent = schemaCarrier with { EventDataValues = [EventProperty.FromReference(42L)] };
@@ -431,7 +410,7 @@ public sealed class EventColumnStoreEventDataTests
         reader.CountEventDataValues(AllSurvive(reader.Count), "TicketEncryptionType", counts, CancellationToken.None);
 
         Assert.Equal(2, counts.Count);
-        Assert.Equal(2, counts[23]); // decimal 23 and hex "0x17" fold to the same code
+        Assert.Equal(2, counts[23]);
         Assert.Equal(1, counts[18]);
     }
 
@@ -450,7 +429,6 @@ public sealed class EventColumnStoreEventDataTests
     [Fact]
     public void CountEventDataValues_ReadsUnsignedIntegralCodes()
     {
-        // A UInt32-typed value exercises the unsigned direct-read branch and must fold with the signed Int64 spelling of the same code.
         IEventColumnReader reader = ReaderFor(Event("LogonType", (uint)3), Event("LogonType", 3L));
 
         var counts = new Dictionary<long, int>();
@@ -463,7 +441,6 @@ public sealed class EventColumnStoreEventDataTests
     [Fact]
     public void CountEventDataValues_RejectsHexCodeThatOverflowsALong()
     {
-        // A high-bit hex form must not wrap to a negative code (-1) and fold with a real code.
         IEventColumnReader reader = ReaderFor(Event("TicketEncryptionType", "0xFFFFFFFFFFFFFFFF"), Event("TicketEncryptionType", 23L));
 
         var counts = new Dictionary<long, int>();
@@ -477,8 +454,6 @@ public sealed class EventColumnStoreEventDataTests
     [Fact]
     public void HResultScans_MixedEventDataAndUserData_CountAndBucketAgree()
     {
-        // A WUClient EventData errorCode and a Servicing UserData ErrorCode in one store both chart; the EventData-first /
-        // UserData-fallback contributes exactly one slot per row, so the bucket sum equals the count total.
         IEventColumnReader reader = ReaderFor(
             UpdateEvent(WuClient, unchecked((int)0x800F081Fu)),
             ServicingEvent("CbsPackageChangeState/ErrorCode", "0x800f0816", 1));

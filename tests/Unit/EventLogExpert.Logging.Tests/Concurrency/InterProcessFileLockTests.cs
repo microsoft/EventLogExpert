@@ -7,6 +7,10 @@ namespace EventLogExpert.Logging.Tests.Concurrency;
 
 public sealed class InterProcessFileLockTests : IDisposable
 {
+    private static readonly TimeSpan s_acquireTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan s_contendedTimeout = TimeSpan.FromMilliseconds(300);
+    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(10);
+
     private readonly string _directory =
         Path.Combine(Path.GetTempPath(), $"elx-filelock-{Guid.NewGuid():N}");
 
@@ -25,11 +29,10 @@ public sealed class InterProcessFileLockTests : IDisposable
         var target = TargetPath();
         var fileLock = new InterProcessFileLock("ProviderDbSchema", target);
 
-        fileLock.Run(TimeSpan.FromSeconds(5), static () => { });
+        fileLock.Run(s_acquireTimeout, static () => { });
 
-        // A second sequential acquisition must succeed, proving the handle was released on the first Run's completion.
         var ranAgain = false;
-        fileLock.Run(TimeSpan.FromSeconds(5), () => ranAgain = true);
+        fileLock.Run(s_acquireTimeout, () => ranAgain = true);
 
         Assert.True(ranAgain);
     }
@@ -42,11 +45,10 @@ public sealed class InterProcessFileLockTests : IDisposable
         var fileLock = new InterProcessFileLock("ProviderDbSchema", target);
 
         var ran = false;
-        fileLock.Run(TimeSpan.FromSeconds(5), () => ran = true);
+        fileLock.Run(s_acquireTimeout, () => ran = true);
 
         Assert.True(ran);
 
-        // The sentinel is deliberately never deleted (deleting it would open a pending-deletion race).
         Assert.True(File.Exists(lockPath));
     }
 
@@ -62,8 +64,8 @@ public sealed class InterProcessFileLockTests : IDisposable
 
         var holder = StartHolder(first, acquired, release, TestContext.Current.CancellationToken);
 
-        Assert.True(acquired.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
-        Assert.Throws<TimeoutException>(() => second.Run(TimeSpan.FromMilliseconds(300), static () => { }));
+        Assert.True(acquired.Wait(s_testTimeout, TestContext.Current.CancellationToken));
+        Assert.Throws<TimeoutException>(() => second.Run(s_contendedTimeout, static () => { }));
 
         release.Set();
         holder.Join();
@@ -72,6 +74,8 @@ public sealed class InterProcessFileLockTests : IDisposable
     [Fact]
     public void TryRun_InfiniteTimeout_WaitsForHeldLockThenAcquires()
     {
+        const int ReleaseDelayMilliseconds = 300;
+
         var target = TargetPath();
         var first = new InterProcessFileLock("ProviderDbSchema", target);
         var second = new InterProcessFileLock("ProviderDbSchema", target);
@@ -81,13 +85,11 @@ public sealed class InterProcessFileLockTests : IDisposable
 
         var holder = StartHolder(first, acquired, release, TestContext.Current.CancellationToken);
 
-        Assert.True(acquired.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        Assert.True(acquired.Wait(s_testTimeout, TestContext.Current.CancellationToken));
 
-        // Release the holder shortly after; an infinite-timeout acquire must WAIT for the release rather than
-        // treating the -1ms TimeSpan as an already-expired deadline and returning false.
         var releaser = new Thread(() =>
         {
-            Thread.Sleep(300);
+            Thread.Sleep(ReleaseDelayMilliseconds);
             release.Set();
         });
         releaser.Start();
@@ -101,9 +103,9 @@ public sealed class InterProcessFileLockTests : IDisposable
     }
 
     [Theory]
-    [InlineData(-20000)] // -2ms
-    [InlineData(-15000)] // -1.5ms: a naive (long)TotalMilliseconds cast truncates to -1 (== infinite) and slips through.
-    [InlineData(-1)]     // -1 tick: a naive cast truncates to 0 (== try-once) and slips through.
+    [InlineData(-20000)]
+    [InlineData(-15000)]
+    [InlineData(-1)]
     public void TryRun_NegativeTimeoutBelowInfinite_ThrowsArgumentOutOfRange(long ticks)
     {
         var fileLock = new InterProcessFileLock("ProviderDbSchema", TargetPath());
@@ -124,14 +126,13 @@ public sealed class InterProcessFileLockTests : IDisposable
 
         var holder = StartHolder(first, acquired, release, TestContext.Current.CancellationToken);
 
-        Assert.True(acquired.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
-        Assert.False(second.TryRun(TimeSpan.FromMilliseconds(300), static () => { }));
+        Assert.True(acquired.Wait(s_testTimeout, TestContext.Current.CancellationToken));
+        Assert.False(second.TryRun(s_contendedTimeout, static () => { }));
 
         release.Set();
         holder.Join();
 
-        // The lock is released when the holder's stream is disposed, so the second instance can now acquire it.
-        Assert.True(second.TryRun(TimeSpan.FromSeconds(10), static () => { }));
+        Assert.True(second.TryRun(s_testTimeout, static () => { }));
     }
 
     private static Thread StartHolder(
@@ -140,10 +141,10 @@ public sealed class InterProcessFileLockTests : IDisposable
         ManualResetEventSlim release,
         CancellationToken cancellationToken)
     {
-        var holder = new Thread(() => fileLock.Run(TimeSpan.FromSeconds(10), () =>
+        var holder = new Thread(() => fileLock.Run(s_testTimeout, () =>
         {
             acquired.Set();
-            release.Wait(TimeSpan.FromSeconds(10), cancellationToken);
+            release.Wait(s_testTimeout, cancellationToken);
         }));
 
         holder.Start();

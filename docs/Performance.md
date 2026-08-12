@@ -60,12 +60,11 @@ newest rows stay as a bounded array-of-structs tail that seals into a new chunk 
 target size, giving amortized O(1) append. Repeated strings fold into an interned pool and
 `EventData` field-name sequences into a shared schema table, and `Append` returns a new snapshot
 that reference-shares the prior chunks, pool, and schema table, so a published snapshot is safe to
-read while the next ingest builds. Each log exposes an `EventColumnView` that sorts its rows into a
-display order and reads fields straight through the store's reader with no event objects rehydrated;
-`CombinedColumnView` merges several such views with a K-way, column-direct cursor walk that compares
-head-to-head off each row's own reader, plus a periodic checkpoint index (stride 64) so a positional
-read seeks in log(rows) rather than walking from the start, with per-read offset scratch
-stack-allocated up to a capped K.
+read while the next ingest builds. The ordered-view engine maintains the display order
+incrementally in an `OrderedViewSnapshot` and reads fields straight through the store's reader with no
+event objects rehydrated; `OrderedColumnView` presents a single log and `CombinedOrderedColumnView`
+presents several, addressing each row to its owning reader over the pre-merged global order rather than
+re-running a K-way merge per read.
 
 ### P6 - Viewport virtualization and render-buffer reuse
 
@@ -109,7 +108,7 @@ filtering.
 | Read | Reverse read, newest bookmark, tuned `EvtNext` batch | `EventLogReader` |
 | Marshalling | Non-boxing packed `EventProperty` | `EventProperty`, `NativeMethods.Evt` |
 | Resolve | `ProcessorCount - 1` priority-gated parallelism | `OpenLogEffects` |
-| Store | Chunked columnar snapshot + K-way combined view | `EventColumnStore`, `EventColumnView`, `CombinedColumnView` |
+| Store | Chunked columnar snapshot + incrementally-ordered view engine | `EventColumnStore`, `OrderedColumnView`, `CombinedOrderedColumnView` |
 | Viewport | `Virtualize` + one-slice-per-window provider | `LogTablePane` |
 | Render | Per-thread grow-only render buffer, skip-probe | `NativeMethods.Evt` |
 | Filter memory | Retained structured `EventData` / `UserData` fields | `ResolvedEvent`, `UserDataValueExtractor` |
