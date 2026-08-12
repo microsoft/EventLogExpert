@@ -80,7 +80,8 @@ internal sealed class LiveTailIngestCoordinator : IDisposable
 
             batch.Add(newEvent);
 
-            bool idle = Stopwatch.GetElapsedTime(_lastFlushTimestamp) >= _maxBatchAge;
+            bool idle = _lastFlushTimestamp == 0
+                || Stopwatch.GetElapsedTime(_lastFlushTimestamp) >= _maxBatchAge;
 
             flushNow = batch.Count >= MaxPendingPerLog || (idle && _pending.Count == 1 && batch.Count == 1);
         }

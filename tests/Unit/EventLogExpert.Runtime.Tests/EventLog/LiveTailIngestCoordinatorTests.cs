@@ -138,6 +138,18 @@ public sealed class LiveTailIngestCoordinatorTests
     }
 
     [Fact]
+    public void Enqueue_OnAFreshCoordinatorWithALongWindow_StillFlushesTheLeadingEdge()
+    {
+        var recorder = new DispatchRecorder();
+        using var coordinator = new LiveTailIngestCoordinator(recorder.Dispatcher, TimeSpan.FromDays(40));
+        EventLogId logId = EventLogId.Create();
+
+        coordinator.Enqueue(logId, MakeEvent(1));
+
+        Assert.Equal([1], recorder.RecordIdsFor(logId));
+    }
+
+    [Fact]
     public void Enqueue_WhenIdle_FlushesImmediatelySoASparseTailPaysNoLatency()
     {
         var recorder = new DispatchRecorder();
