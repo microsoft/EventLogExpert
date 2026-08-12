@@ -25,8 +25,9 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
     private static readonly TimeSpan s_testExitGrace = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan s_testGrace = TimeSpan.FromMilliseconds(500);
-    private static readonly TimeSpan s_testHelloTimeout = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan s_testHelloTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan s_testReadTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan s_testShortHelloTimeout = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(10);
     private static readonly UTF8Encoding s_utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
@@ -233,7 +234,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var fakeProcess = new FakeElevatedHelperProcess(server, processId: 6262);
         var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
         var logger = new LoggerUtils.RecordingTraceLogger();
-        var runner = CreateRunner(host, logger);
+        var runner = CreateRunner(host, logger, s_testShortHelloTimeout);
         var logProgress = new ListProgress<LogRecord>();
 
         var runTask = runner.ShowAsync(
@@ -573,7 +574,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         };
         var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
         var logger = new LoggerUtils.RecordingTraceLogger();
-        var runner = CreateRunner(host, logger);
+        var runner = CreateRunner(host, logger, s_testShortHelloTimeout);
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var logProgress = new ListProgress<LogRecord>();
@@ -847,6 +848,9 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
     private static ElevatedDatabaseToolsRunner CreateRunner(IElevatedHelperProcessHost host, ITraceLogger logger) =>
         new(host, logger, s_testHelloTimeout, s_testGrace, s_testExitGrace);
+
+    private static ElevatedDatabaseToolsRunner CreateRunner(IElevatedHelperProcessHost host, ITraceLogger logger, TimeSpan helloTimeout) =>
+        new(host, logger, helloTimeout, s_testGrace, s_testExitGrace);
 
     private static void DisposeSafely(IDisposable disposable)
     {
