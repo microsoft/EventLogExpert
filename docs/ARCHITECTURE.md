@@ -5,22 +5,27 @@
 The `EventLogExpert.Runtime` and `EventLogExpert.UI` projects intentionally mirror each
 other's folder structure where a Runtime feature slice has a rendered surface:
 
-- **Runtime** (`Microsoft.NET.Sdk`) — Fluxor state, effects, reducers, services, and commands.
-  Pure C# with no Razor dependency.
-- **UI** (`Microsoft.NET.Sdk.Razor`) — Razor components that render the state managed by
-  Runtime.
+- **Runtime** (`Microsoft.NET.Sdk`) — Fluxor state, effects, reducers, services, and commands,
+  plus the front-end-agnostic ordered-view render engine and the read-sources / change-notifiers
+  that expose runtime state. Pure C# with no Razor dependency, and front-end-agnostic: it
+  references Fluxor **core** (not `Fluxor.Blazor.Web`), so a non-Blazor front end can consume it.
+- **UI** (`Microsoft.NET.Sdk.Razor`) — Razor components that render Runtime state through
+  framework-agnostic read-sources, change-notifiers, and the ordered-view engine's
+  `OrderedViewPresentation` (via `IOrderedViewSource`), rather than by binding Fluxor `IState<>`
+  selectors directly. The event grid, histogram, and status bar render purely from the engine
+  presentation; Fluxor remains the state-management substrate inside Runtime.
 
 The SDK difference physically enforces the split. Most Runtime feature slices have a
 matching UI folder that renders their state — examples: `Alerts/`, `Announcement/`,
 `Banner/`, `Database/`, `DatabaseTools/`, `DebugLog/`, `DetailsPane/`, `FilterLibrary/`,
-`FilterPane/`, `LogTable/`, `Menu/`, `Modal/`, `Settings/`, `StatusBar/`, `Update/`. The
+`FilterPane/`, `LogTable/`, `Menu/`, `Settings/`, `StatusBar/`, `Update/`. The
 mirroring is one-way pragmatic, not symmetric:
 
-- A few Runtime slices have no UI counterpart — `EventLog/` (the log-loading pipeline
-  used by every render path) and `FilterProgress/` (cross-cutting progress state).
+- A Runtime slice with no UI counterpart — `EventLog/` (the log-loading pipeline used by
+  every render path).
 - UI has presentation-only folders that don't correspond to a Runtime feature slice —
   `ErrorHandling/`, `FilterEditor/`, `Focus/`, `Inputs/`, `Keyboard/`, `Layout/`,
-  `wwwroot/`.
+  `Modal/`, `wwwroot/`.
 
 ## Library Dependency Graph
 
@@ -71,7 +76,7 @@ project references.
 The log-loading pipeline (`Runtime/EventLog/` plus the `Eventing` reader and `Runtime/LogTable/`
 store) is tuned to open very large logs with a fast first paint, bounded memory, and smooth
 scrolling. The design intent behind each mechanism - eager first paint, reverse-read batching,
-non-boxing property marshalling, bounded-parallel resolution, the segmented sorted store and
-combined merge view, viewport virtualization, render-buffer reuse, and the retained
+non-boxing property marshalling, bounded-parallel resolution, the chunked columnar store and
+the incrementally-ordered view engine, viewport virtualization, render-buffer reuse, and the retained
 structured-field filtering model - is documented, with its owning code and its guarding tests,
 in [Performance](Performance.md).
