@@ -1,31 +1,21 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 using System.Diagnostics;
 using System.Security.Principal;
+using static EventLogExpert.Runtime.Tests.LogTable.TestSupport.DivergenceReport;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
 
-/// <summary>
-///     Differential parity for the bulk column-scan sort kernel (
-///     <see cref="ResolvedEventOrdering.SortColumnDirect" />): over the full 756-config sort matrix it must produce the
-///     exact physical-index order that sorting the same survivors through the relocated array-of-structs reference
-///     comparer (<see cref="AosReferenceOrdering.Reference" />) plus the same final physical-index ascending tie-break
-///     produces. A <see cref="LegacyEventColumnReader" /> feeds both sides the same corpus, so any divergence isolates the
-///     kernel. A perf smoke test guards that the kernel finishes on a large synthetic corpus.
-/// </summary>
 public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
 {
-    private static readonly ColumnName[] s_allColumns = Enum.GetValues<ColumnName>();
-    private static readonly bool[] s_bools = [false, true];
-    private static readonly IReadOnlyList<SortConfig> s_allConfigs = BuildAllConfigs();
-    private static readonly IReadOnlyList<ResolvedEvent> s_edgeCorpus = BuildEdgeCorpus();
-    private static readonly IReadOnlyList<ResolvedEvent> s_tieBurstCorpus = BuildTieBurstCorpus();
+    private static readonly IReadOnlyList<SortConfig> s_allConfigs = SortConfigMatrix.All();
+    private static readonly IReadOnlyList<ResolvedEvent> s_edgeSample = BuildEdgeSample();
+    private static readonly IReadOnlyList<ResolvedEvent> s_tieBurstSample = BuildTieBurstSample();
 
     private readonly ITestOutputHelper _output = output;
 
@@ -33,20 +23,19 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
     public void MatrixCovers756Configs_AcrossOrderGroupAscendingDescending()
     {
         Assert.Equal(756, s_allConfigs.Count);
-        Assert.Contains(s_allConfigs, config => config.OrderBy is null && config.IsDescending && config.GroupBy is null);
-        Assert.Contains(s_allConfigs, config => config.OrderBy is null && config.IsDescending && config.GroupBy is not null);
+        Assert.Contains(s_allConfigs, config => config.OrderBy is null && config is { IsDescending: true, GroupBy: null });
+        Assert.Contains(s_allConfigs, config => config.OrderBy is null && config is { IsDescending: true, GroupBy: not null });
     }
 
     [Fact]
-    public void SortColumnDirect_CompletesWithinBudget_OnLargeSyntheticCorpus()
+    public void SortColumnDirect_CompletesWithinBudget_OnLargeSyntheticSample()
     {
-        const int eventCount = 200_000;
-        const int budgetMilliseconds = 20_000;
-        IReadOnlyList<ResolvedEvent> corpus = BuildPerfCorpus(eventCount);
-        var reader = NewReader(corpus);
-        int[] survivors = AllIndices(eventCount);
+        const int EventCount = 200_000;
+        const int BudgetMilliseconds = 20_000;
+        IReadOnlyList<ResolvedEvent> sample = BuildPerfSample(EventCount);
+        var reader = ColumnReaderTestFactory.ReaderOver(sample);
+        int[] survivors = AllIndices(EventCount);
 
-        // A representative spread: ungrouped default, an ordered descending column, and a grouped-plus-ordered chain.
         SortConfig[] configs =
         [
             new SortConfig(null, false, null, false),
@@ -57,48 +46,42 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
         foreach (SortConfig config in configs)
         {
             var stopwatch = Stopwatch.StartNew();
-            int[] sorted = ResolvedEventOrdering.SortColumnDirect(
-                reader, survivors, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
+            int[] sorted = ColumnDirectSort.SortColumnDirect(
+                reader, survivors, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending, TestContext.Current.CancellationToken);
             stopwatch.Stop();
 
-            Assert.Equal(eventCount, sorted.Length);
-            _output.WriteLine($"SortColumnDirect {config}: {stopwatch.ElapsedMilliseconds} ms for {eventCount:N0} events");
+            Assert.Equal(EventCount, sorted.Length);
+            _output.WriteLine($"SortColumnDirect {config}: {stopwatch.ElapsedMilliseconds} ms for {EventCount:N0} events");
 
             Assert.True(
-                stopwatch.ElapsedMilliseconds < budgetMilliseconds,
-                $"{config} took {stopwatch.ElapsedMilliseconds} ms, over the {budgetMilliseconds} ms budget");
+                stopwatch.ElapsedMilliseconds < BudgetMilliseconds,
+                $"{config} took {stopwatch.ElapsedMilliseconds} ms, over the {BudgetMilliseconds} ms budget");
         }
 
-        // Log the array-of-structs baseline for context only; a strict "faster than AoS" assert is too flaky for CI.
         var baseline = Stopwatch.StartNew();
-        _ = AosReferenceOrdering.Order(corpus, ColumnName.DateAndTime, isDescending: true).Length;
+        _ = AosReferenceOrdering.Order(sample, ColumnName.DateAndTime, isDescending: true).Length;
         baseline.Stop();
-        _output.WriteLine($"AosReferenceOrdering.Order (reference baseline, DateAndTime desc): {baseline.ElapsedMilliseconds} ms for {eventCount:N0} events");
+        _output.WriteLine($"AosReferenceOrdering.Order (reference baseline, DateAndTime desc): {baseline.ElapsedMilliseconds} ms for {EventCount:N0} events");
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void SortColumnDirect_FullTieCorpus_ReordersToAscendingIndexTieBreak_RegardlessOfDescending(bool isDescending)
+    public void SortColumnDirect_FullTieSample_ReordersToAscendingIndexTieBreak_RegardlessOfDescending(bool isDescending)
     {
-        // Four byte-identical events with a null RecordId in one OwningLog: the whole chain (RecordId, time, OwningLog)
-        // ties, so only the final physical-index tie-break separates rows. The survivors are handed in DESCENDING index
-        // order, so the expected ascending result can ONLY come from the tie-break actively reordering - the test fails if
-        // WithIndexTieBreak is broken to return 0 (a pre-sorted input would leave it a placebo). That tie-break is ascending
-        // and never negated, so a descending order still lands ascending physical index.
         var when = new DateTime(2024, 3, 3, 3, 3, 3, DateTimeKind.Utc);
-        IReadOnlyList<ResolvedEvent> corpus =
+        IReadOnlyList<ResolvedEvent> sample =
         [
             FilterEventBuilder.CreateTestEvent(id: 9, source: "Same", level: "Same", timeCreated: when, owningLog: "L"),
             FilterEventBuilder.CreateTestEvent(id: 9, source: "Same", level: "Same", timeCreated: when, owningLog: "L"),
             FilterEventBuilder.CreateTestEvent(id: 9, source: "Same", level: "Same", timeCreated: when, owningLog: "L"),
             FilterEventBuilder.CreateTestEvent(id: 9, source: "Same", level: "Same", timeCreated: when, owningLog: "L")
         ];
-        var reader = NewReader(corpus);
+        var reader = ColumnReaderTestFactory.ReaderOver(sample);
         int[] survivors = [3, 2, 1, 0];
 
-        int[] order = ResolvedEventOrdering.SortColumnDirect(
-            reader, survivors, ColumnName.DateAndTime, isDescending, groupBy: null, isGroupDescending: false);
+        int[] order = ColumnDirectSort.SortColumnDirect(
+            reader, survivors, ColumnName.DateAndTime, isDescending, groupBy: null, isGroupDescending: false, TestContext.Current.CancellationToken);
 
         Assert.Equal(new[] { 0, 1, 2, 3 }, order);
     }
@@ -111,60 +94,52 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
     public void SortColumnDirect_GroupedChain_NegatesGroupAndWithinOrderIndependently(
         bool isWithinDescending, bool isGroupDescending, int[] expectedOrder)
     {
-        // Two Source groups (Alpha < Beta ordinally), two distinct RecordIds within each. With groupBy=Source and
-        // orderBy=RecordId the two GroupedChain negations are isolated: the group order flips with isGroupDescending and
-        // the within-group order flips with isDescending, independently. These direct expected orders guard the two
-        // -Math.Sign(...) sites in GroupedChain without routing through the AoS parity oracle.
         var when = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        IReadOnlyList<ResolvedEvent> corpus =
+        IReadOnlyList<ResolvedEvent> sample =
         [
             FilterEventBuilder.CreateTestEvent(id: 1, recordId: 1, source: "Alpha", timeCreated: when, owningLog: "L"),
             FilterEventBuilder.CreateTestEvent(id: 1, recordId: 2, source: "Alpha", timeCreated: when, owningLog: "L"),
             FilterEventBuilder.CreateTestEvent(id: 1, recordId: 3, source: "Beta", timeCreated: when, owningLog: "L"),
             FilterEventBuilder.CreateTestEvent(id: 1, recordId: 4, source: "Beta", timeCreated: when, owningLog: "L")
         ];
-        var reader = NewReader(corpus);
+        var reader = ColumnReaderTestFactory.ReaderOver(sample);
 
-        int[] order = ResolvedEventOrdering.SortColumnDirect(
-            reader, AllIndices(corpus.Count), ColumnName.RecordId, isWithinDescending, ColumnName.Source, isGroupDescending);
+        int[] order = ColumnDirectSort.SortColumnDirect(
+            reader, AllIndices(sample.Count), ColumnName.RecordId, isWithinDescending, ColumnName.Source, isGroupDescending, TestContext.Current.CancellationToken);
 
         Assert.Equal(expectedOrder, order);
     }
 
     [Fact]
-    public void SortColumnDirect_MatchesOracleOrder_ForEveryConfig_OverEdgeCorpus()
+    public void SortColumnDirect_MatchesOracleOrder_ForEveryConfig_OverEdgeSample()
     {
-        AssertParityForEveryConfig(s_edgeCorpus, AllIndices(s_edgeCorpus.Count), "edge");
+        AssertParityForEveryConfig(s_edgeSample, AllIndices(s_edgeSample.Count), "edge");
     }
 
     [Fact]
     public void SortColumnDirect_MatchesOracleOrder_ForEveryConfig_OverFilteredSurvivors()
     {
-        // A non-contiguous, shuffled survivor subset (like a filter result): the kernel must still return the canonical
-        // order over exactly those physical rows, independent of the input order.
-        int[] survivors = FilteredSurvivors(s_edgeCorpus.Count);
+        int[] survivors = FilteredSurvivors(s_edgeSample.Count);
 
-        AssertParityForEveryConfig(s_edgeCorpus, survivors, "filtered-survivors");
+        AssertParityForEveryConfig(s_edgeSample, survivors, "filtered-survivors");
     }
 
     [Fact]
     public void SortColumnDirect_MatchesOracleOrder_ForEveryConfig_OverNullRecordIdTieBursts()
     {
-        // Full-tie bursts (identical events, null RecordId) plus equal-primary/equal-OwningLog groups exercise M4: the
-        // chain ties all the way through RecordId and OwningLog, so only the final physical-index tie-break separates them.
-        AssertParityForEveryConfig(s_tieBurstCorpus, AllIndices(s_tieBurstCorpus.Count), "tie-burst");
+        AssertParityForEveryConfig(s_tieBurstSample, AllIndices(s_tieBurstSample.Count), "tie-burst");
     }
 
     [Fact]
     public void SortColumnDirect_ReturnsPermutationOfSurvivors_ForEveryConfig()
     {
-        var reader = NewReader(s_edgeCorpus);
-        int[] survivors = FilteredSurvivors(s_edgeCorpus.Count);
+        var reader = ColumnReaderTestFactory.ReaderOver(s_edgeSample);
+        int[] survivors = FilteredSurvivors(s_edgeSample.Count);
 
         foreach (SortConfig config in s_allConfigs)
         {
-            int[] sorted = ResolvedEventOrdering.SortColumnDirect(
-                reader, survivors, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
+            int[] sorted = ColumnDirectSort.SortColumnDirect(
+                reader, survivors, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending, TestContext.Current.CancellationToken);
 
             Assert.Equal(survivors.Length, sorted.Length);
             Assert.Equal(survivors.OrderBy(index => index), sorted.OrderBy(index => index));
@@ -173,36 +148,7 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
 
     private static int[] AllIndices(int count) => Enumerable.Range(0, count).ToArray();
 
-    private static IReadOnlyList<SortConfig> BuildAllConfigs()
-    {
-        var configs = new List<SortConfig>();
-
-        foreach (ColumnName? orderBy in OrderByOptions())
-        {
-            foreach (bool isDescending in s_bools)
-            {
-                configs.Add(new SortConfig(orderBy, isDescending, null, false));
-            }
-        }
-
-        foreach (ColumnName groupBy in s_allColumns)
-        {
-            foreach (bool isGroupDescending in s_bools)
-            {
-                foreach (ColumnName? orderBy in OrderByOptions())
-                {
-                    foreach (bool isDescending in s_bools)
-                    {
-                        configs.Add(new SortConfig(orderBy, isDescending, groupBy, isGroupDescending));
-                    }
-                }
-            }
-        }
-
-        return configs;
-    }
-
-    private static IReadOnlyList<ResolvedEvent> BuildEdgeCorpus()
+    private static IReadOnlyList<ResolvedEvent> BuildEdgeSample()
     {
         var guidLow = new Guid("00000001-0000-0000-0000-000000000000");
         var guidHigh = new Guid("ffffffff-0000-0000-0000-000000000000");
@@ -212,10 +158,6 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
         var middle = new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc);
         var late = new DateTime(2024, 12, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        // Oracle-vs-kernel edge: do not pair a null and an empty-string value in the same string column here. The
-        // AosReferenceOrdering oracle is struct-based and sorts null before "" (raw string.Compare), while the live
-        // SortColumnDirect reads through the reader (AsString collapses null to "") and ties them, so pairing the two
-        // in one column would fail this parity test spuriously. No current row does so.
         return
         [
             FilterEventBuilder.CreateTestEvent(id: 2, recordId: 2, processId: 2, threadId: 2, source: "Alpha", level: "Information", timeCreated: early, activityId: guidLow, userId: sidLow),
@@ -232,11 +174,14 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
             FilterEventBuilder.CreateTestEvent(id: 6, recordId: 400, source: "Zeta", timeCreated: early, activityId: guidHigh),
             FilterEventBuilder.CreateTestEvent(id: 6, recordId: 401, source: "Zeta", timeCreated: early, activityId: guidLow),
             FilterEventBuilder.CreateTestEvent(id: 7, source: "Eta", level: "Ledger", timeCreated: early, owningLog: "LogX"),
-            FilterEventBuilder.CreateTestEvent(id: 7, source: "Eta", level: "Ledger", timeCreated: early, owningLog: "LogY")
+            FilterEventBuilder.CreateTestEvent(id: 7, source: "Eta", level: "Ledger", timeCreated: early, owningLog: "LogY"),
+
+            FilterEventBuilder.CreateTestEvent(id: 8, recordId: 500, source: "Theta", level: "", timeCreated: early),
+            FilterEventBuilder.CreateTestEvent(id: 8, recordId: 501, source: "Theta", level: "", timeCreated: early)
         ];
     }
 
-    private static IReadOnlyList<ResolvedEvent> BuildPerfCorpus(int count)
+    private static IReadOnlyList<ResolvedEvent> BuildPerfSample(int count)
     {
         var guids = new[]
         {
@@ -270,40 +215,31 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
         return events;
     }
 
-    private static IReadOnlyList<ResolvedEvent> BuildTieBurstCorpus()
+    private static IReadOnlyList<ResolvedEvent> BuildTieBurstSample()
     {
         var when = new DateTime(2024, 3, 3, 3, 3, 3, DateTimeKind.Utc);
         var events = new List<ResolvedEvent>();
 
-        // Six fully identical events with null RecordId: every chain (incl. OwningLog) ties, so only the physical index
-        // separates them.
         for (int index = 0; index < 6; index++)
         {
             events.Add(FilterEventBuilder.CreateTestEvent(
                 id: 9, source: "Same", level: "Same", timeCreated: when, owningLog: "SameLog"));
         }
 
-        // Same primary, null RecordId, distinct OwningLog: the OwningLog tie-break separates them before the index step.
         events.Add(FilterEventBuilder.CreateTestEvent(id: 9, source: "Same", level: "Same", timeCreated: when, owningLog: "LogB"));
         events.Add(FilterEventBuilder.CreateTestEvent(id: 9, source: "Same", level: "Same", timeCreated: when, owningLog: "LogA"));
 
-        // Same primary and OwningLog with distinct RecordId: the RecordId tie-break separates them.
         events.Add(FilterEventBuilder.CreateTestEvent(id: 9, recordId: 20, source: "Same", level: "Same", timeCreated: when, owningLog: "SameLog"));
         events.Add(FilterEventBuilder.CreateTestEvent(id: 9, recordId: 10, source: "Same", level: "Same", timeCreated: when, owningLog: "SameLog"));
 
-        // A couple of distinct rows so grouped/ordered configs still see more than one group.
         events.Add(FilterEventBuilder.CreateTestEvent(id: 1, recordId: 1, source: "Other", level: "Info", timeCreated: when.AddHours(1), owningLog: "SameLog"));
         events.Add(FilterEventBuilder.CreateTestEvent(id: 2, source: "Other", level: "Info", timeCreated: when.AddHours(2), owningLog: "SameLog"));
 
         return events;
     }
 
-    private static string Describe(IReadOnlyList<string> failures) =>
-        $"{failures.Count} divergence(s):{Environment.NewLine}{string.Join(Environment.NewLine, failures.Take(25))}";
-
     private static int[] FilteredSurvivors(int count)
     {
-        // Every physical row except a couple, handed to the kernel in a shuffled (non-sorted) order.
         var survivors = Enumerable.Range(0, count).Where(index => index != 1 && index != 4).ToList();
         var shuffled = new List<int>(survivors);
 
@@ -317,13 +253,7 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
         return shuffled.ToArray();
     }
 
-    private static LegacyEventColumnReader NewReader(IReadOnlyList<ResolvedEvent> corpus) =>
-        new(EventLogId.Create(), generation: 1, contentVersion: 1, corpus);
-
-    // The oracle order: sort the survivors through the relocated array-of-structs reference comparer, then break residual
-    // ties by physical index ascending (the same total-order completion the kernel appends), so the comparison is
-    // well-defined on ties.
-    private static int[] OracleOrder(IReadOnlyList<ResolvedEvent> corpus, int[] survivors, SortConfig config)
+    private static int[] OracleOrder(IReadOnlyList<ResolvedEvent> sample, int[] survivors, SortConfig config)
     {
         Comparison<ResolvedEvent> chain = AosReferenceOrdering.Reference(
             config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
@@ -331,7 +261,7 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
 
         Array.Sort(order, (a, b) =>
         {
-            int compared = chain(corpus[a], corpus[b]);
+            int compared = chain(sample[a], sample[b]);
 
             return compared != 0 ? compared : a.CompareTo(b);
         });
@@ -339,26 +269,16 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
         return order;
     }
 
-    private static IEnumerable<ColumnName?> OrderByOptions()
+    private void AssertParityForEveryConfig(IReadOnlyList<ResolvedEvent> sample, int[] survivors, string label)
     {
-        yield return null;
-
-        foreach (ColumnName column in s_allColumns)
-        {
-            yield return column;
-        }
-    }
-
-    private void AssertParityForEveryConfig(IReadOnlyList<ResolvedEvent> corpus, int[] survivors, string label)
-    {
-        var reader = NewReader(corpus);
+        var reader = ColumnReaderTestFactory.ReaderOver(sample);
         var failures = new List<string>();
 
         foreach (SortConfig config in s_allConfigs)
         {
-            int[] actual = ResolvedEventOrdering.SortColumnDirect(
-                reader, survivors, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
-            int[] expected = OracleOrder(corpus, survivors, config);
+            int[] actual = ColumnDirectSort.SortColumnDirect(
+                reader, survivors, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending, TestContext.Current.CancellationToken);
+            int[] expected = OracleOrder(sample, survivors, config);
 
             if (!actual.SequenceEqual(expected))
             {
@@ -368,6 +288,4 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
 
         Assert.True(failures.Count == 0, Describe(failures));
     }
-
-    private readonly record struct SortConfig(ColumnName? OrderBy, bool IsDescending, ColumnName? GroupBy, bool IsGroupDescending);
 }

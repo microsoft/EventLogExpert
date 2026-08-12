@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 using NSubstitute;
@@ -15,7 +16,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleLoadColumns_ShouldLoadAllColumnsFromPreferences()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName>
         {
             ColumnName.Level,
@@ -25,10 +25,8 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
 
-        // Act
         await effects.HandleLoadColumns(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
             action != null &&
             action.LoadedColumns.Count == Enum.GetValues<ColumnName>().Length));
@@ -37,7 +35,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleLoadColumns_ShouldLoadWidthsFromPreferences()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName> { ColumnName.Level };
         var savedWidths = new Dictionary<ColumnName, int>
         {
@@ -47,10 +44,8 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
         mockPreferencesProvider.ColumnWidthsPreference.Returns(savedWidths);
 
-        // Act
         await effects.HandleLoadColumns(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
             action != null &&
             action.ColumnWidths[ColumnName.Level] == 150));
@@ -59,7 +54,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleLoadColumns_ShouldMarkDisabledColumnsAsFalse()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName>
         {
             ColumnName.Level
@@ -67,10 +61,8 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
 
-        // Act
         await effects.HandleLoadColumns(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
             action != null &&
             action.LoadedColumns[ColumnName.Source] == false &&
@@ -80,7 +72,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleLoadColumns_ShouldMarkEnabledColumnsAsTrue()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName>
         {
             ColumnName.Level,
@@ -89,10 +80,8 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
 
-        // Act
         await effects.HandleLoadColumns(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
             action != null &&
             action.LoadedColumns[ColumnName.Level] == true &&
@@ -102,15 +91,12 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleLoadColumns_ShouldUseDefaultOrderWhenNotSaved()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName> { ColumnName.Level };
 
         var (effects, mockDispatcher, _) = CreateEffects(enabledColumns);
 
-        // Act
         await effects.HandleLoadColumns(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
             action != null &&
             action.ColumnOrder.SequenceEqual(s_columnDefaults.ColumnOrder)));
@@ -119,15 +105,12 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleLoadColumns_ShouldUseDefaultWidthsWhenNotSaved()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName> { ColumnName.Level };
 
         var (effects, mockDispatcher, _) = CreateEffects(enabledColumns);
 
-        // Act
         await effects.HandleLoadColumns(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
             action != null &&
             action.ColumnWidths[ColumnName.Level] == s_columnDefaults.GetColumnWidth(ColumnName.Level)));
@@ -136,17 +119,14 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleLoadColumns_ShouldUseSavedOrderWhenPresent()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName> { ColumnName.Source, ColumnName.Level };
         var savedOrder = new List<ColumnName> { ColumnName.Source, ColumnName.Level };
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
         mockPreferencesProvider.ColumnOrderPreference.Returns(savedOrder);
 
-        // Act
         await effects.HandleLoadColumns(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
             action != null &&
             action.ColumnOrder[0] == ColumnName.Source &&
@@ -156,15 +136,12 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleLoadColumns_WhenNoColumnsEnabled_ShouldMarkAllAsFalse()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName>();
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
 
-        // Act
         await effects.HandleLoadColumns(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
             action != null &&
             action.LoadedColumns.All(kvp => kvp.Value == false)));
@@ -173,7 +150,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleReorderColumn_ShouldPersistToPreferences()
     {
-        // Arrange - state reflects post-reducer result (Source moved to index 0)
         var postReducerState = new LogTableState
         {
             ColumnOrder = [ColumnName.Source, ColumnName.Level, ColumnName.DateAndTime]
@@ -183,10 +159,8 @@ public sealed class EffectsTests
 
         var action = new ReorderColumnAction(ColumnName.Source, ColumnName.Level, false);
 
-        // Act
         await effects.HandleReorderColumn(action, mockDispatcher);
 
-        // Assert
         _ = mockPreferencesProvider.Received(1).ColumnOrderPreference =
             Arg.Is<IEnumerable<ColumnName>>(order => order != null && order.First() == ColumnName.Source);
     }
@@ -194,14 +168,11 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleResetColumnDefaults_ShouldResetAllColumnSettingsToDefaults()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName> { ColumnName.Level, ColumnName.Source };
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
 
-        // Act
         await effects.HandleResetColumnDefaults(mockDispatcher);
 
-        // Assert
         _ = mockPreferencesProvider.Received(1).EnabledEventTableColumnsPreference =
             Arg.Is<IEnumerable<ColumnName>>(columns =>
                 columns != null && columns.SequenceEqual(s_columnDefaults.EnabledColumns));
@@ -227,9 +198,29 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleSetAllGroupsCollapsed_RaisesTheGroupCollapseNotifier()
+    {
+        var notifier = new GroupCollapseNotifier(Substitute.For<ITraceLogger>());
+        var raised = 0;
+        notifier.Requested += () => raised++;
+
+        var logTableState = Substitute.For<IState<LogTableState>>();
+        logTableState.Value.Returns(new LogTableState());
+        var effects = new Effects(
+            Substitute.For<ILogTablePreferencesProvider>(),
+            logTableState,
+            s_columnDefaults,
+            new NoOpColumnResetMigrator(),
+            notifier);
+
+        await effects.HandleSetAllGroupsCollapsed(Substitute.For<IDispatcher>());
+
+        Assert.Equal(1, raised);
+    }
+
+    [Fact]
     public async Task HandleSetColumnWidth_ShouldPersistToPreferences()
     {
-        // Arrange
         var postReducerState = new LogTableState
         {
             ColumnWidths = new Dictionary<ColumnName, int>
@@ -242,10 +233,8 @@ public sealed class EffectsTests
 
         var action = new SetColumnWidthAction(ColumnName.Level, 200);
 
-        // Act
         await effects.HandleSetColumnWidth(action, mockDispatcher);
 
-        // Assert
         _ = mockPreferencesProvider.Received(1).ColumnWidthsPreference =
             Arg.Is<IDictionary<ColumnName, int>>(width => width != null && width[ColumnName.Level] == 200);
     }
@@ -253,7 +242,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleToggleColumn_ShouldOnlyChangeToggledColumn()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName>
         {
             ColumnName.Level,
@@ -265,10 +253,8 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
         var action = new ToggleColumnAction(ColumnName.DateAndTime);
 
-        // Act
         await effects.HandleToggleColumn(action, mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
             action != null &&
             action.LoadedColumns[ColumnName.Level] == true &&
@@ -280,7 +266,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleToggleColumn_ShouldUpdatePreferences()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName>
         {
             ColumnName.Level,
@@ -290,10 +275,8 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
         var action = new ToggleColumnAction(ColumnName.Source);
 
-        // Act
         await effects.HandleToggleColumn(action, mockDispatcher);
 
-        // Assert
         _ = mockPreferencesProvider.Received(1).EnabledEventTableColumnsPreference =
             Arg.Is<IEnumerable<ColumnName>>(columns =>
                 columns != null &&
@@ -303,7 +286,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleToggleColumn_WhenColumnDisabled_ShouldEnableIt()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName>
         {
             ColumnName.DateAndTime,
@@ -313,10 +295,8 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
         var action = new ToggleColumnAction(ColumnName.Level);
 
-        // Act
         await effects.HandleToggleColumn(action, mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
             action != null &&
             action.LoadedColumns[ColumnName.Level] == true &&
@@ -327,7 +307,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleToggleColumn_WhenColumnEnabled_ShouldDisableIt()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName>
         {
             ColumnName.Level,
@@ -338,10 +317,8 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
         var action = new ToggleColumnAction(ColumnName.Level);
 
-        // Act
         await effects.HandleToggleColumn(action, mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
             action != null &&
             action.LoadedColumns[ColumnName.Level] == false &&
@@ -352,7 +329,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleToggleColumn_WhenDisabling_ShouldRemoveFromPreferences()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName>
         {
             ColumnName.Level,
@@ -363,10 +339,8 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
         var action = new ToggleColumnAction(ColumnName.Source);
 
-        // Act
         await effects.HandleToggleColumn(action, mockDispatcher);
 
-        // Assert
         var _ = mockPreferencesProvider.Received(1).EnabledEventTableColumnsPreference =
             Arg.Is<IEnumerable<ColumnName>>(columns =>
                 columns != null &&
@@ -379,7 +353,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleToggleColumn_WhenEnabling_ShouldPersistToPreferences()
     {
-        // Arrange
         var enabledColumns = new List<ColumnName>
         {
             ColumnName.Level
@@ -388,10 +361,8 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
         var action = new ToggleColumnAction(ColumnName.Source);
 
-        // Act
         await effects.HandleToggleColumn(action, mockDispatcher);
 
-        // Assert
         _ = mockPreferencesProvider.Received(1).EnabledEventTableColumnsPreference =
             Arg.Is<IEnumerable<ColumnName>>(columns =>
                 columns != null &&
@@ -411,7 +382,7 @@ public sealed class EffectsTests
         var mockState = Substitute.For<IState<LogTableState>>();
         mockState.Value.Returns(state ?? new LogTableState());
 
-        var effects = new Effects(mockPreferencesProvider, mockState, s_columnDefaults, new NoOpColumnResetMigrator());
+        var effects = new Effects(mockPreferencesProvider, mockState, s_columnDefaults, new NoOpColumnResetMigrator(), new GroupCollapseNotifier(Substitute.For<ITraceLogger>()));
         var mockDispatcher = Substitute.For<IDispatcher>();
 
         return (effects, mockDispatcher, mockPreferencesProvider);

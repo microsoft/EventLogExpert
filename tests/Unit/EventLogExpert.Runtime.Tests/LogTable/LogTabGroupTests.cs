@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
-using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
+using EventLogExpert.Runtime.LogTable.OrderedView;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using System.Collections.Immutable;
 using Reducers = EventLogExpert.Runtime.LogTable.Reducers;
@@ -14,15 +14,6 @@ namespace EventLogExpert.Runtime.Tests.LogTable;
 
 public sealed class LogTabGroupTests
 {
-    [Fact]
-    public void DisplayedEventsForTab_AllLogsHeader_ReturnsTheSameInstanceAsDisplayedEvents()
-    {
-        var (state, _) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
-        var allLogs = state.EventTables.Single(table => table.GroupId?.IsAll == true);
-
-        Assert.True(ReferenceEquals(state.DisplayedEvents, state.DisplayedEventsForTab(allLogs)));
-    }
-
     [Fact]
     public void DisplayedEventsForTab_GroupWithNoPresentMembers_IsEmpty()
     {
@@ -38,92 +29,7 @@ public sealed class LogTabGroupTests
     }
 
     [Fact]
-    public void DisplayedEventsForTab_SingleMemberGroup_ReturnsThatMembersList()
-    {
-        var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))], [MakeEvent(1, 1, Time(1, 1))]);
-
-        var groupId = NewGroup(ref state, ids[0]);
-        var header = state.EventTables.Single(table => table.GroupId == groupId);
-
-        Assert.True(ReferenceEquals(state.EventsForLog(ids[0]), state.DisplayedEventsForTab(header)));
-    }
-
-    [Fact]
-    public void DisplayedEventsForTab_StandaloneTab_ReturnsThatLogsList()
-    {
-        var (state, ids) = SeedLogs([MakeEvent(0, 1, Time(0, 1))]);
-        var tab = state.EventTables.Single(table => table.Id == ids[0]);
-
-        Assert.True(ReferenceEquals(state.EventsForLog(ids[0]), state.DisplayedEventsForTab(tab)));
-    }
-
-    [Fact]
-    public void DisplayedEventsForTab_UserGroup_AfterAMemberListChanges_ReturnsNewInstance()
-    {
-        var state = TwoMemberGroup(out var groupId);
-        var members = state.Groups.Single().MemberIds.ToArray();
-        var before = state.DisplayedEventsForTab(state.EventTables.Single(table => table.GroupId == groupId));
-
-        state = AppendBatch(state, members[0], MakeEvent(0, 99, Time(0, 99)));
-        var after = state.DisplayedEventsForTab(state.EventTables.Single(table => table.GroupId == groupId));
-
-        Assert.False(ReferenceEquals(before, after));
-    }
-
-    [Fact]
-    public void DisplayedEventsForTab_UserGroup_AfterMembershipChanges_ReturnsNewInstance()
-    {
-        var log0 = new[] { MakeEvent(0, 1, Time(0, 30)) };
-        var log1 = new[] { MakeEvent(1, 1, Time(1, 20)) };
-        var log2 = new[] { MakeEvent(2, 1, Time(2, 10)) };
-        var (state, ids) = SeedLogs(log0, log1, log2);
-
-        var groupId = NewGroup(ref state, ids[0]);
-        state = Reducers.ReduceMoveTabToGroup(state, new MoveTabToGroupAction(ids[1], groupId));
-        var before = state.DisplayedEventsForTab(state.EventTables.Single(table => table.GroupId == groupId));
-
-        state = Reducers.ReduceMoveTabToGroup(state, new MoveTabToGroupAction(ids[2], groupId));
-        var after = state.DisplayedEventsForTab(state.EventTables.Single(table => table.GroupId == groupId));
-
-        Assert.False(ReferenceEquals(before, after));
-        Assert.Equal(3, after.Count);
-    }
-
-    [Fact]
-    public void DisplayedEventsForTab_UserGroup_MergesOnlyItsMembers()
-    {
-        var log0 = new[] { MakeEvent(0, 1, Time(0, 30)), MakeEvent(0, 2, Time(0, 10)) };
-        var log1 = new[] { MakeEvent(1, 1, Time(1, 20)) };
-        var log2 = new[] { MakeEvent(2, 1, Time(2, 30)), MakeEvent(2, 2, Time(2, 5)) };
-        var (state, ids) = SeedLogs(log0, log1, log2);
-
-        var groupId = NewGroup(ref state, ids[0]);
-        state = Reducers.ReduceMoveTabToGroup(state, new MoveTabToGroupAction(ids[2], groupId));
-        var header = state.EventTables.Single(table => table.GroupId == groupId);
-
-        var view = state.DisplayedEventsForTab(header);
-
-        AssertViewExactly(state, view, [.. log0, .. log2]);
-
-        var displayed = view.Slice(0, view.Count);
-
-        foreach (var excluded in log1)
-        {
-            Assert.DoesNotContain(displayed, row => SameEvent(excluded, row.Lean));
-        }
-    }
-
-    [Fact]
-    public void DisplayedEventsForTab_UserGroup_SameGeneration_ReturnsSameInstance()
-    {
-        var state = TwoMemberGroup(out var groupId);
-        var header = state.EventTables.Single(table => table.GroupId == groupId);
-
-        Assert.True(ReferenceEquals(state.DisplayedEventsForTab(header), state.DisplayedEventsForTab(header)));
-    }
-
-    [Fact]
-    public void GetActiveDisplayedEvents_ActiveNamedGroupHeader_ReturnsGroupMembersNotAllLogs()
+    public void GetActiveDisplayedEvents_ActiveNamedGroupHeader_ReturnsWhatThatGroupsTabIsShowing()
     {
         var (state, ids) = SeedLogs(
             [MakeEvent(0, 1, Time(0, 1))],
@@ -136,13 +42,22 @@ public sealed class LogTabGroupTests
         var header = state.EventTables.Single(table => table.GroupId == groupId);
         state = state with { ActiveEventLogId = header.Id };
 
+        var served = new OrderedViewReady(
+            SnapshotVersion: 1,
+            Identity: state.ViewIdentity,
+            Sequence: state.HighestInvalidationSequence,
+            SingleLogId: null,
+            InScope: [new LogGeneration(ids[0], 0), new LogGeneration(ids[1], 0)],
+            View: LogTableState.EmptyView,
+            Config: state.CommittedSortContext,
+            Filter: state.AppliedFilter);
+
+        state = state with { RetainedOrderedViews = RetainedViewTestFactory.RetainedMap(served) };
+
         var active = state.GetActiveDisplayedEvents();
 
-        // Export scopes to the group's members (ids[0], ids[1]); NOT the all-logs view that also includes the
-        // standalone ids[2]. Before the fix this returned DisplayedEvents (every log).
-        Assert.True(ReferenceEquals(active, state.DisplayedEventsForTab(header)));
-        Assert.False(ReferenceEquals(active, state.DisplayedEvents));
-        Assert.Equal(2, active.Count);
+        Assert.Same(served.View, active);
+        Assert.Same(state.DisplayedEventsForTab(header), active);
     }
 
     [Fact]
@@ -155,6 +70,39 @@ public sealed class LogTabGroupTests
 
         Assert.Empty(state.Groups);
         Assert.Empty(state.EventTables);
+    }
+
+    [Fact]
+    public void ReduceCloseLog_ClosingAGroupMember_PrunesItFromBothMemberIdsAndTheRawStore()
+    {
+        var state = new LogTableState();
+        var rawStore = new RawEventStoreState();
+        var logs = new EventLogData[3];
+
+        for (int i = 0; i < logs.Length; i++)
+        {
+            logs[i] = new EventLogData($"Log{i}", LogPathType.Channel);
+
+            var addTable = new AddTableAction(logs[i]);
+            state = Reducers.ReduceAddTable(state, addTable);
+            rawStore = RawEventStoreReducers.ReduceAddTable(rawStore, addTable);
+        }
+
+        var groupId = NewGroup(ref state, logs[0].Id);
+        state = Reducers.ReduceMoveTabToGroup(state, new MoveTabToGroupAction(logs[1].Id, groupId));
+
+        Assert.Contains(logs[1].Id, state.Groups.Single(group => group.Id == groupId).MemberIds);
+        Assert.True(rawStore.ByLog.ContainsKey(logs[1].Id));
+
+        var closeMember = new CloseLogAction(logs[1].Id);
+        state = Reducers.ReduceCloseLog(state, closeMember);
+        rawStore = RawEventStoreReducers.ReduceCloseLog(rawStore, closeMember);
+
+        Assert.DoesNotContain(logs[1].Id, state.Groups.Single(group => group.Id == groupId).MemberIds);
+        Assert.False(rawStore.ByLog.ContainsKey(logs[1].Id));
+
+        Assert.Contains(logs[0].Id, state.Groups.Single(group => group.Id == groupId).MemberIds);
+        Assert.True(rawStore.ByLog.ContainsKey(logs[0].Id));
     }
 
     [Fact]
@@ -502,37 +450,6 @@ public sealed class LogTabGroupTests
         Assert.Same(state, result);
     }
 
-    private static LogTableState AppendBatch(LogTableState state, EventLogId logId, params ResolvedEvent[] events) =>
-        Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction
-        {
-            ViewsByLog = new Dictionary<EventLogId, EventColumnView>
-            {
-                [logId] = DisplayViewTestFactory.Build(logId, events)
-            }
-        });
-
-    private static void AssertViewExactly(
-        LogTableState state, IEventColumnView view, IReadOnlyList<ResolvedEvent> expected)
-    {
-        var oracle = AosReferenceOrdering.OrderedEvents(
-            expected,
-            ResolvedEventOrdering.ResolveDefaultOrderBy(state.OrderBy, state.GroupBy, state.PerLogEvents.Count, state.TimelineVisible),
-            state.IsDescending,
-            state.GroupBy,
-            state.IsGroupDescending);
-
-        Assert.Equal(oracle.Count, view.Count);
-
-        // The view rehydrates fresh ResolvedEvent objects from columns, so compare by value identity rather than
-        // reference (the AoS oracle holds the original object graph).
-        var displayed = view.Slice(0, view.Count);
-
-        for (int i = 0; i < oracle.Count; i++)
-        {
-            Assert.True(SameEvent(oracle[i], displayed[i].Lean), $"Order mismatch at index {i}.");
-        }
-    }
-
     private static ResolvedEvent MakeEvent(int logIndex, long? recordId, DateTime time) =>
         new($"Log{logIndex}", LogPathType.Channel) { RecordId = recordId, TimeCreated = time, Level = "Information" };
 
@@ -543,27 +460,17 @@ public sealed class LogTabGroupTests
         return state.Groups.Single(group => group.MemberIds.Contains(tabId)).Id;
     }
 
-    private static bool SameEvent(ResolvedEvent expected, ResolvedEvent actual) =>
-        expected.RecordId == actual.RecordId
-        && expected.Id == actual.Id
-        && expected.TimeCreated == actual.TimeCreated
-        && string.Equals(expected.Level, actual.Level, StringComparison.Ordinal);
-
     private static (LogTableState State, EventLogId[] Ids) SeedLogs(params IReadOnlyList<ResolvedEvent>[] perLog)
     {
         var state = new LogTableState();
         var ids = new EventLogId[perLog.Length];
-        var batch = new Dictionary<EventLogId, EventColumnView>(perLog.Length);
 
         for (int i = 0; i < perLog.Length; i++)
         {
             var data = new EventLogData($"Log{i}", LogPathType.Channel);
             ids[i] = data.Id;
             state = Reducers.ReduceAddTable(state, new AddTableAction(data));
-            batch[data.Id] = DisplayViewTestFactory.Build(data.Id, perLog[i]);
         }
-
-        state = Reducers.ReduceAppendTableEventsBatch(state, new AppendTableEventsBatchAction { ViewsByLog = batch });
 
         return (state, ids);
     }

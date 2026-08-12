@@ -7,41 +7,28 @@ using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 using System.Security.Principal;
+using static EventLogExpert.Runtime.Tests.LogTable.TestSupport.DivergenceReport;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
 
-/// <summary>
-///     End-to-end display parity for <see cref="EventColumnView" /> over a REAL <see cref="EventColumnStore" />
-///     (built and sealed into columnar chunks, so the view rehydrates from columns, not the original objects). Across the
-///     full 756-config sort matrix the view must (a) report the corpus count, (b) display the same order as the
-///     array-of-structs oracle <see cref="AosReferenceOrdering.OrderedEvents" />, and (c) round-trip every
-///     <see cref="DisplayRow.Loc" /> through <see cref="EventColumnView.Rank" /> and <c>GetDetail</c>. A filtered survivor
-///     subset must display exactly those rows. The corpus uses distinct non-null RecordIds so both sort paths resolve to
-///     one strict total order (the null-RecordId tie-burst corpus is <see cref="ColumnDirectSortKernelTests" />' job, not
-///     this wrapper's).
-/// </summary>
-public sealed class EventColumnViewTests
+public sealed class AosReferenceViewTests
 {
-    private static readonly ColumnName[] s_allColumns = Enum.GetValues<ColumnName>();
-    private static readonly bool[] s_bools = [false, true];
-    private static readonly IReadOnlyList<SortConfig> s_allConfigs = BuildAllConfigs();
-
+    private static readonly IReadOnlyList<SortConfig> s_allConfigs = SortConfigMatrix.All();
     private static readonly EventLogId s_logId = EventLogId.Create();
-    private static readonly IReadOnlyList<ResolvedEvent> s_corpus = BuildCorpus();
-
+    private static readonly IReadOnlyList<ResolvedEvent> s_sample = BuildSample();
     private static readonly IEventColumnReader s_reader =
-        EventColumnStore.Build(s_corpus, generation: 0, contentVersion: 0).CreateReader(s_logId);
+        EventColumnStore.Build(s_sample, generation: 0, contentVersion: 0).CreateReader(s_logId);
 
     [Fact]
-    public void Create_CountMatchesCorpus_ForEveryConfig()
+    public void Create_CountMatchesSample_ForEveryConfig()
     {
         int[] survivors = AllIndices();
 
         foreach (SortConfig config in s_allConfigs)
         {
-            EventColumnView view = CreateView(survivors, config);
+            AosReferenceView view = CreateView(survivors, config);
 
-            Assert.Equal(s_corpus.Count, view.Count);
+            Assert.Equal(s_sample.Count, view.Count);
         }
     }
 
@@ -52,25 +39,22 @@ public sealed class EventColumnViewTests
         var survivorSet = survivors.ToHashSet();
         var config = new SortConfig(ColumnName.DateAndTime, IsDescending: false, GroupBy: null, IsGroupDescending: false);
 
-        EventColumnView view = CreateView(survivors, config);
+        AosReferenceView view = CreateView(survivors, config);
         IReadOnlyList<DisplayRow> displayed = view.Slice(0, view.Count);
 
         Assert.Equal(survivors.Length, view.Count);
         Assert.Equal(survivors.Length, displayed.Count);
 
-        // The displayed physical rows are EXACTLY the survivor set (order-independent set equality).
         Assert.Equal(survivorSet, displayed.Select(row => row.Loc.Index).ToHashSet());
 
-        // The displayed order still matches the oracle sorted over just the survivor events.
-        IReadOnlyList<ResolvedEvent> oracle = AosReferenceOrdering.OrderedEvents(survivors.Select(index => s_corpus[index]), config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
+        IReadOnlyList<ResolvedEvent> oracle = AosReferenceOrdering.OrderedEvents(survivors.Select(index => s_sample[index]), config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
 
         for (int displayIndex = 0; displayIndex < oracle.Count; displayIndex++)
         {
             Assert.True(SameValueIdentity(oracle[displayIndex], displayed[displayIndex].Lean));
         }
 
-        // A filtered-out physical row ranks -1; a surviving one ranks to a display slot that maps back to it.
-        for (int physical = 0; physical < s_corpus.Count; physical++)
+        for (int physical = 0; physical < s_sample.Count; physical++)
         {
             int rank = view.Rank(s_reader.LocatorAt(physical));
 
@@ -95,11 +79,11 @@ public sealed class EventColumnViewTests
     [Fact]
     public void Rank_LocatorOutsideView_ReturnsMinusOne()
     {
-        EventColumnView view = CreateView(AllIndices(), new SortConfig(null, IsDescending: false, GroupBy: null, IsGroupDescending: false));
+        AosReferenceView view = CreateView(AllIndices(), new SortConfig(null, IsDescending: false, GroupBy: null, IsGroupDescending: false));
 
         Assert.Equal(-1, view.Rank(new EventLocator(EventLogId.Create(), 0, 0)));
         Assert.Equal(-1, view.Rank(new EventLocator(s_logId, 999, 0)));
-        Assert.Equal(-1, view.Rank(new EventLocator(s_logId, 0, s_corpus.Count)));
+        Assert.Equal(-1, view.Rank(new EventLocator(s_logId, 0, s_sample.Count)));
         Assert.Equal(-1, view.Rank(new EventLocator(s_logId, 0, -1)));
     }
 
@@ -111,9 +95,9 @@ public sealed class EventColumnViewTests
 
         foreach (SortConfig config in s_allConfigs)
         {
-            EventColumnView view = CreateView(survivors, config);
+            AosReferenceView view = CreateView(survivors, config);
             IReadOnlyList<DisplayRow> displayed = view.Slice(0, view.Count);
-            IReadOnlyList<ResolvedEvent> oracle = AosReferenceOrdering.OrderedEvents(s_corpus, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
+            IReadOnlyList<ResolvedEvent> oracle = AosReferenceOrdering.OrderedEvents(s_sample, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
 
             if (displayed.Count != oracle.Count)
             {
@@ -142,7 +126,7 @@ public sealed class EventColumnViewTests
 
         foreach (SortConfig config in s_allConfigs)
         {
-            EventColumnView view = CreateView(survivors, config);
+            AosReferenceView view = CreateView(survivors, config);
             IReadOnlyList<DisplayRow> displayed = view.Slice(0, view.Count);
 
             for (int displayIndex = 0; displayIndex < displayed.Count; displayIndex++)
@@ -172,8 +156,8 @@ public sealed class EventColumnViewTests
         const int start = 3;
         const int count = 4;
         var config = new SortConfig(ColumnName.RecordId, IsDescending: false, GroupBy: null, IsGroupDescending: false);
-        EventColumnView view = CreateView(AllIndices(), config);
-        IReadOnlyList<ResolvedEvent> oracle = AosReferenceOrdering.OrderedEvents(s_corpus, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
+        AosReferenceView view = CreateView(AllIndices(), config);
+        IReadOnlyList<ResolvedEvent> oracle = AosReferenceOrdering.OrderedEvents(s_sample, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
 
         IReadOnlyList<DisplayRow> window = view.Slice(start, count);
 
@@ -188,40 +172,9 @@ public sealed class EventColumnViewTests
         }
     }
 
-    private static int[] AllIndices() => Enumerable.Range(0, s_corpus.Count).ToArray();
+    private static int[] AllIndices() => Enumerable.Range(0, s_sample.Count).ToArray();
 
-    // Test-local copy of the ColumnDirectSortKernelTests config matrix: the full order x group x asc/desc cross-product.
-    // Kept independent of the kernel suite's private fixture so the two suites do not couple.
-    private static IReadOnlyList<SortConfig> BuildAllConfigs()
-    {
-        var configs = new List<SortConfig>();
-
-        foreach (ColumnName? orderBy in OrderByOptions())
-        {
-            foreach (bool isDescending in s_bools)
-            {
-                configs.Add(new SortConfig(orderBy, isDescending, null, false));
-            }
-        }
-
-        foreach (ColumnName groupBy in s_allColumns)
-        {
-            foreach (bool isGroupDescending in s_bools)
-            {
-                foreach (ColumnName? orderBy in OrderByOptions())
-                {
-                    foreach (bool isDescending in s_bools)
-                    {
-                        configs.Add(new SortConfig(orderBy, isDescending, groupBy, isGroupDescending));
-                    }
-                }
-            }
-        }
-
-        return configs;
-    }
-
-    private static IReadOnlyList<ResolvedEvent> BuildCorpus()
+    private static IReadOnlyList<ResolvedEvent> BuildSample()
     {
         var guidA = new Guid("00000001-0000-0000-0000-000000000000");
         var guidB = new Guid("00000002-0000-0000-0000-000000000000");
@@ -233,9 +186,6 @@ public sealed class EventColumnViewTests
         var middle = new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc);
         var late = new DateTime(2024, 12, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        // Distinct non-null RecordIds (1..16): the RecordId tie-break is the ultimate arbiter of both the AoS and the
-        // column-direct chains, so a unique RecordId makes the total order deterministic and identical between them. Every
-        // other column repeats to exercise per-column ties that resolve through that shared tie-break.
         return
         [
             FilterEventBuilder.CreateTestEvent(id: 5, recordId: 1, source: "Alpha", level: "Information", computerName: "Host-A", logName: "AppLog", taskCategory: "Cat-A", keywords: ["K1"], processId: 30, threadId: 9, activityId: guidA, userId: sidLow, timeCreated: middle),
@@ -257,27 +207,15 @@ public sealed class EventColumnViewTests
         ];
     }
 
-    private static EventColumnView CreateView(ReadOnlySpan<int> survivors, SortConfig config) =>
-        EventColumnView.Create(s_reader, survivors, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
-
-    private static string Describe(IReadOnlyList<string> failures) =>
-        $"{failures.Count} divergence(s):{Environment.NewLine}{string.Join(Environment.NewLine, failures.Take(25))}";
+    private static AosReferenceView CreateView(ReadOnlySpan<int> survivors, SortConfig config) =>
+        AosReferenceView.Create(s_reader, survivors, config.OrderBy, config.IsDescending, config.GroupBy, config.IsGroupDescending);
 
     private static int[] FilteredSurvivors()
     {
-        // A non-contiguous, shuffled subset of physical rows (like a filter result): drop two indices and reverse the rest
-        // so the kernel must impose the canonical order regardless of the survivor input order.
-        List<int> survivors = Enumerable.Range(0, s_corpus.Count).Where(index => index != 2 && index != 11).ToList();
+        List<int> survivors = Enumerable.Range(0, s_sample.Count).Where(index => index != 2 && index != 11).ToList();
         survivors.Reverse();
 
         return survivors.ToArray();
-    }
-
-    private static IEnumerable<ColumnName?> OrderByOptions()
-    {
-        yield return null;
-
-        foreach (ColumnName column in s_allColumns) { yield return column; }
     }
 
     private static bool SameValueIdentity(ResolvedEvent expected, ResolvedEvent actual) =>
@@ -286,6 +224,4 @@ public sealed class EventColumnViewTests
         && expected.TimeCreated == actual.TimeCreated
         && string.Equals(expected.Source, actual.Source, StringComparison.Ordinal)
         && string.Equals(expected.Level, actual.Level, StringComparison.Ordinal);
-
-    private readonly record struct SortConfig(ColumnName? OrderBy, bool IsDescending, ColumnName? GroupBy, bool IsGroupDescending);
 }

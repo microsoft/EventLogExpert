@@ -1,0 +1,486 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Compilation;
+using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Runtime.LogTable;
+using System.Diagnostics.CodeAnalysis;
+
+namespace EventLogExpert.Runtime.Tests.LogTable.TestSupport;
+
+internal sealed class AosReferenceView : IEventColumnView
+{
+    private readonly SortContext _context;
+    private readonly int[] _order;
+    private readonly int[] _rankByPhysical;
+    private readonly IEventColumnReader _reader;
+
+    private Dictionary<ValueKey, int>? _byKey;
+    private HighlightWinnerCache? _highlightCache;
+
+    private AosReferenceView(IEventColumnReader reader, int[] order, int[] rankByPhysical, SortContext context)
+    {
+        _reader = reader;
+        _order = order;
+        _rankByPhysical = rankByPhysical;
+        _context = context;
+    }
+
+    public int Count => _order.Length;
+
+    internal SortContext Context => _context;
+
+    internal IEventColumnReader Reader => _reader;
+
+    internal ReadOnlySpan<int> Survivors => _order;
+
+    public void BucketTimeTicksByEventData(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventData(
+            _rankByPhysical,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            fieldName,
+            targetCodes,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksByEventDataHResult(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventDataHResult(
+            _rankByPhysical,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            fieldName,
+            eligibleProviders,
+            userDataErrorCodePaths,
+            targetCodes,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksByEventDataHResultWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventDataHResultWithTie(
+            _rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            fieldName,
+            eligibleProviders,
+            userDataErrorCodePaths,
+            targetCodes,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksByEventDataString(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventDataString(
+            _rankByPhysical,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            candidateFields,
+            rawValueToSlot,
+            slotCount,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksByEventDataStringWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string[] candidateFields,
+        IReadOnlyDictionary<string, int> rawValueToSlot,
+        int slotCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventDataStringWithTie(
+            _rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            candidateFields,
+            rawValueToSlot,
+            slotCount,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksByEventDataWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        string fieldName,
+        long[] targetCodes,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventDataWithTie(
+            _rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            fieldName,
+            targetCodes,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksByEventId(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventId(_rankByPhysical,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            targetIds,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksByEventIdWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] targetIds,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByEventIdWithTie(_rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            targetIds,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksByField(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventFieldId field,
+        string[] targetValues,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByField(_rankByPhysical,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            field,
+            targetValues,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksByFieldWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        EventFieldId field,
+        string[] targetValues,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksByFieldWithTie(_rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            field,
+            targetValues,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksBySeverity(
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksBySeverity(_rankByPhysical,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            slotCounts,
+            cancellationToken);
+
+    public void BucketTimeTicksBySeverityWithTie(
+        byte[] highlightWinners,
+        uint[] slotColorMask,
+        long minTicks,
+        long bucketSpanTicks,
+        int bucketCount,
+        int[] slotCounts,
+        CancellationToken cancellationToken) =>
+        _reader.BucketTimeTicksBySeverityWithTie(_rankByPhysical,
+            highlightWinners,
+            slotColorMask,
+            minTicks,
+            bucketSpanTicks,
+            bucketCount,
+            slotCounts,
+            cancellationToken);
+
+    public void CountEventDataHResults(
+        string fieldName,
+        IReadOnlyCollection<string> eligibleProviders,
+        IReadOnlyList<string> userDataErrorCodePaths,
+        IDictionary<long, int> counts,
+        CancellationToken cancellationToken) =>
+        _reader.CountEventDataHResults(_rankByPhysical, fieldName, eligibleProviders, userDataErrorCodePaths, counts, cancellationToken);
+
+    public void CountEventDataStringValues(
+        string[] candidateFields,
+        IDictionary<string, int> counts,
+        CancellationToken cancellationToken) =>
+        _reader.CountEventDataStringValues(_rankByPhysical, candidateFields, counts, cancellationToken);
+
+    public void CountEventDataValues(
+        string fieldName,
+        IDictionary<long, int> counts,
+        CancellationToken cancellationToken) =>
+        _reader.CountEventDataValues(_rankByPhysical, fieldName, counts, cancellationToken);
+
+    public void CountEventIds(IDictionary<int, int> counts, CancellationToken cancellationToken) =>
+        _reader.CountEventIds(_rankByPhysical, counts, cancellationToken);
+
+    public void CountFieldValues(
+        EventFieldId field,
+        IDictionary<string, int> counts,
+        CancellationToken cancellationToken) =>
+        _reader.CountFieldValues(_rankByPhysical, field, counts, cancellationToken);
+
+    public byte[] EnsureHighlightWinners(
+        IReadOnlyList<SavedFilter> orderedColoredFilters,
+        int planKey,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(orderedColoredFilters);
+
+        HighlightWinnerCache? cache = _highlightCache;
+
+        if (cache is { PlanKey: var key, Winners: var winners } && key == planKey && winners.Length == _reader.Count)
+        {
+            return winners;
+        }
+
+        byte[] fresh = FilterService.ClassifyHighlightWinners(_reader, _order, orderedColoredFilters, cancellationToken);
+        _highlightCache = new HighlightWinnerCache(planKey, fresh);
+
+        return fresh;
+    }
+
+    public IEnumerable<ResolvedEvent> EnumerateDetail()
+    {
+        foreach (int physical in _order)
+        {
+            yield return _reader.GetDetail(_reader.LocatorAt(physical));
+        }
+    }
+
+    public IEnumerable<ResolvedEvent> EnumerateDetailLean()
+    {
+        foreach (int physical in _order)
+        {
+            yield return _reader.GetDetailLean(_reader.LocatorAt(physical));
+        }
+    }
+
+    public ResolvedEvent GetDetail(EventLocator locator) => _reader.GetDetail(locator);
+
+    public ResolvedEvent GetDetailLean(EventLocator locator) => _reader.GetDetailLean(locator);
+
+    public string GroupKeyAt(EventLocator locator, ColumnName column) =>
+        ResolvedEventGroupKey.For(_reader, locator, column);
+
+    public EventLocator LocatorAt(int displayIndex) => _reader.LocatorAt(_order[displayIndex]);
+
+    public int Rank(EventLocator locator) =>
+        locator.LogId == _reader.LogId
+        && locator.Generation == _reader.Generation
+        && locator.Index >= 0
+        && locator.Index < _rankByPhysical.Length
+            ? _rankByPhysical[locator.Index]
+            : -1;
+
+    public EventLocator? ResolveByKey(ValueKey key)
+    {
+        var byKey = Volatile.Read(ref _byKey);
+
+        if (byKey is null)
+        {
+            byKey = BuildByKey();
+
+            byKey = Interlocked.CompareExchange(ref _byKey, byKey, null) ?? byKey;
+        }
+
+        return byKey.TryGetValue(key, out int physical) ? _reader.LocatorAt(physical) : null;
+    }
+
+    public IReadOnlyList<DisplayRow> Slice(int start, int count)
+    {
+        int clampedStart = Math.Clamp(start, 0, _order.Length);
+        int clampedCount = Math.Clamp(count, 0, _order.Length - clampedStart);
+        List<DisplayRow> rows = new(clampedCount);
+
+        for (int offset = 0; offset < clampedCount; offset++)
+        {
+            EventLocator locator = LocatorAt(clampedStart + offset);
+            rows.Add(new DisplayRow(locator, _reader.GetDetailLean(locator)));
+        }
+
+        return rows;
+    }
+
+    public bool TryGetDetail(EventLocator locator, [NotNullWhen(true)] out ResolvedEvent? detail)
+    {
+        if (locator.LogId == _reader.LogId
+            && locator.Generation == _reader.Generation
+            && locator.Index >= 0
+            && locator.Index < _reader.Count)
+        {
+            detail = _reader.GetDetail(locator);
+
+            return true;
+        }
+
+        detail = null;
+
+        return false;
+    }
+
+    public bool TryGetTimeTicks(EventLocator locator, out long ticks)
+    {
+        if (locator.LogId == _reader.LogId
+            && locator.Generation == _reader.Generation
+            && locator.Index >= 0
+            && locator.Index < _reader.Count)
+        {
+            ticks = _reader.GetTimeTicks(locator);
+
+            return true;
+        }
+
+        ticks = 0;
+
+        return false;
+    }
+
+    public bool TryGetTimeTicksRange(out long minTicks, out long maxTicks, CancellationToken cancellationToken) =>
+        _reader.TryGetTimeTicksRange(_rankByPhysical, out minTicks, out maxTicks, cancellationToken);
+
+    internal static AosReferenceView Create(
+        IEventColumnReader reader,
+        ReadOnlySpan<int> survivors,
+        ColumnName? orderBy,
+        bool isDescending,
+        ColumnName? groupBy,
+        bool isGroupDescending) =>
+        Create(reader, survivors, new SortContext(orderBy, isDescending, groupBy, isGroupDescending));
+
+    internal static AosReferenceView Create(IEventColumnReader reader, ReadOnlySpan<int> survivors, SortContext context)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+
+        int[] survivorList = survivors.ToArray();
+        Array.Sort(survivorList);
+
+        var events = new ResolvedEvent[survivorList.Length];
+
+        for (int i = 0; i < survivorList.Length; i++)
+        {
+            events[i] = reader.GetDetailLean(reader.LocatorAt(survivorList[i]));
+        }
+
+        int[] permutation = AosReferenceOrdering.Order(
+            events, context.OrderBy, context.IsDescending, context.GroupBy, context.IsGroupDescending);
+        int[] order = new int[permutation.Length];
+
+        for (int i = 0; i < permutation.Length; i++) { order[i] = survivorList[permutation[i]]; }
+
+        int[] rankByPhysical = new int[reader.Count];
+        Array.Fill(rankByPhysical, -1);
+
+        for (int display = 0; display < order.Length; display++)
+        {
+            rankByPhysical[order[display]] = display;
+        }
+
+        return new AosReferenceView(reader, order, rankByPhysical, context);
+    }
+
+    internal bool HasContext(SortContext context) => _context.Equals(context);
+
+    internal AosReferenceView WithContext(SortContext context)
+    {
+        AosReferenceView view = Create(_reader, _order, context);
+        view._highlightCache = _highlightCache;
+
+        return view;
+    }
+
+    private Dictionary<ValueKey, int> BuildByKey()
+    {
+        var map = new Dictionary<ValueKey, int>(_order.Length);
+
+        foreach (int physical in _order)
+        {
+            if (ValueKey.TryCreate(_reader.GetDetailLean(_reader.LocatorAt(physical)), out ValueKey key))
+            {
+                map.TryAdd(key, physical);
+            }
+        }
+
+        return map;
+    }
+
+    private sealed record HighlightWinnerCache(int PlanKey, byte[] Winners);
+}
