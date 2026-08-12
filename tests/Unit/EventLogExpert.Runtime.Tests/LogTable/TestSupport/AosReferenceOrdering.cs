@@ -6,40 +6,33 @@ using EventLogExpert.Runtime.LogTable;
 
 namespace EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 
-/// <summary>
-///     Test-only reference oracle relocated verbatim from the deleted production array-of-structs ordering (
-///     <c>ResolvedEventOrdering.SelectComparer</c> / <c>GetComparer</c> / <c>GetGroupedComparer</c> / <c>CompareColumn</c>
-///     / <c>WithTieBreaker</c> / <c>FallbackTieBreaker</c>). The live columnar sort (<c>SortColumnDirect</c> /
-///     <c>SelectCrossColumnComparer</c>) is validated against this reference; the two are structurally distinct
-///     implementations, so the differential/parity assertions stay non-vacuous.
-/// </summary>
 internal static class AosReferenceOrdering
 {
     private static readonly Comparison<ResolvedEvent> s_ascByLevel =
-        (a, b) => WithTieBreaker(string.Compare(a.Level, b.Level, StringComparison.Ordinal), a, b);
+        (a, b) => WithTieBreaker(CompareText(a.Level, b.Level), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByDateAndTime =
         (a, b) => WithTieBreaker(a.TimeCreated.CompareTo(b.TimeCreated), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByActivityId =
         (a, b) => WithTieBreaker(Nullable.Compare(a.ActivityId, b.ActivityId), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByLog =
-        (a, b) => WithTieBreaker(string.Compare(a.LogName, b.LogName, StringComparison.Ordinal), a, b);
+        (a, b) => WithTieBreaker(CompareText(a.LogName, b.LogName), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByComputerName =
-        (a, b) => WithTieBreaker(string.Compare(a.ComputerName, b.ComputerName, StringComparison.Ordinal), a, b);
+        (a, b) => WithTieBreaker(CompareText(a.ComputerName, b.ComputerName), a, b);
 
     private static readonly Comparison<ResolvedEvent> s_ascBySource =
-        (a, b) => WithTieBreaker(string.Compare(a.Source, b.Source, StringComparison.Ordinal), a, b);
+        (a, b) => WithTieBreaker(CompareText(a.Source, b.Source), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByEventId =
         (a, b) => WithTieBreaker(a.Id.CompareTo(b.Id), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByTaskCategory =
-        (a, b) => WithTieBreaker(string.Compare(a.TaskCategory, b.TaskCategory, StringComparison.Ordinal), a, b);
+        (a, b) => WithTieBreaker(CompareText(a.TaskCategory, b.TaskCategory), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByKeywords =
-        (a, b) => WithTieBreaker(string.Compare(a.KeywordsDisplayName, b.KeywordsDisplayName, StringComparison.Ordinal), a, b);
+        (a, b) => WithTieBreaker(CompareText(a.KeywordsDisplayName, b.KeywordsDisplayName), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByProcessId =
         (a, b) => WithTieBreaker(Nullable.Compare(a.ProcessId, b.ProcessId), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByThreadId =
         (a, b) => WithTieBreaker(Nullable.Compare(a.ThreadId, b.ThreadId), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByUser =
-        (a, b) => WithTieBreaker(string.Compare(a.UserId?.Value, b.UserId?.Value, StringComparison.Ordinal), a, b);
+        (a, b) => WithTieBreaker(CompareText(a.UserId?.Value, b.UserId?.Value), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByRecordId =
         (a, b) => WithTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByDefault =
@@ -49,10 +42,9 @@ internal static class AosReferenceOrdering
 
             if (byRecordId != 0) { return byRecordId; }
 
-            // Fall back to timestamp then OwningLog for a total order.
             int byTime = a.TimeCreated.CompareTo(b.TimeCreated);
 
-            return byTime != 0 ? byTime : string.Compare(a.OwningLog, b.OwningLog, StringComparison.Ordinal);
+            return byTime != 0 ? byTime : CompareText(a.OwningLog, b.OwningLog);
         };
 
     private static readonly Comparison<ResolvedEvent> s_descByActivityId = (a, b) => s_ascByActivityId(b, a);
@@ -70,11 +62,6 @@ internal static class AosReferenceOrdering
     private static readonly Comparison<ResolvedEvent> s_descByThreadId = (a, b) => s_ascByThreadId(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByUser = (a, b) => s_ascByUser(b, a);
 
-    /// <summary>
-    ///     Sorts the physical indices <c>0..source.Count-1</c> by <see cref="Reference" /> with a final ascending
-    ///     physical-index tie-break, reproducing the strict total order the live <c>SortColumnDirect</c> produces. Returns a
-    ///     permutation (indices), never sorted events, so value-identical rows stay distinguishable by position.
-    /// </summary>
     internal static int[] Order(
         IReadOnlyList<ResolvedEvent> source,
         ColumnName? orderBy = null,
@@ -99,12 +86,6 @@ internal static class AosReferenceOrdering
         return order;
     }
 
-    /// <summary>
-    ///     Convenience over <see cref="Order" /> that maps the permutation back to events. Deterministic because it
-    ///     delegates to <see cref="Order" /> (whose final physical-index tie-break is a strict total order), so it is safe
-    ///     only for suites that assert field values against a totally ordered corpus, never permutations of value-identical
-    ///     rows.
-    /// </summary>
     internal static IReadOnlyList<ResolvedEvent> OrderedEvents(
         IEnumerable<ResolvedEvent> source,
         ColumnName? orderBy = null,
@@ -123,10 +104,6 @@ internal static class AosReferenceOrdering
         return ordered;
     }
 
-    /// <summary>
-    ///     The relocated array-of-structs comparer (formerly <c>ResolvedEventOrdering.SelectComparer</c>): ungrouped uses
-    ///     the per-column chain, grouped keeps groups contiguous then orders within group.
-    /// </summary>
     internal static Comparison<ResolvedEvent> Reference(
         ColumnName? orderBy,
         bool isDescending,
@@ -140,24 +117,26 @@ internal static class AosReferenceOrdering
         column switch
         {
             ColumnName.RecordId => Nullable.Compare(a.RecordId, b.RecordId),
-            ColumnName.Level => string.Compare(a.Level ?? string.Empty, b.Level ?? string.Empty, StringComparison.Ordinal),
+            ColumnName.Level => CompareText(a.Level, b.Level),
             ColumnName.DateAndTime => a.TimeCreated.CompareTo(b.TimeCreated),
             ColumnName.ActivityId => Nullable.Compare(a.ActivityId, b.ActivityId),
-            ColumnName.Log => string.Compare(a.LogName ?? string.Empty, b.LogName ?? string.Empty, StringComparison.Ordinal),
-            ColumnName.ComputerName => string.Compare(a.ComputerName ?? string.Empty, b.ComputerName ?? string.Empty, StringComparison.Ordinal),
-            ColumnName.Source => string.Compare(a.Source ?? string.Empty, b.Source ?? string.Empty, StringComparison.Ordinal),
+            ColumnName.Log => CompareText(a.LogName, b.LogName),
+            ColumnName.ComputerName => CompareText(a.ComputerName, b.ComputerName),
+            ColumnName.Source => CompareText(a.Source, b.Source),
             ColumnName.EventId => a.Id.CompareTo(b.Id),
-            ColumnName.TaskCategory => string.Compare(a.TaskCategory ?? string.Empty, b.TaskCategory ?? string.Empty, StringComparison.Ordinal),
-            ColumnName.Keywords => string.Compare(a.KeywordsDisplayName ?? string.Empty, b.KeywordsDisplayName ?? string.Empty, StringComparison.Ordinal),
+            ColumnName.TaskCategory => CompareText(a.TaskCategory, b.TaskCategory),
+            ColumnName.Keywords => CompareText(a.KeywordsDisplayName, b.KeywordsDisplayName),
             ColumnName.ProcessId => Nullable.Compare(a.ProcessId, b.ProcessId),
             ColumnName.ThreadId => Nullable.Compare(a.ThreadId, b.ThreadId),
-            ColumnName.User => string.Compare(a.UserId?.Value ?? string.Empty, b.UserId?.Value ?? string.Empty, StringComparison.Ordinal),
+            ColumnName.User => CompareText(a.UserId?.Value, b.UserId?.Value),
             _ => 0
         };
 
-    // Falls back to RecordId, then OwningLog (for combined logs) to guarantee a total order for List.Sort stability.
+    private static int CompareText(string? a, string? b) =>
+        string.Compare(a ?? string.Empty, b ?? string.Empty, StringComparison.Ordinal);
+
     private static int FallbackTieBreaker(int recordIdResult, ResolvedEvent a, ResolvedEvent b) =>
-        recordIdResult != 0 ? recordIdResult : string.Compare(a.OwningLog, b.OwningLog, StringComparison.Ordinal);
+        recordIdResult != 0 ? recordIdResult : CompareText(a.OwningLog, b.OwningLog);
 
     private static Comparison<ResolvedEvent> GetComparer(ColumnName? orderBy, bool isDescending) =>
         isDescending
