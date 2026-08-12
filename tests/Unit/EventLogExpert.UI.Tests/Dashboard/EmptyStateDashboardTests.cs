@@ -15,7 +15,6 @@ using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Dashboard;
-using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -36,11 +35,8 @@ public sealed class EmptyStateDashboardTests : BunitContext
     private readonly IChannelEnableService _channelEnable = Substitute.For<IChannelEnableService>();
     private readonly IChannelReadinessService _channelReadinessService = Substitute.For<IChannelReadinessService>();
     private readonly IScenarioFavoriteCommands _favoriteCommands = Substitute.For<IScenarioFavoriteCommands>();
-    private readonly IState<ScenarioFavoritesState> _favorites = Substitute.For<IState<ScenarioFavoritesState>>();
-    private readonly IStateSelection<ScenarioFavoritesState, ImmutableHashSet<string>> _favoritesSelection =
-        Substitute.For<IStateSelection<ScenarioFavoritesState, ImmutableHashSet<string>>>();
-
-    private readonly IStateSelection<EventLogState, bool> _filterApplied = Substitute.For<IStateSelection<EventLogState, bool>>();
+    private readonly IScenarioFavoritesSource _favoritesSource = Substitute.For<IScenarioFavoritesSource>();
+    private readonly IFilterAppliedSource _filterAppliedSource = Substitute.For<IFilterAppliedSource>();
     private readonly IFilterPaneCommands _filterCommands = Substitute.For<IFilterPaneCommands>();
     private readonly IScenarioLaunchService _scenarioLaunch = Substitute.For<IScenarioLaunchService>();
     private readonly IScenarioQueryService _scenarioQuery = Substitute.For<IScenarioQueryService>();
@@ -58,22 +54,19 @@ public sealed class EmptyStateDashboardTests : BunitContext
                     Access = ChannelAccess.Accessible
                 }
             ]);
-        _favorites.Value.Returns(new ScenarioFavoritesState());
-        _favoritesSelection.Value.Returns(ImmutableHashSet<string>.Empty);
+        _favoritesSource.FavoriteScenarioIds.Returns(ImmutableHashSet<string>.Empty);
 
         Services.AddSingleton(_actions);
         Services.AddSingleton(_alertDialog);
         Services.AddSingleton(_announcer);
         Services.AddSingleton(_favoriteCommands);
-        Services.AddSingleton(_favorites);
-        Services.AddSingleton(_favoritesSelection);
-        Services.AddSingleton(_filterApplied);
+        Services.AddSingleton(_favoritesSource);
+        Services.AddSingleton(_filterAppliedSource);
         Services.AddSingleton(_filterCommands);
         Services.AddSingleton(_scenarioLaunch);
         Services.AddSingleton(_scenarioQuery);
         Services.AddSingleton(_channelReadinessService);
         Services.AddSingleton(_channelEnable);
-        Services.AddFluxor(options => options.ScanAssemblies(typeof(EmptyStateDashboard).Assembly));
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
@@ -100,9 +93,26 @@ public sealed class EmptyStateDashboardTests : BunitContext
     }
 
     [Fact]
+    public void Chip_TogglesReactively_WhenFilterAppliedSourceRaisesChanged()
+    {
+        _filterAppliedSource.IsFilteringEnabled.Returns(false);
+
+        var cut = Render<EmptyStateDashboard>();
+        Assert.Empty(cut.FindAll(".empty-dashboard__chip"));
+
+        _filterAppliedSource.IsFilteringEnabled.Returns(true);
+        cut.InvokeAsync(() => _filterAppliedSource.Changed += Raise.Event<Action>());
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".empty-dashboard__chip")));
+
+        _filterAppliedSource.IsFilteringEnabled.Returns(false);
+        cut.InvokeAsync(() => _filterAppliedSource.Changed += Raise.Event<Action>());
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".empty-dashboard__chip")));
+    }
+
+    [Fact]
     public void Chip_WhenFilterApplied_ClearInvokesClearAllFilters()
     {
-        _filterApplied.Value.Returns(true);
+        _filterAppliedSource.IsFilteringEnabled.Returns(true);
 
         var cut = Render<EmptyStateDashboard>();
         cut.Find(".empty-dashboard__chip button").Click();
@@ -113,7 +123,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void Chip_WhenNoFilterApplied_NotRendered()
     {
-        _filterApplied.Value.Returns(false);
+        _filterAppliedSource.IsFilteringEnabled.Returns(false);
 
         var cut = Render<EmptyStateDashboard>();
 
@@ -388,6 +398,15 @@ public sealed class EmptyStateDashboardTests : BunitContext
     }
 
     [Fact]
+    public async Task DisposeAsync_CalledTwice_DoesNotThrow()
+    {
+        var cut = Render<EmptyStateDashboard>();
+
+        await cut.Instance.DisposeAsync();
+        await cut.Instance.DisposeAsync();
+    }
+
+    [Fact]
     public void EnableChannel_WhenConfirmCancelled_DoesNotInvokeService()
     {
         _channelEnable.CanEnable.Returns(true);
@@ -447,10 +466,24 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("[role='tab']")));
         Assert.DoesNotContain("Favorites", TabLabels(cut));
 
-        _favorites.Value.Returns(new ScenarioFavoritesState { FavoriteScenarioIds = ["application-crashes"] });
-        RaiseFavoritesChanged(cut, "application-crashes");
+        _favoritesSource.FavoriteScenarioIds.Returns(ImmutableHashSet.Create("application-crashes"));
+        RaiseFavoritesChanged(cut);
 
         cut.WaitForAssertion(() => Assert.Contains("Favorites", TabLabels(cut)));
+    }
+
+    [Fact]
+    public void Favoriting_ReactivelyFillsTheActiveDetailStar()
+    {
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.Equal("false", cut.Find(ActiveDetailStar).GetAttribute("aria-pressed")));
+
+        _favoritesSource.FavoriteScenarioIds.Returns(ImmutableHashSet.Create("application-crashes"));
+        RaiseFavoritesChanged(cut);
+
+        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(ActiveDetailStar).GetAttribute("aria-pressed")));
     }
 
     [Fact]
@@ -484,7 +517,6 @@ public sealed class EmptyStateDashboardTests : BunitContext
         });
         Assert.True(captured.IsCancellationRequested);
 
-        // The service ultimately reports Cancelled; no result dialog is shown for a user cancellation.
         release.SetResult(ScenarioFolderLaunchResult.Cancelled);
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning")));
         _alertDialog.DidNotReceive().ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
@@ -494,9 +526,6 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public async Task FolderScan_WhenLaunchedFromReactiveBannerRetry_GuardsScanAndReenablesButtons()
     {
-        // A live launch that cannot open its channels raises a banner whose retry opens from a folder. That retry runs
-        // outside the dashboard's event loop, so it must route through RunGuardedAsync (setting _isBusy while the scan
-        // runs) AND RunGuardedAsync must render on completion to re-enable the busy-gated controls.
         _scenarioLaunch.LaunchAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>())
             .Returns(new ScenarioLaunchResult(0, 0, 1)
             {
@@ -518,7 +547,6 @@ public sealed class EmptyStateDashboardTests : BunitContext
             .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
             .Returns(async ci =>
             {
-                // Simulate the native folder picker being open before any phase is reported.
                 await pickerGate.Task;
                 await ci.Arg<Func<ScenarioFolderPhase, Task>>()!(ScenarioFolderPhase.Scanning);
 
@@ -534,16 +562,12 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         var retried = cut.InvokeAsync(() => retry!());
 
-        // During the picker (before any phase) the guard must already have disabled the busy-gated controls, even though
-        // the scan chip is not shown yet. If the retry bypassed RunGuardedAsync, or RunGuardedAsync did not render on
-        // _isBusy=true, the open-folder button would still be enabled here.
         cut.WaitForAssertion(() =>
         {
             Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning"));
             Assert.True(cut.Find(ActiveDetailOpenFolder).HasAttribute("disabled"));
         });
 
-        // The picker returns; Scanning surfaces the chip while the scan runs, controls still disabled.
         pickerGate.SetResult();
         cut.WaitForAssertion(() =>
         {
@@ -554,7 +578,6 @@ public sealed class EmptyStateDashboardTests : BunitContext
         release.SetResult(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.NoMatchingLogs });
         await retried;
 
-        // The completion render re-enables the busy-gated control on this non-event-loop path.
         cut.WaitForAssertion(() =>
         {
             Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning"));
@@ -647,7 +670,6 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.Find(ActiveDetailOpenFolder).Click();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".empty-dashboard__chip--scanning")));
 
-        // Reselecting a different scenario changes the detail pane but must not hide the masthead scan chip.
         cut.FindAll(ActiveOption).First(option => option.TextContent.Contains("Crash B")).Click();
 
         cut.WaitForAssertion(() =>
@@ -832,7 +854,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void Tablist_ListsFavoritesRecommendedAndGroupsInOrder()
     {
-        _favorites.Value.Returns(new ScenarioFavoritesState { FavoriteScenarioIds = ["application-crashes"] });
+        _favoritesSource.FavoriteScenarioIds.Returns(ImmutableHashSet.Create("application-crashes"));
         _scenarioQuery.GetSplashScenarios().Returns(
         [
             Scenario("application-crashes", "Application crashes", group: ScenarioGroup.SystemHealth),
@@ -858,7 +880,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void Unfavoriting_LastFavorite_RemovesTabAndReconcilesActive()
     {
-        _favorites.Value.Returns(new ScenarioFavoritesState { FavoriteScenarioIds = ["application-crashes"] });
+        _favoritesSource.FavoriteScenarioIds.Returns(ImmutableHashSet.Create("application-crashes"));
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
         var cut = Render<EmptyStateDashboard>();
@@ -868,7 +890,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
             Assert.Equal("Favorites", cut.Find("[role='tab'][aria-selected='true']").TextContent.Trim());
         });
 
-        _favorites.Value.Returns(new ScenarioFavoritesState());
+        _favoritesSource.FavoriteScenarioIds.Returns(ImmutableHashSet<string>.Empty);
         RaiseFavoritesChanged(cut);
 
         cut.WaitForAssertion(() =>
@@ -905,7 +927,6 @@ public sealed class EmptyStateDashboardTests : BunitContext
     private static IReadOnlyList<string> TabLabels(IRenderedComponent<EmptyStateDashboard> cut) =>
         cut.FindAll("[role='tab']").Select(tab => tab.TextContent.Trim()).ToList();
 
-    private void RaiseFavoritesChanged(IRenderedComponent<EmptyStateDashboard> cut, params string[] favoriteIds) =>
-        cut.InvokeAsync(() => _favoritesSelection.SelectedValueChanged +=
-            Raise.Event<EventHandler<ImmutableHashSet<string>>>(this, favoriteIds.ToImmutableHashSet()));
+    private void RaiseFavoritesChanged(IRenderedComponent<EmptyStateDashboard> cut) =>
+        cut.InvokeAsync(() => _favoritesSource.Changed += Raise.Event<Action>());
 }

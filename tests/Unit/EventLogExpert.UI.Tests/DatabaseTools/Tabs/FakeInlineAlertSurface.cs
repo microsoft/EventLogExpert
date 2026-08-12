@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.DatabaseTools;
 
 namespace EventLogExpert.UI.Tests.DatabaseTools.Tabs;

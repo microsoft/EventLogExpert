@@ -1,5 +1,5 @@
 @using EventLogExpert.Scenarios.Catalog
-@inherits FluxorComponent
+@inherits AppStateComponentBase
 
 <div class="filter-pane" @ref="_filterPaneRootRef">
 <div class="filter-header">
@@ -38,7 +38,7 @@
             Apply Filter Set
         </Button>
 
-        @if (OpenLogCount.Value > 0)
+        @if (OpenLogsPresence.HasOpenLogs)
         {
             <Button aria-controls="scenario-picker"
                 aria-expanded="@(IsScenarioPickerVisible ? "true" : "false")"
@@ -49,13 +49,7 @@
         }
     </div>
 
-    @if (FilterProgressState.Value.IsLoading)
-    {
-        <span class="filter-header-status">
-            [<i aria-label="Loading" class="spinner-border loader-spin" role="status"></i> Applying Filters]
-        </span>
-    }
-    else if (HasFilters && GetActiveFilters() > 0)
+    @if (HasFilters && GetActiveFilters() > 0)
     {
         <span class="filter-header-status">[Active Filters: @GetActiveFilters()]</span>
     }
@@ -115,7 +109,7 @@
             There are no filters to clear.
         </span>
 
-        @if (HasFilters || FilterProgressState.Value.IsLoading)
+        @if (HasFilters)
         {
             <Button aria-label="@(_isFilterListVisible ? "Filters Expanded" : "Filters Collapsed")"
                 CssClass="menu-toggle"
@@ -130,14 +124,14 @@
 <div class="filter-set" data-toggle="@MenuState">
     @if (IsDateFilterVisible)
     {
-        <EditForm class="filter-form flex-row" Model="_model">
+        <EditForm class="filter-form flex-row" EditContext="_editContext">
             <span>
                 After:
-                <InputDate aria-label="After" @bind-Value="_model.After" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
+                <InputDate aria-label="After" @bind-Value="ModelAfter" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
             </span>
             <span>
                 Before:
-                <InputDate aria-label="Before" @bind-Value="_model.Before" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
+                <InputDate aria-label="Before" @bind-Value="ModelBefore" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
             </span>
 
             @if (_canEditDate)
@@ -165,7 +159,7 @@
                     Remove
                 </DangerButton>
 
-                @if (FilterPaneState.Value.FilteredDateRange?.IsEnabled is true)
+                @if (FilteredDateRange.Current?.IsEnabled is true)
                 {
                     <DangerButton IconClass="bi bi-dash-circle" OnClick="ToggleDateFilter">
                         Disable
@@ -324,7 +318,7 @@
     }
 
     <CascadingValue IsFixed="true" Value="_authoringContext">
-        @foreach (var item in FilterPaneState.Value.Filters)
+        @foreach (var item in ActiveFilters.Current)
         {
             <FilterRow Id="@ComponentId.For(item.Id, ComponentIdScope.PaneFilter).Value"
                 @key="item.Id"

@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
-using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
 

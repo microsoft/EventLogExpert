@@ -1,7 +1,7 @@
-@inherits FluxorComponent
+@inherits AppStateComponentBase
 
 @{
-    var lenses = LensState.Value.Lenses;
+    var lenses = LensSource.Lenses;
 }
 
 @if (!lenses.IsEmpty)
@@ -16,12 +16,12 @@
 
         @foreach (var lens in lenses)
         {
-            var captured = lens;
-            <span class="lens-chip">
-                <span class="lens-chip-label" title="@lens.Label">@lens.Label</span>
+            var lensId = lens.Id;
+            <span class="lens-lens">
+                <span class="lens-lens-label" title="@lens.Label">@lens.Label</span>
                 <button aria-label="@($"Remove lens: {lens.Label}")"
-                    class="lens-chip-remove"
-                    @onclick="@(() => Commands.RemoveLens(captured))"
+                    class="lens-lens-remove"
+                    @onclick="@(() => Commands.RemoveLens(lensId))"
                     type="button">
                     &times;
                 </button>

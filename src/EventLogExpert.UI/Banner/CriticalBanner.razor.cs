@@ -13,6 +13,8 @@ namespace EventLogExpert.UI.Banner;
 
 public sealed partial class CriticalBanner : ComponentBase, IDisposable
 {
+    private static readonly TimeSpan s_copiedFeedbackDuration = TimeSpan.FromSeconds(2);
+
     private CancellationTokenSource? _copiedFeedbackCts;
     private string? _recoveryFailureMessage;
     private Button? _reloadButton;
@@ -65,7 +67,7 @@ public sealed partial class CriticalBanner : ComponentBase, IDisposable
 
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
+            await Task.Delay(s_copiedFeedbackDuration, cts.Token);
 
             if (ReferenceEquals(_copiedFeedbackCts, cts))
             {

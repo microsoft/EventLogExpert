@@ -9,12 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace EventLogExpert.UI.Tests.DatabaseTools;
 
-/// <summary>
-///     Lifecycle and menu-in-modal infrastructure coverage that goes through the shared <see cref="ModalChrome" />
-///     path. DatabaseToolsModal itself depends on Fluxor + ModalCoordinator plumbing whose isolated coverage already lives
-///     in their respective component tests; the meaningful new contract for #545 is that ANY modal hosted via ModalChrome
-///     now (a) registers an in-dialog MenuHost on open, and (b) unregisters it on dispose.
-/// </summary>
 public sealed class DatabaseToolsModalTests : BunitContext
 {
     public DatabaseToolsModalTests()
@@ -23,8 +17,7 @@ public sealed class DatabaseToolsModalTests : BunitContext
 
         Services.AddBannerHostDependencies();
         Services.AddMenuServiceMock();
-        // Real MenuHostRegistry so the in-dialog MenuHost actually registers itself.
-        Services.AddEventLogUiServices();
+        Services.AddEventLogUIServices();
     }
 
     [Fact]

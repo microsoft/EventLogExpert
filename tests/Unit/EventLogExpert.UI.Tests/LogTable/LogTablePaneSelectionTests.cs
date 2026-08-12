@@ -36,12 +36,15 @@ public sealed class LogTablePaneSelectionTests : BunitContext
     private readonly IHighlightSelector _highlightSelector = Substitute.For<IHighlightSelector>();
     private readonly EventLogId _logId = EventLogId.Create();
     private readonly IState<LogTableState> _logTableState = Substitute.For<IState<LogTableState>>();
-    private readonly IStateSelection<EventLogState, SelectionEntry?> _selectedEvent = Substitute.For<IStateSelection<EventLogState, SelectionEntry?>>();
-    private readonly IStateSelection<EventLogState, ImmutableList<SelectionEntry>> _selectedEvents = Substitute.For<IStateSelection<EventLogState, ImmutableList<SelectionEntry>>>();
+    private readonly IEventFocusSource _selectedEvent = Substitute.For<IEventFocusSource>();
+    private readonly IEventSelectionSource _selectedEvents = Substitute.For<IEventSelectionSource>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
+    private readonly IOrderedViewSource _viewSource = Substitute.For<IOrderedViewSource>();
 
     private SelectionEntry? _dispatchedActive;
     private IReadOnlyCollection<SelectionEntry>? _dispatchedEvents;
+
+    private OrderedViewPresentation? _presentation;
 
     public LogTablePaneSelectionTests()
     {
@@ -56,7 +59,7 @@ public sealed class LogTablePaneSelectionTests : BunitContext
         _highlightSelector.ComputeHighlightKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(0);
         _settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
 
-        _selectedEvent.Value.Returns((SelectionEntry?)null);
+        _selectedEvent.Current.Returns((SelectionEntry?)null);
         SetSelection();
 
         _eventLogCommands
@@ -76,6 +79,9 @@ public sealed class LogTablePaneSelectionTests : BunitContext
         Services.AddSingleton(_selectedEvent);
         Services.AddSingleton(_selectedEvents);
         Services.AddSingleton(_settings);
+
+        _viewSource.Current.Returns(_ => _presentation);
+        Services.AddSingleton(_viewSource);
 
         Services.AddFluxor(options => options.ScanAssemblies(typeof(LogTablePane).Assembly));
     }
@@ -167,9 +173,6 @@ public sealed class LogTablePaneSelectionTests : BunitContext
     [Fact]
     public void CtrlShiftClick_MergesExistingSelectionWithRange()
     {
-        // Pins SelectEvent's merge formula (current selection + range): the mock doesn't propagate the
-        // first plain click's dispatch, so the store stays frozen at [e3] and the merge yields
-        // [e3] + range[e1,e2] = [e1,e2,e3].
         SetSelection(_event3);
         var rows = RenderRows();
 
@@ -275,31 +278,38 @@ public sealed class LogTablePaneSelectionTests : BunitContext
             ColumnName.Keywords, ColumnName.ProcessId, ColumnName.ThreadId, ColumnName.User
         ];
 
+        _presentation = DisplayViewTestFactory.Presentation(
+            _logId, [displayedEvent], orderBy: orderBy, isDescending: isDescending) with
+        {
+            Columns = allColumns.ToImmutableDictionary(column => column, _ => true),
+            ColumnOrder = [.. allColumns]
+        };
+
         _logTableState.Value.Returns(new LogTableState
         {
             ActiveEventLogId = _logId,
             EventTables = ImmutableList.Create(new LogView(_logId) { LogName = LogName }),
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(_logId, 1),
             Columns = allColumns.ToImmutableDictionary(column => column, _ => true),
             ColumnOrder = [.. allColumns],
             OrderBy = orderBy,
             IsDescending = isDescending
-        }.WithLogEvents(_logId, displayedEvent));
+        });
 
         return Render<LogTablePane>();
     }
 
     private IReadOnlyList<IElement> RenderRows()
     {
+        _presentation = DisplayViewTestFactory.Presentation(_logId, [_event1, _event2, _event3]);
+
         _logTableState.Value.Returns(new LogTableState
         {
             ActiveEventLogId = _logId,
             EventTables = ImmutableList.Create(new LogView(_logId) { LogName = LogName }),
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(_logId, 3),
             Columns = ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.Level, true),
             ColumnOrder = ImmutableList.Create(ColumnName.Level),
             IsDescending = false
-        }.WithLogEvents(_logId, _event1, _event2, _event3));
+        });
 
         var cut = Render<LogTablePane>();
 
@@ -307,5 +317,5 @@ public sealed class LogTablePaneSelectionTests : BunitContext
     }
 
     private void SetSelection(params ResolvedEvent[] selection) =>
-        _selectedEvents.Value.Returns(selection.Select(EntryFor).ToImmutableList());
+        _selectedEvents.Current.Returns(selection.Select(EntryFor).ToImmutableList());
 }

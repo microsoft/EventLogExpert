@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -37,15 +36,9 @@ public sealed partial class MenuHost : IAsyncDisposable
 
         _disposed = true;
 
-        // Unsubscribe BEFORE Close() - Close() synchronously raises StateChanged,
-        // which would re-enter OnStateChanged and queue an InvokeAsync that runs
-        // after dispose completes.
         MenuService.StateChanged -= OnStateChanged;
         Registry.ActiveHostChanged -= OnActiveHostChanged;
 
-        // Close on live MenuService state, not on the queued-lambda-mutated
-        // _focusedMenuId - that mirror can lag the singleton when dispose
-        // races a fresh OpenAt.
         if (IsActive && MenuService.ActiveItems is not null)
         {
             MenuService.Close();
@@ -76,7 +69,6 @@ public sealed partial class MenuHost : IAsyncDisposable
             return;
         }
 
-        // Re-clamp every render - popup is hidden until clampMenuPopup reveals it within the viewport.
         if (MenuService.ActiveItems is not null)
         {
             try { await (await GetMenuOverlayAsync()).InvokeVoidAsync("clampMenuPopup", _popupElement); }
@@ -103,7 +95,6 @@ public sealed partial class MenuHost : IAsyncDisposable
 
     private void HandleKeyDown(KeyboardEventArgs args)
     {
-        // Host-level Escape fallback when focus has drifted outside the menu list (e.g., onto the overlay).
         if (args.Key == "Escape") { MenuService.Close(); }
     }
 
@@ -126,11 +117,8 @@ public sealed partial class MenuHost : IAsyncDisposable
 
     private void OnStateChanged()
     {
-        // Inactive hosts stay subscribed but skip render + JS interop so the
-        // active topmost host owns the menu lifecycle.
         if (_disposed || !IsActive) { return; }
 
-        // StateChanged may fire from arbitrary threads - marshal through the renderer dispatcher.
         _ = InvokeAsync(async () =>
         {
             if (_disposed || !IsActive) { return; }
@@ -140,12 +128,8 @@ public sealed partial class MenuHost : IAsyncDisposable
 
             if (nowOpen && MenuService.ActiveMenuId != _focusedMenuId)
             {
-                // Update synchronously before any await so a re-entrant OnStateChanged
-                // (open immediately followed by close) sees the correct wasOpen.
                 _focusedMenuId = MenuService.ActiveMenuId;
 
-                // Capture the opener before StateHasChanged so document.activeElement is still
-                // the element that triggered the menu, not an item the renderer is about to focus.
                 if (MenuService.ActiveCaptureOpener)
                 {
                     try { await (await GetMenuOverlayAsync()).InvokeVoidAsync("captureMenuOpener"); }

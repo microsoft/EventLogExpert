@@ -3,8 +3,8 @@
 
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.DatabaseTools;
+using EventLogExpert.UI.Modal;
 
 namespace EventLogExpert.UI.Banner;
 
@@ -24,18 +24,9 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
     private IReadOnlyList<BannerCycleItem> _items = [];
     private bool _modalContentDisplayed;
     private BannerCycleItem? _pendingOverrideItem;
-    // _priorityStolenSelection holds the most recent item that won selection via priorityOverride
-    // (i.e., a newly-arrived higher-priority item). Cleared (a) when its source identity is no longer
-    // in the current source fingerprint, or (b) when the user explicitly navigates via MoveNext/MovePrev
-    // (user-acknowledgment). While non-null, the _userPreferredItem restore path is gated off so a
-    // stale low-priority preference cannot bounce back over the priority-stolen selection on the next
-    // unrelated rebuild.
-    private BannerCycleItem? _priorityStolenSelection;
     private HashSet<(BannerView View, BannerId? EntryId)> _priorSourceFingerprint = [];
+    private BannerCycleItem? _priorityStolenSelection;
     private BannerCycleItem? _selectedItem;
-    // _userPreferredItem captures the last item the user explicitly selected via MoveNext/MovePrev.
-    // It survives temporary source-filter events (e.g., the DatabaseToolsModal suppressing the
-    // Attention banner) so the user's preferred banner is restored when the filter lifts.
     private BannerCycleItem? _userPreferredItem;
 
     public BannerCycleStateService(
@@ -217,7 +208,6 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
         return selected.EntryId == candidate.EntryId;
     }
 
-    // BannerView enum is ordered for display, not priority - use this rank for comparisons.
     private static int PriorityRank(BannerView view) => view switch
     {
         BannerView.Critical => 6,
@@ -257,7 +247,6 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
         bool attentionSuppressed =
             _modalCoordinator.ActiveSession?.ComponentType == typeof(DatabaseToolsModal);
 
-        // Capture each facet snapshot once - the same data drives BuildCycle AND the fingerprint.
         var critical = _critical.CurrentCritical;
         var errors = _errors.ErrorBanners;
         var attentionEntries = _attention.AttentionEntries;
@@ -276,8 +265,6 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
             exportProgress,
             infos);
 
-        // Fingerprint is built from the UNFILTERED source - otherwise modal close would re-introduce
-        // Attention and wrongly trigger priorityOverride on every reentry.
         var currentSourceFingerprint = ComputeSourceFingerprintFromSnapshot(
             critical,
             errors,
@@ -291,7 +278,6 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
             _priorSourceFingerprint,
             _selectedItem);
 
-        // Advance fingerprint before any early-return so the next rebuild compares against current state.
         _priorSourceFingerprint = currentSourceFingerprint;
 
         if (_userPreferredItem is not null
@@ -318,7 +304,6 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
             return;
         }
 
-        // Priority order: explicit override > priority watermark > user-preferred (gated) > current > clamp.
         if (TryApplySelection(_pendingOverrideItem, items)) { _pendingOverrideItem = null; return; }
 
         if (TryApplySelection(priorityOverride, items))
@@ -327,9 +312,6 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
             return;
         }
 
-        // Gate user-preferred restore against a still-active priority-stolen item only. This does NOT
-        // block restore when a higher-priority item that COEXISTED with the user's preference is
-        // present - only blocks against a newly-arrived steal that is still in the cycle.
         if (_priorityStolenSelection is null
             && TryApplySelection(_userPreferredItem, items))
         {

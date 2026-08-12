@@ -19,6 +19,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Reflection;
 
 namespace EventLogExpert.UI.Tests.LogTable;
 
@@ -26,15 +27,20 @@ public sealed class LogTablePaneFindTests : BunitContext
 {
     private const string LogName = "Application";
 
+    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(5);
+
     private readonly ILogTableColumnDefaultsProvider _columnDefaults = Substitute.For<ILogTableColumnDefaultsProvider>();
     private readonly IEventLogCommands _eventLogCommands = Substitute.For<IEventLogCommands>();
     private readonly IState<FilterPaneState> _filterPaneState = Substitute.For<IState<FilterPaneState>>();
     private readonly IHighlightSelector _highlightSelector = Substitute.For<IHighlightSelector>();
     private readonly EventLogId _logId = EventLogId.Create();
     private readonly IState<LogTableState> _logTableState = Substitute.For<IState<LogTableState>>();
-    private readonly IStateSelection<EventLogState, SelectionEntry?> _selectedEvent = Substitute.For<IStateSelection<EventLogState, SelectionEntry?>>();
-    private readonly IStateSelection<EventLogState, ImmutableList<SelectionEntry>> _selectedEvents = Substitute.For<IStateSelection<EventLogState, ImmutableList<SelectionEntry>>>();
+    private readonly IEventFocusSource _selectedEvent = Substitute.For<IEventFocusSource>();
+    private readonly IEventSelectionSource _selectedEvents = Substitute.For<IEventSelectionSource>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
+    private readonly IOrderedViewSource _viewSource = Substitute.For<IOrderedViewSource>();
+
+    private OrderedViewPresentation? _presentation;
 
     private bool _selectionDispatched;
 
@@ -50,8 +56,8 @@ public sealed class LogTablePaneFindTests : BunitContext
         _highlightSelector.Select(Arg.Any<ImmutableList<SavedFilter>>()).Returns([]);
         _highlightSelector.ComputeHighlightKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(0);
         _settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
-        _selectedEvent.Value.Returns((SelectionEntry?)null);
-        _selectedEvents.Value.Returns(ImmutableList<SelectionEntry>.Empty);
+        _selectedEvent.Current.Returns((SelectionEntry?)null);
+        _selectedEvents.Current.Returns(ImmutableList<SelectionEntry>.Empty);
 
         _eventLogCommands
             .When(c => c.SetSelectedEvents(Arg.Any<IReadOnlyCollection<SelectionEntry>>(), Arg.Any<SelectionEntry?>()))
@@ -66,7 +72,25 @@ public sealed class LogTablePaneFindTests : BunitContext
         Services.AddSingleton(_selectedEvent);
         Services.AddSingleton(_selectedEvents);
         Services.AddSingleton(_settings);
+        _viewSource.Current.Returns(_ => _presentation);
+        Services.AddSingleton(_viewSource);
+
         Services.AddFluxor(options => options.ScanAssemblies(typeof(LogTablePane).Assembly));
+    }
+
+    [Fact]
+    public void ABulkCollapseRequest_RelinquishesFindGroupOwnership()
+    {
+        var cut = RenderWithEvents(NewEvent(1, "alpha"), NewEvent(2, "beta"));
+
+        var ownership = FindExpandedGroupKeys(cut);
+        ownership.Add("owned-group");
+        Assert.NotEmpty(ownership);
+
+        var notifier = Services.GetRequiredService<IGroupCollapseNotifier>();
+        cut.InvokeAsync(() => notifier.Requested += Raise.Event<Action>());
+
+        cut.WaitForAssertion(() => Assert.Empty(FindExpandedGroupKeys(cut)));
     }
 
     [Fact]
@@ -85,17 +109,6 @@ public sealed class LogTablePaneFindTests : BunitContext
     }
 
     [Fact]
-    public void CurrentMatch_RendersInlineMark()
-    {
-        var cut = RenderWithEvents(NewEvent(1, "alpha"), NewEvent(2, "beta match"), NewEvent(3, "gamma match"));
-
-        OpenFindAndSearch(cut, "match");
-
-        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("mark.find-mark")));
-        Assert.Equal("match", cut.Find("mark.find-mark").TextContent);
-    }
-
-    [Fact]
     public void CurrentMatchRow_HasAriaCurrent()
     {
         var cut = RenderWithEvents(NewEvent(1, "alpha match"), NewEvent(2, "beta match"), NewEvent(3, "gamma"));
@@ -105,6 +118,17 @@ public sealed class LogTablePaneFindTests : BunitContext
         cut.WaitForAssertion(() => Assert.Single(cut.FindAll("tr[data-find='current']")));
         Assert.Equal("true", cut.Find("tr[data-find='current']").GetAttribute("aria-current"));
         Assert.DoesNotContain(cut.FindAll("tr[data-find='match']"), row => row.HasAttribute("aria-current"));
+    }
+
+    [Fact]
+    public void CurrentMatch_RendersInlineMark()
+    {
+        var cut = RenderWithEvents(NewEvent(1, "alpha"), NewEvent(2, "beta match"), NewEvent(3, "gamma match"));
+
+        OpenFindAndSearch(cut, "match");
+
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("mark.find-mark")));
+        Assert.Equal("match", cut.Find("mark.find-mark").TextContent);
     }
 
     [Fact]
@@ -161,20 +185,6 @@ public sealed class LogTablePaneFindTests : BunitContext
     }
 
     [Fact]
-    public void Stepping_ToNextMatch_DoesNotChangeSelection()
-    {
-        var cut = RenderWithEvents(NewEvent(1, "match one"), NewEvent(2, "match two"), NewEvent(3, "other"));
-
-        OpenFindAndSearch(cut, "match");
-        cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll("tr[data-find]").Count));
-
-        _selectionDispatched = false;
-        cut.FindAll(".find-nav")[1].Click();
-
-        Assert.False(_selectionDispatched);
-    }
-
-    [Fact]
     public void SteppingPastLastMatch_AnnouncesWrap()
     {
         var cut = RenderWithEvents(NewEvent(1, "match one"), NewEvent(2, "match two"), NewEvent(3, "other"));
@@ -186,6 +196,20 @@ public sealed class LogTablePaneFindTests : BunitContext
         cut.FindAll(".find-nav")[1].Click();
 
         cut.WaitForAssertion(() => Assert.Contains("Wrapped to first", cut.Find(".find-wrap").TextContent));
+    }
+
+    [Fact]
+    public void Stepping_ToNextMatch_DoesNotChangeSelection()
+    {
+        var cut = RenderWithEvents(NewEvent(1, "match one"), NewEvent(2, "match two"), NewEvent(3, "other"));
+
+        OpenFindAndSearch(cut, "match");
+        cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll("tr[data-find]").Count));
+
+        _selectionDispatched = false;
+        cut.FindAll(".find-nav")[1].Click();
+
+        Assert.False(_selectionDispatched);
     }
 
     [Fact]
@@ -215,14 +239,18 @@ public sealed class LogTablePaneFindTests : BunitContext
     {
         var cut = RenderWithEvents(NewEvent(1, "match"), NewEvent(2, "matches found"), NewEvent(3, "rematch"));
 
-        // Enable whole-word via the tray BEFORE typing so there is a single scan cycle (the tray opens against an empty query, avoiding a scan race).
         OpenFind(cut);
         cut.Find(".find-options-toggle").Click();
         cut.FindAll(".find-options .toggle-input")[1].Change(true);
         cut.Find(".find-input").Input("match");
 
-        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("tr[data-find]")), TimeSpan.FromSeconds(5));
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("tr[data-find]")), s_testTimeout);
     }
+
+    private static HashSet<string> FindExpandedGroupKeys(IRenderedComponent<LogTablePane> cut) =>
+        (HashSet<string>)typeof(LogTablePane)
+            .GetField("_findExpandedGroupKeys", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(cut.Instance)!;
 
     private static ResolvedEvent NewEvent(int id, string description) =>
         new(LogName, LogPathType.Channel)
@@ -249,14 +277,15 @@ public sealed class LogTablePaneFindTests : BunitContext
 
     private IRenderedComponent<LogTablePane> RenderWithEvents(params ResolvedEvent[] events)
     {
+        _presentation = DisplayViewTestFactory.Presentation(_logId, events);
+
         _logTableState.Value.Returns(new LogTableState
         {
             ActiveEventLogId = _logId,
             EventTables = ImmutableList.Create(new LogView(_logId) { LogName = LogName }),
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(_logId, events.Length),
             Columns = ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.Level, true),
             ColumnOrder = ImmutableList.Create(ColumnName.Level)
-        }.WithLogEvents(_logId, events));
+        });
 
         return Render<LogTablePane>();
     }

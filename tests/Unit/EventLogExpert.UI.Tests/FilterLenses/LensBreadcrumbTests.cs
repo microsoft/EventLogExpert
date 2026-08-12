@@ -4,30 +4,43 @@
 using Bunit;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.UI.FilterLenses;
-using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Tests.FilterLenses;
 
 public sealed class LensBreadcrumbTests : BunitContext
 {
     private readonly IFilterLensCommands _commands = Substitute.For<IFilterLensCommands>();
-    private readonly IState<FilterLensState> _lensState = Substitute.For<IState<FilterLensState>>();
+
+    private readonly IFilterLensSource _source = Substitute.For<IFilterLensSource>();
 
     public LensBreadcrumbTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
+        _source.Lenses.Returns(ImmutableList<FilterLensSummary>.Empty);
         Services.AddSingleton(_commands);
-        Services.AddSingleton(_lensState);
-        Services.AddFluxor(options => options.ScanAssemblies(typeof(LensBreadcrumb).Assembly));
+        Services.AddSingleton(_source);
+    }
+
+    [Fact]
+    public void Changed_ReRendersTheBreadcrumb()
+    {
+        var cut = Render<LensBreadcrumb>();
+        Assert.Empty(cut.FindAll(".lens-breadcrumb"));
+
+        _source.Lenses.Returns(ImmutableList.Create(Summary("Activity ID = abc")));
+        _source.Changed += Raise.Event<Action>();
+
+        cut.WaitForAssertion(() => Assert.Contains("Activity ID = abc", cut.Markup));
     }
 
     [Fact]
     public void ClearAllButton_DispatchesClearLenses()
     {
-        _lensState.Value.Returns(new FilterLensState { Lenses = [Lens("x")] });
+        _source.Lenses.Returns(ImmutableList.Create(Summary("x")));
 
         var cut = Render<LensBreadcrumb>();
 
@@ -39,21 +52,21 @@ public sealed class LensBreadcrumbTests : BunitContext
     [Fact]
     public void Escape_WithinBreadcrumb_PopsTopLens()
     {
-        var older = Lens("older");
-        var top = Lens("top");
-        _lensState.Value.Returns(new FilterLensState { Lenses = [older, top] });
+        var older = Summary("older");
+        var top = Summary("top");
+        _source.Lenses.Returns(ImmutableList.Create(older, top));
 
         var cut = Render<LensBreadcrumb>();
 
         cut.Find(".lens-breadcrumb").KeyDown(new KeyboardEventArgs { Key = "Escape" });
 
-        _commands.Received(1).RemoveLens(top);
+        _commands.Received(1).RemoveLens(top.Id);
     }
 
     [Fact]
     public void NoLenses_RendersNothing()
     {
-        _lensState.Value.Returns(new FilterLensState());
+        _source.Lenses.Returns(ImmutableList<FilterLensSummary>.Empty);
 
         var cut = Render<LensBreadcrumb>();
 
@@ -61,19 +74,19 @@ public sealed class LensBreadcrumbTests : BunitContext
     }
 
     [Fact]
-    public void WithLens_RendersChip_AndRemoveButtonDispatchesRemoveLens()
+    public void WithLens_RendersLabel_AndRemoveButtonDispatchesRemoveLens()
     {
-        var lens = Lens("Activity ID = abc");
-        _lensState.Value.Returns(new FilterLensState { Lenses = [lens] });
+        var lens = Summary("Activity ID = abc");
+        _source.Lenses.Returns(ImmutableList.Create(lens));
 
         var cut = Render<LensBreadcrumb>();
 
         Assert.Contains("Activity ID = abc", cut.Markup);
 
-        cut.Find(".lens-chip-remove").Click();
+        cut.Find(".lens-lens-remove").Click();
 
-        _commands.Received(1).RemoveLens(lens);
+        _commands.Received(1).RemoveLens(lens.Id);
     }
 
-    private static FilterLens Lens(string label) => new() { Label = label, Kind = LensKind.Property };
+    private static FilterLensSummary Summary(string label) => new(FilterLensId.Create(), label);
 }

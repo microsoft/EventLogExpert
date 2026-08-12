@@ -3,7 +3,6 @@
 
 using Bunit;
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Versioning;
@@ -15,7 +14,6 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Menu;
-using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -29,31 +27,27 @@ public sealed class MenuBarGroupingTests : BunitContext
 
     private readonly IMenuActionService _actions = Substitute.For<IMenuActionService>();
     private readonly IAlertDialogService _alertDialogService = Substitute.For<IAlertDialogService>();
-    private readonly IStateSelection<EventLogState, bool> _eventLogSelection = Substitute.For<IStateSelection<EventLogState, bool>>();
-    private readonly IStateSelection<FilterPaneState, bool> _filterPaneIsEnabled = Substitute.For<IStateSelection<FilterPaneState, bool>>();
-    private readonly IStateSelection<HistogramState, bool> _histogramVisible = Substitute.For<IStateSelection<HistogramState, bool>>();
-    private readonly List<IStateSelection<LogTableState, bool>> _logTableSelections = [];
+    private readonly IEventLogQueries _eventLogQueries = Substitute.For<IEventLogQueries>();
+    private readonly IFilterPaneQueries _filterPaneQueries = Substitute.For<IFilterPaneQueries>();
+    private readonly IHistogramVisibilitySource _histogramVisibility = Substitute.For<IHistogramVisibilitySource>();
+    private readonly ILogTableQueries _logTableQueries = Substitute.For<ILogTableQueries>();
     private readonly IMenuService _menuService = Substitute.For<IMenuService>();
     private readonly IChannelReadinessService _readinessService = Substitute.For<IChannelReadinessService>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
     private readonly ICurrentVersionProvider _versionProvider = Substitute.For<ICurrentVersionProvider>();
 
-    private LogTableState _logTableState = new();
-
     public MenuBarGroupingTests()
     {
         Services.AddSingleton(_actions);
         Services.AddSingleton(_alertDialogService);
-        Services.AddSingleton(_eventLogSelection);
-        Services.AddSingleton(_filterPaneIsEnabled);
-        Services.AddSingleton(_histogramVisible);
-        Services.AddTransient<IStateSelection<LogTableState, bool>>(_ => CreateLogTableSelection());
+        Services.AddSingleton(_eventLogQueries);
+        Services.AddSingleton(_filterPaneQueries);
+        Services.AddSingleton(_histogramVisibility);
+        Services.AddSingleton(_logTableQueries);
         Services.AddSingleton(_menuService);
         Services.AddSingleton(_readinessService);
         Services.AddSingleton(_settings);
         Services.AddSingleton(_versionProvider);
-
-        Services.AddFluxor(options => options.ScanAssemblies(typeof(MenuBar).Assembly));
 
         JSInterop.Mode = JSRuntimeMode.Loose;
         JSInterop.SetupModule("./_content/EventLogExpert.UI/Menu/MenuAnchor.js")
@@ -67,10 +61,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     [Fact]
     public async Task File_CloseAll_ConfirmAccepted_InvokesCloseAllLogs()
     {
-        _logTableState = new LogTableState
-        {
-            EventTables = [new LogView(new EventLogId(Guid.NewGuid())) { LogName = "Application" }],
-        };
+        _logTableQueries.HasActiveLogs().Returns(true);
         _alertDialogService.ShowAlert("Close all logs", Arg.Any<string>(), "Close all", "Cancel").Returns(true);
         var items = await OpenMenu("File");
 
@@ -82,10 +73,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     [Fact]
     public async Task File_CloseAll_ConfirmCancelled_DoesNotInvokeCloseAllLogs()
     {
-        _logTableState = new LogTableState
-        {
-            EventTables = [new LogView(new EventLogId(Guid.NewGuid())) { LogName = "Application" }],
-        };
+        _logTableQueries.HasActiveLogs().Returns(true);
         _alertDialogService.ShowAlert("Close all logs", Arg.Any<string>(), "Close all", "Cancel").Returns(false);
         var items = await OpenMenu("File");
 
@@ -147,76 +135,106 @@ public sealed class MenuBarGroupingTests : BunitContext
     }
 
     [Fact]
-    public async Task File_WhenActiveLogOpen_CloseAllAndCombineEnabled()
+    public async Task File_WhenActiveLogs_CloseCombineExportEnabled()
     {
-        _logTableState = new LogTableState
-        {
-            EventTables = [new LogView(new EventLogId(Guid.NewGuid())) { LogName = "Application" }],
-        };
+        _logTableQueries.HasActiveLogs().Returns(true);
 
         var items = await OpenMenu("File");
 
         Assert.True(Item(items, "Close All").IsEnabled);
         Assert.True(Item(items, "Combine").IsEnabled);
+        Assert.True(Item(items, "Export to CSV").IsEnabled);
+        Assert.True(Item(items, "Export to JSON").IsEnabled);
     }
 
     [Fact]
-    public async Task File_WhenMultipleLogsWithCombinedView_CloseAllAndCombineEnabled()
+    public async Task File_WhenNoActiveLogs_CloseCombineExportDisabled()
     {
-        _logTableState = new LogTableState
-        {
-            EventTables =
-            [
-                new LogView(new EventLogId(Guid.NewGuid())) { GroupId = LogTabGroupId.AllLogs },
-                new LogView(new EventLogId(Guid.NewGuid())) { LogName = "Application" },
-                new LogView(new EventLogId(Guid.NewGuid())) { LogName = "System" },
-            ],
-        };
-
-        var items = await OpenMenu("File");
-
-        Assert.True(Item(items, "Close All").IsEnabled);
-        Assert.True(Item(items, "Combine").IsEnabled);
-    }
-
-    [Fact]
-    public async Task File_WhenNoLogsOpen_CloseAllAndCombineDisabled()
-    {
-        _logTableState = new LogTableState();
+        _logTableQueries.HasActiveLogs().Returns(false);
 
         var items = await OpenMenu("File");
 
         Assert.False(Item(items, "Close All").IsEnabled);
         Assert.False(Item(items, "Combine").IsEnabled);
+        Assert.False(Item(items, "Export to CSV").IsEnabled);
+        Assert.False(Item(items, "Export to JSON").IsEnabled);
     }
 
     [Fact]
-    public async Task File_WhenOnlyCombinedView_CloseAllAndCombineDisabled()
+    public void Render_DoesNotRequireFluxorServices()
     {
-        _logTableState = new LogTableState
-        {
-            EventTables = [new LogView(new EventLogId(Guid.NewGuid())) { GroupId = LogTabGroupId.AllLogs }],
-        };
+        var cut = Render<MenuBar>();
 
-        var items = await OpenMenu("File");
+        Assert.NotEmpty(cut.FindAll("button.menu-bar-item"));
+    }
 
-        Assert.False(Item(items, "Close All").IsEnabled);
-        Assert.False(Item(items, "Combine").IsEnabled);
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task View_ContinuouslyUpdate_CheckReflectsTheQuery(bool continuouslyUpdating)
+    {
+        _eventLogQueries.IsContinuouslyUpdating().Returns(continuouslyUpdating);
+
+        var item = Item(await OpenViewMenu(), "Continuously Update");
+
+        Assert.Equal(continuouslyUpdating, item.IsChecked);
     }
 
     [Fact]
-    public void Render_SubscribesAllLogTableSelections()
+    public async Task View_ReadsQueriesAtEachOpen_NotCachedAtInitialization()
     {
-        Render<MenuBar>();
+        IReadOnlyList<MenuItem>? items = null;
+        _menuService
+            .When(menu => menu.OpenAt(
+                Arg.Any<double>(), Arg.Any<double>(), Arg.Any<IReadOnlyList<MenuItem>>(),
+                Arg.Any<bool>(), Arg.Any<bool>()))
+            .Do(call => items = call.Arg<IReadOnlyList<MenuItem>>());
+        _menuService.ActiveItems.Returns((IReadOnlyList<MenuItem>?)null);
+        _eventLogQueries.IsContinuouslyUpdating().Returns(false);
 
-        Assert.Equal(3, _logTableSelections.Count);
-        Assert.All(_logTableSelections, s => s.Received(1).Select(Arg.Any<Func<LogTableState, bool>>()));
+        var cut = Render<MenuBar>();
+
+        await cut.FindAll("button.menu-bar-item").Single(button => button.TextContent.Trim() == "View")
+            .ClickAsync(new MouseEventArgs());
+        Assert.False(Item(items!, "Continuously Update").IsChecked);
+
+        _eventLogQueries.IsContinuouslyUpdating().Returns(true);
+        await cut.FindAll("button.menu-bar-item").Single(button => button.TextContent.Trim() == "View")
+            .ClickAsync(new MouseEventArgs());
+
+        Assert.True(Item(items!, "Continuously Update").IsChecked);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task View_ShowAllEvents_CheckedWhenFilterPaneDisabled(bool filterPaneEnabled, bool expectedChecked)
+    {
+        _filterPaneQueries.IsEnabled().Returns(filterPaneEnabled);
+
+        var item = Item(await OpenViewMenu(), "Show All Events");
+
+        Assert.True(item.IsEnabled);
+        Assert.Equal(expectedChecked, item.IsChecked);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task View_Timeline_CheckReflectsHistogramVisibility(bool visible)
+    {
+        _histogramVisibility.IsVisible.Returns(visible);
+
+        var item = Item(await OpenViewMenu(), "Timeline");
+
+        Assert.Equal(visible, item.IsChecked);
     }
 
     [Fact]
     public async Task View_WhenGroupingAscending_DescendingEnabledButUnchecked()
     {
-        _logTableState = new LogTableState { GroupBy = ColumnName.Source, IsGroupDescending = false };
+        _logTableQueries.IsGrouping().Returns(true);
+        _logTableQueries.IsGroupDescending().Returns(false);
 
         var descending = Item(await OpenViewMenu(), "Group Descending");
 
@@ -227,7 +245,8 @@ public sealed class MenuBarGroupingTests : BunitContext
     [Fact]
     public async Task View_WhenGroupingDescending_GroupActionsEnabledAndDescendingChecked()
     {
-        _logTableState = new LogTableState { GroupBy = ColumnName.Source, IsGroupDescending = true };
+        _logTableQueries.IsGrouping().Returns(true);
+        _logTableQueries.IsGroupDescending().Returns(true);
 
         var items = await OpenViewMenu();
 
@@ -242,7 +261,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     [Fact]
     public async Task View_WhenNotGrouping_GroupActionsDisabledWithReason()
     {
-        _logTableState = new LogTableState { GroupBy = null };
+        _logTableQueries.IsGrouping().Returns(false);
 
         var items = await OpenViewMenu();
 
@@ -264,19 +283,6 @@ public sealed class MenuBarGroupingTests : BunitContext
     [
         .. channels.Select(channel => new ChannelReadiness(channel, ChannelPresence.Present, ChannelEnablement.Unknown))
     ];
-
-    // Distinct substitute per selection; Value applies its own projection to _logTableState.
-    private IStateSelection<LogTableState, bool> CreateLogTableSelection()
-    {
-        var selection = Substitute.For<IStateSelection<LogTableState, bool>>();
-        Func<LogTableState, bool>? selector = null;
-        selection.When(s => s.Select(Arg.Any<Func<LogTableState, bool>>()))
-            .Do(call => selector = call.Arg<Func<LogTableState, bool>>());
-        selection.Value.Returns(_ => selector is not null && selector(_logTableState));
-        _logTableSelections.Add(selection);
-
-        return selection;
-    }
 
     private async Task<IReadOnlyList<MenuItem>> OpenMenu(string barLabel)
     {

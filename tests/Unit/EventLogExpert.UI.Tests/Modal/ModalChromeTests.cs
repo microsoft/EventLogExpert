@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
-using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -56,8 +56,6 @@ public sealed class ModalChromeTests : BunitContext
     [Fact]
     public void ClickSecondaryButton_WhenPrompt_CarriesTypedPromptValue()
     {
-        // Regression: the secondary action must preserve the typed prompt value in a prompt scenario,
-        // consistent with the Accept path. Previously it hardcoded PromptValue = null, silently losing input.
         InlineAlertResult? captured = null;
         var alert = new InlineAlertRequest(
             Title: "Rename",

@@ -7,7 +7,6 @@ using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.UI.FilterLibrary;
-using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,9 +26,9 @@ public sealed class LibrarySavedTabHeaderTests : BunitContext
         Services.AddSingleton(_commands);
         Services.AddSingleton(Substitute.For<IAlertDialogService>());
 
-        var libraryStateMock = Substitute.For<IState<FilterLibraryState>>();
-        libraryStateMock.Value.Returns(_ => _libraryState);
-        Services.AddSingleton(libraryStateMock);
+        var libraryEntries = Substitute.For<ILibraryEntriesSource>();
+        libraryEntries.Current.Returns(_ => _libraryState.Entries);
+        Services.AddSingleton(libraryEntries);
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }

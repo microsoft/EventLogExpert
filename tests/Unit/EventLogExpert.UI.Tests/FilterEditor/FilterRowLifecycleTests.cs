@@ -2,8 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.UI.FilterEditor;
+using NSubstitute;
+using System.Reflection;
 
 namespace EventLogExpert.UI.Tests.FilterEditor;
 
@@ -19,6 +21,8 @@ public sealed class FilterRowLifecycleTests
             .SetValue(row, filter);
         typeof(FilterRow).GetProperty(nameof(FilterRow.OnDisposed))!
             .SetValue(row, (Action<FilterId>)(id => disposed = id));
+        typeof(FilterRow).GetProperty("LibraryEntries", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(row, Substitute.For<ILibraryEntriesSource>());
 
         row.Dispose();
 

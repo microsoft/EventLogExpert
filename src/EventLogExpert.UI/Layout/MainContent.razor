@@ -1,14 +1,18 @@
-@inherits FluxorComponent
+@inherits AppStateComponentBase
 
-@if (HasActiveLogs.Value)
+@if (OpenLogsSource.HasOpenLogs)
 {
     <FilterPane />
+
     <LensBreadcrumb />
-    @if (HistogramVisible.Value)
+
+    @if (HistogramVisibilitySource.IsVisible)
     {
         <HistogramPane />
     }
+
     <LogTablePane />
+
     <DetailsPane />
 }
 else
