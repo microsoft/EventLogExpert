@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Fluxor.Blazor.Web" />
+    <PackageReference Include="Fluxor" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
   </ItemGroup>
 

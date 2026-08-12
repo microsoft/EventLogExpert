@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.Export;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 using System.Text.Json;
 
 namespace EventLogExpert.Runtime.Tests.Export;
@@ -29,7 +30,6 @@ public sealed class EventTableExporterTests
         EventTableExporter exporter = new(new TabularExportWriter());
         using MemoryStream stream = new();
 
-        // A Cancel during the export must throw so AtomicFileWriter discards the temp; nothing is written.
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => exporter.ExportAsync(
             stream, ExportFormat.Csv, BuildView(s_events), s_columns, s_utc, includeDescription: false, cancellation.Token));
 
@@ -170,15 +170,18 @@ public sealed class EventTableExporterTests
         Assert.Equal("Event ID,Source\r\n", ExportTestHelpers.DecodeWithoutBom(bytes));
     }
 
-    // The exporter now consumes an IEventColumnView, so round-trip the events through a real column store (null orderBy
-    // preserves the input order the assertions expect) rather than a hand-rolled adapter.
     private static IEventColumnView BuildView(IReadOnlyList<ResolvedEvent> events)
     {
         var reader = EventColumnStore.Build(events, generation: 0, contentVersion: 0).CreateReader(EventLogId.Create());
-        int[] survivors = Enumerable.Range(0, events.Count).ToArray();
+        int[] survivors = [.. Enumerable.Range(0, events.Count)];
 
-        return EventColumnView.Create(
-            reader, survivors, orderBy: null, isDescending: false, groupBy: null, isGroupDescending: false);
+        return AosReferenceView.Create(
+            reader,
+            survivors,
+            orderBy: null,
+            isDescending: false,
+            groupBy: null,
+            isGroupDescending: false);
     }
 
     private static async Task<byte[]> ExportAsync(

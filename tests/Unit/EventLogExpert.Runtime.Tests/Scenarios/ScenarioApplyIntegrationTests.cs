@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
@@ -51,7 +52,7 @@ public sealed class ScenarioApplyIntegrationTests
         var lensState = Substitute.For<IState<FilterLensState>>();
         lensState.Value.Returns(new FilterLensState());
 
-        var effects = new FilterPaneEffects(appliedFilter, rawEventStore, paneStateAccessor, lensState);
+        var effects = new FilterPaneEffects(appliedFilter, rawEventStore, paneStateAccessor, lensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()));
         var dispatcher = Substitute.For<IDispatcher>();
 
         ApplyFilterAction? captured = null;

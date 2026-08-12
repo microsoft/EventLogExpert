@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.DependencyInjection;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Eventing.Writers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Configuration;
@@ -13,6 +14,7 @@ using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.AppTitle;
+using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.Database;
@@ -26,11 +28,11 @@ using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
-using EventLogExpert.Runtime.Menu;
-using EventLogExpert.Runtime.Modal;
+using EventLogExpert.Runtime.LogTable.OrderedView;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.Runtime.StatusBar;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
 using EventLogExpert.Scenarios.Catalog;
@@ -90,13 +92,6 @@ public static class RuntimeServiceCollectionExtensions
 
     extension(IServiceCollection services)
     {
-        /// <summary>
-        ///     Helper-friendly subset of <see cref="AddEventLogRuntime" />. Registers ONLY
-        ///     <see cref="IDatabaseToolsService" /> and its operation factory dependency. Used by the packaged elevation helper
-        ///     which needs to run DatabaseTools operations but must NOT pull in the rest of the runtime (Fluxor, banner services,
-        ///     settings, etc.) - those would require host services (file pickers, modal coordinators) that don't exist in a
-        ///     console helper.
-        /// </summary>
         public IServiceCollection AddDatabaseToolsRuntime()
         {
             ArgumentNullException.ThrowIfNull(services);
@@ -107,12 +102,6 @@ public static class RuntimeServiceCollectionExtensions
             return services;
         }
 
-        /// <summary>
-        ///     Registers <see cref="IElevatedDatabaseToolsRunner" /> backed by the in-Runtime
-        ///     <see cref="ElevatedDatabaseToolsRunner" /> implementation. Callers MUST also register
-        ///     <see cref="IElevatedHelperProcessHost" /> separately (the production implementation lives in the MAUI head's
-        ///     adapter layer; tests substitute scripted fakes).
-        /// </summary>
         public IServiceCollection AddElevatedDatabaseToolsRunner()
         {
             ArgumentNullException.ThrowIfNull(services);
@@ -125,39 +114,6 @@ public static class RuntimeServiceCollectionExtensions
             return services;
         }
 
-        /// <summary>
-        ///     Registers the runtime tier's services. Callers MUST also register:
-        ///     <list type="bullet">
-        ///         <item>
-        ///             <c>AddFluxor(...)</c> - effect classes and state selectors depend on <c>IDispatcher</c>,
-        ///             <c>IState&lt;T&gt;</c>, etc.
-        ///         </item>
-        ///         <item><c>AddEventLogFiltering()</c> - effect classes depend on <c>IFilterService</c>.</item>
-        ///         <item>
-        ///             <c>AddEventLogProviderDatabase()</c> - database sub-services depend on
-        ///             <c>IProviderDatabaseMaintenance</c>.
-        ///         </item>
-        ///         <item>
-        ///             <c>IFilePickerService</c> - <c>DatabaseOperationCoordinator</c> depends on it for Import. Host registers
-        ///             a concrete implementation (e.g., <c>MauiFilePickerService</c>).
-        ///         </item>
-        ///         <item>
-        ///             <c>IFilterLibraryStore</c> - <c>FilterLibrary</c> effects depend on it. Register the default
-        ///             SQLite-backed store via <c>services.AddFilterLibrarySqliteStore(<i>dbPath</i>)</c>, or supply a custom
-        ///             implementation.
-        ///         </item>
-        ///         <item>
-        ///             <c>IScenarioFavoriteStore</c> - the scenario favorites effects depend on it. Register the default
-        ///             SQLite-backed store via <c>services.AddScenarioFavoriteSqliteStore(<i>dbPath</i>)</c>, or supply a custom
-        ///             implementation.
-        ///         </item>
-        ///         <item>
-        ///             <c>IMenuActionService</c> - the scenario launch service depends on it to open a scenario's channels. The
-        ///             host registers the concrete implementation (e.g., <c>MauiMenuActionService</c>).
-        ///         </item>
-        ///     </list>
-        ///     Omitting any of these produces a DI resolution failure when the dependent services are first activated.
-        /// </summary>
         public IServiceCollection AddEventLogRuntime()
         {
             ArgumentNullException.ThrowIfNull(services);
@@ -165,7 +121,6 @@ public static class RuntimeServiceCollectionExtensions
             AddDatabaseServices(services);
             AddExportServices(services);
 
-            // Command facades.
             services.AddSingleton<IEventLogCommands, EventLogCommands>();
             services.AddSingleton<IFilterLensCommands, FilterLensCommands>();
             services.AddSingleton<IFilterLibraryCommands, FilterLibraryCommands>();
@@ -174,29 +129,74 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<ILogTableCommands, LogTableCommands>();
             services.AddSingleton<IScenarioFavoriteCommands, ScenarioFavoriteCommands>();
 
-            // Query facades.
             services.AddSingleton<IEventLogQueries, EventLogQueries>();
+            services.AddSingleton<ILogTableQueries, LogTableQueries>();
+            services.AddSingleton<IFilterPaneQueries, FilterPaneQueries>();
 
-            // Shared coordination state for EventLog effects classes.
             services.AddSingleton<LogCloseCoordinator>();
             services.AddSingleton<EventLogConcurrencyState>();
-            services.AddSingleton<PartialLoadCoordinator>();
+            services.AddSingleton<XmlReloadCoordinator>();
+            services.AddSingleton<LiveTailIngestCoordinator>();
+            services.AddSingleton<FilteredLogPresenceCoordinator>();
             services.AddSingleton<IEventLogReaderFactory, EventLogReaderFactory>();
 
-            // UI capabilities.
+            services.AddSingleton<OrderedViewWriter>(static _ => new OrderedViewWriter());
+            services.AddSingleton<ViewRequestIssuer>();
+            services.AddSingleton<OrderedViewDispatchBridge>();
+            services.AddSingleton<IOrderedViewSource, OrderedViewSource>();
+
+            services.AddSingleton<IFilterLensSource, FilterLensSource>();
+
+            services.AddSingleton<IOpenLogsPresenceSource, OpenLogsPresenceSource>();
+            services.AddSingleton<IHistogramVisibilitySource, HistogramVisibilitySource>();
+            services.AddSingleton<IFilterAppliedSource, FilterAppliedSource>();
+
+            services.AddSingleton<IEventFocusSource, EventFocusSource>();
+            services.AddSingleton<IActiveEventLogSource, ActiveEventLogSource>();
+            services.AddSingleton<IEventSelectionSource, EventSelectionSource>();
+
+            services.AddSingleton<IRevealFocusSource, RevealFocusSource>();
+
+            services.AddSingleton<GroupCollapseNotifier>();
+            services.AddSingleton<IGroupCollapseNotifier>(sp => sp.GetRequiredService<GroupCollapseNotifier>());
+
+            services.AddSingleton<IHistogramDimensionRequestSource, HistogramDimensionRequestSource>();
+            services.AddSingleton<IActiveFiltersSource, ActiveFiltersSource>();
+
+            services.AddSingleton<IFilteredDateRangeSource, FilteredDateRangeSource>();
+            services.AddSingleton<ILoadedLogNamesSource, LoadedLogNamesSource>();
+
+            services.AddSingleton<ILibraryEntriesSource, LibraryEntriesSource>();
+
+            services.AddSingleton<ILibraryLoadStatusSource, LibraryLoadStatusSource>();
+
+            services.AddSingleton<TagBulkUpdateFailedNotifier>();
+            services.AddSingleton<ITagBulkUpdateFailedNotifier>(sp => sp.GetRequiredService<TagBulkUpdateFailedNotifier>());
+
+            services.AddSingleton<ClearAllFiltersNotifier>();
+            services.AddSingleton<IClearAllFiltersNotifier>(sp => sp.GetRequiredService<ClearAllFiltersNotifier>());
+            services.AddSingleton<SetFilterDateRangeSucceededNotifier>();
+            services.AddSingleton<ISetFilterDateRangeSucceededNotifier>(sp => sp.GetRequiredService<SetFilterDateRangeSucceededNotifier>());
+
+            services.AddSingleton<IScenarioFavoritesSource, ScenarioFavoritesSource>();
+
+            services.AddSingleton<ILogTabBarSource, LogTabBarSource>();
+
+            services.AddSingleton<IStatusBarSource, StatusBarSource>();
+
+            services.AddSingleton<DisplayIndicatorGate>();
+            services.AddSingleton<IEventDetailResolver, EventDetailResolver>();
+
+            services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
+
+            services.AddSingleton<IEventCopyFormatter, EventCopyFormatter>();
+
             services.AddSingleton<IHighlightSelector, HighlightSelector>();
             services.AddSingleton<ILogTableColumnDefaultsProvider, ColumnDefaults>();
-            services.AddSingleton<DatabaseCoordinationEffects>();
-            services.AddSingleton<ILogReloadCoordinator>(static sp => sp.GetRequiredService<DatabaseCoordinationEffects>());
+            services.AddSingleton<ILogReloadCoordinator, DatabaseCoordinationEffects>();
 
-            // Application services.
             services.AddSingleton<IAppTitleService, AppTitleService>();
 
-            // BannerService is the shared backing store for the 5 banner facets.
-            // Registered once as the concrete type, then each facet interface resolves
-            // back to the same singleton instance. This preserves cross-facet state
-            // invariants (single lock, single backing store) while letting consumers
-            // depend only on the narrow interface they need.
             services.AddSingleton<BannerService>();
             services.AddSingleton<IAttentionBannerService>(static sp => sp.GetRequiredService<BannerService>());
             services.AddSingleton<IProgressBannerService>(static sp => sp.GetRequiredService<BannerService>());
@@ -204,9 +204,6 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IErrorBannerService>(static sp => sp.GetRequiredService<BannerService>());
             services.AddSingleton<IInfoBannerService>(static sp => sp.GetRequiredService<BannerService>());
 
-            // Export progress is a standalone banner facet with no database coupling, so it is a
-            // separate singleton from BannerService. The UI BannerCycleStateService consumes it as a
-            // 7th source; the head menu driver brackets a streaming export with Begin/End.
             services.AddSingleton<IExportProgressBannerService, ExportProgressBannerService>();
 
             services.AddSingleton<IAnnouncementService, AnnouncementService>();
@@ -219,9 +216,6 @@ public static class RuntimeServiceCollectionExtensions
                     sp.GetRequiredService<IOptions<LoggingOptions>>().Value,
                     settings.LogLevel);
 
-                // Seed the initial verbose-resolution override at construction (mirrors the LogLevel baseline seeding
-                // above) so a persisted-ON toggle is in effect the moment the singleton is visible - before the eager
-                // DebugLogHost resolve. DebugLogHost then bridges only subsequent toggles.
                 if (settings.VerboseResolution)
                 {
                     policy.SetCategoryOverride(LogCategories.Resolution, LogLevel.Trace);
@@ -236,14 +230,11 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IDebugLogReader>(static sp => new DebugLogFileReader(
                 sp.GetRequiredService<FileLocationOptions>(),
                 sp.GetRequiredService<FileLogSink>()));
-            // Owns the settings->routing-baseline bridge + the unhandled-exception hook. Nothing depends on it, so the
-            // MAUI head force-resolves it at startup; it depends on FileLogSink so it is disposed (hooks detached) first.
             services.AddSingleton<DebugLogHost>();
             services.AddSingleton<ILogSourceFactory>(static sp =>
             {
                 List<ILogSink> sinks = [sp.GetRequiredService<FileLogSink>()];
 #if DEBUG
-                // Debug builds also mirror to the console so logs surface in the F12 / debug window; Release is file-only.
                 sinks.Add(new ConsoleSink());
 #endif
                 return new LogSourceFactory(sinks);
@@ -254,12 +245,8 @@ public static class RuntimeServiceCollectionExtensions
                 sp.GetRequiredService<ILogSourceFactory>().ForCategory(LogCategories.EventLog));
             services.AddSingleton<IOperationLogProgressFactory, OperationLogProgressFactory>();
             services.AddSingleton<ILogWatcherService, LogWatcherService>();
-            services.AddSingleton<IMenuService, MenuService>();
-            services.AddSingleton<IModalCoordinator, ModalCoordinator>();
-            services.AddSingleton<IModalService, ModalService>();
             services.AddSingleton<ISettingsService, SettingsService>();
 
-            // Update + deployment services.
             services.AddSingleton<ICurrentVersionProvider, CurrentVersionProvider>();
             services.AddSingleton<IDeploymentService, DeploymentService>();
             services.AddSingleton<IGitHubService, GitHubService>();
@@ -267,12 +254,9 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IPackageVersionProvider, PackageVersionProvider>();
             services.AddSingleton<IUpdateService, UpdateService>();
 
-            // DatabaseTools service (CLI-equivalent operations exposed to the UI).
             services.AddDatabaseToolsServices();
             services.TryAddSingleton<IDatabaseToolsService, DatabaseToolsService>();
 
-            // Built-in scenarios: the immutable embedded catalog + presence/query/launch services. The registry
-            // aggregates every registered IScenarioSource (PR1 ships only the built-in source).
             services.AddSingleton<IScenarioSource, BuiltInScenarioSource>();
             services.AddSingleton<BuiltInScenarioRegistry>();
             services.AddSingleton<IChannelConfigReader>(static sp =>

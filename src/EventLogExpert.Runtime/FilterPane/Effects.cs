@@ -14,20 +14,26 @@ namespace EventLogExpert.Runtime.FilterPane;
 internal sealed class Effects
 {
     private readonly IStateSelection<EventLogState, Filter> _appliedFilter;
+    private readonly ClearAllFiltersNotifier _clearAllFiltersNotifier;
     private readonly IState<FilterPaneState> _filterPaneState;
     private readonly IState<FilterLensState> _lensState;
     private readonly IState<RawEventStoreState> _rawEventStore;
+    private readonly SetFilterDateRangeSucceededNotifier _setFilterDateRangeSucceededNotifier;
 
     public Effects(
         IStateSelection<EventLogState, Filter> appliedFilter,
         IState<RawEventStoreState> rawEventStore,
         IState<FilterPaneState> filterPaneState,
-        IState<FilterLensState> lensState)
+        IState<FilterLensState> lensState,
+        ClearAllFiltersNotifier clearAllFiltersNotifier,
+        SetFilterDateRangeSucceededNotifier setFilterDateRangeSucceededNotifier)
     {
         _appliedFilter = appliedFilter;
         _rawEventStore = rawEventStore;
         _filterPaneState = filterPaneState;
         _lensState = lensState;
+        _clearAllFiltersNotifier = clearAllFiltersNotifier;
+        _setFilterDateRangeSucceededNotifier = setFilterDateRangeSucceededNotifier;
 
         _appliedFilter.Select(static s => s.AppliedFilter);
     }
@@ -51,6 +57,7 @@ internal sealed class Effects
     public Task HandleClearAllFilters(IDispatcher dispatcher)
     {
         UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+        _clearAllFiltersNotifier.Raise();
         return Task.CompletedTask;
     }
 
@@ -131,6 +138,7 @@ internal sealed class Effects
     public Task HandleSetFilterDateRangeSuccess(IDispatcher dispatcher)
     {
         UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+        _setFilterDateRangeSucceededNotifier.Raise();
 
         return Task.CompletedTask;
     }
@@ -177,9 +185,6 @@ internal sealed class Effects
 
     private void UpdateEventTableFilters(FilterPaneState filterPaneState, IDispatcher dispatcher)
     {
-        // Build the effective filter by layering any active transient lenses onto the base through the single shared
-        // EffectiveFilterBuilder, so the FilterPane apply path and the FilterLens push/pop path can never diverge.
-        // FilterPaneFilterBuilder handles both the enabled and the excluded-only (pane-disabled) branch, so lenses narrow in both.
         var candidate = EffectiveFilterBuilder.Build(
             FilterPaneFilterBuilder.Build(filterPaneState),
             _lensState.Value.Lenses);

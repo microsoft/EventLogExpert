@@ -15,7 +15,7 @@ internal sealed class OperationLogProgressFactory(FileLogSink fileSink, LogRouti
         ArgumentNullException.ThrowIfNull(uiProgress);
         ArgumentException.ThrowIfNullOrEmpty(category);
 
-        List<ILogSink> sinks = [new UiStreamingSink(uiProgress, routingPolicy.UiMinimumFor(verbose)), fileSink];
+        List<ILogSink> sinks = [new UIStreamingSink(uiProgress, routingPolicy.UIMinimumFor(verbose)), fileSink];
 
         return new BroadcastLogProgress(sinks, category);
     }

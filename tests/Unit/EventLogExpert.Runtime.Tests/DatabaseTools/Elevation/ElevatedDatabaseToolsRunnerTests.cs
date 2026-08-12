@@ -21,10 +21,13 @@ namespace EventLogExpert.Runtime.Tests.DatabaseTools.Elevation;
 
 public sealed class ElevatedDatabaseToolsRunnerTests
 {
+    private const int RunnerSettleDelayMilliseconds = 50;
+
     private static readonly TimeSpan s_testExitGrace = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan s_testGrace = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan s_testHelloTimeout = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan s_testReadTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(10);
     private static readonly UTF8Encoding s_utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
     [Fact]
@@ -519,11 +522,10 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null),
             logProgress, progress: null, cts.Token);
 
-        // Let the runner enter the Hello wait before cancelling.
-        await Task.Delay(50, ct);
+        await Task.Delay(RunnerSettleDelayMilliseconds, ct);
         cts.Cancel();
 
-        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        var result = await runTask.WaitAsync(s_testTimeout, ct);
 
         Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
         Assert.True(fakeProcess.WasKilled);
@@ -553,7 +555,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         await WriteMessageAsync(clientWriter, new LogMessage(DateTime.UtcNow, LogLevel.Information, "early log"), ct);
 
-        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        var result = await runTask.WaitAsync(s_testTimeout, ct);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
         Assert.Contains("HelloMessage", result.FailureSummary);
@@ -563,7 +565,6 @@ public sealed class ElevatedDatabaseToolsRunnerTests
     [Fact]
     public async Task RunAsync_WhenHelloTimeoutAndHelperUnkillable_CentralizedFinallyCleansUpWithinBoundedTime()
     {
-        // No-Hello plus unkillable helper must still bound every cleanup wait.
         var ct = TestContext.Current.CancellationToken;
         await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
         var fakeProcess = new FakeElevatedHelperProcess(server, processId: 4242)
@@ -581,8 +582,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null),
             logProgress, progress: null, cts.Token);
 
-        // No Hello forces the 500 ms timeout; 10 s only bounds regression hangs.
-        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        var result = await runTask.WaitAsync(s_testTimeout, ct);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
         Assert.Contains("Hello", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
@@ -621,7 +621,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
             cts.Cancel();
 
-            var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
+            var result = await runTask.WaitAsync(s_testTimeout, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
             Assert.Contains("force-killed", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
@@ -637,7 +637,6 @@ public sealed class ElevatedDatabaseToolsRunnerTests
     [Fact]
     public async Task RunAsync_WhenHelperUnkillableAfterCancel_DoesNotHangAndReportsOrphan()
     {
-        // Unkillable post-cancel helpers must dispose the pipe to unblock the drain instead of hanging on exit.
         var ct = TestContext.Current.CancellationToken;
         await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
         var fakeProcess = new FakeElevatedHelperProcess(server, processId: 4242)
@@ -665,8 +664,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         cts.Cancel();
 
-        // 10 s bounds regressions around the cancellation-grace and exit-grace waits.
-        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        var result = await runTask.WaitAsync(s_testTimeout, ct);
 
         Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
         Assert.Contains("could not be terminated", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
@@ -693,10 +691,10 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null),
             logProgress, progress: null, cts.Token);
 
-        await Task.Delay(50, ct);
+        await Task.Delay(RunnerSettleDelayMilliseconds, ct);
         await client.DisposeAsync();
 
-        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        var result = await runTask.WaitAsync(s_testTimeout, ct);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
         Assert.Contains("Pipe closed", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
@@ -727,7 +725,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         await WriteMessageAsync(clientWriter, new HelloMessage(4242, ProtocolVersion: 99), ct);
 
-        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        var result = await runTask.WaitAsync(s_testTimeout, ct);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
         Assert.Contains("protocol version", result.FailureSummary, StringComparison.OrdinalIgnoreCase);

@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.Runtime.FilterLenses;
 
-internal sealed record RemoveFilterLensAction(FilterLens Lens);
+internal sealed record RemoveFilterLensAction(FilterLensId Id);
