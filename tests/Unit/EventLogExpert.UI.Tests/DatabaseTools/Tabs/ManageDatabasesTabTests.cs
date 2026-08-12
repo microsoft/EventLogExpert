@@ -3,12 +3,12 @@
 
 using Bunit;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DatabaseTools.Tabs;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -24,6 +24,11 @@ namespace EventLogExpert.UI.Tests.DatabaseTools.Tabs;
 
 public sealed class ManageDatabasesTabTests : BunitContext
 {
+    private const int LongSettleDelayMilliseconds = 100;
+    private const int ShortSettleDelayMilliseconds = 50;
+
+    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(2);
+
     private readonly IAnnouncementService _announcementService = Substitute.For<IAnnouncementService>();
     private readonly IDatabaseOperationCoordinator _coordinator = Substitute.For<IDatabaseOperationCoordinator>();
     private readonly FakeDatabaseService _databaseService = new();
@@ -507,7 +512,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
 
         var cancelTask = InvokeCancelUpgradesAsync(component, ["b.db"]);
 
-        await Task.Delay(50, TestContext.Current.CancellationToken);
+        await Task.Delay(ShortSettleDelayMilliseconds, TestContext.Current.CancellationToken);
         Assert.True(cancelCalled);
         Assert.False(cancelTask.IsCompleted);
 
@@ -517,7 +522,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
                 new UpgradeBatchResult([], ["b.db"], []),
                 wasCancelled: true));
 
-        await cancelTask.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        await cancelTask.WaitAsync(s_testTimeout, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -539,7 +544,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
 
         var cancelTask = InvokeCancelUpgradesAsync(component, ["c.db"]);
 
-        await Task.Delay(50, TestContext.Current.CancellationToken);
+        await Task.Delay(ShortSettleDelayMilliseconds, TestContext.Current.CancellationToken);
         Assert.True(cancelCalled);
         Assert.False(cancelTask.IsCompleted);
 
@@ -549,7 +554,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
                 new UpgradeBatchResult([], ["c.db"], []),
                 wasCancelled: true));
 
-        await cancelTask.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        await cancelTask.WaitAsync(s_testTimeout, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -569,7 +574,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
 
         var cancelTask = InvokeCancelUpgradesAsync(component, ["b.db"]);
 
-        await Task.Delay(100, TestContext.Current.CancellationToken);
+        await Task.Delay(LongSettleDelayMilliseconds, TestContext.Current.CancellationToken);
 
         Assert.False(cancelTask.IsCompleted);
 
@@ -580,10 +585,9 @@ public sealed class ManageDatabasesTabTests : BunitContext
                 new UpgradeBatchResult([], ["b.db"], []),
                 wasCancelled: true));
 
-        await cancelTask.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        await cancelTask.WaitAsync(s_testTimeout, TestContext.Current.CancellationToken);
         var elapsed = DateTime.UtcNow - beforeRaise;
-        // Must complete well under s_cancelTimeout (30s) — otherwise a hang regression would pass.
-        Assert.True(elapsed < TimeSpan.FromSeconds(2), $"Cancel flow took {elapsed} after batch completion (should be <2s).");
+        Assert.True(elapsed < s_testTimeout, $"Cancel flow took {elapsed} after batch completion (should be <2s).");
     }
 
     [Fact]
@@ -603,7 +607,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
 
         var cancelTask = InvokeCancelUpgradesAsync(component, ["c.db"]);
 
-        await Task.Delay(100, TestContext.Current.CancellationToken);
+        await Task.Delay(LongSettleDelayMilliseconds, TestContext.Current.CancellationToken);
         Assert.True(cancelCalled);
         Assert.False(cancelTask.IsCompleted);
 
@@ -613,7 +617,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
                 new UpgradeBatchResult([], ["c.db"], []),
                 wasCancelled: true));
 
-        await cancelTask.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        await cancelTask.WaitAsync(s_testTimeout, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -630,7 +634,6 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
         Assert.Contains("2 selected", component.Find(".manage-databases-bulk-count").TextContent);
 
-        // Master checkbox in the selection header clears when all are selected.
         var masterBtn = component.Find(".manage-databases-master-btn");
         await component.InvokeAsync(() => masterBtn.Click());
 
@@ -649,7 +652,6 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
         Assert.NotEqual(string.Empty, liveRegion.TextContent.Trim());
 
-        // With 1 of 1 selected, master is "all"; clicking clears.
         var masterBtn = component.Find(".manage-databases-master-btn");
         await component.InvokeAsync(() => masterBtn.Click());
 
@@ -780,7 +782,6 @@ public sealed class ManageDatabasesTabTests : BunitContext
     [Fact]
     public void HasDatabaseStateChanged_AfterEnabledEntryRemovedFromActiveSet_True()
     {
-        // Active set was {a}; mutate underlying entries so set becomes {}; flag computed via diff.
         var entry = Entry("a.db", isEnabled: true, status: DatabaseStatus.Ready);
         _databaseService.Entries = [entry];
         var component = Render<ManageDatabasesTab>();
@@ -856,7 +857,6 @@ public sealed class ManageDatabasesTabTests : BunitContext
         _databaseService.Entries = [entry];
         var component = Render<ManageDatabasesTab>();
 
-        // Schema migrated in place — entry stays in the active set, but the underlying data changed.
         _databaseService.RaiseUpgradeBatchCompleted(
             new UpgradeBatchCompletedEventArgs(UpgradeBatchId.Create(), new UpgradeBatchResult(["a.db"], [], []), wasCancelled: false));
 
@@ -876,8 +876,6 @@ public sealed class ManageDatabasesTabTests : BunitContext
     [Fact]
     public void HasDatabaseStateChanged_PartiallySucceededWasCancelled_True()
     {
-        // Multi-file batch: A succeeds, B is cancelled mid-flight. A's schema is permanently migrated;
-        // flag must fire even though args.WasCancelled is true.
         _databaseService.Entries = [Entry("a.db", isEnabled: true, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
 
@@ -893,8 +891,6 @@ public sealed class ManageDatabasesTabTests : BunitContext
     [Fact]
     public void HasDatabaseStateChanged_UpgradeSucceededForDisabledEntry_False()
     {
-        // Background-scope upgrades of disabled (non-active) DBs must not trigger the reload prompt:
-        // the file isn't in the active resolver set, so open logs aren't affected.
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
 
@@ -962,9 +958,6 @@ public sealed class ManageDatabasesTabTests : BunitContext
     [Fact]
     public async Task RebaselineActiveSnapshotOnly_PreservesStickyFlags()
     {
-        // Modal opens mid-classification (empty snapshot), user-initiated upgrade succeeds during the
-        // wait (_schemaUpgradeOccurred=true), classification completes. The snapshot rebaselines but
-        // the sticky flag must survive so the close-time reload prompt still fires.
         var tcs = new TaskCompletionSource();
         _databaseService.InitialClassificationTask = tcs.Task;
         _databaseService.Entries = [Entry("a.db", isEnabled: true, status: DatabaseStatus.Ready)];
@@ -976,7 +969,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         Assert.True(component.Instance.HasDatabaseStateChanged);
 
         tcs.SetResult();
-        await Task.Delay(50, TestContext.Current.CancellationToken);
+        await Task.Delay(ShortSettleDelayMilliseconds, TestContext.Current.CancellationToken);
 
         Assert.True(component.Instance.HasDatabaseStateChanged);
     }
@@ -1148,8 +1141,6 @@ public sealed class ManageDatabasesTabTests : BunitContext
     [Fact]
     public async Task RestoreFromBackup_WhileUpgradeInFlight_DoesNotInvokeService()
     {
-        // Prevents the race where DatabaseRecoveryService.RestoreFromBackupAsync triggers
-        // ClassifyEntriesAsync, deleting a .upgrade.bak that an in-flight upgrade still needs.
         _databaseService.Entries = [Entry("a.db", isEnabled: true, status: DatabaseStatus.UpgradeRequired, backupExists: true)];
         _coordinator.IsAnyUpgradeInFlight.Returns(true);
         var component = Render<ManageDatabasesTab>();
@@ -1224,7 +1215,6 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var component = Render<ManageDatabasesTab>();
         await EnterSelectionModeAsync(component);
 
-        // Master checkbox: 0 selected → click selects all.
         var masterBtn = component.Find(".manage-databases-master-btn");
         await component.InvokeAsync(() => masterBtn.Click());
 
@@ -1251,6 +1241,43 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var captured = Assert.Single(alertSurface.Requests);
         Assert.Contains("Cancel", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("upgrade", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ToggleSelectionMode_EntersMode_RevealsCheckboxes_ChangesLabelToDone()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+
+        var wrapper = component.Find(".db-entry-checkbox");
+        Assert.DoesNotContain("db-entry-checkbox--visible", wrapper.GetAttribute("class") ?? string.Empty);
+
+        await EnterSelectionModeAsync(component);
+
+        var selectBtn = component.Find("#manage-select-button");
+        Assert.Equal("true", selectBtn.GetAttribute("aria-pressed"));
+        Assert.Contains("Done", selectBtn.TextContent);
+
+        wrapper = component.Find(".db-entry-checkbox");
+        Assert.Contains("db-entry-checkbox--visible", wrapper.GetAttribute("class") ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task ToggleSelectionMode_Exits_ClearsSelection()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+
+        await EnterSelectionModeAsync(component);
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']")
+            .ChangeAsync(new ChangeEventArgs { Value = true }));
+        Assert.True(component.Instance.HasBulkSelection);
+
+        await EnterSelectionModeAsync(component);
+
+        Assert.False(component.Instance.HasBulkSelection);
+        var selectBtn = component.Find("#manage-select-button");
+        Assert.Equal("false", selectBtn.GetAttribute("aria-pressed"));
     }
 
     [Fact]
@@ -1328,43 +1355,6 @@ public sealed class ManageDatabasesTabTests : BunitContext
         Assert.Contains("2", liveRegion.TextContent);
     }
 
-    [Fact]
-    public async Task ToggleSelectionMode_EntersMode_RevealsCheckboxes_ChangesLabelToDone()
-    {
-        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
-        var component = Render<ManageDatabasesTab>();
-
-        var wrapper = component.Find(".db-entry-checkbox");
-        Assert.DoesNotContain("db-entry-checkbox--visible", wrapper.GetAttribute("class") ?? string.Empty);
-
-        await EnterSelectionModeAsync(component);
-
-        var selectBtn = component.Find("#manage-select-button");
-        Assert.Equal("true", selectBtn.GetAttribute("aria-pressed"));
-        Assert.Contains("Done", selectBtn.TextContent);
-
-        wrapper = component.Find(".db-entry-checkbox");
-        Assert.Contains("db-entry-checkbox--visible", wrapper.GetAttribute("class") ?? string.Empty);
-    }
-
-    [Fact]
-    public async Task ToggleSelectionMode_Exits_ClearsSelection()
-    {
-        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
-        var component = Render<ManageDatabasesTab>();
-
-        await EnterSelectionModeAsync(component);
-        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']")
-            .ChangeAsync(new ChangeEventArgs { Value = true }));
-        Assert.True(component.Instance.HasBulkSelection);
-
-        await EnterSelectionModeAsync(component);
-
-        Assert.False(component.Instance.HasBulkSelection);
-        var selectBtn = component.Find("#manage-select-button");
-        Assert.Equal("false", selectBtn.GetAttribute("aria-pressed"));
-    }
-
     private static async Task EnterSelectionModeAsync(IRenderedComponent<ManageDatabasesTab> component)
     {
         await component.InvokeAsync(() => component.Find("#manage-select-button").Click());
@@ -1377,8 +1367,6 @@ public sealed class ManageDatabasesTabTests : BunitContext
         IRenderedComponent<ManageDatabasesTab> component,
         IReadOnlyList<string> fileNames)
     {
-        // Reflection bypasses the bunit click + alert-surface chain so the test can deterministically
-        // interleave the batch-completion signal with the await on pendingBatches.
         var method = typeof(ManageDatabasesTab).GetMethod(
             "CancelUpgradesAndAwaitCompletionAsync",
             BindingFlags.Instance | BindingFlags.NonPublic);
@@ -1390,8 +1378,6 @@ public sealed class ManageDatabasesTabTests : BunitContext
         IRenderedComponent<ManageDatabasesTab> component,
         DatabaseEntry entry)
     {
-        // Single-row remove is now triggered via the right-click context menu; invoke
-        // the private path directly to keep tests focused on remove semantics.
         var method = typeof(ManageDatabasesTab).GetMethod(
             "RemoveDatabase",
             BindingFlags.Instance | BindingFlags.NonPublic);

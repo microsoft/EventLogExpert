@@ -14,26 +14,26 @@
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
     @ref="ChromeRef">
     <ChildContent>
-        @if (FilterLibraryState.Value.LoadError)
+        @if (LibraryLoadStatus.Current.LoadError)
         {
             <div class="filter-library-error" role="alert">
                 <p>Could not load saved filters or filter sets. See trace log for details.</p>
                 <Button OnClick="RetryLoad">Retry</Button>
             </div>
         }
-        else if (!FilterLibraryState.Value.IsLoaded)
+        else if (!LibraryLoadStatus.Current.IsLoaded)
         {
             <p aria-busy="true" class="filter-library-loading">Loading filter library&hellip;</p>
         }
         else
         {
             <CascadingValue IsFixed="true" Value="_authoringContext">
-                <SidebarTabs @bind-ActiveTab="_activeTab"
-                    IsTabpanelFocusable="@IsTabpanelEmpty"
-                    @ref="_sidebarTabsRef"
+                <SidebarTabs IsTabpanelFocusable="@IsTabpanelEmpty"
+                    TTab="LibraryTab"
                     TablistAriaLabel="Filter library views"
                     Tabs="@CurrentTabLabels"
-                    TTab="LibraryTab">
+                    @bind-ActiveTab="_activeTab"
+                    @ref="_sidebarTabsRef">
                     <TabContent Context="tab">
                         @{
                             var tagManagementPanelId = GetTagManagementPanelId(tab);
@@ -46,13 +46,13 @@
                                 @onkeydown="HandleTagFilterBarKeyDown"
                                 role="group">
                                 <span class="library-tag-filter-bar-label">Tags:</span>
-                                <Button aria-controls="@(_isTagManagementExpanded ? tagManagementPanelId : null)"
-                                    aria-expanded="@(_isTagManagementExpanded ? "true" : "false")"
-                                    aria-label="@(_isTagManagementExpanded ? "Hide tag management" : "Manage tags")"
-                                    CssClass="library-tag-management-trigger"
+                                <Button CssClass="library-tag-management-trigger"
                                     IconClass="bi bi-gear"
                                     IconOnly
                                     OnClick="ToggleTagManagement"
+                                    aria-controls="@(_isTagManagementExpanded ? tagManagementPanelId : null)"
+                                    aria-expanded="@(_isTagManagementExpanded ? "true" : "false")"
+                                    aria-label="@(_isTagManagementExpanded ? "Hide tag management" : "Manage tags")"
                                     title="Manage tags" />
                                 @{
                                     var visibleTags = AllLibraryTags.Take(TagFilterBarMaxVisible).ToList();
@@ -62,19 +62,19 @@
                                 {
                                     var isSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.OrdinalIgnoreCase);
 
-                                    <ChromelessButton aria-pressed="@(isSelected ? "true" : "false")"
-                                        CssClass="library-tag-filter-chip"
-                                        OnClick="@(() => ToggleTagFilter(tag))">
+                                    <ChromelessButton CssClass="library-tag-filter-chip"
+                                        OnClick="@(() => ToggleTagFilter(tag))"
+                                        aria-pressed="@(isSelected ? "true" : "false")">
                                         @tag
                                     </ChromelessButton>
                                 }
                                 @if (hiddenTagsCount > 0)
                                 {
-                                    <ChromelessButton aria-controls="@(_isTagOverflowExpanded ? tagOverflowRegionId : null)"
+                                    <ChromelessButton CssClass="library-tag-filter-chip-overflow"
+                                        OnClick="ToggleTagOverflowExpanded"
+                                        aria-controls="@(_isTagOverflowExpanded ? tagOverflowRegionId : null)"
                                         aria-expanded="@(_isTagOverflowExpanded ? "true" : "false")"
-                                        aria-label="@(_isTagOverflowExpanded ? "Hide additional tags" : $"Show {hiddenTagsCount} additional tags")"
-                                        CssClass="library-tag-filter-chip-overflow"
-                                        OnClick="ToggleTagOverflowExpanded">
+                                        aria-label="@(_isTagOverflowExpanded ? "Hide additional tags" : $"Show {hiddenTagsCount} additional tags")">
                                         @(_isTagOverflowExpanded ? "- less" : $"+{hiddenTagsCount} more")
                                     </ChromelessButton>
                                 }
@@ -85,9 +85,9 @@
                                         {
                                             var isOverflowSelected = _selectedTagsByTab[tab].Contains(tag, StringComparer.OrdinalIgnoreCase);
 
-                                            <ChromelessButton aria-pressed="@(isOverflowSelected ? "true" : "false")"
-                                                CssClass="library-tag-filter-chip"
-                                                OnClick="@(() => ToggleTagFilter(tag))">
+                                            <ChromelessButton CssClass="library-tag-filter-chip"
+                                                OnClick="@(() => ToggleTagFilter(tag))"
+                                                aria-pressed="@(isOverflowSelected ? "true" : "false")">
                                                 @tag
                                             </ChromelessButton>
                                         }
@@ -97,7 +97,7 @@
 
                             @if (_isTagManagementExpanded)
                             {
-                                <TagManagementPanel AllEntries="@FilterLibraryState.Value.Entries"
+                                <TagManagementPanel AllEntries="@LibraryEntries.Current"
                                     AllLibraryTags="@AllLibraryTags"
                                     Id="@tagManagementPanelId"
                                     OnTagDeleted="HandleTagDeleted"
@@ -161,7 +161,6 @@
                 AllFilterSets="@AllFilterSets"
                 AllLibraryTags="@AllLibraryTags"
                 Entry="@entry"
-                @key="entry.Id"
                 OnAddToFilterSet="@HandleAddToFilterSetAsync"
                 OnApply="@HandleApplyAsync"
                 OnCopyScenario="@OnCopyScenarioCallback"
@@ -173,6 +172,7 @@
                 OnSaveScenario="@OnSaveScenarioCallback"
                 OnSaveToLibrary="@HandleSaveToLibrary"
                 OnToggleFavorite="@HandleToggleFavorite"
+                @key="entry.Id"
                 @ref="_rowRefs[(tab, entry.Id)]" />
         };
 }

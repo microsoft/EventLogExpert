@@ -4,21 +4,16 @@
 using EventLogExpert.UI.Keyboard;
 using EventLogExpert.UI.LogTable.Find;
 using EventLogExpert.UI.Menu;
+using EventLogExpert.UI.Modal;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
-public static class UiServiceCollectionExtensions
+public static class UIServiceCollectionExtensions
 {
     extension(IServiceCollection services)
     {
-        /// <summary>Registers the EventLogExpert UI-library services into the host container.</summary>
-        /// <remarks>
-        ///     The registered <see cref="KeyboardShortcutService" /> resolves <c>IMenuActionService</c>,
-        ///     <c>IModalCoordinator</c>, and <c>ISettingsService</c> from the container - the host must register those
-        ///     abstractions (the Runtime layer via <c>AddEventLogRuntime</c> plus the host's menu adapter) before resolving UI
-        ///     services.
-        /// </remarks>
-        public IServiceCollection AddEventLogUiServices()
+        public IServiceCollection AddEventLogUIServices()
         {
             ArgumentNullException.ThrowIfNull(services);
 
@@ -26,6 +21,10 @@ public static class UiServiceCollectionExtensions
             services.AddSingleton<IFindCoordinator, FindCoordinator>();
             services.AddSingleton<IFindMarkerSource, FindMarkerSource>();
             services.AddSingleton<KeyboardShortcutService>();
+
+            services.TryAddSingleton<IMenuService, MenuService>();
+            services.TryAddSingleton<IModalCoordinator, ModalCoordinator>();
+            services.TryAddSingleton<IModalService, ModalService>();
 
             return services;
         }

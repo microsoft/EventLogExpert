@@ -12,9 +12,7 @@ using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.Menu;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Scenarios.Catalog;
@@ -22,9 +20,10 @@ using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
+using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Modal;
-using Fluxor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
@@ -42,7 +41,6 @@ public sealed partial class FilterPane
     internal string? SelectedScenarioId;
 
     private readonly List<string> _filterSetTags = [];
-    private readonly DateFilter _model = new();
     private readonly List<FilterDraft> _pendingDrafts = [];
     private readonly Dictionary<FilterId, FilterRow?> _rowRefs = new();
 
@@ -53,29 +51,36 @@ public sealed partial class FilterPane
     private bool _canEditDate;
     private ScenarioClipboardExporter _clipboardExporter = null!;
     private TimeZoneInfo _currentTimeZone = TimeZoneInfo.Utc;
+    private volatile bool _disposed;
+    private EditContext _editContext = null!;
     private ElementReference _filterPaneRootRef;
     private bool _focusAddButtonAfterRemove;
     private FilterId? _focusTargetAfterRemove;
     private bool _isFilterListVisible;
     private IJSObjectReference? _menuAnchorModule;
+    private DateFilter _model = new();
     private IReadOnlyList<IGrouping<ScenarioGroup, ScenarioDefinition>> _scenarioMatchGroups = [];
     private ImmutableHashSet<string>? _scenarioMatchSource;
     private IJSObjectReference? _scrollSuppressorModule;
 
     internal IReadOnlyList<string> AvailableFilterSetTags =>
-        AvailableTagsForSets([.. FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>()]);
+        AvailableTagsForSets([.. LibraryEntries.Current.OfType<LibraryEntryFilterSet>()]);
 
     internal bool ScenarioAuthoringEnabled => ScenarioAuthoringOptions.Enabled;
 
     internal IReadOnlyList<LibraryEntryFilterSet> VisibleFilterSets =>
         FilterSetsByTags(
-            [.. FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>()],
+            [.. LibraryEntries.Current.OfType<LibraryEntryFilterSet>()],
             _filterSetTags,
             SelectedFilterSetId);
+
+    [Inject] private IActiveFiltersSource ActiveFilters { get; init; } = null!;
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
+
+    [Inject] private IClearAllFiltersNotifier ClearAllFiltersNotifier { get; init; } = null!;
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
@@ -90,42 +95,44 @@ public sealed partial class FilterPane
 
     [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
 
-    [Inject] private IState<FilterLibraryState> FilterLibraryState { get; init; } = null!;
-
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
-    [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
-
-    [Inject] private IState<FilterProgressState> FilterProgressState { get; init; } = null!;
+    [Inject] private IFilteredDateRangeSource FilteredDateRange { get; init; } = null!;
 
     private bool HasClearableFilters =>
-        IsDateFilterVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
+        IsDateFilterVisible || ActiveFilters.Current.IsEmpty is false || _pendingDrafts.Count > 0;
 
-    private bool HasEnabledFilters => FilterPaneState.Value.Filters.Any(filter => filter.IsEnabled);
-
-    private bool HasFilters =>
-        IsDateFilterVisible || IsFilterSetPickerVisible || IsScenarioPickerVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
+    private bool HasEnabledFilters => ActiveFilters.Current.Any(filter => filter.IsEnabled);
 
     private bool HasFilterSets =>
-        FilterLibraryState.Value.IsLoaded
-        && !FilterLibraryState.Value.LoadError
-        && FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().Any();
+        LibraryLoadStatus.Current is { IsLoaded: true, LoadError: false }
+        && LibraryEntries.Current.OfType<LibraryEntryFilterSet>().Any();
+
+    private bool HasFilters =>
+        IsDateFilterVisible ||
+        IsFilterSetPickerVisible ||
+        IsScenarioPickerVisible ||
+        ActiveFilters.Current.IsEmpty is false ||
+        _pendingDrafts.Count > 0;
 
     private bool HasRecentFilters =>
-        FilterLibraryState.Value.IsLoaded
-        && !FilterLibraryState.Value.LoadError
-        && FilterLibraryState.Value.Entries.OfType<LibraryEntrySavedFilter>().Any(e => e.IsFavorite || e.LastUsedUtc is not null);
+        LibraryLoadStatus.Current is { IsLoaded: true, LoadError: false }
+        && LibraryEntries.Current.OfType<LibraryEntrySavedFilter>().Any(e => e.IsFavorite || e.LastUsedUtc is not null);
 
-    private bool HasSavableFilters => !FilterPaneState.Value.Filters.IsEmpty;
+    private bool HasSavableFilters => !ActiveFilters.Current.IsEmpty;
 
     private bool IsAddFilterMenuOpen =>
         _addFilterMenuId != 0 && MenuService.ActiveMenuId == _addFilterMenuId && MenuService.ActiveItems is not null;
 
-    private bool IsDateFilterVisible => _canEditDate || FilterPaneState.Value.FilteredDateRange is not null;
+    private bool IsDateFilterVisible => _canEditDate || FilteredDateRange.Current is not null;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, ImmutableHashSet<string>> LoadedLogNames { get; init; } = null!;
+    [Inject] private ILibraryEntriesSource LibraryEntries { get; init; } = null!;
+
+    [Inject] private ILibraryLoadStatusSource LibraryLoadStatus { get; init; } = null!;
+
+    [Inject] private ILoadedLogNamesSource LoadedLogNames { get; init; } = null!;
 
     [Inject] private IMenuActionService MenuActions { get; init; } = null!;
 
@@ -135,7 +142,19 @@ public sealed partial class FilterPane
 
     [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, int> OpenLogCount { get; init; } = null!;
+    private DateTime? ModelAfter
+    {
+        get => _model.After;
+        set => _model = _model with { After = value };
+    }
+
+    private DateTime? ModelBefore
+    {
+        get => _model.Before;
+        set => _model = _model with { Before = value };
+    }
+
+    [Inject] private IOpenLogsPresenceSource OpenLogsPresence { get; init; } = null!;
 
     private ScenarioDefinition? ResolvedScenario =>
         VisibleScenarioMatches.FirstOrDefault(match => match.Id == SelectedScenarioId)
@@ -147,13 +166,11 @@ public sealed partial class FilterPane
 
     [Inject] private IScenarioAuthoringService ScenarioAuthoringService { get; init; } = null!;
 
-    private IReadOnlyList<ScenarioDefinition> ScenarioMatches => [.. ScenarioMatchGroups.SelectMany(group => group)];
-
     private IReadOnlyList<IGrouping<ScenarioGroup, ScenarioDefinition>> ScenarioMatchGroups
     {
         get
         {
-            var names = LoadedLogNames.Value;
+            var names = LoadedLogNames.Current;
 
             if (ReferenceEquals(names, _scenarioMatchSource))
             {
@@ -173,7 +190,11 @@ public sealed partial class FilterPane
         }
     }
 
+    private IReadOnlyList<ScenarioDefinition> ScenarioMatches => [.. ScenarioMatchGroups.SelectMany(group => group)];
+
     [Inject] private IScenarioQueryService ScenarioQueryService { get; init; } = null!;
+
+    [Inject] private ISetFilterDateRangeSucceededNotifier SetFilterDateRangeSucceededNotifier { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -239,9 +260,9 @@ public sealed partial class FilterPane
     {
         if (HasRecentFilters) { return null; }
 
-        if (FilterLibraryState.Value.LoadError) { return FilterPaneAnnouncements.LoadFailedRetryViaModal; }
+        if (LibraryLoadStatus.Current.LoadError) { return FilterPaneAnnouncements.LoadFailedRetryViaModal; }
 
-        return !FilterLibraryState.Value.IsLoaded ?
+        return !LibraryLoadStatus.Current.IsLoaded ?
             FilterPaneAnnouncements.LoadingTryAgain :
             FilterPaneAnnouncements.RecentNoneAvailable;
     }
@@ -254,17 +275,15 @@ public sealed partial class FilterPane
 
     internal void OpenFilterSetPicker()
     {
-        // Re-clicking the trigger is a no-op so an in-progress dropdown selection isn't silently
-        // overwritten by `filterSets.First()` reset. Cancel button is the only way to dismiss the picker.
         if (IsFilterSetPickerVisible) { return; }
 
-        if (FilterLibraryState.Value.LoadError)
+        if (LibraryLoadStatus.Current.LoadError)
         {
             AnnouncementService.Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal);
             return;
         }
 
-        if (!FilterLibraryState.Value.IsLoaded)
+        if (!LibraryLoadStatus.Current.IsLoaded)
         {
             AnnouncementService.Announce(FilterPaneAnnouncements.LoadingTryAgain);
             return;
@@ -273,7 +292,7 @@ public sealed partial class FilterPane
         _filterSetTags.Clear();
         IsFilterSetPickerVisible = true;
         SelectedFilterSetId = HasFilterSets
-            ? FilterLibraryState.Value.Entries
+            ? LibraryEntries.Current
                 .OfType<LibraryEntryFilterSet>()
                 .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
                 .First().Id
@@ -314,7 +333,7 @@ public sealed partial class FilterPane
 
     internal bool TryResolveSelectedFilterSet()
     {
-        if (FilterLibraryState.Value.LoadError)
+        if (LibraryLoadStatus.Current.LoadError)
         {
             AnnouncementService.Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal);
             CancelFilterSetPicker();
@@ -322,7 +341,7 @@ public sealed partial class FilterPane
             return false;
         }
 
-        if (!FilterLibraryState.Value.IsLoaded)
+        if (!LibraryLoadStatus.Current.IsLoaded)
         {
             AnnouncementService.Announce(FilterPaneAnnouncements.LoadingTryAgain);
             CancelFilterSetPicker();
@@ -330,7 +349,7 @@ public sealed partial class FilterPane
             return false;
         }
 
-        var filterSets = FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().ToList();
+        var filterSets = LibraryEntries.Current.OfType<LibraryEntryFilterSet>().ToList();
 
         if (filterSets.Any(p => p.Id.Equals(SelectedFilterSetId)))
         {
@@ -349,9 +368,16 @@ public sealed partial class FilterPane
     {
         if (disposing)
         {
+            _disposed = true;
+
             Settings.TimeZoneChanged -= UpdateFilterDateTimeZone;
             MenuService.StateChanged -= OnMenuServiceStateChanged;
+        }
 
+        await base.DisposeAsyncCore(disposing);
+
+        if (disposing)
+        {
             await JsModuleInterop.DisposeModuleSafelyAsync(
                 _scrollSuppressorModule,
                 module => module.InvokeVoidAsync("release", _filterPaneRootRef));
@@ -361,8 +387,6 @@ public sealed partial class FilterPane
             _menuAnchorModule = null;
             _scrollSuppressorModule = null;
         }
-
-        await base.DisposeAsyncCore(disposing);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -412,23 +436,45 @@ public sealed partial class FilterPane
 
     protected override void OnInitialized()
     {
-        LoadedLogNames.Select(s => s.LoadedLogNames);
-        OpenLogCount.Select(s => s.OpenLogCount);
+        _editContext = new EditContext(_model);
 
-        SubscribeToAction<ClearAllFiltersAction>(action =>
-        {
-            _canEditDate = false;
-            _pendingDrafts.Clear();
-            IsFilterSetPickerVisible = false;
-            CancelScenarioPicker();
-            SelectedFilterSetId = default;
-            _filterSetTags.Clear();
-        });
+        ObserveSource(LibraryEntries);
+        ObserveSource(LibraryLoadStatus);
+        ObserveSource(ActiveFilters);
+        ObserveSource(FilteredDateRange);
+        ObserveSource(OpenLogsPresence);
+        ObserveSource(LoadedLogNames);
 
-        SubscribeToAction<SetFilterDateRangeSuccessAction>(action =>
-        {
-            UpdateFilterDate(action.DateFilter);
-        });
+        ObserveSource(
+            handler => ClearAllFiltersNotifier.Requested += handler,
+            handler => ClearAllFiltersNotifier.Requested -= handler,
+            () =>
+            {
+                if (_disposed) { return Task.CompletedTask; }
+
+                _canEditDate = false;
+                _pendingDrafts.Clear();
+                IsFilterSetPickerVisible = false;
+                CancelScenarioPicker();
+                SelectedFilterSetId = default;
+                _filterSetTags.Clear();
+                StateHasChanged();
+
+                return Task.CompletedTask;
+            });
+
+        ObserveSource(
+            handler => SetFilterDateRangeSucceededNotifier.Succeeded += handler,
+            handler => SetFilterDateRangeSucceededNotifier.Succeeded -= handler,
+            () =>
+            {
+                if (_disposed) { return Task.CompletedTask; }
+
+                UpdateFilterDate(FilteredDateRange.Current);
+                StateHasChanged();
+
+                return Task.CompletedTask;
+            });
 
         Settings.TimeZoneChanged += UpdateFilterDateTimeZone;
         MenuService.StateChanged += OnMenuServiceStateChanged;
@@ -487,8 +533,11 @@ public sealed partial class FilterPane
 
         var (after, before) = EventLogQueries.GetEventDateRange(DateTime.UtcNow);
 
-        _model.After = after.ConvertTimeZone(_currentTimeZone);
-        _model.Before = before.ConvertTimeZone(_currentTimeZone);
+        _model = _model with
+        {
+            After = after.ConvertTimeZone(_currentTimeZone),
+            Before = before.ConvertTimeZone(_currentTimeZone)
+        };
 
         _isFilterListVisible = true;
         _canEditDate = true;
@@ -550,16 +599,13 @@ public sealed partial class FilterPane
     {
         if (!HasClearableFilters) { return; }
 
-        // Counts everything Clear All actually removes: persisted filters (regardless of IsEnabled),
-        // any open date filter row, and any uncommitted pending drafts.
-        int count = FilterPaneState.Value.Filters.Count
-            + _pendingDrafts.Count
-            + (IsDateFilterVisible ? 1 : 0);
+        int count = ActiveFilters.Current.Count +
+            _pendingDrafts.Count +
+            (IsDateFilterVisible ? 1 : 0);
 
-        // HasClearableFilters guarantees count >= 1, so the message is always factual.
-        string message = count == 1
-            ? "Clear 1 filter? This cannot be undone."
-            : $"Clear {count} filters? This cannot be undone.";
+        string message = count == 1 ?
+            "Clear 1 filter? This cannot be undone." :
+            $"Clear {count} filters? This cannot be undone.";
 
         bool confirmed = await AlertDialogService.ShowAlert("Clear All Filters", message, "Clear", "Cancel");
 
@@ -579,22 +625,22 @@ public sealed partial class FilterPane
 
     private ScenarioExportResult ExportCurrentRows() =>
         ScenarioAuthoringService.ExportRows(
-            [.. FilterPaneState.Value.Filters.Where(filter => filter.IsEnabled)],
+            [.. ActiveFilters.Current.Where(filter => filter.IsEnabled)],
             CurrentChannelNames());
 
     private int GetActiveFilters()
     {
         int count = 0;
 
-        count += FilterPaneState.Value.FilteredDateRange?.IsEnabled is true ? 1 : 0;
-        count += FilterPaneState.Value.Filters.Count(filter => filter.IsEnabled);
+        count += FilteredDateRange.Current?.IsEnabled is true ? 1 : 0;
+        count += ActiveFilters.Current.Count(filter => filter.IsEnabled);
 
         return count;
     }
 
     private string GetFilterSetName(LibraryEntryId id)
     {
-        var set = FilterLibraryState.Value.Entries.OfType<LibraryEntryFilterSet>().FirstOrDefault(p => p.Id.Equals(id));
+        var set = LibraryEntries.Current.OfType<LibraryEntryFilterSet>().FirstOrDefault(p => p.Id.Equals(id));
 
         return set is null ? string.Empty : FormatFilterSetLabel(set);
     }
@@ -623,7 +669,7 @@ public sealed partial class FilterPane
         _pendingDrafts.Remove(draft);
 
         var target = FilterPaneFocus.ComputeFocusTargetAfterPendingDiscard(
-            FilterPaneState.Value.Filters,
+            ActiveFilters.Current,
             IsFocusable);
 
         _focusTargetAfterRemove = target;
@@ -639,7 +685,7 @@ public sealed partial class FilterPane
     private void HandleRemovedFilter(FilterId removedId)
     {
         var target = FilterPaneFocus.ComputeFocusTargetAfterRemove(
-            FilterPaneState.Value.Filters,
+            ActiveFilters.Current,
             removedId,
             IsFocusable);
 
@@ -658,9 +704,7 @@ public sealed partial class FilterPane
         _filterSetTags.AddRange(tags);
     }
 
-    // Marshaled through the renderer dispatcher because StateChanged may fire from arbitrary threads;
-    // re-renders so the chevron's aria-expanded reflects open/close state.
-    private void OnMenuServiceStateChanged() => _ = InvokeAsync(StateHasChanged);
+    private void OnMenuServiceStateChanged() => RequestGuardedRender(StateHasChanged);
 
     private void OnRowDisposed(FilterId id) => _rowRefs.Remove(id);
 
@@ -697,7 +741,7 @@ public sealed partial class FilterPane
     {
         if (_rowRefs.Count == 0) { return; }
 
-        var liveFilters = FilterPaneState.Value.Filters;
+        var liveFilters = ActiveFilters.Current;
 
         if (liveFilters.Count == 0)
         {
@@ -754,17 +798,24 @@ public sealed partial class FilterPane
 
     private void UpdateFilterDate(DateFilter? updatedDate)
     {
-        _model.Before = updatedDate?.Before?.ConvertTimeZone(_currentTimeZone);
-        _model.After = updatedDate?.After?.ConvertTimeZone(_currentTimeZone);
+        _model = _model with
+        {
+            Before = updatedDate?.Before?.ConvertTimeZone(_currentTimeZone),
+            After = updatedDate?.After?.ConvertTimeZone(_currentTimeZone)
+        };
     }
 
     private void UpdateFilterDateTimeZone(object? sender, TimeZoneInfo timeZoneInfo)
     {
-        _model.Before = _model.Before is not null ?
-            TimeZoneInfo.ConvertTime(_model.Before.Value, _currentTimeZone, timeZoneInfo) : null;
+        if (_disposed) { return; }
 
-        _model.After = _model.After is not null ?
-            TimeZoneInfo.ConvertTime(_model.After.Value, _currentTimeZone, timeZoneInfo) : null;
+        _model = _model with
+        {
+            Before = _model.Before is not null ?
+                TimeZoneInfo.ConvertTime(_model.Before.Value, _currentTimeZone, timeZoneInfo) : null,
+            After = _model.After is not null ?
+                TimeZoneInfo.ConvertTime(_model.After.Value, _currentTimeZone, timeZoneInfo) : null
+        };
 
         _currentTimeZone = timeZoneInfo;
     }

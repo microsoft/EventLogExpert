@@ -7,26 +7,20 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.LogTable;
-using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
-using Fluxor;
+using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
-using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.LogTable;
 
 public sealed partial class LogTabBar
 {
-    private EventLogId? _activeEventLogId;
-    private HashSet<EventLogId> _emptyTabIds = [];
-    private ImmutableList<LogView>? _eventTables;
-    private ImmutableList<LogTabGroup> _groups = [];
     private IJSObjectReference? _logTabBarModule;
     private ElementReference _logTabBarRootRef;
-    private LogTableState _logTableState = null!;
+    private LogTabBarPresentation? _renderedPresentation;
     private IJSObjectReference? _scrollSuppressorModule;
     private List<TabRow> _tabRows = [];
 
@@ -38,9 +32,11 @@ public sealed partial class LogTabBar
 
     [Inject] private ILogTableCommands LogTableCommands { get; init; } = null!;
 
-    [Inject] private IState<LogTableState> LogTableState { get; init; } = null!;
-
     [Inject] private IMenuService MenuService { get; init; } = null!;
+
+    [Inject] private ILogTableQueries Queries { get; init; } = null!;
+
+    [Inject] private ILogTabBarSource Source { get; init; } = null!;
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
@@ -91,55 +87,24 @@ public sealed partial class LogTabBar
 
     protected override void OnInitialized()
     {
+        ObserveSource(Source);
         base.OnInitialized();
-
-        var state = LogTableState.Value;
-        _logTableState = state;
-        _eventTables = state.EventTables;
-        _groups = state.Groups;
-        _activeEventLogId = state.ActiveEventLogId;
-        _emptyTabIds = ComputeEmptyTabIds(state);
-        _tabRows = BuildTabRows(state);
     }
 
-    protected override bool ShouldRender()
-    {
-        var state = LogTableState.Value;
+    protected override bool ShouldRender() => !ReferenceEquals(Source.Current, _renderedPresentation);
 
-        if (ReferenceEquals(state, _logTableState)) { return false; }
-
-        bool tablesChanged = !ReferenceEquals(state.EventTables, _eventTables);
-        bool groupsChanged = !ReferenceEquals(state.Groups, _groups);
-        bool activeChanged = state.ActiveEventLogId != _activeEventLogId;
-        var emptyTabIds = ComputeEmptyTabIds(state);
-        bool emptinessChanged = !emptyTabIds.SetEquals(_emptyTabIds);
-
-        _logTableState = state;
-
-        if (!tablesChanged && !groupsChanged && !activeChanged && !emptinessChanged) { return false; }
-
-        _eventTables = state.EventTables;
-        _groups = state.Groups;
-        _activeEventLogId = state.ActiveEventLogId;
-        _emptyTabIds = emptyTabIds;
-
-        if (tablesChanged || groupsChanged) { _tabRows = BuildTabRows(state); }
-
-        return true;
-    }
-
-    private static List<TabRow> BuildTabRows(LogTableState state)
+    private static List<TabRow> BuildTabRows(LogTabBarPresentation presentation)
     {
         var headerGroupIds = new HashSet<LogTabGroupId>();
 
-        foreach (var table in state.EventTables)
+        foreach (var table in presentation.Tabs)
         {
             if (table.GroupId is { IsAll: false } groupId) { headerGroupIds.Add(groupId); }
         }
 
         var memberToGroupId = new Dictionary<EventLogId, LogTabGroupId>();
 
-        foreach (var group in state.Groups)
+        foreach (var group in presentation.Groups)
         {
             if (!headerGroupIds.Contains(group.Id)) { continue; }
 
@@ -149,7 +114,7 @@ public sealed partial class LogTabBar
         var membersByGroup = new Dictionary<LogTabGroupId, List<LogView>>();
         var standalone = new List<LogView>();
 
-        foreach (var table in state.EventTables)
+        foreach (var table in presentation.Tabs)
         {
             if (table.GroupId is not null) { continue; }
 
@@ -171,16 +136,16 @@ public sealed partial class LogTabBar
 
         var rows = new List<TabRow>();
 
-        if (state.EventTables.FirstOrDefault(table => table.GroupId?.IsAll == true) is { } allLogs)
+        if (presentation.Tabs.FirstOrDefault(table => table.GroupId?.IsAll == true) is { } allLogs)
         {
             rows.Add(new AllLogsRow(allLogs));
         }
 
-        foreach (var header in state.EventTables)
+        foreach (var header in presentation.Tabs)
         {
             if (header.GroupId is not { IsAll: false } headerGroupId) { continue; }
 
-            if (state.Groups.FirstOrDefault(candidate => candidate.Id == headerGroupId) is not { } group)
+            if (presentation.Groups.FirstOrDefault(candidate => candidate.Id == headerGroupId) is not { } group)
             {
                 continue;
             }
@@ -199,20 +164,6 @@ public sealed partial class LogTabBar
             .Select(table => new StandaloneRow(table)));
 
         return rows;
-    }
-
-    private static HashSet<EventLogId> ComputeEmptyTabIds(LogTableState state)
-    {
-        var empty = new HashSet<EventLogId>();
-
-        foreach (var table in state.EventTables)
-        {
-            if (table.IsCombined || table.IsLoading) { continue; }
-
-            if (state.EventCountByLog.GetValueOrDefault(table.Id, 0) <= 0) { empty.Add(table.Id); }
-        }
-
-        return empty;
     }
 
     private static MenuItem DangerItem(
@@ -240,6 +191,11 @@ public sealed partial class LogTabBar
             : $"Live Log: {table.LogName}\n" +
                 $"Computer Name: {table.ComputerName}";
     }
+
+    private static IReadOnlyList<LogView> VisibleMembers(LogTabBarPresentation presentation, GroupRow row) =>
+        row.Group.IsCollapsed
+            ? [.. row.Members.Where(member => member.Id == presentation.ActiveTabId)]
+            : row.Members;
 
     private IReadOnlyList<MenuItem> BuildAllLogsMenu() =>
     [
@@ -279,7 +235,7 @@ public sealed partial class LogTabBar
     {
         var items = new List<MenuItem>();
 
-        foreach ((LogTabGroupId logTabGroupId, string name, var _) in LogTableState.Value.Groups)
+        foreach ((LogTabGroupId logTabGroupId, string name, var _) in Queries.GetTabGroups())
         {
             if (excludeGroupId is { } excluded && logTabGroupId == excluded) { continue; }
 
@@ -302,17 +258,16 @@ public sealed partial class LogTabBar
         CloseOtherTabsItem(tab.Id),
     ];
 
-    private bool CanCloseOthersInGroup(LogTabGroup group, EventLogId keepTabId) =>
-        group.MemberIds.Contains(keepTabId) &&
-        LogTableState.Value.EventTables.Count(tab => tab.GroupId is null && group.MemberIds.Contains(tab.Id)) > 1;
+    private bool CanCloseOtherTabs() => Queries.HasMultipleIndividualTabs();
 
-    private bool CanCloseOtherTabs() => LogTableState.Value.EventTables.Count(tab => !tab.IsCombined) > 1;
+    private bool CanCloseOthersInGroup(LogTabGroup group, EventLogId keepTabId) =>
+        Queries.HasOtherTabsInGroup(group.Id, keepTabId);
 
     private void CloseGroup(LogTabGroup group) => LogTableCommands.CloseGroup(group.Id);
 
     private void CloseLog(LogView table)
     {
-        if (LogTableState.Value.EventTables.All(tab => tab.Id != table.Id)) { return; }
+        if (!Queries.IsTabOpen(table.Id)) { return; }
 
         EventLogCommands.CloseLog(table.Id, table.LogName);
     }
@@ -336,17 +291,17 @@ public sealed partial class LogTabBar
         }
     }
 
-    private string GetActiveTab(LogView table) =>
-        LogTableState.Value.ActiveEventLogId == table.Id ? "tab active" : "tab";
+    private string GetActiveTab(LogTabBarPresentation presentation, LogView table) =>
+        presentation.ActiveTabId == table.Id ? "tab active" : "tab";
 
-    private string GetTabClass(LogView table, bool isMember)
+    private string GetTabClass(LogTabBarPresentation presentation, LogView table, bool isMember)
     {
-        string active = GetActiveTab(table);
+        string active = GetActiveTab(presentation, table);
 
         return isMember ? $"{active} member" : active;
     }
 
-    private string GetTabName(LogView table)
+    private string GetTabName(LogTabBarPresentation presentation, LogView table)
     {
         if (table.GroupId?.IsAll == true) { return "Combined"; }
 
@@ -358,9 +313,7 @@ public sealed partial class LogTabBar
 
         if (table.IsLoading) { return tabName; }
 
-        int count = _logTableState.EventCountByLog.GetValueOrDefault(table.Id, 0);
-
-        return count <= 0 ? $"(Empty) {tabName}" : tabName;
+        return presentation.IsKnownEmpty(table.Id) ? $"(Empty) {tabName}" : tabName;
     }
 
     private void OnCloseGroupKeyDown(KeyboardEventArgs e, LogTabGroup group)
@@ -420,7 +373,7 @@ public sealed partial class LogTabBar
 
         if (string.IsNullOrWhiteSpace(name)) { return; }
 
-        if (!LogTableState.Value.EventTables.Any(table => table.Id == tab.Id && table.GroupId is null))
+        if (!Queries.IsUngroupedTabOpen(tab.Id))
         {
             TraceLogger.Trace($"New group skipped: tab '{tab.LogName}' is no longer an open per-log tab.");
             return;
@@ -439,7 +392,7 @@ public sealed partial class LogTabBar
 
         if (string.IsNullOrWhiteSpace(name)) { return; }
 
-        if (LogTableState.Value.Groups.All(candidate => candidate.Id != group.Id))
+        if (!Queries.HasTabGroup(group.Id))
         {
             TraceLogger.Trace($"Rename skipped: group '{group.Name}' no longer exists.");
             return;
@@ -457,11 +410,6 @@ public sealed partial class LogTabBar
 
     private void ToggleCollapse(LogTabGroup group) =>
         LogTableCommands.SetTabGroupCollapsed(group.Id, !group.IsCollapsed);
-
-    private IReadOnlyList<LogView> VisibleMembers(GroupRow row) =>
-        row.Group.IsCollapsed
-            ? [.. row.Members.Where(member => member.Id == _activeEventLogId)]
-            : row.Members;
 
     private sealed record AllLogsRow(LogView Header) : TabRow;
 

@@ -16,7 +16,6 @@ using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.Inputs;
-using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
@@ -47,25 +46,15 @@ public sealed partial class MenuBar
 
     [Inject] private IChannelReadinessService ChannelReadinessService { get; init; } = null!;
 
-    [Inject]
-    private IStateSelection<EventLogState, bool> ContinuouslyUpdate { get; init; } = null!;
+    [Inject] private IEventLogQueries EventLogQueries { get; init; } = null!;
 
-    [Inject]
-    private IStateSelection<FilterPaneState, bool> FilterPaneIsEnabled { get; init; } = null!;
+    [Inject] private IFilterPaneQueries FilterPaneQueries { get; init; } = null!;
 
-    [Inject]
-    private IStateSelection<LogTableState, bool> HasActiveLogs { get; init; } = null!;
-
-    [Inject]
-    private IStateSelection<HistogramState, bool> HistogramVisible { get; init; } = null!;
-
-    [Inject]
-    private IStateSelection<LogTableState, bool> IsGroupDescending { get; init; } = null!;
-
-    [Inject]
-    private IStateSelection<LogTableState, bool> IsGrouping { get; init; } = null!;
+    [Inject] private IHistogramVisibilitySource HistogramVisibility { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private ILogTableQueries LogTableQueries { get; init; } = null!;
 
     [Inject] private IMenuService MenuService { get; init; } = null!;
 
@@ -118,13 +107,6 @@ public sealed partial class MenuBar
 
     protected override void OnInitialized()
     {
-        ContinuouslyUpdate.Select(state => state.ContinuouslyUpdate);
-        FilterPaneIsEnabled.Select(state => state.IsEnabled);
-        HasActiveLogs.Select(state => state.EventTables.Any(table => !table.IsCombined));
-        HistogramVisible.Select(state => state.IsVisible);
-        IsGroupDescending.Select(state => state.IsGroupDescending);
-        IsGrouping.Select(state => state.GroupBy is not null);
-
         Settings.CopyFormatChanged += OnSettingsChanged;
         MenuService.StateChanged += OnMenuServiceStateChanged;
         MenuService.NavigateBarRequested += OnNavigateBarRequested;
@@ -168,7 +150,7 @@ public sealed partial class MenuBar
 
     private IReadOnlyList<MenuItem> BuildFile()
     {
-        bool hasActiveLogs = HasActiveLogs.Value;
+        bool hasActiveLogs = LogTableQueries.HasActiveLogs();
 
         return
         [
@@ -242,7 +224,6 @@ public sealed partial class MenuBar
                 continue;
             }
 
-            // NUL keys folderMap entries so segments containing '-' or '/' can't collide.
             var children = rootChildren;
             var pathBuilder = new StringBuilder();
 
@@ -287,12 +268,11 @@ public sealed partial class MenuBar
 
     private IReadOnlyList<MenuItem> BuildView()
     {
-        // Snapshot state at open time. Live updates aren't pushed into an open menu - the next open will reflect any change.
-        bool isFilterEnabled = FilterPaneIsEnabled.Value;
-        bool isContinuouslyUpdating = ContinuouslyUpdate.Value;
-        bool isGrouping = IsGrouping.Value;
-        bool isGroupDescending = IsGroupDescending.Value;
-        bool isHistogramVisible = HistogramVisible.Value;
+        bool isFilterEnabled = FilterPaneQueries.IsEnabled();
+        bool isContinuouslyUpdating = EventLogQueries.IsContinuouslyUpdating();
+        bool isGrouping = LogTableQueries.IsGrouping();
+        bool isGroupDescending = LogTableQueries.IsGroupDescending();
+        bool isHistogramVisible = HistogramVisibility.IsVisible;
 
         return
         [
@@ -381,10 +361,8 @@ public sealed partial class MenuBar
 
         _focusedBarIndex = index;
 
-        // If a menu is already open, switch to the new bar's menu so arrow keys feel continuous.
         if (openIfMenuActive && MenuService.ActiveItems is not null)
         {
-            // Preserve the original opener so closing restores focus to the menubar.
             await OpenBarAsync(_bars[index], index, captureOpener: false);
 
             return;
@@ -413,7 +391,6 @@ public sealed partial class MenuBar
 
     private async Task OnBarHover(TopLevel bar, int index)
     {
-        // Only switch on hover when another menu is already open - matches Win32 menubar behavior.
         if (MenuService.ActiveItems is null || ReferenceEquals(ActiveBar, bar)) { return; }
 
         await OpenBarAsync(bar, index, captureOpener: false);
@@ -438,12 +415,9 @@ public sealed partial class MenuBar
                 await MoveBarFocusTo(_bars.Count - 1, true);
                 return;
             case "ArrowDown":
-                // Enter/Space are intentionally not handled here so the browser's native button
-                // click fires once - handling them on keydown would toggle the menu shut.
                 await OpenBarAsync(_bars[index], index);
                 return;
             case "ArrowUp":
-                // WAI-ARIA menubar: ArrowUp opens and focuses the last item.
                 await OpenBarAsync(_bars[index], index, false);
                 return;
             case "Escape":
@@ -457,8 +431,6 @@ public sealed partial class MenuBar
     {
         if (MenuService.ActiveItems is null)
         {
-            // Invalidate any in-flight OpenBarAsync so a stale continuation can't reopen
-            // the menu after it was closed (overlay click, item activation, Escape, etc.).
             InvalidatePendingOpen();
 
             if (ActiveBar is not null) { ActiveBar = null; }
@@ -474,11 +446,8 @@ public sealed partial class MenuBar
 
     private async Task OpenBarAsync(TopLevel bar, int index, bool focusFirst = true, bool captureOpener = true)
     {
-        // Tag this open request so out-of-order JS interop completions from rapid hover/keyboard
-        // navigation (or a close that happens mid-await) don't activate the wrong bar.
         var requestId = Interlocked.Increment(ref _openRequestId);
 
-        // Anchor the dropdown to the bottom-left of the trigger button.
         _menuAnchorModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
             "import", "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
 

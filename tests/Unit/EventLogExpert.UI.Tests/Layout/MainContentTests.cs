@@ -10,7 +10,6 @@ using EventLogExpert.UI.FilterLenses;
 using EventLogExpert.UI.Layout;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.LogTable.Histogram;
-using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using DetailsPaneComponent = EventLogExpert.UI.DetailsPane.DetailsPane;
@@ -20,18 +19,13 @@ namespace EventLogExpert.UI.Tests.Layout;
 
 public sealed class MainContentTests : BunitContext
 {
-    private readonly IStateSelection<EventLogState, bool> _hasActiveLogs =
-        Substitute.For<IStateSelection<EventLogState, bool>>();
-
-    private readonly IStateSelection<HistogramState, bool> _histogramVisible =
-        Substitute.For<IStateSelection<HistogramState, bool>>();
+    private readonly IHistogramVisibilitySource _histogramVisibility = Substitute.For<IHistogramVisibilitySource>();
+    private readonly IOpenLogsPresenceSource _openLogs = Substitute.For<IOpenLogsPresenceSource>();
 
     public MainContentTests()
     {
-        Services.AddSingleton(_hasActiveLogs);
-        Services.AddSingleton(_histogramVisible);
-        Services.AddFluxor(options => options.ScanAssemblies(typeof(MainContent).Assembly));
-        JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddSingleton(_openLogs);
+        Services.AddSingleton(_histogramVisibility);
 
         ComponentFactories.AddStub<FilterPaneComponent>();
         ComponentFactories.AddStub<LensBreadcrumb>();
@@ -42,21 +36,41 @@ public sealed class MainContentTests : BunitContext
     }
 
     [Fact]
-    public void Render_WhenLogsActive_RendersPanesNotDashboard()
+    public void HistogramVisibilityChangeAfterRender_TogglesTheHistogramPane_ThroughTheSource()
     {
-        _hasActiveLogs.Value.Returns(true);
-
+        _openLogs.HasOpenLogs.Returns(true);
+        _histogramVisibility.IsVisible.Returns(false);
         var cut = Render<MainContent>();
+        Assert.Empty(cut.FindComponents<Stub<HistogramPane>>());
 
-        Assert.NotEmpty(cut.FindComponents<Stub<FilterPaneComponent>>());
-        Assert.Empty(cut.FindComponents<Stub<EmptyStateDashboard>>());
+        _histogramVisibility.IsVisible.Returns(true);
+        _histogramVisibility.Changed += Raise.Event<Action>();
+
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindComponents<Stub<HistogramPane>>()));
+    }
+
+    [Fact]
+    public void OpenLogsChangeAfterRender_SwapsTheDashboardForThePanes_ThroughTheSource()
+    {
+        _openLogs.HasOpenLogs.Returns(false);
+        var cut = Render<MainContent>();
+        Assert.NotEmpty(cut.FindComponents<Stub<EmptyStateDashboard>>());
+
+        _openLogs.HasOpenLogs.Returns(true);
+        _openLogs.Changed += Raise.Event<Action>();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.NotEmpty(cut.FindComponents<Stub<FilterPaneComponent>>());
+            Assert.Empty(cut.FindComponents<Stub<EmptyStateDashboard>>());
+        });
     }
 
     [Fact]
     public void Render_WhenLogsActiveAndTimelineHidden_DoesNotRenderHistogramPane()
     {
-        _hasActiveLogs.Value.Returns(true);
-        _histogramVisible.Value.Returns(false);
+        _openLogs.HasOpenLogs.Returns(true);
+        _histogramVisibility.IsVisible.Returns(false);
 
         var cut = Render<MainContent>();
 
@@ -66,8 +80,8 @@ public sealed class MainContentTests : BunitContext
     [Fact]
     public void Render_WhenLogsActiveAndTimelineVisible_RendersHistogramPane()
     {
-        _hasActiveLogs.Value.Returns(true);
-        _histogramVisible.Value.Returns(true);
+        _openLogs.HasOpenLogs.Returns(true);
+        _histogramVisibility.IsVisible.Returns(true);
 
         var cut = Render<MainContent>();
 
@@ -75,9 +89,20 @@ public sealed class MainContentTests : BunitContext
     }
 
     [Fact]
+    public void Render_WhenLogsActive_RendersPanesNotDashboard()
+    {
+        _openLogs.HasOpenLogs.Returns(true);
+
+        var cut = Render<MainContent>();
+
+        Assert.NotEmpty(cut.FindComponents<Stub<FilterPaneComponent>>());
+        Assert.Empty(cut.FindComponents<Stub<EmptyStateDashboard>>());
+    }
+
+    [Fact]
     public void Render_WhenNoActiveLogs_RendersDashboardNotPanes()
     {
-        _hasActiveLogs.Value.Returns(false);
+        _openLogs.HasOpenLogs.Returns(false);
 
         var cut = Render<MainContent>();
 

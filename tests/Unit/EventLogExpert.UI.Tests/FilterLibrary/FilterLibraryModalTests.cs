@@ -9,11 +9,10 @@ using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.UI.FilterLibrary;
+using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
-using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,16 +46,21 @@ public sealed class FilterLibraryModalTests : BunitContext
         Services.AddSingleton(_filePicker);
         Services.AddSingleton(_exportService);
 
-        var paneState = Substitute.For<IState<FilterPaneState>>();
-        paneState.Value.Returns(new FilterPaneState());
-        Services.AddSingleton(paneState);
+        var defaultLibraryEntries = Substitute.For<ILibraryEntriesSource>();
+        defaultLibraryEntries.Current.Returns(ImmutableList<LibraryEntry>.Empty);
+        Services.AddSingleton(defaultLibraryEntries);
+        var activeFilters = Substitute.For<IActiveFiltersSource>();
+        activeFilters.Current.Returns(ImmutableList<SavedFilter>.Empty);
+        Services.AddSingleton(activeFilters);
+        var defaultLoadStatus = Substitute.For<ILibraryLoadStatusSource>();
+        defaultLoadStatus.Current.Returns(new LibraryLoadStatus(false, false));
+        Services.AddSingleton(defaultLoadStatus);
+        Services.AddSingleton(Substitute.For<ITagBulkUpdateFailedNotifier>());
 
         Services.AddSingleton(Substitute.For<IAlertDialogService>());
         Services.AddSingleton(Substitute.For<IScenarioAuthoringService>());
         Services.AddSingleton(Substitute.For<IClipboardService>());
         Services.AddSingleton(new ScenarioAuthoringOptions(false));
-
-        Services.AddFluxor(options => options.ScanAssemblies(typeof(FilterLibraryModal).Assembly));
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
@@ -270,6 +274,69 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public async Task LibraryList_RepaintsWhenTheEntriesSourceChanges()
+    {
+        var alpha = BuildSavedFilter("Alpha");
+        var beta = BuildSavedFilter("Beta");
+        var entries = Substitute.For<ILibraryEntriesSource>();
+        entries.Current.Returns(ImmutableList.Create<LibraryEntry>(alpha));
+        Services.AddSingleton(entries);
+        var loadStatus = Substitute.For<ILibraryLoadStatusSource>();
+        loadStatus.Current.Returns(new LibraryLoadStatus(true, false));
+        Services.AddSingleton(loadStatus);
+
+        var component = Render<FilterLibraryModal>();
+        Assert.Contains("Alpha", component.Markup);
+
+        entries.Current.Returns(ImmutableList.Create<LibraryEntry>(beta));
+        await component.InvokeAsync(() => entries.Changed += Raise.Event<Action>());
+
+        component.WaitForAssertion(() =>
+        {
+            Assert.Contains("Beta", component.Markup);
+            Assert.DoesNotContain("Alpha", component.Markup);
+        });
+    }
+
+    [Fact]
+    public async Task LoadError_IsShownWhenTheLoadStatusSourceReportsLoadError()
+    {
+        var entries = Substitute.For<ILibraryEntriesSource>();
+        entries.Current.Returns(ImmutableList<LibraryEntry>.Empty);
+        Services.AddSingleton(entries);
+        var loadStatus = Substitute.For<ILibraryLoadStatusSource>();
+        loadStatus.Current.Returns(new LibraryLoadStatus(false, false));
+        Services.AddSingleton(loadStatus);
+
+        var component = Render<FilterLibraryModal>();
+        Assert.Empty(component.FindAll(".filter-library-error"));
+
+        loadStatus.Current.Returns(new LibraryLoadStatus(true, true));
+        await component.InvokeAsync(() => loadStatus.Changed += Raise.Event<Action>());
+
+        component.WaitForAssertion(() => Assert.NotEmpty(component.FindAll(".filter-library-error")));
+    }
+
+    [Fact]
+    public async Task LoadingSpinner_IsReplacedWhenTheLoadStatusSourceReportsLoaded()
+    {
+        var entries = Substitute.For<ILibraryEntriesSource>();
+        entries.Current.Returns(ImmutableList<LibraryEntry>.Empty);
+        Services.AddSingleton(entries);
+        var loadStatus = Substitute.For<ILibraryLoadStatusSource>();
+        loadStatus.Current.Returns(new LibraryLoadStatus(false, false));
+        Services.AddSingleton(loadStatus);
+
+        var component = Render<FilterLibraryModal>();
+        Assert.NotEmpty(component.FindAll(".filter-library-loading"));
+
+        loadStatus.Current.Returns(new LibraryLoadStatus(true, false));
+        await component.InvokeAsync(() => loadStatus.Changed += Raise.Event<Action>());
+
+        component.WaitForAssertion(() => Assert.Empty(component.FindAll(".filter-library-loading")));
+    }
+
+    [Fact]
     public void OnInitialized_DispatchesLoadLibrary_WhenLoadError()
     {
         SetState(new FilterLibraryState { IsLoaded = true, LoadError = true });
@@ -315,7 +382,7 @@ public sealed class FilterLibraryModalTests : BunitContext
     {
         var older = BuildAutoTrackedFilterEntry("Old", DateTimeOffset.UtcNow.AddDays(-2));
         var newer = BuildAutoTrackedFilterEntry("New", DateTimeOffset.UtcNow.AddHours(-1));
-        var saved = BuildSavedFilter("Saved"); // No LastUsedUtc → not in Previously Used
+        var saved = BuildSavedFilter("Saved");
         SetState(new FilterLibraryState { Entries = [older, newer, saved], IsLoaded = true });
 
         var component = Render<FilterLibraryModal>();
@@ -336,8 +403,6 @@ public sealed class FilterLibraryModalTests : BunitContext
             .GetField("_rowRefs", BindingFlags.NonPublic | BindingFlags.Instance)!
             .GetValue(component.Instance)!;
 
-        // Blazor cleared a row's @ref (disposed before OnRowDisposed's scan) while the entry id stays
-        // live, so only the value-null check can prune the dangling entry.
         rowRefs[(LibraryTab.Saved, entry.Id)] = null;
 
         typeof(FilterLibraryModal)
@@ -406,7 +471,6 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var component = Render<FilterLibraryModal>();
 
-        // Only the active (Saved) tab should render its row; the other two tabpanels are empty.
         Assert.Single(component.FindAll(".library-entry"));
     }
 
@@ -488,7 +552,7 @@ public sealed class FilterLibraryModalTests : BunitContext
     [Fact]
     public void Render_TabpanelTabindex_ZeroWhenEmpty()
     {
-        SetState(new FilterLibraryState { IsLoaded = true }); // empty
+        SetState(new FilterLibraryState { IsLoaded = true });
         var component = Render<FilterLibraryModal>();
         Assert.Equal("0", component.FindAll("[role='tabpanel']")[0].GetAttribute("tabindex"));
     }
@@ -502,7 +566,6 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var panels = component.FindAll("[role='tabpanel']");
         Assert.Equal(3, panels.Count);
-        // Saved is active by default — its style should not contain display:none
         Assert.DoesNotContain("display: none", panels[0].GetAttribute("style") ?? string.Empty);
         Assert.Contains("display: none", panels[1].GetAttribute("style") ?? string.Empty);
         Assert.Contains("display: none", panels[2].GetAttribute("style") ?? string.Empty);
@@ -612,74 +675,6 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var selectedAfter = GetSelectedTagsForTab(component, LibraryTab.Saved);
         Assert.DoesNotContain("alpha", selectedAfter, StringComparer.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task TagFilter_AllTagsSelectedButNoEntryCarriesAll_ShowsFilteredEmptyMessage()
-    {
-        var onlyAlpha = BuildSavedFilter("onlyAlpha") with { Tags = ["alpha"] };
-        var onlyBeta = BuildSavedFilter("onlyBeta") with { Tags = ["beta"] };
-        SetState(new FilterLibraryState { Entries = [onlyAlpha, onlyBeta], IsLoaded = true });
-
-        var component = Render<FilterLibraryModal>();
-
-        var chips = component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-tag-filter-chip");
-        await chips[0].ClickAsync(new MouseEventArgs());
-        await component.Find("[role='tabpanel'].active")
-            .QuerySelectorAll(".library-tag-filter-chip")[1]
-            .ClickAsync(new MouseEventArgs());
-
-        var empty = component.Find("[role='tabpanel'].active .library-empty-state");
-        Assert.Contains("No entries match the selected tags", empty.TextContent);
-    }
-
-    [Fact]
-    public async Task TagFilter_PreviouslyUsedTab_AppliesBeforeTake50()
-    {
-        var entries = new List<LibraryEntry>();
-        var now = DateTimeOffset.UtcNow;
-        for (int i = 0; i < 60; i++)
-        {
-            entries.Add(BuildAutoTrackedFilterEntry($"recent-{i}", now.AddMinutes(-i)));
-        }
-        var oldTagged = BuildAutoTrackedFilterEntry("ancient-tagged", now.AddDays(-30)) with { Tags = ["special"] };
-        entries.Add(oldTagged);
-
-        SetState(new FilterLibraryState { Entries = [.. entries], IsLoaded = true });
-
-        var component = Render<FilterLibraryModal>();
-        await component.FindAll("[role='tab']")[2].ClickAsync(new MouseEventArgs());
-
-        var puPanel = component.Find("[role='tabpanel'].active");
-        var specialChip = puPanel.QuerySelectorAll(".library-tag-filter-chip")
-            .Single(c => c.TextContent.Trim() == "special");
-        await specialChip.ClickAsync(new MouseEventArgs());
-
-        var rows = component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry");
-        Assert.Single(rows);
-        Assert.Contains("ancient-tagged", rows[0].TextContent);
-    }
-
-    [Fact]
-    public async Task TagFilter_StaleSelectionAfterUnappliedRename_IsIgnored_EntryStillShown()
-    {
-        var alpha = BuildSavedFilter("a") with { Tags = ["alpha"] };
-        SetState(new FilterLibraryState { Entries = [alpha], IsLoaded = true });
-
-        var component = Render<FilterLibraryModal>();
-        var alphaChip = component.Find("[role='tabpanel'].active .library-tag-filter-chip");
-        await alphaChip.ClickAsync(new MouseEventArgs());
-        Assert.Single(component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry"));
-
-        await component.Find(".library-tag-management-trigger").ClickAsync(new MouseEventArgs());
-        var renameButton = component.Find(".library-tag-management-row").QuerySelectorAll(".icon-button")[0];
-        await renameButton.ClickAsync(new MouseEventArgs());
-        var editInput = component.Find(".library-tag-management-row-edit-input");
-        await editInput.InputAsync(new ChangeEventArgs { Value = "renamed" });
-        await component.Find(".library-tag-management-row .button-green").ClickAsync(new MouseEventArgs());
-
-        Assert.Contains("renamed", GetSelectedTagsForTab(component, LibraryTab.Saved), StringComparer.OrdinalIgnoreCase);
-        Assert.Single(component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry"));
     }
 
     [Fact]
@@ -817,6 +812,74 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public async Task TagFilter_AllTagsSelectedButNoEntryCarriesAll_ShowsFilteredEmptyMessage()
+    {
+        var onlyAlpha = BuildSavedFilter("onlyAlpha") with { Tags = ["alpha"] };
+        var onlyBeta = BuildSavedFilter("onlyBeta") with { Tags = ["beta"] };
+        SetState(new FilterLibraryState { Entries = [onlyAlpha, onlyBeta], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        var chips = component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-tag-filter-chip");
+        await chips[0].ClickAsync(new MouseEventArgs());
+        await component.Find("[role='tabpanel'].active")
+            .QuerySelectorAll(".library-tag-filter-chip")[1]
+            .ClickAsync(new MouseEventArgs());
+
+        var empty = component.Find("[role='tabpanel'].active .library-empty-state");
+        Assert.Contains("No entries match the selected tags", empty.TextContent);
+    }
+
+    [Fact]
+    public async Task TagFilter_PreviouslyUsedTab_AppliesBeforeTake50()
+    {
+        var entries = new List<LibraryEntry>();
+        var now = DateTimeOffset.UtcNow;
+        for (int i = 0; i < 60; i++)
+        {
+            entries.Add(BuildAutoTrackedFilterEntry($"recent-{i}", now.AddMinutes(-i)));
+        }
+        var oldTagged = BuildAutoTrackedFilterEntry("ancient-tagged", now.AddDays(-30)) with { Tags = ["special"] };
+        entries.Add(oldTagged);
+
+        SetState(new FilterLibraryState { Entries = [.. entries], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        await component.FindAll("[role='tab']")[2].ClickAsync(new MouseEventArgs());
+
+        var puPanel = component.Find("[role='tabpanel'].active");
+        var specialChip = puPanel.QuerySelectorAll(".library-tag-filter-chip")
+            .Single(c => c.TextContent.Trim() == "special");
+        await specialChip.ClickAsync(new MouseEventArgs());
+
+        var rows = component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry");
+        Assert.Single(rows);
+        Assert.Contains("ancient-tagged", rows[0].TextContent);
+    }
+
+    [Fact]
+    public async Task TagFilter_StaleSelectionAfterUnappliedRename_IsIgnored_EntryStillShown()
+    {
+        var alpha = BuildSavedFilter("a") with { Tags = ["alpha"] };
+        SetState(new FilterLibraryState { Entries = [alpha], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+        var alphaChip = component.Find("[role='tabpanel'].active .library-tag-filter-chip");
+        await alphaChip.ClickAsync(new MouseEventArgs());
+        Assert.Single(component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry"));
+
+        await component.Find(".library-tag-management-trigger").ClickAsync(new MouseEventArgs());
+        var renameButton = component.Find(".library-tag-management-row").QuerySelectorAll(".icon-button")[0];
+        await renameButton.ClickAsync(new MouseEventArgs());
+        var editInput = component.Find(".library-tag-management-row-edit-input");
+        await editInput.InputAsync(new ChangeEventArgs { Value = "renamed" });
+        await component.Find(".library-tag-management-row .button-green").ClickAsync(new MouseEventArgs());
+
+        Assert.Contains("renamed", GetSelectedTagsForTab(component, LibraryTab.Saved), StringComparer.OrdinalIgnoreCase);
+        Assert.Single(component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry"));
+    }
+
+    [Fact]
     public async Task TagManagementAndOverflow_RenderUniqueIdsAcrossTabpanels()
     {
         var tags = Enumerable.Range(0, 12).Select(i => $"tag{i:D2}").ToArray();
@@ -862,6 +925,37 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public async Task TagRenameFailure_RollsBackOptimisticSelection()
+    {
+        var alpha = BuildSavedFilter("a") with { Tags = ["alpha"] };
+        var notifier = Substitute.For<ITagBulkUpdateFailedNotifier>();
+        Services.AddSingleton(notifier);
+        SetState(new FilterLibraryState { Entries = [alpha], IsLoaded = true });
+
+        var component = Render<FilterLibraryModal>();
+
+        _commands.When(c => c.RenameTag(Arg.Any<string>(), Arg.Any<string>()))
+            .Do(_ => notifier.Failed += Raise.Event<Action>());
+
+        var alphaChip = component.Find("[role='tabpanel'].active .library-tag-filter-chip");
+        await alphaChip.ClickAsync(new MouseEventArgs());
+
+        await component.Find(".library-tag-management-trigger").ClickAsync(new MouseEventArgs());
+        var renameButton = component.Find(".library-tag-management-row").QuerySelectorAll(".icon-button")[0];
+        await renameButton.ClickAsync(new MouseEventArgs());
+        var editInput = component.Find(".library-tag-management-row-edit-input");
+        await editInput.InputAsync(new ChangeEventArgs { Value = "renamed" });
+        await component.Find(".library-tag-management-row .button-green").ClickAsync(new MouseEventArgs());
+
+        component.WaitForAssertion(() =>
+        {
+            var selection = GetSelectedTagsForTab(component, LibraryTab.Saved);
+            Assert.Contains("alpha", selection, StringComparer.OrdinalIgnoreCase);
+            Assert.DoesNotContain("renamed", selection, StringComparer.OrdinalIgnoreCase);
+        });
+    }
+
+    [Fact]
     public async Task TagRename_PrunesSelectedTagsByTab()
     {
         var alpha = BuildSavedFilter("a") with { Tags = ["alpha"] };
@@ -881,33 +975,6 @@ public sealed class FilterLibraryModalTests : BunitContext
         var selectedAfter = GetSelectedTagsForTab(component, LibraryTab.Saved);
         Assert.DoesNotContain("alpha", selectedAfter, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("renamed", selectedAfter, StringComparer.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task TagRenameFailure_RollsBackOptimisticSelection()
-    {
-        var alpha = BuildSavedFilter("a") with { Tags = ["alpha"] };
-        SetState(new FilterLibraryState { Entries = [alpha], IsLoaded = true });
-
-        var component = Render<FilterLibraryModal>();
-        await component.InvokeAsync(() => Services.GetRequiredService<IStore>().InitializeAsync());
-        var dispatcher = Services.GetRequiredService<IDispatcher>();
-        _commands.When(c => c.RenameTag(Arg.Any<string>(), Arg.Any<string>()))
-            .Do(_ => dispatcher.Dispatch(new TagBulkUpdateFailedAction()));
-
-        var alphaChip = component.Find("[role='tabpanel'].active .library-tag-filter-chip");
-        await alphaChip.ClickAsync(new MouseEventArgs());
-
-        await component.Find(".library-tag-management-trigger").ClickAsync(new MouseEventArgs());
-        var renameButton = component.Find(".library-tag-management-row").QuerySelectorAll(".icon-button")[0];
-        await renameButton.ClickAsync(new MouseEventArgs());
-        var editInput = component.Find(".library-tag-management-row-edit-input");
-        await editInput.InputAsync(new ChangeEventArgs { Value = "renamed" });
-        await component.Find(".library-tag-management-row .button-green").ClickAsync(new MouseEventArgs());
-
-        var selection = GetSelectedTagsForTab(component, LibraryTab.Saved);
-        Assert.Contains("alpha", selection, StringComparer.OrdinalIgnoreCase);
-        Assert.DoesNotContain("renamed", selection, StringComparer.OrdinalIgnoreCase);
     }
 
     private static LibraryEntrySavedFilter BuildAutoTrackedFilterEntry(string name, DateTimeOffset? lastUsed = null)
@@ -953,8 +1020,12 @@ public sealed class FilterLibraryModalTests : BunitContext
 
     private void SetState(FilterLibraryState state)
     {
-        var stateMock = Substitute.For<IState<FilterLibraryState>>();
-        stateMock.Value.Returns(state);
-        Services.AddSingleton(stateMock);
+        var libraryEntries = Substitute.For<ILibraryEntriesSource>();
+        libraryEntries.Current.Returns(state.Entries);
+        Services.AddSingleton(libraryEntries);
+
+        var loadStatus = Substitute.For<ILibraryLoadStatusSource>();
+        loadStatus.Current.Returns(new LibraryLoadStatus(state.IsLoaded, state.LoadError));
+        Services.AddSingleton(loadStatus);
     }
 }

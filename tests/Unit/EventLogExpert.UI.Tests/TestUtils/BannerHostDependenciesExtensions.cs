@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.Banner;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.Banner;
+using EventLogExpert.UI.Modal;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 

@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -11,13 +10,9 @@ namespace EventLogExpert.UI.Menu;
 
 public sealed partial class MenuRenderer : IAsyncDisposable
 {
-    // Constant rather than method-level call because Blazor's @onkeydown:preventDefault must
-    // resolve at render time. Tab is handled in HandleListKeyDown so it can close the menu first.
     private const bool PreventDefaultKeyDown = true;
 
-    // Type-ahead matches reset after this idle window (WAI-ARIA Authoring Practices guidance).
     private static readonly TimeSpan s_typeAheadResetWindow = TimeSpan.FromMilliseconds(500);
-    // Per-instance suffix for aria-describedby ids so nested MenuRenderers don't collide.
     private static long s_rendererIdCounter;
 
     private readonly long _rendererId = Interlocked.Increment(ref s_rendererIdCounter);
@@ -35,35 +30,18 @@ public sealed partial class MenuRenderer : IAsyncDisposable
     private string _typeAheadBuffer = string.Empty;
     private DateTimeOffset _typeAheadLastInputAt = DateTimeOffset.MinValue;
 
-    /// <summary>0 for first enabled item, -1 for last. Used by hosts that open the menu via ArrowUp/ArrowDown.</summary>
     [Parameter] public int InitialFocusIndex { get; set; }
 
-    /// <summary>True for the inner <see cref="MenuRenderer" /> instance rendered inside an open submenu.</summary>
     [Parameter] public bool IsSubmenu { get; set; }
 
     [Parameter] public IReadOnlyList<MenuItem>? Items { get; set; }
 
-    /// <summary>
-    ///     Raised when a leaf item (one without children) is activated. Hosts use this to close the popup. Bubbles up
-    ///     through nested renderers.
-    /// </summary>
     [Parameter] public EventCallback OnActivated { get; set; }
 
-    /// <summary>Raised when the user presses ArrowLeft inside a submenu so the parent can collapse and refocus.</summary>
     [Parameter] public EventCallback OnCloseSubmenu { get; set; }
 
-    /// <summary>
-    ///     Raised when the top-level menu wants the menubar to switch to the previous (-1) or next (+1) bar item. Hosts
-    ///     that don't sit on a menubar can ignore this.
-    /// </summary>
     [Parameter] public EventCallback<int> OnNavigateBar { get; set; }
 
-    /// <summary>
-    ///     When true, the renderer will not set <c>_focusedIndex</c> from <see cref="InitialFocusIndex" /> on parameter
-    ///     changes and will not auto-focus the first enabled item on first render. Used for hover-opened submenus so keyboard
-    ///     focus stays on the parent item per WAI-ARIA menu guidance - focus only enters the submenu when the user explicitly
-    ///     opens it via Enter/Space/ArrowRight.
-    /// </summary>
     [Parameter] public bool SuppressInitialFocus { get; set; }
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
@@ -79,7 +57,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
         _rendererModule = null;
     }
 
-    /// <summary>Programmatically focus the first/last item; called by hosts after the popup is in the DOM.</summary>
     public Task FocusInitialAsync(bool focusFirst)
     {
         if (Items is null) { return Task.CompletedTask; }
@@ -136,8 +113,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
             }
             else if (SuppressInitialFocus)
             {
-                // Hover-opened submenu: keep focus on the parent until the user explicitly enters
-                // via Enter/Space/ArrowRight (which re-opens without SuppressInitialFocus).
                 _focusedIndex = -1;
             }
             else
@@ -149,8 +124,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
         }
         else if (_previousSuppressInitialFocus && !SuppressInitialFocus && _focusedIndex < 0 && Items is not null)
         {
-            // SuppressInitialFocus flipped false while Items stayed the same reference - user
-            // stepped into a hover-opened submenu, so move focus into it.
             _focusedIndex = InitialFocusIndex == 0
                 ? FindEnabledIndex(0, +1)
                 : FindEnabledIndex(Items.Count - 1, -1);
@@ -179,7 +152,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
 
     private async Task HandleArrowLeftAsync()
     {
-        // Submenu: collapse to parent. Top-level menu: ask the menubar to switch entries.
         if (IsSubmenu) { await OnCloseSubmenu.InvokeAsync(); }
         else { await OnNavigateBar.InvokeAsync(-1); }
     }
@@ -197,8 +169,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
             return;
         }
 
-        // Top-level leaf: ArrowRight advances the menubar. Submenus stay put so users don't lose
-        // their place while navigating.
         if (!IsSubmenu) { await OnNavigateBar.InvokeAsync(+1); }
     }
 
@@ -228,7 +198,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
                 return;
             case "Enter":
             case " ":
-                // Block auto-repeat on activation keys; navigation keys above intentionally allow it.
                 if (args.Repeat) { return; }
 
                 if (_focusedIndex >= 0) { await OnItemActivate(Items[_focusedIndex], _focusedIndex); }
@@ -240,14 +209,11 @@ public sealed partial class MenuRenderer : IAsyncDisposable
 
                 return;
             case "Tab":
-                // WAI-ARIA: Tab/Shift+Tab closes the entire menu. preventDefault on the <ul>
-                // blocks browser tab traversal so focus-restore lands on the opener first.
                 await OnActivated.InvokeAsync();
 
                 return;
         }
 
-        // Type-ahead: any single printable character. KeyboardEventArgs.Key respects keyboard layout.
         if (args.Key.Length == 1 && !char.IsControl(args.Key, 0))
         {
             HandleTypeAhead(args.Key);
@@ -268,8 +234,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
         _typeAheadLastInputAt = now;
         _typeAheadBuffer += typedKey;
 
-        // A buffer of all-the-same-character cycles through matches (e.g., 'S' twice: Save -> System).
-        // Multi-character buffers do exact prefix matching.
         bool repeatedSameChar = true;
 
         for (int charIndex = 1; charIndex < _typeAheadBuffer.Length; charIndex++)
@@ -285,7 +249,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
         bool isCycling = _typeAheadBuffer.Length == 1 || repeatedSameChar;
         string matchPrefix = isCycling ? _typeAheadBuffer[..1] : _typeAheadBuffer;
 
-        // Cycling matches start after the focused item; multi-letter buffers match from the start.
         int startIndex = isCycling
             ? (_focusedIndex < 0 ? 0 : (_focusedIndex + 1) % Items.Count)
             : 0;
@@ -359,7 +322,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
 
         if (item.OnClickAsync is not null)
         {
-            // Surface activation BEFORE invoking so the popup tears down before any modal opens.
             await OnActivated.InvokeAsync();
             await item.OnClickAsync();
         }
@@ -373,8 +335,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
     {
         if (!item.IsFocusable) { return; }
 
-        // Informative-disabled items: move focus on hover so the disabled reason is announced,
-        // but never open a submenu or change submenu state.
         if (!item.IsEnabled)
         {
             if (_focusedIndex == index) { return; }
@@ -389,8 +349,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
 
         if (item.Children is null && item.ChildrenLoader is null)
         {
-            // Hovering a leaf collapses any open sibling submenu and moves focus to the leaf
-            // so roving tabindex stays in sync with _focusedIndex.
             if (_openItem is null && _focusedIndex == index) { return; }
 
             _openItem = null;
@@ -474,7 +432,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
 
         try
         {
-            // preventScroll keeps the page steady; scrollMenuItemIntoView scrolls within the menu panel.
             await _itemElements[_focusedIndex].FocusAsync(true);
 
             try

@@ -5,7 +5,7 @@ using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
-using Fluxor;
+using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
 
@@ -16,6 +16,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>, IDisposable
     private IReadOnlyList<CachedFilterOption>? _cachedOptions;
     private ImmutableList<LibraryEntry>? _cachedOptionsSource;
     private FilterEditorCore? _coreRef;
+    private SourceSubscription? _librarySubscription;
 
     [Parameter] public Action<FilterId>? OnDisposed { get; set; }
 
@@ -31,8 +32,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>, IDisposable
     {
         get
         {
-            // Stable reference required: per-read allocation reparameterizes the editor (WebView2 render bug).
-            var source = FilterLibraryState.Value.Entries;
+            var source = LibraryEntries.Current;
 
             if (_cachedOptions is not null && ReferenceEquals(source, _cachedOptionsSource))
             {
@@ -48,16 +48,28 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>, IDisposable
 
     internal bool IsEditing => _coreRef?.IsEditing ?? false;
 
-    [Inject] private IState<FilterLibraryState> FilterLibraryState { get; init; } = null!;
-
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
+
+    [Inject] private ILibraryEntriesSource LibraryEntries { get; init; } = null!;
 
     public void Dispose()
     {
+        _librarySubscription?.Dispose();
+
         if (Value is { } filter) { OnDisposed?.Invoke(filter.Id); }
     }
 
     internal ValueTask FocusEditAsync() => _coreRef?.FocusEditAsync() ?? ValueTask.CompletedTask;
+
+    protected override void OnInitialized()
+    {
+        _librarySubscription = new SourceSubscription(
+            handler => LibraryEntries.Changed += handler,
+            handler => LibraryEntries.Changed -= handler,
+            () => InvokeAsync(StateHasChanged));
+
+        base.OnInitialized();
+    }
 
     private static IReadOnlyList<CachedFilterOption> BuildCachedOptions(ImmutableList<LibraryEntry> entries)
     {

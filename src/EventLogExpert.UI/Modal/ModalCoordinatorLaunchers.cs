@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Update.ReleaseNotes;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.DatabaseTools;
@@ -12,7 +11,6 @@ using EventLogExpert.UI.Update;
 
 namespace EventLogExpert.UI.Modal;
 
-/// <summary>Typed launchers that route production modal opens through the coordinator's veto pipeline.</summary>
 public static class ModalCoordinatorLaunchers
 {
     extension(IModalCoordinator coordinator)

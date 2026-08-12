@@ -5,12 +5,11 @@ using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
-using Fluxor;
+using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
@@ -64,6 +63,8 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     [Parameter][EditorRequired] public EventCallback<FavoriteToggleIntent> OnToggleFavorite { get; set; }
 
+    [Inject] private IActiveFiltersSource ActiveFilters { get; init; } = null!;
+
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
@@ -78,10 +79,6 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
 
-    [Inject] private IState<FilterLibraryState> FilterLibraryState { get; init; } = null!;
-
-    [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
-
     private bool IsFavoritable => Entry is LibraryEntrySavedFilter;
 
     private bool IsMoreMenuOpen =>
@@ -91,9 +88,12 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     private string KindAriaLabel => Entry is LibraryEntryFilterSet ? "Filter set" : "Filter";
 
-    private string KindIconClass => Entry is LibraryEntryFilterSet
-        ? "bi bi-collection library-entry-kind-icon"
-        : "bi bi-funnel library-entry-kind-icon";
+    private string KindIconClass =>
+        Entry is LibraryEntryFilterSet ?
+            "bi bi-collection library-entry-kind-icon" :
+            "bi bi-funnel library-entry-kind-icon";
+
+    [Inject] private ILibraryEntriesSource LibraryEntries { get; init; } = null!;
 
     [Inject] private IMenuService MenuService { get; init; } = null!;
 
@@ -236,7 +236,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     private bool HasDuplicateNameOfSameKind(string candidateName)
     {
-        return FilterLibraryState.Value.Entries.Any(other =>
+        return LibraryEntries.Current.Any(other =>
             !other.Id.Equals(Entry.Id) &&
             SameKind(other) &&
             string.Equals(other.Name, candidateName, StringComparison.OrdinalIgnoreCase));
@@ -354,7 +354,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     private async Task OnReplaceAsync()
     {
-        if (!FilterPaneState.Value.Filters.IsEmpty)
+        if (!ActiveFilters.Current.IsEmpty)
         {
             var confirmed = await AlertDialogService.ShowAlert(
                 "Replace current filters?",

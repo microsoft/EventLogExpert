@@ -9,10 +9,10 @@ using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.LogTable.OrderedView;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.LogTable.Find;
-using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
@@ -31,6 +31,7 @@ public sealed partial class HistogramPane
     private const int MinWindowBaseBins = 4;
     private const double MinWindowFraction = (double)MinWindowBaseBins / HistogramConstants.MaxBuckets;
     private const int RecomputeThrottleMs = 500;
+    private const int StackHiddenGroupThreshold = 16;
     private const double ZoomInFactor = 0.8;
     private const double ZoomOutFactor = 1.25;
 
@@ -44,21 +45,22 @@ public sealed partial class HistogramPane
     private HistogramData? _baseData;
     private string _binAnnouncement = string.Empty;
     private int? _binCursor;
+    private HistogramChartState _chartState = HistogramChartState.Pending;
     private HistogramDimension _dimension = HistogramDimension.Severity;
     private bool _disposed;
     private DotNetObjectReference<HistogramPane>? _dotNetRef;
     private long[] _findTicks = [];
     private long? _focusedTicks;
     private bool _isZoomed;
+    private ViewContentToken? _lastScannedToken;
     private IJSObjectReference? _module;
-    // Generation for queued pan/zoom: bumped on undo so a pan/zoom initiated before the undo (its stale token captured at schedule time) no-ops instead of reapplying the pre-undo window.
     private int _navToken;
     private double? _pendingViewStartFraction;
     private int _plotHeightPx;
     private bool _recomputePending;
     private HistogramRender? _render;
     private CancellationTokenSource? _scanCts;
-    private int _scanEpoch;
+    private int _scanVersion;
     private int _segmentGroupCount;
     private int[] _segmentHeights = [];
     private SavedFilter[] _tieHighlightFilters = [];
@@ -69,21 +71,17 @@ public sealed partial class HistogramPane
     private long _windowEndTicks;
     private long _windowStartTicks;
 
-    [Inject] private IStateSelection<LogTableState, EventLogId?> ActiveEventLogId { get; init; } = null!;
+    [Inject] private IActiveEventLogSource ActiveEventLog { get; init; } = null!;
 
-    [Inject] private IStateSelection<LogTableState, string?> ActiveOriginLog { get; init; } = null!;
+    [Inject] private IHistogramDimensionRequestSource DimensionRequest { get; init; } = null!;
 
-    [Inject] private IStateSelection<LogTableState, IEventColumnView> ActiveView { get; init; } = null!;
-
-    [Inject] private IStateSelection<HistogramState, HistogramDimensionRequest?> DimensionRequest { get; init; } = null!;
+    [Inject] private IEventFocusSource EventFocus { get; init; } = null!;
 
     [Inject] private IFilterLensCommands FilterLensCommands { get; init; } = null!;
 
-    [Inject] private IStateSelection<FilterPaneState, ImmutableList<SavedFilter>> Filters { get; init; } = null!;
+    [Inject] private IActiveFiltersSource Filters { get; init; } = null!;
 
     [Inject] private IFindMarkerSource FindMarkers { get; init; } = null!;
-
-    [Inject] private IStateSelection<EventLogState, SelectionEntry?> Focus { get; init; } = null!;
 
     [Inject] private IHighlightSelector HighlightSelector { get; init; } = null!;
 
@@ -137,7 +135,6 @@ public sealed partial class HistogramPane
 
         if (widthPx <= 0 || heightPx <= 0) { return; }
 
-        // A widened or newly-revealed viewport can push the current zoom depth past the track-width cap, so re-clamp the retained window and render immediately: the inline track width is a percentage the browser re-resolves against the new viewport at once, so deferring the render to an async rescan would briefly expose the stale over-cap track.
         if (_baseData is { } data)
         {
             SetWindowByBins(data, WindowStartBin(data), WindowBinCount(data));
@@ -159,7 +156,7 @@ public sealed partial class HistogramPane
             new DateTime(bin.StartTicks, DateTimeKind.Utc),
             new DateTime(bin.EndTicks, DateTimeKind.Utc),
             _timeZone,
-            ActiveOriginLog.Value);
+            Presentation.ActiveLogName);
     }
 
     [JSInvokable]
@@ -229,12 +226,6 @@ public sealed partial class HistogramPane
         if (disposing)
         {
             _disposed = true;
-
-            ActiveView.SelectedValueChanged -= OnActiveViewChanged;
-            ActiveEventLogId.SelectedValueChanged -= OnActiveEventLogIdChanged;
-            DimensionRequest.SelectedValueChanged -= OnDimensionRequestChanged;
-            Filters.SelectedValueChanged -= OnFiltersChanged;
-            Focus.SelectedValueChanged -= OnFocusChanged;
             Settings.TimeZoneChanged -= OnTimeZoneChanged;
             FindMarkers.MarksChanged -= OnFindMarksChanged;
 
@@ -285,21 +276,16 @@ public sealed partial class HistogramPane
     protected override void OnInitialized()
     {
         _timeZone = Settings.TimeZoneInfo;
-        ActiveView.Select(state => state.GetActiveDisplayedEvents());
-        ActiveOriginLog.Select(SelectActiveOriginLog);
-        ActiveEventLogId.Select(state => state.ActiveEventLogId);
-        Focus.Select(state => state.Focus);
-        Filters.Select(state => state.Filters);
-        DimensionRequest.Select(state => state.DimensionRequest);
-        ActiveView.SelectedValueChanged += OnActiveViewChanged;
-        ActiveEventLogId.SelectedValueChanged += OnActiveEventLogIdChanged;
-        Focus.SelectedValueChanged += OnFocusChanged;
-        Filters.SelectedValueChanged += OnFiltersChanged;
-        DimensionRequest.SelectedValueChanged += OnDimensionRequestChanged;
+
+        ObserveSource(ActiveEventLog, OnActiveLogChangedAsync);
+        ObserveSource(EventFocus, OnFocusChangedAsync);
+        ObserveSource(Filters, OnFiltersChangedAsync);
+        ObserveSource(DimensionRequest, OnDimensionRequestChangedAsync);
+
         Settings.TimeZoneChanged += OnTimeZoneChanged;
         FindMarkers.MarksChanged += OnFindMarksChanged;
 
-        var initialRequest = DimensionRequest.Value;
+        var initialRequest = DimensionRequest.Current;
 
         if (initialRequest is not null && initialRequest.Token > _appliedDimensionToken)
         {
@@ -311,6 +297,16 @@ public sealed partial class HistogramPane
         RefreshTieFilters(rescanOnPredicateChange: false);
 
         base.OnInitialized();
+
+        _lastScannedToken = Presentation.ContentToken;
+    }
+
+    protected override void OnPresentationChanged()
+    {
+        if (_lastScannedToken == Presentation.ContentToken) { return; }
+
+        _lastScannedToken = Presentation.ContentToken;
+        ScheduleRecompute();
     }
 
     private static string DimensionLabel(HistogramDimension dimension) => dimension switch
@@ -325,8 +321,6 @@ public sealed partial class HistogramPane
         _ => dimension.ToString()
     };
 
-    // ErrorCode charts a failure subset, so its empty-state reports the absence of failures (not of the field, which may be
-    // present as errorCode = 0); visibleRange distinguishes a zoomed window with no failures from the whole view having none.
     private static string EmptyStateMessage(HistogramDimension dimension, bool visibleRange) => dimension switch
     {
         HistogramDimension.ErrorCode => visibleRange
@@ -372,13 +366,6 @@ public sealed partial class HistogramPane
     private static bool IsCategoricalOther(HistogramData data, int group) =>
         group < data.Groups.Count && data.Groups[group].ColorClass == "histogram-cat-other";
 
-    private static string? SelectActiveOriginLog(LogTableState state)
-    {
-        var activeTab = state.EventTables.FirstOrDefault(tab => tab.Id == state.ActiveEventLogId);
-
-        return activeTab is { IsCombined: false } ? activeTab.LogName : null;
-    }
-
     private static bool ShouldArmTie(SavedFilter[] filters)
     {
         if (filters.Length is 0 or > 31) { return false; }
@@ -401,7 +388,6 @@ public sealed partial class HistogramPane
 
             if (_baseData is { GroupingFieldAbsent: true })
             {
-                // Match the visible empty-state so a screen reader is told why the timeline is blank, and drop any stale bin readout.
                 _binAnnouncement = string.Empty;
                 _announcement = EmptyStateMessage(_dimension, visibleRange: false);
             }
@@ -445,9 +431,6 @@ public sealed partial class HistogramPane
         _dimension = dimension;
         _hiddenGroups.Clear();
 
-        // A retained absent-field result would otherwise render its empty-state under the newly-selected dimension's name
-        // until the rescan lands; clear the live-region status with it so a screen reader isn't left holding the previous
-        // dimension's "no values" message during the gap.
         if (_baseData is { GroupingFieldAbsent: true })
         {
             _baseData = null;
@@ -465,7 +448,6 @@ public sealed partial class HistogramPane
     {
         if (_baseData is not { } data) { return; }
 
-        // A disjoint-domain reload leaves both the pinned window and the absolute-tick undo history meaningless - including after a Fit cleared _isZoomed but left history - so drop the history and supersede queued nav whenever the retained window falls entirely outside the new domain, before the not-zoomed refit. A same-tab clear/refill reaches here (not OnActiveEventLogIdChanged), so the token bump must live here too.
         bool windowDisjoint = _windowEndTicks < data.MinUtc.Ticks || _windowStartTicks > data.MaxUtc.Ticks;
 
         if (windowDisjoint)
@@ -579,12 +561,11 @@ public sealed partial class HistogramPane
 
         double barsHeight = BarsAreaHeight();
 
-        Span<bool> hidden = groupCount <= 16 ? stackalloc bool[16] : new bool[groupCount];
+        Span<bool> hidden = groupCount <= StackHiddenGroupThreshold ? stackalloc bool[StackHiddenGroupThreshold] : new bool[groupCount];
         hidden = hidden[..groupCount];
 
         for (int group = 0; group < groupCount; group++) { hidden[group] = IsGroupHidden(group); }
 
-        // Normalize bar heights to the tallest VISIBLE bin (hidden legend groups excluded) so toggling a group off rescales the remaining bars to fill the plot, instead of leaving the true tallest bar a 1-2px sliver under a hidden group's scale.
         int maxVisibleBinTotal = 0;
 
         for (int bin = 0; bin < render.Bins.Count; bin++)
@@ -729,39 +710,48 @@ public sealed partial class HistogramPane
         StateHasChanged();
     }
 
-    // A tab switch makes the absolute-tick zoom window meaningless, so drop the zoom and rescan at the new tab's full span.
-    private void OnActiveEventLogIdChanged(object? sender, EventLogId? logId) => _ = InvokeAsync(() =>
+    private Task OnActiveLogChangedAsync()
     {
+        if (_disposed) { return Task.CompletedTask; }
+
         _isZoomed = false;
         _windowHistory.Clear();
         SupersedeQueuedNavigation();
-        // Invalidate the old tab's data + render so nothing acts on stale data during the gap, then schedule the rescan directly: a one-member group's header and member tabs share one view, so OnActiveViewChanged is not guaranteed to fire and can't be relied on to republish (ScheduleRecompute de-dupes with it when it does).
         _baseData = null;
         _render = null;
         RefreshFindTicks();
         ScheduleRecompute();
-    });
 
-    private void OnActiveViewChanged(object? sender, IEventColumnView view) => _ = InvokeAsync(ScheduleRecompute);
+        return Task.CompletedTask;
+    }
 
-    private void OnDimensionRequestChanged(object? sender, HistogramDimensionRequest? request) => _ = InvokeAsync(() =>
+    private Task OnDimensionRequestChangedAsync()
     {
-        if (_disposed) { return; }
+        if (_disposed) { return Task.CompletedTask; }
 
-        var current = DimensionRequest.Value;
-        if (current is null || current.Token <= _appliedDimensionToken) { return; }
+        var current = DimensionRequest.Current;
+
+        if (current is null || current.Token <= _appliedDimensionToken) { return Task.CompletedTask; }
 
         _appliedDimensionToken = current.Token;
         ApplyDimension(current.Dimension, force: true);
-    });
+
+        return Task.CompletedTask;
+    }
 
     private void OnDimensionSelected(HistogramDimension dimension)
     {
         ApplyDimension(dimension, force: false);
     }
 
-    private void OnFiltersChanged(object? sender, ImmutableList<SavedFilter> filters) =>
-        _ = InvokeAsync(() => RefreshTieFilters(rescanOnPredicateChange: true));
+    private Task OnFiltersChangedAsync()
+    {
+        if (_disposed) { return Task.CompletedTask; }
+
+        RefreshTieFilters(rescanOnPredicateChange: true);
+
+        return Task.CompletedTask;
+    }
 
     private void OnFindMarksChanged(object? sender, EventArgs args) => _ = InvokeAsync(() =>
     {
@@ -771,11 +761,15 @@ public sealed partial class HistogramPane
         StateHasChanged();
     });
 
-    private void OnFocusChanged(object? sender, SelectionEntry? focus) => _ = InvokeAsync(() =>
+    private Task OnFocusChangedAsync()
     {
+        if (_disposed) { return Task.CompletedTask; }
+
         ResolveFocusedTicks();
         StateHasChanged();
-    });
+
+        return Task.CompletedTask;
+    }
 
     private void OnTimeZoneChanged(object? sender, TimeZoneInfo timeZone) => _ = InvokeAsync(() =>
     {
@@ -783,7 +777,6 @@ public sealed partial class HistogramPane
 
         _timeZone = timeZone;
 
-        // Both live regions embed _timeZone-formatted times, so re-render alone would leave a screen reader announcing the old zone until the next pan/zoom/scan.
         ScheduleAnnouncement();
 
         if (_binCursor is { } cursor && _render is { Bins.Count: > 0 } render && cursor < render.Bins.Count)
@@ -821,28 +814,22 @@ public sealed partial class HistogramPane
         if (_windowHistory.Count > MaxWindowHistory) { _windowHistory.RemoveAt(0); }
     }
 
-    // Segment heights are scaled to the visible groups, so any change to the hidden set must rescale the current render's bars (the pending scan, if any, replaces them once it lands).
     private void RecomputeSegmentHeights()
     {
         if (_render is { } render && _baseData is { } data) { ComputeSegmentHeights(render, data.Groups.Count); }
     }
 
-    // Refresh the cached assertive-region bin readout against the current (post-filter-change) state. The cached string
-    // embeds the highlight description, so it must be re-derived on every highlight change (disarm, plan change, or a
-    // color-only edit that does not rescan) or it can keep announcing a stale highlight after the cursor is dismissed.
     private void RefreshBinAnnouncement() =>
-        _binAnnouncement = _binCursor is { } cursor && _render is { } render && cursor < render.Bins.Count
-            ? BinCursorAnnouncement(render.Bins[cursor])
-            : string.Empty;
+        _binAnnouncement = _binCursor is { } cursor && _render is { } render && cursor < render.Bins.Count ?
+                BinCursorAnnouncement(render.Bins[cursor]) :
+                string.Empty;
 
     private void RefreshFindTicks() =>
-        _findTicks = FindMarkers.Owner == ActiveEventLogId.Value && FindMarkers.Ticks is { Count: > 0 } ticks
-            ? [.. ticks]
-            : [];
+        _findTicks = FindMarkers.Owner == ActiveEventLog.Current && FindMarkers.Ticks is { Count: > 0 } ticks ? [.. ticks] : [];
 
     private void RefreshTieFilters(bool rescanOnPredicateChange)
     {
-        ImmutableList<SavedFilter> filters = Filters.Value;
+        ImmutableList<SavedFilter> filters = Filters.Current;
         SavedFilter[] selected = HighlightSelector.Select(filters);
         int planKey = HighlightSelector.ComputePredicatePlanKey(filters);
 
@@ -855,9 +842,6 @@ public sealed partial class HistogramPane
 
         if (rescanNeeded && rescanOnPredicateChange)
         {
-            // The rescan will republish _baseData, but until it lands the current masks were resolved against the OLD
-            // eligible list. Invalidate them synchronously so a render in the gap does not map stale ordinals through
-            // the new filters (masks are non-null only when the prior state was armed).
             if (_baseData is { GroupHighlightMasks: not null } data)
             {
                 _baseData = data with { GroupHighlightMasks = null };
@@ -872,6 +856,7 @@ public sealed partial class HistogramPane
         }
 
         RefreshBinAnnouncement();
+
         StateHasChanged();
     }
 
@@ -880,11 +865,12 @@ public sealed partial class HistogramPane
 
     private void ResolveFocusedTicks()
     {
-        _focusedTicks = Focus.Value?.CurrentHandle is { } handle
-            && ActiveView.Value.Rank(handle) >= 0
-            && ActiveView.Value.TryGetTimeTicks(handle, out long ticks)
-            ? ticks
-            : null;
+        IEventColumnView view = ViewSource.Current.View;
+
+        _focusedTicks =
+            EventFocus.Current?.CurrentHandle is { } handle &&
+            view.Rank(handle) >= 0 &&
+            view.TryGetTimeTicks(handle, out long ticks) ? ticks : null;
     }
 
     private (string? CssName, string Description) ResolveGroupHighlight(uint mask) =>
@@ -892,8 +878,9 @@ public sealed partial class HistogramPane
 
     private async Task RunScanAsync(
         IEventColumnView view,
+        EventLogId? scannedTabId,
         HistogramDimension dimension,
-        int epoch,
+        int scanVersion,
         SavedFilter[] tieHighlightFilters,
         int tiePlanKey,
         bool useHighlightTie,
@@ -903,7 +890,6 @@ public sealed partial class HistogramPane
 
         try
         {
-            // Domain is the view's own survivor span, so the bucketer's edge clamp can't pile off-window rows into false spikes.
             data = await Task.Run(() =>
             {
                 token.ThrowIfCancellationRequested();
@@ -923,6 +909,37 @@ public sealed partial class HistogramPane
         {
             TraceLogger.Error($"{nameof(HistogramPane)}: histogram scan failed: {e}");
 
+            // Marshal the failure back rather than only logging it. Without this the pane keeps whatever state the scan
+            // began in and never assigns _baseData, so the empty-state branch reports "no events to chart" - a
+            // statement about the user's data, for a chart that failed to build from it.
+            try
+            {
+                await InvokeAsync(() =>
+                {
+                    // A superseded scan's failure says nothing about the request that replaced it.
+                    if (_disposed || scanVersion != _scanVersion) { return; }
+
+                    _chartState = HistogramChartState.Failed;
+
+                    // Discard the chart rather than merely stop drawing it. Every interaction path reads these fields
+                    // directly, not the rendered markup, so bars left behind stay clickable and drag-selectable and
+                    // would issue a time-range filter derived from a scan that failed - acting on data rather than
+                    // only misreading it. Nothing re-stamps a retained chart the way the grid's rows are re-stamped,
+                    // so there is no version of these bars that stays true.
+                    _baseData = null;
+                    _render = null;
+                    _binCursor = null;
+                    _binAnnouncement = string.Empty;
+
+                    // Retires any summary already queued behind the delay, which would otherwise describe the chart
+                    // that just failed as though it had arrived.
+                    _announceGeneration++;
+
+                    StateHasChanged();
+                });
+            }
+            catch (ObjectDisposedException) { /* Component torn down mid-failure; nothing to report to. */ }
+
             return;
         }
 
@@ -930,11 +947,15 @@ public sealed partial class HistogramPane
         {
             await InvokeAsync(() =>
             {
-                if (_disposed || token.IsCancellationRequested || epoch != _scanEpoch || !ReferenceEquals(view, ActiveView.Value)) { return; }
+                if (_disposed ||
+                    token.IsCancellationRequested ||
+                    scanVersion != _scanVersion ||
+                    scannedTabId != ViewSource.Current.ActiveTabId) { return; }
 
                 if (useHighlightTie && tiePlanKey != _tiePlanKey) { return; }
 
                 _baseData = data;
+                _chartState = HistogramChartState.Ready;
                 ResolveFocusedTicks();
                 ApplyPublishedWindow();
                 AggregateAndRender();
@@ -947,9 +968,15 @@ public sealed partial class HistogramPane
 
     private void ScheduleRecompute()
     {
-        if (_recomputePending || _disposed) { return; }
+        if (_disposed) { return; }
+
+        _scanVersion++;
+        _chartState = HistogramChartState.Pending;
+
+        if (_recomputePending) { return; }
 
         _recomputePending = true;
+
         _ = ThrottleThenScanAsync();
     }
 
@@ -958,7 +985,7 @@ public sealed partial class HistogramPane
             new DateTime(bin.StartTicks, DateTimeKind.Utc),
             new DateTime(bin.EndTicks, DateTimeKind.Utc),
             _timeZone,
-            ActiveOriginLog.Value);
+            Presentation.ActiveLogName);
 
     private void ScopeBinCursorOrWindow()
     {
@@ -980,7 +1007,7 @@ public sealed partial class HistogramPane
             new DateTime(render.WindowStartTicks, DateTimeKind.Utc),
             new DateTime(render.WindowEndTicks, DateTimeKind.Utc),
             _timeZone,
-            ActiveOriginLog.Value);
+            Presentation.ActiveLogName);
     }
 
     private void SetWindow(long startTicks, long endTicks)
@@ -1000,13 +1027,11 @@ public sealed partial class HistogramPane
         AggregateAndRender();
     }
 
-    // Every zoom/pan/fit sets the window here as a whole base-bin range, so the render bounds equal the window and incremental zoom never re-quantizes back to the same bins (no stall).
     private void SetWindowByBins(HistogramData data, int startBin, int binCount, bool recordHistory = false)
     {
         int totalBins = data.BinCount;
         int minBins = Math.Min(MinWindowBaseBins, totalBins);
 
-        // Keep the virtual scroll track under the browser's maximum layout width so scrollWidth == clientWidth / WindowFraction holds and the scrollbar can reach the final bins; a deeper zoom would overflow the cap.
         if (_viewportWidthPx > 0)
         {
             minBins = Math.Max(minBins, HistogramTrackCap.MinBinsForWidth(_viewportWidthPx, totalBins));
@@ -1022,7 +1047,6 @@ public sealed partial class HistogramPane
         long newStartTicks = newZoomed ? baseMin + (startBin * span) : baseMin;
         long newEndTicks = newZoomed ? Math.Min((baseMin + ((startBin + binCount) * span)) - 1, data.MaxUtc.Ticks) : data.MaxUtc.Ticks;
 
-        // Record an undo step only when the window actually moves, so a no-op zoom (clamped at the floor or full span) can't leave a dead history entry that swallows the first Undo.
         if (recordHistory && (newStartTicks != _windowStartTicks || newEndTicks != _windowEndTicks)) { PushWindowHistory(); }
 
         _isZoomed = newZoomed;
@@ -1045,14 +1069,15 @@ public sealed partial class HistogramPane
         _scanCts?.Dispose();
         _scanCts = null;
 
-        // Bump the epoch on every supersede -- even when we bail below for a zero-size viewport -- so a prior scan whose
-        // UI publication is already queued is rejected by RunScanAsync's epoch guard and cannot restore stale data (for
-        // example, re-arm masks that a disarm just cleared).
-        int epoch = ++_scanEpoch;
+        int scanVersion = ++_scanVersion;
+
+        _chartState = HistogramChartState.Pending;
 
         if (_viewportWidthPx <= 0 || _plotHeightPx <= 0) { return; }
 
-        IEventColumnView view = ActiveView.Value;
+        var current = ViewSource.Current;
+        IEventColumnView view = current.View;
+        EventLogId? scannedTabId = current.ActiveTabId;
         HistogramDimension dimension = _dimension;
         SavedFilter[] tieHighlightFilters = _tieHighlightFilters;
         int tiePlanKey = _tiePlanKey;
@@ -1060,10 +1085,9 @@ public sealed partial class HistogramPane
         var cts = new CancellationTokenSource();
         _scanCts = cts;
 
-        _ = RunScanAsync(view, dimension, epoch, tieHighlightFilters, tiePlanKey, useHighlightTie, cts.Token);
+        _ = RunScanAsync(view, scannedTabId, dimension, scanVersion, tieHighlightFilters, tiePlanKey, useHighlightTie, cts.Token);
     }
 
-    // Invalidate any pan/zoom queued before an explicit navigation reset (undo, Fit, drag-select, tab switch): the higher generation makes their stale, schedule-time-stamped OnHistogramZoomed/OnHistogramPanned invocations no-op. Every caller is followed by a render (immediate sync-scroll render, or the rescan's after a tab switch) that publishes the new token to JS via applyView.
     private void SupersedeQueuedNavigation() => _navToken++;
 
     private int TargetBins(HistogramData data)
@@ -1084,7 +1108,6 @@ public sealed partial class HistogramPane
 
     private void ToggleGroup(string key)
     {
-        // Keyed by stable Key so a live-tail re-rank can't swap which category is hidden. Window totals and anomaly flags stay over all groups.
         if (!_hiddenGroups.Remove(key)) { _hiddenGroups.Add(key); }
 
         RecomputeSegmentHeights();
@@ -1103,7 +1126,6 @@ public sealed partial class HistogramPane
         long beforeStart = _windowStartTicks;
         long beforeEnd = _windowEndTicks;
 
-        // Pop past any snapshot that, after the track-cap clamp, reproduces the current window (a resize-forced re-clamp can leave the top entry equal to the current view), so Undo always moves visibly.
         while (_windowHistory.Count > 0)
         {
             (long start, long end, bool zoomed) = _windowHistory[^1];
@@ -1137,7 +1159,6 @@ public sealed partial class HistogramPane
         return endBin - startBin + 1;
     }
 
-    // True when the window's displayed endpoints fall on different calendar days (including a short window straddling midnight), so times need a date to disambiguate.
     private bool WindowCrossesDay() =>
         _render is { } render &&
         ToDisplay(new DateTime(render.WindowStartTicks, DateTimeKind.Utc)).Date
@@ -1160,7 +1181,6 @@ public sealed partial class HistogramPane
     private int WindowStartBin(HistogramData data) =>
         (int)Math.Clamp((_windowStartTicks - data.MinUtc.Ticks) / data.BucketSpanTicks, 0, data.BinCount - 1);
 
-    // Explicit keyboard/toolbar zoom supersedes any queued wheel/scroll momentum before zooming; the wheel path (OnHistogramZoomed) calls ApplyZoom directly with no bump, so rapid coalesced wheel zooming isn't self-invalidated.
     private void ZoomFromControl(double factor)
     {
         SupersedeQueuedNavigation();

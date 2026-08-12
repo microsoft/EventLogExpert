@@ -14,11 +14,10 @@ using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Menu;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.DatabaseTools;
+using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.DatabaseTools.Tabs;
 using EventLogExpert.UI.Tests.TestUtils;
-using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -68,7 +67,6 @@ public sealed class DatabaseToolsModalTabbingTests : BunitContext
         Services.AddSingleton(Substitute.For<IMenuActionService>());
         Services.AddOperationLogProgressFactoryMock();
 
-        Services.AddFluxor(options => options.ScanAssemblies(typeof(DatabaseToolsModal).Assembly));
     }
 
     [Fact]

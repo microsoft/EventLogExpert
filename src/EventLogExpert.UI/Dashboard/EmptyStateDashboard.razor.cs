@@ -16,15 +16,13 @@ using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.Modal;
-using Fluxor;
-using Fluxor.Blazor.Web.Components;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Dashboard;
 
-public sealed partial class EmptyStateDashboard : FluxorComponent
+public sealed partial class EmptyStateDashboard : AppStateComponentBase
 {
     private const string ElevationReasonId = "empty-dashboard-elevation-reason";
 
@@ -76,13 +74,11 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
     [Inject] private IScenarioFavoriteCommands FavoriteCommands { get; init; } = null!;
 
-    [Inject] private IStateSelection<ScenarioFavoritesState, ImmutableHashSet<string>> Favorites { get; init; } = null!;
+    [Inject] private IScenarioFavoritesSource FavoritesSource { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, bool> FilterApplied { get; init; } = null!;
+    [Inject] private IFilterAppliedSource FilterAppliedSource { get; init; } = null!;
 
     [Inject] private IFilterPaneCommands FilterCommands { get; init; } = null!;
-
-    [Inject] private IState<ScenarioFavoritesState> ScenarioFavorites { get; init; } = null!;
 
     [Inject] private IScenarioLaunchService ScenarioLaunch { get; init; } = null!;
 
@@ -121,10 +117,9 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
-        if (disposing)
+        if (disposing && !_disposed)
         {
             _disposed = true;
-            Favorites.SelectedValueChanged -= OnFavoritesChanged;
             await _lifetimeCts.CancelAsync();
             _lifetimeCts.Dispose();
         }
@@ -160,9 +155,12 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
     protected override void OnInitialized()
     {
-        FilterApplied.Select(state => state.AppliedFilter.IsFilteringEnabled);
-        Favorites.Select(state => state.FavoriteScenarioIds);
-        Favorites.SelectedValueChanged += OnFavoritesChanged;
+        ObserveSource(FilterAppliedSource);
+        ObserveSource(
+            handler => FavoritesSource.Changed += handler,
+            handler => FavoritesSource.Changed -= handler,
+            OnFavoritesChangedAsync);
+
         FavoriteCommands.Load();
         base.OnInitialized();
     }
@@ -267,8 +265,6 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
             or ChannelLaunchOutcome.NotPresent
             or ChannelLaunchOutcome.Failed);
 
-    // Analytic/Debug channels never have their access evaluated (NotEvaluated), so they must not be
-    // treated as blocked; only a genuine RequiresElevation or a read-failure Unknown disables launch.
     private bool AccessAllowsLaunch(string channel) =>
         _readinessByChannel.GetValueOrDefault(
             channel,
@@ -277,8 +273,6 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
     private void CancelFolderScan()
     {
-        // No-op once the scan has committed to opening or a cancel is already in flight. The null-field guard plus the
-        // null-before-Dispose ordering in the finally means Cancel() is never called on a disposed source.
         if (_openingLogs || _cancelRequested || _folderLaunchCts is null) { return; }
 
         _cancelRequested = true;
@@ -311,8 +305,6 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
                 return;
             }
 
-            // The committed change is authoritative; re-run the full readiness fetch (never a single-channel probe,
-            // which would make LivePresence treat one channel as the complete set) so the pill reflects real state.
             await RefreshReadinessAsync();
 
             if (!_readinessByChannel.TryGetValue(channel, out var refreshed)
@@ -340,7 +332,7 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
         scenario.OptionalChannels.IsDefaultOrEmpty ? [] : ReadinessFor(scenario.OptionalChannels);
 
     private bool IsFavored(ScenarioDefinition scenario) =>
-        ScenarioFavorites.Value.FavoriteScenarioIds.Contains(scenario.Id);
+        FavoritesSource.FavoriteScenarioIds.Contains(scenario.Id);
 
     private bool IsLivePresent(ScenarioDefinition scenario) =>
         !_livePresence.Known || scenario.Channels.All(_livePresence.Present.Contains);
@@ -391,9 +383,6 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
             if (_scanningScenario is not null)
             {
-                // Hide the scan chip before any result dialog. The banner-retry path does not run in the dashboard's
-                // event loop, so it will not auto-render; the explicit render is required there. Clear the scan-end
-                // focus intent too, so an Opening-set request cannot steal focus from a result modal opened below.
                 _scanningScenario = null;
                 _openingLogs = false;
                 _cancelRequested = false;
@@ -406,34 +395,26 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
         if (DescribeFolderLaunch(scenario, result) is not { } message)
         {
-            // Cancelled: no dialog takes focus and the Cancel chip that had focus is gone, so restore it.
             if (scanStarted) { RestoreFocusAfterScan(); }
 
             return;
         }
 
-        // A launch that opens logs is self-evident (the workspace changes) and only needs the screen-reader detail;
-        // the outcomes that leave the dashboard unchanged need a visible dialog so a sighted user sees them.
         switch (result.Outcome)
         {
             case ScenarioFolderOutcome.Completed:
                 Announcer.Announce(message);
                 break;
             case ScenarioFolderOutcome.Error:
-                // ShowErrorAlert surfaces a banner, which does not capture focus; restore it so a scan that showed the
-                // Cancel chip does not strand keyboard focus on <body>.
                 if (scanStarted) { RestoreFocusAfterScan(); }
 
                 await AlertDialogService.ShowErrorAlert("Open from folder", message);
                 break;
             default:
-                // ShowAlert opens a focus-capturing modal, so it owns focus; issuing a restore here would fight it.
                 await AlertDialogService.ShowAlert("Open from folder", message, "OK");
                 break;
         }
 
-        // Runs on the UI dispatcher via SafeInvokeAsync and must never throw out of onPhase: it executes outside the
-        // service's cancellation catch, so an escaping teardown exception would surface a normal launch as a fault.
         async Task OnFolderScanPhaseAsync(ScenarioFolderPhase phase) =>
             await SafeInvokeAsync(() =>
             {
@@ -460,19 +441,18 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
             });
     }
 
-    private async void OnFavoritesChanged(object? _, ImmutableHashSet<string> __)
+    private Task OnFavoritesChangedAsync()
     {
-        try
-        {
-            await InvokeAsync(() =>
-            {
-                RebuildCategories();
-                ReconcileActiveTab();
-                StateHasChanged();
-            });
-        }
-        catch (ObjectDisposedException) { }
-        catch (OperationCanceledException) { }
+        if (_disposed) { return Task.CompletedTask; }
+
+        RebuildCategories();
+        ReconcileActiveTab();
+
+        if (_disposed) { return Task.CompletedTask; }
+
+        StateHasChanged();
+
+        return Task.CompletedTask;
     }
 
     private Task OpenApplicationAndSystemAsync() =>
@@ -589,10 +569,6 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
 
         try
         {
-            // Render immediately (inside the try, so the finally still clears _isBusy if this ever threw) so the
-            // busy-gated controls disable right away. On a normal button click Blazor auto-renders at the first await
-            // inside the action, but the banner-retry path runs outside the dashboard's event loop and gets no
-            // automatic render, so without this the controls would stay visibly enabled during the folder picker.
             await SafeInvokeAsync(StateHasChanged);
             await action();
         }
@@ -600,7 +576,6 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
         {
             _isBusy = false;
 
-            // Re-render after clearing the busy flag for the same non-event-loop reason, so the controls re-enable.
             await SafeInvokeAsync(StateHasChanged);
         }
     }
@@ -609,8 +584,6 @@ public sealed partial class EmptyStateDashboard : FluxorComponent
     {
         if (_disposed) { return; }
 
-        // Matches the OnFavoritesChanged teardown pattern: a render can race the dashboard unmounting when a folder
-        // launch opens logs; treat disposal and cancellation as expected.
         try { await InvokeAsync(render); }
         catch (ObjectDisposedException) { }
         catch (OperationCanceledException) { }

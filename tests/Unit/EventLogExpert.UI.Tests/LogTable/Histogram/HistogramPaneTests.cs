@@ -3,6 +3,7 @@
 
 using Bunit;
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
@@ -10,45 +11,45 @@ using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.LogTable.OrderedView;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.LogTable.Find;
 using EventLogExpert.UI.LogTable.Histogram;
-using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
 using System.Reflection;
+using TestContext = Xunit.TestContext;
 
 namespace EventLogExpert.UI.Tests.LogTable.Histogram;
 
 public sealed class HistogramPaneTests : BunitContext
 {
-    private readonly IStateSelection<LogTableState, EventLogId?> _activeEventLogId =
-        Substitute.For<IStateSelection<LogTableState, EventLogId?>>();
+    private static readonly TimeSpan s_settleWindow = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(10);
 
-    private readonly IStateSelection<LogTableState, string?> _activeOriginLog =
-        Substitute.For<IStateSelection<LogTableState, string?>>();
-
-    private readonly IStateSelection<LogTableState, IEventColumnView> _activeView =
-        Substitute.For<IStateSelection<LogTableState, IEventColumnView>>();
-
-    private readonly IStateSelection<HistogramState, HistogramDimensionRequest?> _dimensionRequest =
-        Substitute.For<IStateSelection<HistogramState, HistogramDimensionRequest?>>();
-
+    private static readonly EventLogId s_tokenLog = EventLogId.Create();
+    private readonly IActiveEventLogSource _activeEventLog = Substitute.For<IActiveEventLogSource>();
+    private readonly IHistogramDimensionRequestSource _dimensionRequest =
+        Substitute.For<IHistogramDimensionRequestSource>();
+    private readonly IEventFocusSource _eventFocus = Substitute.For<IEventFocusSource>();
     private readonly IFilterLensCommands _filterLensCommands = Substitute.For<IFilterLensCommands>();
-    private readonly IStateSelection<FilterPaneState, ImmutableList<SavedFilter>> _filters =
-        Substitute.For<IStateSelection<FilterPaneState, ImmutableList<SavedFilter>>>();
+    private readonly IActiveFiltersSource _filters = Substitute.For<IActiveFiltersSource>();
     private readonly IFindMarkerSource _findMarkers = new FindMarkerSource();
-    private readonly IStateSelection<EventLogState, SelectionEntry?> _focus =
-        Substitute.For<IStateSelection<EventLogState, SelectionEntry?>>();
     private readonly IHighlightSelector _highlightSelector = Substitute.For<IHighlightSelector>();
 
+    private readonly IEventColumnView _scanView = Substitute.For<IEventColumnView>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
+    private readonly EventLogId _tabId = EventLogId.Create();
     private readonly ITraceLogger _traceLogger = Substitute.For<ITraceLogger>();
+    private readonly IOrderedViewSource _viewSource = Substitute.For<IOrderedViewSource>();
 
     private HistogramDimensionRequest? _dimensionRequestValue;
+    private ImmutableList<SavedFilter> _filtersValue = ImmutableList<SavedFilter>.Empty;
+
+    private OrderedViewPresentation _presentation;
 
     public HistogramPaneTests()
     {
@@ -56,31 +57,33 @@ public sealed class HistogramPaneTests : BunitContext
         JSInterop.SetupModule("./_content/EventLogExpert.UI/Inputs/ValueSelect.razor.js");
         JSInterop.SetupModule("./_content/EventLogExpert.UI/LogTable/Histogram/HistogramPane.razor.js");
 
-        _activeEventLogId.Value.Returns((EventLogId?)null);
-        _activeOriginLog.Value.Returns((string?)null);
-        _activeView.Value.Returns(LogTableState.EmptyView);
-        _dimensionRequest.Value.Returns(_ => _dimensionRequestValue);
-        _filters.Value.Returns(ImmutableList<SavedFilter>.Empty);
-        _focus.Value.Returns((SelectionEntry?)null);
+        _activeEventLog.Current.Returns((EventLogId?)null);
+        _presentation = new OrderedViewPresentation(_scanView, _tabId, default, PresentationState.Current, 1)
+        {
+            ContentToken = Token(1)
+        };
+        _viewSource.Current.Returns(_ => _presentation);
+        _dimensionRequest.Current.Returns(_ => _dimensionRequestValue);
+        _filters.Current.Returns(_ => _filtersValue);
+        _eventFocus.Current.Returns((SelectionEntry?)null);
         _highlightSelector.Select(Arg.Any<ImmutableList<SavedFilter>>()).Returns([]);
         _highlightSelector.ComputePredicatePlanKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(0);
         _settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
 
-        Services.AddSingleton(_activeEventLogId);
-        Services.AddSingleton(_activeOriginLog);
-        Services.AddSingleton(_activeView);
+        Services.AddSingleton(_activeEventLog);
+        Services.AddSingleton(_viewSource);
         Services.AddSingleton(_dimensionRequest);
+        Services.AddSingleton(_eventFocus);
         Services.AddSingleton(_filterLensCommands);
         Services.AddSingleton(_filters);
         Services.AddSingleton(_findMarkers);
-        Services.AddSingleton(_focus);
         Services.AddSingleton(_highlightSelector);
         Services.AddSingleton(_settings);
         Services.AddSingleton(_traceLogger);
-        Services.AddFluxor(options => options.ScanAssemblies(typeof(HistogramPane).Assembly));
     }
 
     public static TheoryData<uint, SavedFilter[], string?, string> GroupHighlightCases()
+
     {
         var lightRed = Filter(HighlightColor.LightRed);
         var anotherLightRed = Filter(HighlightColor.LightRed);
@@ -101,10 +104,117 @@ public sealed class HistogramPaneTests : BunitContext
     }
 
     [Fact]
+    public void AChartThatHasNotBeenBuiltYet_SaysSo_RatherThanClaimingThereAreNoEvents()
+    {
+        var cut = Render<HistogramPane>();
+
+        Assert.Contains("Building the timeline", cut.Markup);
+        Assert.DoesNotContain("No events to chart", cut.Markup);
+    }
+
+    [Fact]
+    public async Task AFailureAfterAChartHasDrawn_LeavesNothingStaleToActOn()
+    {
+        var cut = Render<HistogramPane>();
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
+
+        cut.WaitForAssertion(() => _scanView.Received().TryGetTimeTicksRange(
+            out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()));
+
+        long start = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+        long end = start + TimeSpan.FromMinutes(1).Ticks;
+
+        await cut.InvokeAsync(() => SetPrivateField(
+            cut,
+            "_render",
+            new HistogramRender([new HistogramRenderBin(start, end, 2, [2])], start, end, 2, 2, [2])));
+
+        var rescanView = Substitute.For<IEventColumnView>();
+
+        rescanView
+            .When(view => view.TryGetTimeTicksRange(out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()))
+            .Do(_ => throw new InvalidOperationException("the rescan blew up"));
+
+        _presentation = new OrderedViewPresentation(rescanView, _tabId, default, PresentationState.Current, 2)
+        {
+            ContentToken = Token(2)
+        };
+        await cut.InvokeAsync(() => _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(_presentation));
+
+        cut.WaitForAssertion(() => Assert.Contains("could not be built", cut.Markup));
+
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramScopeBin(0.5));
+
+        _filterLensCommands.DidNotReceive().ShowTimeRange(
+            Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<TimeZoneInfo>(), Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task AFirstSameViewPublication_DoesNotScheduleARescan()
+    {
+        var cut = Render<HistogramPane>();
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
+
+        int rendersBeforeTheRepublish = cut.RenderCount;
+
+        _presentation = _presentation with { Revision = 2 };
+        await cut.InvokeAsync(() => _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(_presentation));
+
+        cut.WaitForState(() => cut.RenderCount > rendersBeforeTheRepublish);
+
+        Assert.False(GetPrivateField<bool>(cut, "_recomputePending"));
+    }
+
+    [Fact]
+    public async Task AScanThatFindsNothing_ReportsEmptinessAsTheAnswer()
+    {
+        var cut = Render<HistogramPane>();
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
+
+        cut.WaitForAssertion(() => Assert.Contains("No events to chart", cut.Markup));
+
+        Assert.DoesNotContain("Building the timeline", cut.Markup);
+    }
+
+    [Fact]
+    public async Task AScanThatThrows_SaysTheTimelineFailed_RatherThanClaimingThereAreNoEvents()
+    {
+        _scanView
+            .When(view => view.TryGetTimeTicksRange(out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()))
+            .Do(_ => throw new InvalidOperationException("bucketing blew up"));
+
+        var cut = Render<HistogramPane>();
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
+
+        cut.WaitForAssertion(() => Assert.Contains("could not be built", cut.Markup));
+
+        Assert.DoesNotContain("No events to chart", cut.Markup);
+    }
+
+    [Fact]
+    public async Task ActiveLogChange_DropsZoomAndRescansForTheNewTab()
+    {
+        var cut = Render<HistogramPane>();
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
+
+        cut.WaitForAssertion(() => _scanView.Received().TryGetTimeTicksRange(
+            out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()));
+        SetPrivateField(cut, "_isZoomed", true);
+        _scanView.ClearReceivedCalls();
+
+        _activeEventLog.Current.Returns(EventLogId.Create());
+        await cut.InvokeAsync(() => _activeEventLog.Changed += Raise.Event<Action>());
+
+        cut.WaitForAssertion(() => Assert.False(GetPrivateField<bool>(cut, "_isZoomed")));
+        cut.WaitForAssertion(
+            () => _scanView.Received().TryGetTimeTicksRange(
+                out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()),
+            s_testTimeout);
+    }
+
+    [Fact]
     public async Task FilterRefresh_WhenColorOnlyEditWithNoActiveCursor_ClearsStaleBinAnnouncement()
     {
-        // Red -> blue keeps the tie armed AND the same predicate-plan key (color is excluded from the plan key), so no
-        // rescan occurs. The non-rescan tail must still drop the stale "Light red" announcement when no cursor is active.
         SavedFilter red = Filter(HighlightColor.LightRed);
         SavedFilter blue = Filter(HighlightColor.LightBlue);
         _highlightSelector.Select(Arg.Any<ImmutableList<SavedFilter>>()).Returns([blue]);
@@ -117,8 +227,7 @@ public sealed class HistogramPaneTests : BunitContext
         await cut.InvokeAsync(() => { });
         Assert.Contains("Light red", GetPrivateField<string>(cut, "_binAnnouncement"));
 
-        _filters.SelectedValueChanged +=
-            Raise.Event<EventHandler<ImmutableList<SavedFilter>>>(_filters, ImmutableList.Create(blue));
+        _filters.Changed += Raise.Event<Action>();
         await cut.InvokeAsync(() => { });
 
         Assert.Equal(string.Empty, GetPrivateField<string>(cut, "_binAnnouncement"));
@@ -132,15 +241,13 @@ public sealed class HistogramPaneTests : BunitContext
         _highlightSelector.ComputePredicatePlanKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(7);
         var cut = Render<HistogramPane>();
 
-        // A prior armed bin readout was cached, then the cursor was dismissed (Escape) which leaves the text behind.
         SetPrivateField(cut, "_tieHighlightFilters", new[] { red });
         SetPrivateField(cut, "_binCursor", null);
         SetPrivateField(cut, "_binAnnouncement", "2 events (1 Alpha, Light red highlight)");
         await cut.InvokeAsync(() => { });
         Assert.Contains("highlight", GetPrivateField<string>(cut, "_binAnnouncement"));
 
-        _filters.SelectedValueChanged +=
-            Raise.Event<EventHandler<ImmutableList<SavedFilter>>>(_filters, ImmutableList<SavedFilter>.Empty);
+        _filters.Changed += Raise.Event<Action>();
         await cut.InvokeAsync(() => { });
 
         Assert.Equal(string.Empty, GetPrivateField<string>(cut, "_binAnnouncement"));
@@ -149,8 +256,6 @@ public sealed class HistogramPaneTests : BunitContext
     [Fact]
     public async Task FilterRefresh_WhenDisarmed_ClearsGroupHighlightMasksSynchronously()
     {
-        // Arm on init, disarm on the filter change. Keep the viewport at 0 (never resize) so StartScan no-ops and cannot
-        // publish mask-free data on its own -- the synchronous mask clear in RefreshTieFilters is the only mutation.
         SavedFilter red = Filter(HighlightColor.LightRed);
         _highlightSelector.Select(Arg.Any<ImmutableList<SavedFilter>>()).Returns([]);
         _highlightSelector.ComputePredicatePlanKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(7);
@@ -159,21 +264,17 @@ public sealed class HistogramPaneTests : BunitContext
         SetPrivateField(cut, "_tieHighlightFilters", new[] { red });
         await PublishBaseDataAsync(cut, ArmedCategoryData());
 
-        // Non-vacuous: the armed legend swatch renders the highlight class.
         cut.WaitForAssertion(() => Assert.Equal("histogram-cat-hl", AlphaSwatchClass(cut)));
 
-        _filters.SelectedValueChanged +=
-            Raise.Event<EventHandler<ImmutableList<SavedFilter>>>(_filters, ImmutableList<SavedFilter>.Empty);
+        _filters.Changed += Raise.Event<Action>();
         await cut.InvokeAsync(() => { });
 
-        // histogram-cat-hl comes only from GroupHighlightMasks; with no scan publishing (viewport 0), its disappearance
-        // proves the synchronous clear ran.
         cut.WaitForAssertion(() => Assert.NotEqual("histogram-cat-hl", AlphaSwatchClass(cut)));
         Assert.Null(GetPrivateField<HistogramData>(cut, "_baseData").GroupHighlightMasks);
     }
 
     [Fact]
-    public async Task FilterRefresh_WhenOnlyHighlightColorChanges_DoesNotReadActiveViewForScan()
+    public async Task FilterRefresh_WhenOnlyHighlightColorChanges_DoesNotRescan()
     {
         SavedFilter red = Filter(HighlightColor.LightRed);
         SavedFilter blue = red with { Color = HighlightColor.LightBlue };
@@ -182,26 +283,18 @@ public sealed class HistogramPaneTests : BunitContext
         var cut = Render<HistogramPane>();
         await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
 
-        // The resize starts a background scan that reads ActiveView.Value twice: once synchronously at StartScan (before
-        // this await returns) and once in its post-scan continuation (the "did the view change mid-scan?" check). Wait for
-        // that second read so the continuation's read is not miscounted against the colour-only change under test (it
-        // otherwise races ClearReceivedCalls under load). The markup never reads ActiveView.Value, so the count is exact.
-        cut.WaitForAssertion(() => _ = _activeView.Received(2).Value);
-        _activeView.ClearReceivedCalls();
+        cut.WaitForAssertion(() => _scanView.Received().TryGetTimeTicksRange(out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()));
+        _scanView.ClearReceivedCalls();
 
-        _filters.SelectedValueChanged +=
-            Raise.Event<EventHandler<ImmutableList<SavedFilter>>>(_filters, ImmutableList.Create(blue));
+        _filters.Changed += Raise.Event<Action>();
         await cut.InvokeAsync(() => { });
 
-        _ = _activeView.DidNotReceive().Value;
+        _scanView.DidNotReceive().TryGetTimeTicksRange(out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task FilterRefresh_WhenPredicatePlanChangesButTieStaysUnarmed_DoesNotReadActiveViewForScan()
+    public async Task FilterRefresh_WhenPredicatePlanChangesButTieStaysUnarmed_DoesNotRescan()
     {
-        // Both filter sets are eligible but uncoloured (HighlightColor.None), so highlight-tie is never armed
-        // and the histogram output is independent of the predicates. A plan-key change (7 -> 8) while tie stays
-        // unarmed must update UI state only - it must not trigger a background rescan (which would read ActiveView).
         SavedFilter firstUncoloured = Filter(HighlightColor.None);
         SavedFilter secondUncoloured = Filter(HighlightColor.None);
         _highlightSelector.Select(Arg.Any<ImmutableList<SavedFilter>>()).Returns([firstUncoloured], [secondUncoloured]);
@@ -209,20 +302,17 @@ public sealed class HistogramPaneTests : BunitContext
         var cut = Render<HistogramPane>();
         await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
 
-        // Wait for the resize scan's two ActiveView.Value reads (sync StartScan + post-scan continuation) to
-        // settle before clearing, so a late continuation read is not miscounted against the change under test.
-        cut.WaitForAssertion(() => _ = _activeView.Received(2).Value);
-        _activeView.ClearReceivedCalls();
+        cut.WaitForAssertion(() => _scanView.Received().TryGetTimeTicksRange(out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()));
+        _scanView.ClearReceivedCalls();
 
-        _filters.SelectedValueChanged +=
-            Raise.Event<EventHandler<ImmutableList<SavedFilter>>>(_filters, ImmutableList.Create(secondUncoloured));
+        _filters.Changed += Raise.Event<Action>();
         await cut.InvokeAsync(() => { });
 
-        _ = _activeView.DidNotReceive().Value;
+        _scanView.DidNotReceive().TryGetTimeTicksRange(out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task FilterRefresh_WhenPredicatePlanChanges_ReadsActiveViewForScan()
+    public async Task FilterRefresh_WhenPredicatePlanChanges_Rescans()
     {
         SavedFilter red = Filter(HighlightColor.LightRed);
         SavedFilter blue = Filter(HighlightColor.LightBlue);
@@ -231,16 +321,81 @@ public sealed class HistogramPaneTests : BunitContext
         var cut = Render<HistogramPane>();
         await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
 
-        // Wait for the resize scan's two ActiveView.Value reads (sync StartScan + post-scan continuation) to settle
-        // before clearing, so the continuation's late read is not miscounted against the plan-change rescan under test.
-        cut.WaitForAssertion(() => _ = _activeView.Received(2).Value);
-        _activeView.ClearReceivedCalls();
+        cut.WaitForAssertion(() => _scanView.Received().TryGetTimeTicksRange(out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()));
+        _scanView.ClearReceivedCalls();
 
-        _filters.SelectedValueChanged +=
-            Raise.Event<EventHandler<ImmutableList<SavedFilter>>>(_filters, ImmutableList.Create(blue));
+        _filters.Changed += Raise.Event<Action>();
 
-        // The plan-change rescan dispatches via InvokeAsync; wait for its ActiveView.Value read rather than checking eagerly.
-        cut.WaitForAssertion(() => _ = _activeView.Received().Value);
+        cut.WaitForAssertion(() => _scanView.Received().TryGetTimeTicksRange(out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()));
+    }
+
+    [Fact]
+    public async Task FocusChange_ResolvesTheFocusedTickFromTheView()
+    {
+        var handle = new EventLocator(_tabId, 0, 0);
+        long focusedTicks = new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+        _scanView.Rank(handle).Returns(0);
+        _scanView.TryGetTimeTicks(handle, out Arg.Any<long>()).Returns(call => { call[1] = focusedTicks; return true; });
+        var cut = Render<HistogramPane>();
+
+        var focusedTicksField = typeof(HistogramPane).GetField(
+            "_focusedTicks", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        Assert.Null(focusedTicksField.GetValue(cut.Instance));
+
+        _eventFocus.Current.Returns(new SelectionEntry(handle, handle, null));
+        await cut.InvokeAsync(() => _eventFocus.Changed += Raise.Event<Action>());
+
+        cut.WaitForAssertion(() => Assert.Equal(focusedTicks, (long?)focusedTicksField.GetValue(cut.Instance)));
+    }
+
+    [Fact]
+    public async Task OrderingOnlyPublication_NewViewSameContent_DoesNotRescan()
+    {
+        var cut = Render<HistogramPane>();
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
+        cut.WaitForAssertion(() => _scanView.Received().TryGetTimeTicksRange(
+            out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()));
+
+        int rendersBefore = cut.RenderCount;
+
+        var reordered = Substitute.For<IEventColumnView>();
+        var next = new OrderedViewPresentation(reordered, _tabId, default, PresentationState.Current, 2)
+        {
+            ContentToken = Token(1)
+        };
+        _presentation = next;
+        await cut.InvokeAsync(() => _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(next));
+
+        cut.WaitForState(() => cut.RenderCount > rendersBefore);
+
+        Assert.False(GetPrivateField<bool>(cut, "_recomputePending"));
+        reordered.DidNotReceive().TryGetTimeTicksRange(
+            out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Publication_ForTheSameTab_RescansAgainstTheNewView()
+    {
+        var cut = Render<HistogramPane>();
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
+
+        cut.WaitForAssertion(() => _scanView.Received().TryGetTimeTicksRange(
+            out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()));
+
+        var appended = Substitute.For<IEventColumnView>();
+        var next = new OrderedViewPresentation(appended, _tabId, default, PresentationState.Current, 2)
+        {
+            ContentToken = Token(2)
+        };
+
+        _presentation = next;
+        await cut.InvokeAsync(() => _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(next));
+
+        cut.WaitForAssertion(
+            () => appended.Received().TryGetTimeTicksRange(
+                out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()),
+            s_testTimeout);
     }
 
     [Fact]
@@ -261,8 +416,7 @@ public sealed class HistogramPaneTests : BunitContext
         var cut = Render<HistogramPane>();
 
         _dimensionRequestValue = new HistogramDimensionRequest(HistogramDimension.EventId, 2);
-        _dimensionRequest.SelectedValueChanged +=
-            Raise.Event<EventHandler<HistogramDimensionRequest?>>(_dimensionRequest, _dimensionRequestValue);
+        _dimensionRequest.Changed += Raise.Event<Action>();
 
         cut.WaitForAssertion(() => Assert.Equal(HistogramDimension.EventId, GetDimension(cut)));
     }
@@ -298,8 +452,7 @@ public sealed class HistogramPaneTests : BunitContext
         var cut = Render<HistogramPane>();
         await SelectDimensionAsync(cut, HistogramDimension.Source);
 
-        _dimensionRequest.SelectedValueChanged +=
-            Raise.Event<EventHandler<HistogramDimensionRequest?>>(_dimensionRequest, _dimensionRequestValue);
+        _dimensionRequest.Changed += Raise.Event<Action>();
 
         cut.WaitForAssertion(() => Assert.Equal(HistogramDimension.Source, GetDimension(cut)));
     }
@@ -344,6 +497,44 @@ public sealed class HistogramPaneTests : BunitContext
     }
 
     [Fact]
+    public async Task ScanThatFinishesAfterItsTabIsLeft_DoesNotPublish()
+    {
+        // because the switch only schedules a THROTTLED rescan, so no supersede has happened yet when this lands.
+        //
+        // The tab moves from inside the scan's own first view read, so no thread is parked waiting for it. Completion
+        // is awaited through a signal rather than WaitForAssertion: a rejected scan renders nothing, and
+        // WaitForAssertion only re-evaluates on render, so it would wait out its whole timeout no matter what happened.
+        var scanRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        _scanView.TryGetTimeTicksRange(out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                _presentation = new OrderedViewPresentation(
+                    _scanView, EventLogId.Create(), default, PresentationState.Current, 2);
+
+                call[0] = 0L;
+                call[1] = TimeSpan.TicksPerHour;
+                scanRead.TrySetResult();
+
+                return true;
+            });
+
+        var cut = Render<HistogramPane>();
+
+        var seeded = ArmedCategoryData();
+
+        await PublishBaseDataAsync(cut, seeded);
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
+
+        await scanRead.Task.WaitAsync(s_testTimeout, TestContext.Current.CancellationToken);
+
+        await Task.Delay(s_settleWindow, TestContext.Current.CancellationToken);
+        await cut.InvokeAsync(() => { });
+
+        Assert.Same(seeded, GetPrivateFieldOrNull<HistogramData>(cut, "_baseData"));
+    }
+
+    [Fact]
     public void ShouldArmTie_WhenMoreThanThirtyOneFilters_ReturnsFalse()
     {
         SavedFilter[] filters = Enumerable.Range(0, 32)
@@ -378,16 +569,47 @@ public sealed class HistogramPaneTests : BunitContext
     }
 
     [Fact]
-    public async Task StartScan_WhenViewportZero_BumpsScanEpochToSupersedeQueuedPublish()
+    public async Task StartScan_WhenViewportZero_BumpsScanVersionToSupersedeQueuedPublish()
     {
-        // A zero-size viewport makes StartScan bail without launching a scan, but it must still bump the epoch so a prior
-        // scan whose UI publication is already queued is rejected and cannot restore stale (for example, armed) data.
         var cut = Render<HistogramPane>();
-        int before = GetPrivateField<int>(cut, "_scanEpoch");
+        int before = GetPrivateField<int>(cut, "_scanVersion");
 
         await cut.InvokeAsync(() => InvokePrivate(cut, "StartScan"));
 
-        Assert.Equal(before + 1, GetPrivateField<int>(cut, "_scanEpoch"));
+        Assert.Equal(before + 1, GetPrivateField<int>(cut, "_scanVersion"));
+    }
+
+    [Fact]
+    public async Task TabSwitchWithSimultaneousPublication_RescansAgainstTheNewView()
+    {
+        var cut = Render<HistogramPane>();
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
+        cut.WaitForAssertion(() => _scanView.Received().TryGetTimeTicksRange(
+            out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()));
+
+        SetPrivateField(cut, "_isZoomed", true);
+
+        var newTab = EventLogId.Create();
+        var newView = Substitute.For<IEventColumnView>();
+        var newPresentation = new OrderedViewPresentation(newView, newTab, default, PresentationState.Current, 2)
+        {
+            ContentToken = Token(2)
+        };
+        _activeEventLog.Current.Returns(newTab);
+        _presentation = newPresentation;
+
+        await cut.InvokeAsync(() =>
+        {
+            _activeEventLog.Changed += Raise.Event<Action>();
+            _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(newPresentation);
+        });
+
+        cut.WaitForAssertion(() => Assert.False(GetPrivateField<bool>(cut, "_isZoomed")));
+        cut.WaitForAssertion(() => Assert.Equal(Token(2), ScannedToken(cut)));
+        cut.WaitForAssertion(
+            () => newView.Received().TryGetTimeTicksRange(
+                out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>()),
+            s_testTimeout);
     }
 
     private static string? AlphaSwatchClass(IRenderedComponent<HistogramPane> cut) =>
@@ -426,6 +648,14 @@ public sealed class HistogramPaneTests : BunitContext
         var field = typeof(HistogramPane).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(field);
         return Assert.IsType<T>(field.GetValue(cut.Instance));
+    }
+
+    private static T? GetPrivateFieldOrNull<T>(IRenderedComponent<HistogramPane> cut, string name)
+        where T : class
+    {
+        var field = typeof(HistogramPane).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return field.GetValue(cut.Instance) as T;
     }
 
     private static void InvokePrivate(IRenderedComponent<HistogramPane> cut, string name)
@@ -467,6 +697,11 @@ public sealed class HistogramPaneTests : BunitContext
         return path;
     }
 
+    private static ViewContentToken? ScannedToken(IRenderedComponent<HistogramPane> cut) =>
+        (ViewContentToken?)typeof(HistogramPane)
+            .GetField("_lastScannedToken", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(cut.Instance);
+
     private static Task SelectDimensionAsync(IRenderedComponent<HistogramPane> cut, HistogramDimension dimension)
     {
         var select = cut.FindComponent<ValueSelect<HistogramDimension>>();
@@ -480,4 +715,7 @@ public sealed class HistogramPaneTests : BunitContext
         Assert.NotNull(field);
         field.SetValue(cut.Instance, value);
     }
+
+    private static ViewContentToken Token(long contentVersion) =>
+        ViewContentToken.FromStamps(default, [new ViewContentTokenReaderStamp(s_tokenLog, 0, contentVersion, 1)], 1);
 }
