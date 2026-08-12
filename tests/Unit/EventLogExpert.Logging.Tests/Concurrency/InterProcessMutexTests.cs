@@ -9,6 +9,10 @@ namespace EventLogExpert.Logging.Tests.Concurrency;
 
 public sealed class InterProcessMutexTests
 {
+    private static readonly TimeSpan s_acquireTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan s_contendedTimeout = TimeSpan.FromMilliseconds(300);
+    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(10);
+
     [Fact]
     public void DeriveName_DebugLogScope_MatchesLegacyFileLogSinkFormat()
     {
@@ -51,8 +55,8 @@ public sealed class InterProcessMutexTests
 
         var holder = StartHolder(first, acquired, release, TestContext.Current.CancellationToken);
 
-        Assert.True(acquired.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
-        Assert.Throws<TimeoutException>(() => second.Run(TimeSpan.FromMilliseconds(300), static () => { }));
+        Assert.True(acquired.Wait(s_testTimeout, TestContext.Current.CancellationToken));
+        Assert.Throws<TimeoutException>(() => second.Run(s_contendedTimeout, static () => { }));
 
         release.Set();
         holder.Join();
@@ -64,8 +68,6 @@ public sealed class InterProcessMutexTests
         var key = UniqueKey();
         var name = InterProcessMutex.DeriveName("AbandonScope", key);
 
-        // Keep the named object alive across the owning thread's death so the abandoned state (not object destruction)
-        // is what the next acquirer observes.
         using var keepAlive = new Mutex(false, name);
 
         var owningThread = new Thread(() =>
@@ -73,7 +75,6 @@ public sealed class InterProcessMutexTests
             var owner = new Mutex(false, name);
             owner.WaitOne();
 
-            // Exit while still owning -> Windows marks the mutex abandoned.
         });
 
         owningThread.Start();
@@ -82,7 +83,7 @@ public sealed class InterProcessMutexTests
         using var mutex = new InterProcessMutex("AbandonScope", key);
         var ran = false;
 
-        Assert.True(mutex.TryRun(TimeSpan.FromSeconds(5), () => ran = true));
+        Assert.True(mutex.TryRun(s_acquireTimeout, () => ran = true));
         Assert.True(ran);
     }
 
@@ -98,16 +99,14 @@ public sealed class InterProcessMutexTests
 
         var holder = StartHolder(first, acquired, release, TestContext.Current.CancellationToken);
 
-        Assert.True(acquired.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        Assert.True(acquired.Wait(s_testTimeout, TestContext.Current.CancellationToken));
 
-        // Separate handle to the same named kernel object cannot acquire while the first holds it - proving true
-        // interprocess coordination rather than an in-process lock.
-        Assert.False(second.TryRun(TimeSpan.FromMilliseconds(300), static () => { }));
+        Assert.False(second.TryRun(s_contendedTimeout, static () => { }));
 
         release.Set();
         holder.Join();
 
-        Assert.True(second.TryRun(TimeSpan.FromSeconds(10), static () => { }));
+        Assert.True(second.TryRun(s_testTimeout, static () => { }));
     }
 
     private static Thread StartHolder(
@@ -116,10 +115,10 @@ public sealed class InterProcessMutexTests
         ManualResetEventSlim release,
         CancellationToken cancellationToken)
     {
-        var holder = new Thread(() => mutex.Run(TimeSpan.FromSeconds(10), () =>
+        var holder = new Thread(() => mutex.Run(s_testTimeout, () =>
         {
             acquired.Set();
-            release.Wait(TimeSpan.FromSeconds(10), cancellationToken);
+            release.Wait(s_testTimeout, cancellationToken);
         }));
 
         holder.Start();

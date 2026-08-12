@@ -16,10 +16,12 @@ namespace EventLogExpert.ElevationHelper;
 internal static class ProgramEntry
 {
     private const int CancelWatchdogExitCode = 12;
-    // High-IL helper must kill itself if native code ignores cooperative cancellation; the medium-IL host cannot.
-    private static readonly TimeSpan s_selfTerminateWatchdog = TimeSpan.FromSeconds(8);
+    private const int PipeConnectTimeoutMilliseconds = 10_000;
 
-    // Startup orphan cleanup must not block the control reader from receiving cancellation.
+    private static readonly TimeSpan s_controlReaderDrainTimeout = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan s_requestReadTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan s_selfTerminateWatchdog = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan s_selfTerminateWriteTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan s_startupReconcileTimeout = TimeSpan.FromSeconds(30);
 
     public static async Task<int> MainAsync(string[] args)
@@ -55,7 +57,7 @@ internal static class ProgramEntry
 
         try
         {
-            using var requestCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var requestCts = new CancellationTokenSource(s_requestReadTimeout);
             request = await reader.ReadRequestAsync(requestCts.Token);
         }
         catch (OperationCanceledException)
@@ -80,7 +82,6 @@ internal static class ProgramEntry
 
         using var operationCts = new CancellationTokenSource();
 
-        // Armed on CancelMessage and cancelled on completion so only an ignored cooperative cancel self-terminates.
         using var watchdogCts = new CancellationTokenSource();
 
         var controlReaderTask = Task.Run(async () =>
@@ -104,7 +105,6 @@ internal static class ProgramEntry
                     {
                         operationCts.Cancel();
 
-                        // If the operation does not unwind, self-terminate so the host observes pipe EOF promptly.
                         try { await Task.Delay(s_selfTerminateWatchdog, watchdogCts.Token); }
                         catch (OperationCanceledException) { return; }
 
@@ -121,7 +121,6 @@ internal static class ProgramEntry
             }
         });
 
-        // Run orphan cleanup off the main flow so a wedged delete cannot block cancellation handling.
         var reconcileTask = Task.Run(() =>
         {
             try { OfflineMaintenance.ReconcileOrphans(logger: null); }
@@ -141,7 +140,7 @@ internal static class ProgramEntry
         {
             watchdogCts.Cancel();
             operationCts.Cancel();
-            try { await controlReaderTask.WaitAsync(TimeSpan.FromSeconds(1)); } catch { /* Best-effort control-reader drain. */ }
+            try { await controlReaderTask.WaitAsync(s_controlReaderDrainTimeout); } catch { /* Best-effort control-reader drain. */ }
 
             await TryWriteTerminalAsync(writer,
                 new FatalMessage(ex.GetType().FullName ?? ex.GetType().Name, ex.Message, ex.StackTrace ?? string.Empty));
@@ -152,7 +151,7 @@ internal static class ProgramEntry
         watchdogCts.Cancel();
         operationCts.Cancel();
 
-        try { await controlReaderTask.WaitAsync(TimeSpan.FromSeconds(1)); } catch { /* Best-effort control-reader drain. */ }
+        try { await controlReaderTask.WaitAsync(s_controlReaderDrainTimeout); } catch { /* Best-effort control-reader drain. */ }
 
         await TryWriteTerminalAsync(writer,
             new ResultMessage(result.Outcome, result.FailureSummary, (long)result.Duration.TotalMilliseconds));
@@ -166,12 +165,11 @@ internal static class ProgramEntry
             ".",
             pipeName,
             PipeDirection.InOut,
-            // Omit client-side CurrentUserOnly: elevated and medium-IL same-user tokens have different SIDs; server DACL plus PID verification authenticates.
             PipeOptions.Asynchronous);
 
         try
         {
-            await pipe.ConnectAsync(timeout: 10_000);
+            await pipe.ConnectAsync(timeout: PipeConnectTimeoutMilliseconds);
         }
         catch (TimeoutException)
         {
@@ -208,7 +206,6 @@ internal static class ProgramEntry
         }
     }
 
-    // Last-resort self-termination leaves orphaned mounts for next elevated-launch reconciliation.
     private static async Task SelfTerminateAfterUnresponsiveCancelAsync(IpcMessageWriter writer, long elapsedMs)
     {
         try
@@ -216,7 +213,7 @@ internal static class ProgramEntry
             await TryWriteTerminalAsync(writer, new ResultMessage(
                 DatabaseToolsOutcome.Cancelled,
                 "Cancelled; the elevated helper self-terminated after a native operation ignored cancellation.",
-                elapsedMs)).WaitAsync(TimeSpan.FromSeconds(2));
+                elapsedMs)).WaitAsync(s_selfTerminateWriteTimeout);
         }
         catch { /* Pipe EOF on exit is the guaranteed host signal. */ }
 

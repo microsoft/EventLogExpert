@@ -12,15 +12,20 @@ namespace EventLogExpert.Eventing.IntegrationTests.Readers;
 
 public sealed class EventLogWatcherTests
 {
+    private static readonly TimeSpan s_concurrentTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan s_interEventDelay = TimeSpan.FromMilliseconds(50);
+    private static readonly TimeSpan s_longTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan s_negativeWait = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan s_settleDelay = TimeSpan.FromMilliseconds(200);
+    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(5);
+
     [Theory]
     [InlineData(Constants.ApplicationLogName)]
     [InlineData(Constants.SystemLogName)]
     public void Constructor_WithCommonLogs_ShouldCreateWatcher(string logName)
     {
-        // Arrange & Act
         using var watcher = new EventLogWatcher(logName);
 
-        // Assert
         Assert.NotNull(watcher);
         Assert.False(watcher.Enabled);
     }
@@ -28,55 +33,46 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void Constructor_WithEmptyLogName_ShouldThrowArgumentException()
     {
-        // Arrange & Act & Assert
         Assert.Throws<ArgumentException>(() => new EventLogWatcher(string.Empty));
     }
 
     [Fact]
     public void Constructor_WithInvalidLogName_ShouldThrowFileNotFoundException()
     {
-        // Arrange
         var invalidLogName = "NonExistentLog_" + Guid.NewGuid();
 
-        // Act & Assert
         Assert.Throws<FileNotFoundException>(() => new EventLogWatcher(invalidLogName));
     }
 
     [Fact]
     public void Constructor_WithNullLogName_ShouldThrowArgumentException()
     {
-        // Arrange & Act & Assert
         Assert.Throws<ArgumentNullException>(() => new EventLogWatcher(null!));
     }
 
     [Fact]
     public void Constructor_WithValidBookmark_ShouldCreateWatcher()
     {
-        // Arrange
         using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         reader.TryGetEvents(out _, 1);
 
         var bookmark = reader.LastBookmark;
 
-        // Act
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName, bookmark);
 
-        // Assert
         Assert.NotNull(watcher);
     }
 
     [Fact]
     public void Constructor_WithWhitespaceLogName_ShouldThrowArgumentException()
     {
-        // Arrange & Act & Assert
         Assert.Throws<ArgumentException>(() => new EventLogWatcher("   "));
     }
 
     [Fact]
     public void Dispose_AfterDispose_ShouldNotReceiveEvents()
     {
-        // Arrange
         var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         int eventCount = 0;
         var eventReceived = new ManualResetEventSlim(false);
@@ -89,7 +85,6 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         watcher.Dispose();
         int countBefore = Volatile.Read(ref eventCount);
         eventReceived.Reset();
@@ -98,9 +93,8 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event after dispose", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
+        bool received = eventReceived.Wait(s_negativeWait, TestContext.Current.CancellationToken);
 
-        // Assert
         int actual = Volatile.Read(ref eventCount);
         Assert.False(received, "Should not have received any event after dispose");
         Assert.Equal(countBefore, actual);
@@ -109,18 +103,15 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void Dispose_BeforeSubscribe_ShouldNotThrow()
     {
-        // Arrange
         var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         Assert.False(watcher.Enabled);
 
-        // Act & Assert
         watcher.Dispose();
     }
 
     [Fact]
     public void Dispose_ShouldReleaseUnderlyingWaitHandle()
     {
-        // Arrange
         var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         watcher.Enabled = true;
 
@@ -132,10 +123,8 @@ public sealed class EventLogWatcherTests
         var newEvents = (AutoResetEvent?)newEventsField.GetValue(watcher);
         Assert.NotNull(newEvents);
 
-        // Act
         watcher.Dispose();
 
-        // Assert
         Assert.True(newEvents.SafeWaitHandle.IsClosed, "AutoResetEvent kernel handle leaked after Dispose.");
 
         watcher.Dispose();
@@ -145,7 +134,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void Dispose_WhenCalledFromHandler_ShouldThrowInvalidOperationException()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         Exception? observed = null;
         var observedSet = new ManualResetEventSlim(false);
@@ -169,14 +157,12 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for reentrant Dispose", EventLogEntryType.Information);
 
-        bool received = observedSet.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = observedSet.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         Assert.True(received, "Handler was never invoked, so reentrancy was not exercised");
         var captured = Volatile.Read(ref observed);
         Assert.NotNull(captured);
@@ -187,11 +173,9 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void Dispose_WhenCalledMultipleTimes_ShouldNotThrow()
     {
-        // Arrange
         var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         watcher.Enabled = true;
 
-        // Act & Assert
         watcher.Dispose();
         watcher.Dispose();
         watcher.Dispose();
@@ -200,49 +184,39 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void Dispose_WhenCalled_ShouldUnsubscribe()
     {
-        // Arrange
         var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         watcher.Enabled = true;
 
-        // Act
         watcher.Dispose();
 
-        // Assert
         Assert.False(watcher.Enabled);
     }
 
     [Fact]
     public void Dispose_WhenNotSubscribed_ShouldNotThrow()
     {
-        // Arrange
         var watcher = new EventLogWatcher(Constants.ApplicationLogName);
 
-        // Act & Assert
         watcher.Dispose();
     }
 
     [Fact]
     public void Dispose_WhileSubscribed_ShouldUnsubscribeAndDispose()
     {
-        // Arrange
         var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         watcher.Enabled = true;
         Assert.True(watcher.Enabled);
 
-        // Act
         watcher.Dispose();
 
-        // Assert
         Assert.False(watcher.Enabled);
     }
 
     [Fact]
     public void Enabled_AfterMultipleToggle_ShouldMaintainCorrectState()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
 
-        // Act & Assert
         for (int i = 0; i < 3; i++)
         {
             watcher.Enabled = true;
@@ -256,20 +230,16 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void Enabled_WhenCreated_ShouldBeFalse()
     {
-        // Arrange & Act
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
 
-        // Assert
         Assert.False(watcher.Enabled);
     }
 
     [Fact]
     public async Task Enabled_WhenRacingFromMultipleThreads_ShouldNotHangOrCorruptState()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
 
-        // Act
         var tasks = new List<Task>(100);
         var ct = TestContext.Current.CancellationToken;
 
@@ -285,14 +255,12 @@ public sealed class EventLogWatcherTests
 
         var allDone = Task.WhenAll(tasks);
 
-        // Assert: timeout regression-tests the RegisteredWaitHandle race.
-        await allDone.WaitAsync(TimeSpan.FromSeconds(30), ct);
+        await allDone.WaitAsync(s_concurrentTimeout, ct);
     }
 
     [Fact]
     public void Enabled_WhenSetToFalseFromHandler_ShouldThrowInvalidOperationException()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         Exception? observed = null;
         var observedSet = new ManualResetEventSlim(false);
@@ -316,14 +284,12 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for reentrant Enabled=false", EventLogEntryType.Information);
 
-        bool received = observedSet.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = observedSet.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         Assert.True(received, "Handler was never invoked, so reentrancy was not exercised");
         var captured = Volatile.Read(ref observed);
         Assert.NotNull(captured);
@@ -334,12 +300,10 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void Enabled_WhenSetToFalseTwice_ShouldNotThrow()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         watcher.Enabled = true;
         watcher.Enabled = false;
 
-        // Act & Assert
         watcher.Enabled = false;
         Assert.False(watcher.Enabled);
     }
@@ -347,25 +311,20 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void Enabled_WhenSetToFalse_ShouldUnsubscribe()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         watcher.Enabled = true;
 
-        // Act
         watcher.Enabled = false;
 
-        // Assert
         Assert.False(watcher.Enabled);
     }
 
     [Fact]
     public void Enabled_WhenSetToSameValue_ShouldNotThrow()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         watcher.Enabled = false;
 
-        // Act & Assert
         watcher.Enabled = false;
         Assert.False(watcher.Enabled);
     }
@@ -373,62 +332,49 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void Enabled_WhenSetToTrueAfterDispose_ShouldThrowObjectDisposedException()
     {
-        // Arrange
         var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         watcher.Dispose();
 
-        // Act & Assert
         Assert.Throws<ObjectDisposedException>(() => watcher.Enabled = true);
     }
 
     [Fact]
     public void Enabled_WhenSetToTrueTwice_ShouldNotThrow()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         watcher.Enabled = true;
 
-        // Act - Setting to true when already true is a no-op (switch case doesn't match)
         watcher.Enabled = true;
 
-        // Assert
         Assert.True(watcher.Enabled);
     }
 
     [Fact]
     public void Enabled_WhenSetToTrueTwice_ShouldRemainEnabled()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         watcher.Enabled = true;
 
-        // Act - Setting to true when already true is a no-op (switch case doesn't match)
         watcher.Enabled = true;
 
-        // Assert
         Assert.True(watcher.Enabled);
     }
 
     [Fact]
     public void Enabled_WhenSetToTrue_ShouldSubscribe()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
 
-        // Act
         watcher.Enabled = true;
 
-        // Assert
         Assert.True(watcher.Enabled);
     }
 
     [Fact]
     public void Enabled_WhenToggled_ShouldUpdateState()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
 
-        // Act & Assert
         Assert.False(watcher.Enabled);
 
         watcher.Enabled = true;
@@ -444,7 +390,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_AfterResubscribe_ShouldReceiveEvents()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         int eventCount = 0;
         var eventReceived = new ManualResetEventSlim(false);
@@ -455,7 +400,6 @@ public sealed class EventLogWatcherTests
             eventReceived.Set();
         };
 
-        // Act
         watcher.Enabled = true;
         watcher.Enabled = false;
         Interlocked.Exchange(ref eventCount, 0);
@@ -467,9 +411,8 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event after resubscribe", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = eventReceived.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         int actual = Volatile.Read(ref eventCount);
         Assert.True(received, "Did not receive event within timeout period");
         Assert.True(actual > 0, $"Expected at least one event after resubscribe, but got {actual}.");
@@ -478,7 +421,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_AfterUnsubscribe_ShouldStopReceivingEvents()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         int eventCount = 0;
         var eventReceived = new ManualResetEventSlim(false);
@@ -491,19 +433,16 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         watcher.Enabled = false;
         int countBefore = Volatile.Read(ref eventCount);
         eventReceived.Reset();
 
-        // Stimulus event written AFTER Disable so the test isn't vacuous.
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event after unsubscribe", EventLogEntryType.Information);
 
-        bool fired = eventReceived.Wait(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
+        bool fired = eventReceived.Wait(s_negativeWait, TestContext.Current.CancellationToken);
 
-        // Assert
         int actual = Volatile.Read(ref eventCount);
         Assert.False(fired, "Should not have received any event after unsubscribe");
         Assert.Equal(countBefore, actual);
@@ -512,7 +451,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_ForNormalEvent_ShouldHaveNullError()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         var receivedEvents = new ConcurrentQueue<EventRecord>();
         var eventReceived = new ManualResetEventSlim(false);
@@ -529,14 +467,12 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for normal-path null Error invariant", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = eventReceived.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         var snapshot = receivedEvents.ToArray();
         Assert.True(received, "Did not receive event within timeout period");
         Assert.NotEmpty(snapshot);
@@ -546,7 +482,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_ShouldHaveRecordId()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         EventRecord? capturedEvent = null;
         var eventReceived = new ManualResetEventSlim(false);
@@ -559,14 +494,12 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for record ID", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = eventReceived.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         var snapshot = Volatile.Read(ref capturedEvent);
         Assert.True(received, "Did not receive event within timeout period");
         Assert.NotNull(snapshot);
@@ -577,7 +510,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_ShouldHaveValidTimeCreated()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         EventRecord? capturedEvent = null;
         var eventReceived = new ManualResetEventSlim(false);
@@ -590,17 +522,15 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         var beforeWrite = DateTime.UtcNow;
 
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for timestamp", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        var afterWrite = DateTime.UtcNow.AddSeconds(1); // Add buffer for processing
+        bool received = eventReceived.Wait(s_testTimeout, TestContext.Current.CancellationToken);
+        var afterWrite = DateTime.UtcNow.AddSeconds(1);
 
-        // Assert
         var snapshot = Volatile.Read(ref capturedEvent);
         Assert.True(received, "Did not receive event within timeout period");
         Assert.NotNull(snapshot);
@@ -612,7 +542,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_ShouldIncludePathName()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         EventRecord? capturedEvent = null;
         var eventReceived = new ManualResetEventSlim(false);
@@ -625,14 +554,12 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for path validation", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = eventReceived.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         var snapshot = Volatile.Read(ref capturedEvent);
         Assert.True(received, "Did not receive event within timeout period");
         Assert.NotNull(snapshot);
@@ -642,7 +569,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_ShouldIncludeProperties()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         EventRecord? capturedEvent = null;
         var eventReceived = new ManualResetEventSlim(false);
@@ -655,14 +581,12 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for properties", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = eventReceived.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         var snapshot = Volatile.Read(ref capturedEvent);
         Assert.True(received, "Did not receive event within timeout period");
         Assert.NotNull(snapshot);
@@ -672,7 +596,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_ShouldProvideCorrectSender()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         object? capturedSender = null;
         var eventReceived = new ManualResetEventSlim(false);
@@ -685,14 +608,12 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for sender validation", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = eventReceived.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         var snapshot = Volatile.Read(ref capturedSender);
         Assert.True(received, "Did not receive event within timeout period");
         Assert.NotNull(snapshot);
@@ -702,7 +623,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public async Task EventRecordWritten_ShouldReceiveEventsInOrder()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         const int expectedCount = 3;
         var receivedEvents = new ConcurrentQueue<EventRecord>();
@@ -713,7 +633,6 @@ public sealed class EventLogWatcherTests
         {
             receivedEvents.Enqueue(record);
 
-            // Bound Signal — ambient callbacks past expectedCount would throw.
             int count = Interlocked.Increment(ref signalCount);
 
             if (count <= expectedCount)
@@ -724,19 +643,17 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
 
         eventLog.WriteEntry("Event A", EventLogEntryType.Information);
-        await Task.Delay(TimeSpan.FromMilliseconds(50), TestContext.Current.CancellationToken);
+        await Task.Delay(s_interEventDelay, TestContext.Current.CancellationToken);
         eventLog.WriteEntry("Event B", EventLogEntryType.Information);
-        await Task.Delay(TimeSpan.FromMilliseconds(50), TestContext.Current.CancellationToken);
+        await Task.Delay(s_interEventDelay, TestContext.Current.CancellationToken);
         eventLog.WriteEntry("Event C", EventLogEntryType.Information);
 
-        bool received = countdown.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        bool received = countdown.Wait(s_longTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         var snapshot = receivedEvents.ToArray();
         Assert.True(received, "Did not receive all events within timeout period");
         Assert.True(snapshot.Length >= expectedCount, $"Expected at least {expectedCount} events in snapshot, but got {snapshot.Length}.");
@@ -751,7 +668,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_WhenHandlerThrows_ShouldStillDeliverFutureEvents()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         int attempts = 0;
         var firstObserved = new ManualResetEventSlim(false);
@@ -759,7 +675,6 @@ public sealed class EventLogWatcherTests
 
         watcher.EventRecordWritten += (sender, record) =>
         {
-            // Signal "first observed" before the throw so the stimulus thread can release the second write.
             int n = Interlocked.Increment(ref attempts);
 
             if (n == 1)
@@ -776,15 +691,13 @@ public sealed class EventLogWatcherTests
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
 
-        // Act
         eventLog.WriteEntry("Test event 1 (handler throws on first invocation)", EventLogEntryType.Information);
-        bool firstReceived = firstObserved.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool firstReceived = firstObserved.Wait(s_testTimeout, TestContext.Current.CancellationToken);
         Assert.True(firstReceived, "First handler invocation was not observed");
 
         eventLog.WriteEntry("Test event 2 (handler should still fire)", EventLogEntryType.Information);
-        bool laterReceived = laterObserved.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool laterReceived = laterObserved.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         int actual = Volatile.Read(ref attempts);
         Assert.True(laterReceived,
             $"Handler did not fire again after throwing on first invocation; attempts={actual}");
@@ -795,7 +708,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_WhenMultipleEventsWritten_ShouldReceiveAll()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         const int expectedCount = 3;
         int eventCount = 0;
@@ -803,7 +715,6 @@ public sealed class EventLogWatcherTests
 
         watcher.EventRecordWritten += (sender, record) =>
         {
-            // Bound Signal — ambient callbacks past expectedCount would throw.
             int count = Interlocked.Increment(ref eventCount);
 
             if (count <= expectedCount)
@@ -814,7 +725,6 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
 
@@ -822,9 +732,8 @@ public sealed class EventLogWatcherTests
         eventLog.WriteEntry("Test event 2", EventLogEntryType.Warning);
         eventLog.WriteEntry("Test event 3", EventLogEntryType.Error);
 
-        bool received = countdown.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        bool received = countdown.Wait(s_longTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         int actual = Volatile.Read(ref eventCount);
         Assert.True(received, $"Did not receive all events within timeout period. Got {actual}.");
         Assert.True(actual >= expectedCount, $"Expected at least {expectedCount} events, but got {actual}.");
@@ -833,7 +742,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_WhenNotSubscribed_ShouldNotReceiveEvents()
     {
-        // Arrange — handler attached but Enabled is never set to true.
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         int eventCount = 0;
         var eventReceived = new ManualResetEventSlim(false);
@@ -844,14 +752,12 @@ public sealed class EventLogWatcherTests
             eventReceived.Set();
         };
 
-        // Act — stimulus event so the negative case isn't vacuous.
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event with watcher not enabled", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
+        bool received = eventReceived.Wait(s_negativeWait, TestContext.Current.CancellationToken);
 
-        // Assert
         int actual = Volatile.Read(ref eventCount);
         Assert.False(received, "Should not have received any event when watcher is not Enabled");
         Assert.Equal(0, actual);
@@ -860,20 +766,17 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_WhenOneOfMultipleHandlersThrows_ShouldStillNotifyOthers()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         int failingCount = 0;
         int succeedingCount = 0;
         var succeedingObserved = new ManualResetEventSlim(false);
 
-        // First subscriber always throws.
         watcher.EventRecordWritten += (sender, record) =>
         {
             Interlocked.Increment(ref failingCount);
             throw new InvalidOperationException("subscriber A always fails");
         };
 
-        // Second subscriber must still fire despite the first throwing.
         watcher.EventRecordWritten += (sender, record) =>
         {
             Interlocked.Increment(ref succeedingCount);
@@ -882,14 +785,12 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for multi-subscriber isolation", EventLogEntryType.Information);
 
-        bool received = succeedingObserved.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = succeedingObserved.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         int failed = Volatile.Read(ref failingCount);
         int succeeded = Volatile.Read(ref succeedingCount);
         Assert.True(received,
@@ -901,7 +802,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_WhenSubscribed_ShouldReceiveEvents()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         int eventCount = 0;
         EventRecord? capturedEvent = null;
@@ -914,16 +814,14 @@ public sealed class EventLogWatcherTests
             eventReceived.Set();
         };
 
-        // Act
         watcher.Enabled = true;
 
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for EventLogWatcher", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = eventReceived.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         int actual = Volatile.Read(ref eventCount);
         var snapshot = Volatile.Read(ref capturedEvent);
         Assert.True(received, "Did not receive event within timeout period");
@@ -934,7 +832,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_WithBookmark_ShouldReceiveNewEvents()
     {
-        // Arrange
         using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
         reader.TryGetEvents(out _, 1);
         var bookmark = reader.LastBookmark;
@@ -949,16 +846,14 @@ public sealed class EventLogWatcherTests
             eventReceived.Set();
         };
 
-        // Act
         watcher.Enabled = true;
 
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event after bookmark", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = eventReceived.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         int actual = Volatile.Read(ref eventCount);
         Assert.True(received, "Did not receive event within timeout period");
         Assert.True(actual > 0, $"Expected at least one event after bookmark, but got {actual}.");
@@ -967,7 +862,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public async Task EventRecordWritten_WithConcurrentEventWrites_ShouldHandleAllEvents()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         const int expectedCount = 5;
         int eventCount = 0;
@@ -975,7 +869,6 @@ public sealed class EventLogWatcherTests
 
         watcher.EventRecordWritten += (sender, record) =>
         {
-            // Bound Signal — ambient callbacks past expectedCount would throw.
             int count = Interlocked.Increment(ref eventCount);
 
             if (count <= expectedCount)
@@ -986,7 +879,6 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act - Write events from multiple threads
         var tasks = new[]
         {
             Task.Run(() =>
@@ -1022,9 +914,8 @@ public sealed class EventLogWatcherTests
         };
 
         await Task.WhenAll(tasks);
-        bool received = countdown.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        bool received = countdown.Wait(s_longTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         int actual = Volatile.Read(ref eventCount);
         Assert.True(received, $"Did not receive all events within timeout period. Got {actual} events.");
         Assert.True(actual >= expectedCount, $"Expected at least {expectedCount} events, but got {actual}.");
@@ -1033,14 +924,11 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_WithInvalidBookmark_ShouldThrowAndNotMaskAsUnauthorizedAccessException()
     {
-        // Arrange
         var invalidBookmark = "InvalidBookmarkString";
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName, invalidBookmark);
 
-        // Act
         var ex = Record.Exception(() => watcher.Enabled = true);
 
-        // Assert — bad bookmark must surface an exception that is not masked as UAE.
         Assert.NotNull(ex);
         Assert.IsNotType<UnauthorizedAccessException>(ex);
     }
@@ -1048,7 +936,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_WithMultipleSubscribers_ShouldNotifyAll()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         const int expectedCountPerSubscriber = 1;
         int eventCount1 = 0;
@@ -1057,7 +944,6 @@ public sealed class EventLogWatcherTests
 
         watcher.EventRecordWritten += (sender, record) =>
         {
-            // Guard CountdownEvent.Signal against ambient over-signal.
             int count = Interlocked.Increment(ref eventCount1);
 
             if (count <= expectedCountPerSubscriber)
@@ -1078,14 +964,12 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for multiple subscribers", EventLogEntryType.Information);
 
-        bool received = countdown.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = countdown.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         int actual1 = Volatile.Read(ref eventCount1);
         int actual2 = Volatile.Read(ref eventCount2);
         Assert.True(received, "Did not receive events in all subscribers within timeout period");
@@ -1096,26 +980,22 @@ public sealed class EventLogWatcherTests
     [Fact]
     public async Task EventRecordWritten_WithNoSubscribers_ShouldNotThrow()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
 
-        // Act
         watcher.Enabled = true;
 
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event with no subscribers", EventLogEntryType.Information);
 
-        await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
+        await Task.Delay(s_settleDelay, TestContext.Current.CancellationToken);
 
-        // Assert - No exception means success
         Assert.True(watcher.Enabled);
     }
 
     [Fact]
     public void EventRecordWritten_WithRenderXmlFalse_ShouldNotIncludeXml()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         EventRecord? capturedEvent = null;
         var eventReceived = new ManualResetEventSlim(false);
@@ -1128,14 +1008,12 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event without XML", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = eventReceived.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         var snapshot = Volatile.Read(ref capturedEvent);
         Assert.True(received, "Did not receive event within timeout period");
         Assert.NotNull(snapshot);
@@ -1145,7 +1023,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_WithRenderXmlTrue_ShouldIncludeXml()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName, true);
         EventRecord? capturedEvent = null;
         var eventReceived = new ManualResetEventSlim(false);
@@ -1158,14 +1035,12 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for XML rendering", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = eventReceived.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         var snapshot = Volatile.Read(ref capturedEvent);
         Assert.True(received, "Did not receive event within timeout period");
         Assert.NotNull(snapshot);
@@ -1175,15 +1050,12 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void Multiple_Watchers_OnDifferentLogs_ShouldBothSubscribe()
     {
-        // Arrange
         using var appWatcher = new EventLogWatcher(Constants.ApplicationLogName);
         using var sysWatcher = new EventLogWatcher(Constants.SystemLogName);
 
-        // Act
         appWatcher.Enabled = true;
         sysWatcher.Enabled = true;
 
-        // Assert - Both watchers should successfully subscribe
         Assert.True(appWatcher.Enabled);
         Assert.True(sysWatcher.Enabled);
     }
@@ -1191,7 +1063,6 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void Multiple_Watchers_OnSameLog_ShouldAllReceiveEvents()
     {
-        // Arrange
         using var watcher1 = new EventLogWatcher(Constants.ApplicationLogName);
         using var watcher2 = new EventLogWatcher(Constants.ApplicationLogName);
 
@@ -1202,7 +1073,6 @@ public sealed class EventLogWatcherTests
 
         watcher1.EventRecordWritten += (sender, record) =>
         {
-            // Guard CountdownEvent.Signal against ambient over-signal.
             int count = Interlocked.Increment(ref eventCount1);
 
             if (count <= expectedCountPerWatcher)
@@ -1224,14 +1094,12 @@ public sealed class EventLogWatcherTests
         watcher1.Enabled = true;
         watcher2.Enabled = true;
 
-        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for multiple watchers", EventLogEntryType.Information);
 
-        bool received = countdown.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        bool received = countdown.Wait(s_testTimeout, TestContext.Current.CancellationToken);
 
-        // Assert
         int actual1 = Volatile.Read(ref eventCount1);
         int actual2 = Volatile.Read(ref eventCount2);
         Assert.True(received, "Did not receive events in all watchers within timeout period");
@@ -1242,10 +1110,8 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void SubscribeAndUnsubscribe_WhenRepeated_ShouldWork()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
 
-        // Act & Assert - Subscribe and unsubscribe multiple times
         watcher.Enabled = true;
         Assert.True(watcher.Enabled);
 
@@ -1262,11 +1128,9 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void Unsubscribe_MultipleTimes_ShouldNotThrow()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         watcher.Enabled = true;
 
-        // Act & Assert
         watcher.Enabled = false;
         watcher.Enabled = false;
         watcher.Enabled = false;
@@ -1277,10 +1141,8 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void Unsubscribe_WhenNotSubscribed_ShouldNotThrow()
     {
-        // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
 
-        // Act & Assert
         watcher.Enabled = false;
         Assert.False(watcher.Enabled);
     }

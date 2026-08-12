@@ -28,7 +28,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void BuildChannels_AuxKeyedInlineOnly_FirstWinsAndUnnamedOmitted()
     {
-        // Aux @8 is the reference id; duplicates keep the first row and inline-only unnamed rows are omitted.
         byte[] resource = BuildProviderResource(channels:
         [
             new ChannelSpec(Id: 1, ReferenceId: 16, MessageId: uint.MaxValue, Name: "Operational"),
@@ -74,7 +73,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_FileTimeFlatTemplate_IsNotStructAndWritesFileTime()
     {
-        // A multi-field flat template (FILETIME + UInt32) has numNames == numDesc, so it must NOT be treated as a struct.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 200, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -97,7 +95,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_FixedCountArray_EmitsLiteralCount()
     {
-        // flags@0 bit 0x8 makes count@12 a literal count emitted as count="<n>".
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -113,7 +110,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_FixedNumericLengthAnsiString_EmitsLength()
     {
-        // win:AnsiString (0x02) is length-bearing: a fixed length@14=4 emits length="4".
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -126,9 +122,22 @@ public sealed class OfflineWevtProviderReaderTests
     }
 
     [Fact]
+    public void MapToRawContent_FixedNumericLengthBinaryNonHexBinary_EmitsLength()
+    {
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
+            template: new TemplateSpec(
+                Items: [new TemplateItemSpec(InType: 0x0e, OutType: 0x18, Count: 0, Name: "Address", Flags: 0x2, Length: 16)],
+                NameCount: 1));
+
+        string template = Assert.Single(MapResource(resource).Events).Template;
+
+        Assert.Contains("inType=\"win:Binary\" outType=\"win:IPv6\" length=\"16\"", template);
+    }
+
+    [Fact]
     public void MapToRawContent_FixedNumericLengthBinary_EmitsLength()
     {
-        // flags@0 bit 0x2 without bit 0x4 makes Binary length@14 a literal byte count.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -142,24 +151,8 @@ public sealed class OfflineWevtProviderReaderTests
     }
 
     [Fact]
-    public void MapToRawContent_FixedNumericLengthBinaryNonHexBinary_EmitsLength()
-    {
-        // Fixed Binary length is valid for non-hexBinary outTypes such as IPv6 and must render like native.
-        byte[] resource = BuildProviderResource(
-            events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
-            template: new TemplateSpec(
-                Items: [new TemplateItemSpec(InType: 0x0e, OutType: 0x18, Count: 0, Name: "Address", Flags: 0x2, Length: 16)],
-                NameCount: 1));
-
-        string template = Assert.Single(MapResource(resource).Events).Template;
-
-        Assert.Contains("inType=\"win:Binary\" outType=\"win:IPv6\" length=\"16\"", template);
-    }
-
-    [Fact]
     public void MapToRawContent_FixedNumericLengthNonBinary_FailsClosedToEmptyTemplate()
     {
-        // Fixed numeric lengths are valid only for string and binary inTypes; other inTypes fail closed.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -174,7 +167,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_FixedNumericLengthUnicodeString_EmitsLength()
     {
-        // win:UnicodeString (0x01) is length-bearing: a fixed length@14=32 emits length="32".
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -189,7 +181,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_LengthFieldReference_EmitsReferencedFieldName()
     {
-        // flags@0 bit 0x4 makes length@14 a field index, not a numeric length.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -209,7 +200,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_LengthReferenceOutOfRange_FailsClosedToEmptyTemplate()
     {
-        // Unresolvable length references fail the whole template closed rather than emitting a guessed length.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -224,7 +214,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_NestedStructMember_FailsClosedToEmptyTemplate()
     {
-        // Nested structs are absent from the corpus, so memberCount@6 > 0 fails the whole template closed.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 7, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: 0, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -245,7 +234,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_OpcodeValue_PassesHighWordThroughForFactoryProjection()
     {
-        // OPCO values are already high-word shifted, so the reader preserves the raw native value for factory projection.
         byte[] resource = BuildProviderResource(opcodes:
         [
             new IdentifiedSpec(Id: 0, MessageId: uint.MaxValue, Name: "Op0"),
@@ -276,7 +264,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_RenderingCriticalOutTypeBytes_EmitExactLiveCasing()
     {
-        // outType spelling is casing-sensitive against the live API: win:Hresult and win:NTStatus are pinned here.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -298,7 +285,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_StructTemplate_EmitsNestedDataInsideStruct()
     {
-        // memberCount@6 claims appended descriptors by range; no count flag means the struct carries no count.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 5, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: 0, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -357,7 +343,6 @@ public sealed class OfflineWevtProviderReaderTests
                 Items: [new TemplateItemSpec(InType: 0x08, OutType: 0x08, Count: 0, Name: "Field")],
                 NameCount: 1));
 
-        // Unreadable item names make the whole template fail closed rather than emit partial XML.
         WriteUInt32(resource, TemplateOffset + 20 + 16, BufferSize + 0x100);
 
         RawProviderContent content = MapResource(resource);
@@ -387,7 +372,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_TemplateWithUnclaimedAppendedDescriptor_FailsClosedToEmptyTemplate()
     {
-        // Unclaimed appended descriptors fail the exact-partition check and suppress XML output.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -409,7 +393,6 @@ public sealed class OfflineWevtProviderReaderTests
                 Items: [new TemplateItemSpec(InType: 0x08, OutType: 0x08, Count: 0, Name: "Field")],
                 NameCount: 1));
 
-        // Truncated descriptors fail the whole template closed instead of writing from partially-read bytes.
         byte[] truncated = resource[..(TemplateOffset + 20 + 4)];
 
         RawProviderContent content = MapResource(truncated);
@@ -420,7 +403,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_TwoSiblingStructs_EmitEachWithItsOwnMembers()
     {
-        // Sibling structs claim disjoint member ranges from their own start indexes, not a shared cursor.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 6, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: 0, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -454,7 +436,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_UnknownInTypeByte_FailsClosedToEmptyTemplate()
     {
-        // Unknown inType bytes fail closed instead of emitting guessed winmeta tokens.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -469,7 +450,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_UnknownOutTypeByte_FailsClosedToEmptyTemplate()
     {
-        // Unknown non-zero outType bytes fail closed instead of emitting guessed winmeta tokens.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -484,7 +464,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_VariableCountArray_EmitsReferencedFieldName()
     {
-        // flags@0 bit 0x10 makes count@12 a field index, not a numeric count.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -504,7 +483,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_VariableCountReferenceOutOfRange_FailsClosedToEmptyTemplate()
     {
-        // Unresolvable count references fail the whole template closed rather than emitting a guessed count.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -519,7 +497,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_VariableCountReferenceToStruct_FailsClosedToEmptyTemplate()
     {
-        // Variable counts must reference leaf numeric fields, never structs.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 8, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: 0, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -541,7 +518,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void MapToRawContent_ZeroOutTypeByte_EmitsInTypeDefaultOutType()
     {
-        // Zero outType uses the inType default because the live API always emits an outType.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -568,25 +544,8 @@ public sealed class OfflineWevtProviderReaderTests
         Assert.Equal(expected, OfflineWevtProviderReader.ResolveParameterReferences(raw, FakeParameterText));
 
     [Fact]
-    public void TryParse_MapLessProvider_ReturnsNullWhileFullParseReturnsEventsAndTables()
-    {
-        byte[] resource = BuildProviderResource(
-            events: [new EventSpec(Id: 1, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue)],
-            opcodes: [new IdentifiedSpec(Id: 1, MessageId: uint.MaxValue, Name: "OpcodeName")]);
-
-        Assert.Null(WevtTemplateReader.TryParse(resource, s_publisherGuid, logger: null));
-
-        // Full parse must still yield events and tables when the legacy map API returns null for map-less providers.
-        WevtProviderData data = ParseResource(resource);
-        Assert.Single(data.Events);
-        Assert.Single(data.Opcodes);
-        Assert.Empty(data.Templates.Maps);
-    }
-
-    [Fact]
     public void TryParseProvider_ClassicAndModernShareSixteenBitId_ProduceDistinctIds()
     {
-        // Two rows share the 16-bit code 4: one classic (projected to the qualified id) and one modern (kept bare).
         byte[] resource = BuildProviderResource(
             events:
             [
@@ -602,23 +561,8 @@ public sealed class OfflineWevtProviderReaderTests
     }
 
     [Fact]
-    public void TryParseProvider_ClassicEvent_ProjectsToQualifiedIdWithZeroedVersionAndOpcode()
-    {
-        byte[] resource = BuildProviderResource(
-            events: [new EventSpec(Id: 4, Version: 90, Channel: 0, Level: 0, Opcode: 0x42, Task: 0, Keywords: 0, MessageId: 0x425A0004)]);
-
-        WevtProviderEvent parsed = Assert.Single(ParseResource(resource).Events);
-
-        Assert.Equal(0x425A0004u, parsed.Id);
-        Assert.Equal((byte)0, parsed.Version);
-        Assert.Equal((byte)0, parsed.Opcode);
-        Assert.Equal(0x425A0004u, parsed.MessageId);
-    }
-
-    [Fact]
     public void TryParseProvider_ClassicEventHighOpcodeByte_ComposesQualifiedIdWithoutSignExtension()
     {
-        // An opcode byte >= 0x80 must shift in the uint domain; an int-domain shift would sign-extend into the high dword.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 1, Version: 6, Channel: 0, Level: 0, Opcode: 0xC0, Task: 0, Keywords: 0, MessageId: 0xC0060001)]);
 
@@ -630,7 +574,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void TryParseProvider_ClassicEventWithValueMap_KeysFieldMapByQualifiedId()
     {
-        // Classic event value maps are theoretical, but map keys must still use the projected event identity.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 4, Version: 90, Channel: 0, Level: 0, Opcode: 0x42, Task: 0, Keywords: 0, MessageId: 0x425A0004, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -642,6 +585,20 @@ public sealed class OfflineWevtProviderReaderTests
 
         Assert.True(data.Templates.EventFieldMaps.ContainsKey(new WevtEventKey(0x425A0004, 0)));
         Assert.False(data.Templates.EventFieldMaps.ContainsKey(new WevtEventKey(4, 90)));
+    }
+
+    [Fact]
+    public void TryParseProvider_ClassicEvent_ProjectsToQualifiedIdWithZeroedVersionAndOpcode()
+    {
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 4, Version: 90, Channel: 0, Level: 0, Opcode: 0x42, Task: 0, Keywords: 0, MessageId: 0x425A0004)]);
+
+        WevtProviderEvent parsed = Assert.Single(ParseResource(resource).Events);
+
+        Assert.Equal(0x425A0004u, parsed.Id);
+        Assert.Equal((byte)0, parsed.Version);
+        Assert.Equal((byte)0, parsed.Opcode);
+        Assert.Equal(0x425A0004u, parsed.MessageId);
     }
 
     [Fact]
@@ -684,7 +641,6 @@ public sealed class OfflineWevtProviderReaderTests
             opcodes: [new IdentifiedSpec(Id: 1, MessageId: uint.MaxValue, Name: "OpcodeName")],
             keywords: [new KeywordSpec(Mask: 0x1, MessageId: uint.MaxValue, Name: "KeywordName")]);
 
-        // A count above the table cap is malformed; the keyword table fails closed to empty while the other tables parse.
         WriteUInt32(resource, KeywordTableOffset + 8, uint.MaxValue);
 
         WevtProviderData data = ParseResource(resource);
@@ -696,7 +652,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void TryParseProvider_MessageIdCustomerBitSet_LeavesEventUnprojected()
     {
-        // A modern manifest message id sets the customer bit (0x20000000); such an event is not a classic row.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 4, Version: 90, Channel: 0, Level: 0, Opcode: 0x42, Task: 0, Keywords: 0, MessageId: 0x625A0004)]);
 
@@ -710,7 +665,6 @@ public sealed class OfflineWevtProviderReaderTests
     [Fact]
     public void TryParseProvider_OpcodeTableReferenceNonZero_LeavesEventUnprojected()
     {
-        // A non-zero opcode-table reference marks a modern event even when trailing fields look classic.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 4, Version: 90, Channel: 0, Level: 0, Opcode: 0x42, Task: 0, Keywords: 0, MessageId: 0x425A0004, OpcodeTableReference: 0x40)]);
 
@@ -735,9 +689,23 @@ public sealed class OfflineWevtProviderReaderTests
     }
 
     [Fact]
+    public void TryParse_MapLessProvider_ReturnsNullWhileFullParseReturnsEventsAndTables()
+    {
+        byte[] resource = BuildProviderResource(
+            events: [new EventSpec(Id: 1, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue)],
+            opcodes: [new IdentifiedSpec(Id: 1, MessageId: uint.MaxValue, Name: "OpcodeName")]);
+
+        Assert.Null(WevtTemplateReader.TryParse(resource, s_publisherGuid, logger: null));
+
+        WevtProviderData data = ParseResource(resource);
+        Assert.Single(data.Events);
+        Assert.Single(data.Opcodes);
+        Assert.Empty(data.Templates.Maps);
+    }
+
+    [Fact]
     public void Write_XmlEscapedFieldName_StillMatchesMapInjection()
     {
-        // Map injection must escape raw field keys identically to the written template.
         byte[] resource = BuildProviderResource(
             events: [new EventSpec(Id: 10, Version: 0, Channel: 0, Level: 0, Opcode: 0, Task: 0, Keywords: 0, MessageId: uint.MaxValue, ReferencesTemplate: true)],
             template: new TemplateSpec(
@@ -893,7 +861,6 @@ public sealed class OfflineWevtProviderReaderTests
 
                 if (item.MemberCount > 0)
                 {
-                    // A struct descriptor carries no inType: @4 is the member-start index (u16) and @6 the member count.
                     WriteUInt16(buffer, itemOffset + 4, item.MemberStart);
                     WriteUInt16(buffer, itemOffset + 6, item.MemberCount);
                 }
