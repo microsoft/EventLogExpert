@@ -7,8 +7,8 @@ using EventLogExpert.Provider.Schema;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
-using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Database;
+using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -156,7 +156,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     [Fact]
     public void OsStamp_AboveDisplayCap_RendersOverflowCount()
     {
-        // Overflow uses "9+" because the classifier only reads cap + 1 distinct stamps.
         var entry = MakeEntry(DatabaseStatus.Ready) with { OsStamps = MakeDistinctStamps(10) };
 
         var component = RenderRow(entry);
@@ -436,7 +435,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     [Fact]
     public void Render_ManageUpgrade_TransitionalWindow_RoleStatusPresent()
     {
-        // Covers the manage-upgrade window before first per-file progress arrives.
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
 
         var component = RenderRow(entry, isUpgrading: true);
@@ -449,7 +447,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     [Fact]
     public void Render_NonReadyEnabledEntry_NoTrashButton()
     {
-        // Non-ready enabled entries are not resolver-loaded, so removal remains safe.
         var entry = MakeEntry(DatabaseStatus.UpgradeFailed, isEnabled: true);
 
         var component = RenderRow(entry);
@@ -504,7 +501,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     [Fact]
     public void Render_PendingToggleOnDisabledToggle_DoesNotShowIndicator()
     {
-        // Disabled toggles must suppress pending announcements because the user cannot act on them.
         var entry = MakeEntry(DatabaseStatus.NotClassified, "provider-z.db");
 
         var component = RenderRow(entry, isTogglePending: true);
@@ -568,7 +564,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     [InlineData(DatabaseStatus.ObsoleteSchema, "Obsolete")]
     public void Render_TerminalStatus_ShowsBadge_NoTrash(DatabaseStatus status, string expectedLabel)
     {
-        // ClassificationFailed is excluded because it renders the retry classification button.
         var entry = MakeEntry(status);
 
         var component = RenderRow(entry);
@@ -776,7 +771,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     [Fact]
     public async Task RestoreButtonClick_WhenUpgradeProgressMatchesRow_DoesNotInvokeOnRestoreFromBackup()
     {
-        // Backup restore clicks must honor per-row background upgrade progress even without a spinner.
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired, backupExists: true);
         int invocationCount = 0;
         var progress = new BannerProgressEntry(

@@ -7,6 +7,20 @@
 
   <ItemGroup>
     <PackageReference Include="bunit" />
+    <!-- The UI no longer references Fluxor. The Fluxor-boundary architecture test still names FluxorComponent / IState /
+         IStateSelection / IActionSubscriber to assert their ABSENCE from the converted surfaces, so it needs Fluxor here. -->
+    <PackageReference Include="Fluxor.Blazor.Web" />
+  </ItemGroup>
+
+  <!-- The independent array-of-structs display-view oracles (AosReferenceView / AosReferenceCombinedView) live in
+       EventLogExpert.Runtime.Tests. This project does not reference that test assembly, so link the sources here to
+       compile a private internal copy against the production internals it already sees via InternalsVisibleTo. The
+       oracles derive their display order from AosReferenceOrdering (a test-only reference sort, NOT the production
+       kernel), so that helper is linked alongside the two views. -->
+  <ItemGroup>
+    <Compile Include="..\EventLogExpert.Runtime.Tests\LogTable\TestSupport\AosReferenceView.cs" Link="TestSupport\AosReferenceView.cs" />
+    <Compile Include="..\EventLogExpert.Runtime.Tests\LogTable\TestSupport\AosReferenceCombinedView.cs" Link="TestSupport\AosReferenceCombinedView.cs" />
+    <Compile Include="..\EventLogExpert.Runtime.Tests\LogTable\TestSupport\AosReferenceOrdering.cs" Link="TestSupport\AosReferenceOrdering.cs" />
   </ItemGroup>
 
   <ItemGroup>

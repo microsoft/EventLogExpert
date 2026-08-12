@@ -11,7 +11,6 @@ using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.LogTable;
 
-// In-view incremental Find (Ctrl+F): read-only over the current view; it never dispatches filter/lens/sort/selection actions.
 public sealed partial class LogTablePane
 {
     private const int FindChunkSize = 4096;
@@ -27,8 +26,8 @@ public sealed partial class LogTablePane
     private CancellationTokenSource? _findDebounceCts;
     private int _findFocusSignal;
     private (EventLogId? TableId, ColumnName? GroupBy) _findGroupContext;
-    private List<EventLocator> _findMatches = [];
     private HashSet<EventLocator> _findMatchSet = [];
+    private List<EventLocator> _findMatches = [];
     private bool _findOpen;
     private string _findQuery = string.Empty;
     private IDisposable? _findRegistration;
@@ -50,7 +49,6 @@ public sealed partial class LogTablePane
 
     private int FindMatchCount => _findMatches.Count;
 
-    // Renders Blazor-escaped segments (never MarkupString) so event text can't inject markup; capped at MaxMarksPerCell so a pathological cell can't explode the DOM.
     private IReadOnlyList<FindSegment> BuildFindSegments(string? text)
     {
         string value = text ?? string.Empty;
@@ -82,7 +80,6 @@ public sealed partial class LogTablePane
 
     private void CancelFindScans()
     {
-        // Bump the epoch so a scan already past its cancellation check is rejected at publish time.
         _findScanEpoch++;
         _findScanCts?.Cancel();
         _findScanCts?.Dispose();
@@ -111,7 +108,6 @@ public sealed partial class LogTablePane
         _findDebounceCts?.Dispose();
         _findDebounceCts = null;
 
-        // Re-collapse only the groups Find expanded, keeping the current match's group open so the cursor lands on the event.
         RecollapseFindGroups();
 
         if (TryGetCurrentMatchLocator(out EventLocator locator))
@@ -129,7 +125,7 @@ public sealed partial class LogTablePane
     }
 
     private (EventLogId? TableId, ColumnName? GroupBy) CurrentFindGroupContext() =>
-        (_currentTable?.Id, _logTableState.GroupBy);
+        (Presentation.ActiveTabId, Presentation.Ordering.GroupBy);
 
     private async Task DebounceThenScanAsync(CancellationTokenSource cts)
     {
@@ -160,7 +156,6 @@ public sealed partial class LogTablePane
 
     private int FindAnchorIndex()
     {
-        // Anchor in event-display-index space (Rank / group StartIndex), not visible-row space, so the first jump targets the right match under headers / collapsed groups.
         if (_cursor is { Kind: TableRowKind.Event, Handle: { } handle })
         {
             int rank = _activeDisplayedEvents.Rank(handle);
@@ -196,7 +191,6 @@ public sealed partial class LogTablePane
         return 0;
     }
 
-    // Enter/F3 must act on the just-typed query, not a debounce-stale result set: flush the pending debounce and scan now.
     private void FlushPendingFindScan()
     {
         if (_findDebounceCts is null) { return; }
@@ -220,7 +214,6 @@ public sealed partial class LogTablePane
     private bool IsCurrentFindMatch(DisplayRow row) =>
         _findOpen && _findCurrentLocator is { } locator && locator.Equals(row.Loc);
 
-    // Called when the searchable text or event set changed; collapse/regroup deliberately do NOT call this (they keep the same view reference and Find keeps its group-expansion ownership).
     private void NotifyFindViewChanged()
     {
         if (!_findOpen) { return; }
@@ -257,6 +250,15 @@ public sealed partial class LogTablePane
         RequestFindRender();
     }
 
+    private Task OnGroupCollapseRequestedAsync()
+    {
+        if (_disposed) { return Task.CompletedTask; }
+
+        _findExpandedGroupKeys.Clear();
+
+        return Task.CompletedTask;
+    }
+
     private void OpenFind()
     {
         bool wasOpen = _findOpen;
@@ -276,10 +278,9 @@ public sealed partial class LogTablePane
         }
     }
 
-    // Hand the current match timestamps (owner-tagged, ascending) to the timeline; collected free during the scan, the histogram re-bins them against its current window.
     private void PublishFindMarks(List<long> matchTicks)
     {
-        if (_currentTable is not { } table)
+        if (Presentation.ActiveTabId is not { } tableId)
         {
             FindMarkerSource.Clear();
 
@@ -289,7 +290,7 @@ public sealed partial class LogTablePane
         long[] sorted = [.. matchTicks];
         Array.Sort(sorted);
 
-        FindMarkerSource.Publish(table.Id, sorted);
+        FindMarkerSource.Publish(tableId, sorted);
     }
 
     private void PublishFindMatches(List<EventLocator> matches, List<long> matchTicks)
@@ -356,8 +357,6 @@ public sealed partial class LogTablePane
 
     private void RegisterFind() => _findRegistration = FindCoordinator.SetActivePane(OpenFind);
 
-    private void RelinquishFindGroupOwnership() => _ = InvokeAsync(() => _findExpandedGroupKeys.Clear());
-
     private void RequestFindRender()
     {
         _findRenderRequested = true;
@@ -375,7 +374,6 @@ public sealed partial class LogTablePane
             return;
         }
 
-        // Preserve the current match across a rescan: the locator survives a same-generation rescan and the ValueKey survives a reload; else fall back to the first match at/after the cursor.
         if (priorLocator is { } locator && _findMatchSet.Contains(locator))
         {
             SetCurrentMatchIndex(_findMatches.IndexOf(locator));
@@ -451,7 +449,6 @@ public sealed partial class LogTablePane
         {
             await InvokeAsync(() =>
             {
-                // Publish only if this scan is still the current one: same epoch, same view instance, same query terms.
                 if (epoch != _findScanEpoch ||
                     !ReferenceEquals(view, _activeDisplayedEvents) ||
                     !string.Equals(query, _findQuery, StringComparison.Ordinal) ||
@@ -489,7 +486,6 @@ public sealed partial class LogTablePane
             return;
         }
 
-        // Mark scanning immediately so stepping is blocked during the debounce window (otherwise Enter would navigate the pre-edit result set).
         _findScanning = true;
         _findWrapAnnouncement = string.Empty;
 

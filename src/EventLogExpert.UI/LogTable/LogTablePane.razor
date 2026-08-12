@@ -1,6 +1,6 @@
 @using EventLogExpert.UI.LogTable.Find
 @using EventLogExpert.UI.LogTable.Grouping
-@inherits FluxorComponent
+@inherits PresentationViewComponentBase
 
 <LogTabBar />
 
@@ -19,7 +19,7 @@
                  }
              }
              else { @context.Text }
-        </text>;
+    </text>;
 
     RenderFragment RenderEventRow(DisplayRow row) =>
         @<tr aria-current="@(IsCurrentFindMatch(row) ? "true" : null)"
@@ -85,7 +85,18 @@
             WrapAnnouncement="@_findWrapAnnouncement" />
     }
     <div aria-labelledby="eventTable" class="table-container" @onkeydown="HandleKeyDown" role="region" tabindex="0">
+        @if (_indicator.Spinner)
+        {
+            <div aria-hidden="true" class="table-indicator">
+                <span class="table-indicator-spinner"></span>
+                @if (IndicatorSentence() is { } sentence)
+                {
+                    <span class="table-indicator-text">@sentence</span>
+                }
+            </div>
+        }
         <table aria-label="Event Log Table"
+            aria-busy="@(IsGridBusy() ? "true" : null)"
             aria-multiselectable="true"
             aria-rowcount="@GetAriaRowCount()"
             id="eventTable"
@@ -99,7 +110,7 @@
                     var width = GetColumnWidth(columnHeader);
 
                     <th aria-colindex="@(columnIndex + 1)"
-                        aria-sort="@(_logTableState.OrderBy == columnHeader ? _logTableState.IsDescending ? "descending" : "ascending" : "none")"
+                        aria-sort="@(Presentation.Ordering.OrderBy == columnHeader ? Presentation.Ordering.IsDescending ? "descending" : "ascending" : "none")"
                         class="@columnHeader.ToString().ToLowerInvariant()"
                         data-column="@columnHeader"
                         @key="columnHeader"
@@ -113,14 +124,14 @@
                         {
                             @_headerName
                         }
-                        @if (_logTableState.OrderBy == columnHeader)
+                        @if (Presentation.Ordering.OrderBy == columnHeader)
                         {
-                            <ChromelessButton aria-label="Toggle sort direction"
-                                CssClass="menu-toggle"
-                                data-rotate="@_logTableState.IsDescending.ToString().ToLower()"
+                            <ChromelessButton CssClass="menu-toggle"
                                 IconClass="bi bi-caret-up"
                                 OnClick="ToggleSorting"
-                                StopKeyDownPropagation="true" />
+                                StopKeyDownPropagation="true"
+                                aria-label="Toggle sort direction"
+                                data-rotate="@Presentation.Ordering.IsDescending.ToString().ToLower()" />
                         }
                     </th>
                 }
@@ -133,12 +144,10 @@
             </tr>
             </thead>
             <tbody @oncontextmenu="InvokeContextMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
-            @if (_currentTable is not null)
+            @if (Presentation.ActiveTabId is not null)
             {
                 @if (_rowView is null)
                 {
-                    @* Ungrouped: ItemsProvider fetches one Slice per viewport window, avoiding the Items= binding's
-                   per-row this[i] re-seek over the K-way merge. *@
                     <Virtualize Context="row" ItemSize="@EventRowHeightPixels" ItemsProvider="LoadEventViewport" @ref="_eventVirtualize">
                         @RenderEventRow(row)
                     </Virtualize>
@@ -147,7 +156,7 @@
                 {
                     var view = _rowView;
 
-                    <Virtualize Context="row" Items="view" ItemSize="@EventRowHeightPixels">
+                    <Virtualize Context="row" ItemSize="@EventRowHeightPixels" Items="view">
                         @if (row.Kind == TableRowKind.Header)
                         {
                             var group = view.GroupAt(row);

@@ -4,7 +4,6 @@
 using AngleSharp.Dom;
 using Bunit;
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
@@ -15,14 +14,13 @@ using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.Menu;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.UI.FilterPane;
+using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
@@ -30,25 +28,32 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
 using System.Reflection;
-using Reducers = EventLogExpert.Runtime.EventLog.Reducers;
 
 namespace EventLogExpert.UI.Tests.FilterPane;
 
 public sealed class FilterPaneTests : BunitContext
 {
+    private readonly IActiveFiltersSource _activeFilters = Substitute.For<IActiveFiltersSource>();
     private readonly IAnnouncementService _announcements = Substitute.For<IAnnouncementService>();
+    private readonly IClearAllFiltersNotifier _clearAllFiltersNotifier = Substitute.For<IClearAllFiltersNotifier>();
     private readonly IEventLogQueries _eventLogQueries = Substitute.For<IEventLogQueries>();
     private readonly IState<EventLogState> _eventLogStateMock = Substitute.For<IState<EventLogState>>();
     private readonly IFilterLibraryCommands _filterLibraryCommands = Substitute.For<IFilterLibraryCommands>();
     private readonly IFilterPaneCommands _filterPaneCommands = Substitute.For<IFilterPaneCommands>();
+    private readonly IFilteredDateRangeSource _filteredDateRange = Substitute.For<IFilteredDateRangeSource>();
+    private readonly ILibraryEntriesSource _libraryEntries = Substitute.For<ILibraryEntriesSource>();
+    private readonly ILibraryLoadStatusSource _libraryLoadStatus = Substitute.For<ILibraryLoadStatusSource>();
     private readonly IState<FilterLibraryState> _libraryStateMock = Substitute.For<IState<FilterLibraryState>>();
     private readonly IStateSelection<EventLogState, ImmutableHashSet<string>> _loadedLogNames =
         Substitute.For<IStateSelection<EventLogState, ImmutableHashSet<string>>>();
+    private readonly ILoadedLogNamesSource _loadedLogNamesSource = Substitute.For<ILoadedLogNamesSource>();
     private readonly IStateSelection<EventLogState, int> _openLogCount =
         Substitute.For<IStateSelection<EventLogState, int>>();
+    private readonly IOpenLogsPresenceSource _openLogsPresence = Substitute.For<IOpenLogsPresenceSource>();
     private readonly IState<FilterPaneState> _paneStateMock = Substitute.For<IState<FilterPaneState>>();
     private readonly IScenarioApplyService _scenarioApply = Substitute.For<IScenarioApplyService>();
     private readonly IScenarioQueryService _scenarioQuery = Substitute.For<IScenarioQueryService>();
+    private readonly ISetFilterDateRangeSucceededNotifier _setFilterDateRangeSucceededNotifier = Substitute.For<ISetFilterDateRangeSucceededNotifier>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
 
     public FilterPaneTests()
@@ -60,6 +65,9 @@ public sealed class FilterPaneTests : BunitContext
         Services.AddSingleton(_filterLibraryCommands);
         Services.AddSingleton(_filterPaneCommands);
         Services.AddSingleton(_libraryStateMock);
+
+        _libraryEntries.Current.Returns(_ => _libraryStateMock.Value?.Entries ?? ImmutableList<LibraryEntry>.Empty);
+        Services.AddSingleton(_libraryEntries);
         Services.AddSingleton(_settings);
         Services.AddSingleton(Substitute.For<IAlertDialogService>());
         Services.AddSingleton(Substitute.For<IModalCoordinator>());
@@ -75,10 +83,6 @@ public sealed class FilterPaneTests : BunitContext
         paneState.Value.Returns(new FilterPaneState());
         Services.AddSingleton(paneState);
 
-        var progressState = Substitute.For<IState<FilterProgressState>>();
-        progressState.Value.Returns(new FilterProgressState());
-        Services.AddSingleton(progressState);
-
         _eventLogStateMock.Value.Returns(new EventLogState());
         Services.AddSingleton(_eventLogStateMock);
         Services.AddSingleton(_eventLogQueries);
@@ -89,6 +93,25 @@ public sealed class FilterPaneTests : BunitContext
         Services.AddSingleton(_openLogCount);
 
         _settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
+
+        _libraryLoadStatus.Current.Returns(_ => new LibraryLoadStatus(
+            _libraryStateMock.Value?.IsLoaded ?? false, _libraryStateMock.Value?.LoadError ?? false));
+        Services.AddSingleton(_libraryLoadStatus);
+
+        _activeFilters.Current.Returns(_ => _paneStateMock.Value?.Filters ?? ImmutableList<SavedFilter>.Empty);
+        Services.AddSingleton(_activeFilters);
+
+        _filteredDateRange.Current.Returns(_ => _paneStateMock.Value?.FilteredDateRange);
+        Services.AddSingleton(_filteredDateRange);
+
+        _openLogsPresence.HasOpenLogs.Returns(_ => _openLogCount.Value > 0);
+        Services.AddSingleton(_openLogsPresence);
+
+        _loadedLogNamesSource.Current.Returns(_ => _loadedLogNames.Value ?? ImmutableHashSet<string>.Empty);
+        Services.AddSingleton(_loadedLogNamesSource);
+
+        Services.AddSingleton(_clearAllFiltersNotifier);
+        Services.AddSingleton(_setFilterDateRangeSucceededNotifier);
 
         Services.AddFluxor(options => options.ScanAssemblies(typeof(UI.FilterPane.FilterPane).Assembly));
 
@@ -304,6 +327,19 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public async Task ClearAllFiltersNotifier_ResetsLocalEditorStateAndRepaints()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+        var before = component.RenderCount;
+
+        await component.InvokeAsync(() => _clearAllFiltersNotifier.Requested += Raise.Event<Action>());
+
+        Assert.False(GetCanEditDate(component));
+        Assert.True(component.RenderCount > before);
+    }
+
+    [Fact]
     public async Task CopyScenario_ExportsOnlyEnabledRows()
     {
         Services.AddSingleton(new ScenarioAuthoringOptions(true));
@@ -328,6 +364,22 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public async Task DirectHandlersAreInertAfterDisposal()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+        SetDateModel(component, new DateFilter { After = new DateTime(2020, 6, 1, 12, 0, 0, DateTimeKind.Unspecified) });
+        var appliedBeforeDispose = GetDateModel(component).After;
+
+        await ((IAsyncDisposable)component.Instance).DisposeAsync();
+
+        typeof(UI.FilterPane.FilterPane)
+            .GetMethod("UpdateFilterDateTimeZone", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(component.Instance, [null, TimeZoneInfo.CreateCustomTimeZone("probe", TimeSpan.FromHours(5), "probe", "probe")]);
+
+        Assert.Equal(appliedBeforeDispose, GetDateModel(component).After);
+    }
+
+    [Fact]
     public void EditButton_OnActiveFilterRow_EntersEditMode()
     {
         Services.AddSingleton(new ScenarioAuthoringOptions(true));
@@ -336,7 +388,6 @@ public sealed class FilterPaneTests : BunitContext
 
         var component = Render<UI.FilterPane.FilterPane>();
 
-        // The per-row scenario-copy button must be present for this regression (it sits alongside Edit in the row).
         Assert.Contains(
             component.FindAll("button"),
             b => b.GetAttribute("aria-label")?.Contains("scenario JSON") == true);
@@ -347,7 +398,6 @@ public sealed class FilterPaneTests : BunitContext
 
         editButton!.Click();
 
-        // Entering edit mode replaces the saved-row actions (including the Edit button) with the edit panel.
         Assert.DoesNotContain(
             component.FindAll("button"),
             b => b.GetAttribute("aria-label")?.StartsWith("Edit ", StringComparison.Ordinal) == true);
@@ -735,15 +785,13 @@ public sealed class FilterPaneTests : BunitContext
 
         var pane = new UI.FilterPane.FilterPane();
         typeof(UI.FilterPane.FilterPane)
-            .GetProperty("FilterPaneState", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .SetValue(pane, _paneStateMock);
+            .GetProperty("ActiveFilters", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(pane, _activeFilters);
 
         var rowRefs = (Dictionary<FilterId, FilterRow?>)typeof(UI.FilterPane.FilterPane)
             .GetField("_rowRefs", BindingFlags.NonPublic | BindingFlags.Instance)!
             .GetValue(pane)!;
 
-        // Live filter id, but its @ref was cleared to null: only the value-null check can prune it
-        // (the id is still live, and a non-empty filter list skips the clear-all fast path).
         rowRefs[filter.Id] = null;
 
         typeof(UI.FilterPane.FilterPane)
@@ -754,21 +802,16 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
-    public async Task RenderIsolation_WhenFileLoadAddsName_ReRendersAndUpdatesScenarioGroups()
+    public async Task RenderIsolation_WhenLoadedLogNamesSourceChanges_ReRendersAndUpdatesScenarioGroups()
     {
-        var initial = Reducers.ReduceOpenLog(
-            new EventLogState(), new OpenLogAction(@"C:\F.evtx", LogPathType.File));
-        var fLog = new EventLogData(@"C:\F.evtx", LogPathType.File) { Id = initial.OpenLogs[@"C:\F.evtx"].Id };
-        initial = Reducers.ReduceLoadEvents(
-            initial, new LoadEventsAction(fLog, [EventWithName("Security")]));
-
+        SetOpenLogCount(1);
+        SetLoadedLogNames("Security");
         SetLibraryState(new FilterLibraryState { IsLoaded = true, Entries = ImmutableList<LibraryEntry>.Empty });
 
         IReadOnlyCollection<string>? capturedNames = null;
         _scenarioQuery.GetInAppScenarios(Arg.Do<IReadOnlyCollection<string>>(names => capturedNames = names))
             .Returns([Scenario("sec", ScenarioGroup.Security)]);
 
-        var feature = WireRealSelections(initial);
         var component = Render<UI.FilterPane.FilterPane>();
         await FindApplyScenarioButton(component)!.ClickAsync(new MouseEventArgs());
 
@@ -776,58 +819,68 @@ public sealed class FilterPaneTests : BunitContext
         Assert.Contains("Security", capturedNames!);
         var renderCountBefore = component.RenderCount;
 
-        var next = Reducers.ReduceLoadEventsPartial(
-            initial, new LoadEventsPartialAction(fLog, [EventWithName("Application")]));
-
-        await component.InvokeAsync(() => feature.Publish(next));
+        SetLoadedLogNames("Security", "Application");
+        await component.InvokeAsync(() => _loadedLogNamesSource.Changed += Raise.Event<Action>());
 
         Assert.True(component.RenderCount > renderCountBefore);
         Assert.Contains("Application", capturedNames!);
     }
 
     [Fact]
-    public async Task RenderIsolation_WhenNamesByLogChangesButLoadedNamesUnionUnchanged_DoesNotReRender()
+    public async Task RenderIsolation_WhenOpenLogPresenceSourceChanges_ReRenders()
     {
-        var initial = Reducers.ReduceOpenLog(
-            new EventLogState(), new OpenLogAction(@"C:\F.evtx", LogPathType.File));
-        initial = Reducers.ReduceOpenLog(
-            initial, new OpenLogAction(@"C:\G.evtx", LogPathType.File));
-        var fLog = new EventLogData(@"C:\F.evtx", LogPathType.File) { Id = initial.OpenLogs[@"C:\F.evtx"].Id };
-        var gLog = new EventLogData(@"C:\G.evtx", LogPathType.File) { Id = initial.OpenLogs[@"C:\G.evtx"].Id };
-        initial = Reducers.ReduceLoadEvents(
-            initial, new LoadEventsAction(fLog, [EventWithName("A"), EventWithName("B")]));
-        initial = Reducers.ReduceLoadEvents(
-            initial, new LoadEventsAction(gLog, [EventWithName("B")]));
-
-        var feature = WireRealSelections(initial);
+        SetOpenLogCount(1);
         var component = Render<UI.FilterPane.FilterPane>();
         var renderCountBefore = component.RenderCount;
 
-        var next = Reducers.ReduceLoadEvents(
-            initial, new LoadEventsAction(fLog, [EventWithName("A")]));
+        SetOpenLogCount(0);
+        await component.InvokeAsync(() => _openLogsPresence.Changed += Raise.Event<Action>());
 
-        Assert.Same(initial.LoadedLogNames, next.LoadedLogNames);
-        await component.InvokeAsync(() => feature.Publish(next));
-
-        Assert.Equal(renderCountBefore, component.RenderCount);
+        Assert.True(component.RenderCount > renderCountBefore);
     }
 
     [Fact]
-    public async Task RenderIsolation_WhenOpenLogCountChanges_ReRenders()
+    public async Task Repaints_WhenActiveFiltersSourceChanges()
     {
-        var initial = Reducers.ReduceOpenLog(
-            new EventLogState(), new OpenLogAction("System", LogPathType.Channel));
-
-        var feature = WireRealSelections(initial);
         var component = Render<UI.FilterPane.FilterPane>();
-        var renderCountBefore = component.RenderCount;
+        var before = component.RenderCount;
 
-        var closed = Reducers.ReduceCloseLog(
-            initial, new CloseLogAction(initial.OpenLogs["System"].Id, "System"));
+        await component.InvokeAsync(() => _activeFilters.Changed += Raise.Event<Action>());
 
-        await component.InvokeAsync(() => feature.Publish(closed));
+        Assert.True(component.RenderCount > before);
+    }
 
-        Assert.True(component.RenderCount > renderCountBefore);
+    [Fact]
+    public async Task Repaints_WhenFilteredDateRangeSourceChanges()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+        var before = component.RenderCount;
+
+        await component.InvokeAsync(() => _filteredDateRange.Changed += Raise.Event<Action>());
+
+        Assert.True(component.RenderCount > before);
+    }
+
+    [Fact]
+    public async Task Repaints_WhenLibraryEntriesSourceChanges()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+        var before = component.RenderCount;
+
+        await component.InvokeAsync(() => _libraryEntries.Changed += Raise.Event<Action>());
+
+        Assert.True(component.RenderCount > before);
+    }
+
+    [Fact]
+    public async Task Repaints_WhenLibraryLoadStatusSourceChanges()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+        var before = component.RenderCount;
+
+        await component.InvokeAsync(() => _libraryLoadStatus.Changed += Raise.Event<Action>());
+
+        Assert.True(component.RenderCount > before);
     }
 
     [Fact]
@@ -967,6 +1020,20 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public async Task SetFilterDateRangeSucceededNotifier_ResyncsTheDateEditorFromTheSource_EvenWhenTheSourceIsSilent()
+    {
+        var applied = new DateFilter { After = DateTimeOffset.UnixEpoch.UtcDateTime, IsEnabled = true };
+        SetPaneState(new FilterPaneState { FilteredDateRange = applied });
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        Assert.Null(GetDateModel(component).After);
+
+        await component.InvokeAsync(() => _setFilterDateRangeSucceededNotifier.Succeeded += Raise.Event<Action>());
+
+        Assert.Equal(applied.After, GetDateModel(component).After);
+    }
+
+    [Fact]
     public void SetQuickDateRange_PopulatesEditFieldsWithoutApplyingFilter()
     {
         var component = Render<UI.FilterPane.FilterPane>();
@@ -1015,6 +1082,16 @@ public sealed class FilterPaneTests : BunitContext
     private static IElement? FindApplyScenarioButton(IRenderedComponent<UI.FilterPane.FilterPane> component) =>
         component.FindAll("button").FirstOrDefault(button => button.TextContent.Contains("Apply Scenario"));
 
+    private static bool GetCanEditDate(IRenderedComponent<UI.FilterPane.FilterPane> component) =>
+        (bool)typeof(UI.FilterPane.FilterPane)
+            .GetField("_canEditDate", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(component.Instance)!;
+
+    private static DateFilter GetDateModel(IRenderedComponent<UI.FilterPane.FilterPane> component) =>
+        (DateFilter)typeof(UI.FilterPane.FilterPane)
+            .GetField("_model", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(component.Instance)!;
+
     private static ScenarioDefinition Scenario(string id, ScenarioGroup group) =>
         new()
         {
@@ -1026,6 +1103,11 @@ public sealed class FilterPaneTests : BunitContext
             Filters = [],
         };
 
+    private static void SetDateModel(IRenderedComponent<UI.FilterPane.FilterPane> component, DateFilter model) =>
+        typeof(UI.FilterPane.FilterPane)
+            .GetField("_model", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(component.Instance, model);
+
     private void SetLibraryState(FilterLibraryState state) => _libraryStateMock.Value.Returns(state);
 
     private void SetLoadedLogNames(params string[] names) =>
@@ -1034,34 +1116,4 @@ public sealed class FilterPaneTests : BunitContext
     private void SetOpenLogCount(int count) => _openLogCount.Value.Returns(count);
 
     private void SetPaneState(FilterPaneState state) => _paneStateMock.Value.Returns(state);
-
-    private TestEventLogFeature WireRealSelections(EventLogState initial)
-    {
-        var feature = new TestEventLogFeature(initial);
-        Services.AddSingleton<IState<EventLogState>>(new State<EventLogState>(feature));
-        Services.AddSingleton<IStateSelection<EventLogState, ImmutableHashSet<string>>>(
-            new StateSelection<EventLogState, ImmutableHashSet<string>>(feature));
-        Services.AddSingleton<IStateSelection<EventLogState, int>>(
-            new StateSelection<EventLogState, int>(feature));
-
-        return feature;
-    }
-
-    private sealed class TestEventLogFeature : Feature<EventLogState>
-    {
-        private readonly EventLogState _initial;
-
-        public TestEventLogFeature(EventLogState initial)
-        {
-            _initial = initial;
-            MaximumStateChangedNotificationsPerSecond = 0;
-            State = initial;
-        }
-
-        public override string GetName() => "EventLog";
-
-        public void Publish(EventLogState state) => State = state;
-
-        protected override EventLogState GetInitialState() => _initial;
-    }
 }

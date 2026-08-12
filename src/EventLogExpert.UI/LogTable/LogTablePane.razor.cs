@@ -14,12 +14,11 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
-using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.LogTable.Grouping;
-using Fluxor;
+using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.Web.Virtualization;
@@ -31,24 +30,21 @@ namespace EventLogExpert.UI.LogTable;
 public sealed partial class LogTablePane
 {
     private const int DefaultPageSize = 20;
-    // Must match the CSS `tr { height: 22px }`; Virtualize defaults ItemSize to 50px, so leaving it unset computes the
-    // scroll model against a 50px spacer and jump-to-selected lands at the wrong position. Set explicitly so the model
-    // matches from the first render.
     private const float EventRowHeightPixels = 22f;
     private const int MenuValueMaxLength = 40;
     private const string NoCellValueReason = "No value in this cell to filter on";
 
-    private static readonly IEventColumnView s_emptyView = Runtime.LogTable.LogTableState.EmptyView;
+    private static readonly IEventColumnView s_emptyView = LogTableState.EmptyView;
     private static readonly HashSet<int> s_warnedUnknownColors = [];
 
-    // Keyed on EventLocator (physical, generation-stamped) so the cache survives a re-sort within a generation; default
-    // value equality (a ReferenceEqualityComparer would box every struct key and never match).
     private readonly Dictionary<EventLocator, string?> _highlightCache = [];
 
     private IEventColumnView _activeDisplayedEvents = s_emptyView;
     private SavedFilter[] _activeHighlightFilters = [];
-    private LogView? _currentTable;
+    private bool _busyAssertedOnLastPaint;
+    private bool _busyHeldForRefresh;
     private TableCursor? _cursor;
+    private bool _disposed;
     private DotNetObjectReference<LogTablePane>? _dotNetRef;
     private ColumnName[] _enabledColumns = null!;
     private Virtualize<DisplayRow>? _eventVirtualize;
@@ -58,13 +54,16 @@ public sealed partial class LogTablePane
     private bool _focusActiveOnNextRender;
     private string _headerName = string.Empty;
     private EventLogId? _highlightCacheTableId;
+    private DisplayedIndicator _indicator = DisplayedIndicator.Nothing;
+    private bool _indicatorRenderRequested;
+    private DisplayIndicatorState _indicatorState = null!;
     private IEventColumnView? _lastIndexedDisplayedEvents;
-    private LogTableState _logTableState = null!;
     private int _pageSize = DefaultPageSize;
     private ColumnName[] _previousEnabledColumns = [];
     private bool _refreshEventViewportOnRender;
-    private bool _repaintViewportOnNextRender;
+    private long _renderedPresentationRevision = -1;
     private bool _rescrollToSelectedOnRender;
+    private IEventColumnView? _rescrolledForView;
     private bool _resortSelectionOnNextRender;
     private GroupedRowView? _rowView;
     private (IEventColumnView View, EventLogId? TableId, ColumnName? GroupBy, bool GroupDescending, bool CollapsedDefault, ImmutableHashSet<string>? Overrides) _rowViewSnapshot;
@@ -73,6 +72,7 @@ public sealed partial class LogTablePane
     private EventLocator? _selectionAnchor;
     private IJSObjectReference? _tableModule;
     private TimeZoneInfo _timeZoneSettings = null!;
+    private bool _viewportRenderRequested;
 
     private EventLocator? ActiveHandle =>
         _cursor is { Kind: TableRowKind.Event, Handle: { } handle } ? handle : null;
@@ -87,23 +87,27 @@ public sealed partial class LogTablePane
 
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
-    [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
+    [Inject] private IActiveFiltersSource FilterSelection { get; init; } = null!;
 
     [Inject] private IFilterService FilterService { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, SelectionEntry?> Focus { get; init; } = null!;
+    [Inject] private IEventFocusSource Focus { get; init; } = null!;
+
+    [Inject] private IGroupCollapseNotifier GroupCollapseNotifier { get; init; } = null!;
 
     [Inject] private IHighlightSelector HighlightSelector { get; init; } = null!;
+
+    [Inject] private DisplayIndicatorGate IndicatorGate { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
     [Inject] private ILogTableCommands LogTableCommands { get; init; } = null!;
 
-    [Inject] private IState<LogTableState> LogTableState { get; init; } = null!;
-
     [Inject] private IMenuService MenuService { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, ImmutableList<SelectionEntry>> Selection { get; init; } = null!;
+    [Inject] private IRevealFocusSource RevealFocusSource { get; init; } = null!;
+
+    [Inject] private IEventSelectionSource Selection { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -128,8 +132,6 @@ public sealed partial class LogTablePane
         }
     }
 
-    // Extracted from the ItemsProvider so the viewport clamp (empty view, start past the end, window overrunning the
-    // tail) is unit-testable without driving the Virtualize component.
     internal static ItemsProviderResult<DisplayRow> ComputeEventViewport(
         IEventColumnView displayedEvents,
         ItemsProviderRequest request)
@@ -150,7 +152,13 @@ public sealed partial class LogTablePane
     {
         if (disposing)
         {
+            _disposed = true;
+
+            Settings.TimeZoneChanged -= OnTimeZoneChanged;
+
             DisposeFind();
+
+            _indicatorState?.Dispose();
 
             await JsModuleInterop.DisposeModuleSafelyAsync(
                 _tableModule,
@@ -166,11 +174,12 @@ public sealed partial class LogTablePane
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Capture up front and clear: consuming the request after the awaits below could otherwise steal a request
-        // that a background action (e.g. a live-tail append) queued during one of those awaits, dropping that later
-        // render's scroll. A request arriving mid-render stays set and is handled by the next render instead.
         bool rescrollRequested = _rescrollToSelectedOnRender;
         _rescrollToSelectedOnRender = false;
+
+        _busyAssertedOnLastPaint = IsGridBusy();
+
+        _indicatorState.RecordPaint(_indicator);
 
         if (firstRender || !_enabledColumns.SequenceEqual(_previousEnabledColumns))
         {
@@ -222,13 +231,51 @@ public sealed partial class LogTablePane
                 try
                 {
                     await _eventVirtualize.RefreshDataAsync();
-                    _repaintViewportOnNextRender = true;
-                    StateHasChanged();
                 }
                 catch (JSDisconnectedException) { /* Circuit gone; nothing to refresh. */ }
                 catch (Exception e)
                 {
                     TraceLogger.Error($"Failed to refresh the event viewport: {e}");
+                }
+                finally
+                {
+                    _busyHeldForRefresh = false;
+                    _viewportRenderRequested = true;
+
+                    StateHasChanged();
+                }
+            }
+            else
+            {
+                ReleaseBusyHeldForRefresh();
+            }
+        }
+
+        if (RevealFocusSource.Current is { } revealTarget)
+        {
+            var liveSelection = Selection.Current;
+            var currentFocusTarget = Focus.Current?.CurrentHandle
+                ?? (liveSelection.Count > 0 ? liveSelection[^1].CurrentHandle : null);
+
+            if (currentFocusTarget != revealTarget)
+            {
+                EventLogCommands.ConsumeRevealFocus(revealTarget);
+            }
+            else
+            {
+                try
+                {
+                    if (await TryScrollToRow(revealTarget))
+                    {
+                        EventLogCommands.ConsumeRevealFocus(revealTarget);
+                        rescrollRequested = false;
+                    }
+                }
+                catch (JSDisconnectedException) { /* Circuit gone; leave the reveal pending so a reconnected or remounted pane can retry. */ }
+                catch (Exception e)
+                {
+                    EventLogCommands.ConsumeRevealFocus(revealTarget);
+                    TraceLogger.Error($"Failed to scroll to the restored selection: {e}");
                 }
             }
         }
@@ -260,36 +307,50 @@ public sealed partial class LogTablePane
             }
         }
 
+        // the queue has drained - turns that silent staleness into one extra pass. Cannot spin: if the pass still
+        // cannot adopt, ShouldRender returns false, no render happens, and this method does not run again.
+        if (Presentation.Revision != _renderedPresentationRevision) { StateHasChanged(); }
+
         await base.OnAfterRenderAsync(firstRender);
     }
 
     protected override async Task OnInitializedAsync()
     {
-        Focus.Select(s => s.Focus);
-        Selection.Select(s => s.Selection);
+        ObserveSource(Focus);
+        ObserveSource(Selection);
+        ObserveSource(FilterSelection);
 
-        SubscribeToAction<SetActiveTableAction>(_ => RescrollToSelected());
-        SubscribeToAction<DisplayReadyAction>(_ => RescrollToSelected());
-        SubscribeToAction<AppendTableEventsAction>(_ => RescrollToSelected());
-        SubscribeToAction<AppendTableEventsBatchAction>(_ => RescrollToSelected());
-        SubscribeToAction<UpdateTableAction>(_ => RescrollToSelected());
+        ObserveSource(
+            handler => GroupCollapseNotifier.Requested += handler,
+            handler => GroupCollapseNotifier.Requested -= handler,
+            OnGroupCollapseRequestedAsync);
 
-        // A bulk expand/collapse (any trigger) is a user choice: Find relinquishes group-expansion ownership so it won't later undo the user's collapse.
-        SubscribeToAction<SetAllGroupsCollapsedAction>(_ => RelinquishFindGroupOwnership());
+        ObserveSource(RevealFocusSource);
 
-        _logTableState = LogTableState.Value;
+        // The time zone is a plain service event, not Fluxor, and every date cell is rendered through it. FluxorComponent
+        // used to repaint this surface often enough to pick a change up for free; now it must be subscribed directly.
+        Settings.TimeZoneChanged += OnTimeZoneChanged;
 
-        _currentTable = _logTableState.EventTables.FirstOrDefault(x => x.Id == _logTableState.ActiveEventLogId);
+        // Owned per component rather than injected: the minimum-visible clock it holds is measured from THIS pane's
+        // paints, and the render its floor asks for has to be marshalled onto this pane's dispatcher.
+        _indicatorState = new DisplayIndicatorState(IndicatorGate, RequestIndicatorRender);
+
         _enabledColumns = GetOrderedEnabledColumns();
-        _focus = Focus.Value;
+        _focus = Focus.Current;
         SetCursorEvent(_focus?.CurrentHandle);
-        _selection = Selection.Value;
+        _selection = Selection.Current;
         _selectedSet = BuildSelectedSet(_selection);
-        var initialPaneState = FilterPaneState.Value;
-        _filters = initialPaneState.Filters;
-        _activeHighlightFilters = HighlightSelector.Select(initialPaneState.Filters);
-        _filtersHighlightKey = HighlightSelector.ComputeHighlightKey(initialPaneState.Filters);
+        _filters = FilterSelection.Current;
+        _activeHighlightFilters = HighlightSelector.Select(_filters);
+        _filtersHighlightKey = HighlightSelector.ComputeHighlightKey(_filters);
         _timeZoneSettings = Settings.TimeZoneInfo;
+
+        // Seed the rescroll guard with the view the pane initialises on. OnPresentationChanged rescrolls only when the
+        // view instance differs from this; the base sets Presentation without ever raising that callback, so leaving the
+        // guard null would make the FIRST publication over these same rows (a collapse, a width change, a fault or
+        // staleness transition - all now advance the revision without moving a row) read as a row change and yank the
+        // viewport to the selection.
+        _rescrolledForView = Presentation.View;
 
         WarnOnUnknownFilterColors(_filters);
 
@@ -300,47 +361,58 @@ public sealed partial class LogTablePane
         await base.OnInitializedAsync();
     }
 
+    protected override void OnPresentationChanged()
+    {
+        if (ReferenceEquals(Presentation.View, _rescrolledForView)) { return; }
+
+        _rescrolledForView = Presentation.View;
+        _rescrollToSelectedOnRender = true;
+    }
+
     protected override bool ShouldRender()
     {
-        var currentPaneState = FilterPaneState.Value;
-        var currentFilters = currentPaneState.Filters;
+        var currentFilters = FilterSelection.Current;
         bool filtersChanged = !ReferenceEquals(currentFilters, _filters);
-        // The focus is now a value-type SelectionEntry?; compare by OriginHandle (its stable identity). Reference
-        // equality would box and always differ, and full-value equality would re-render on a CurrentHandle re-point.
-        bool focusChanged = Focus.Value?.OriginHandle != _focus?.OriginHandle;
+        bool focusChanged = Focus.Current?.OriginHandle != _focus?.OriginHandle;
 
-        // Also render for a pending focus move or a post-refresh viewport repaint, neither of which changes Fluxor state.
         if (!_focusActiveOnNextRender &&
-            !_repaintViewportOnNextRender &&
+            !_viewportRenderRequested &&
             !_rescrollToSelectedOnRender &&
+            RevealFocusSource.Current is null &&
             !_findRenderRequested &&
-            ReferenceEquals(LogTableState.Value, _logTableState) &&
-            ReferenceEquals(Selection.Value, _selection) &&
+            !_indicatorRenderRequested &&
+            Presentation.Revision == _renderedPresentationRevision &&
+            ReferenceEquals(Selection.Current, _selection) &&
             !focusChanged &&
             !filtersChanged &&
             Settings.TimeZoneInfo.Equals(_timeZoneSettings)) { return false; }
 
-        _repaintViewportOnNextRender = false;
+        _viewportRenderRequested = false;
         _findRenderRequested = false;
+        _indicatorRenderRequested = false;
+        _renderedPresentationRevision = Presentation.Revision;
 
-        bool selectionChanged = !ReferenceEquals(Selection.Value, _selection);
+        _indicator = _indicatorState.Resolve(
+            Presentation.IndicatorKind,
+            Presentation.Revision,
 
-        _logTableState = LogTableState.Value;
+            _busyHeldForRefresh);
 
-        _currentTable = _logTableState.EventTables.FirstOrDefault(x => x.Id == _logTableState.ActiveEventLogId);
+        bool selectionChanged = !ReferenceEquals(Selection.Current, _selection);
+
         var previousColumnsForFind = _enabledColumns;
         _enabledColumns = GetOrderedEnabledColumns();
         bool findSearchTextChanged = _findOpen && !previousColumnsForFind.SequenceEqual(_enabledColumns);
 
         if (selectionChanged)
         {
-            _selection = Selection.Value;
+            _selection = Selection.Current;
             _selectedSet = BuildSelectedSet(_selection);
         }
 
         if (focusChanged)
         {
-            _focus = Focus.Value;
+            _focus = Focus.Current;
             SetCursorEvent(_focus?.CurrentHandle);
         }
 
@@ -370,8 +442,6 @@ public sealed partial class LogTablePane
 
     private static HashSet<EventLocator> BuildSelectedSet(ImmutableList<SelectionEntry> selection)
     {
-        // Membership tests a rendered row's live locator, so key on CurrentHandle (where the selection currently
-        // resolves), not OriginHandle; entries absent from the live generation carry a null CurrentHandle.
         var set = new HashSet<EventLocator>(selection.Count);
 
         foreach (var entry in selection)
@@ -382,8 +452,6 @@ public sealed partial class LogTablePane
         return set;
     }
 
-    // OriginHandle and CurrentHandle are the same live locator at selection time; ReloadKey re-points the selection
-    // after a reload (null for a null-RecordId row, which cannot be re-resolved).
     private static SelectionEntry EntryFor(DisplayRow row) =>
         new(row.Loc, row.Loc, ValueKey.TryCreate(row.Lean, out var key) ? key : null);
 
@@ -483,7 +551,6 @@ public sealed partial class LogTablePane
     {
         SelectionEntry? focusEntry = focus is { } focusLocator ? EntryFor(focusLocator) : null;
 
-        // These callers pass ordered, unique entries; skip rank + sort.
         if (alreadyOrdered)
         {
             EventLogCommands.SetSelectedEvents(entries, focusEntry);
@@ -497,7 +564,6 @@ public sealed partial class LogTablePane
 
         foreach (var entry in entries)
         {
-            // Dedupe by OriginHandle (the selection's stable identity); order by the live CurrentHandle position.
             if (!seen.Add(entry.OriginHandle)) { continue; }
 
             int index = entry.CurrentHandle is { } handle ? RowIndexOf(handle) : -1;
@@ -523,7 +589,6 @@ public sealed partial class LogTablePane
         EventLogCommands.SetSelectedEvents(ordered, focusEntry);
     }
 
-    // Builds a selection entry from a bare locator; rehydrates the lean row to mint the ReloadKey.
     private SelectionEntry EntryFor(EventLocator locator) =>
         new(
             locator,
@@ -538,7 +603,6 @@ public sealed partial class LogTablePane
         {
             if (_tableModule is null) { return; }
 
-            // No cursor row to land on (e.g. closing Find over an empty table): focus the scroll container so keyboard nav isn't stranded on a removed element.
             if (visibleRow < 0)
             {
                 await _tableModule.InvokeVoidAsync("focusTableContainer");
@@ -558,7 +622,7 @@ public sealed partial class LogTablePane
     private int GetAriaRowCount() => (_rowView?.Count ?? _activeDisplayedEvents.Count) + 1;
 
     private int GetColumnWidth(ColumnName column) =>
-        _logTableState.ColumnWidths.TryGetValue(column, out int width) ? width : ColumnDefaults.GetColumnWidth(column);
+        Presentation.ColumnWidths.TryGetValue(column, out int width) ? width : ColumnDefaults.GetColumnWidth(column);
 
     private string GetCss(EventLocator loc) =>
         _selectedSet.Contains(loc) ? "table-row selected" : "table-row";
@@ -587,17 +651,15 @@ public sealed partial class LogTablePane
     private string GetDateColumnHeader() =>
         EventTableColumnFormatter.GetColumnHeader(ColumnName.DateAndTime, Settings.TimeZoneInfo);
 
-    private string GetGroupName() => _logTableState.GroupBy?.ToFullString() ?? string.Empty;
+    private string GetGroupName() => Presentation.Ordering.GroupBy?.ToFullString() ?? string.Empty;
 
     private string GetGroupValueText(EventGroup group)
     {
         if (group.EventCount == 0) { return "(none)"; }
 
-        // M2: rehydrate the representative row (lean suffices for these header columns) and run the timezone/culture
-        // switch. Do NOT read GroupKeyAt here: its canonical key text is not the display header text.
         var representative = _activeDisplayedEvents.GetDetailLean(_activeDisplayedEvents.LocatorAt(group.StartIndex));
 
-        string? value = _logTableState.GroupBy switch
+        string? value = Presentation.Ordering.GroupBy switch
         {
             ColumnName.RecordId => representative.RecordId?.ToString(),
             ColumnName.Level => representative.Level,
@@ -632,11 +694,6 @@ public sealed partial class LogTablePane
         }
 
         string? color = null;
-        // Highlight filters can reference EventData, so evaluate against the full rehydrated event; the result is
-        // cached per locator (stable within a generation) so the rehydrate happens at most once per physical row.
-        // Resolve defensively: during a tab switch or reload the virtualized rows can momentarily carry a locator from
-        // the prior view/generation. A stale row yields no highlight this frame and recomputes once the view
-        // reconciles - far better than throwing out of the render tree.
         if (!_activeDisplayedEvents.TryGetDetail(row.Loc, out var detail)) { return null; }
 
         foreach (var filter in _activeHighlightFilters)
@@ -654,7 +711,7 @@ public sealed partial class LogTablePane
     }
 
     private ColumnName[] GetOrderedEnabledColumns() =>
-        [.. _logTableState.GetOrderedEnabledColumns(ColumnDefaults)];
+        [.. LogTableState.ResolveOrderedEnabledColumns(Presentation.Columns, Presentation.ColumnOrder, ColumnDefaults)];
 
     private int GetRowIndex(EventLocator loc)
     {
@@ -678,7 +735,6 @@ public sealed partial class LogTablePane
 
     private async Task HandleKeyDown(KeyboardEventArgs args)
     {
-        // Esc closes an open Find here BEFORE the selection-clearing Escape branch below, so closing Find never wipes the user's selection.
         if (_findOpen && args.Code == "Escape")
         {
             await CloseFind();
@@ -864,6 +920,17 @@ public sealed partial class LogTablePane
         }
     }
 
+    private string? IndicatorSentence() =>
+        _indicator.Sentence switch
+        {
+            DisplayIndicatorKind.EmptyPending => "Loading events\u2026",
+            DisplayIndicatorKind.ReorderPending => "Reordering events\u2026",
+            DisplayIndicatorKind.Fault => Presentation.FaultCause is { Length: > 0 } cause ?
+                $"These events could not be prepared. {cause}" :
+                "These events could not be prepared.",
+            _ => null
+        };
+
     private async Task InitializeTableEventHandlers()
     {
         _dotNetRef?.Dispose();
@@ -878,7 +945,6 @@ public sealed partial class LogTablePane
 
     private void InvokeCellContextMenu(MouseEventArgs args, DisplayRow row, ColumnName? column)
     {
-        // A stale row (mid tab-switch/reload) has no resolvable detail; skip the menu rather than throw.
         if (!_activeDisplayedEvents.TryGetDetail(row.Loc, out var detail)) { return; }
 
         var items = new List<MenuItem>();
@@ -891,7 +957,7 @@ public sealed partial class LogTablePane
 
     private void InvokeContextMenu(MouseEventArgs args)
     {
-        if (Focus.Value?.CurrentHandle is not { } handle) { return; }
+        if (Focus.Current?.CurrentHandle is not { } handle) { return; }
 
         if (!_activeDisplayedEvents.TryGetDetail(handle, out var clicked)) { return; }
 
@@ -906,6 +972,9 @@ public sealed partial class LogTablePane
 
     private void InvokeTableColumnMenu(MouseEventArgs args) =>
         MenuService.OpenAt(args.ClientX, args.ClientY, ShowColumnMenuItems());
+
+    private bool IsGridBusy() =>
+        Presentation.IndicatorKind == DisplayIndicatorKind.EmptyPending || _busyHeldForRefresh;
 
     private bool IsSelectionOutOfSortOrder(IReadOnlyList<SelectionEntry> selection)
     {
@@ -979,7 +1048,6 @@ public sealed partial class LogTablePane
         return TableCursor.ForHeader(groups[^1].Key);
     }
 
-    // Retype an event in a collapsed group to its header.
     private TableCursor? NormalizeCursor(TableCursor? cursor)
     {
         if (_rowView is not { } view ||
@@ -999,11 +1067,11 @@ public sealed partial class LogTablePane
         return cursor;
     }
 
-    private void RebuildGroupedRowView(IEventColumnView displayedEvents)
-    {
-        var state = _logTableState;
+    private void OnTimeZoneChanged(object? sender, TimeZoneInfo value) => RequestAppStateRender();
 
-        if (state.GroupBy is not { } groupBy)
+    private void RebuildGroupedRowView(IEventColumnView displayedEvents, bool absenceIsFinal)
+    {
+        if (Presentation.Ordering.GroupBy is not { } groupBy)
         {
             EventLocator? formerGroupFirstLocator = null;
 
@@ -1025,17 +1093,21 @@ public sealed partial class LogTablePane
             return;
         }
 
-        var snapshot = (displayedEvents, _currentTable?.Id, state.GroupBy, state.IsGroupDescending,
-            state.GroupsCollapsedByDefault, (ImmutableHashSet<string>?)state.GroupCollapseOverrides);
+        var snapshot = (displayedEvents,
+            Presentation.ActiveTabId,
+            Presentation.Ordering.GroupBy,
+            Presentation.Ordering.IsGroupDescending,
+            Presentation.GroupsCollapsedByDefault,
+            (ImmutableHashSet<string>?)Presentation.GroupCollapseOverrides);
 
         if (_rowView is not null && _rowViewSnapshot.Equals(snapshot)) { return; }
 
         int priorHeaderRow = _cursor is { Kind: TableRowKind.Header } ? ResolveCursorVisibleRow() : -1;
 
         _rowViewSnapshot = snapshot;
-        _rowView = GroupedRowView.Build(displayedEvents, groupBy, state.IsGroupCollapsed);
+        _rowView = GroupedRowView.Build(displayedEvents, groupBy, Presentation.IsGroupCollapsed);
 
-        ReconcileGroupedCursor(priorHeaderRow);
+        ReconcileGroupedCursor(priorHeaderRow, absenceIsFinal);
     }
 
     private void RebuildRowMaps()
@@ -1043,14 +1115,13 @@ public sealed partial class LogTablePane
         var displayedEvents = ResolveActiveDisplayedEvents();
         _activeDisplayedEvents = displayedEvents;
 
-        // Drop Find's group-expansion ownership when the group-key namespace (active table / GroupBy) has changed.
         PruneFindGroupOwnershipOnContextChange();
 
-        var currentTableId = _currentTable?.Id;
+        var currentTableId = Presentation.ActiveTabId;
 
-        // Highlight results are keyed by locator (stable within a generation across re-sorts). A reload mints a new
-        // EventLogId, so clear the cache only when the active table identity changes, bounding growth without discarding
-        // still-valid entries on every re-sort.
+        bool absenceIsFinal = displayedEvents.Count > 0 ||
+            (currentTableId is not null && Presentation.State == PresentationState.Current);
+
         if (!Equals(currentTableId, _highlightCacheTableId))
         {
             _highlightCacheTableId = currentTableId;
@@ -1062,18 +1133,12 @@ public sealed partial class LogTablePane
             _lastIndexedDisplayedEvents = displayedEvents;
             _refreshEventViewportOnRender = true;
 
-            // The event set changed (filter/sort/append/reload) so prior Find matches are stale; collapse/regroup keep the same reference and deliberately don't reach here.
+            if (_busyAssertedOnLastPaint) { _busyHeldForRefresh = true; }
+
             NotifyFindViewChanged();
 
-            if (displayedEvents.Count == 0)
+            if (displayedEvents.Count > 0)
             {
-                _selectionAnchor = null;
-                _cursor = null;
-            }
-            else
-            {
-                // Locators are physical positions within a generation: a re-sort keeps them valid (Rank >= 0); a
-                // reload invalidates them (wrong generation, Rank -1), dropping the stale anchor/cursor.
                 if (_selectionAnchor is { } anchor && displayedEvents.Rank(anchor) < 0)
                 {
                     _selectionAnchor = null;
@@ -1092,11 +1157,16 @@ public sealed partial class LogTablePane
             }
         }
 
-        // Outside the events-ref guard: collapse toggles keep the same reference.
-        RebuildGroupedRowView(displayedEvents);
+        if (absenceIsFinal && displayedEvents.Count == 0)
+        {
+            _selectionAnchor = null;
+            _cursor = null;
+        }
+
+        RebuildGroupedRowView(displayedEvents, absenceIsFinal);
     }
 
-    private void ReconcileGroupedCursor(int priorHeaderRow)
+    private void ReconcileGroupedCursor(int priorHeaderRow, bool absenceIsFinal)
     {
         if (_rowView is not { } view || _cursor is not { } cursor) { return; }
 
@@ -1110,7 +1180,7 @@ public sealed partial class LogTablePane
 
                 if (group.IsCollapsed) { _cursor = TableCursor.ForHeader(group.Key); }
             }
-            else
+            else if (absenceIsFinal)
             {
                 _cursor = null;
             }
@@ -1118,21 +1188,37 @@ public sealed partial class LogTablePane
             return;
         }
 
-        if (cursor is { Kind: TableRowKind.Header, GroupKey: { } key } && !view.TryGetGroupByKey(key, out _))
+        if (absenceIsFinal &&
+            cursor is { Kind: TableRowKind.Header, GroupKey: { } key } &&
+            !view.TryGetGroupByKey(key, out _))
         {
             _cursor = NearestHeaderCursor(priorHeaderRow);
         }
     }
 
-    private void RescrollToSelected() =>
-        _ = InvokeAsync(() =>
+    private void ReleaseBusyHeldForRefresh()    {
+        if (!_busyHeldForRefresh) { return; }
+
+        _busyHeldForRefresh = false;
+        _viewportRenderRequested = true;
+
+        StateHasChanged();
+    }
+
+    private void RequestAppStateRender() => RequestGuardedRender(StateHasChanged);
+
+    private void RequestIndicatorRender() =>
+        RequestGuardedRender(() =>
         {
-            _rescrollToSelectedOnRender = true;
+            _indicatorRenderRequested = true;
+
             StateHasChanged();
         });
 
     private IEventColumnView ResolveActiveDisplayedEvents() =>
-        _currentTable is null ? s_emptyView : _logTableState.DisplayedEventsForTab(_currentTable);
+        Presentation.ActiveTabId is not null ?
+            Presentation.View :
+            s_emptyView;
 
     private int ResolveCursorVisibleRow()
     {
@@ -1171,7 +1257,6 @@ public sealed partial class LogTablePane
 
         if (_activeDisplayedEvents.Count == 0) { return; }
 
-        // Locators are live positions within the current generation; no value-key re-resolve is needed.
         int index = RowIndexOf(handle);
 
         if (index < 0) { return; }
@@ -1224,7 +1309,6 @@ public sealed partial class LogTablePane
 
                     foreach (var existing in _selection)
                     {
-                        // Toggle off by live position (CurrentHandle), not OriginHandle; they differ after a reload.
                         if (existing.CurrentHandle != row.Loc) { remaining.Add(existing); }
                     }
 
@@ -1294,7 +1378,7 @@ public sealed partial class LogTablePane
     {
         if (_rowView is null || !_rowView.TryGetGroupByKey(key, out _)) { return; }
 
-        if (LogTableState.Value.IsGroupCollapsed(key) != collapse)
+        if (Presentation.IsGroupCollapsed(key) != collapse)
         {
             LogTableCommands.ToggleGroupCollapsed(key);
         }
@@ -1302,10 +1386,11 @@ public sealed partial class LogTablePane
 
     private IReadOnlyList<MenuItem> ShowColumnMenuItems()
     {
-        var state = LogTableState.Value;
+        var columns = Presentation.Columns;
+        var ordering = Presentation.Ordering;
         var items = new List<MenuItem>();
 
-        foreach (var (column, isVisible) in state.Columns)
+        foreach (var (column, isVisible) in columns)
         {
             var capturedColumn = column;
             items.Add(MenuItem.Item(
@@ -1317,13 +1402,13 @@ public sealed partial class LogTablePane
         items.Add(MenuItem.Separator());
 
         var orderItems = new List<MenuItem>();
-        foreach (var (column, _) in state.Columns)
+        foreach (var (column, _) in columns)
         {
             var capturedColumn = column;
             orderItems.Add(MenuItem.Item(
                 column.ToFullString(),
                 () => LogTableCommands.SetOrderBy(capturedColumn),
-                isChecked: state.OrderBy.Equals(capturedColumn)));
+                isChecked: ordering.OrderBy.Equals(capturedColumn)));
         }
 
         items.Add(MenuItem.SubMenu("Order By", orderItems));
@@ -1332,17 +1417,17 @@ public sealed partial class LogTablePane
         {
             MenuItem.Item(
                 "(none)",
-                () => { if (state.GroupBy is not null) { LogTableCommands.SetGroupBy(null); } },
-                isChecked: state.GroupBy is null)
+                () => { if (ordering.GroupBy is not null) { LogTableCommands.SetGroupBy(null); } },
+                isChecked: ordering.GroupBy is null)
         };
 
-        foreach (var (column, _) in state.Columns)
+        foreach (var (column, _) in columns)
         {
             var capturedColumn = column;
             groupItems.Add(MenuItem.Item(
                 column.ToFullString(),
-                () => { if (!state.GroupBy.Equals(capturedColumn)) { LogTableCommands.SetGroupBy(capturedColumn); } },
-                isChecked: state.GroupBy.Equals(capturedColumn)));
+                () => { if (!ordering.GroupBy.Equals(capturedColumn)) { LogTableCommands.SetGroupBy(capturedColumn); } },
+                isChecked: ordering.GroupBy.Equals(capturedColumn)));
         }
 
         items.Add(MenuItem.SubMenu("Group By", groupItems));
@@ -1443,7 +1528,7 @@ public sealed partial class LogTablePane
 
     private IReadOnlyList<MenuItem> ShowGroupContextMenuItems(EventGroup group)
     {
-        bool collapsedNow = LogTableState.Value.IsGroupCollapsed(group.Key);
+        bool collapsedNow = Presentation.IsGroupCollapsed(group.Key);
 
         return
         [
@@ -1456,7 +1541,7 @@ public sealed partial class LogTablePane
             MenuItem.Item(
                 "Group Descending",
                 () => LogTableCommands.ToggleGroupSortDirection(),
-                isChecked: LogTableState.Value.IsGroupDescending),
+                isChecked: Presentation.Ordering.IsGroupDescending),
             MenuItem.Separator(),
             MenuItem.Item("Select Group", () => SelectGroupByKey(group.Key)),
         ];
@@ -1464,7 +1549,6 @@ public sealed partial class LogTablePane
 
     private void ToggleGroupCollapsed(string groupKey)
     {
-        // A manual toggle of a Find-expanded group hands ownership back to the user, so Find will not later re-collapse it.
         _findExpandedGroupKeys.Remove(groupKey);
         LogTableCommands.ToggleGroupCollapsed(groupKey);
     }
@@ -1488,6 +1572,22 @@ public sealed partial class LogTablePane
 
             return 0;
         }
+    }
+
+    private async Task<bool> TryScrollToRow(EventLocator target)
+    {
+        if (_activeDisplayedEvents.Count == 0) { return false; }
+
+        int index = RowIndexOf(target);
+
+        if (index < 0) { return false; }
+
+        if (_tableModule is null) { return false; }
+
+        int targetRow = _rowView?.VisibleRowForEvent(index) ?? index;
+        await _tableModule.InvokeVoidAsync("scrollToRow", targetRow);
+
+        return true;
     }
 
     private void WarnOnUnknownFilterColors(IEnumerable<SavedFilter> filters)

@@ -2,10 +2,9 @@
 // // Licensed under the MIT License.
 
 using Bunit;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.Alerts;
+using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
-using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -23,8 +22,6 @@ public sealed class PromptModalTests : BunitContext
         _modalService.ActiveModalId.Returns(new ModalId(1L));
         Services.AddSingleton(_modalService);
         Services.AddSingleton(Substitute.For<IModalCoordinator>());
-
-        Services.AddFluxor(options => options.ScanAssemblies(typeof(PromptModal).Assembly));
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }

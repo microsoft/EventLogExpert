@@ -19,18 +19,19 @@ using EventLogExpert.Runtime.Settings;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using System.Collections.Immutable;
 using DetailsPaneComponent = EventLogExpert.UI.DetailsPane.DetailsPane;
 
 namespace EventLogExpert.UI.Tests.DetailsPane;
 
 public sealed class DetailsPaneTests : BunitContext
 {
-    private readonly IStateSelection<LogTableState, EventLogId?> _activeLog = Substitute.For<IStateSelection<LogTableState, EventLogId?>>();
+    private readonly IActiveEventLogSource _activeEventLog = Substitute.For<IActiveEventLogSource>();
     private readonly IClipboardService _clipboard = Substitute.For<IClipboardService>();
+    private readonly IEventDetailResolver _detailResolver = Substitute.For<IEventDetailResolver>();
+    private readonly IEventFocusSource _eventFocus = Substitute.For<IEventFocusSource>();
     private readonly IFilterLensCommands _filterLensCommands = Substitute.For<IFilterLensCommands>();
-    private readonly IStateSelection<EventLogState, SelectionEntry?> _focus = Substitute.For<IStateSelection<EventLogState, SelectionEntry?>>();
     private readonly EventLogId _logId = EventLogId.Create();
-    private readonly IState<LogTableState> _logTableState = Substitute.For<IState<LogTableState>>();
     private readonly IDetailsPanePreferencesProvider _preferences = Substitute.For<IDetailsPanePreferencesProvider>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
     private readonly ITraceLogger _traceLogger = Substitute.For<ITraceLogger>();
@@ -42,18 +43,17 @@ public sealed class DetailsPaneTests : BunitContext
         JSInterop.SetupModule("./_content/EventLogExpert.UI/DetailsPane/DetailsPane.razor.js");
 
         _settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
-        _focus.Value.Returns((SelectionEntry?)null);
+        _eventFocus.Current.Returns((SelectionEntry?)null);
 
-        Services.AddSingleton(_activeLog);
+        Services.AddSingleton(_activeEventLog);
         Services.AddSingleton(_clipboard);
         Services.AddSingleton(_filterLensCommands);
-        Services.AddSingleton(_focus);
-        Services.AddSingleton(_logTableState);
+        Services.AddSingleton(_eventFocus);
+        Services.AddSingleton(_detailResolver);
         Services.AddSingleton(_preferences);
         Services.AddSingleton(_settings);
         Services.AddSingleton(_traceLogger);
         Services.AddSingleton(_xmlResolver);
-        Services.AddFluxor(options => options.ScanAssemblies(typeof(DetailsPaneComponent).Assembly));
     }
 
     [Fact]
@@ -100,7 +100,6 @@ public sealed class DetailsPaneTests : BunitContext
         var @event = EventWithData(("LogonType", 3));
         var cut = SelectAndRender(@event);
 
-        // User collapses the pane, then a later selection arrives: it must respect the collapse.
         cut.Find("#details-header").Click();
         Assert.Equal("false", cut.Find(".details-pane").GetAttribute("data-toggle"));
 
@@ -146,7 +145,6 @@ public sealed class DetailsPaneTests : BunitContext
 
         Assert.Equal(2, cut.FindAll(".details-correlation-action").Count);
 
-        // Re-issue FindAll before each click: the first click re-renders, which invalidates handler ids captured earlier.
         cut.FindAll(".details-correlation-action")[0].Click();
         cut.FindAll(".details-correlation-action")[1].Click();
 
@@ -165,8 +163,6 @@ public sealed class DetailsPaneTests : BunitContext
     [Fact]
     public void CorrelationSection_ShownForGuidEmptyActivityId_MirroringContextMenu()
     {
-        // The log-table context menu enables its lens items on Guid?.HasValue (so a zero-Guid still enables); the pane
-        // mirrors that, keeping the two surfaces consistent.
         ResolvedEvent @event = BaseEvent() with { ActivityId = Guid.Empty };
 
         var cut = SelectAndRender(@event);
@@ -243,10 +239,59 @@ public sealed class DetailsPaneTests : BunitContext
         cut.FindAll(".details-copy")[0].Click();
         cut.FindAll(".details-copy")[1].Click();
 
-        // A shared-variable closure capture would make every field's button emit the last field's value, so asserting
-        // each row copies its OWN value discriminates that regression.
         _clipboard.Received(1).CopyTextAsync("SYSTEM");
         _clipboard.Received(1).CopyTextAsync("ADMIN");
+    }
+
+    [Fact]
+    public void Render_WhileFocusLagsItsReaction_BlanksThePriorPayloadButKeepsThePane()
+    {
+        var a = BaseEvent() with { Id = 1001, Xml = "<EventA/>" };
+        var b = BaseEvent() with { Id = 1002, Xml = "<EventB/>" };
+        var handleA = new EventLocator(_logId, 0, 0);
+        var handleB = new EventLocator(_logId, 0, 1);
+        StubResolution(handleA, a);
+        StubResolution(handleB, b);
+
+        _eventFocus.Current.Returns(new SelectionEntry(handleA, handleA, null));
+        var cut = Render<DetailsPaneComponent>();
+        cut.WaitForAssertion(() => Assert.Contains("Event ID 1001", cut.Markup));
+
+        _eventFocus.Current.Returns(new SelectionEntry(handleB, handleB, null));
+
+        int rendersBefore = cut.RenderCount;
+        _activeEventLog.Changed += Raise.Event<Action>();
+        cut.WaitForState(() => cut.RenderCount > rendersBefore);
+
+        Assert.DoesNotContain("Event ID 1001", cut.Markup);
+        Assert.False(cut.Find(".details-pane").HasAttribute("hidden"));
+
+        _eventFocus.Changed += Raise.Event<Action>();
+        cut.WaitForAssertion(() => Assert.Contains("Event ID 1002", cut.Markup));
+    }
+
+    [Fact]
+    public void RetainedFocus_ResolvesThroughTheRawStore_WithNoDisplayViewInPlay()
+    {
+        var @event = BaseEvent();
+        var logId = EventLogId.Create();
+        var rawStore = Substitute.For<IState<RawEventStoreState>>();
+
+        rawStore.Value.Returns(new RawEventStoreState
+        {
+            ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty
+                .Add(logId, EventColumnStore.Build([@event], 0, 0))
+        });
+
+        Services.AddSingleton<IEventDetailResolver>(new EventDetailResolver(rawStore));
+
+        var handle = new EventLocator(logId, 0, 0);
+        ValueKey.TryCreate(@event, out var reloadKey);
+        _eventFocus.Current.Returns(new SelectionEntry(handle, handle, reloadKey));
+
+        var cut = Render<DetailsPaneComponent>();
+
+        Assert.Contains(@event.Id.ToString(), cut.Markup);
     }
 
     [Fact]
@@ -295,7 +340,6 @@ public sealed class DetailsPaneTests : BunitContext
     [Fact]
     public void ShowMoreToggle_ExposesExpandedStateToAssistiveTech()
     {
-        // A 600-char scalar exceeds the preview length, so the field renders the Show more / Show less toggle.
         var cut = SelectAndRender(EventWithData(("CommandLine", new string('a', 600))));
 
         IElement toggle = cut.Find(".details-show-more");
@@ -325,7 +369,8 @@ public sealed class DetailsPaneTests : BunitContext
         var cut = SelectAndRender(EventWithData(("LogonType", 3)));
         XmlTab(cut).Click();
 
-        _activeLog.SelectedValueChanged += Raise.Event<EventHandler<EventLogId?>>(_activeLog, (EventLogId?)EventLogId.Create());
+        _activeEventLog.Current.Returns(EventLogId.Create());
+        _activeEventLog.Changed += Raise.Event<Action>();
 
         cut.WaitForAssertion(() => Assert.Equal("true", ReaderTab(cut).GetAttribute("aria-selected")));
     }
@@ -335,8 +380,6 @@ public sealed class DetailsPaneTests : BunitContext
     {
         var cut = SelectAndRender(EventWithData(("LogonType", 3)));
 
-        // Both tabpanels stay mounted (only hidden toggles), so every tab's aria-controls resolves to a panel that is
-        // actually in the DOM, and each panel points back at its controlling tab.
         Assert.Equal("details-tabpanel-reader", cut.Find("#details-tab-reader").GetAttribute("aria-controls"));
         Assert.Equal("details-tab-reader", cut.Find("#details-tabpanel-reader").GetAttribute("aria-labelledby"));
         Assert.Equal("details-tabpanel-xml", cut.Find("#details-tab-xml").GetAttribute("aria-controls"));
@@ -355,6 +398,81 @@ public sealed class DetailsPaneTests : BunitContext
         var cut = SelectAndRender(@event);
 
         Assert.NotEmpty(cut.FindAll(".details-warn"));
+    }
+
+    [Fact]
+    public void Xml_ResolvesAsynchronously_ReplacingTheLoadingSentinel()
+    {
+        var @event = BaseEvent() with { Xml = "" };
+        var handle = new EventLocator(_logId, 0, 0);
+        var resolution = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        StubResolution(handle, @event);
+        _xmlResolver.GetXmlAsync(Arg.Any<ResolvedEvent>(), Arg.Any<CancellationToken>()).Returns(new ValueTask<string>(resolution.Task));
+        _eventFocus.Current.Returns(new SelectionEntry(handle, handle, null));
+
+        var cut = Render<DetailsPaneComponent>();
+        XmlTab(cut).Click();
+        cut.WaitForAssertion(() => Assert.Contains("Resolving XML", cut.Markup));
+
+        resolution.SetResult("<AsyncResolved/>");
+
+        cut.WaitForAssertion(() => Assert.Contains("AsyncResolved", cut.Markup));
+    }
+
+    [Fact]
+    public void Xml_StaleResolution_IsDiscarded_WhenFocusChangesMidFetch()
+    {
+        var first = BaseEvent() with { Id = 1001, Xml = "" };
+        var second = BaseEvent() with { Id = 1002, Xml = "" };
+        var firstHandle = new EventLocator(_logId, 0, 0);
+        var secondHandle = new EventLocator(_logId, 0, 1);
+        var firstFetch = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondFetch = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        StubResolution(firstHandle, first);
+        StubResolution(secondHandle, second);
+        _xmlResolver.GetXmlAsync(Arg.Is<ResolvedEvent>(e => e != null && e.Id == 1001), Arg.Any<CancellationToken>()).Returns(new ValueTask<string>(firstFetch.Task));
+        _xmlResolver.GetXmlAsync(Arg.Is<ResolvedEvent>(e => e != null && e.Id == 1002), Arg.Any<CancellationToken>()).Returns(new ValueTask<string>(secondFetch.Task));
+
+        _eventFocus.Current.Returns(new SelectionEntry(firstHandle, firstHandle, null));
+        var cut = Render<DetailsPaneComponent>();
+        XmlTab(cut).Click();
+        cut.WaitForAssertion(() => Assert.Contains("Resolving XML", cut.Markup));
+
+        _eventFocus.Current.Returns(new SelectionEntry(secondHandle, secondHandle, null));
+        _eventFocus.Changed += Raise.Event<Action>();
+        secondFetch.SetResult("<SecondEventXml/>");
+        cut.WaitForAssertion(() => Assert.Contains("SecondEventXml", cut.Markup));
+
+        var renderCountBeforeStale = cut.RenderCount;
+        firstFetch.SetResult("<FirstEventXml/>");
+        cut.WaitForState(() => cut.RenderCount > renderCountBeforeStale);
+
+        Assert.Contains("SecondEventXml", cut.Markup);
+        Assert.DoesNotContain("FirstEventXml", cut.Markup);
+    }
+
+    [Fact]
+    public void Xml_StaleResolution_IsDiscarded_WhenSourceAdoptsNewFocusBeforeItsReactionRuns()
+    {
+        var @event = BaseEvent() with { Id = 1001, Xml = "" };
+        var handle = new EventLocator(_logId, 0, 0);
+        var otherHandle = new EventLocator(_logId, 0, 1);
+        var fetch = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        StubResolution(handle, @event);
+        _xmlResolver.GetXmlAsync(Arg.Any<ResolvedEvent>(), Arg.Any<CancellationToken>()).Returns(new ValueTask<string>(fetch.Task));
+
+        _eventFocus.Current.Returns(new SelectionEntry(handle, handle, null));
+        var cut = Render<DetailsPaneComponent>();
+        XmlTab(cut).Click();
+        cut.WaitForAssertion(() => Assert.Contains("Resolving XML", cut.Markup));
+
+        _eventFocus.Current.Returns(new SelectionEntry(otherHandle, otherHandle, null));
+
+        var renderCountBefore = cut.RenderCount;
+        fetch.SetResult("<StaleEventXml/>");
+        cut.WaitForState(() => cut.RenderCount > renderCountBefore);
+
+        Assert.DoesNotContain("StaleEventXml", cut.Markup);
     }
 
     private static ResolvedEvent BaseEvent() =>
@@ -380,17 +498,27 @@ public sealed class DetailsPaneTests : BunitContext
     {
         var handle = new EventLocator(_logId, 0, 0);
         ValueKey.TryCreate(@event, out var reloadKey);
-        _focus.SelectedValueChanged += Raise.Event<EventHandler<SelectionEntry?>>(_focus, new SelectionEntry(handle, handle, reloadKey));
+        StubResolution(handle, @event);
+        _eventFocus.Current.Returns(new SelectionEntry(handle, handle, reloadKey));
+        _eventFocus.Changed += Raise.Event<Action>();
     }
 
     private IRenderedComponent<DetailsPaneComponent> SelectAndRender(ResolvedEvent @event)
     {
-        _logTableState.Value.Returns(new LogTableState { ActiveEventLogId = _logId }.WithLogEvents(_logId, @event));
-
         var handle = new EventLocator(_logId, 0, 0);
         ValueKey.TryCreate(@event, out var reloadKey);
-        _focus.Value.Returns(new SelectionEntry(handle, handle, reloadKey));
+        StubResolution(handle, @event);
+        _eventFocus.Current.Returns(new SelectionEntry(handle, handle, reloadKey));
 
         return Render<DetailsPaneComponent>();
     }
+
+    private void StubResolution(EventLocator handle, ResolvedEvent @event) =>
+        _detailResolver.TryResolve(handle, out Arg.Any<ResolvedEvent?>())
+            .Returns(call =>
+            {
+                call[1] = @event;
+
+                return true;
+            });
 }

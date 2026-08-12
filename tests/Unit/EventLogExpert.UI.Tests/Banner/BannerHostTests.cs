@@ -8,9 +8,9 @@ using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Restart;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Menu;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.DatabaseTools;
+using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -70,7 +70,6 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_CriticalActive_DoesNotRenderCycleNav_EvenWithOtherSlices()
     {
-        // Critical pre-empts the entire cycle — no Prev/Next chevrons should appear.
         _criticalErrorService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
         _errorBannerService.ErrorBanners.Returns(
             [new ErrorBannerEntry(BannerId.Create(), "E", "m", null, null, DateTime.UtcNow)]);
@@ -164,7 +163,6 @@ public sealed class BannerHostTests : BunitContext
         _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
-        // Advance to last item (index 1).
         await component.Find("button.banner-cycle-next").ClickAsync(new MouseEventArgs());
 
         var next = component.Find("button.banner-cycle-next");
@@ -172,7 +170,6 @@ public sealed class BannerHostTests : BunitContext
 
         await next.ClickAsync(new MouseEventArgs());
 
-        // Index stays at 1.
         Assert.Equal("2 of 2", component.Find(".banner-pagination").TextContent.Trim());
         Assert.Single(component.FindAll("aside.banner-attention"));
     }
@@ -206,7 +203,6 @@ public sealed class BannerHostTests : BunitContext
 
         await prev.ClickAsync(new MouseEventArgs());
 
-        // Index stays at 0 — first error still rendered.
         Assert.Equal("1 of 2", component.Find(".banner-pagination").TextContent.Trim());
         Assert.Single(component.FindAll("aside.banner-error"));
     }
@@ -214,23 +210,16 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_CycleStableSelection_DismissingPrecedingError_StaysOnSameLogicalError()
     {
-        // Regression: an earlier design matched selection by (View, IndexWithinSlice) record equality, which
-        // silently jumped the user to a different error whenever a preceding error was dismissed (e.g., user on
-        // E1 = index 1, then E0 dismissed → new (Error, 1) refers to E2 → user is now reading E2 without any
-        // intent to navigate). BannerCycleItem.EntryId provides stable identity so the user stays on E1.
         var e0 = new ErrorBannerEntry(BannerId.Create(), "First", "first message", null, null, DateTime.UtcNow);
         var e1 = new ErrorBannerEntry(BannerId.Create(), "Second", "second message", null, null, DateTime.UtcNow);
         var e2 = new ErrorBannerEntry(BannerId.Create(), "Third", "third message", null, null, DateTime.UtcNow);
         _errorBannerService.ErrorBanners.Returns([e0, e1, e2]);
 
         var component = Render<BannerHost>();
-        // Advance to e1.
         await component.Find("button.banner-cycle-next").ClickAsync(new MouseEventArgs());
         Assert.Contains("Second: second message", component.Find("aside.banner-error").TextContent);
         Assert.Equal("2 of 3", component.Find(".banner-pagination").TextContent.Trim());
 
-        // Simulate e0 being dismissed externally — IndexWithinSlice for e1/e2 shifts down by one, but EntryId
-        // stays stable so selection-by-EntryId still resolves to e1.
         _errorBannerService.ErrorBanners.Returns([e1, e2]);
         _errorBannerService.StateChanged += Raise.Event<Action>();
 
@@ -240,8 +229,6 @@ public sealed class BannerHostTests : BunitContext
             return pages.Count > 0 && pages[0].TextContent.Trim() == "1 of 2";
         });
 
-        // After rebuild, the user must still see e1 (now at index 0). The bug being prevented: jumping to e2
-        // because the old (Error, 1) tuple matched e2's new (Error, 1) position.
         Assert.Contains("Second: second message", component.Find("aside.banner-error").TextContent);
         Assert.DoesNotContain("Third", component.Find("aside.banner-error").TextContent);
     }
@@ -323,7 +310,6 @@ public sealed class BannerHostTests : BunitContext
         Assert.Single(component.FindAll("aside.banner-attention"));
 
         await component.Find("aside.banner-attention button.banner-action").ClickAsync(new MouseEventArgs());
-        // Substitute does not raise StateChanged from ReportError; raise manually to trigger re-render.
         _errorBannerService.StateChanged += Raise.Event<Action>();
 
         component.WaitForState(() => component.FindAll("aside.banner-error").Count > 0);

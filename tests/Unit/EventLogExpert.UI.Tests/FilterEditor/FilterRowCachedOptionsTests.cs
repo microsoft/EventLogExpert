@@ -4,19 +4,12 @@
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.UI.FilterEditor;
-using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
 using System.Reflection;
 
 namespace EventLogExpert.UI.Tests.FilterEditor;
 
-/// <summary>
-///     Pure-instance unit tests for <see cref="FilterRow.CachedOptions" /> (Δ30 contract): explicit
-///     <c>OfType&lt;LibraryEntrySavedFilter&gt;</c> filtering, favorites-first ordered alphabetically (OrdinalIgnoreCase),
-///     then non-favorite recents ordered by <c>LastUsedUtc</c> descending, with cross-bucket dedupe by
-///     <c>ComparisonText</c> only (legacy quick-pick contract).
-/// </summary>
 public sealed class FilterRowCachedOptionsTests
 {
     [Fact]
@@ -69,27 +62,19 @@ public sealed class FilterRowCachedOptionsTests
     [Fact]
     public void CachedOptions_Recomputes_WhenLibraryEntriesReferenceChanges()
     {
-        var stateMock = Substitute.For<IState<FilterLibraryState>>();
-        stateMock.Value.Returns(new FilterLibraryState
-        {
-            IsLoaded = true,
-            Entries = ImmutableList.CreateRange(
-                new LibraryEntry[] { BuildSavedFilter("Fav", filterText: "Level == 4", isFavorite: true) }),
-        });
-        var row = NewRowWithState(stateMock);
+        var source = Substitute.For<ILibraryEntriesSource>();
+        source.Current.Returns(ImmutableList.CreateRange(
+            new LibraryEntry[] { BuildSavedFilter("Fav", filterText: "Level == 4", isFavorite: true) }));
+        var row = NewRowWithSource(source);
 
         var first = row.CachedOptions;
         Assert.Single(first);
 
-        stateMock.Value.Returns(new FilterLibraryState
+        source.Current.Returns(ImmutableList.CreateRange(new LibraryEntry[]
         {
-            IsLoaded = true,
-            Entries = ImmutableList.CreateRange(new LibraryEntry[]
-            {
-                BuildSavedFilter("Fav", filterText: "Level == 4", isFavorite: true),
-                BuildSavedFilter("Fav2", filterText: "Level == 2", isFavorite: true),
-            }),
-        });
+            BuildSavedFilter("Fav", filterText: "Level == 4", isFavorite: true),
+            BuildSavedFilter("Fav2", filterText: "Level == 2", isFavorite: true),
+        }));
 
         var second = row.CachedOptions;
 
@@ -190,22 +175,18 @@ public sealed class FilterRowCachedOptionsTests
 
     private static FilterRow NewRowWithLibraryEntries(params LibraryEntry[] entries)
     {
-        var stateMock = Substitute.For<IState<FilterLibraryState>>();
-        stateMock.Value.Returns(new FilterLibraryState
-        {
-            IsLoaded = true,
-            Entries = ImmutableList.CreateRange(entries),
-        });
-        return NewRowWithState(stateMock);
+        var source = Substitute.For<ILibraryEntriesSource>();
+        source.Current.Returns(ImmutableList.CreateRange(entries));
+        return NewRowWithSource(source);
     }
 
-    private static FilterRow NewRowWithState(IState<FilterLibraryState> stateMock)
+    private static FilterRow NewRowWithSource(ILibraryEntriesSource source)
     {
         var row = new FilterRow();
         var prop = typeof(FilterRow).GetProperty(
-            "FilterLibraryState",
+            "LibraryEntries",
             BindingFlags.NonPublic | BindingFlags.Instance)!;
-        prop.SetValue(row, stateMock);
+        prop.SetValue(row, source);
         return row;
     }
 }

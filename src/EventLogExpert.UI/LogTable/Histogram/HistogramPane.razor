@@ -1,5 +1,5 @@
 @using EventLogExpert.Runtime.Histogram
-@inherits FluxorComponent
+@inherits PresentationViewComponentBase
 
 <div class="histogram-pane">
     <div class="histogram-toolbar">
@@ -173,7 +173,6 @@
                     @for (int index = 0; index < barCount; index++)
                     {
                         var bin = render.Bins[index];
-                        // Integer-align each bar slot to whole pixels so the 1px separator stays uniform; empty bins still hold their slot.
                         int barLeft = (int)Math.Round(index * barWidth);
                         int barRight = (int)Math.Round((index + 1) * barWidth);
                         int slotWidth = Math.Max(1, barRight - barLeft);
@@ -239,6 +238,14 @@
         else if (_render is { Bins.Count: > 0, WindowTotal: 0 })
         {
             <div class="histogram-empty">@EmptyStateMessage(_dimension, true)</div>
+        }
+        else if (_chartState == HistogramChartState.Failed)
+        {
+            <div class="histogram-empty">The timeline could not be built for these events.</div>
+        }
+        else if (_chartState == HistogramChartState.Pending)
+        {
+            <div class="histogram-empty">Building the timeline...</div>
         }
         else
         {

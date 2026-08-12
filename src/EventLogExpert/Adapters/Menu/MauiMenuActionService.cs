@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
-using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Versioning;
@@ -16,7 +15,6 @@ using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
@@ -27,18 +25,11 @@ using EventLogExpert.UI.Settings;
 using EventLogExpert.WindowsPlatform.Activation;
 using Fluxor;
 using System.Collections.Immutable;
-using System.Globalization;
 using Application = Microsoft.Maui.Controls.Application;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Adapters.Menu;
 
-/// <summary>
-///     MAUI implementation of <see cref="IMenuActionService" />. Owns the cancellation token that gates background
-///     log loads (replaces the legacy field on MainPage). Exposes <see cref="OpenLogsBatchAsync" /> publicly so the
-///     page-level drag/drop and command-line handlers can batch multiple opens through the same cancellation lifecycle and
-///     surface one banner alert per gesture for empty logs.
-/// </summary>
 public sealed class MauiMenuActionService(
     IDispatcher dispatcher,
     IEventLogCommands eventLogCommands,
@@ -56,29 +47,21 @@ public sealed class MauiMenuActionService(
     IFilePickerService filePickerService,
     IFolderPickerService folderPickerService,
     IState<EventLogState> eventLogState,
-    IState<LogTableState> logTableState,
-    ILogTableColumnDefaultsProvider columnDefaults,
-    IEventTableExporter eventTableExporter,
-    IExportProgressBannerService exportProgressBannerService,
-    IFileSaveService fileSaveService) : IMenuActionService, IDisposable
+    EventExportCoordinator exportCoordinator) : IMenuActionService, IDisposable
 {
     private readonly IClipboardService _clipboardService = clipboardService;
-    private readonly ILogTableColumnDefaultsProvider _columnDefaults = columnDefaults;
     private readonly ICurrentVersionProvider _currentVersionProvider = currentVersionProvider;
     private readonly IAlertDialogService _dialogService = dialogService;
     private readonly IDispatcher _dispatcher = dispatcher;
     private readonly IEventLogCommands _eventLogCommands = eventLogCommands;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
-    private readonly IEventTableExporter _eventTableExporter = eventTableExporter;
-    private readonly IExportProgressBannerService _exportProgress = exportProgressBannerService;
+    private readonly EventExportCoordinator _exportCoordinator = exportCoordinator;
     private readonly IFilePickerService _filePickerService = filePickerService;
-    private readonly IFileSaveService _fileSaveService = fileSaveService;
     private readonly IFilterLibraryCommands _filterLibraryCommands = filterLibraryCommands;
     private readonly IFilterPaneCommands _filterPaneCommands = filterPaneCommands;
     private readonly IFolderPickerService _folderPickerService = folderPickerService;
     private readonly IHistogramCommands _histogramCommands = histogramCommands;
     private readonly ILogTableCommands _logTableCommands = logTableCommands;
-    private readonly IState<LogTableState> _logTableState = logTableState;
     private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
     private readonly ISettingsService _settings = settings;
     private readonly ITraceLogger _traceLogger = traceLogger;
@@ -86,7 +69,6 @@ public sealed class MauiMenuActionService(
 
     private CancellationTokenSource _cancellationTokenSource = new();
     private bool _disposed;
-    private int _exportInFlight;
 
     public async Task CheckForUpdatesAsync()
     {
@@ -114,8 +96,6 @@ public sealed class MauiMenuActionService(
 
         _disposed = true;
 
-        // Best-effort cancellation so any in-flight OpenLog effects stop linking new callbacks
-        // to a token whose CTS is about to be disposed (which would surface ObjectDisposedException).
         try
         {
             _cancellationTokenSource.Cancel();
@@ -139,125 +119,7 @@ public sealed class MauiMenuActionService(
         }
     }
 
-    public async Task ExportEventsAsync(ExportFormat format)
-    {
-        var state = _logTableState.Value;
-        var events = state.GetActiveDisplayedEvents();
-
-        if (events.Count == 0)
-        {
-            await _dialogService.ShowAlert(
-                "Export events", "There are no events to export.", "Ok", AlertPresentation.Banner);
-
-            return;
-        }
-
-        // Snapshot everything the export needs before opening the picker, so a state change while the dialog is open
-        // cannot mutate the rows/columns/timezone being written.
-        var columns = state.GetOrderedEnabledColumns(_columnDefaults);
-
-        if (columns.Count == 0)
-        {
-            await _dialogService.ShowAlert(
-                "Export events", "There are no visible columns to export.", "Ok", AlertPresentation.Banner);
-
-            return;
-        }
-
-        var timeZone = _settings.TimeZoneInfo;
-        bool isCsv = format == ExportFormat.Csv;
-        var fileTypes = isCsv ? FileSaveFileTypes.Csv : FileSaveFileTypes.Json;
-        string extension = isCsv ? ".csv" : ".json";
-        string suggestedFileName =
-            $"events-{DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)}{extension}";
-
-        // Only one export may run at a time: the progress banner holds a single entry and the cancel
-        // affordance owns a single CTS, so a concurrent export would orphan the first cancellation.
-        if (Interlocked.CompareExchange(ref _exportInFlight, 1, 0) != 0)
-        {
-            await _dialogService.ShowAlert(
-                "Export events", "An export is already in progress.", "Ok", AlertPresentation.Banner);
-
-            return;
-        }
-
-        CancellationTokenSource cancellation = new();
-        string? savedPath = null;
-        Exception? failure = null;
-        bool canceled = false;
-
-        try
-        {
-            savedPath = await _fileSaveService.SaveStreamingAsync(
-                suggestedFileName,
-                fileTypes,
-                async (stream, _) =>
-                {
-                    // Begin only once the picker has returned a destination and the streaming write is starting;
-                    // dismissing the picker never reaches here, so it stays silent. A Cancel click can race export
-                    // teardown (the CTS is disposed in the finally), so guard the narrow disposed-CTS window.
-                    _exportProgress.Begin(
-                        "Exporting events...",
-                        () => { try { cancellation.Cancel(); } catch (ObjectDisposedException) { /* Teardown disposed the CTS; a late Cancel is a no-op. */ } });
-
-                    // Cancellation gates the WRITE only: ExportAsync throws per-row on Cancel, so AtomicFileWriter
-                    // discards the temp. SaveStreamingAsync gets CancellationToken.None, so once the write completes
-                    // the atomic commit is unconditional - a late Cancel can no longer discard a fully-written export.
-                    await _eventTableExporter.ExportAsync(
-                        stream, format, events, columns, timeZone, includeDescription: true, cancellation.Token);
-                },
-                CancellationToken.None);
-        }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-        {
-            canceled = true;
-        }
-        catch (Exception ex)
-        {
-            failure = ex;
-        }
-        finally
-        {
-            // End() raises StateChanged; isolate it so a throwing subscriber can never skip the CTS
-            // disposal or the in-flight reset, which would otherwise wedge every later export.
-            try
-            {
-                _exportProgress.End();
-            }
-            finally
-            {
-                cancellation.Dispose();
-                Interlocked.Exchange(ref _exportInFlight, 0);
-            }
-        }
-
-        if (canceled)
-        {
-            await _dialogService.ShowAlert(
-                "Export canceled", "The export was canceled.", "Ok", AlertPresentation.Banner);
-
-            return;
-        }
-
-        if (failure is not null)
-        {
-            _traceLogger.Error($"Failed to export events: {failure}");
-
-            await _dialogService.ShowAlert("Export failed", failure.Message, "Ok", AlertPresentation.Banner);
-
-            return;
-        }
-
-        // A null path means the user dismissed the save picker; only confirm an actual write.
-        if (savedPath is not null)
-        {
-            await _dialogService.ShowAlert(
-                "Export complete",
-                $"Exported {events.Count:N0} {(events.Count == 1 ? "event" : "events")} to {savedPath}.",
-                "Ok",
-                AlertPresentation.Banner);
-        }
-    }
+    public Task ExportEventsAsync(ExportFormat format) => _exportCoordinator.ExportEventsAsync(format);
 
     public void LoadNewEvents() => _eventLogCommands.LoadNewEvents();
 
@@ -431,69 +293,6 @@ public sealed class MauiMenuActionService(
         }
     }
 
-    private async Task<OpenLogsBatchResult> OpenLogsBatchCoreAsync(
-        IEnumerable<(string Path, LogPathType Type)> logs,
-        bool combineLog,
-        bool showInlineAlerts)
-    {
-        ArgumentNullException.ThrowIfNull(logs);
-
-        List<string>? emptyDisplayNames = null;
-        List<ChannelOutcome>? channelOutcomes = null;
-        var combineForCall = combineLog;
-        var opened = 0;
-        var failed = 0;
-        var skipped = 0;
-
-        foreach (var (path, type) in logs)
-        {
-            var outcome = await OpenLogWithOutcomeAsync(path, type, combineForCall, showInlineAlerts);
-
-            if (type == LogPathType.Channel)
-            {
-                (channelOutcomes ??= []).Add(outcome);
-            }
-
-            switch (outcome.Outcome)
-            {
-                case ChannelLaunchOutcome.Opened:
-                    opened++;
-                    combineForCall = true;
-                    break;
-                case ChannelLaunchOutcome.Empty:
-                    (emptyDisplayNames ??= []).Add(GetEmptyLogDisplayName(path, type));
-                    break;
-                case ChannelLaunchOutcome.AccessDenied:
-                case ChannelLaunchOutcome.NotPresent:
-                case ChannelLaunchOutcome.Failed:
-                    failed++;
-                    break;
-                case ChannelLaunchOutcome.Skipped:
-                    skipped++;
-                    break;
-            }
-        }
-
-        if (emptyDisplayNames is { Count: > 0 })
-        {
-            await _dialogService.ShowAlert(
-                "Empty log",
-                EmptyLogAlertFormatter.BuildMessage(emptyDisplayNames),
-                "Ok",
-                AlertPresentation.Banner);
-        }
-
-        return new OpenLogsBatchResult(
-            opened,
-            emptyDisplayNames?.Count ?? 0,
-            failed,
-            skipped,
-            emptyDisplayNames?.ToImmutableArray() ?? [])
-        {
-            ChannelOutcomes = channelOutcomes?.ToImmutableArray() ?? []
-        };
-    }
-
     private async Task<ChannelOutcome> OpenLogWithOutcomeAsync(
         string logPath,
         LogPathType pathType,
@@ -567,6 +366,69 @@ public sealed class MauiMenuActionService(
         return new ChannelOutcome(logPath, ChannelLaunchOutcome.Opened);
     }
 
+    private async Task<OpenLogsBatchResult> OpenLogsBatchCoreAsync(
+        IEnumerable<(string Path, LogPathType Type)> logs,
+        bool combineLog,
+        bool showInlineAlerts)
+    {
+        ArgumentNullException.ThrowIfNull(logs);
+
+        List<string>? emptyDisplayNames = null;
+        List<ChannelOutcome>? channelOutcomes = null;
+        var combineForCall = combineLog;
+        var opened = 0;
+        var failed = 0;
+        var skipped = 0;
+
+        foreach (var (path, type) in logs)
+        {
+            var outcome = await OpenLogWithOutcomeAsync(path, type, combineForCall, showInlineAlerts);
+
+            if (type == LogPathType.Channel)
+            {
+                (channelOutcomes ??= []).Add(outcome);
+            }
+
+            switch (outcome.Outcome)
+            {
+                case ChannelLaunchOutcome.Opened:
+                    opened++;
+                    combineForCall = true;
+                    break;
+                case ChannelLaunchOutcome.Empty:
+                    (emptyDisplayNames ??= []).Add(GetEmptyLogDisplayName(path, type));
+                    break;
+                case ChannelLaunchOutcome.AccessDenied:
+                case ChannelLaunchOutcome.NotPresent:
+                case ChannelLaunchOutcome.Failed:
+                    failed++;
+                    break;
+                case ChannelLaunchOutcome.Skipped:
+                    skipped++;
+                    break;
+            }
+        }
+
+        if (emptyDisplayNames is { Count: > 0 })
+        {
+            await _dialogService.ShowAlert(
+                "Empty log",
+                EmptyLogAlertFormatter.BuildMessage(emptyDisplayNames),
+                "Ok",
+                AlertPresentation.Banner);
+        }
+
+        return new OpenLogsBatchResult(
+            opened,
+            emptyDisplayNames?.Count ?? 0,
+            failed,
+            skipped,
+            emptyDisplayNames?.ToImmutableArray() ?? [])
+        {
+            ChannelOutcomes = channelOutcomes?.ToImmutableArray() ?? []
+        };
+    }
+
     private async Task<bool> TryOpenModalAsync(Func<Task<ModalOpenResult<bool>>> open, string modalName)
     {
         try
@@ -575,9 +437,6 @@ public sealed class MauiMenuActionService(
 
             if (!result.WasOpened) { _traceLogger.Trace($"{modalName} open preempted by an active modal."); }
 
-            // Propagate WasOpened so callers like AttentionBanner can surface a fallback error when the
-            // coordinator vetoes preemption (returns ModalOpenResult.NotOpened) rather than misreading
-            // a no-op as a successful open.
             return result.WasOpened;
         }
         catch (Exception ex)

@@ -7,8 +7,8 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.LogTable;
-using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.LogTable;
+using EventLogExpert.UI.Menu;
 using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +24,10 @@ public sealed class LogTabBarTests : BunitContext
     private readonly ILogTableCommands _logTableCommands = Substitute.For<ILogTableCommands>();
     private readonly IState<LogTableState> _logTableState = Substitute.For<IState<LogTableState>>();
     private readonly IMenuService _menuService = Substitute.For<IMenuService>();
+    private readonly IState<FilteredLogPresenceState> _presenceState =
+        Substitute.For<IState<FilteredLogPresenceState>>();
+    private readonly ILogTableQueries _queries = Substitute.For<ILogTableQueries>();
+    private readonly ILogTabBarSource _source = Substitute.For<ILogTabBarSource>();
     private readonly ITraceLogger _traceLogger = Substitute.For<ITraceLogger>();
 
     private IReadOnlyList<MenuItem>? _capturedMenu;
@@ -42,13 +46,41 @@ public sealed class LogTabBarTests : BunitContext
                 Arg.Any<bool>()))
             .Do(call => _capturedMenu = call.Arg<IReadOnlyList<MenuItem>>());
 
+        _logTableState.Value.Returns(new LogTableState());
+
+        _presenceState.Value.Returns(new FilteredLogPresenceState());
+
+        _source.Current.Returns(_ => PresentationFrom(_logTableState.Value, _presenceState.Value));
+        _queries.GetTabGroups().Returns(_ => _logTableState.Value.Groups);
+        _queries.HasMultipleIndividualTabs()
+            .Returns(_ => _logTableState.Value.EventTables.Count(table => !table.IsCombined) > 1);
+        _queries.HasOtherTabsInGroup(Arg.Any<LogTabGroupId>(), Arg.Any<EventLogId>()).Returns(call =>
+        {
+            var state = _logTableState.Value;
+
+            if (state.Groups.FirstOrDefault(group => group.Id == call.ArgAt<LogTabGroupId>(0)) is not { } group)
+            {
+                return false;
+            }
+
+            return group.MemberIds.Contains(call.ArgAt<EventLogId>(1)) &&
+                state.EventTables.Count(table => table.GroupId is null && group.MemberIds.Contains(table.Id)) > 1;
+        });
+        _queries.HasTabGroup(Arg.Any<LogTabGroupId>())
+            .Returns(call => _logTableState.Value.Groups.Any(group => group.Id == call.ArgAt<LogTabGroupId>(0)));
+        _queries.IsTabOpen(Arg.Any<EventLogId>())
+            .Returns(call => _logTableState.Value.EventTables.Any(table => table.Id == call.ArgAt<EventLogId>(0)));
+        _queries.IsUngroupedTabOpen(Arg.Any<EventLogId>())
+            .Returns(call => _logTableState.Value.EventTables.Any(
+                table => table.Id == call.ArgAt<EventLogId>(0) && table.GroupId is null));
+
         Services.AddSingleton(_alertDialogService);
         Services.AddSingleton(_eventLogCommands);
         Services.AddSingleton(_logTableCommands);
-        Services.AddSingleton(_logTableState);
         Services.AddSingleton(_menuService);
+        Services.AddSingleton(_queries);
+        Services.AddSingleton(_source);
         Services.AddSingleton(_traceLogger);
-        Services.AddFluxor(options => options.ScanAssemblies(typeof(LogTabBar).Assembly));
     }
 
     [Fact]
@@ -56,7 +88,7 @@ public sealed class LogTabBarTests : BunitContext
     {
         var alpha = EventLogId.Create();
         var beta = EventLogId.Create();
-        var state1 = TwoTabState(alpha, beta, alphaCount: 1, betaCount: 1);
+        var state1 = TwoTabState(alpha, beta);
         _logTableState.Value.Returns(state1);
         var cut = Render<LogTabBar>();
         int before = cut.RenderCount;
@@ -114,16 +146,29 @@ public sealed class LogTabBarTests : BunitContext
     {
         var alpha = EventLogId.Create();
         var beta = EventLogId.Create();
-        _logTableState.Value.Returns(TwoTabState(alpha, beta, alphaCount: 1, betaCount: 1));
+        _logTableState.Value.Returns(TwoTabState(alpha, beta));
         var cut = Render<LogTabBar>();
         var menu = OpenContextMenu(cut, ".tab");
 
-        // Alpha is gone by the time the captured "Close" action runs.
-        _logTableState.Value.Returns(TwoTabState(beta, EventLogId.Create(), alphaCount: 1, betaCount: 1));
+        _logTableState.Value.Returns(TwoTabState(beta, EventLogId.Create()));
 
         await InvokeMenuItemAsync(cut, FindItem(menu, "Close"));
 
         _eventLogCommands.DidNotReceive().CloseLog(Arg.Any<EventLogId>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public void CloseOtherTabs_DisabledWhenNoOtherPerLogTabs()
+    {
+        var allLogsId = EventLogId.Create();
+        var logId = EventLogId.Create();
+        _logTableState.Value.Returns(AllLogsState(allLogsId, logId, "Alpha"));
+        var cut = Render<LogTabBar>();
+        var menu = OpenContextMenuByIndex(cut, 1);
+
+        var item = FindItem(menu, "Close other tabs");
+        Assert.False(item.IsEnabled);
+        Assert.Equal("No other tabs to close", item.DisabledReason);
     }
 
     [Fact]
@@ -140,17 +185,20 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
-    public void CloseOtherTabs_DisabledWhenNoOtherPerLogTabs()
+    public async Task CollapseOnlyChange_Rerenders()
     {
-        var allLogsId = EventLogId.Create();
-        var logId = EventLogId.Create();
-        _logTableState.Value.Returns(AllLogsState(allLogsId, logId, "Alpha"));
+        var (state1, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        _logTableState.Value.Returns(state1);
         var cut = Render<LogTabBar>();
-        var menu = OpenContextMenuByIndex(cut, 1);
+        int before = cut.RenderCount;
 
-        var item = FindItem(menu, "Close other tabs");
-        Assert.False(item.IsEnabled);
-        Assert.Equal("No other tabs to close", item.DisabledReason);
+        var state2 = state1 with
+        {
+            Groups = state1.Groups.SetItem(0, state1.Groups[0] with { IsCollapsed = true })
+        };
+        await RaiseStateChange(cut, state2);
+
+        Assert.True(cut.RenderCount > before);
     }
 
     [Fact]
@@ -177,23 +225,6 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
-    public async Task CollapseOnlyChange_Rerenders()
-    {
-        var (state1, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
-        _logTableState.Value.Returns(state1);
-        var cut = Render<LogTabBar>();
-        int before = cut.RenderCount;
-
-        var state2 = state1 with
-        {
-            Groups = state1.Groups.SetItem(0, state1.Groups[0] with { IsCollapsed = true })
-        };
-        await RaiseStateChange(cut, state2);
-
-        Assert.True(cut.RenderCount > before);
-    }
-
-    [Fact]
     public void CombinedHeader_RendersCombinedLabel()
     {
         var allLogsId = EventLogId.Create();
@@ -203,8 +234,7 @@ public sealed class LogTabBarTests : BunitContext
             ActiveEventLogId = allLogsId,
             EventTables = ImmutableList.Create(
                 new LogView(allLogsId) { GroupId = LogTabGroupId.AllLogs },
-                new LogView(logId) { LogName = "Alpha" }),
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(logId, 1)
+                new LogView(logId) { LogName = "Alpha" })
         };
         _logTableState.Value.Returns(state);
 
@@ -214,55 +244,19 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
-    public async Task EmptinessSwapSameTotal_Rerenders()
-    {
-        var alpha = EventLogId.Create();
-        var beta = EventLogId.Create();
-        var state1 = TwoTabState(alpha, beta, alphaCount: 5, betaCount: 0);
-        _logTableState.Value.Returns(state1);
-        var cut = Render<LogTabBar>();
-        int before = cut.RenderCount;
-
-        var state2 = state1 with
-        {
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(alpha, 0).Add(beta, 5)
-        };
-        await RaiseStateChange(cut, state2);
-
-        Assert.True(cut.RenderCount > before);
-    }
-
-    [Fact]
-    public async Task EmptyToNonEmpty_Rerenders()
-    {
-        var alpha = EventLogId.Create();
-        var beta = EventLogId.Create();
-        var state1 = TwoTabState(alpha, beta, alphaCount: 0, betaCount: 1);
-        _logTableState.Value.Returns(state1);
-        var cut = Render<LogTabBar>();
-        int before = cut.RenderCount;
-
-        var state2 = state1 with { EventCountByLog = state1.EventCountByLog.SetItem(alpha, 1) };
-        await RaiseStateChange(cut, state2);
-
-        Assert.True(cut.RenderCount > before);
-    }
-
-    [Fact]
     public async Task EventTablesChange_Rerenders()
     {
         var alpha = EventLogId.Create();
         var beta = EventLogId.Create();
         var gamma = EventLogId.Create();
-        var state1 = TwoTabState(alpha, beta, alphaCount: 1, betaCount: 1);
+        var state1 = TwoTabState(alpha, beta);
         _logTableState.Value.Returns(state1);
         var cut = Render<LogTabBar>();
         int before = cut.RenderCount;
 
         var state2 = state1 with
         {
-            EventTables = state1.EventTables.Add(new LogView(gamma) { LogName = "Gamma" }),
-            EventCountByLog = state1.EventCountByLog.Add(gamma, 1)
+            EventTables = state1.EventTables.Add(new LogView(gamma) { LogName = "Gamma" })
         };
         await RaiseStateChange(cut, state2);
 
@@ -299,7 +293,7 @@ public sealed class LogTabBarTests : BunitContext
     {
         var alpha = EventLogId.Create();
         var beta = EventLogId.Create();
-        _logTableState.Value.Returns(TwoTabState(alpha, beta, alphaCount: 1, betaCount: 1));
+        _logTableState.Value.Returns(TwoTabState(alpha, beta));
 
         var cut = Render<LogTabBar>();
 
@@ -317,6 +311,18 @@ public sealed class LogTabBarTests : BunitContext
         cut.Find(".group-header > i.bi-x").Click();
 
         _logTableCommands.Received(1).CloseGroup(groupId);
+    }
+
+    [Fact]
+    public void GroupHeaderName_MouseDown_DispatchesSetActiveTable()
+    {
+        var (state, _, headerId, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        _logTableState.Value.Returns(state);
+        var cut = Render<LogTabBar>();
+
+        cut.Find(".group-header > span").MouseDown();
+
+        _logTableCommands.Received(1).SetActiveTable(headerId);
     }
 
     [Fact]
@@ -349,6 +355,24 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
+    public async Task GroupHeader_Rename_StaleGroup_DoesNotDispatch()
+    {
+        var (state, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        _logTableState.Value.Returns(state);
+        _alertDialogService
+            .DisplayPrompt("Rename group", Arg.Any<string>(), "MyGroup", Arg.Any<Func<string, string?>?>())
+            .Returns("Renamed");
+        var cut = Render<LogTabBar>();
+        var menu = OpenContextMenu(cut, ".group-header");
+
+        _logTableState.Value.Returns(new LogTableState());
+
+        await InvokeMenuItemAsync(cut, FindItem(menu, "Rename\u2026"));
+
+        _logTableCommands.DidNotReceive().RenameGroup(Arg.Any<LogTabGroupId>(), Arg.Any<string>());
+    }
+
+    [Fact]
     public void GroupHeader_RightClick_ShowsExpectedItems()
     {
         var (state, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
@@ -362,15 +386,17 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
-    public void GroupHeaderName_MouseDown_DispatchesSetActiveTable()
+    public void KnownEmptyPresence_RendersEmptyPrefix()
     {
-        var (state, _, headerId, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
-        _logTableState.Value.Returns(state);
+        var alpha = EventLogId.Create();
+        var beta = EventLogId.Create();
+        _logTableState.Value.Returns(TwoTabState(alpha, beta));
+        _presenceState.Value.Returns(Presence((alpha, false), (beta, true)));
+
         var cut = Render<LogTabBar>();
 
-        cut.Find(".group-header > span").MouseDown();
-
-        _logTableCommands.Received(1).SetActiveTable(headerId);
+        Assert.Contains("(Empty) Alpha", cut.Markup);
+        Assert.DoesNotContain("(Empty) Beta", cut.Markup);
     }
 
     [Fact]
@@ -447,19 +473,30 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
-    public async Task NonEmptyTabCountIncrement_DoesNotRerender()
+    public void PendingPresence_DoesNotRenderEmptyPrefix()
     {
         var alpha = EventLogId.Create();
         var beta = EventLogId.Create();
-        var state1 = TwoTabState(alpha, beta, alphaCount: 5, betaCount: 3);
-        _logTableState.Value.Returns(state1);
+        _logTableState.Value.Returns(TwoTabState(alpha, beta));
+        _presenceState.Value.Returns(new FilteredLogPresenceState());
+
         var cut = Render<LogTabBar>();
-        int before = cut.RenderCount;
 
-        var state2 = state1 with { EventCountByLog = state1.EventCountByLog.SetItem(alpha, 6) };
-        await RaiseStateChange(cut, state2);
+        Assert.DoesNotContain("(Empty)", cut.Markup);
+    }
 
-        Assert.Equal(before, cut.RenderCount);
+    [Fact]
+    public async Task PresenceChange_RerendersEmptyLabels()
+    {
+        var alpha = EventLogId.Create();
+        var beta = EventLogId.Create();
+        _logTableState.Value.Returns(TwoTabState(alpha, beta));
+        var cut = Render<LogTabBar>();
+        Assert.DoesNotContain("(Empty) Alpha", cut.Markup);
+
+        await RaisePresenceChange(cut, Presence((alpha, false), (beta, true)));
+
+        Assert.Contains("(Empty) Alpha", cut.Markup);
     }
 
     [Fact]
@@ -467,7 +504,7 @@ public sealed class LogTabBarTests : BunitContext
     {
         var alpha = EventLogId.Create();
         var beta = EventLogId.Create();
-        _logTableState.Value.Returns(TwoTabState(alpha, beta, alphaCount: 1, betaCount: 1));
+        _logTableState.Value.Returns(TwoTabState(alpha, beta));
         var cut = Render<LogTabBar>();
 
         cut.Find(".tab > span").MouseDown(new MouseEventArgs { Button = 2 });
@@ -480,7 +517,7 @@ public sealed class LogTabBarTests : BunitContext
     {
         var alpha = EventLogId.Create();
         var beta = EventLogId.Create();
-        _logTableState.Value.Returns(TwoTabState(alpha, beta, alphaCount: 1, betaCount: 1));
+        _logTableState.Value.Returns(TwoTabState(alpha, beta));
         var cut = Render<LogTabBar>();
 
         cut.Find(".tab > i.bi-x").MouseDown(new MouseEventArgs { Button = 2 });
@@ -493,7 +530,7 @@ public sealed class LogTabBarTests : BunitContext
     {
         var alpha = EventLogId.Create();
         var beta = EventLogId.Create();
-        _logTableState.Value.Returns(TwoTabState(alpha, beta, alphaCount: 1, betaCount: 1));
+        _logTableState.Value.Returns(TwoTabState(alpha, beta));
         _alertDialogService
             .DisplayPrompt("New group", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Func<string, string?>?>())
             .Returns("   ");
@@ -506,31 +543,31 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
-    public async Task StandaloneTab_Close_DispatchesCloseLog()
-    {
-        var alpha = EventLogId.Create();
-        var beta = EventLogId.Create();
-        _logTableState.Value.Returns(TwoTabState(alpha, beta, alphaCount: 1, betaCount: 1));
-        var cut = Render<LogTabBar>();
-        var menu = OpenContextMenu(cut, ".tab");
-
-        await InvokeMenuItemAsync(cut, FindItem(menu, "Close"));
-
-        _eventLogCommands.Received(1).CloseLog(alpha, "Alpha");
-    }
-
-    [Fact]
     public async Task StandaloneTab_CloseOtherTabs_DispatchesCloseAllButThis()
     {
         var alpha = EventLogId.Create();
         var beta = EventLogId.Create();
-        _logTableState.Value.Returns(TwoTabState(alpha, beta, alphaCount: 1, betaCount: 1));
+        _logTableState.Value.Returns(TwoTabState(alpha, beta));
         var cut = Render<LogTabBar>();
         var menu = OpenContextMenu(cut, ".tab");
 
         await InvokeMenuItemAsync(cut, FindItem(menu, "Close other tabs"));
 
         _logTableCommands.Received(1).CloseAllButThis(alpha);
+    }
+
+    [Fact]
+    public async Task StandaloneTab_Close_DispatchesCloseLog()
+    {
+        var alpha = EventLogId.Create();
+        var beta = EventLogId.Create();
+        _logTableState.Value.Returns(TwoTabState(alpha, beta));
+        var cut = Render<LogTabBar>();
+        var menu = OpenContextMenu(cut, ".tab");
+
+        await InvokeMenuItemAsync(cut, FindItem(menu, "Close"));
+
+        _eventLogCommands.Received(1).CloseLog(alpha, "Alpha");
     }
 
     [Fact]
@@ -549,31 +586,11 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
-    public async Task StandaloneTab_NewGroup_StaleTab_DoesNotDispatch()
-    {
-        var alpha = EventLogId.Create();
-        var beta = EventLogId.Create();
-        _logTableState.Value.Returns(TwoTabState(alpha, beta, alphaCount: 1, betaCount: 1));
-        _alertDialogService
-            .DisplayPrompt("New group", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Func<string, string?>?>())
-            .Returns("Diagnostics");
-        var cut = Render<LogTabBar>();
-        var menu = OpenContextMenu(cut, ".tab");
-
-        // Alpha is closed while the prompt is open -> the captured menu action targets a tab no longer present.
-        _logTableState.Value.Returns(TwoTabState(beta, EventLogId.Create(), alphaCount: 1, betaCount: 1));
-
-        await InvokeMenuItemAsync(cut, FindItem(menu, "New group from tab\u2026"));
-
-        _logTableCommands.DidNotReceive().NewGroupFromTab(Arg.Any<EventLogId>(), Arg.Any<string>());
-    }
-
-    [Fact]
     public async Task StandaloneTab_NewGroupFromTab_PromptThenDispatches()
     {
         var alpha = EventLogId.Create();
         var beta = EventLogId.Create();
-        _logTableState.Value.Returns(TwoTabState(alpha, beta, alphaCount: 1, betaCount: 1));
+        _logTableState.Value.Returns(TwoTabState(alpha, beta));
         _alertDialogService
             .DisplayPrompt("New group", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Func<string, string?>?>())
             .Returns("Diagnostics");
@@ -586,11 +603,30 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
+    public async Task StandaloneTab_NewGroup_StaleTab_DoesNotDispatch()
+    {
+        var alpha = EventLogId.Create();
+        var beta = EventLogId.Create();
+        _logTableState.Value.Returns(TwoTabState(alpha, beta));
+        _alertDialogService
+            .DisplayPrompt("New group", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Func<string, string?>?>())
+            .Returns("Diagnostics");
+        var cut = Render<LogTabBar>();
+        var menu = OpenContextMenu(cut, ".tab");
+
+        _logTableState.Value.Returns(TwoTabState(beta, EventLogId.Create()));
+
+        await InvokeMenuItemAsync(cut, FindItem(menu, "New group from tab\u2026"));
+
+        _logTableCommands.DidNotReceive().NewGroupFromTab(Arg.Any<EventLogId>(), Arg.Any<string>());
+    }
+
+    [Fact]
     public void StandaloneTab_RightClick_ShowsExpectedItems()
     {
         var alpha = EventLogId.Create();
         var beta = EventLogId.Create();
-        _logTableState.Value.Returns(TwoTabState(alpha, beta, alphaCount: 1, betaCount: 1));
+        _logTableState.Value.Returns(TwoTabState(alpha, beta));
         var cut = Render<LogTabBar>();
 
         var menu = OpenContextMenu(cut, ".tab");
@@ -599,34 +635,38 @@ public sealed class LogTabBarTests : BunitContext
         Assert.Equal(["New group from tab\u2026", "Move to group", string.Empty, "Close", "Close other tabs"], labels);
     }
 
-    [Fact]
-    public async Task UnrelatedFieldChange_DoesNotRerender()
-    {
-        var alpha = EventLogId.Create();
-        var beta = EventLogId.Create();
-        var state1 = TwoTabState(alpha, beta, alphaCount: 1, betaCount: 1);
-        _logTableState.Value.Returns(state1);
-        var cut = Render<LogTabBar>();
-        int before = cut.RenderCount;
-
-        var state2 = state1 with { OrderBy = ColumnName.Source, IsDescending = false };
-        await RaiseStateChange(cut, state2);
-
-        Assert.Equal(before, cut.RenderCount);
-    }
-
     private static LogTableState AllLogsState(EventLogId allLogsId, EventLogId logId, string logName) =>
         new()
         {
             ActiveEventLogId = allLogsId,
             EventTables = ImmutableList.Create(
                 new LogView(allLogsId) { GroupId = LogTabGroupId.AllLogs },
-                new LogView(logId) { LogName = logName }),
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(logId, 1)
+                new LogView(logId) { LogName = logName })
         };
 
     private static MenuItem FindItem(IEnumerable<MenuItem> items, string label) =>
         items.First(item => item.Label == label);
+
+    private static (LogTableState State, LogTabGroupId GroupId, EventLogId Standalone) GroupPlusStandaloneState()
+    {
+        var groupId = LogTabGroupId.Create();
+        var headerId = EventLogId.Create();
+        var member = EventLogId.Create();
+        var standalone = EventLogId.Create();
+
+        var state = new LogTableState
+        {
+            ActiveEventLogId = standalone,
+            EventTables = ImmutableList.Create(
+                new LogView(headerId) { GroupId = groupId, LogName = "MyGroup" },
+                new LogView(member) { LogName = "Alpha" },
+                new LogView(standalone) { LogName = "Gamma" }),
+            Groups = ImmutableList.Create(
+                new LogTabGroup(groupId, "MyGroup", ImmutableHashSet.Create(member)))
+        };
+
+        return (state, groupId, standalone);
+    }
 
     private static (LogTableState State, LogTabGroupId GroupId, EventLogId HeaderId, EventLogId Member1, EventLogId Member2)
         GroupedState(bool collapsed, bool activeIsMember1)
@@ -647,33 +687,44 @@ public sealed class LogTabBarTests : BunitContext
                 new LogTabGroup(groupId, "MyGroup", ImmutableHashSet.Create(member1, member2))
                 {
                     IsCollapsed = collapsed
-                }),
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(member1, 1).Add(member2, 1)
+                })
         };
 
         return (state, groupId, headerId, member1, member2);
     }
 
-    private static (LogTableState State, LogTabGroupId GroupId, EventLogId Standalone) GroupPlusStandaloneState()
+    private static FilteredLogPresenceState Presence(params (EventLogId LogId, bool HasSurvivor)[] verdicts)
     {
-        var groupId = LogTabGroupId.Create();
-        var headerId = EventLogId.Create();
-        var member = EventLogId.Create();
-        var standalone = EventLogId.Create();
+        var byLog = ImmutableDictionary<EventLogId, FilteredLogPresence>.Empty;
 
-        var state = new LogTableState
+        foreach (var (logId, hasSurvivor) in verdicts)
         {
-            ActiveEventLogId = standalone,
-            EventTables = ImmutableList.Create(
-                new LogView(headerId) { GroupId = groupId, LogName = "MyGroup" },
-                new LogView(member) { LogName = "Alpha" },
-                new LogView(standalone) { LogName = "Gamma" }),
-            Groups = ImmutableList.Create(
-                new LogTabGroup(groupId, "MyGroup", ImmutableHashSet.Create(member))),
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(member, 1).Add(standalone, 1)
-        };
+            byLog = byLog.SetItem(
+                logId,
+                hasSurvivor ? FilteredLogPresence.HasSurvivor : FilteredLogPresence.NoSurvivor);
+        }
 
-        return (state, groupId, standalone);
+        return new FilteredLogPresenceState { ByLog = byLog };
+    }
+
+    private static LogTabBarPresentation PresentationFrom(LogTableState state, FilteredLogPresenceState presence)
+    {
+        var knownEmpty = ImmutableHashSet.CreateBuilder<EventLogId>();
+
+        foreach (var table in state.EventTables)
+        {
+            if (table.IsCombined || table.IsLoading) { continue; }
+
+            if (presence.IsKnownEmpty(table.Id)) { knownEmpty.Add(table.Id); }
+        }
+
+        return new LogTabBarPresentation
+        {
+            Tabs = state.EventTables,
+            Groups = state.Groups,
+            ActiveTabId = state.ActiveEventLogId,
+            KnownEmptyTabIds = knownEmpty.ToImmutable()
+        };
     }
 
     private static (LogTableState State, LogTabGroupId GroupId, EventLogId Member) SingleMemberGroupState()
@@ -689,21 +740,19 @@ public sealed class LogTabBarTests : BunitContext
                 new LogView(headerId) { GroupId = groupId, LogName = "Solo" },
                 new LogView(member) { LogName = "OnlyMember" }),
             Groups = ImmutableList.Create(
-                new LogTabGroup(groupId, "Solo", ImmutableHashSet.Create(member))),
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(member, 1)
+                new LogTabGroup(groupId, "Solo", ImmutableHashSet.Create(member)))
         };
 
         return (state, groupId, member);
     }
 
-    private static LogTableState TwoTabState(EventLogId alpha, EventLogId beta, int alphaCount, int betaCount) =>
+    private static LogTableState TwoTabState(EventLogId alpha, EventLogId beta) =>
         new()
         {
             ActiveEventLogId = alpha,
             EventTables = ImmutableList.Create(
                 new LogView(alpha) { LogName = "Alpha" },
-                new LogView(beta) { LogName = "Beta" }),
-            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(alpha, alphaCount).Add(beta, betaCount)
+                new LogView(beta) { LogName = "Beta" })
         };
 
     private async Task InvokeMenuItemAsync(IRenderedComponent<LogTabBar> cut, MenuItem item) =>
@@ -725,12 +774,19 @@ public sealed class LogTabBarTests : BunitContext
         return _capturedMenu!;
     }
 
+    private async Task RaisePresenceChange(IRenderedComponent<LogTabBar> cut, FilteredLogPresenceState next)
+    {
+        _presenceState.Value.Returns(next);
+
+        await cut.InvokeAsync(() => _source.Changed += Raise.Event<Action>());
+        await cut.InvokeAsync(() => Task.CompletedTask);
+    }
+
     private async Task RaiseStateChange(IRenderedComponent<LogTabBar> cut, LogTableState next)
     {
         _logTableState.Value.Returns(next);
 
-        await cut.InvokeAsync(() =>
-            _logTableState.StateChanged += Raise.Event<EventHandler>(_logTableState, EventArgs.Empty));
+        await cut.InvokeAsync(() => _source.Changed += Raise.Event<Action>());
         await cut.InvokeAsync(() => Task.CompletedTask);
     }
 }

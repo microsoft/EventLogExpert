@@ -65,6 +65,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="Fluxor.Blazor.Web" />
         <PackageReference Include="Microsoft.Maui.Controls" />
         <PackageReference Include="Microsoft.Maui.Controls.Compatibility" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" />
@@ -88,8 +89,10 @@
       fails fast with a clear message rather than a confusing MSB4126 from VS MSBuild.
     -->
     <PropertyGroup>
+      <_HostOSArch>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</_HostOSArch>
       <ExplorerExtensionNativePlatform Condition="'$(RuntimeIdentifier)' != '' AND $(RuntimeIdentifier.Contains('-arm64'))">ARM64</ExplorerExtensionNativePlatform>
       <ExplorerExtensionNativePlatform Condition="'$(ExplorerExtensionNativePlatform)' == '' AND '$(RuntimeIdentifier)' == '' AND '$(Platform)' == 'ARM64'">ARM64</ExplorerExtensionNativePlatform>
+      <ExplorerExtensionNativePlatform Condition="'$(ExplorerExtensionNativePlatform)' == '' AND '$(RuntimeIdentifier)' == '' AND '$(Platform)' != 'x64' AND '$(_HostOSArch)' == 'Arm64'">ARM64</ExplorerExtensionNativePlatform>
       <ExplorerExtensionNativePlatform Condition="'$(ExplorerExtensionNativePlatform)' == '' AND ('$(RuntimeIdentifier)' == '' OR $(RuntimeIdentifier.Contains('-x64')))">x64</ExplorerExtensionNativePlatform>
     </PropertyGroup>
 
@@ -222,8 +225,10 @@
     </ItemGroup>
 
     <PropertyGroup>
+      <_HostOSArch>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</_HostOSArch>
       <_ElevationHelperRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_ElevationHelperRid>
       <_ElevationHelperRid Condition="'$(_ElevationHelperRid)' == '' and '$(Platform)' == 'ARM64'">win-arm64</_ElevationHelperRid>
+      <_ElevationHelperRid Condition="'$(_ElevationHelperRid)' == '' and '$(Platform)' != 'x64' and '$(_HostOSArch)' == 'Arm64'">win-arm64</_ElevationHelperRid>
       <_ElevationHelperRid Condition="'$(_ElevationHelperRid)' == ''">win-x64</_ElevationHelperRid>
       <!--
         Anchor the publish output under $(BaseIntermediateOutputPath) (always "obj/") so the SDK's default Content
