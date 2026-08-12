@@ -17,7 +17,8 @@ internal sealed class Effects(
     ILegacyFilterMigrator legacyMigrator,
     IBackslashNameMigrator backslashMigrator,
     IAnnouncementService announcementService,
-    ITraceLogger logger)
+    ITraceLogger logger,
+    TagBulkUpdateFailedNotifier tagBulkUpdateFailedNotifier)
 {
     private const int MaxAutoTrackedRecents = 50;
 
@@ -163,16 +164,8 @@ internal sealed class Effects(
 
             if (legacyMigrator.ShouldRunMigration())
             {
-                // AddRange-throws → keep returning currently-loaded entries + return without marking complete
-                // (retries next launch). Post-AddRange LoadAll-throws → in-memory fallback + MarkMigrationCompleted
-                // as on the happy path.
                 var migrationResult = legacyMigrator.BuildEntriesFromLegacy();
 
-                // Dedup against the already-loaded entries before AddRange - the per-section flag check in
-                // BuildEntriesFromLegacy short-circuits already-completed sections, but on the bitmask-not-advanced
-                // path (e.g., MarkMigrationCompleted SetString throws after a successful AddRange) the next launch
-                // would re-read the still-present legacy keys and produce content-duplicate rows because migration
-                // entries are Origin=UserSaved and the store's partial UNIQUE INDEX only covers AutoTracked rows.
                 var entriesToAdd = DedupMigrationEntriesAgainstExisting(migrationResult.Entries, entries);
 
                 if (entriesToAdd.Count > 0)
@@ -202,7 +195,6 @@ internal sealed class Effects(
                     logger.Information($"Migrated {entriesToAdd.Count} legacy entries to filter library (deduped from {migrationResult.Entries.Count}).");
                 }
 
-                // Not wrapped: a SetString failure surfaces via the outer catch (LoadLibraryFailure). On the next
                 // launch ShouldRunMigration returns true again, BuildEntriesFromLegacy re-emits the same entries,
                 // and DedupMigrationEntriesAgainstExisting filters them out against the now-non-empty store -
                 // so the SetString-throws path is idempotent rather than duplicating.
@@ -485,8 +477,6 @@ internal sealed class Effects(
         {
             Name = action.Name,
             CreatedUtc = DateTimeOffset.UtcNow,
-            // Regenerate FilterIds so Razor `@key=filter.Id` diffing stays correct when the
-            // same pane filters are saved into multiple filter sets.
             Filters = [.. action.Filters.Select(f => f with { Id = FilterId.Create(), IsEnabled = false })],
             Origin = LibraryEntryOrigin.UserSaved,
         };
@@ -545,6 +535,14 @@ internal sealed class Effects(
         return PersistAndDispatchAsync(action.EntryId, e => ApplyFavoriteToggle(e, setIsFavorite, unfavoriteTimestamp), dispatcher);
     }
 
+    [EffectMethod(typeof(TagBulkUpdateFailedAction))]
+    public Task HandleTagBulkUpdateFailed(IDispatcher dispatcher)
+    {
+        tagBulkUpdateFailedNotifier.Raise();
+
+        return Task.CompletedTask;
+    }
+
     [EffectMethod]
     public async Task HandleUpdateLibraryEntry(UpdateLibraryEntryAction action, IDispatcher dispatcher)
     {
@@ -580,7 +578,6 @@ internal sealed class Effects(
     {
         if (isFavorite)
         {
-            // Favoriting: mutex (LastUsedUtc=null) + promotion (Origin=UserSaved). Symmetric for filter + filter set.
             return entry switch
             {
                 LibraryEntrySavedFilter f => f with
@@ -599,7 +596,6 @@ internal sealed class Effects(
             };
         }
 
-        // Unfavoriting: filters drop to Recents (matches legacy FilterCache UX); filter sets stay out of Recents.
         return entry switch
         {
             LibraryEntrySavedFilter f => f with
@@ -924,7 +920,6 @@ internal sealed class Effects(
 
         if (autoTrackedRecents.Count <= MaxAutoTrackedRecents) { return; }
 
-        // CreatedUtc tie-break keeps prune deterministic when entries share LastUsedUtc.
         var toDelete = autoTrackedRecents
             .OrderBy(e => e.LastUsedUtc!.Value)
             .ThenBy(e => e.CreatedUtc)
@@ -933,8 +928,6 @@ internal sealed class Effects(
 
         foreach (var entry in toDelete)
         {
-            // SQL guard no-ops the delete if a concurrent SetIsFavorite/SaveEntry promoted the row
-            // (Origin=UserSaved or IsFavorite=true) after the snapshot was projected.
             bool deleted;
 
             try { deleted = await store.TryDeleteAutoTrackedIfNotFavoriteAsync(entry.Id).ConfigureAwait(false); }

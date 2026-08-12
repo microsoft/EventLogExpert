@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
@@ -20,34 +21,27 @@ public sealed class ReplaceFiltersTests
     [Fact]
     public async Task HandleReplaceFilters_DispatchesUpdateEventTableFilters()
     {
-        // Arrange
         var (effects, dispatcher) = CreateEffects(isEnabled: true, filters: [FilterBuilder.CreateTestFilter(isEnabled: true)]);
 
-        // Act
         await effects.HandleReplaceFilters(dispatcher);
 
-        // Assert
         dispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
     public void ReduceReplaceFilters_AssignsFreshIds()
     {
-        // Arrange
         var input = FilterBuilder.CreateTestFilter();
         var action = new ReplaceFiltersAction([input]);
 
-        // Act
         var result = Reducers.ReduceReplaceFilters(new FilterPaneState(), action);
 
-        // Assert
         Assert.NotEqual(input.Id, result.Filters[0].Id);
     }
 
     [Fact]
     public void ReduceReplaceFilters_PreservesOtherStateFields()
     {
-        // Arrange
         var initialState = new FilterPaneState
         {
             IsEnabled = false,
@@ -61,10 +55,8 @@ public sealed class ReplaceFiltersTests
 
         var action = new ReplaceFiltersAction([FilterBuilder.CreateTestFilter()]);
 
-        // Act
         var result = Reducers.ReduceReplaceFilters(initialState, action);
 
-        // Assert
         Assert.False(result.IsEnabled);
         Assert.Equal(initialState.FilteredDateRange, result.FilteredDateRange);
     }
@@ -72,17 +64,14 @@ public sealed class ReplaceFiltersTests
     [Fact]
     public void ReduceReplaceFilters_ReplacesFilters()
     {
-        // Arrange
         var stale = FilterBuilder.CreateTestFilter(isEnabled: true);
         var initialState = new FilterPaneState { Filters = [stale] };
 
         var newFilter = FilterBuilder.CreateTestFilter();
         var action = new ReplaceFiltersAction([newFilter]);
 
-        // Act
         var result = Reducers.ReduceReplaceFilters(initialState, action);
 
-        // Assert
         Assert.Single(result.Filters);
         Assert.DoesNotContain(result.Filters, f => f.Id == stale.Id);
     }
@@ -107,7 +96,7 @@ public sealed class ReplaceFiltersTests
         var mockLensState = Substitute.For<IState<FilterLensState>>();
         mockLensState.Value.Returns(new FilterLensState());
 
-        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState, mockLensState);
+        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState, mockLensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()));
         var dispatcher = Substitute.For<IDispatcher>();
 
         return (effects, dispatcher);

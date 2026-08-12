@@ -92,6 +92,18 @@ public sealed class EventLogQueriesTests
         Assert.Equal(["Alpha", "Bravo"], sources);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void IsContinuouslyUpdating_ReflectsTheEventLogState(bool continuouslyUpdate)
+    {
+        var queries = new EventLogQueries(
+            StateReturning(new RawEventStoreState()),
+            EventLogStateReturning(new EventLogState { ContinuouslyUpdate = continuouslyUpdate }));
+
+        Assert.Equal(continuouslyUpdate, queries.IsContinuouslyUpdating());
+    }
+
     [Fact]
     public void RoundOrFallback_WhenNewestIsExactHour_DoesNotPushBeforeForward()
     {

@@ -65,6 +65,8 @@ internal sealed class EventLogQueries(
         return EventPropertyValuesCache.GetUserDataFieldValues(byLog, EnumerateAll(byLog), fieldName);
     }
 
+    public bool IsContinuouslyUpdating() => _eventLogState.Value.ContinuouslyUpdate;
+
     private static IEnumerable<ResolvedEvent> EnumerateAll(
         ImmutableDictionary<EventLogId, EventColumnStore> byLog)
     {
