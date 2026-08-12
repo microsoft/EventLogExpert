@@ -41,9 +41,11 @@ public sealed class DatabaseToolsServiceTests
     [Fact]
     public async Task DurationIsMeasured_AndGreaterThanZero()
     {
+        const int MeasurableWorkDelayMilliseconds = 50;
+
         var fake = new RecordingOperation(async _ =>
         {
-            await Task.Delay(50);
+            await Task.Delay(MeasurableWorkDelayMilliseconds);
             return DatabaseToolsOutcome.Succeeded;
         });
         var (service, _) = CreateSut(showOperation: () => fake);

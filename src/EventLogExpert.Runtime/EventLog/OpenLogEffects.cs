@@ -35,30 +35,29 @@ internal sealed class OpenLogEffects(
     ICriticalErrorService criticalErrorService,
     LogCloseCoordinator closeCoordinator,
     EventLogConcurrencyState concurrencyState,
-    PartialLoadCoordinator coordinator,
+    LiveTailIngestCoordinator liveTailCoordinator,
     IEventLogReaderFactory readerFactory)
 {
-    // Eager first paint fires at a screenful so the newest rows render in ~1s instead of waiting for the 3s partial timer.
     private const int EagerFirstPaintThreshold = 200;
 
-    // EvtNext batch: benchmarked Win11 throughput sweet spot; 512 regresses.
     private const int ReadBatchSize = 256;
 
     private static readonly int s_maxGlobalConcurrency = ConcurrencyLimits.MaxBackgroundIoParallelism;
+    private static readonly TimeSpan s_partialDispatchInterval = TimeSpan.FromSeconds(3);
     private static readonly PrioritySemaphore s_resolutionGate = new(s_maxGlobalConcurrency);
 
     private readonly LogCloseCoordinator _closeCoordinator = closeCoordinator;
     private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
-    private readonly PartialLoadCoordinator _coordinator = coordinator;
     private readonly ICriticalErrorService _criticalErrorService = criticalErrorService;
     private readonly IDatabaseService _databaseService = databaseService;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly Lock _globalCtsLock = new();
     private readonly ITraceLogger _lifecycleLogger = logger.ForCategory(LogCategories.EventLogLifecycle);
+    private readonly LiveTailIngestCoordinator _liveTailCoordinator = liveTailCoordinator;
     private readonly ConcurrentDictionary<EventLogId, CancellationTokenSource> _logCts = new();
-    private readonly ITraceLogger _logger = logger;
     private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logLoadCompletions = new();
     private readonly ILogWatcherService _logWatcherService = logWatcherService;
+    private readonly ITraceLogger _logger = logger;
     private readonly IEventLogReaderFactory _readerFactory = readerFactory;
     private readonly IEventResolverCache _resolverCache = resolverCache;
     private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
@@ -72,9 +71,8 @@ internal sealed class OpenLogEffects(
     {
         _lifecycleLogger.Debug($"Close-all requested ({_eventLogState.Value.OpenLogs.Count} active logs).");
 
-        _coordinator.DiscardAll();
+        _liveTailCoordinator.DiscardAll();
 
-        _concurrencyState.InvalidateInFlightFilters();
         _concurrencyState.InvalidateInFlightReloads();
 
         CancelAllLoads();
@@ -92,7 +90,7 @@ internal sealed class OpenLogEffects(
     {
         _lifecycleLogger.Debug($"Close requested for '{action.LogName}' (id: {action.LogId}).");
 
-        _coordinator.Discard(action.LogId);
+        _liveTailCoordinator.Discard(action.LogId);
 
         try
         {
@@ -114,12 +112,14 @@ internal sealed class OpenLogEffects(
                 }
             }
 
-            await _logWatcherService.RemoveLogAsync(action.LogName);
+            if (!(_eventLogState.Value.OpenLogs.TryGetValue(action.LogName, out var activeLog) && activeLog.Id != action.LogId))
+            {
+                await _logWatcherService.RemoveLogAsync(action.LogName);
+                _closeCoordinator.ClearPendingRestore(action.LogName);
+                _xmlResolver.ClearXmlCacheForLog(action.LogName);
+            }
 
             _concurrencyState.ClearLoadedWithXml(action.LogId);
-            _closeCoordinator.ClearPendingRestore(action.LogName);
-
-            _xmlResolver.ClearXmlCacheForLog(action.LogName);
 
             dispatcher.Dispatch(new LogTable.CloseLogAction(action.LogId));
 
@@ -153,6 +153,13 @@ internal sealed class OpenLogEffects(
         }
 
         var logData = new EventLogData(action.LogName, openInfo.Type) { Id = openInfo.Id };
+
+        if (action.PreassignedId is { } preassignedId && openInfo.Id != preassignedId)
+        {
+            _logger.Trace($"Open '{action.LogName}': correlated reopen superseded by a same-name open (expected {preassignedId}, found {openInfo.Id}); skipping load.");
+
+            return;
+        }
 
         CancellationTokenSource perLoadCts;
 
@@ -330,7 +337,7 @@ internal sealed class OpenLogEffects(
             },
             null,
             TimeSpan.Zero,
-            TimeSpan.FromSeconds(3));
+            s_partialDispatchInterval);
 
         bool renderXml = _eventLogState.Value.AppliedFilter.RequiresXml;
 
@@ -381,8 +388,6 @@ internal sealed class OpenLogEffects(
                 {
                     EventRecord[] batch = item.Batch;
 
-                    // Classify by ADMITTED (not completed) events so a slow-resolving load still demotes to Bulk after
-                    // its first screenful instead of monopolizing the high-priority lane.
                     var priority = Volatile.Read(ref highAdmitted) < EagerFirstPaintThreshold ?
                         ResolutionPriority.FirstScreenful :
                         ResolutionPriority.Bulk;
@@ -435,8 +440,6 @@ internal sealed class OpenLogEffects(
                                 nextDrainSeq++;
                             }
 
-                            // Dispatch the first screenful immediately instead of waiting for the 3s timer (the read is
-                            // reversed, so these are the newest events).
                             if (events.Count >= EagerFirstPaintThreshold && Interlocked.Exchange(ref eagerFired, 1) == 0)
                             {
                                 dispatchEager = true;
@@ -500,12 +503,8 @@ internal sealed class OpenLogEffects(
             return;
         }
 
-        // Stop the timer before dispatching so no stale LoadEventsPartialAction fires after the final LoadEventsAction.
         await timer.DisposeAsync();
 
-        // Dispatch the finalized list in physical read order (the order partials were appended) so the finalization
-        // Build keeps every physical Index stable; re-sorting would strand partial-era EventLocators (the selection and
-        // highlight-cache keys) on a different physical row.
         token.ThrowIfCancellationRequested();
 
         if (!_eventLogState.Value.OpenLogs.TryGetValue(logData.Name, out var activeLog)

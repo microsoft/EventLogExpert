@@ -7,6 +7,7 @@ using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Filtering.TestUtils.Constants;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 using EventLogExpert.Runtime.Tests.TestUtils;
 
 namespace EventLogExpert.Runtime.Tests.Histogram;
@@ -14,25 +15,9 @@ namespace EventLogExpert.Runtime.Tests.Histogram;
 public sealed class HistogramHighlightTieTests
 {
     [Fact]
-    public void Build_WhenHighlightTieIsNotRequested_LeavesGroupMasksNull()
-    {
-        EventColumnView view = DisplayViewTestFactory.Build(
-            EventLogId.Create(),
-            [FilterEventBuilder.CreateTestEvent(20)]);
-
-        HistogramData data = HistogramBuilder.Build(
-            view,
-            HistogramDimension.EventId,
-            HistogramConstants.MaxBuckets,
-            TestContext.Current.CancellationToken)!;
-
-        Assert.Null(data.GroupHighlightMasks);
-    }
-
-    [Fact]
     public void BuildWithHighlightTie_FieldDimension_SetsMasksForCountedRows()
     {
-        EventColumnView view = DisplayViewTestFactory.Build(
+        AosReferenceView view = DisplayViewTestFactory.Build(
             EventLogId.Create(),
             [FilterEventBuilder.CreateTestEvent(20, source: "Alpha")]);
         SavedFilter[] filters = [CreateFilter("Id == 20", HighlightColor.LightRed)];
@@ -55,7 +40,7 @@ public sealed class HistogramHighlightTieTests
     [InlineData(HistogramDimension.ProcessImage)]
     public void BuildWithHighlightTie_PreservesSlotCountsAcrossDimensions(HistogramDimension dimension)
     {
-        EventColumnView view = DisplayViewTestFactory.Build(
+        AosReferenceView view = DisplayViewTestFactory.Build(
             EventLogId.Create(),
             [
                 FilterEventBuilder.CreateTestEvent(20, source: "Alpha", level: FilterTestConstants.EventLevelError),
@@ -77,7 +62,7 @@ public sealed class HistogramHighlightTieTests
     [Fact]
     public void BuildWithHighlightTie_UsesCapturedWinnerArrayWhenViewCacheChanges()
     {
-        EventColumnView view = DisplayViewTestFactory.Build(
+        AosReferenceView view = DisplayViewTestFactory.Build(
             EventLogId.Create(),
             [FilterEventBuilder.CreateTestEvent(20)]);
         SavedFilter[] firstFilters = [CreateFilter("Id == 20", HighlightColor.LightRed)];
@@ -94,7 +79,7 @@ public sealed class HistogramHighlightTieTests
     [Fact]
     public void BuildWithHighlightTie_WhenGroupHasOneWinner_StoresThatWinnerMask()
     {
-        EventColumnView view = DisplayViewTestFactory.Build(
+        AosReferenceView view = DisplayViewTestFactory.Build(
             EventLogId.Create(),
             [FilterEventBuilder.CreateTestEvent(20), FilterEventBuilder.CreateTestEvent(20)]);
         SavedFilter[] filters = [CreateFilter("Id == 20", HighlightColor.LightRed)];
@@ -114,7 +99,7 @@ public sealed class HistogramHighlightTieTests
     [Fact]
     public void BuildWithHighlightTie_WhenGroupHasUncoloredRow_IncludesBitZero()
     {
-        EventColumnView view = DisplayViewTestFactory.Build(
+        AosReferenceView view = DisplayViewTestFactory.Build(
             EventLogId.Create(),
             [
                 FilterEventBuilder.CreateTestEvent(20, source: FilterTestConstants.EventSourceTestSource),
@@ -137,7 +122,7 @@ public sealed class HistogramHighlightTieTests
     [Fact]
     public void BuildWithHighlightTie_WhenSeverityGroupFoldsSlots_OrsSlotMasks()
     {
-        EventColumnView view = DisplayViewTestFactory.Build(
+        AosReferenceView view = DisplayViewTestFactory.Build(
             EventLogId.Create(),
             [
                 FilterEventBuilder.CreateTestEvent(20, level: FilterTestConstants.EventLevelError),
@@ -162,15 +147,31 @@ public sealed class HistogramHighlightTieTests
     }
 
     [Fact]
+    public void Build_WhenHighlightTieIsNotRequested_LeavesGroupMasksNull()
+    {
+        AosReferenceView view = DisplayViewTestFactory.Build(
+            EventLogId.Create(),
+            [FilterEventBuilder.CreateTestEvent(20)]);
+
+        HistogramData data = HistogramBuilder.Build(
+            view,
+            HistogramDimension.EventId,
+            HistogramConstants.MaxBuckets,
+            TestContext.Current.CancellationToken)!;
+
+        Assert.Null(data.GroupHighlightMasks);
+    }
+
+    [Fact]
     public void CombinedColumnView_BuildWithHighlightTie_OrsPerChildMasks()
     {
-        EventColumnView first = DisplayViewTestFactory.Build(
+        AosReferenceView first = DisplayViewTestFactory.Build(
             EventLogId.Create(),
             [FilterEventBuilder.CreateTestEvent(20, source: "Alpha")]);
-        EventColumnView second = DisplayViewTestFactory.Build(
+        AosReferenceView second = DisplayViewTestFactory.Build(
             EventLogId.Create(),
             [FilterEventBuilder.CreateTestEvent(20, source: "Beta")]);
-        var combined = new CombinedColumnView(
+        var combined = new AosReferenceCombinedView(
             [first, second],
             new SortContext(orderBy: null, isDescending: false, groupBy: null, isGroupDescending: false));
         SavedFilter[] filters =
@@ -189,10 +190,10 @@ public sealed class HistogramHighlightTieTests
     [Fact]
     public void CombinedColumnView_BuildWithHighlightTie_RejectsForeignWinnerHandle()
     {
-        EventColumnView first = DisplayViewTestFactory.Build(
+        AosReferenceView first = DisplayViewTestFactory.Build(
             EventLogId.Create(),
             [FilterEventBuilder.CreateTestEvent(20)]);
-        var combined = new CombinedColumnView(
+        var combined = new AosReferenceCombinedView(
             [first],
             new SortContext(orderBy: null, isDescending: false, groupBy: null, isGroupDescending: false));
 
@@ -203,7 +204,7 @@ public sealed class HistogramHighlightTieTests
     [Fact]
     public void EnsureHighlightWinners_AfterPlanChange_ReturnsPlanConsistentSnapshot()
     {
-        EventColumnView view = DisplayViewTestFactory.Build(
+        AosReferenceView view = DisplayViewTestFactory.Build(
             EventLogId.Create(),
             [FilterEventBuilder.CreateTestEvent(20), FilterEventBuilder.CreateTestEvent(21)]);
         SavedFilter[] firstFilters = [CreateFilter("Id == 20", HighlightColor.LightRed)];
@@ -222,7 +223,7 @@ public sealed class HistogramHighlightTieTests
     [Fact]
     public void EventColumnView_WithContext_PreservesCapturedHighlightWinners()
     {
-        EventColumnView view = DisplayViewTestFactory.Build(
+        AosReferenceView view = DisplayViewTestFactory.Build(
             EventLogId.Create(),
             [
                 FilterEventBuilder.CreateTestEvent(20, timeCreated: DateTime.UtcNow.AddMinutes(1)),

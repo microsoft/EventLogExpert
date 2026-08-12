@@ -18,11 +18,13 @@ using System.Threading.Channels;
 
 namespace EventLogExpert.Runtime.DatabaseTools.Elevation;
 
-// Duplex named-pipe buffers permit concurrent drain reads and request/cancel writes.
 internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 {
     private const int ChannelCapacity = 1024;
 
+    private static readonly TimeSpan s_defaultCancellationGrace = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan s_defaultExitGrace = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan s_defaultHelloTimeout = TimeSpan.FromSeconds(10);
     private static readonly UTF8Encoding s_utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
     private readonly TimeSpan _cancellationGrace;
@@ -32,7 +34,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
     private readonly ITraceLogger _traceLogger;
 
     public ElevatedDatabaseToolsRunner(IElevatedHelperProcessHost host, ITraceLogger traceLogger)
-        : this(host, traceLogger, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(5)) { }
+        : this(host, traceLogger, s_defaultHelloTimeout, s_defaultCancellationGrace, s_defaultExitGrace) { }
 
     internal ElevatedDatabaseToolsRunner(
         IElevatedHelperProcessHost host,
@@ -518,7 +520,6 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
             killState.CancelGraceTimer();
 
-            // Join the kill-timer so its disposition write happens-before the TranslateOutcome read.
             try { await killState.KillTaskOrCompleted.WaitAsync(_exitGrace); }
             catch (TimeoutException)
             {
@@ -605,7 +606,6 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                     catch { /* best effort */ }
                 }
 
-                // Dispose pipe before force-kill so the helper can exit cooperatively.
                 try { await ((IAsyncDisposable)process.Pipe).DisposeAsync(); }
                 catch { /* best effort */ }
 

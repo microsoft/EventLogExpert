@@ -14,6 +14,8 @@ namespace EventLogExpert.Runtime.Tests.EventLog;
 
 public sealed class DatabaseCoordinationEffectsReloadTests
 {
+    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(5);
+
     private readonly LogCloseCoordinator _closeCoordinator = new();
     private readonly IDispatcher _dispatcher = Substitute.For<IDispatcher>();
     private readonly IEventLogCommands _eventLogCommands = Substitute.For<IEventLogCommands>();
@@ -109,7 +111,7 @@ public sealed class DatabaseCoordinationEffectsReloadTests
 
         var sut = CreateSut();
         await sut.ReloadAllActiveLogsAsync(Ct);
-        await sut.ReloadAllActiveLogsAsync(Ct).WaitAsync(TimeSpan.FromSeconds(5), Ct);
+        await sut.ReloadAllActiveLogsAsync(Ct).WaitAsync(s_testTimeout, Ct);
 
         _dispatcher.Received(2).Dispatch(Arg.Any<CloseLogAction>());
         _eventLogCommands.Received(2).OpenLog("Application", LogPathType.Channel, Arg.Any<CancellationToken>());
@@ -158,8 +160,6 @@ public sealed class DatabaseCoordinationEffectsReloadTests
         {
             if (!signalCompletionOnDispatch)
             {
-                // Cancel deterministically at the close-await point (not via a wall-clock timer) so the first
-                // reload always fails at the same place and the Received(2) assertion can't race CI scheduling.
                 firstCallCts!.Cancel();
 
                 return;
@@ -177,7 +177,7 @@ public sealed class DatabaseCoordinationEffectsReloadTests
         }
 
         signalCompletionOnDispatch = true;
-        await sut.ReloadAllActiveLogsAsync(Ct).WaitAsync(TimeSpan.FromSeconds(5), Ct);
+        await sut.ReloadAllActiveLogsAsync(Ct).WaitAsync(s_testTimeout, Ct);
 
         _eventLogCommands.Received(2).OpenLog("Application", LogPathType.Channel, Arg.Any<CancellationToken>());
     }

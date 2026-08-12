@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
@@ -65,7 +66,7 @@ public sealed class RestoreFilterPaneStateTests
         var lensState = Substitute.For<IState<FilterLensState>>();
         lensState.Value.Returns(new FilterLensState());
 
-        var effects = new Effects(appliedFilter, rawEventStore, filterPaneState, lensState);
+        var effects = new Effects(appliedFilter, rawEventStore, filterPaneState, lensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()));
 
         return (effects, Substitute.For<IDispatcher>());
     }

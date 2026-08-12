@@ -7,11 +7,11 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Filtering.TestUtils.Constants;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using Fluxor;
@@ -27,24 +27,19 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleAddFilter_WhenComparisonValueExists_ShouldUpdateEventTableFilters()
     {
-        // Arrange
         var filterModel = FilterBuilder.CreateTestFilter(isEnabled: true);
 
         var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
         var action = new AddFilterAction(filterModel);
 
-        // Act
         await effects.HandleAddFilter(action, mockDispatcher);
 
-        // Assert
         mockDispatcher.Received().Dispatch(Arg.Any<ApplyFilterAction>());
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterProgressAction>());
     }
 
     [Fact]
     public async Task HandleAddFilter_WhenComparisonValueIsNull_ShouldNotUpdateEventTableFilters()
     {
-        // Arrange
         var filterModel = new SavedFilter
         {
             ComparisonText = string.Empty,
@@ -54,26 +49,21 @@ public sealed class EffectsTests
         var (effects, mockDispatcher) = CreateEffects();
         var action = new AddFilterAction(filterModel);
 
-        // Act
         await effects.HandleAddFilter(action, mockDispatcher);
 
-        // Assert
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
     public async Task HandleAddFilter_WhenFilterHasBasicFilter_ShouldRecordFilterApplied()
     {
-        // Arrange
         var filterModel = FilterBuilder.CreateTestFilter(basicFilter: CreateBasicFilter());
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new AddFilterAction(filterModel);
 
-        // Act
         await effects.HandleAddFilter(action, mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
             x != null &&
             x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
@@ -82,33 +72,53 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleAddFilter_WhenFilterHasNoBasicFilter_ShouldRecordFilterApplied()
     {
-        // Arrange
         var filterModel = FilterBuilder.CreateTestFilter();
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new AddFilterAction(filterModel);
 
-        // Act
         await effects.HandleAddFilter(action, mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
             x != null &&
             x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
     }
 
     [Fact]
+    public async Task HandleClearAllFilters_RaisesTheNotifierOncePerDispatch()
+    {
+        var filterPaneState = Substitute.For<IState<FilterPaneState>>();
+        filterPaneState.Value.Returns(new FilterPaneState());
+        var appliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
+        appliedFilter.Value.Returns(new Filter(null, []));
+        var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
+        rawEventStore.Value.Returns(new RawEventStoreState());
+        var lensState = Substitute.For<IState<FilterLensState>>();
+        lensState.Value.Returns(new FilterLensState());
+
+        var notifier = new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>());
+        var raised = 0;
+        notifier.Requested += () => raised++;
+
+        var effects = new Effects(
+            appliedFilter, rawEventStore, filterPaneState, lensState,
+            notifier, new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()));
+
+        await effects.HandleClearAllFilters(Substitute.For<IDispatcher>());
+        await effects.HandleClearAllFilters(Substitute.For<IDispatcher>());
+
+        Assert.Equal(2, raised);
+    }
+
+    [Fact]
     public async Task HandleClearAllFilters_ShouldUpdateEventTableFilters()
     {
-        // Arrange
         var (effects, mockDispatcher) = CreateEffects(
             true,
             appliedFilter: new Filter(null, CreateSingleEnabledFilters()));
 
-        // Act
         await effects.HandleClearAllFilters(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
@@ -125,74 +135,57 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleRemoveAdvancedFilter_ShouldUpdateEventTableFilters()
     {
-        // Arrange
         var (effects, mockDispatcher) = CreateEffects(
             true,
             appliedFilter: new Filter(null, CreateSingleEnabledFilters()));
 
-        // Act
         await effects.HandleRemoveAdvancedFilter(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
-    public async Task HandleSetFilter_ShouldUpdateEventTableFilters()
+    public async Task HandleSetFilterDateRangeSuccess_RaisesTheNotifierOncePerDispatch()
     {
-        // Arrange
+        var filterPaneState = Substitute.For<IState<FilterPaneState>>();
+        filterPaneState.Value.Returns(new FilterPaneState());
+        var appliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
+        appliedFilter.Value.Returns(new Filter(null, []));
+        var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
+        rawEventStore.Value.Returns(new RawEventStoreState());
+        var lensState = Substitute.For<IState<FilterLensState>>();
+        lensState.Value.Returns(new FilterLensState());
+
+        var notifier = new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>());
+        var raised = 0;
+        notifier.Succeeded += () => raised++;
+
+        var effects = new Effects(
+            appliedFilter, rawEventStore, filterPaneState, lensState,
+            new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), notifier);
+
+        await effects.HandleSetFilterDateRangeSuccess(Substitute.For<IDispatcher>());
+        await effects.HandleSetFilterDateRangeSuccess(Substitute.For<IDispatcher>());
+
+        Assert.Equal(2, raised);
+    }
+
+    [Fact]
+    public async Task HandleSetFilterDateRangeSuccess_ShouldUpdateEventTableFilters()
+    {
         var filterModel = FilterBuilder.CreateTestFilter(isEnabled: true);
 
         var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
         var action = new SetFilterAction(filterModel);
 
-        // Act
-        await effects.HandleSetFilter(action, mockDispatcher);
+        await effects.HandleSetFilterDateRangeSuccess(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
-    }
-
-    [Fact]
-    public async Task HandleSetFilter_WhenFilterHasBasicFilter_ShouldRecordFilterApplied()
-    {
-        // Arrange
-        var filterModel = FilterBuilder.CreateTestFilter(basicFilter: CreateBasicFilter());
-
-        var (effects, mockDispatcher) = CreateEffects();
-        var action = new SetFilterAction(filterModel);
-
-        // Act
-        await effects.HandleSetFilter(action, mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
-            x != null &&
-            x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
-    }
-
-    [Fact]
-    public async Task HandleSetFilter_WhenFilterHasNoBasicFilter_ShouldRecordFilterApplied()
-    {
-        // Arrange
-        var filterModel = FilterBuilder.CreateTestFilter();
-
-        var (effects, mockDispatcher) = CreateEffects();
-        var action = new SetFilterAction(filterModel);
-
-        // Act
-        await effects.HandleSetFilter(action, mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
-            x != null &&
-            x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
     }
 
     [Fact]
     public async Task HandleSetFilterDateRange_WhenAfterIsNull_ShouldUseRangeFromActiveLogs()
     {
-        // Arrange
         var oldest = new DateTime(2024, 1, 1, 8, 30, 45, DateTimeKind.Utc);
         var newest = new DateTime(2024, 1, 1, 14, 15, 0, DateTimeKind.Utc);
         var unrelatedBefore = new DateTime(2024, 1, 1, 23, 0, 0, DateTimeKind.Utc);
@@ -208,10 +201,8 @@ public sealed class EffectsTests
         var (effects, mockDispatcher) = CreateEffects(logsWithEvents: [(logData, events)]);
         var action = new SetFilterDateRangeAction(new DateFilter { Before = unrelatedBefore });
 
-        // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
 
-        // Assert
         var expectedAfter = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
             x != null &&
@@ -223,7 +214,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleSetFilterDateRange_WhenBeforeIsNull_ShouldUseRangeFromActiveLogs()
     {
-        // Arrange
         var oldest = new DateTime(2024, 1, 1, 8, 30, 45, DateTimeKind.Utc);
         var newest = new DateTime(2024, 1, 1, 14, 15, 0, DateTimeKind.Utc);
         var unrelatedAfter = new DateTime(2023, 12, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -239,10 +229,8 @@ public sealed class EffectsTests
         var (effects, mockDispatcher) = CreateEffects(logsWithEvents: [(logData, events)]);
         var action = new SetFilterDateRangeAction(new DateFilter { After = unrelatedAfter });
 
-        // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
 
-        // Assert
         var expectedBefore = new DateTime(2024, 1, 1, 15, 0, 0, DateTimeKind.Utc);
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
             x != null &&
@@ -254,7 +242,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleSetFilterDateRange_WhenBothNullAcrossMultipleLogs_ShouldComputeRange()
     {
-        // Arrange
         var logAOldest = new DateTime(2024, 1, 1, 4, 0, 0, DateTimeKind.Utc);
         var logANewest = new DateTime(2024, 1, 1, 6, 0, 0, DateTimeKind.Utc);
         var logBOldest = new DateTime(2024, 1, 5, 20, 0, 0, DateTimeKind.Utc);
@@ -282,10 +269,8 @@ public sealed class EffectsTests
         var (effects, mockDispatcher) = CreateEffects(logsWithEvents: [(logA, eventsA), (logB, eventsB)]);
         var action = new SetFilterDateRangeAction(new DateFilter());
 
-        // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
             x != null &&
             x.DateFilter != null &&
@@ -296,17 +281,14 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleSetFilterDateRange_WhenBothProvided_ShouldUseProvidedValues()
     {
-        // Arrange
         var after = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Utc);
         var before = new DateTime(2024, 1, 1, 14, 0, 0, DateTimeKind.Utc);
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new SetFilterDateRangeAction(new DateFilter { After = after, Before = before });
 
-        // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
             x != null &&
             x.DateFilter != null &&
@@ -317,7 +299,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleSetFilterDateRange_WhenExistingDateRangeHasAfter_ShouldUseExistingAfter()
     {
-        // Arrange
         var existingAfter = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
         var newBefore = new DateTime(2024, 1, 1, 16, 0, 0, DateTimeKind.Utc);
 
@@ -326,10 +307,8 @@ public sealed class EffectsTests
 
         var action = new SetFilterDateRangeAction(new DateFilter { Before = newBefore });
 
-        // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
             x != null &&
             x.DateFilter != null &&
@@ -340,7 +319,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleSetFilterDateRange_WhenExistingDateRangeHasBefore_ShouldUseExistingBefore()
     {
-        // Arrange
         var existingBefore = new DateTime(2024, 1, 1, 16, 0, 0, DateTimeKind.Utc);
         var newAfter = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
 
@@ -349,10 +327,8 @@ public sealed class EffectsTests
 
         var action = new SetFilterDateRangeAction(new DateFilter { After = newAfter });
 
-        // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
             x != null &&
             x.DateFilter != null &&
@@ -363,39 +339,62 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleSetFilterDateRange_WhenFilterDateModelIsNull_ShouldDispatchSuccessWithNull()
     {
-        // Arrange
         var (effects, mockDispatcher) = CreateEffects();
         var action = new SetFilterDateRangeAction(null);
 
-        // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
             x != null &&
             x.DateFilter == null));
     }
 
     [Fact]
-    public async Task HandleSetFilterDateRangeSuccess_ShouldUpdateEventTableFilters()
+    public async Task HandleSetFilter_ShouldUpdateEventTableFilters()
     {
-        // Arrange
         var filterModel = FilterBuilder.CreateTestFilter(isEnabled: true);
 
         var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
         var action = new SetFilterAction(filterModel);
 
-        // Act
-        await effects.HandleSetFilterDateRangeSuccess(mockDispatcher);
+        await effects.HandleSetFilter(action, mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
+    }
+
+    [Fact]
+    public async Task HandleSetFilter_WhenFilterHasBasicFilter_ShouldRecordFilterApplied()
+    {
+        var filterModel = FilterBuilder.CreateTestFilter(basicFilter: CreateBasicFilter());
+
+        var (effects, mockDispatcher) = CreateEffects();
+        var action = new SetFilterAction(filterModel);
+
+        await effects.HandleSetFilter(action, mockDispatcher);
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
+            x != null &&
+            x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
+    }
+
+    [Fact]
+    public async Task HandleSetFilter_WhenFilterHasNoBasicFilter_ShouldRecordFilterApplied()
+    {
+        var filterModel = FilterBuilder.CreateTestFilter();
+
+        var (effects, mockDispatcher) = CreateEffects();
+        var action = new SetFilterAction(filterModel);
+
+        await effects.HandleSetFilter(action, mockDispatcher);
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<RecordFilterAppliedAction>(x =>
+            x != null &&
+            x.Filter.ComparisonText == FilterTestConstants.FilterIdEquals100));
     }
 
     [Fact]
     public async Task HandleToggleFilterDate_ShouldUpdateEventTableFilters()
     {
-        // Arrange
         var (effects, mockDispatcher) = CreateEffects(
             true,
             filteredDateRange: new DateFilter
@@ -404,56 +403,44 @@ public sealed class EffectsTests
                 Before = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc)
             });
 
-        // Act
         await effects.HandleToggleFilterDate(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
     public async Task HandleToggleFilterEnabled_ShouldUpdateEventTableFilters()
     {
-        // Arrange
         var (effects, mockDispatcher) = CreateEffects(true, CreateSingleEnabledFilters());
 
-        // Act
         await effects.HandleToggleFilterEnabled(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
     public async Task HandleToggleFilterExcluded_ShouldUpdateEventTableFilters()
     {
-        // Arrange
         var (effects, mockDispatcher) = CreateEffects(true, CreateSingleEnabledFilters());
 
-        // Act
         await effects.HandleToggleFilterExcluded(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
     public async Task HandleToggleIsEnabled_ShouldUpdateEventTableFilters()
     {
-        // Arrange
         var (effects, mockDispatcher) = CreateEffects(true, CreateSingleEnabledFilters());
 
-        // Act
         await effects.HandleToggleIsEnabled(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
     public async Task UpdateEventTableFilters_WhenEquivalentFiltersFromDifferentInstances_ShouldNotDispatch()
     {
-        // Arrange
         var paneFilters = ImmutableList.Create(
             FilterBuilder.CreateTestFilter(isEnabled: true,
                 isExcluded: false));
@@ -467,17 +454,14 @@ public sealed class EffectsTests
             paneFilters,
             appliedFilter: new Filter(null, appliedFilters));
 
-        // Act
         await effects.HandleToggleIsEnabled(mockDispatcher);
 
-        // Assert
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
     public async Task UpdateEventTableFilters_WhenFilterPaneDisabled_ShouldOnlyKeepExcludedFilters()
     {
-        // Arrange
         var filters = ImmutableList.Create(
             FilterBuilder.CreateTestFilter(isEnabled: true,
                 isExcluded: false),
@@ -488,10 +472,8 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher) = CreateEffects(false, filters);
 
-        // Act
         await effects.HandleToggleIsEnabled(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<ApplyFilterAction>(x =>
             x != null &&
             x.Filter.Filters.Count == 1 &&
@@ -501,7 +483,6 @@ public sealed class EffectsTests
     [Fact]
     public async Task UpdateEventTableFilters_WhenFilterPaneEnabled_ShouldIncludeEnabledFilters()
     {
-        // Arrange
         var filters = ImmutableList.Create(
             FilterBuilder.CreateTestFilter(isEnabled: true,
                 isExcluded: false),
@@ -512,10 +493,8 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher) = CreateEffects(true, filters);
 
-        // Act
         await effects.HandleToggleIsEnabled(mockDispatcher);
 
-        // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<ApplyFilterAction>(x =>
             x != null &&
             x.Filter.Filters.Count == 1 &&
@@ -525,18 +504,14 @@ public sealed class EffectsTests
     [Fact]
     public async Task UpdateEventTableFilters_WhenFilterUnchanged_ShouldNotDispatch()
     {
-        // Arrange
         var filters = CreateSingleEnabledFilters();
         var (effects, mockDispatcher) = CreateEffects(
             true,
             filters,
             appliedFilter: new Filter(null, filters));
 
-        // Act
         await effects.HandleToggleIsEnabled(mockDispatcher);
 
-        // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterProgressAction>());
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
@@ -589,7 +564,7 @@ public sealed class EffectsTests
         var mockLensState = Substitute.For<IState<FilterLensState>>();
         mockLensState.Value.Returns(new FilterLensState());
 
-        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState, mockLensState);
+        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState, mockLensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()));
         var mockDispatcher = Substitute.For<IDispatcher>();
 
         return (effects, mockDispatcher);

@@ -11,7 +11,6 @@ namespace EventLogExpert.Runtime.EventLog;
 [FeatureState]
 public sealed record EventLogState
 {
-    /// <summary>The maximum number of new events we will hold in the state before we turn off the watcher.</summary>
     public static int MaxNewEvents => 1000;
 
     internal ImmutableDictionary<string, OpenLogInfo> OpenLogs { get; init; } =
@@ -38,4 +37,6 @@ public sealed record EventLogState
     public SelectionEntry? Focus { get; init; }
 
     public ImmutableList<SelectionEntry> Selection { get; init; } = [];
+
+    public EventLocator? PendingRevealFocus { get; init; }
 }

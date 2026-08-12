@@ -15,6 +15,12 @@ namespace EventLogExpert.Runtime.Tests.FilterLibrary;
 
 public sealed class FilterLibraryEffectsTests
 {
+    private const int PollDelayMilliseconds = 10;
+    private const int SettleDelayMilliseconds = 150;
+
+    private static readonly TimeSpan s_shortTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(5);
+
     [Fact]
     public async Task ApplyBulkTagUpdate_ReissueAgainstLatestSnapshotFails_ReloadsLibrary_AnnouncesFailure_DispatchesNoProjection()
     {
@@ -35,7 +41,7 @@ public sealed class FilterLibraryEffectsTests
                 if (bulkCalls == 1)
                 {
                     var list = call.ArgAt<IReadOnlyList<LibraryEntry>>(0);
-                    return Task.FromResult<IReadOnlyList<LibraryEntryId>>(list.Select(e => e.Id).ToList());
+                    return Task.FromResult<IReadOnlyList<LibraryEntryId>>([.. list.Select(e => e.Id)]);
                 }
 
                 return Task.FromException<IReadOnlyList<LibraryEntryId>>(new InvalidOperationException("reissue-fail"));
@@ -93,9 +99,7 @@ public sealed class FilterLibraryEffectsTests
             new AddFilterToExistingFilterSetAction(filterSet.Id, duplicate, source.Id),
             dispatcher);
 
-        // Did NOT update the filter set (duplicate).
         await store.DidNotReceive().UpdateAsync(Arg.Is<LibraryEntry>(e => e != null && e.Id == filterSet.Id), Arg.Any<CancellationToken>());
-        // But DID promote the source.
         await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e != null && e.Id == source.Id && e.Origin == LibraryEntryOrigin.UserSaved), Arg.Any<CancellationToken>());
     }
 
@@ -130,7 +134,6 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleAddFilterToExistingFilterSet_SameTextDifferentMode_AppendsAsDistinctFilter()
     {
-        // Mode-drift policy: distinct Mode + same ComparisonText must coexist in a filter set.
         var advanced = SavedFilter.TryCreate("Level == 4", mode: FilterMode.Advanced);
         var basic = SavedFilter.TryCreate("Level == 4", mode: FilterMode.Basic);
         Assert.NotNull(advanced);
@@ -517,9 +520,6 @@ public sealed class FilterLibraryEffectsTests
         var migratedEntry = BuildFilterEntry("migrated");
         var migrator = Substitute.For<ILegacyFilterMigrator>();
         var migrationComplete = 0;
-        // Realistic mock: ShouldRunMigration returns true until the migrator marks completion (matches the
-        // real LegacyFilterMigrator's per-section flag semantics). The previous test relied on the now-removed
-        // entries.IsEmpty guard to suppress the second BuildEntriesFromLegacy call.
         migrator.ShouldRunMigration().Returns(_ => Volatile.Read(ref migrationComplete) == 0);
         migrator.When(m => m.MarkMigrationCompleted(Arg.Any<LegacyMigrationSections>()))
             .Do(_ => Volatile.Write(ref migrationComplete, 1));
@@ -577,11 +577,11 @@ public sealed class FilterLibraryEffectsTests
         var load2 = default(Task);
         try
         {
-            await migratorReachedSignal.Task.WaitAsync(TimeSpan.FromSeconds(5), ct);
+            await migratorReachedSignal.Task.WaitAsync(s_testTimeout, ct);
             load2 = Task.Run(() => effects.HandleLoadLibrary(dispatcher), ct);
             await PollUntilAsync(
                 () => dispatcher.ReceivedCalls().Count(c => c.GetArguments().FirstOrDefault() is LoadLibraryStartedAction) >= 2,
-                TimeSpan.FromSeconds(5),
+                s_testTimeout,
                 ct);
 
             dispatcher.Received(2).Dispatch(Arg.Any<LoadLibraryStartedAction>());
@@ -589,8 +589,6 @@ public sealed class FilterLibraryEffectsTests
         }
         finally
         {
-            // Always release the migrator so the load tasks unblock even if an assertion or polling timeout
-            // throws - otherwise xUnit's per-test cleanup hangs waiting for the still-running load tasks.
             migratorReleaser.Release();
             if (load2 is not null) { await Task.WhenAll(load1, load2); }
             else { await load1; }
@@ -734,8 +732,6 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleLoadLibrary_NonEmptyStore_FilterSetsSameNameDifferentFilters_BothSurvive()
     {
-        // Presets are user-created with no name-uniqueness invariant; same-name presets with distinct
-        // filter content must both persist. Dedup must key on name + filters fingerprint, not name alone.
         var existingFilter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(existingFilter);
         var existingFilterSet = new LibraryEntryFilterSet
@@ -750,7 +746,7 @@ public sealed class FilterLibraryEffectsTests
         {
             Name = "Errors",
             CreatedUtc = DateTimeOffset.UtcNow,
-            Filters = ImmutableList.Create(migratedFilter), // different filters
+            Filters = ImmutableList.Create(migratedFilter),
         };
         var sections = LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents;
         var migrator = Substitute.For<ILegacyFilterMigrator>();
@@ -763,7 +759,6 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleLoadLibrary(dispatcher);
 
-        // Distinct filter content → migrated filter set is NOT deduped → AddRange called with it.
         await store.Received(1).AddRangeAsync(Arg.Is<IEnumerable<LibraryEntry>>(e => e != null && e.Count() == 1 && e.First() is LibraryEntryFilterSet), Arg.Any<CancellationToken>());
         migrator.Received(1).MarkMigrationCompleted(sections);
         dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 2));
@@ -772,10 +767,6 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleLoadLibrary_NonEmptyStore_MigrationEntriesOverlap_DedupsAgainstExisting_NoDuplicateInsertion()
     {
-        // Critical defense against the SetString-throws-then-retry duplication scenario: if a prior launch
-        // successfully ran AddRange but failed MarkMigrationCompleted, the next launch reads the populated
-        // store, ShouldRunMigration still returns true, BuildEntriesFromLegacy re-emits the same entries
-        // (fresh GUIDs but same content), and the migration must NOT re-insert them as content-duplicates.
         var existingFavorite = BuildFilterEntryWithText("Favorite", "Level == 4");
         var existingFilterSet = BuildFilterSetEntry("Errors");
         var duplicateFavorite = BuildFilterEntryWithText("Favorite", "Level == 4");
@@ -791,11 +782,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleLoadLibrary(dispatcher);
 
-        // Both migration entries collide with existing store content → AddRange must NOT be called with them.
         await store.DidNotReceive().AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>());
-        // Bitmask still advances - the section is "complete" from the persistence perspective.
         migrator.Received(1).MarkMigrationCompleted(sections);
-        // Loaded entries reflect the existing store (no duplicates).
         dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 2));
     }
 
@@ -804,7 +792,7 @@ public sealed class FilterLibraryEffectsTests
     {
         var existing = BuildFilterEntryWithText("Existing", "Level == 4");
         var dupeOverlap = BuildFilterEntryWithText("Existing", "Level == 4");
-        var newEntry = BuildFilterEntryWithText("New", "Level == 5"); // does not collide
+        var newEntry = BuildFilterEntryWithText("New", "Level == 5");
         var sections = LegacyMigrationSections.Favorites | LegacyMigrationSections.Groups | LegacyMigrationSections.Recents;
         var migrator = Substitute.For<ILegacyFilterMigrator>();
         migrator.ShouldRunMigration().Returns(true);
@@ -816,7 +804,6 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleLoadLibrary(dispatcher);
 
-        // Only the non-overlapping entry is inserted.
         await store.Received(1).AddRangeAsync(Arg.Is<IEnumerable<LibraryEntry>>(e => e != null && e.Count() == 1 && e.First().Id == newEntry.Id), Arg.Any<CancellationToken>());
         migrator.Received(1).MarkMigrationCompleted(sections);
         dispatcher.Received(1).Dispatch(Arg.Is<LoadLibrarySuccessAction>(a => a != null && a.Entries.Count == 2));
@@ -922,7 +909,6 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleRecordEntryApplied_BumpReturnsFalse_SkipsDispatchAndPrune()
     {
-        // SQL bump returns false (concurrent SetIsFavorite committed) → no dispatch, no prune.
         var entry = BuildFilterEntry("First") with { Origin = LibraryEntryOrigin.AutoTracked };
         var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [entry] });
         store.TryBumpLastUsedIfNotFavoriteAsync(Arg.Any<LibraryEntryId>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(false);
@@ -975,7 +961,6 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleRecordEntryApplied_PruneDeleteReturnsFalse_DoesNotDispatchDeleteSuccess()
     {
-        // SQL DELETE returns false (entry was promoted/favorited since snapshot) → don't orphan state.
         var seedFilter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(seedFilter);
         var entries = new List<LibraryEntry>();
@@ -1014,7 +999,6 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleRecordEntryApplied_PrunesOldestAutoTrackedEntries_WhenCapExceeded()
     {
-        // Seed 50 AutoTracked recents (at-cap) + the entry we're about to bump.
         var seedFilter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(seedFilter);
         var entries = new List<LibraryEntry>();
@@ -1030,9 +1014,6 @@ public sealed class FilterLibraryEffectsTests
             });
         }
 
-        // The 51st entry - about to be bumped (will project into the prune snapshot).
-        // Pre-bump LastUsedUtc doesn't affect the prune order - the effect overwrites it with UtcNow
-        // and that's the value that lands in the snapshot before PruneFromSnapshot runs.
         var bumpTarget = new LibraryEntrySavedFilter
         {
             Name = "bumped",
@@ -1050,7 +1031,6 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRecordEntryApplied(new RecordEntryAppliedAction(bumpTarget.Id), dispatcher);
 
-        // SQL-guarded delete no-ops if the row was concurrently promoted/favorited.
         await store.Received(1).TryDeleteAutoTrackedIfNotFavoriteAsync(Arg.Is(oldestId), Arg.Any<CancellationToken>());
         dispatcher.Received(1).Dispatch(Arg.Is<DeleteLibraryEntrySuccessAction>(a => a != null && a.EntryId == oldestId));
     }
@@ -1068,7 +1048,6 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleRecordFilterApplied_CollisionBranch_BumpsExistingAndDispatchesAddSuccess()
     {
-        // In-memory state has no match; SQL INSERT OR IGNORE collides with an existing AutoTracked row.
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
         var existing = new LibraryEntrySavedFilter
@@ -1133,7 +1112,6 @@ public sealed class FilterLibraryEffectsTests
             });
         }
 
-        // The "already in state" collision target - distinct ComparisonText so in-memory match misses.
         var alreadyInState = new LibraryEntrySavedFilter
         {
             Name = "already-in-state",
@@ -1142,7 +1120,7 @@ public sealed class FilterLibraryEffectsTests
             LastUsedUtc = new DateTimeOffset(2026, 5, 1, 0, 0, 49, TimeSpan.Zero),
             Filter = SavedFilter.TryCreate("Level == 1999")!,
         };
-        entries.Add(alreadyInState);  // state count now 50 (at cap)
+        entries.Add(alreadyInState);
 
         var newFilter = SavedFilter.TryCreate("Level == 2777");
         Assert.NotNull(newFilter);
@@ -1155,10 +1133,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRecordFilterApplied(new RecordFilterAppliedAction(newFilter), dispatcher);
 
-        // Snapshot should be 50 (SetItem on the existing row, not Add); prune sees count == cap; no delete.
         await store.DidNotReceive().TryDeleteAutoTrackedIfNotFavoriteAsync(Arg.Any<LibraryEntryId>(), Arg.Any<CancellationToken>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<DeleteLibraryEntrySuccessAction>());
-        // Bump + AddSuccess dispatch still happen as part of the collision-bump path.
         dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => a != null && a.Entry.Id == alreadyInState.Id));
     }
 
@@ -1244,7 +1220,6 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleRecordFilterApplied_PrunesOldestAutoTrackedEntries_WhenInsertExceedsCap()
     {
-        // Mirrors the HandleRecordEntryApplied prune test for the auto-create insert path.
         var seedFilter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(seedFilter);
         var entries = new List<LibraryEntry>();
@@ -1256,7 +1231,6 @@ public sealed class FilterLibraryEffectsTests
                 CreatedUtc = DateTimeOffset.UtcNow,
                 Origin = LibraryEntryOrigin.AutoTracked,
                 LastUsedUtc = new DateTimeOffset(2026, 5, 1, 0, 0, i, TimeSpan.Zero),
-                // Distinct ComparisonText per entry forces the effect through AddOrReturnExistingFilter.
                 Filter = SavedFilter.TryCreate($"Level == {i + 100}")!,
             });
         }
@@ -1325,7 +1299,6 @@ public sealed class FilterLibraryEffectsTests
     [Fact]
     public async Task HandleRecordFilterApplied_UserSavedExisting_BumpsAndSkipsAutoTrack()
     {
-        // Re-applying a user-saved filter refreshes its LastUsedUtc; no AutoTracked duplicate.
         var filter = SavedFilter.TryCreate("Level == 4");
         Assert.NotNull(filter);
         var existing = new LibraryEntrySavedFilter
@@ -1731,18 +1704,6 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleSetIsFavorite_False_OnFilter_BumpsLastUsedToNow()
-    {
-        var filter = BuildFilterEntry("First") with { IsFavorite = true };
-        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [filter] });
-
-        await effects.HandleSetIsFavorite(new SetIsFavoriteAction(filter.Id, IsFavorite: false), dispatcher);
-
-        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e != null &&
-            e.Id == filter.Id && !e.IsFavorite && e.LastUsedUtc != null), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
     public async Task HandleSetIsFavorite_False_OnFilterSet_LeavesLastUsedNull()
     {
         var f = SavedFilter.TryCreate("Level == 4");
@@ -1759,6 +1720,18 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleSetIsFavorite(new SetIsFavoriteAction(filterSet.Id, IsFavorite: false), dispatcher);
 
         await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e != null && e.Id == filterSet.Id && !e.IsFavorite && e.LastUsedUtc == null), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleSetIsFavorite_False_OnFilter_BumpsLastUsedToNow()
+    {
+        var filter = BuildFilterEntry("First") with { IsFavorite = true };
+        var (effects, store, dispatcher, _, _) = CreateEffects(state: new FilterLibraryState { Entries = [filter] });
+
+        await effects.HandleSetIsFavorite(new SetIsFavoriteAction(filter.Id, IsFavorite: false), dispatcher);
+
+        await store.Received(1).UpdateAsync(Arg.Is<LibraryEntry>(e => e != null &&
+            e.Id == filter.Id && !e.IsFavorite && e.LastUsedUtc != null), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -1868,8 +1841,8 @@ public sealed class FilterLibraryEffectsTests
         var task1 = effects.HandleSaveEntry(new SaveEntryAction(entry1.Id), dispatcher);
         var task2 = effects.HandleSaveEntry(new SaveEntryAction(entry2.Id), dispatcher);
 
-        await PollUntilAsync(() => Volatile.Read(ref totalCalls) == 1, TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
-        await Task.Delay(150, TestContext.Current.CancellationToken);
+        await PollUntilAsync(() => Volatile.Read(ref totalCalls) == 1, s_shortTimeout, TestContext.Current.CancellationToken);
+        await Task.Delay(SettleDelayMilliseconds, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, Volatile.Read(ref totalCalls));
 
@@ -1940,7 +1913,10 @@ public sealed class FilterLibraryEffectsTests
         if (!storeWasSupplied)
         {
             store.LoadAllAsync(Arg.Any<CancellationToken>()).Returns([]);
-            store.UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>()).ReturnsForAnyArgs(ci => ci.ArgAt<IReadOnlyList<LibraryEntry>>(0).Select(e => e.Id).ToList());
+            store.UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>()).ReturnsForAnyArgs(ci =>
+            [
+                .. ci.ArgAt<IReadOnlyList<LibraryEntry>>(0).Select(e => e.Id)
+            ]);
         }
 
         var stateMock = Substitute.For<IState<FilterLibraryState>>();
@@ -1964,7 +1940,7 @@ public sealed class FilterLibraryEffectsTests
 
         var logger = Substitute.For<ITraceLogger>();
         var dispatcher = Substitute.For<IDispatcher>();
-        var effects = new Effects(store, stateMock, paneStateMock, migrator, backslashMigrator, announcementService, logger);
+        var effects = new Effects(store, stateMock, paneStateMock, migrator, backslashMigrator, announcementService, logger, new TagBulkUpdateFailedNotifier(Substitute.For<ITraceLogger>()));
 
         return (effects, store, dispatcher, stateMock, migrator, logger);
     }
@@ -1975,11 +1951,10 @@ public sealed class FilterLibraryEffectsTests
         while (DateTime.UtcNow < deadline)
         {
             if (predicate()) { return; }
-            await Task.Delay(10, cancellationToken);
+            await Task.Delay(PollDelayMilliseconds, cancellationToken);
         }
         if (!predicate()) { throw new TimeoutException($"Predicate did not become true within {timeout}."); }
     }
 
-    // Used for the unknown-concrete-type wildcard test (covers the throw arm in HandleApplyLibraryEntry).
     private sealed record UnknownLibraryEntry : LibraryEntry;
 }
