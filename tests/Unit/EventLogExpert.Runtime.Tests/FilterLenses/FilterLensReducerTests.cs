@@ -42,43 +42,6 @@ public sealed class FilterLensReducerTests
     }
 
     [Fact]
-    public void Remove_DuplicateContentLenses_RemovesOnlyTargetedInstance()
-    {
-        var first = Lens("duplicate");
-        var second = Lens("duplicate");
-        Assert.NotEqual(first.Id, second.Id);
-        var state = new FilterLensState { Lenses = [first, second] };
-
-        var result = Reducers.ReduceRemove(state, new RemoveFilterLensAction(second));
-
-        Assert.Single(result.Lenses);
-        Assert.Same(first, result.Lenses[0]);
-    }
-
-    [Fact]
-    public void Remove_RemovesSpecificLens()
-    {
-        var a = Lens("a");
-        var b = Lens("b");
-        var state = new FilterLensState { Lenses = [a, b] };
-
-        var result = Reducers.ReduceRemove(state, new RemoveFilterLensAction(a));
-
-        Assert.Single(result.Lenses);
-        Assert.Same(b, result.Lenses[0]);
-    }
-
-    [Fact]
-    public void Remove_UnknownLens_ReturnsSameStateInstance()
-    {
-        var state = new FilterLensState { Lenses = [Lens("a")] };
-
-        var result = Reducers.ReduceRemove(state, new RemoveFilterLensAction(Lens("other")));
-
-        Assert.Same(state, result);
-    }
-
-    [Fact]
     public void RemoveForLog_NoMatch_ReturnsSameStateInstance()
     {
         var state = new FilterLensState { Lenses = [LensFromLog("a", "LogA")] };
@@ -100,6 +63,43 @@ public sealed class FilterLensReducerTests
 
         Assert.Single(result.Lenses);
         Assert.Same(fromB, result.Lenses[0]);
+    }
+
+    [Fact]
+    public void Remove_DuplicateContentLenses_RemovesOnlyTargetedInstance()
+    {
+        var first = Lens("duplicate");
+        var second = Lens("duplicate");
+        Assert.NotEqual(first.Id, second.Id);
+        var state = new FilterLensState { Lenses = [first, second] };
+
+        var result = Reducers.ReduceRemove(state, new RemoveFilterLensAction(second.Id));
+
+        Assert.Single(result.Lenses);
+        Assert.Same(first, result.Lenses[0]);
+    }
+
+    [Fact]
+    public void Remove_RemovesSpecificLens()
+    {
+        var a = Lens("a");
+        var b = Lens("b");
+        var state = new FilterLensState { Lenses = [a, b] };
+
+        var result = Reducers.ReduceRemove(state, new RemoveFilterLensAction(a.Id));
+
+        Assert.Single(result.Lenses);
+        Assert.Same(b, result.Lenses[0]);
+    }
+
+    [Fact]
+    public void Remove_UnknownLens_ReturnsSameStateInstance()
+    {
+        var state = new FilterLensState { Lenses = [Lens("a")] };
+
+        var result = Reducers.ReduceRemove(state, new RemoveFilterLensAction(Lens("other").Id));
+
+        Assert.Same(state, result);
     }
 
     private static FilterLens Lens(string label) =>

@@ -11,18 +11,11 @@ namespace EventLogExpert.Runtime.FilterLenses;
 
 internal static class FilterLensFactory
 {
-    /// <summary>
-    ///     Builds a lens that keeps only rows whose ActivityId equals <paramref name="activityId" />. An optional
-    ///     <paramref name="label" /> overrides the default chip text - used by the parent-activity jump, which is an
-    ///     ActivityId-equality narrowing surfaced to the user under a different name.
-    /// </summary>
+    private static readonly TimeSpan s_maxTimeWindowRadius = TimeSpan.FromHours(1);
+
     public static FilterLens? ForActivityId(Guid activityId, string? originLog = null, string? label = null) =>
         BuildEqualityLens(EventProperty.ActivityId, activityId, label ?? $"Activity ID = {activityId}", originLog);
 
-    /// <summary>
-    ///     Builds a lens that keeps only rows whose RelatedActivityId equals <paramref name="relatedActivityId" />,
-    ///     grouping events that share the same parent/correlation activity.
-    /// </summary>
     public static FilterLens? ForRelatedActivityId(Guid relatedActivityId, string? originLog = null) =>
         BuildEqualityLens(
             EventProperty.RelatedActivityId,
@@ -30,10 +23,6 @@ internal static class FilterLensFactory
             $"Related Activity ID = {relatedActivityId}",
             originLog);
 
-    /// <summary>
-    ///     Builds a lens keeping rows whose TimeCreated is in the inclusive UTC range [startUtc, endUtc]; endpoints are
-    ///     normalized so a right-to-left brush stays a valid non-empty window.
-    /// </summary>
     public static FilterLens ForTimeRange(
         DateTime startUtc,
         DateTime endUtc,
@@ -46,7 +35,6 @@ internal static class FilterLensFactory
 
         return new FilterLens
         {
-            // Include each endpoint's date when the window spans more than one displayed day, so a midnight-straddling or multi-day range isn't a bare, ambiguous "23:55:00 - 00:05:00".
             Label = afterLocal.Date == beforeLocal.Date
                 ? $"{afterLocal:T} - {beforeLocal:T}"
                 : $"{afterLocal:d} {afterLocal:T} - {beforeLocal:d} {beforeLocal:T}",
@@ -56,20 +44,6 @@ internal static class FilterLensFactory
         };
     }
 
-    /// <summary>
-    ///     Builds a transient time-window lens centered on <paramref name="timeCreatedUtc" /> (the source event's UTC
-    ///     timestamp): the effective view is narrowed to the inclusive range [timeCreatedUtc - radius, timeCreatedUtc +
-    ///     radius], so the source event itself always survives. Bounds are clamped to the <see cref="DateTime" /> range
-    ///     because boundary arithmetic throws on overflow - a degenerate near-min/near-max timestamp must not crash the menu
-    ///     handler. The chip label renders the anchor's time of day in <paramref name="displayZone" /> (the grid's display
-    ///     zone) as a compact marker; it is not the grid's full date+time rendering. <paramref name="radius" /> must be within
-    ///     (0, 1 hour] and a whole number of seconds (validated); the suffix renders it to its largest whole unit (for example
-    ///     90s stays "90s").
-    /// </summary>
-    /// <exception cref="ArgumentOutOfRangeException">
-    ///     <paramref name="radius" /> is not within (0, 1 hour], or is not a whole
-    ///     number of seconds.
-    /// </exception>
     public static FilterLens ForTimeWindow(
         DateTime timeCreatedUtc,
         TimeSpan radius,
@@ -77,7 +51,7 @@ internal static class FilterLensFactory
         string? originLog = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(radius, TimeSpan.Zero);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(radius, TimeSpan.FromHours(1));
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(radius, s_maxTimeWindowRadius);
 
         if (radius.Ticks % TimeSpan.TicksPerSecond != 0)
         {
@@ -96,14 +70,6 @@ internal static class FilterLensFactory
         };
     }
 
-    /// <summary>
-    ///     Encodes a nullable-Guid equality narrowing (keep only rows where the field equals <paramref name="value" />)
-    ///     as an <em>exclude-of-complement</em>: because the base's include filters are OR-combined an appended include would
-    ///     broaden, so the complement (<c>field != value</c>, <see cref="SavedFilter.IsExcluded" />) is excluded to AND-narrow
-    ///     to exactly <c>field == value</c>. <c>NotEqual</c> on a nullable-Guid column is total (a decisive Match for an
-    ///     absent value), so the exclude hides absent-field rows rather than leaking them. Returns <see langword="null" />
-    ///     only if the criterion fails to format or compile.
-    /// </summary>
     private static FilterLens? BuildEqualityLens(EventProperty property, Guid value, string label, string? originLog)
     {
         if (!TryFormatNotEqual(property, value.ToString(), out var comparisonText))
@@ -128,11 +94,6 @@ internal static class FilterLensFactory
         };
     }
 
-    /// <summary>
-    ///     Formats the window radius as a compact chip suffix (for example "30s", "5m", "1h") using the largest whole
-    ///     unit that represents it exactly. Callers are validated to whole-second radii, so every valid radius renders
-    ///     losslessly.
-    /// </summary>
     private static string FormatRadius(TimeSpan radius) => radius switch
     {
         { Minutes: 0, Seconds: 0, Milliseconds: 0 } => $"{radius.TotalHours:0}h",

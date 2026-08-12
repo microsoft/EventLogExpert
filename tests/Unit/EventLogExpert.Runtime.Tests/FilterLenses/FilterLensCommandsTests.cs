@@ -23,12 +23,12 @@ public sealed class FilterLensCommandsTests
     public void RemoveLens_DispatchesRemove()
     {
         var dispatcher = Substitute.For<IDispatcher>();
-        var lens = new FilterLens { Label = "x", Kind = LensKind.Property };
+        var id = FilterLensId.Create();
 
-        new FilterLensCommands(dispatcher).RemoveLens(lens);
+        new FilterLensCommands(dispatcher).RemoveLens(id);
 
         dispatcher.Received(1).Dispatch(Arg.Is<RemoveFilterLensAction>(action =>
-            action != null && action.Lens == lens));
+            action != null && action.Id == id));
     }
 
     [Theory]
@@ -71,7 +71,6 @@ public sealed class FilterLensCommandsTests
     {
         var dispatcher = Substitute.For<IDispatcher>();
 
-        // 90s is within (0, 1h] but not an offered duration; the suffix renders it losslessly as "90s", not a rounded "2m".
         new FilterLensCommands(dispatcher).ShowEventsNearTime(
             new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc), TimeSpan.FromSeconds(90), TimeZoneInfo.Utc);
 
@@ -90,27 +89,9 @@ public sealed class FilterLensCommandsTests
 
         new FilterLensCommands(dispatcher).ShowEventsNearTime(anchor, TimeSpan.FromMinutes(5), displayZone);
 
-        // Built with the same culture-sensitive ":T" the production label uses, so the assertion holds under any ambient
-        // culture; the anchor renders in the +5 display zone (17:00:00), not UTC (12:00:00).
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
             action != null &&
             action.Lens.Label == $"Near {expectedAnchor:T} \u00b15m"));
-    }
-
-    [Fact]
-    public void ShowEventsNearTime_MinValueAnchor_ClampsLowerBoundWithoutThrowing()
-    {
-        var dispatcher = Substitute.For<IDispatcher>();
-
-        // A degenerate default(DateTime) anchor must not throw - DateTime boundary arithmetic throws on underflow; the
-        // lower bound clamps to DateTime.MinValue.
-        new FilterLensCommands(dispatcher).ShowEventsNearTime(
-            DateTime.MinValue, TimeSpan.FromSeconds(30), TimeZoneInfo.Utc);
-
-        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
-            action != null &&
-            action.Lens.Window!.After == DateTime.MinValue &&
-            action.Lens.Window.Before == DateTime.MinValue.AddSeconds(30)));
     }
 
     [Fact]
@@ -119,14 +100,24 @@ public sealed class FilterLensCommandsTests
         var dispatcher = Substitute.For<IDispatcher>();
         var westOfUtc = TimeZoneInfo.CreateCustomTimeZone("test-5", TimeSpan.FromHours(-5), "test-5", "test-5");
 
-        // Guards the chip-label conversion for a degenerate default(DateTime) anchor against a non-UTC display zone: on
-        // net10 TimeZoneInfo.ConvertTimeFromUtc clamps an out-of-range result to DateTime.MinValue instead of throwing, so
-        // the label renders without crashing the context-menu handler. (Legacy .NET Framework threw for this exact case; a
-        // future retarget that reintroduced the throw would fail this test rather than crashing at runtime.)
         new FilterLensCommands(dispatcher).ShowEventsNearTime(
             DateTime.MinValue, TimeSpan.FromSeconds(30), westOfUtc);
 
         dispatcher.Received(1).Dispatch(Arg.Any<PushFilterLensAction>());
+    }
+
+    [Fact]
+    public void ShowEventsNearTime_MinValueAnchor_ClampsLowerBoundWithoutThrowing()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+
+        new FilterLensCommands(dispatcher).ShowEventsNearTime(
+            DateTime.MinValue, TimeSpan.FromSeconds(30), TimeZoneInfo.Utc);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null &&
+            action.Lens.Window!.After == DateTime.MinValue &&
+            action.Lens.Window.Before == DateTime.MinValue.AddSeconds(30)));
     }
 
     [Theory]
@@ -148,8 +139,6 @@ public sealed class FilterLensCommandsTests
     {
         var dispatcher = Substitute.For<IDispatcher>();
 
-        // The window is whole-second granularity; a sub-second radius (which the compact suffix cannot render losslessly)
-        // is rejected rather than silently rounded.
         Assert.Throws<ArgumentOutOfRangeException>(() => new FilterLensCommands(dispatcher).ShowEventsNearTime(
             new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc), TimeSpan.FromMilliseconds(500), TimeZoneInfo.Utc));
 

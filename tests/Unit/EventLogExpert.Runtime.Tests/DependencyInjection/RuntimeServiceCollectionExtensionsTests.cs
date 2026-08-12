@@ -21,15 +21,16 @@ using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.Runtime.StatusBar;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
 using EventLogExpert.Scenarios.Catalog;
@@ -88,7 +89,6 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IInfoBannerService))]
     public async Task AddEventLogRuntime_BannerFacets_AreSingletons(Type facetType)
     {
-        // Arrange
         var services = new ServiceCollection();
         RegisterHostDependencies(services);
         services.AddEventLogRuntime();
@@ -96,17 +96,12 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         await using var provider = services.BuildServiceProvider(
             new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
 
-        // Resolve from TWO DIFFERENT SCOPES: singleton instances are shared across scopes,
-        // scoped instances would be distinct. Resolving twice from the same scope cannot
-        // distinguish singleton from scoped (both would return the same per-scope instance).
         await using var scope1 = provider.CreateAsyncScope();
         await using var scope2 = provider.CreateAsyncScope();
 
-        // Act
         var first = scope1.ServiceProvider.GetService(facetType);
         var second = scope2.ServiceProvider.GetService(facetType);
 
-        // Assert
         Assert.NotNull(first);
         Assert.Same(first, second);
     }
@@ -114,7 +109,6 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [Fact]
     public async Task AddEventLogRuntime_Resolves5BannerFacetsToSameSingleton()
     {
-        // Arrange
         var services = new ServiceCollection();
         RegisterHostDependencies(services);
         services.AddEventLogRuntime();
@@ -122,13 +116,9 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         await using var provider = services.BuildServiceProvider(
             new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
 
-        // Resolve from two scopes: locks in same-instance + singleton-lifetime invariants
-        // in one test. If any facet were registered Scoped instead of Singleton, the
-        // cross-scope assertion would fail (per-scope instances would be distinct).
         await using var scope1 = provider.CreateAsyncScope();
         await using var scope2 = provider.CreateAsyncScope();
 
-        // Act
         var attentionScope1 = scope1.ServiceProvider.GetRequiredService<IAttentionBannerService>();
         var progressScope1 = scope1.ServiceProvider.GetRequiredService<IProgressBannerService>();
         var criticalScope1 = scope1.ServiceProvider.GetRequiredService<ICriticalErrorService>();
@@ -136,8 +126,6 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         var infoScope1 = scope1.ServiceProvider.GetRequiredService<IInfoBannerService>();
         var attentionScope2 = scope2.ServiceProvider.GetRequiredService<IAttentionBannerService>();
 
-        // Assert: all five facets resolve to the same backing BannerService instance
-        // within a scope, AND that instance is shared across scopes (singleton lifetime).
         Assert.Same(attentionScope1, progressScope1);
         Assert.Same(attentionScope1, criticalScope1);
         Assert.Same(attentionScope1, errorScope1);
@@ -148,7 +136,6 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [Fact]
     public async Task AddEventLogRuntime_SharesOneFileLogSinkSingleton()
     {
-        // Arrange
         var services = new ServiceCollection();
         RegisterHostDependencies(services);
         services.AddEventLogRuntime();
@@ -159,34 +146,45 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         await using var scope1 = provider.CreateAsyncScope();
         await using var scope2 = provider.CreateAsyncScope();
 
-        // Act: the IDebugLogReader (whose ClearAsync truncates the writer), the ILogSourceFactory sink list,
-        // and OperationLogProgressFactory all inject the concrete FileLogSink. A single shared singleton is
-        // load-bearing: a second instance would let the reader's Clear truncate a different handle than the
-        // one the sinks write through.
         var sinkScope1 = scope1.ServiceProvider.GetRequiredService<FileLogSink>();
         var sinkScope2 = scope2.ServiceProvider.GetRequiredService<FileLogSink>();
 
-        // Assert: one shared singleton, and every file-sink consumer resolves against it.
         Assert.Same(sinkScope1, sinkScope2);
         Assert.NotNull(scope1.ServiceProvider.GetRequiredService<IDebugLogReader>());
         Assert.NotNull(scope1.ServiceProvider.GetRequiredService<IOperationLogProgressFactory>());
     }
 
     [Theory]
-    // Command facades.
     [InlineData(typeof(IEventLogCommands))]
     [InlineData(typeof(IFilterLibraryCommands))]
     [InlineData(typeof(IFilterPaneCommands))]
     [InlineData(typeof(ILogTableCommands))]
     [InlineData(typeof(IScenarioFavoriteCommands))]
     [InlineData(typeof(IEventLogQueries))]
-    // UI capabilities.
+    [InlineData(typeof(ILogTableQueries))]
+    [InlineData(typeof(IFilterPaneQueries))]
+    [InlineData(typeof(IFilterLensSource))]
+    [InlineData(typeof(IOpenLogsPresenceSource))]
+    [InlineData(typeof(IHistogramVisibilitySource))]
+    [InlineData(typeof(IEventFocusSource))]
+    [InlineData(typeof(IActiveEventLogSource))]
+    [InlineData(typeof(IFilterAppliedSource))]
+    [InlineData(typeof(IScenarioFavoritesSource))]
+    [InlineData(typeof(ILogTabBarSource))]
+    [InlineData(typeof(IStatusBarSource))]
+    [InlineData(typeof(IHistogramDimensionRequestSource))]
+    [InlineData(typeof(IActiveFiltersSource))]
+    [InlineData(typeof(IEventSelectionSource))]
+    [InlineData(typeof(IGroupCollapseNotifier))]
+    [InlineData(typeof(ITagBulkUpdateFailedNotifier))]
+    [InlineData(typeof(IClearAllFiltersNotifier))]
+    [InlineData(typeof(ISetFilterDateRangeSucceededNotifier))]
+    [InlineData(typeof(ILibraryEntriesSource))]
+    [InlineData(typeof(ILibraryLoadStatusSource))]
+    [InlineData(typeof(IFilteredDateRangeSource))]
+    [InlineData(typeof(ILoadedLogNamesSource))]
     [InlineData(typeof(IHighlightSelector))]
     [InlineData(typeof(ILogTableColumnDefaultsProvider))]
-    // ILogReloadCoordinator omitted: it forwards to the Fluxor-registered Effects type,
-    // which is auto-registered by AddFluxor (not by AddEventLogRuntime). Production wiring
-    // covers it; here it would require also bootstrapping Fluxor scanning in the test.
-    // Application services (moved out of MauiProgram into AddEventLogRuntime).
     [InlineData(typeof(IAppTitleService))]
     [InlineData(typeof(IAttentionBannerService))]
     [InlineData(typeof(IProgressBannerService))]
@@ -197,23 +195,18 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IDatabaseService))]
     [InlineData(typeof(IActiveDatabases))]
     [InlineData(typeof(IDatabaseOperationCoordinator))]
-    [InlineData(typeof(IModalCoordinator))]
     [InlineData(typeof(ILogWatcherService))]
-    [InlineData(typeof(IMenuService))]
-    [InlineData(typeof(IModalService))]
     [InlineData(typeof(ISettingsService))]
     [InlineData(typeof(ITraceLogger))]
     [InlineData(typeof(ILogSourceFactory))]
     [InlineData(typeof(IDebugLogReader))]
     [InlineData(typeof(IOperationLogProgressFactory))]
-    // Update + deployment services.
     [InlineData(typeof(ICurrentVersionProvider))]
     [InlineData(typeof(IDeploymentService))]
     [InlineData(typeof(IGitHubService))]
     [InlineData(typeof(IPackageDeploymentService))]
     [InlineData(typeof(IPackageVersionProvider))]
     [InlineData(typeof(IUpdateService))]
-    // Built-in scenarios.
     [InlineData(typeof(BuiltInScenarioRegistry))]
     [InlineData(typeof(IScenarioQueryService))]
     [InlineData(typeof(IScenarioApplyService))]
@@ -221,14 +214,8 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IScenarioAuthoringService))]
     public async Task AddEventLogRuntime_ShouldResolveHostFacingAbstraction(Type serviceType)
     {
-        // Arrange
         var services = new ServiceCollection();
 
-        // Dependencies the host normally provides (IDispatcher comes from Fluxor; the
-        // others are concrete options/identity/IO surfaces that AddEventLogRuntime doesn't
-        // own). Substituting them keeps this smoke test focused on the wiring inside
-        // AddEventLogRuntime while letting the dependency-injection container actually
-        // build each registered service.
         services.AddSingleton(Substitute.For<IDispatcher>());
         services.AddSingleton(Substitute.For<IAlertDialogService>());
         services.AddSingleton(Substitute.For<IApplicationRestartService>());
@@ -239,11 +226,38 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IMainThreadService>());
         services.AddSingleton(Substitute.For<IWindowsIdentityProvider>());
         services.AddSingleton(Substitute.For<IFilePickerService>());
-        services.AddSingleton(Substitute.For<IState<EventLogState>>());
-        services.AddSingleton(Substitute.For<IState<FilterPaneState>>());
-        services.AddSingleton(Substitute.For<IState<LogTableState>>());
+        var filterPaneState = Substitute.For<IState<FilterPaneState>>();
+        filterPaneState.Value.Returns(new FilterPaneState());
+        services.AddSingleton(filterPaneState);
+        var rawEventCountState = Substitute.For<IState<RawEventCountState>>();
+        rawEventCountState.Value.Returns(new RawEventCountState());
+        services.AddSingleton(rawEventCountState);
+        var statusBarState = Substitute.For<IState<StatusBarState>>();
+        statusBarState.Value.Returns(new StatusBarState());
+        services.AddSingleton(statusBarState);
+
+        var eventLogState = Substitute.For<IState<EventLogState>>();
+        eventLogState.Value.Returns(new EventLogState());
+        services.AddSingleton(eventLogState);
+        var filterLensState = Substitute.For<IState<FilterLensState>>();
+        filterLensState.Value.Returns(new FilterLensState());
+        services.AddSingleton(filterLensState);
+        var logTableState = Substitute.For<IState<LogTableState>>();
+        logTableState.Value.Returns(new LogTableState());
+        services.AddSingleton(logTableState);
         services.AddSingleton(Substitute.For<IState<RawEventStoreState>>());
-        services.AddSingleton(Substitute.For<IState<HistogramState>>());
+        var filteredLogPresenceState = Substitute.For<IState<FilteredLogPresenceState>>();
+        filteredLogPresenceState.Value.Returns(new FilteredLogPresenceState());
+        services.AddSingleton(filteredLogPresenceState);
+        var histogramState = Substitute.For<IState<HistogramState>>();
+        histogramState.Value.Returns(new HistogramState());
+        services.AddSingleton(histogramState);
+        var filterLibraryState = Substitute.For<IState<FilterLibraryState>>();
+        filterLibraryState.Value.Returns(new FilterLibraryState());
+        services.AddSingleton(filterLibraryState);
+        var scenarioFavoritesState = Substitute.For<IState<ScenarioFavoritesState>>();
+        scenarioFavoritesState.Value.Returns(new ScenarioFavoritesState());
+        services.AddSingleton(scenarioFavoritesState);
         services.AddSingleton(Substitute.For<IStateSelection<EventLogState, bool>>());
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
         services.AddSingleton<HttpClient>();
@@ -258,17 +272,14 @@ public sealed class RuntimeServiceCollectionExtensionsTests
 
         await using var scope = provider.CreateAsyncScope();
 
-        // Act
         var resolved = scope.ServiceProvider.GetService(serviceType);
 
-        // Assert
         Assert.NotNull(resolved);
     }
 
     [Fact]
     public async Task AddEventLogRuntime_WhenVerboseResolutionPersistedOff_LeavesResolutionAtShippedThrottle()
     {
-        // Arrange
         var services = new ServiceCollection();
         var preferences = Substitute.For<ISettingsPreferencesProvider>();
         preferences.VerboseResolutionPreference.Returns(false);
@@ -280,17 +291,14 @@ public sealed class RuntimeServiceCollectionExtensionsTests
 
         await using var scope = provider.CreateAsyncScope();
 
-        // Act
         var routingPolicy = scope.ServiceProvider.GetRequiredService<LogRoutingPolicy>();
 
-        // Assert: no runtime override, so the fine categories follow the shipped Resolution throttle.
         Assert.Equal(LogLevel.Warning, routingPolicy.FileMinimumFor("Resolution"));
     }
 
     [Fact]
     public async Task AddEventLogRuntime_WhenVerboseResolutionPersistedOn_SeedsResolutionOverrideAtConstruction()
     {
-        // Arrange
         var services = new ServiceCollection();
         var preferences = Substitute.For<ISettingsPreferencesProvider>();
         preferences.VerboseResolutionPreference.Returns(true);
@@ -302,10 +310,8 @@ public sealed class RuntimeServiceCollectionExtensionsTests
 
         await using var scope = provider.CreateAsyncScope();
 
-        // Act: the routing policy is the shared singleton the file sink reads on every emit.
         var routingPolicy = scope.ServiceProvider.GetRequiredService<LogRoutingPolicy>();
 
-        // Assert: a persisted-ON toggle is in effect the moment the singleton is visible, before DebugLogHost resolves.
         Assert.Equal(LogLevel.Trace, routingPolicy.FileMinimumFor("Resolution"));
         Assert.Equal(LogLevel.Trace, routingPolicy.FileMinimumFor("Resolution.Modern"));
     }
@@ -328,6 +334,30 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         Assert.NotNull(scope.ServiceProvider.GetService<IScenarioFavoriteStore>());
     }
 
+    [Fact]
+    public async Task Notifiers_ResolveTheirConcreteAndInterfaceAsOneSharedSingleton()
+    {
+        var services = new ServiceCollection();
+        RegisterHostDependencies(services);
+        services.AddEventLogRuntime();
+
+        await using var provider = services.BuildServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+
+        Assert.Same(
+            provider.GetRequiredService<GroupCollapseNotifier>(),
+            provider.GetRequiredService<IGroupCollapseNotifier>());
+        Assert.Same(
+            provider.GetRequiredService<TagBulkUpdateFailedNotifier>(),
+            provider.GetRequiredService<ITagBulkUpdateFailedNotifier>());
+        Assert.Same(
+            provider.GetRequiredService<ClearAllFiltersNotifier>(),
+            provider.GetRequiredService<IClearAllFiltersNotifier>());
+        Assert.Same(
+            provider.GetRequiredService<SetFilterDateRangeSucceededNotifier>(),
+            provider.GetRequiredService<ISetFilterDateRangeSucceededNotifier>());
+    }
+
     private static void RegisterHostDependencies(IServiceCollection services, ISettingsPreferencesProvider? preferences = null)
     {
         services.AddSingleton(Substitute.For<IDispatcher>());
@@ -342,9 +372,15 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IFilePickerService>());
         services.AddSingleton(Substitute.For<IState<EventLogState>>());
         services.AddSingleton(Substitute.For<IState<FilterPaneState>>());
+        services.AddSingleton(Substitute.For<IState<RawEventCountState>>());
+        services.AddSingleton(Substitute.For<IState<StatusBarState>>());
+        services.AddSingleton(Substitute.For<IState<FilterLensState>>());
         services.AddSingleton(Substitute.For<IState<LogTableState>>());
         services.AddSingleton(Substitute.For<IState<RawEventStoreState>>());
+        services.AddSingleton(Substitute.For<IState<FilteredLogPresenceState>>());
         services.AddSingleton(Substitute.For<IState<HistogramState>>());
+        services.AddSingleton(Substitute.For<IState<FilterLibraryState>>());
+        services.AddSingleton(Substitute.For<IState<ScenarioFavoritesState>>());
         services.AddSingleton(Substitute.For<IStateSelection<EventLogState, bool>>());
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
         services.AddSingleton<HttpClient>();

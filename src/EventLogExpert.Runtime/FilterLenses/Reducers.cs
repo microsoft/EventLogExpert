@@ -18,7 +18,7 @@ internal sealed class Reducers
     [ReducerMethod]
     public static FilterLensState ReduceRemove(FilterLensState state, RemoveFilterLensAction action)
     {
-        var updated = state.Lenses.RemoveAll(lens => lens.Id == action.Lens.Id);
+        var updated = state.Lenses.RemoveAll(lens => lens.Id == action.Id);
 
         return updated.Count == state.Lenses.Count ? state : state with { Lenses = updated };
     }

@@ -29,6 +29,27 @@ public sealed class StatusBarFormatterTests
         Assert.Equal("Filter active", StatusBarFormatter.FilterIndicatorTooltip(persistentActive: true, lensCount: 0));
 
     [Theory]
+    [InlineData(DisplayIndicatorKind.Fault, true, true, true, "Error: No resolver", "Error: No resolver")]
+    [InlineData(DisplayIndicatorKind.Fault, true, true, true, "", "These events could not be prepared")]
+    [InlineData(DisplayIndicatorKind.EmptyPending, true, false, false, "", "Loading")]
+    [InlineData(DisplayIndicatorKind.EmptyPending, false, false, false, "", "Loading events")]
+    [InlineData(DisplayIndicatorKind.ReorderPending, false, false, false, "", "Reordering events")]
+    [InlineData(DisplayIndicatorKind.ReorderPending, false, false, true, "", "Reordering events")]
+    [InlineData(DisplayIndicatorKind.None, false, false, true, "", "Continuously updating")]
+    [InlineData(DisplayIndicatorKind.None, false, false, false, "", "")]
+    public void FormatActivityAnnouncement_RanksTheDisplaysOwnNewsAgainstTheLogs(
+        DisplayIndicatorKind indicator,
+        bool isLoading,
+        bool bufferFull,
+        bool continuouslyUpdating,
+        string resolverStatus,
+        string expected) =>
+        Assert.Equal(
+            expected,
+            StatusBarFormatter.FormatActivityAnnouncement(
+                isLoading, bufferFull, continuouslyUpdating, resolverStatus, indicator));
+
+    [Theory]
     [InlineData(true, false, false, "Error: Failed to load System", "Error: Failed to load System")]
     [InlineData(true, false, false, "", "Loading")]
     [InlineData(false, true, false, "", "Buffer full")]
@@ -40,6 +61,13 @@ public sealed class StatusBarFormatterTests
         Assert.Equal(
             expected,
             StatusBarFormatter.FormatActivityAnnouncement(isLoading, bufferFull, continuouslyUpdating, resolverStatus));
+
+    [Fact]
+    public void FormatActivityAnnouncement_WithoutADisplayIndicator_IsUnchanged() =>
+        Assert.Equal(
+            "Loading",
+            StatusBarFormatter.FormatActivityAnnouncement(
+                isLoading: true, bufferFull: false, continuouslyUpdating: false, resolverStatus: ""));
 
     [Fact]
     public void FormatCounts_Filtered_ShowsShownOfTotal() =>

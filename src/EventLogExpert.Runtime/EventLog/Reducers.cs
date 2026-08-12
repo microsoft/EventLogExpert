@@ -21,9 +21,6 @@ internal sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceAddEvent(EventLogState state, AddEventAction action)
     {
-        // Buffer additively in the reducer so concurrent adds and the flush's consume compose against current state (a
-        // stale whole-buffer effect write could clobber them). Continuously-update buffers nothing; HandleAddEvent drives
-        // the live tail.
         if (state.ContinuouslyUpdate || !state.OpenLogs.ContainsKey(action.NewEvent.OwningLog))
         {
             return state;
@@ -59,6 +56,7 @@ internal sealed class Reducers
             LoadedLogNames = RecomputeLoadedLogNames(s_emptyNamesByLog, state.LoadedLogNames),
             Focus = null,
             Selection = [],
+            PendingRevealFocus = null,
             NewEventBuffer = [],
             NewEventBufferIsFull = false
         };
@@ -66,20 +64,27 @@ internal sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceCloseLog(EventLogState state, CloseLogAction action)
     {
+        if (state.OpenLogs.TryGetValue(action.LogName, out var closingLog) && closingLog.Id != action.LogId)
+        {
+            return state;
+        }
+
         var newEventBuffer = state.NewEventBuffer
             .Where(e => e.OwningLog != action.LogName)
             .ToList();
 
-        // Drop selections belonging to the closed log; otherwise a reload (close then reopen) leaves stale-generation
-        // handles that block the highlight refresh when the restored entries arrive.
         var newSelection = state.Selection
             .RemoveAll(entry => entry.OriginHandle.LogId == action.LogId);
 
-        // Clear focus when it belongs to the closed log; otherwise it would address a defunct generation after the reopen.
         var newFocus =
             state.Focus is { } focus && focus.OriginHandle.LogId == action.LogId
                 ? null
                 : state.Focus;
+
+        var newPendingRevealFocus =
+            state.PendingRevealFocus is { } reveal && reveal.LogId == action.LogId
+                ? null
+                : state.PendingRevealFocus;
 
         var newNamesByLog = state.NamesByLog.Remove(action.LogName);
 
@@ -91,7 +96,8 @@ internal sealed class Reducers
             NewEventBuffer = newEventBuffer,
             NewEventBufferIsFull = newEventBuffer.Count >= EventLogState.MaxNewEvents,
             Focus = newFocus,
-            Selection = newSelection
+            Selection = newSelection,
+            PendingRevealFocus = newPendingRevealFocus
         };
     }
 
@@ -154,8 +160,6 @@ internal sealed class Reducers
     {
         if (action.ConsumedEvents.Count == 0) { return state; }
 
-        // Remove only the captured entries by reference identity, so an event a watcher buffered during the flush
-        // (prepended after the snapshot) survives. Mirrors ReduceCloseLog's filtered removal + IsFull recompute.
         var consumed = new HashSet<object>(action.ConsumedEvents, ReferenceEqualityComparer.Instance);
         var remaining = state.NewEventBuffer.Where(bufferedEvent => !consumed.Contains(bufferedEvent)).ToList();
 
@@ -169,11 +173,9 @@ internal sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceOpenLog(EventLogState state, OpenLogAction action)
     {
-        // Idempotent: re-opening an already-active log is a no-op, so callers need not coordinate to avoid
-        // ImmutableDictionary.Add throwing.
         if (state.OpenLogs.ContainsKey(action.LogName)) { return state; }
 
-        var openLogId = EventLogId.Create();
+        var openLogId = action.PreassignedId ?? EventLogId.Create();
 
         var perLogNames = action.LogPathType == LogPathType.Channel
             ? s_emptyNames.Add(action.LogName)
@@ -190,13 +192,22 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
+    public static EventLogState ReduceRequestRevealFocus(EventLogState state, RequestRevealFocusAction action) =>
+        state.PendingRevealFocus == action.Target ? state : state with { PendingRevealFocus = action.Target };
+
+    [ReducerMethod]
+    public static EventLogState ReduceRevealFocusConsumed(EventLogState state, RevealFocusConsumedAction action)
+    {
+        if (state.PendingRevealFocus != action.Target) { return state; }
+
+        return state with { PendingRevealFocus = null };
+    }
+
+    [ReducerMethod]
     public static EventLogState ReduceSelectEvent(EventLogState state, SelectEventAction action)
     {
-        // OriginHandle value equality is the selection identity: a stale (prior-generation) handle is distinct from the
-        // fresh one, matching reference-identity semantics without holding event object references.
         bool alreadySelected = ContainsByOriginHandle(state.Selection, action.Selection);
 
-        // Focus always tracks the affected row (Explorer-style focus), independent of whether the row ends up selected.
         if (!alreadySelected)
         {
             return state with
@@ -229,8 +240,6 @@ internal sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceSelectEvents(EventLogState state, SelectEventsAction action)
     {
-        // OriginHandle-identity dedupe only: blocks the same handle twice but lets distinct-generation handles (a stale
-        // entry and a freshly restored one) coexist, so a stale selection isn't collapsed with the fresh copy.
         var existing = new HashSet<EventLocator>();
 
         foreach (var entry in state.Selection) { existing.Add(entry.OriginHandle); }
@@ -246,8 +255,6 @@ internal sealed class Reducers
 
         var newSelection = state.Selection.AddRange(entriesToAdd);
 
-        // Preserve focus when it survives the merge (matched by OriginHandle); otherwise focus the last incoming entry
-        // so the restore path leaves something focused.
         SelectionEntry newFocus = entriesToAdd[^1];
 
         if (state.Focus is not { } priorFocus)
@@ -277,8 +284,6 @@ internal sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceSetSelectedEvents(EventLogState state, SetSelectedEventsAction action)
     {
-        // Order-preserving distinct by OriginHandle; the caller orders entries by the current sort, and the reducer
-        // honors that order.
         var seen = new HashSet<EventLocator>();
         var builder = ImmutableList.CreateBuilder<SelectionEntry>();
 
@@ -292,8 +297,6 @@ internal sealed class Reducers
 
         var newSelection = builder.ToImmutable();
 
-        // Avoid a new state reference when nothing changed; SelectionEntry is a value type, so identity uses OriginHandle
-        // value equality, not ReferenceEquals.
         bool selectionUnchanged = SelectionsEqualByOriginHandle(state.Selection, newSelection);
         bool focusUnchanged = FocusEqualsByOriginHandle(state.Focus, action.Focus);
 
