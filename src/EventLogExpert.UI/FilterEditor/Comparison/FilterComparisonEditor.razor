@@ -1,10 +1,12 @@
 <ValueSelect AriaLabel="@(PropertyAriaLabelledBy is null ? "Property" : null)"
     AriaLabelledBy="@PropertyAriaLabelledBy"
-    @bind-Value="PropertyBinding"
     CssClass="input filter-dropdown"
     T="EventProperty"
-    ToStringFunc="x => x.ToFullString()">
-    @foreach (var item in Enum.GetValues<EventProperty>().OrderBy(p => p.ToFullString(), StringComparer.CurrentCulture))
+    ToStringFunc="x => x.ToFullString()"
+    @bind-Value="PropertyBinding">
+    @foreach (var item in Enum.GetValues<EventProperty>()
+        .Where(p => p != EventProperty.UserId || Comparison.Property == EventProperty.UserId)
+        .OrderBy(p => p.ToFullString(), StringComparer.CurrentCulture))
     {
         <ValueSelectItem T="EventProperty" Value="item" />
     }
@@ -49,8 +51,8 @@
     MatchMode="Comparison.MatchMode"
     OnChanged="HandleOperatorChanged"
     Operator="Comparison.Operator"
-    SupportsMany="!IsTextOnlyProperty(Comparison.Property)"
     SupportsContainsMany="FilterPropertyConstraints.SupportsContainsMany(Comparison.Property)"
+    SupportsMany="!IsTextOnlyProperty(Comparison.Property)"
     SupportsNoneOfMany="FilterPropertyConstraints.SupportsNoneOfMany(Comparison.Property)" />
 
 <label class="visually-hidden" id="@($"{Id}_Value")">Value</label>

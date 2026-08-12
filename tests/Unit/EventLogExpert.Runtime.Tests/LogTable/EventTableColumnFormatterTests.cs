@@ -22,7 +22,8 @@ public sealed class EventTableColumnFormatterTests
         ProcessId = 1234,
         ThreadId = 56,
         Keywords = ["Audit Success"],
-        UserId = new SecurityIdentifier("S-1-5-18")
+        UserId = new SecurityIdentifier("S-1-5-18"),
+        UserDisplayName = @"NT AUTHORITY\SYSTEM"
     };
     private static readonly TimeZoneInfo s_plusTwo =
         TimeZoneInfo.CreateCustomTimeZone("UnitTest+2", TimeSpan.FromHours(2), "UnitTest+2", "UnitTest+2");
@@ -74,9 +75,9 @@ public sealed class EventTableColumnFormatterTests
     }
 
     [Fact]
-    public void GetCellText_User_ReturnsSidValue()
+    public void GetCellText_User_ReturnsUserDisplayName()
     {
-        Assert.Equal("S-1-5-18", EventTableColumnFormatter.GetCellText(s_event, ColumnName.User, s_plusTwo));
+        Assert.Equal(@"NT AUTHORITY\SYSTEM", EventTableColumnFormatter.GetCellText(s_event, ColumnName.User, s_plusTwo));
     }
 
     [Fact]

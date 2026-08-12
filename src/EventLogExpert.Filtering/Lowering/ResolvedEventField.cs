@@ -29,5 +29,6 @@ internal enum ResolvedEventField
     ThreadId,
     TimeCreated,
     UserId,
+    UserDisplayName,
     Xml
 }

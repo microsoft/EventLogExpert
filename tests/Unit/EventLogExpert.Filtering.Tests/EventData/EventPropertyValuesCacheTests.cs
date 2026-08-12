@@ -132,13 +132,32 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
         Assert.Empty(items);
     }
 
+    [Fact]
+    public void GetValues_UserDisplayNameField_ExcludesNoIdentityRowsFromThePicker()
+    {
+        // No-identity rows carry an empty UserDisplayName; the merged "User" filter is presence-gated, so an
+        // empty selectable value could never match a row — the picker must not offer it.
+        var events = new List<ResolvedEvent>
+        {
+            CreateTestEvent(100, userDisplayName: @"NT AUTHORITY\SYSTEM"),
+            CreateTestEvent(200, userDisplayName: "S-1-5-21-1-2-3-4"),
+            CreateTestEvent(300, userDisplayName: "")
+        };
+
+        var users = EventPropertyValuesCache.GetValues(new object(), events, EventProperty.UserDisplayName);
+
+        Assert.Equal([@"NT AUTHORITY\SYSTEM", "S-1-5-21-1-2-3-4"], users);
+        Assert.DoesNotContain(string.Empty, users);
+    }
+
     private static ResolvedEvent CreateTestEvent(
         int id = 1,
         string source = "TestSource",
         string logName = "Application",
         string owningLog = Constants.LogNameTestLog,
         string opcode = "",
-        Guid? relatedActivityId = null) =>
+        Guid? relatedActivityId = null,
+        string userDisplayName = "") =>
         new(owningLog, LogPathType.Channel)
         {
             Id = id,
@@ -151,6 +170,7 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
             RelatedActivityId = relatedActivityId,
             LogName = logName,
             TimeCreated = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc),
+            UserDisplayName = userDisplayName,
             Keywords = []
         };
 }

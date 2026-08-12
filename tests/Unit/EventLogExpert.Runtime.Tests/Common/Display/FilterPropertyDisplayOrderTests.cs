@@ -42,6 +42,7 @@ public sealed class FilterPropertyDisplayOrderTests
                 "Source",
                 "Task Category",
                 "Thread ID",
+                "User",
                 "User Data",
                 "User ID",
                 "Xml"

@@ -578,6 +578,10 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
             }
             case EventFieldId.UserId:
                 return UserIdField(index);
+            case EventFieldId.UserDisplayName:
+                return PooledField(EventColumnField.UserDisplayName, index);
+            case EventFieldId.UserIdSddl:
+                return UserIdSddlField(index);
             case EventFieldId.Description:
                 return PooledField(EventColumnField.Description, index);
             case EventFieldId.Xml:
@@ -703,6 +707,7 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         EventColumnField.Xml => pending.Xml,
         EventColumnField.UserId => pending.UserId?.Value,
         EventColumnField.Opcode => pending.Opcode,
+        EventColumnField.UserDisplayName => pending.UserDisplayName,
         _ => throw new ArgumentOutOfRangeException(nameof(column), column, null)
     };
 
@@ -718,6 +723,7 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         EventFieldId.Xml => EventColumnField.Xml,
         EventFieldId.OwningLog => EventColumnField.OwningLog,
         EventFieldId.Opcode => EventColumnField.Opcode,
+        EventFieldId.UserDisplayName => EventColumnField.UserDisplayName,
         _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Not a single pooled string column.")
     };
 
@@ -738,6 +744,7 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
             AddPendingValue(pending.TaskCategory, indexByValue, extras);
             AddPendingValue(pending.Xml, indexByValue, extras);
             AddPendingValue(pending.UserId?.Value, indexByValue, extras);
+            AddPendingValue(pending.UserDisplayName, indexByValue, extras);
             AddPendingValue(pending.Opcode, indexByValue, extras);
         }
 
@@ -815,6 +822,15 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         SecurityIdentifier? userId = poolIndex < 0 ? null : new SecurityIdentifier(_store.PoolGet(poolIndex)!);
 
         return EventFieldValue.FromProperty(userId);
+    }
+
+    // The raw interned SID string (SDDL), allocation-free (no SecurityIdentifier) for the match-both "User" filter's
+    // SID disjunct. Absent (Kind==Null) when the row carries no UserId, matching the pending path.
+    private EventFieldValue UserIdSddlField(int index)
+    {
+        int poolIndex = _store.RawPoolIndex(EventColumnField.UserId, index);
+
+        return poolIndex < 0 ? ResolvedEventFieldReader.Absent : EventFieldValue.FromProperty(_store.PoolGet(poolIndex)!);
     }
 
     // The pending-tail pooled strings that the sealed pool does not already index, addressed as

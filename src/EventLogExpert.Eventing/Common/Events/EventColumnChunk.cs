@@ -25,7 +25,8 @@ internal enum EventColumnField : byte
     TaskCategory,
     Xml,
     UserId,
-    Opcode
+    Opcode,
+    UserDisplayName
 }
 
 /// <summary>
@@ -114,6 +115,7 @@ internal sealed class EventColumnChunk
     private readonly int[] _userDataValue;
     private readonly int[] _userDataValuesCount;
     private readonly int[] _userDataValuesOffset;
+    private readonly int[] _userDisplayName;
     private readonly int[] _userId;
     private readonly int[] _xml;
 
@@ -130,6 +132,7 @@ internal sealed class EventColumnChunk
         _taskCategory = builder.TaskCategory;
         _xml = builder.Xml;
         _userId = builder.UserId;
+        _userDisplayName = builder.UserDisplayName;
         _opcode = builder.Opcode;
 
         _id = builder.Id;
@@ -232,6 +235,7 @@ internal sealed class EventColumnChunk
         EventColumnField.Xml => _xml,
         EventColumnField.UserId => _userId,
         EventColumnField.Opcode => _opcode,
+        EventColumnField.UserDisplayName => _userDisplayName,
         _ => throw new ArgumentOutOfRangeException(nameof(column), column, null)
     };
 
@@ -278,6 +282,7 @@ internal sealed class EventColumnChunk
         EventColumnField.Xml => _xml[row],
         EventColumnField.UserId => _userId[row],
         EventColumnField.Opcode => _opcode[row],
+        EventColumnField.UserDisplayName => _userDisplayName[row],
         _ => throw new ArgumentOutOfRangeException(nameof(column), column, null)
     };
 
@@ -409,6 +414,7 @@ internal sealed class EventColumnChunk
         internal readonly List<int> UserDataValue = [];
         internal readonly List<int> UserDataValuesCount = [];
         internal readonly List<int> UserDataValuesOffset = [];
+        internal readonly int[] UserDisplayName;
         internal readonly int[] UserId;
         internal readonly int[] Xml;
 
@@ -425,6 +431,7 @@ internal sealed class EventColumnChunk
             TaskCategory = new int[count];
             Xml = new int[count];
             UserId = new int[count];
+            UserDisplayName = new int[count];
             Opcode = new int[count];
 
             Id = new int[count];
@@ -469,6 +476,7 @@ internal sealed class EventColumnChunk
             TaskCategory[row] = pool.Intern(resolvedEvent.TaskCategory);
             Xml[row] = pool.Intern(resolvedEvent.Xml);
             UserId[row] = pool.Intern(resolvedEvent.UserId?.Value);
+            UserDisplayName[row] = pool.Intern(resolvedEvent.UserDisplayName.Length == 0 ? null : resolvedEvent.UserDisplayName);
             Opcode[row] = pool.Intern(resolvedEvent.Opcode);
 
             Id[row] = resolvedEvent.Id;
@@ -476,15 +484,35 @@ internal sealed class EventColumnChunk
             LogPathType[row] = (byte)resolvedEvent.LogPathType;
             UserDataIncomplete[row] = resolvedEvent.UserDataIncomplete;
 
-            if (resolvedEvent.RecordId is { } recordId) { RecordId[row] = recordId; RecordIdHas[row] = true; }
+            if (resolvedEvent.RecordId is { } recordId)
+            {
+                RecordId[row] = recordId;
+                RecordIdHas[row] = true;
+            }
 
-            if (resolvedEvent.ActivityId is { } activityId) { ActivityId[row] = activityId; ActivityIdHas[row] = true; }
+            if (resolvedEvent.ActivityId is { } activityId)
+            {
+                ActivityId[row] = activityId;
+                ActivityIdHas[row] = true;
+            }
 
-            if (resolvedEvent.RelatedActivityId is { } relatedActivityId) { RelatedActivityId[row] = relatedActivityId; RelatedActivityIdHas[row] = true; }
+            if (resolvedEvent.RelatedActivityId is { } relatedActivityId)
+            {
+                RelatedActivityId[row] = relatedActivityId;
+                RelatedActivityIdHas[row] = true;
+            }
 
-            if (resolvedEvent.ProcessId is { } processId) { ProcessId[row] = processId; ProcessIdHas[row] = true; }
+            if (resolvedEvent.ProcessId is { } processId)
+            {
+                ProcessId[row] = processId;
+                ProcessIdHas[row] = true;
+            }
 
-            if (resolvedEvent.ThreadId is { } threadId) { ThreadId[row] = threadId; ThreadIdHas[row] = true; }
+            if (resolvedEvent.ThreadId is { } threadId)
+            {
+                ThreadId[row] = threadId;
+                ThreadIdHas[row] = true;
+            }
 
             AddKeywords(row, resolvedEvent, pool);
             AddUserData(row, resolvedEvent, pool);

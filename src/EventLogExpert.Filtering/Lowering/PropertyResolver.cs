@@ -16,7 +16,7 @@ internal static class PropertyResolver
     ///     Returns the <see cref="ResolvedEventField" /> matching <paramref name="identifier" /> (case-insensitive), plus
     ///     the literal kind a comparison literal must coerce to.
     /// </summary>
-    public static bool TryResolve(string identifier, out ResolvedEventField field, out TypedLiteralKind literalKind)
+    public static bool TryResolve(string? identifier, out ResolvedEventField field, out TypedLiteralKind literalKind)
     {
         field = default;
         literalKind = default;
@@ -102,6 +102,12 @@ internal static class PropertyResolver
                 return true;
             case "USERID":
                 field = ResolvedEventField.UserId;
+                literalKind = TypedLiteralKind.String;
+
+                return true;
+            case "USER":
+            case "USERDISPLAYNAME":
+                field = ResolvedEventField.UserDisplayName;
                 literalKind = TypedLiteralKind.String;
 
                 return true;

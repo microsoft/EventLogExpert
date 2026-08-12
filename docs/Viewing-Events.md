@@ -27,6 +27,8 @@ See [Performance](Performance.md) for how the virtualized table, the segmented s
 
 The current sort indicator (a caret) appears in the active column header; clicking it flips between ascending and descending.
 
+The `User` column shows the best-available account identity, resolved offline (no directory lookup): a well-known-SID name (e.g. `NT AUTHORITY\SYSTEM`), otherwise the acting or target account carried in the event's data (`DOMAIN\user`), otherwise the raw SID, and blank only when the event carries no user identity at all. Sorting, grouping, and cell-filtering on `User` all use this displayed name.
+
 **Column reordering.** Drag a column header sideways to drop it before or after another column. The new order persists across sessions until `Reset Column Defaults` (in the column menu) restores it.
 
 **Column sizing.** Drag a column-header edge to resize. Sizes persist across sessions; `Reset Column Defaults` restores the built-in widths along with visibility, ordering, and sort.
@@ -39,7 +41,7 @@ The current sort indicator (a caret) appears in the active column header; clicki
 
 - `Copy Selected` / `Copy Selected (Simple)` / `Copy Selected (XML)` / `Copy Selected (Full)` — same four formats as the `Edit` menu.
 - `Exclude Events Before` / `Exclude Events After` — sets a date filter using the right-clicked event's timestamp as the boundary.
-- `Include` and `Exclude` submenus — each lists the field comparisons applicable to a single right-clicked event. Picking one creates a new basic filter (or exclusion) for that field equal to the right-clicked event's value. `Description` and `Xml` are not present in the submenu. Today this works for `Event ID`, `Activity ID`, `Level`, `Keywords`, `Source`, and `Task Category`; the `Process ID`, `Thread ID`, and `User ID` items are present in the menu but produce empty filter values, so they currently no-op.
+- `Include` and `Exclude` submenus — each lists the field comparisons applicable to a single right-clicked event; a field is enabled only when the event carries a value for it (otherwise it is shown disabled with a reason). Picking an enabled one creates a new basic filter (or exclusion) for that field equal to the right-clicked event's value. `Description`, `Xml`, and the advanced-only `User ID` are not offered; the fields that can produce a filter are `Event ID`, `Activity ID`, `Level`, `Keywords`, `Source`, `Task Category`, `Process ID`, `Thread ID`, `User` (the resolved account name, or the raw SID when that is all the event carries), and `Log Name`.
 
 ### Grouping
 

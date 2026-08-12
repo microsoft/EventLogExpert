@@ -504,6 +504,7 @@ public sealed class BasicFilterDecomposerTests
             EventProperty.ProcessId => ["4", "8"],
             EventProperty.ThreadId => ["8", "16"],
             EventProperty.UserId => ["S-1-5-18", "S-1-5-19"],
+            EventProperty.UserDisplayName => [@"CONTOSO\alice", @"NT AUTHORITY\SYSTEM"],
             EventProperty.LogName => ["Application", "System"],
             _ => null
         };
@@ -522,6 +523,7 @@ public sealed class BasicFilterDecomposerTests
             EventProperty.ProcessId => "4",
             EventProperty.ThreadId => "8",
             EventProperty.UserId => "S-1-5-18",
+            EventProperty.UserDisplayName => @"CONTOSO\alice",
             EventProperty.Description => "An error occurred",
             EventProperty.Xml => "<x/>",
             EventProperty.LogName => "Application",

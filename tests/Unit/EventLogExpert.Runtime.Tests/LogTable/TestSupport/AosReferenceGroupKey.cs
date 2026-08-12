@@ -30,7 +30,7 @@ internal static class AosReferenceGroupKey
             ColumnName.Keywords => @event.KeywordsDisplayName ?? string.Empty,
             ColumnName.ProcessId => @event.ProcessId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             ColumnName.ThreadId => @event.ThreadId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            ColumnName.User => @event.UserId?.Value ?? string.Empty,
+            ColumnName.User => @event.UserDisplayName,
             _ => string.Empty
         };
 }

@@ -114,6 +114,19 @@ public sealed class DetailsReaderFormatterTests
     }
 
     [Fact]
+    public void BuildModel_DerivedIdentity_RendersUserDisplayNameOnly()
+    {
+        // Security-audit event: no System <Security UserID>, name derived from EventData. The Subject/Target SID is
+        // shown in the EventData section, so no "User SID" row is hoisted here.
+        ResolvedEvent @event = new ResolvedEvent("TestLog", LogPathType.Channel) with { UserDisplayName = @"CONTOSO\alice" };
+
+        DetailsProperty user = Assert.Single(Model(@event).SystemProperties, property => property.Label == "User");
+
+        Assert.Equal(@"CONTOSO\alice", user.Value);
+        Assert.DoesNotContain(Model(@event).SystemProperties, property => property.Label == "User SID");
+    }
+
+    [Fact]
     public void BuildModel_EmptyStringValue_IsMutedButCopiesRealValue()
     {
         DetailsField field = Assert.Single(Model(EventDataTestFactory.CreateEventWithData(("SubjectUserName", ""))).EventData);
@@ -271,6 +284,20 @@ public sealed class DetailsReaderFormatterTests
     }
 
     [Fact]
+    public void BuildModel_UnresolvedUser_RendersSidOnceWithoutDuplicateSidRow()
+    {
+        // A populated but non-well-known SID that resolves to nothing: UserDisplayName == the SID, so the "User SID"
+        // row is suppressed to avoid showing the SID twice.
+        ResolvedEvent @event = new ResolvedEvent("TestLog", LogPathType.Channel)
+            with { UserId = new SecurityIdentifier("S-1-5-21-1-2-3-1105"), UserDisplayName = "S-1-5-21-1-2-3-1105" };
+
+        DetailsProperty user = Assert.Single(Model(@event).SystemProperties, property => property.Label == "User");
+
+        Assert.Equal("S-1-5-21-1-2-3-1105", user.Value);
+        Assert.DoesNotContain(Model(@event).SystemProperties, property => property.Label == "User SID");
+    }
+
+    [Fact]
     public void BuildModel_UserData_RendersPathAndFlagsIncompleteExtraction()
     {
         ResolvedEvent @event = new ResolvedEvent("TestLog", LogPathType.Channel) with
@@ -288,13 +315,16 @@ public sealed class DetailsReaderFormatterTests
     }
 
     [Fact]
-    public void BuildModel_UserId_RendersRawSid()
+    public void BuildModel_WellKnownUser_RendersBothNameAndSid()
     {
-        ResolvedEvent @event = new ResolvedEvent("TestLog", LogPathType.Channel) with { UserId = new SecurityIdentifier("S-1-5-18") };
+        ResolvedEvent @event = new ResolvedEvent("TestLog", LogPathType.Channel)
+            with { UserId = new SecurityIdentifier("S-1-5-18"), UserDisplayName = @"NT AUTHORITY\SYSTEM" };
 
         DetailsProperty user = Assert.Single(Model(@event).SystemProperties, property => property.Label == "User");
+        DetailsProperty userSid = Assert.Single(Model(@event).SystemProperties, property => property.Label == "User SID");
 
-        Assert.Equal("S-1-5-18", user.Value);
+        Assert.Equal(@"NT AUTHORITY\SYSTEM", user.Value);
+        Assert.Equal("S-1-5-18", userSid.Value);
     }
 
     [Fact]

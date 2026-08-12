@@ -46,6 +46,9 @@ internal static class ColumnEmitter
         }
     }
 
+    private static bool ColumnUserHasIdentity(string userDisplayName, EventFieldValue sid) =>
+        userDisplayName.Length != 0 || sid.Kind != EventFieldValueKind.Null;
+
     private static EventFieldId ContainsFieldId(ResolvedEventField field) =>
         field switch
         {
@@ -61,6 +64,7 @@ internal static class ColumnEmitter
             ResolvedEventField.Level => EventFieldId.Level,
             ResolvedEventField.LogName => EventFieldId.LogName,
             ResolvedEventField.Source => EventFieldId.Source,
+            ResolvedEventField.UserDisplayName => EventFieldId.UserDisplayName,
             ResolvedEventField.TaskCategory => EventFieldId.TaskCategory,
             ResolvedEventField.Opcode => EventFieldId.Opcode,
             ResolvedEventField.Xml => EventFieldId.Xml,
@@ -114,6 +118,12 @@ internal static class ColumnEmitter
     {
         var needle = node.Needle;
         var comparison = node.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+        if (node.Field == ResolvedEventField.UserDisplayName)
+        {
+            return EmitUserContains(needle, comparison, negated: false);
+        }
+
         var field = ContainsFieldId(node.Field);
 
         return (reader, locator) =>
@@ -313,6 +323,11 @@ internal static class ColumnEmitter
             return EmitMultiContainsUserId(node.Values, comparison, node.Negated);
         }
 
+        if (node.Field == ResolvedEventField.UserDisplayName)
+        {
+            return EmitMultiContainsUser(node.Values, comparison, node.Negated);
+        }
+
         var fieldId = ContainsFieldId(node.Field);
         var needles = CompileTimeLiterals.Snapshot(node.Values);
         var negated = node.Negated;
@@ -325,6 +340,38 @@ internal static class ColumnEmitter
             for (var i = 0; i < needles.Length; i++)
             {
                 if (actual.Contains(needles[i], comparison))
+                {
+                    matched = true;
+
+                    break;
+                }
+            }
+
+            return (negated ? !matched : matched) ? FilterMatch.Match : FilterMatch.NoMatch;
+        };
+    }
+
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitMultiContainsUser(
+        IReadOnlyList<string> values,
+        StringComparison comparison,
+        bool negated)
+    {
+        var needles = CompileTimeLiterals.Snapshot(values);
+
+        return (reader, locator) =>
+        {
+            var udn = reader.GetField(locator, EventFieldId.UserDisplayName).AsString();
+            var sid = reader.GetField(locator, EventFieldId.UserIdSddl);
+
+            if (!ColumnUserHasIdentity(udn, sid)) { return FilterMatch.NoMatch; }
+
+            var sidValue = sid.Kind != EventFieldValueKind.Null ? sid.AsString() : null;
+            var matched = false;
+
+            for (var i = 0; i < needles.Length; i++)
+            {
+                if (udn.Contains(needles[i], comparison) ||
+                    (sidValue is not null && sidValue.Contains(needles[i], comparison)))
                 {
                     matched = true;
 
@@ -374,6 +421,11 @@ internal static class ColumnEmitter
         if (node.Field == ResolvedEventField.UserId)
         {
             return EmitMultiEqualsUserId(node.Values, node.Negated);
+        }
+
+        if (node.Field == ResolvedEventField.UserDisplayName)
+        {
+            return EmitMultiEqualsUser(node.Values, node.Negated);
         }
 
         Func<IEventColumnReader, EventLocator, FilterMatch> positive = node.Field switch
@@ -488,6 +540,35 @@ internal static class ColumnEmitter
         };
     }
 
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitMultiEqualsUser(IReadOnlyList<string> values, bool negated)
+    {
+        var snapshot = CompileTimeLiterals.Snapshot(values);
+
+        return (reader, locator) =>
+        {
+            var udn = reader.GetField(locator, EventFieldId.UserDisplayName).AsString();
+            var sid = reader.GetField(locator, EventFieldId.UserIdSddl);
+
+            if (!ColumnUserHasIdentity(udn, sid)) { return FilterMatch.NoMatch; }
+
+            var sidValue = sid.Kind != EventFieldValueKind.Null ? sid.AsString() : null;
+            var matched = false;
+
+            for (var i = 0; i < snapshot.Length; i++)
+            {
+                if (string.Equals(udn, snapshot[i], StringComparison.Ordinal) ||
+                    (sidValue is not null && string.Equals(sidValue, snapshot[i], StringComparison.Ordinal)))
+                {
+                    matched = true;
+
+                    break;
+                }
+            }
+
+            return (negated ? !matched : matched) ? FilterMatch.Match : FilterMatch.NoMatch;
+        };
+    }
+
     private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitMultiEqualsUserId(
         IReadOnlyList<string> values,
         bool negated)
@@ -544,6 +625,16 @@ internal static class ColumnEmitter
 
     private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitNot(NotNode node)
     {
+        // SPECIAL: NOT(User.Contains) is presence-gated + match-both (name OR SID), NOT the naive !inner.
+        if (node.Operand is ContainsNode { Field: ResolvedEventField.UserDisplayName } userContains)
+        {
+            var userComparison = userContains.IgnoreCase ?
+                StringComparison.OrdinalIgnoreCase :
+                StringComparison.Ordinal;
+
+            return EmitUserContains(userContains.Needle, userComparison, negated: true);
+        }
+
         // SPECIAL: NOT(UserId.Contains) is presence-required - an absent UserId is NoMatch, NOT the
         // naive !inner. Mirrors Emitter.EmitNot.
         if (node.Operand is ContainsNode { Field: ResolvedEventField.UserId } userIdContains)
@@ -570,23 +661,6 @@ internal static class ColumnEmitter
         return (reader, locator) => Negate(inner(reader, locator));
     }
 
-    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitNullableNullCheck(
-        EventFieldId field,
-        FilterBinaryOperator op) =>
-        op switch
-        {
-            // == null is true (Match) when the field is absent; != null is true when present.
-            FilterBinaryOperator.Equal => (reader, locator) =>
-                reader.GetField(locator, field).Kind == EventFieldValueKind.Null
-                    ? FilterMatch.Match
-                    : FilterMatch.NoMatch,
-            FilterBinaryOperator.NotEqual => (reader, locator) =>
-                reader.GetField(locator, field).Kind == EventFieldValueKind.Null
-                    ? FilterMatch.NoMatch
-                    : FilterMatch.Match,
-            _ => throw new EmitException($"Operator '{op}' is not supported against null.")
-        };
-
     private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitNullComparison(
         ResolvedEventField field,
         FilterBinaryOperator op)
@@ -605,6 +679,8 @@ internal static class ColumnEmitter
                 return EmitNullableNullCheck(EventFieldId.RelatedActivityId, op);
             case ResolvedEventField.UserId:
                 return EmitNullableNullCheck(EventFieldId.UserId, op);
+            case ResolvedEventField.UserDisplayName:
+                return EmitUserNullCheck(op);
             case ResolvedEventField.Id:
             case ResolvedEventField.TimeCreated:
                 return EmitConstantNullComparison(op);
@@ -626,6 +702,23 @@ internal static class ColumnEmitter
         }
     }
 
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitNullableNullCheck(
+        EventFieldId field,
+        FilterBinaryOperator op) =>
+        op switch
+        {
+            // == null is true (Match) when the field is absent; != null is true when present.
+            FilterBinaryOperator.Equal => (reader, locator) =>
+                reader.GetField(locator, field).Kind == EventFieldValueKind.Null ?
+                    FilterMatch.Match :
+                    FilterMatch.NoMatch,
+            FilterBinaryOperator.NotEqual => (reader, locator) =>
+                reader.GetField(locator, field).Kind == EventFieldValueKind.Null ?
+                    FilterMatch.NoMatch :
+                    FilterMatch.Match,
+            _ => throw new EmitException($"Operator '{op}' is not supported against null.")
+        };
+
     private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitOr(OrNode node)
     {
         var parts = FilterNodeMetadata.FlattenOrChain(node).Select(EmitNode).ToArray();
@@ -644,6 +737,7 @@ internal static class ColumnEmitter
             ResolvedEventField.Level => FilterCompare.StringOrdinal(EventFieldId.Level, op, value),
             ResolvedEventField.LogName => FilterCompare.StringOrdinal(EventFieldId.LogName, op, value),
             ResolvedEventField.Source => FilterCompare.StringOrdinal(EventFieldId.Source, op, value),
+            ResolvedEventField.UserDisplayName => EmitUserStringCompare(op, value),
             ResolvedEventField.TaskCategory => FilterCompare.StringOrdinal(EventFieldId.TaskCategory, op, value),
             ResolvedEventField.Opcode => FilterCompare.StringOrdinal(EventFieldId.Opcode, op, value),
             ResolvedEventField.Xml => FilterCompare.StringOrdinal(EventFieldId.Xml, op, value),
@@ -659,6 +753,23 @@ internal static class ColumnEmitter
             ResolvedEventField.Keywords => throw new EmitException(
                 "Keywords cannot be compared directly; use Keywords.Any."),
             _ => throw new EmitException($"Unsupported field '{field}' for string comparison.")
+        };
+
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitUserContains(string needle, StringComparison comparison, bool negated) =>
+        (reader, locator) =>
+        {
+            var udn = reader.GetField(locator, EventFieldId.UserDisplayName).AsString();
+            var sid = reader.GetField(locator, EventFieldId.UserIdSddl);
+
+            if (!ColumnUserHasIdentity(udn, sid)) { return FilterMatch.NoMatch; }
+
+            var sidPresent = sid.Kind != EventFieldValueKind.Null;
+
+            var matched = negated ?
+                !udn.Contains(needle, comparison) && (!sidPresent || !sid.AsString().Contains(needle, comparison)) :
+                udn.Contains(needle, comparison) || (sidPresent && sid.AsString().Contains(needle, comparison));
+
+            return matched ? FilterMatch.Match : FilterMatch.NoMatch;
         };
 
     private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitUserData(
@@ -699,6 +810,50 @@ internal static class ColumnEmitter
             return result == FilterMatch.NoMatch && incomplete ? FilterMatch.Unknown : result;
         };
     }
+
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitUserNullCheck(FilterBinaryOperator op) =>
+        op switch
+        {
+            FilterBinaryOperator.Equal => (reader, locator) =>
+                ColumnUserHasIdentity(reader.GetField(locator, EventFieldId.UserDisplayName).AsString(),
+                    reader.GetField(locator, EventFieldId.UserIdSddl)) ?
+                        FilterMatch.NoMatch : FilterMatch.Match,
+            FilterBinaryOperator.NotEqual => (reader, locator) =>
+                ColumnUserHasIdentity(reader.GetField(locator, EventFieldId.UserDisplayName).AsString(),
+                    reader.GetField(locator, EventFieldId.UserIdSddl)) ?
+                        FilterMatch.Match : FilterMatch.NoMatch,
+            _ => throw new EmitException($"Operator '{op}' is not supported against null.")
+        };
+
+    private static Func<IEventColumnReader, EventLocator, FilterMatch> EmitUserStringCompare(FilterBinaryOperator op, string value) =>
+        op switch
+        {
+            FilterBinaryOperator.Equal => (reader, locator) =>
+            {
+                var udn = reader.GetField(locator, EventFieldId.UserDisplayName).AsString();
+                var sid = reader.GetField(locator, EventFieldId.UserIdSddl);
+
+                if (!ColumnUserHasIdentity(udn, sid)) { return FilterMatch.NoMatch; }
+
+                return string.Equals(udn, value, StringComparison.Ordinal) ||
+                    (sid.Kind != EventFieldValueKind.Null && string.Equals(sid.AsString(), value, StringComparison.Ordinal)) ?
+                        FilterMatch.Match :
+                        FilterMatch.NoMatch;
+            },
+            FilterBinaryOperator.NotEqual => (reader, locator) =>
+            {
+                var udn = reader.GetField(locator, EventFieldId.UserDisplayName).AsString();
+                var sid = reader.GetField(locator, EventFieldId.UserIdSddl);
+
+                if (!ColumnUserHasIdentity(udn, sid)) { return FilterMatch.NoMatch; }
+
+                return !string.Equals(udn, value, StringComparison.Ordinal) &&
+                    (sid.Kind == EventFieldValueKind.Null || !string.Equals(sid.AsString(), value, StringComparison.Ordinal)) ?
+                        FilterMatch.Match :
+                        FilterMatch.NoMatch;
+            },
+            _ => throw new EmitException($"Operator '{op}' is not supported on User.")
+        };
 
     // Evaluates part[index] against the per-event reader and locator carried in a by-value named tuple, so the And/Or
     // combine stays closure-free (a cached static method group, no per-event allocation).
