@@ -673,7 +673,7 @@ public sealed partial class LogTablePane
             ColumnName.Keywords => representative.KeywordsDisplayName,
             ColumnName.ProcessId => representative.ProcessId?.ToString(),
             ColumnName.ThreadId => representative.ThreadId?.ToString(),
-            ColumnName.User => representative.UserId?.ToString(),
+            ColumnName.User => representative.UserDisplayName,
             _ => null
         };
 
@@ -1511,7 +1511,7 @@ public sealed partial class LogTablePane
 
         foreach (EventProperty property in Enum.GetValues<EventProperty>())
         {
-            if (property is EventProperty.Description or EventProperty.Xml) { continue; }
+            if (property is EventProperty.Description or EventProperty.Xml or EventProperty.UserId) { continue; }
 
             var capturedProperty = property;
             bool hasValue = CellFilterBuilder.TryGetDisplayValue(selectedEvent, property, out _);

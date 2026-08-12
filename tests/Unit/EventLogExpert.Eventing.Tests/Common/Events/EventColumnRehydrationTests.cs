@@ -18,6 +18,37 @@ public sealed class EventColumnRehydrationTests
     private const int ChunkSize = 4096;
 
     [Fact]
+    public void GetDetailLean_PendingRow_ReturnsSamePendingEvent()
+    {
+        ResolvedEvent pending = BuildRichEvent();
+        EventColumnStore store = EventColumnStore.Build([], generation: 1, contentVersion: 1).Append([pending]);
+
+        Assert.True(store.IsPending(0));
+
+        // R1: a pending lean read is O(1) and leaves the fully materialized detail fields intact.
+        ResolvedEvent lean = store.GetDetailLean(0);
+        Assert.Same(pending, lean);
+    }
+
+    [Fact]
+    public void GetDetailLean_SealedRow_GridMatchesDetailWithEmptyDetailFields()
+    {
+        ResolvedEvent source = BuildRichEvent();
+        EventColumnStore store = EventColumnStore.Build([source], generation: 1, contentVersion: 1);
+        Assert.False(store.IsPending(0));
+
+        ResolvedEvent full = store.GetDetail(0);
+        ResolvedEvent lean = store.GetDetailLean(0);
+
+        AssertGridParity(full, lean);
+
+        // Detail-only fields are best-effort empty on the sealed lean projection.
+        Assert.True(lean.UserData.IsDefaultOrEmpty);
+        Assert.Equal(string.Empty, lean.Xml);
+        Assert.Equal(EventDataKind.None, lean.EventData.Kind);
+    }
+
+    [Fact]
     public void GetDetail_PendingRow_ReturnsSamePendingEvent()
     {
         ResolvedEvent pending = BuildRichEvent();
@@ -310,34 +341,32 @@ public sealed class EventColumnRehydrationTests
     }
 
     [Fact]
-    public void GetDetailLean_PendingRow_ReturnsSamePendingEvent()
+    public void SealedRow_EmptyUserDisplayName_ReconstructsAsEmpty()
     {
-        ResolvedEvent pending = BuildRichEvent();
-        EventColumnStore store = EventColumnStore.Build([], generation: 1, contentVersion: 1).Append([pending]);
+        ResolvedEvent source = new("live", LogPathType.Channel) { Id = 1 };
 
-        Assert.True(store.IsPending(0));
-
-        // R1: a pending lean read is O(1) and leaves the fully materialized detail fields intact.
-        ResolvedEvent lean = store.GetDetailLean(0);
-        Assert.Same(pending, lean);
-    }
-
-    [Fact]
-    public void GetDetailLean_SealedRow_GridMatchesDetailWithEmptyDetailFields()
-    {
-        ResolvedEvent source = BuildRichEvent();
         EventColumnStore store = EventColumnStore.Build([source], generation: 1, contentVersion: 1);
         Assert.False(store.IsPending(0));
 
-        ResolvedEvent full = store.GetDetail(0);
-        ResolvedEvent lean = store.GetDetailLean(0);
+        Assert.Equal(string.Empty, store.GetDetailLean(0).UserDisplayName);
+        Assert.Equal(string.Empty, store.GetDetail(0).UserDisplayName);
+    }
 
-        AssertGridParity(full, lean);
+    [Fact]
+    public void SealedRow_LeanAndDetail_CarryResolvedUserDisplayName()
+    {
+        ResolvedEvent source = new("live", LogPathType.Channel)
+        {
+            Id = 4624,
+            UserId = null,
+            UserDisplayName = @"CONTOSO\alice"
+        };
 
-        // Detail-only fields are best-effort empty on the sealed lean projection.
-        Assert.True(lean.UserData.IsDefaultOrEmpty);
-        Assert.Equal(string.Empty, lean.Xml);
-        Assert.Equal(EventDataKind.None, lean.EventData.Kind);
+        EventColumnStore store = EventColumnStore.Build([source], generation: 1, contentVersion: 1);
+        Assert.False(store.IsPending(0));
+
+        Assert.Equal(@"CONTOSO\alice", store.GetDetailLean(0).UserDisplayName);
+        Assert.Equal(@"CONTOSO\alice", store.GetDetail(0).UserDisplayName);
     }
 
     private static void AssertEnumerationParity(EventDataView expected, EventDataView actual)
@@ -417,6 +446,7 @@ public sealed class EventColumnRehydrationTests
         Assert.Equal(expected.ProcessId, actual.ProcessId);
         Assert.Equal(expected.ThreadId, actual.ThreadId);
         Assert.Equal(expected.UserId, actual.UserId);
+        Assert.Equal(expected.UserDisplayName, actual.UserDisplayName);
         Assert.Equal(expected.UserDataIncomplete, actual.UserDataIncomplete);
 
         Assert.Equal(expected.Keywords.ToArray(), actual.Keywords.ToArray());
@@ -445,6 +475,7 @@ public sealed class EventColumnRehydrationTests
         Assert.Equal(full.ProcessId, lean.ProcessId);
         Assert.Equal(full.ThreadId, lean.ThreadId);
         Assert.Equal(full.UserId, lean.UserId);
+        Assert.Equal(full.UserDisplayName, lean.UserDisplayName);
         Assert.Equal(full.UserDataIncomplete, lean.UserDataIncomplete);
         Assert.Equal(full.Keywords.ToArray(), lean.Keywords.ToArray());
         Assert.Equal(full.KeywordsDisplayName, lean.KeywordsDisplayName);
@@ -570,6 +601,7 @@ public sealed class EventColumnRehydrationTests
             TaskCategory = "Logon",
             Xml = "<Event><System /></Event>",
             UserId = new SecurityIdentifier("S-1-5-18"),
+            UserDisplayName = @"NT AUTHORITY\SYSTEM",
             RecordId = 99L,
             ActivityId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
             RelatedActivityId = Guid.Parse("44444444-4444-4444-4444-444444444444"),

@@ -104,6 +104,7 @@ public sealed class LogTablePaneSelectionTests : BunitContext
             ProcessId = 111,
             ThreadId = 222,
             UserId = userId,
+            UserDisplayName = @"NT AUTHORITY\SYSTEM",
             Description = "test description"
         };
 
@@ -122,7 +123,7 @@ public sealed class LogTablePaneSelectionTests : BunitContext
         Assert.Equal("AuditKeyword", Cell(row, 9).TextContent.Trim());
         Assert.Equal("111", Cell(row, 10).TextContent.Trim());
         Assert.Equal("222", Cell(row, 11).TextContent.Trim());
-        Assert.Equal(userId.ToString(), Cell(row, 12).TextContent.Trim());
+        Assert.Equal(@"NT AUTHORITY\SYSTEM", Cell(row, 12).TextContent.Trim());
         Assert.Equal("test description", Cell(row, 13).TextContent.Trim());
     }
 

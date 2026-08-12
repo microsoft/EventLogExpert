@@ -54,6 +54,8 @@ public sealed record ResolvedEvent(
 
     public SecurityIdentifier? UserId { get; init; }
 
+    public string UserDisplayName { get; init; } = string.Empty;
+
     /// <summary>
     ///     Pre-rendered XML for the event. Populated by <c>EventLogReader</c> only when the log is opened with
     ///     <c>renderXml: true</c> (currently driven by the presence of an applied filter that references this property). When

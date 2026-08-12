@@ -47,7 +47,7 @@ Pick a property, pick an operator, then enter or pick a comparison value. Option
 | `Task Category` | resolved task name |
 | `Process ID` | process id |
 | `Thread ID` | thread id |
-| `User ID` | SID string |
+| `User` | The event's user identity, matched against EITHER the resolved account name shown in the User column (`DOMAIN\user`, a well-known-SID name like `NT AUTHORITY\SYSTEM`) OR the raw SID; the multi-select set offers the account names seen in the active logs. Events with no user identity are not matched by a `User` predicate (including its negation). |
 | `Description` | resolved description text |
 | `Xml` | raw XML (forces eager XML resolution; see caveat) |
 
@@ -88,7 +88,8 @@ Available properties:
 | `TaskCategory` | `string` | |
 | `ProcessId` | `int?` | |
 | `ThreadId` | `int?` | |
-| `UserId` | `SecurityIdentifier?` | Use `.ToString()` to compare. |
+| `UserId` | `SecurityIdentifier?` | SID-exact match of the System &lt;Security UserID&gt; (advanced only; usually empty on Security-audit events). The Basic editor offers `User` instead, which matches the SID or the resolved name. |
+| `UserDisplayName` (alias `User`) | `string` | The merged "User" filter: matches the resolved account name shown in the User column (a well-known-SID name, else the Subject/Target account `DOMAIN\user`) OR the raw SID. `User.Contains("alice")` matches the name; `User == "S-1-5-18"` matches the SID. A row with no user identity is never matched by a value comparison (presence-required, including negated value comparisons) — unlike plain string fields; compare against `null` (`User == null` / `User != null`) to select rows by identity absence or presence. |
 | `TimeCreated` | `DateTime` | The raw `ResolvedEvent` value — the table and Details pane render it in the configured time zone, but expressions see the underlying value. |
 | `LogName` | `string` | Source log channel as reported by the event reader. |
 | `OwningLog` | `string` | The file path or live-channel name as displayed in the tab strip. |

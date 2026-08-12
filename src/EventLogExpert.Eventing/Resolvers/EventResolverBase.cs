@@ -141,6 +141,7 @@ public class EventResolverBase : IDisposable
         TemplateInfo? primaryInfo = modernEvent?.Template is { } template ? _templates.GetTemplateInfo(template) : null;
 
         var (eventDataValues, eventDataSchema) = BuildEventData(eventRecord, primaryInfo);
+        var userId = _cache?.GetOrAddSid(eventRecord.UserId) ?? eventRecord.UserId;
 
         return new(eventRecord.PathName, eventRecord.LogPathType)
         {
@@ -161,7 +162,8 @@ public class EventResolverBase : IDisposable
             TaskCategory = _taskKeywords.ResolveTaskName(eventRecord, details, modernEvent, supplemental, supplementalModernEvent),
             ThreadId = eventRecord.ThreadId,
             TimeCreated = eventRecord.TimeCreated,
-            UserId = _cache?.GetOrAddSid(eventRecord.UserId) ?? eventRecord.UserId,
+            UserId = userId,
+            UserDisplayName = UserDisplayNameResolver.Resolve(userId, new EventDataView(eventDataValues, eventDataSchema)),
             Xml = eventRecord.Xml ?? string.Empty,
             UserData = InternUserData(eventRecord.UserData),
             UserDataIncomplete = eventRecord.UserDataIncomplete

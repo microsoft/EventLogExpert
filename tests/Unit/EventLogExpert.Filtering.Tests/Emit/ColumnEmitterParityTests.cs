@@ -8,6 +8,7 @@ using EventLogExpert.Eventing.Structured;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Filtering.Parsing;
 using EventLogExpert.Filtering.Tests.TestUtils;
+using System.Security.Principal;
 
 namespace EventLogExpert.Filtering.Tests.Emit;
 
@@ -22,7 +23,6 @@ public sealed class ColumnEmitterParityTests
         ("Path", @"C:\Windows\System32\cmd.exe"),
         ("Dup", "first"),
         ("Dup", "second"));
-
     private static readonly ResolvedEvent s_readerEnablerEvent = new("TestLog", LogPathType.Channel)
     {
         Id = 700,
@@ -431,6 +431,39 @@ public sealed class ColumnEmitterParityTests
     }
 
     [Fact]
+    public void UserDisplayName_MultiValueOperators_MatchInBothBackends()
+    {
+        ResolvedEvent alice = new("TestLog", LogPathType.Channel) { Id = 1, UserDisplayName = @"CONTOSO\alice" };
+        ResolvedEvent bob = new("TestLog", LogPathType.Channel) { Id = 2, UserDisplayName = @"CONTOSO\bob" };
+
+        // Multi-equals ("is any of").
+        AssertBothBackends(@"(new[] {""CONTOSO\\alice"", ""CONTOSO\\carol""}).Contains(UserDisplayName)", alice, FilterMatch.Match);
+        AssertBothBackends(@"(new[] {""CONTOSO\\alice"", ""CONTOSO\\carol""}).Contains(UserDisplayName)", bob, FilterMatch.NoMatch);
+
+        // Multi-contains ("contains any of") + its negation.
+        AssertBothBackends(@"(new[] {""alice"", ""carol""}).Any(e => UserDisplayName.Contains(e, StringComparison.OrdinalIgnoreCase))", alice, FilterMatch.Match);
+        AssertBothBackends(@"(new[] {""alice"", ""carol""}).Any(e => UserDisplayName.Contains(e, StringComparison.OrdinalIgnoreCase))", bob, FilterMatch.NoMatch);
+        AssertBothBackends(@"!(new[] {""alice""}).Any(e => UserDisplayName.Contains(e, StringComparison.OrdinalIgnoreCase))", bob, FilterMatch.Match);
+    }
+
+    [Fact]
+    public void UserDisplayName_ResolvedName_MatchesExactAndContains_InBothBackends()
+    {
+        ResolvedEvent alice = new("TestLog", LogPathType.Channel) { Id = 1, UserDisplayName = @"CONTOSO\alice" };
+        ResolvedEvent bob = new("TestLog", LogPathType.Channel) { Id = 2, UserDisplayName = @"CONTOSO\bob" };
+        ResolvedEvent noUser = new("TestLog", LogPathType.Channel) { Id = 3 };
+
+        AssertBothBackends(@"UserDisplayName == ""CONTOSO\\alice""", alice, FilterMatch.Match);
+        AssertBothBackends(@"UserDisplayName == ""CONTOSO\\alice""", bob, FilterMatch.NoMatch);
+        AssertBothBackends(@"UserDisplayName == ""CONTOSO\\alice""", noUser, FilterMatch.NoMatch);
+        AssertBothBackends(@"UserDisplayName.Contains(""alice"", StringComparison.OrdinalIgnoreCase)", alice, FilterMatch.Match);
+
+        // The `User` grammar alias resolves to the same UserDisplayName field.
+        AssertBothBackends(@"User.Contains(""alice"", StringComparison.OrdinalIgnoreCase)", alice, FilterMatch.Match);
+        AssertBothBackends(@"User.Contains(""alice"", StringComparison.OrdinalIgnoreCase)", bob, FilterMatch.NoMatch);
+    }
+
+    [Fact]
     public void UserIdEquals_OverNullUserId_IsNoMatch()
     {
         AssertBothBackends(
@@ -455,6 +488,119 @@ public sealed class ColumnEmitterParityTests
             "UserId != null && UserId.Value != \"S-1-5-18\"",
             FilterTestFixtures.NoNullables,
             FilterMatch.NoMatch);
+    }
+
+    [Fact]
+    public void UserIdSddl_MultiRowSealed_ReadsCorrectSidPerRow()
+    {
+        // A repeated SID interns once, so its pool index differs from later rows' physical indices — guards the
+        // allocation-free reader against confusing the row index with the SID pool index.
+        var sidA = new SecurityIdentifier("S-1-5-21-1-2-3-1001");
+        var sidB = new SecurityIdentifier("S-1-5-21-1-2-3-1002");
+        ResolvedEvent[] events =
+        [
+            new("live", LogPathType.Channel) { Id = 1, UserId = sidA },
+            new("live", LogPathType.Channel) { Id = 2, UserId = sidB },
+            new("live", LogPathType.Channel) { Id = 3, UserId = sidA },
+            new("live", LogPathType.Channel) { Id = 4 }
+        ];
+
+        var reader = EventColumnStore.Build(events, generation: 1, contentVersion: 1).CreateReader(EventLogId.Create());
+
+        Assert.Equal(sidA.Value, reader.GetField(reader.LocatorAt(0), EventFieldId.UserIdSddl).AsString());
+        Assert.Equal(sidB.Value, reader.GetField(reader.LocatorAt(1), EventFieldId.UserIdSddl).AsString());
+        Assert.Equal(sidA.Value, reader.GetField(reader.LocatorAt(2), EventFieldId.UserIdSddl).AsString());
+        Assert.Equal(EventFieldValueKind.Null, reader.GetField(reader.LocatorAt(3), EventFieldId.UserIdSddl).Kind);
+    }
+
+    [Fact]
+    public void User_MatchesSidOrName_InBothBackends()
+    {
+        // Well-known: System UserID present (SID) AND a resolved name that differs from the SID.
+        ResolvedEvent wellKnown = new("TestLog", LogPathType.Channel)
+        {
+            Id = 1,
+            UserId = new SecurityIdentifier("S-1-5-18"),
+            UserDisplayName = @"NT AUTHORITY\SYSTEM"
+        };
+        // Derived: no System UserID; identity came from EventData (name only).
+        ResolvedEvent derived = new("TestLog", LogPathType.Channel) { Id = 2, UserDisplayName = @"CONTOSO\alice" };
+        ResolvedEvent noIdentity = new("TestLog", LogPathType.Channel) { Id = 3 };
+
+        // A SID query matches the well-known row via the SID disjunct; a name query matches via the display name.
+        AssertBothBackends(@"User == ""S-1-5-18""", wellKnown, FilterMatch.Match);
+        AssertBothBackends(@"User.Contains(""SYSTEM"", StringComparison.OrdinalIgnoreCase)", wellKnown, FilterMatch.Match);
+        AssertBothBackends(@"User == ""CONTOSO\\alice""", derived, FilterMatch.Match);
+        AssertBothBackends(@"User == ""S-1-5-18""", derived, FilterMatch.NoMatch);
+        // A no-identity row never matches a value query (presence gate), incl. the degenerate empty value.
+        AssertBothBackends(@"User == ""S-1-5-18""", noIdentity, FilterMatch.NoMatch);
+        AssertBothBackends(@"User == """"", noIdentity, FilterMatch.NoMatch);
+    }
+
+    [Fact]
+    public void User_NegatedComparison_RespectsPresenceGate_InBothBackends()
+    {
+        ResolvedEvent derived = new("TestLog", LogPathType.Channel) { Id = 1, UserDisplayName = @"CONTOSO\alice" };
+        ResolvedEvent noIdentity = new("TestLog", LogPathType.Channel) { Id = 2 };
+
+        // `!(User == x)` must behave exactly like `User != x` (gated), NOT a generic !inner that flips the gate.
+        AssertBothBackends(@"!(User == ""bob"")", derived, FilterMatch.Match);
+        AssertBothBackends(@"!(User == ""bob"")", noIdentity, FilterMatch.NoMatch);
+        // `!(User != x)` must behave like `User == x`.
+        AssertBothBackends(@"!(User != ""CONTOSO\\alice"")", derived, FilterMatch.Match);
+        AssertBothBackends(@"!(User != ""bob"")", noIdentity, FilterMatch.NoMatch);
+        // Double-negated contains collapses to the gated positive.
+        AssertBothBackends(@"!!User.Contains(""alice"", StringComparison.OrdinalIgnoreCase)", derived, FilterMatch.Match);
+        AssertBothBackends(@"!!User.Contains(""alice"", StringComparison.OrdinalIgnoreCase)", noIdentity, FilterMatch.NoMatch);
+    }
+
+    [Fact]
+    public void User_NegativeOperators_GateAndDeMorgan_InBothBackends()
+    {
+        ResolvedEvent wellKnown = new("TestLog", LogPathType.Channel)
+        {
+            Id = 1,
+            UserId = new SecurityIdentifier("S-1-5-18"),
+            UserDisplayName = @"NT AUTHORITY\SYSTEM"
+        };
+        ResolvedEvent derived = new("TestLog", LogPathType.Channel) { Id = 2, UserDisplayName = @"CONTOSO\alice" };
+        ResolvedEvent noIdentity = new("TestLog", LogPathType.Channel) { Id = 3 };
+
+        // DERIVED (null UserId) rows MUST participate in the negatives via the absent-SID=>TRUE De Morgan disjunct.
+        AssertBothBackends(@"User != ""bob""", derived, FilterMatch.Match);
+        AssertBothBackends(@"!User.Contains(""zzz"", StringComparison.OrdinalIgnoreCase)", derived, FilterMatch.Match);
+        AssertBothBackends(@"!(new[] {""bob""}).Any(e => User.Contains(e, StringComparison.OrdinalIgnoreCase))", derived, FilterMatch.Match);
+        // A well-known row won't satisfy `!= its own SID`.
+        AssertBothBackends(@"User != ""S-1-5-18""", wellKnown, FilterMatch.NoMatch);
+        // A true no-identity row is gated OUT of the negatives too (presence-required, like the old User ID field).
+        AssertBothBackends(@"User != ""x""", noIdentity, FilterMatch.NoMatch);
+        AssertBothBackends(@"!User.Contains(""x"", StringComparison.OrdinalIgnoreCase)", noIdentity, FilterMatch.NoMatch);
+    }
+
+    [Fact]
+    public void User_NullComparison_IsPresenceCheck_InBothBackends()
+    {
+        ResolvedEvent derived = new("TestLog", LogPathType.Channel) { Id = 1, UserDisplayName = @"CONTOSO\alice" };
+        ResolvedEvent noIdentity = new("TestLog", LogPathType.Channel) { Id = 2 };
+
+        AssertBothBackends("User != null", derived, FilterMatch.Match);
+        AssertBothBackends("User == null", derived, FilterMatch.NoMatch);
+        AssertBothBackends("User != null", noIdentity, FilterMatch.NoMatch);
+        AssertBothBackends("User == null", noIdentity, FilterMatch.Match);
+    }
+
+    [Fact]
+    public void User_UnsupportedNegatedForms_AreRejectedNotSilentlyRewritten()
+    {
+        // A relational operator isn't supported on User; `!(User < x)` must NOT be silently rewritten to `User == x`.
+        Assert.False(FilterParser.TryCompile(@"!(User < ""x"")", out _, out _));
+        // Negating a GROUP that contains a User condition is rejected (distributing the negation would flip the gate).
+        Assert.False(FilterParser.TryCompile(@"!(User == ""a"" || User == ""b"")", out _, out _));
+        Assert.False(FilterParser.TryCompile(@"!(User == ""a"" && Level == ""Error"")", out _, out _));
+
+        // The gated alternative (negated any-of) compiles and stays presence-gated.
+        ResolvedEvent noIdentity = new("TestLog", LogPathType.Channel) { Id = 1 };
+        AssertBothBackends(@"!(new[] {""a"", ""b""}).Contains(User)", noIdentity, FilterMatch.NoMatch);
     }
 
     private static void AssertBothBackends(string expression, ResolvedEvent resolvedEvent, FilterMatch expected)

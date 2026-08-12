@@ -26,13 +26,14 @@ internal static class ResolvedEventFieldReader
             EventFieldId.ProcessId => resolvedEvent.ProcessId is { } processId ? EventFieldValue.FromProperty(processId) : Absent,
             EventFieldId.ThreadId => resolvedEvent.ThreadId is { } threadId ? EventFieldValue.FromProperty(threadId) : Absent,
             EventFieldId.UserId => EventFieldValue.FromProperty(resolvedEvent.UserId),
+            EventFieldId.UserDisplayName => EventFieldValue.FromProperty(resolvedEvent.UserDisplayName),
+            EventFieldId.UserIdSddl => resolvedEvent.UserId is { } userIdSddl ? EventFieldValue.FromProperty(userIdSddl.Value) : Absent,
             EventFieldId.Description => EventFieldValue.FromProperty(resolvedEvent.Description),
             EventFieldId.Xml => EventFieldValue.FromProperty(resolvedEvent.Xml),
             EventFieldId.OwningLog => EventFieldValue.FromProperty(resolvedEvent.OwningLog),
             EventFieldId.Opcode => EventFieldValue.FromProperty(resolvedEvent.Opcode),
-            EventFieldId.RelatedActivityId => resolvedEvent.RelatedActivityId is { } relatedActivityId
-                ? EventFieldValue.FromProperty(relatedActivityId)
-                : Absent,
+            EventFieldId.RelatedActivityId => resolvedEvent.RelatedActivityId is { } relatedActivityId ?
+                EventFieldValue.FromProperty(relatedActivityId) : Absent,
             _ => Absent
         };
     }

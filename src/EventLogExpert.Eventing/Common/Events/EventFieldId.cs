@@ -22,5 +22,7 @@ public enum EventFieldId
     Xml,
     OwningLog,
     Opcode,
-    RelatedActivityId
+    RelatedActivityId,
+    UserDisplayName,
+    UserIdSddl
 }

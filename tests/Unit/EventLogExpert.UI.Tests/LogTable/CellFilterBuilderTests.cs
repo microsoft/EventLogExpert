@@ -24,7 +24,7 @@ public sealed class CellFilterBuilderTests
     [InlineData(ColumnName.TaskCategory, EventProperty.TaskCategory)]
     [InlineData(ColumnName.ProcessId, EventProperty.ProcessId)]
     [InlineData(ColumnName.ThreadId, EventProperty.ThreadId)]
-    [InlineData(ColumnName.User, EventProperty.UserId)]
+    [InlineData(ColumnName.User, EventProperty.UserDisplayName)]
     public void MapColumn_SupportedColumn_ReturnsProperty(ColumnName column, EventProperty expected) =>
         Assert.Equal(expected, CellFilterBuilder.MapColumn(column));
 
@@ -65,7 +65,7 @@ public sealed class CellFilterBuilderTests
     [InlineData(EventProperty.TaskCategory)]
     [InlineData(EventProperty.ProcessId)]
     [InlineData(EventProperty.ThreadId)]
-    [InlineData(EventProperty.UserId)]
+    [InlineData(EventProperty.UserDisplayName)]
     public void TryBuild_IncludeFilter_MatchesSourceEvent(EventProperty property)
     {
         var sourceEvent = FullEvent();
@@ -130,19 +130,19 @@ public sealed class CellFilterBuilderTests
     }
 
     [Fact]
-    public void TryBuild_UserId_MatchesSameSidButNotDifferentSid()
+    public void TryBuild_UserDisplayName_MatchesSameNameButNotDifferentName()
     {
         var sourceEvent = FullEvent();
-        var otherEvent = FullEvent() with { UserId = new SecurityIdentifier("S-1-5-18") };
+        var otherEvent = FullEvent() with { UserDisplayName = @"CONTOSO\bob" };
 
-        Assert.True(CellFilterBuilder.TryBuild(sourceEvent, EventProperty.UserId, exclude: false, out var filter));
+        Assert.True(CellFilterBuilder.TryBuild(sourceEvent, EventProperty.UserDisplayName, exclude: false, out var filter));
         Assert.True(filter.Compiled!.Predicate(sourceEvent));
         Assert.False(filter.Compiled!.Predicate(otherEvent));
     }
 
     [Theory]
     [InlineData(EventProperty.ActivityId)]
-    [InlineData(EventProperty.UserId)]
+    [InlineData(EventProperty.UserDisplayName)]
     [InlineData(EventProperty.ProcessId)]
     [InlineData(EventProperty.ThreadId)]
     [InlineData(EventProperty.Level)]
@@ -164,7 +164,7 @@ public sealed class CellFilterBuilderTests
     [Theory]
     [InlineData(EventProperty.ProcessId)]
     [InlineData(EventProperty.ThreadId)]
-    [InlineData(EventProperty.UserId)]
+    [InlineData(EventProperty.UserDisplayName)]
     public void TryGetDisplayValue_PreviouslyUnmappedProperties_ReturnNonEmptyValue(EventProperty property)
     {
         Assert.True(CellFilterBuilder.TryGetDisplayValue(FullEvent(), property, out var value));
@@ -175,7 +175,7 @@ public sealed class CellFilterBuilderTests
         property switch
         {
             EventProperty.ActivityId => FullEvent() with { ActivityId = null },
-            EventProperty.UserId => FullEvent() with { UserId = null },
+            EventProperty.UserDisplayName => FullEvent() with { UserDisplayName = string.Empty },
             EventProperty.ProcessId => FullEvent() with { ProcessId = null },
             EventProperty.ThreadId => FullEvent() with { ThreadId = null },
             EventProperty.Level => FullEvent() with { Level = string.Empty },
@@ -195,6 +195,7 @@ public sealed class CellFilterBuilderTests
             ProcessId = 111,
             ThreadId = 222,
             UserId = s_userSid,
+            UserDisplayName = @"CONTOSO\alice",
             ComputerName = "TEST-PC",
             Description = "test description"
         };

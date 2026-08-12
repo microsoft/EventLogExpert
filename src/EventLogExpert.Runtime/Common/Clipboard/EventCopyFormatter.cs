@@ -141,7 +141,7 @@ internal sealed class EventCopyFormatter(IEventDetailResolver detailResolver, IE
                             builder.Append($"\"{@event.ThreadId}\" ");
                             break;
                         case ColumnName.User:
-                            builder.Append($"\"{@event.UserId}\" ");
+                            builder.Append($"\"{@event.UserDisplayName}\" ");
                             break;
                     }
                 }
@@ -168,7 +168,13 @@ internal sealed class EventCopyFormatter(IEventDetailResolver detailResolver, IE
                 builder.AppendLine($"Task Category: {@event.TaskCategory}");
                 builder.AppendLine($"Level: {@event.Level}");
                 builder.AppendLine($"Keywords: {@event.KeywordsDisplayName}");
-                builder.AppendLine($"User: {@event.UserId}");
+                builder.AppendLine($"User: {@event.UserDisplayName}");
+
+                if (@event.UserId is { } userId && !string.Equals(userId.Value, @event.UserDisplayName, StringComparison.Ordinal))
+                {
+                    builder.AppendLine($"User SID: {userId.Value}");
+                }
+
                 builder.AppendLine($"Computer: {@event.ComputerName}");
                 builder.AppendLine("Description:");
                 builder.AppendLine(@event.Description);

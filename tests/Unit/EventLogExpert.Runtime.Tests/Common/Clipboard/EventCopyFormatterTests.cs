@@ -10,6 +10,7 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.LogTable;
 using NSubstitute;
 using System.Collections.Immutable;
+using System.Security.Principal;
 
 namespace EventLogExpert.Runtime.Tests.Common.Clipboard;
 
@@ -99,6 +100,67 @@ public sealed class EventCopyFormatterTests
 
         Assert.Contains("FocusProvider", result);
         Assert.Contains("FocusedDescription", result);
+    }
+
+    [Fact]
+    public async Task FormatAsync_FullFormat_IncludesUserSidWhenItDiffersFromResolvedName()
+    {
+        var locator = new EventLocator(s_logId, 0, 0);
+        var @event = new ResolvedEvent("Application", LogPathType.Channel)
+        {
+            RecordId = 1,
+            Id = 4000,
+            Level = "Information",
+            Source = "ProviderA",
+            Description = "Alpha",
+            TimeCreated = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            UserDisplayName = @"NT AUTHORITY\SYSTEM",
+            UserId = new SecurityIdentifier("S-1-5-18")
+        };
+
+        var detailResolver = Substitute.For<IEventDetailResolver>();
+        detailResolver.TryResolve(locator, out Arg.Any<ResolvedEvent?>())
+            .Returns(call => { call[1] = @event; return true; });
+
+        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>());
+
+        string result = await formatter.FormatAsync(
+            Request([Entry(locator)], focus: null, EventCopyFormat.Full),
+            TestContext.Current.CancellationToken);
+
+        Assert.Contains(@"User: NT AUTHORITY\SYSTEM", result);
+        Assert.Contains("User SID: S-1-5-18", result);
+    }
+
+    [Fact]
+    public async Task FormatAsync_FullFormat_OmitsUserSidWhenResolvedNameIsTheRawSid()
+    {
+        // Raw-SID fallback: the resolved name already IS the SID, so a separate "User SID" line would just duplicate it.
+        var locator = new EventLocator(s_logId, 0, 0);
+        var @event = new ResolvedEvent("Application", LogPathType.Channel)
+        {
+            RecordId = 1,
+            Id = 4000,
+            Level = "Information",
+            Source = "ProviderA",
+            Description = "Alpha",
+            TimeCreated = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            UserDisplayName = "S-1-5-21-1-2-3-4",
+            UserId = new SecurityIdentifier("S-1-5-21-1-2-3-4")
+        };
+
+        var detailResolver = Substitute.For<IEventDetailResolver>();
+        detailResolver.TryResolve(locator, out Arg.Any<ResolvedEvent?>())
+            .Returns(call => { call[1] = @event; return true; });
+
+        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>());
+
+        string result = await formatter.FormatAsync(
+            Request([Entry(locator)], focus: null, EventCopyFormat.Full),
+            TestContext.Current.CancellationToken);
+
+        Assert.Contains("User: S-1-5-21-1-2-3-4", result);
+        Assert.DoesNotContain("User SID:", result);
     }
 
     [Fact]

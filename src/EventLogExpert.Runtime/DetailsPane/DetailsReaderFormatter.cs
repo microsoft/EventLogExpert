@@ -193,8 +193,14 @@ public static class DetailsReaderFormatter
 
         if (@event.RelatedActivityId is { } relatedActivityId) { properties.Add(new DetailsProperty("Related Activity ID", relatedActivityId.ToString())); }
 
-        // Raw SID by design; account-name resolution is a separate task.
-        if (@event.UserId is { } userId) { properties.Add(new DetailsProperty("User", userId.Value)); }
+        // The best-available user identity (well-known-SID name or EventData Subject/Target account), resolved offline.
+        if (@event.UserDisplayName.Length > 0) { properties.Add(new DetailsProperty("User", @event.UserDisplayName)); }
+
+        // The raw System <Security UserID> SID, shown only when it adds information beyond the resolved name.
+        if (@event.UserId is { } userId && !string.Equals(userId.Value, @event.UserDisplayName, StringComparison.Ordinal))
+        {
+            properties.Add(new DetailsProperty("User SID", userId.Value));
+        }
 
         return properties;
     }

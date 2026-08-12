@@ -109,6 +109,19 @@ internal static class Lowerer
             _ => false
         };
 
+    private static bool ContainsUserFilterNode(FilterNode node) =>
+        node switch
+        {
+            ComparisonNode { Field: ResolvedEventField.UserDisplayName } => true,
+            ContainsNode { Field: ResolvedEventField.UserDisplayName } => true,
+            MultiEqualsNode { Field: ResolvedEventField.UserDisplayName } => true,
+            MultiContainsNode { Field: ResolvedEventField.UserDisplayName } => true,
+            AndNode and => ContainsUserFilterNode(and.Left) || ContainsUserFilterNode(and.Right),
+            OrNode or => ContainsUserFilterNode(or.Left) || ContainsUserFilterNode(or.Right),
+            NotNode not => ContainsUserFilterNode(not.Operand),
+            _ => false
+        };
+
     private static IReadOnlyList<string> ExtractStringArray(ArrayCreationSyntax array, int position)
     {
         if (array.Elements.Count == 0)
@@ -186,6 +199,7 @@ internal static class Lowerer
             or ResolvedEventField.Source
             or ResolvedEventField.TaskCategory
             or ResolvedEventField.UserId
+            or ResolvedEventField.UserDisplayName
             or ResolvedEventField.Xml;
 
     private static bool IsNullCheckOnIdentifier(BinarySyntax bin, string identifier)
@@ -567,6 +581,19 @@ internal static class Lowerer
                     multiContains.Values,
                     multiContains.IgnoreCase,
                     !multiContains.Negated);
+            case ComparisonNode { Field: ResolvedEventField.UserDisplayName, Op: FilterBinaryOperator.Equal or FilterBinaryOperator.NotEqual } userComparison:
+                // The merged "User" field is presence-gated, so a negated equality must lower to the gated inverse
+                // operator, NOT a generic NotNode wrap: `!inner` would flip the gate and let a no-identity row match
+                // `!(User == x)`, contradicting `User != x`. Only Equal/NotEqual invert; any other operator falls
+                // through so the emitter reports it as unsupported on User (rather than being silently rewritten).
+                return new ComparisonNode(
+                    userComparison.Field,
+                    userComparison.Op == FilterBinaryOperator.Equal ? FilterBinaryOperator.NotEqual : FilterBinaryOperator.Equal,
+                    userComparison.Literal);
+            case NotNode { Operand: ContainsNode { Field: ResolvedEventField.UserDisplayName } } doubleNegatedUserContains:
+                // `!!User.Contains(...)` == `User.Contains(...)`. Collapsing only the presence-gated User leaf keeps it
+                // out of a NotNode whose generic `!inner` would flip its gate, without changing general `!!` handling.
+                return doubleNegatedUserContains.Operand;
             default:
                 if (ContainsEventDataNode(inner))
                 {
@@ -578,6 +605,15 @@ internal static class Lowerer
                 {
                     throw new LowerException(
                         $"Negating a group that contains UserData conditions is not supported; negate each UserData condition individually (position {neg.Position}).");
+                }
+
+                if (inner is AndNode or OrNode && ContainsUserFilterNode(inner))
+                {
+                    // The merged "User" field is presence-gated; distributing the negation through a group would flip
+                    // the gate for no-identity rows (like EventData/UserData). Reject so the user negates each User
+                    // condition individually or uses `User is none of (...)` (a gated multi-equals).
+                    throw new LowerException(
+                        $"Negating a group that contains a User condition is not supported; negate each User condition individually, or use `User is none of (...)` (position {neg.Position}).");
                 }
 
                 return new NotNode(inner);

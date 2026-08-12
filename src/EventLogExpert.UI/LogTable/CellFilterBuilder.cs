@@ -24,7 +24,7 @@ internal static class CellFilterBuilder
             ColumnName.TaskCategory => EventProperty.TaskCategory,
             ColumnName.ProcessId => EventProperty.ProcessId,
             ColumnName.ThreadId => EventProperty.ThreadId,
-            ColumnName.User => EventProperty.UserId,
+            ColumnName.User => EventProperty.UserDisplayName,
             _ => null
         };
 
@@ -64,7 +64,7 @@ internal static class CellFilterBuilder
             EventProperty.TaskCategory => @event.TaskCategory,
             EventProperty.ProcessId => @event.ProcessId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             EventProperty.ThreadId => @event.ThreadId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            EventProperty.UserId => @event.UserId?.Value ?? string.Empty,
+            EventProperty.UserDisplayName => @event.UserDisplayName,
             EventProperty.LogName => @event.LogName,
             _ => string.Empty
         };

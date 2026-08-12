@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.UI.Common;
@@ -52,5 +53,36 @@ public sealed class FilterPredicateEditorAccessibilityTests : BunitContext
         {
             Assert.DoesNotContain(' ', element.GetAttribute("id")!);
         }
+    }
+
+    [Fact]
+    public void PropertyPicker_LegacyUserIdComparison_KeepsUserIdSelectable()
+    {
+        // A saved filter whose property is the retired "User ID" must keep the option so its bound <select> is not
+        // silently rebound to another property.
+        var predicate = new FilterPredicateDraft { Comparison = { Property = EventProperty.UserId } };
+
+        var component = Render<FilterPredicateEditor>(parameters => parameters
+            .Add(editor => editor.Value, predicate)
+            .Add(editor => editor.IsEditing, true));
+
+        var options = component.FindAll("[role=option]").Select(option => option.TextContent.Trim()).ToList();
+
+        Assert.Contains("User ID", options);
+    }
+
+    [Fact]
+    public void PropertyPicker_NewComparison_OffersUser_AndHidesUserId()
+    {
+        var predicate = new FilterPredicateDraft();
+
+        var component = Render<FilterPredicateEditor>(parameters => parameters
+            .Add(editor => editor.Value, predicate)
+            .Add(editor => editor.IsEditing, true));
+
+        var options = component.FindAll("[role=option]").Select(option => option.TextContent.Trim()).ToList();
+
+        Assert.Contains("User", options);
+        Assert.DoesNotContain("User ID", options);
     }
 }

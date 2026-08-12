@@ -32,7 +32,7 @@ internal static class AosReferenceOrdering
     private static readonly Comparison<ResolvedEvent> s_ascByThreadId =
         (a, b) => WithTieBreaker(Nullable.Compare(a.ThreadId, b.ThreadId), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByUser =
-        (a, b) => WithTieBreaker(CompareText(a.UserId?.Value, b.UserId?.Value), a, b);
+        (a, b) => WithTieBreaker(CompareText(a.UserDisplayName, b.UserDisplayName), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByRecordId =
         (a, b) => WithTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByDefault =
@@ -128,7 +128,7 @@ internal static class AosReferenceOrdering
             ColumnName.Keywords => CompareText(a.KeywordsDisplayName, b.KeywordsDisplayName),
             ColumnName.ProcessId => Nullable.Compare(a.ProcessId, b.ProcessId),
             ColumnName.ThreadId => Nullable.Compare(a.ThreadId, b.ThreadId),
-            ColumnName.User => CompareText(a.UserId?.Value, b.UserId?.Value),
+            ColumnName.User => CompareText(a.UserDisplayName, b.UserDisplayName),
             _ => 0
         };
 

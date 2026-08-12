@@ -1778,6 +1778,7 @@ public sealed class EventColumnStore
         EventColumnField.LogName => pending.LogName,
         EventColumnField.ComputerName => pending.ComputerName,
         EventColumnField.OwningLog => pending.OwningLog,
+        EventColumnField.UserDisplayName => pending.UserDisplayName,
         _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Field is not a supported group-by dimension.")
     };
 
@@ -1968,6 +1969,7 @@ public sealed class EventColumnStore
             Source = PoolGet(chunk.RowPoolIndex(EventColumnField.Source, row)) ?? string.Empty,
             TaskCategory = PoolGet(chunk.RowPoolIndex(EventColumnField.TaskCategory, row)) ?? string.Empty,
             UserId = userIdPoolIndex < 0 ? null : new SecurityIdentifier(PoolGet(userIdPoolIndex)!),
+            UserDisplayName = PoolGet(chunk.RowPoolIndex(EventColumnField.UserDisplayName, row)) ?? string.Empty,
             RecordId = hasRecordId ? recordId : null,
             ActivityId = hasActivityId ? activityId : null,
             RelatedActivityId = hasRelatedActivityId ? relatedActivityId : null,

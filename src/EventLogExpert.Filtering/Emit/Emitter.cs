@@ -185,6 +185,7 @@ internal static class Emitter
             ResolvedEventField.Level => resolvedEvent => resolvedEvent.Level.Contains(needle, comparison),
             ResolvedEventField.LogName => resolvedEvent => resolvedEvent.LogName.Contains(needle, comparison),
             ResolvedEventField.Source => resolvedEvent => resolvedEvent.Source.Contains(needle, comparison),
+            ResolvedEventField.UserDisplayName => EmitUserContains(needle, comparison, negated: false),
             ResolvedEventField.TaskCategory => resolvedEvent => resolvedEvent.TaskCategory.Contains(needle, comparison),
             ResolvedEventField.Opcode => resolvedEvent => resolvedEvent.Opcode.Contains(needle, comparison),
             ResolvedEventField.Xml => resolvedEvent => resolvedEvent.Xml.Contains(needle, comparison),
@@ -408,6 +409,11 @@ internal static class Emitter
             return EmitMultiContainsUserId(node.Values, comparison, node.Negated);
         }
 
+        if (node.Field == ResolvedEventField.UserDisplayName)
+        {
+            return EmitMultiContainsUser(node.Values, comparison, node.Negated);
+        }
+
         Func<ResolvedEvent, string> getter = node.Field switch
         {
             ResolvedEventField.ComputerName => static resolvedEvent => resolvedEvent.ComputerName,
@@ -432,6 +438,32 @@ internal static class Emitter
             for (var i = 0; i < needles.Length; i++)
             {
                 if (actual.Contains(needles[i], comparison))
+                {
+                    matched = true;
+
+                    break;
+                }
+            }
+
+            return negated ? !matched : matched;
+        };
+    }
+
+    private static Func<ResolvedEvent, bool> EmitMultiContainsUser(IReadOnlyList<string> values, StringComparison comparison, bool negated)
+    {
+        var needles = CompileTimeLiterals.Snapshot(values);
+
+        return resolvedEvent =>
+        {
+            if (!UserFilterHasIdentity(resolvedEvent)) { return false; }
+
+            var sddl = resolvedEvent.UserId?.Value;
+            var matched = false;
+
+            for (var i = 0; i < needles.Length; i++)
+            {
+                if (resolvedEvent.UserDisplayName.Contains(needles[i], comparison) ||
+                    (sddl is not null && sddl.Contains(needles[i], comparison)))
                 {
                     matched = true;
 
@@ -479,6 +511,11 @@ internal static class Emitter
         if (node.Field == ResolvedEventField.UserId)
         {
             return EmitMultiEqualsUserId(node.Values, node.Negated);
+        }
+
+        if (node.Field == ResolvedEventField.UserDisplayName)
+        {
+            return EmitMultiEqualsUser(node.Values, node.Negated);
         }
 
         Func<ResolvedEvent, bool> positive = node.Field switch
@@ -604,6 +641,32 @@ internal static class Emitter
         };
     }
 
+    private static Func<ResolvedEvent, bool> EmitMultiEqualsUser(IReadOnlyList<string> values, bool negated)
+    {
+        var snapshot = CompileTimeLiterals.Snapshot(values);
+
+        return resolvedEvent =>
+        {
+            if (!UserFilterHasIdentity(resolvedEvent)) { return false; }
+
+            var sddl = resolvedEvent.UserId?.Value;
+            var matched = false;
+
+            for (var i = 0; i < snapshot.Length; i++)
+            {
+                if (string.Equals(resolvedEvent.UserDisplayName, snapshot[i], StringComparison.Ordinal)
+                    || (sddl is not null && string.Equals(sddl, snapshot[i], StringComparison.Ordinal)))
+                {
+                    matched = true;
+
+                    break;
+                }
+            }
+
+            return negated ? !matched : matched;
+        };
+    }
+
     private static Func<ResolvedEvent, bool> EmitMultiEqualsUserId(IReadOnlyList<string> values, bool negated)
     {
         var snapshot = CompileTimeLiterals.Snapshot(values);
@@ -652,13 +715,24 @@ internal static class Emitter
 
     private static Func<ResolvedEvent, bool> EmitNot(NotNode node)
     {
+        if (node.Operand is ContainsNode { Field: ResolvedEventField.UserDisplayName } userContains)
+        {
+            var userNeedle = userContains.Needle;
+
+            var userComparison = userContains.IgnoreCase ?
+                StringComparison.OrdinalIgnoreCase :
+                StringComparison.Ordinal;
+
+            return EmitUserContains(userNeedle, userComparison, negated: true);
+        }
+
         if (node.Operand is ContainsNode { Field: ResolvedEventField.UserId } userIdContains)
         {
             var needle = userIdContains.Needle;
 
-            var comparison = userIdContains.IgnoreCase
-                ? StringComparison.OrdinalIgnoreCase
-                : StringComparison.Ordinal;
+            var comparison = userIdContains.IgnoreCase ?
+                StringComparison.OrdinalIgnoreCase :
+                StringComparison.Ordinal;
 
             return resolvedEvent => resolvedEvent.UserId is not null && !resolvedEvent.UserId.Value.Contains(needle, comparison);
         }
@@ -666,6 +740,56 @@ internal static class Emitter
         var inner = EmitNode(node.Operand);
 
         return resolvedEvent => !inner(resolvedEvent);
+    }
+
+    private static Func<ResolvedEvent, bool> EmitNullComparison(ResolvedEventField field, FilterBinaryOperator op)
+    {
+        switch (field)
+        {
+            case ResolvedEventField.ProcessId:
+                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.ProcessId.HasValue, op);
+            case ResolvedEventField.ThreadId:
+                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.ThreadId.HasValue, op);
+            case ResolvedEventField.RecordId:
+                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.RecordId.HasValue, op);
+            case ResolvedEventField.ActivityId:
+                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.ActivityId.HasValue, op);
+            case ResolvedEventField.RelatedActivityId:
+                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.RelatedActivityId.HasValue, op);
+            case ResolvedEventField.UserId:
+                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.UserId is not null, op);
+            case ResolvedEventField.UserDisplayName:
+                // Presence check over the merged identity (name OR SID): `!= null` iff the row has any User identity.
+                return EmitNullableNullCheck(
+                    static resolvedEvent => resolvedEvent.UserDisplayName.Length != 0 || resolvedEvent.UserId is not null, op);
+            case ResolvedEventField.Id:
+            case ResolvedEventField.TimeCreated:
+                return op switch
+                {
+                    FilterBinaryOperator.Equal => static _ => false,
+                    FilterBinaryOperator.NotEqual => static _ => true,
+                    _ => throw new EmitException($"Operator '{op}' is not supported against null.")
+                };
+            case ResolvedEventField.ComputerName:
+            case ResolvedEventField.Description:
+            case ResolvedEventField.Level:
+            case ResolvedEventField.LogName:
+            case ResolvedEventField.Source:
+            case ResolvedEventField.TaskCategory:
+            case ResolvedEventField.Opcode:
+            case ResolvedEventField.Xml:
+                // ResolvedEvent string properties default to string.Empty and writer paths never assign null.
+                return op switch
+                {
+                    FilterBinaryOperator.Equal => static _ => false,
+                    FilterBinaryOperator.NotEqual => static _ => true,
+                    _ => throw new EmitException($"Operator '{op}' is not supported against null.")
+                };
+            case ResolvedEventField.Keywords:
+                throw new EmitException("Keywords cannot be compared directly; use Keywords.Any.");
+            default:
+                throw new EmitException($"Unsupported field '{field}' for null comparison.");
+        }
     }
 
     private static Func<ResolvedEvent, bool> EmitNullableGuidComparison(
@@ -719,52 +843,6 @@ internal static class Emitter
             _ => throw new EmitException($"Operator '{op}' is not supported against null.")
         };
 
-    private static Func<ResolvedEvent, bool> EmitNullComparison(ResolvedEventField field, FilterBinaryOperator op)
-    {
-        switch (field)
-        {
-            case ResolvedEventField.ProcessId:
-                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.ProcessId.HasValue, op);
-            case ResolvedEventField.ThreadId:
-                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.ThreadId.HasValue, op);
-            case ResolvedEventField.RecordId:
-                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.RecordId.HasValue, op);
-            case ResolvedEventField.ActivityId:
-                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.ActivityId.HasValue, op);
-            case ResolvedEventField.RelatedActivityId:
-                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.RelatedActivityId.HasValue, op);
-            case ResolvedEventField.UserId:
-                return EmitNullableNullCheck(static resolvedEvent => resolvedEvent.UserId is not null, op);
-            case ResolvedEventField.Id:
-            case ResolvedEventField.TimeCreated:
-                return op switch
-                {
-                    FilterBinaryOperator.Equal => static _ => false,
-                    FilterBinaryOperator.NotEqual => static _ => true,
-                    _ => throw new EmitException($"Operator '{op}' is not supported against null.")
-                };
-            case ResolvedEventField.ComputerName:
-            case ResolvedEventField.Description:
-            case ResolvedEventField.Level:
-            case ResolvedEventField.LogName:
-            case ResolvedEventField.Source:
-            case ResolvedEventField.TaskCategory:
-            case ResolvedEventField.Opcode:
-            case ResolvedEventField.Xml:
-                // ResolvedEvent string properties default to string.Empty and writer paths never assign null.
-                return op switch
-                {
-                    FilterBinaryOperator.Equal => static _ => false,
-                    FilterBinaryOperator.NotEqual => static _ => true,
-                    _ => throw new EmitException($"Operator '{op}' is not supported against null.")
-                };
-            case ResolvedEventField.Keywords:
-                throw new EmitException("Keywords cannot be compared directly; use Keywords.Any.");
-            default:
-                throw new EmitException($"Unsupported field '{field}' for null comparison.");
-        }
-    }
-
     private static Func<ResolvedEvent, bool> EmitOr(OrNode node)
     {
         var conditions = FilterNodeMetadata.FlattenOrChain(node).Select(EmitNode).ToArray();
@@ -796,6 +874,7 @@ internal static class Emitter
             ResolvedEventField.Level => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.Level, op, value),
             ResolvedEventField.LogName => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.LogName, op, value),
             ResolvedEventField.Source => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.Source, op, value),
+            ResolvedEventField.UserDisplayName => EmitUserStringCompare(op, value),
             ResolvedEventField.TaskCategory => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.TaskCategory, op, value),
             ResolvedEventField.Opcode => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.Opcode, op, value),
             ResolvedEventField.Xml => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.Xml, op, value),
@@ -876,6 +955,15 @@ internal static class Emitter
         }
     }
 
+    private static Func<ResolvedEvent, bool> EmitUserContains(string needle, StringComparison comparison, bool negated) =>
+        negated ?
+            resolvedEvent => UserFilterHasIdentity(resolvedEvent) &&
+                !resolvedEvent.UserDisplayName.Contains(needle, comparison) &&
+                (resolvedEvent.UserId is null || !resolvedEvent.UserId.Value.Contains(needle, comparison)) :
+            resolvedEvent => UserFilterHasIdentity(resolvedEvent) &&
+                (resolvedEvent.UserDisplayName.Contains(needle, comparison) ||
+                    (resolvedEvent.UserId is not null && resolvedEvent.UserId.Value.Contains(needle, comparison)));
+
     private static Func<ResolvedEvent, FilterMatch> EmitUserDataFieldMatcher(
         string canonicalPath,
         Func<StructuredFieldResult, FilterMatch> evaluate)
@@ -907,6 +995,18 @@ internal static class Emitter
             _ => throw new EmitException($"Operator '{op}' is not supported on UserId.")
         };
 
+    private static Func<ResolvedEvent, bool> EmitUserStringCompare(FilterBinaryOperator op, string value) =>
+        op switch
+        {
+            FilterBinaryOperator.Equal => resolvedEvent => UserFilterHasIdentity(resolvedEvent) &&
+                (string.Equals(resolvedEvent.UserDisplayName, value, StringComparison.Ordinal) ||
+                    (resolvedEvent.UserId is not null && string.Equals(resolvedEvent.UserId.Value, value, StringComparison.Ordinal))),
+            FilterBinaryOperator.NotEqual => resolvedEvent => UserFilterHasIdentity(resolvedEvent) &&
+                !string.Equals(resolvedEvent.UserDisplayName, value, StringComparison.Ordinal) &&
+                (resolvedEvent.UserId is null || !string.Equals(resolvedEvent.UserId.Value, value, StringComparison.Ordinal)),
+            _ => throw new EmitException($"Operator '{op}' is not supported on User.")
+        };
+
     private static FilterMatch EvaluateUserDataGlob(
         ResolvedEvent @event,
         Func<string, bool> matchesPath,
@@ -936,4 +1036,7 @@ internal static class Emitter
         // the glob at all) becomes keep-visible Unknown.
         return result == FilterMatch.NoMatch && @event.UserDataIncomplete ? FilterMatch.Unknown : result;
     }
+
+    private static bool UserFilterHasIdentity(ResolvedEvent resolvedEvent) =>
+        resolvedEvent.UserDisplayName.Length != 0 || resolvedEvent.UserId is not null;
 }

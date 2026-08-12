@@ -23,7 +23,7 @@ internal static class ColumnFieldMap
             ColumnName.Keywords => EventFieldId.KeywordsDisplay,
             ColumnName.ProcessId => EventFieldId.ProcessId,
             ColumnName.ThreadId => EventFieldId.ThreadId,
-            ColumnName.User => EventFieldId.UserId,
+            ColumnName.User => EventFieldId.UserDisplayName,
             _ => throw new ArgumentOutOfRangeException(nameof(column), column, "No field mapping for column.")
         };
 }

@@ -27,21 +27,21 @@ public static class EventTableColumnFormatter
             ColumnName.Keywords => @event.KeywordsDisplayName,
             ColumnName.ProcessId => @event.ProcessId?.ToString() ?? string.Empty,
             ColumnName.ThreadId => @event.ThreadId?.ToString() ?? string.Empty,
-            ColumnName.User => @event.UserId?.ToString() ?? string.Empty,
+            ColumnName.User => @event.UserDisplayName,
             _ => string.Empty
         };
 
     public static string GetColumnHeader(ColumnName column, TimeZoneInfo timeZone) =>
-        column == ColumnName.DateAndTime && !timeZone.Equals(TimeZoneInfo.Local)
-            ? $"Date and Time {timeZone.DisplayName.Split(' ').First()}"
-            : column.ToFullString();
+        column == ColumnName.DateAndTime && !timeZone.Equals(TimeZoneInfo.Local) ?
+            $"Date and Time {timeZone.DisplayName.Split(' ').First()}" :
+            column.ToFullString();
 
     private static string FormatTimeCreated(DateTime timeCreated, TimeZoneInfo timeZone, string? dateTimeFormat)
     {
         DateTime converted = timeCreated.ConvertTimeZone(timeZone);
 
-        return dateTimeFormat is null
-            ? converted.ToString()
-            : converted.ToString(dateTimeFormat, CultureInfo.InvariantCulture);
+        return dateTimeFormat is null ?
+            converted.ToString() :
+            converted.ToString(dateTimeFormat, CultureInfo.InvariantCulture);
     }
 }

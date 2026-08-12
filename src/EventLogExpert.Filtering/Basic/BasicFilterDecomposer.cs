@@ -22,12 +22,9 @@ internal static class BasicFilterDecomposer
             return false;
         }
 
-        if (!Tokenizer.TryTokenize(filterText, out var tokens, out _)
-            || !Parser.TryParse(tokens, out var syntax, out _)
-            || !Lowerer.TryLower(syntax!, out var filterNode, out _))
-        {
-            return false;
-        }
+        if (!Tokenizer.TryTokenize(filterText, out var tokens, out _) ||
+            !Parser.TryParse(tokens, out var syntax, out _) ||
+            !Lowerer.TryLower(syntax!, out var filterNode, out _)) { return false; }
 
         return TryDecomposeRoot(filterNode!, out structured);
     }
@@ -309,6 +306,7 @@ internal static class BasicFilterDecomposer
             case ResolvedEventField.ProcessId: property = EventProperty.ProcessId; return true;
             case ResolvedEventField.ThreadId: property = EventProperty.ThreadId; return true;
             case ResolvedEventField.UserId: property = EventProperty.UserId; return true;
+            case ResolvedEventField.UserDisplayName: property = EventProperty.UserDisplayName; return true;
             case ResolvedEventField.Description: property = EventProperty.Description; return true;
             case ResolvedEventField.Xml: property = EventProperty.Xml; return true;
             case ResolvedEventField.LogName: property = EventProperty.LogName; return true;
