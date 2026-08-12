@@ -7,9 +7,8 @@ using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.FilterLibrary;
-using Fluxor;
+using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
@@ -35,13 +34,13 @@ public sealed class LibraryEntryRowTests : BunitContext
         Services.AddSingleton(_commands);
         Services.AddSingleton(_menuService);
 
-        var paneStateMock = Substitute.For<IState<FilterPaneState>>();
-        paneStateMock.Value.Returns(_ => _paneState);
-        Services.AddSingleton(paneStateMock);
+        var activeFilters = Substitute.For<IActiveFiltersSource>();
+        activeFilters.Current.Returns(_ => _paneState.Filters);
+        Services.AddSingleton(activeFilters);
 
-        var libraryStateMock = Substitute.For<IState<FilterLibraryState>>();
-        libraryStateMock.Value.Returns(_ => _libraryState);
-        Services.AddSingleton(libraryStateMock);
+        var libraryEntries = Substitute.For<ILibraryEntriesSource>();
+        libraryEntries.Current.Returns(_ => _libraryState.Entries);
+        Services.AddSingleton(libraryEntries);
 
         JSInterop.Mode = JSRuntimeMode.Loose;
         JSInterop.SetupModule("./_content/EventLogExpert.UI/Menu/MenuAnchor.js")
@@ -59,7 +58,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         var items = await CapturedMoreMenuItemsAsync(component);
         var sub = items.First(i => i.Label == "Add to filter set...").Children!;
 
-        Assert.Equal(3, sub.Count); // "+ New filter set...", separator, "P1"
+        Assert.Equal(3, sub.Count);
         Assert.Equal("+ New filter set...", sub[0].Label);
         Assert.True(sub[1].IsSeparator);
         Assert.Equal("P1", sub[2].Label);
@@ -271,18 +270,6 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void MoreButton_HasAriaLabel_AriaHaspopup_AriaExpandedFalseInitial()
-    {
-        var entry = BuildSavedFilter("X");
-        var component = RenderRow(entry);
-
-        var more = component.Find("button[aria-label^='More actions for']");
-        Assert.Contains("More actions for X", more.GetAttribute("aria-label"));
-        Assert.Equal("menu", more.GetAttribute("aria-haspopup"));
-        Assert.Equal("false", more.GetAttribute("aria-expanded"));
-    }
-
-    [Fact]
     public async Task MoreButtonClick_OpensMenuViaIMenuServiceWithAnchorCoords()
     {
         var entry = BuildSavedFilter("X");
@@ -294,6 +281,18 @@ public sealed class LibraryEntryRowTests : BunitContext
             Arg.Any<double>(),
             Arg.Any<double>(),
             Arg.Any<IReadOnlyList<MenuItem>>());
+    }
+
+    [Fact]
+    public void MoreButton_HasAriaLabel_AriaHaspopup_AriaExpandedFalseInitial()
+    {
+        var entry = BuildSavedFilter("X");
+        var component = RenderRow(entry);
+
+        var more = component.Find("button[aria-label^='More actions for']");
+        Assert.Contains("More actions for X", more.GetAttribute("aria-label"));
+        Assert.Equal("menu", more.GetAttribute("aria-haspopup"));
+        Assert.Equal("false", more.GetAttribute("aria-expanded"));
     }
 
     [Fact]

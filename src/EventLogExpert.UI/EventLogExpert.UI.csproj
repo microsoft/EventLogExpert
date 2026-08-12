@@ -5,6 +5,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Blazor Web component + JSInterop references, formerly pulled in transitively through Fluxor.Blazor.Web. The UI no
+         longer consumes Fluxor, so this is now a direct reference at the version the net10 MAUI head already runs. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\EventLogExpert.Eventing.OfflineImaging\EventLogExpert.Eventing.OfflineImaging.csproj" />
     <ProjectReference Include="..\EventLogExpert.Runtime\EventLogExpert.Runtime.csproj" />
   </ItemGroup>

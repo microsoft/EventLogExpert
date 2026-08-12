@@ -19,20 +19,17 @@ using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.DetailsPane;
+using EventLogExpert.Runtime.Export;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Alerts;
+using EventLogExpert.UI.Modal;
 using EventLogExpert.WindowsPlatform.Activation;
 
 namespace EventLogExpert.DependencyInjection;
 
-/// <summary>
-///     Themed grouping extensions that keep <see cref="MauiProgram.CreateMauiApp" /> focused on assembly and
-///     lifecycle wiring rather than per-adapter registration churn. Each method represents a cohesive host-side concern.
-/// </summary>
 internal static class MauiProgramExtensions
 {
     extension(IServiceCollection services)
@@ -89,6 +86,7 @@ internal static class MauiProgramExtensions
 
         public IServiceCollection AddMauiMenuServices()
         {
+            services.AddSingleton<EventExportCoordinator>();
             services.AddSingleton<MauiMenuActionService>();
             services.AddSingleton<IMenuActionService>(static provider =>
                 provider.GetRequiredService<MauiMenuActionService>());

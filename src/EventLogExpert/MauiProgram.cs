@@ -56,7 +56,6 @@ public static class MauiProgram
                 .WithLifetime(StoreLifetime.Singleton);
         });
 
-        // Bootstrap infrastructure
         var fileLocationOptions = new FileLocationOptions(FileSystem.AppDataDirectory);
         builder.Services.AddSingleton(fileLocationOptions);
         Directory.CreateDirectory(fileLocationOptions.DatabasePath);
@@ -72,14 +71,11 @@ public static class MauiProgram
             return client;
         });
 
-        // Provider event-log resolvers
         builder.Services.AddEventLogProviderDatabase();
         builder.Services.AddSingleton<IEventResolverCache, EventResolverCache>();
-        builder.Services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
         builder.Services.AddTransient<IEventResolver>(sp => ActivatorUtilities.CreateInstance<EventResolver>(sp,
             sp.GetRequiredService<ILogSourceFactory>().ForCategory(LogCategories.Resolution)));
 
-        // FilterLibrary persistence
         var appDbPath = Path.Combine(FileSystem.AppDataDirectory, "filter-library.db");
         builder.Services.AddFilterLibrarySqliteStore(appDbPath);
         builder.Services.AddScenarioFavoriteSqliteStore(appDbPath);
@@ -96,13 +92,11 @@ public static class MauiProgram
         builder.Services.AddBackslashNameMigration();
         builder.Services.AddColumnResetMigration();
 
-        // Top-level layer registration
         builder.Services.AddEventLogFiltering();
         builder.Services.AddEventLogRuntime();
         builder.Services.AddElevatedDatabaseToolsRunner();
-        builder.Services.AddEventLogUiServices();
+        builder.Services.AddEventLogUIServices();
 
-        // Host-side DI groupings (see MauiProgramExtensions for membership)
         builder.Services.AddMauiPreferenceAdapters();
         builder.Services.AddMauiPlatformAdapters();
         builder.Services.AddWindowsPlatformAdapters();
@@ -115,8 +109,6 @@ public static class MauiProgram
 
         var mauiApp = builder.Build();
 
-        // Force eager construction of BannerService — its ctor subscribes to IDatabaseService.EntriesChanged +
-        // UpgradeBatch* events. Any facet resolves to the same singleton instance.
         mauiApp.Services.GetRequiredService<IAttentionBannerService>();
         mauiApp.Services.GetRequiredService<DatabaseRecoveryHost>();
         mauiApp.Services.GetRequiredService<DebugLogHost>();

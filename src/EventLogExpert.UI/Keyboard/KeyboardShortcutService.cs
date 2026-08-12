@@ -2,19 +2,14 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.Menu;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.LogTable.Find;
+using EventLogExpert.UI.Modal;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Keyboard;
 
-/// <summary>
-///     Hosts the .NET side of the JS keydown bridge. Webview JS calls <see cref="HandleShortcutAsync" /> for any
-///     Ctrl-modified key it considers menu-relevant after the bridge has already synchronously suppressed the browser
-///     default; this class then decides whether to run the corresponding action.
-/// </summary>
 public sealed class KeyboardShortcutService(
     IMenuActionService actions,
     IModalCoordinator modalCoordinator,
@@ -43,9 +38,6 @@ public sealed class KeyboardShortcutService(
 
     public async Task EnsureRegisteredAsync(IJSRuntime jsRuntime)
     {
-        // The JS bridge is idempotent on re-register and refreshes its DotNetObjectReference, so we
-        // always invoke it. This keeps shortcuts working after WebView reloads / circuit restarts /
-        // hot reload.
         var previousSelfRef = _selfRef;
         var previousModule = _keyboardModule;
         var newSelfRef = DotNetObjectReference.Create(this);
@@ -82,19 +74,11 @@ public sealed class KeyboardShortcutService(
         }
     }
 
-    /// <summary>
-    ///     Runs the requested shortcut action when applicable. The JS bridge has already synchronously called
-    ///     <c>preventDefault</c>/<c>stopPropagation</c> in capture phase before invoking this method, so the return value
-    ///     would be ignored - this method is intentionally <see cref="Task" /> rather than <c>Task&lt;bool&gt;</c>. When a
-    ///     modal is active, the action is skipped (no-op) so modal keybindings stay isolated; the browser default has still
-    ///     been suppressed by the bridge.
-    /// </summary>
     [JSInvokable]
     public async Task HandleShortcutAsync(string code, bool ctrl, bool alt, bool shift, bool meta)
     {
         if (!ctrl || alt || shift || meta) { return; }
 
-        // Modal-gating happens here, not in JS, so a misbehaving (or stale) bridge can't bypass it.
         if (_modalCoordinator.ActiveSession is not null) { return; }
 
         switch (code)

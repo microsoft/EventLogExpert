@@ -6,10 +6,10 @@ using EventLogExpert.Provider.Schema;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
-using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
+using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using System.Globalization;
@@ -18,7 +18,6 @@ namespace EventLogExpert.UI.Database;
 
 public sealed partial class DatabaseEntryRow : ComponentBase
 {
-    // Classification reads one extra stamp so "9+" means more than nine distinct versions.
     private const int OsStampDisplayCap = 9;
 
     private static readonly IReadOnlyDictionary<string, object> s_ariaHiddenTrueAttributes =
@@ -86,14 +85,12 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private bool IsRestoreBlocked => IsUpgradeBlocked || IsUpgrading || UpgradeProgress is not null;
 
-    // Bare revisions and non-positive builds carry no provenance without edition/display version.
     private IReadOnlyList<ProviderDatabaseOsStamp> MeaningfulOsStamps => _meaningfulOsStamps;
 
     [Inject] private IMenuService MenuService { get; init; } = null!;
 
     private string OsStampAriaLabel => $"Source OS: {OsStampDetail}";
 
-    // Keep full detail in both title and accessible label so OS info is not hover-only.
     private string OsStampDetail => _osStampDetail;
 
     private string OsStampSummary => _osStampSummary;
@@ -160,7 +157,6 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private static string? FormatBuildRevision(int? build, int? revision)
     {
-        // UBR is meaningful only with a real build; revision 0 is valid for RTM builds.
         if (build is not > 0) { return null; }
 
         return revision is not null

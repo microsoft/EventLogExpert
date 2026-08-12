@@ -4,9 +4,9 @@
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.DatabaseTools;
+using EventLogExpert.UI.Modal;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Banner;
@@ -96,17 +96,13 @@ public sealed class BannerCycleStateServiceTests
         _infos.InfoBanners.Returns([info0, info1]);
         var service = CreateService();
 
-        // Two infos give a navigable cycle; select the second so it becomes the user-preferred item.
         service.MoveNext();
         Assert.Equal(info1.Id, service.SelectedItem?.EntryId);
 
-        // Export arrives and outranks Info, so it priority-steals the selection.
         _exportProgress.CurrentExport.Returns(MakeExport());
         _exportProgress.StateChanged += Raise.Event<Action>();
         Assert.Equal(BannerView.ExportProgress, service.SelectedItem?.View);
 
-        // An unrelated rebuild must keep the priority-stolen export selected: export is still in the
-        // source fingerprint, so it is neither re-stolen nor cleared back to the user-preferred info.
         _infos.InfoBanners.Returns([info0, info1, MakeInfo()]);
         _infos.StateChanged += Raise.Event<Action>();
         Assert.Equal(BannerView.ExportProgress, service.SelectedItem?.View);
@@ -140,8 +136,6 @@ public sealed class BannerCycleStateServiceTests
         _attention.AttentionEntries.Returns([MakeAttention("db1.db")]);
 
         var service = CreateService();
-        // Construction yields a single-item cycle; MoveNext is a no-op there. Add an Error to give
-        // a 2-item cycle so we can navigate and set _userPreferredItem.
         _errors.ErrorBanners.Returns([MakeError()]);
         _errors.StateChanged += Raise.Event<Action>();
         Assert.Equal(2, service.Items.Count);
@@ -184,7 +178,6 @@ public sealed class BannerCycleStateServiceTests
         _modalCoordinator.StateChanged += Raise.Event<Action>();
         Assert.Equal(BannerView.Attention, service.SelectedItem?.View);
 
-        // Trigger an unrelated rebuild — Attention must STAY selected (no stale priority steal).
         _infos.InfoBanners.Returns([MakeInfo()]);
         _infos.StateChanged += Raise.Event<Action>();
         Assert.Equal(BannerView.Attention, service.SelectedItem?.View);
@@ -264,7 +257,6 @@ public sealed class BannerCycleStateServiceTests
         _errors.ErrorBanners.Returns([MakeError()]);
         _critical.StateChanged += Raise.Event<Action>();
 
-        // Critical present → BannerViewSelector returns ONLY Critical (exclusive).
         Assert.Equal(BannerView.Critical, service.SelectedItem?.View);
     }
 
@@ -346,8 +338,6 @@ public sealed class BannerCycleStateServiceTests
         var service = CreateService();
         Assert.Equal(BannerView.Attention, service.SelectedItem?.View);
 
-        // Progress tick on the same background batch — fingerprint key (UpgradeProgress, null)
-        // unchanged, so NOT newly-arrived → selection stays.
         _progress.BackgroundProgress.Returns(MakeProgress());
         _progress.StateChanged += Raise.Event<Action>();
 
@@ -370,7 +360,6 @@ public sealed class BannerCycleStateServiceTests
         _critical.StateChanged += Raise.Event<Action>();
         Assert.Equal(BannerView.Critical, service.SelectedItem?.View);
 
-        // Unrelated rebuild — must NOT bounce to info2.
         _critical.StateChanged += Raise.Event<Action>();
         Assert.Equal(BannerView.Critical, service.SelectedItem?.View);
     }
@@ -516,9 +505,6 @@ public sealed class BannerCycleStateServiceTests
     [Fact]
     public void UserExplicitMoveAfterPriorityOverride_ClearsPriorityStolenMarker_AllowsRestoreAfterSuppression()
     {
-        // Uses Error (non-exclusive — stays in the cycle) as the stealer so the user-ack clear is
-        // actually exercised; Critical is exclusive and self-clears from the fingerprint, making
-        // the user-ack code path a no-op for that view.
         _attention.AttentionEntries.Returns([MakeAttention("db1.db")]);
         _infos.InfoBanners.Returns([MakeInfo()]);
         var service = CreateService();
@@ -553,8 +539,6 @@ public sealed class BannerCycleStateServiceTests
 
         _infos.StateChanged += Raise.Event<Action>();
 
-        // Remove info1: if the passive tick had implicitly recorded a preference for info1, the
-        // subsequent rebuild would still land on info2 via clamp — confirming no preference was set.
         _infos.InfoBanners.Returns([info2]);
         _infos.StateChanged += Raise.Event<Action>();
         Assert.Equal(info2.Id, service.SelectedItem?.EntryId);
@@ -574,7 +558,6 @@ public sealed class BannerCycleStateServiceTests
         _infos.StateChanged += Raise.Event<Action>();
         Assert.Equal(info1.Id, service.SelectedItem?.EntryId);
 
-        // Re-add info2 — should NOT snap back via stale preference.
         _infos.InfoBanners.Returns([info1, info2]);
         _infos.StateChanged += Raise.Event<Action>();
         Assert.Equal(info1.Id, service.SelectedItem?.EntryId);

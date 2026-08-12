@@ -1,26 +1,24 @@
 @using EventLogExpert.Eventing.Common.Channels
 @using EventLogExpert.Runtime.StatusBar
-@inherits FluxorComponent
+@inherits PresentationViewComponentBase
 
 @{
-    var eventLog = EventLogSelection.Value;
-    var rawCount = RawCountSelection.Value;
-    var logTable = LogTableSelection.Value;
-    var statusBar = StatusBarSelection.Value;
+    var status = StatusBarSource.Current;
 
-    var activeTable = logTable.EventTables.FirstOrDefault(table => table.Id == logTable.ActiveEventLogId);
-    var hasChannel = logTable.EventTables.Any(table => table.LogPathType == LogPathType.Channel);
-    var isFiltered = eventLog.AppliedFilter.IsFilteringEnabled;
-    var isLoading = !statusBar.EventsLoading.IsEmpty;
+    var activeTable = status.Tabs.FirstOrDefault(table => table.Id == status.ActiveTabId);
+    var hasChannel = status.Tabs.Any(table => table.LogPathType == LogPathType.Channel);
+    var isFiltered = FilterApplied.IsFilteringEnabled;
+    var isLoading = !status.LoadingActivities.IsEmpty;
 
-    var source = StatusBarFormatter.FormatSource(activeTable, logTable.EventTables, logTable.Groups);
-    var filterTooltip = StatusBarFormatter.FilterIndicatorTooltip(FilterActiveSelection.Value, LensCountSelection.Value);
+    var source = StatusBarFormatter.FormatSource(activeTable, status.Tabs, status.Groups);
+    var filterTooltip = StatusBarFormatter.FilterIndicatorTooltip(status.IsPersistentFilterActive, LensSource.Lenses.Count);
 
     var announcement = StatusBarFormatter.FormatActivityAnnouncement(
         isLoading,
-        hasChannel && eventLog.NewEventBufferIsFull,
-        hasChannel && eventLog.ContinuouslyUpdate,
-        statusBar.ResolverStatus);
+        hasChannel && status.NewEventBufferIsFull,
+        hasChannel && status.ContinuouslyUpdate,
+        status.ResolverStatus,
+        ResolveIndicator());
 }
 
 <div class="status-bar">
@@ -29,14 +27,15 @@
 
         @if (activeTable is not null)
         {
-            var total = TotalRawCount(activeTable, logTable.Groups, rawCount);
+            var total = TotalRawCount(activeTable, status.Groups, status);
 
-            var shown = activeTable.IsCombined ?
-                logTable.ActiveFilteredViewCount :
-                logTable.EventCountByLog.GetValueOrDefault(activeTable.Id, 0);
+            var describesActiveTab = Presentation.ActiveTabId == activeTable.Id &&
+                Presentation.State == PresentationState.Current;
+
+            var shown = Presentation.View.Count;
 
             <span aria-hidden="true" class="status-bar-sep">|</span>
-            <span class="status-bar-counts">@StatusBarFormatter.FormatCounts(total, shown, isFiltered, eventLog.SelectionCount)</span>
+            <span class="status-bar-counts">@StatusBarFormatter.FormatCounts(total, shown, isFiltered && describesActiveTab, status.SelectionCount)</span>
         }
 
         @if (isFiltered)
@@ -49,36 +48,36 @@
     <div class="status-bar-right">
         <span aria-atomic="true" aria-live="polite" class="status-bar-announce" role="status">@announcement</span>
 
-        @foreach (var loadingProgress in statusBar.EventsLoading)
+        @foreach (var loadingProgress in status.LoadingActivities)
         {
-            <span class="status-bar-activity">Loading: @loadingProgress.Value.Item1</span>
+            <span class="status-bar-activity">Loading: @loadingProgress.Value.Loaded</span>
 
-            @if (loadingProgress.Value.Item2 > 0)
+            @if (loadingProgress.Value.Failed > 0)
             {
-                <span class="status-bar-activity status-bar-warn">Failed: @loadingProgress.Value.Item2</span>
+                <span class="status-bar-activity status-bar-warn">Failed: @loadingProgress.Value.Failed</span>
             }
         }
 
         @if (hasChannel)
         {
-            @if (eventLog.ContinuouslyUpdate)
+            @if (status.ContinuouslyUpdate)
             {
                 <span class="status-bar-activity status-bar-live">Continuously updating</span>
             }
             else
             {
-                <span aria-live="off" class="status-bar-activity">New Events: @eventLog.NewEventBufferCount</span>
+                <span aria-live="off" class="status-bar-activity">New Events: @status.NewEventBufferCount</span>
 
-                @if (eventLog.NewEventBufferIsFull)
+                @if (status.NewEventBufferIsFull)
                 {
                     <span class="status-bar-activity status-bar-warn">Buffer full</span>
                 }
             }
         }
 
-        @if (!string.IsNullOrEmpty(statusBar.ResolverStatus))
+        @if (!string.IsNullOrEmpty(status.ResolverStatus))
         {
-            <span class="status-bar-activity">@statusBar.ResolverStatus</span>
+            <span class="status-bar-activity">@status.ResolverStatus</span>
         }
     </div>
 </div>

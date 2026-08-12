@@ -7,12 +7,11 @@ using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterLibrary;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Scenarios;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.UI.Modal;
-using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using System.Collections.Immutable;
@@ -22,6 +21,8 @@ namespace EventLogExpert.UI.FilterLibrary;
 
 public sealed partial class FilterLibraryModal : ModalBase<bool>
 {
+    private const int MaxPreviewedImportNames = 10;
+    private const int MaxPreviouslyUsedEntries = 50;
     private const int TagFilterBarMaxVisible = 10;
 
     private static readonly (LibraryTab Tab, string Label)[] s_tabs =
@@ -46,15 +47,18 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private LibraryTab _activeTab = LibraryTab.Saved;
     private ScenarioAuthoringRowContext? _authoringContext;
     private ScenarioClipboardExporter _clipboardExporter = null!;
+
+    private SourceSubscription? _entriesSubscription;
     private bool _isTagManagementExpanded;
     private bool _isTagOverflowExpanded;
     private bool _justClearedTags;
+    private SourceSubscription? _loadStatusSubscription;
     private LibraryTab? _pendingFocusSourceTab;
     private LibraryEntryId? _pendingFocusTargetEntryId;
     private bool _pendingFocusToActiveTab;
-
     private Dictionary<LibraryTab, ImmutableList<string>>? _selectedTagsBeforeTagOp;
     private SidebarTabs<LibraryTab>? _sidebarTabsRef;
+    private SourceSubscription? _tagBulkUpdateFailedSubscription;
 
     private enum EmptyValueChoice
     {
@@ -68,12 +72,12 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
     private IReadOnlyList<LibraryEntryFilterSet> AllFilterSets =>
-        [.. FilterLibraryState.Value.Entries
+        [.. LibraryEntries.Current
             .OfType<LibraryEntryFilterSet>()
             .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)];
 
     private IReadOnlyList<string> AllLibraryTags =>
-        [.. FilterLibraryState.Value.Entries
+        [.. LibraryEntries.Current
             .SelectMany(e => e.Tags)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)];
@@ -97,7 +101,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         {
             var selected = SelectedTagsInLibrary(LibraryTab.Favorites);
 
-            return [.. FilterLibraryState.Value.Entries
+            return [.. LibraryEntries.Current
                 .Where(e => e is LibraryEntrySavedFilter && e.IsFavorite)
                 .Where(e => MatchesTagFilter(e, selected))
                 .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
@@ -108,15 +112,19 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
 
-    [Inject] private IState<FilterLibraryState> FilterLibraryState { get; init; } = null!;
+    [Inject] private ILibraryEntriesSource LibraryEntries { get; init; } = null!;
 
-    private EventCallback<LibraryEntryId> OnCopyScenarioCallback => ScenarioAuthoringOptions.Enabled
-        ? EventCallback.Factory.Create<LibraryEntryId>(this, HandleCopyScenarioAsync)
-        : default;
+    [Inject] private ILibraryLoadStatusSource LibraryLoadStatus { get; init; } = null!;
 
-    private EventCallback<LibraryEntryId> OnSaveScenarioCallback => ScenarioAuthoringOptions.Enabled
-        ? EventCallback.Factory.Create<LibraryEntryId>(this, HandleSaveScenarioAsync)
-        : default;
+    private EventCallback<LibraryEntryId> OnCopyScenarioCallback =>
+        ScenarioAuthoringOptions.Enabled ?
+            EventCallback.Factory.Create<LibraryEntryId>(this, HandleCopyScenarioAsync) :
+            default;
+
+    private EventCallback<LibraryEntryId> OnSaveScenarioCallback =>
+        ScenarioAuthoringOptions.Enabled ?
+            EventCallback.Factory.Create<LibraryEntryId>(this, HandleSaveScenarioAsync) :
+            default;
 
     private IReadOnlyList<LibraryEntry> PreviouslyUsedEntries
     {
@@ -124,12 +132,12 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         {
             var selected = SelectedTagsInLibrary(LibraryTab.PreviouslyUsed);
 
-            return [.. FilterLibraryState.Value.Entries
+            return [.. LibraryEntries.Current
                 .Where(e => e is { Origin: LibraryEntryOrigin.AutoTracked, IsFavorite: false })
                 .Where(e => e.LastUsedUtc.HasValue)
                 .Where(e => MatchesTagFilter(e, selected))
                 .OrderByDescending(e => e.LastUsedUtc.GetValueOrDefault())
-                .Take(50)];
+                .Take(MaxPreviouslyUsedEntries)];
         }
     }
 
@@ -139,7 +147,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         {
             var selected = SelectedTagsInLibrary(LibraryTab.Saved);
 
-            return [.. FilterLibraryState.Value.Entries
+            return [.. LibraryEntries.Current
                 .Where(e => e is { Origin: LibraryEntryOrigin.UserSaved, IsFavorite: false })
                 .Where(e => MatchesTagFilter(e, selected))
                 .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
@@ -147,11 +155,13 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     }
 
     private IReadOnlyList<LibraryEntrySavedFilter> SavedFilterEntries =>
-        [.. FilterLibraryState.Value.Entries.OfType<LibraryEntrySavedFilter>()];
+        [.. LibraryEntries.Current.OfType<LibraryEntrySavedFilter>()];
 
     [Inject] private ScenarioAuthoringOptions ScenarioAuthoringOptions { get; init; } = null!;
 
     [Inject] private IScenarioAuthoringService ScenarioAuthoringService { get; init; } = null!;
+
+    [Inject] private ITagBulkUpdateFailedNotifier TagBulkUpdateFailedNotifier { get; init; } = null!;
 
     internal static void ApplyImportPreflight(
         ImportPreflight preflight,
@@ -206,9 +216,9 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     {
         if (preflight.ImportBlocked)
         {
-            var preview = string.Join("\n  \u2022 ", preflight.InvalidLegacyNames.Take(10));
-            var more = preflight.InvalidLegacyNames.Count > 10
-                ? $"\n  \u2022 ...and {preflight.InvalidLegacyNames.Count - 10} more"
+            var preview = string.Join("\n  \u2022 ", preflight.InvalidLegacyNames.Take(MaxPreviewedImportNames));
+            var more = preflight.InvalidLegacyNames.Count > MaxPreviewedImportNames
+                ? $"\n  \u2022 ...and {preflight.InvalidLegacyNames.Count - MaxPreviewedImportNames} more"
                 : string.Empty;
 
             return "This file contains entries with names that cannot be imported:\n  \u2022 " +
@@ -223,9 +233,9 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         if (preflight.ToReplace.Count > 0)
         {
             var conflictList = "\nNames being overwritten:\n  \u2022 " +
-                string.Join("\n  \u2022 ", preflight.ToReplace.Select(p => p.Incoming.Name).Take(10)) +
-                (preflight.ToReplace.Count > 10
-                    ? $"\n  \u2022 ...and {preflight.ToReplace.Count - 10} more"
+                string.Join("\n  \u2022 ", preflight.ToReplace.Select(p => p.Incoming.Name).Take(MaxPreviewedImportNames)) +
+                (preflight.ToReplace.Count > MaxPreviewedImportNames
+                    ? $"\n  \u2022 ...and {preflight.ToReplace.Count - MaxPreviewedImportNames} more"
                     : string.Empty);
 
             lines.Add($"  \u2022 {preflight.ToReplace.Count} existing entries WILL BE OVERWRITTEN (current filter content will be lost){conflictList}");
@@ -303,6 +313,18 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         _pendingFocusToActiveTab = fallback;
     }
 
+    protected override async ValueTask DisposeAsyncCore(bool disposing)
+    {
+        if (disposing)
+        {
+            _entriesSubscription?.Dispose();
+            _loadStatusSubscription?.Dispose();
+            _tagBulkUpdateFailedSubscription?.Dispose();
+        }
+
+        await base.DisposeAsyncCore(disposing);
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         PruneStaleRowRefs();
@@ -343,7 +365,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     {
         try
         {
-            var entries = FilterLibraryState.Value.Entries;
+            var entries = LibraryEntries.Current;
             var json = ExportService.Serialize(entries);
             var path = await FilePickerService.PickSaveAsync(
                 "Export Filter Library",
@@ -383,7 +405,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             return;
         }
 
-        var preflight = ExportService.Deserialize(json, FilterLibraryState.Value.Entries);
+        var preflight = ExportService.Deserialize(json, LibraryEntries.Current);
 
         if (preflight.Error is not null)
         {
@@ -403,7 +425,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
                 case EmptyValueChoice.Normalize:
                     preflight = ExportService.Deserialize(
                         json,
-                        FilterLibraryState.Value.Entries,
+                        LibraryEntries.Current,
                         normalizeEmptyValues: true);
 
                     if (preflight.Error is not null)
@@ -434,14 +456,25 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     {
         base.OnInitialized();
 
-        SubscribeToAction<TagBulkUpdateFailedAction>(_ => RevertOptimisticTagSelection());
+        _entriesSubscription = new SourceSubscription(
+            handler => LibraryEntries.Changed += handler,
+            handler => LibraryEntries.Changed -= handler,
+            () => InvokeAsync(() => { if (!IsDisposed) { StateHasChanged(); } }));
+        _loadStatusSubscription = new SourceSubscription(
+            handler => LibraryLoadStatus.Changed += handler,
+            handler => LibraryLoadStatus.Changed -= handler,
+            () => InvokeAsync(() => { if (!IsDisposed) { StateHasChanged(); } }));
+        _tagBulkUpdateFailedSubscription = new SourceSubscription(
+            handler => TagBulkUpdateFailedNotifier.Failed += handler,
+            handler => TagBulkUpdateFailedNotifier.Failed -= handler,
+            () => InvokeAsync(() => { if (!IsDisposed) { RevertOptimisticTagSelection(); } }));
 
         if (InitialTab is { } tab)
         {
             _activeTab = tab;
         }
 
-        if (!FilterLibraryState.Value.IsLoaded || FilterLibraryState.Value.LoadError)
+        if (!LibraryLoadStatus.Current.IsLoaded || LibraryLoadStatus.Current.LoadError)
         {
             FilterLibraryCommands.LoadLibrary();
         }
@@ -518,7 +551,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             "this filter");
 
     private LibraryEntryFilterSet? FindFilterSet(LibraryEntryId entryId) =>
-        FilterLibraryState.Value.Entries.FirstOrDefault(e => e.Id.Equals(entryId)) as LibraryEntryFilterSet;
+        LibraryEntries.Current.FirstOrDefault(e => e.Id.Equals(entryId)) as LibraryEntryFilterSet;
 
     private string GetEmptyStateMessage(LibraryTab tab)
     {
@@ -560,8 +593,10 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private async Task HandleApplyAsync(LibraryEntryId id)
     {
         FilterLibraryCommands.ApplyEntry(id);
-        var entry = FilterLibraryState.Value.Entries.FirstOrDefault(e => e.Id.Equals(id));
+        var entry = LibraryEntries.Current.FirstOrDefault(e => e.Id.Equals(id));
+
         if (entry is not null) { AnnouncementService.Announce($"Applied {entry.Name}"); }
+        
         await CompleteAsync(true);
     }
 
@@ -579,7 +614,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private async Task HandleExportEntryAsync(LibraryEntryId entryId)
     {
-        var entry = FilterLibraryState.Value.Entries.FirstOrDefault(e => e.Id.Equals(entryId));
+        var entry = LibraryEntries.Current.FirstOrDefault(e => e.Id.Equals(entryId));
+
         if (entry is null) { return; }
 
         try
@@ -607,8 +643,10 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private async Task HandleReplaceAsync(LibraryEntryId id)
     {
         FilterLibraryCommands.ReplaceWithEntry(id);
-        var entry = FilterLibraryState.Value.Entries.FirstOrDefault(e => e.Id.Equals(id));
+        var entry = LibraryEntries.Current.FirstOrDefault(e => e.Id.Equals(id));
+
         if (entry is not null) { AnnouncementService.Announce($"Replaced filters with {entry.Name}"); }
+
         await CompleteAsync(true);
     }
 
@@ -685,9 +723,10 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             if (index < 0) { continue; }
 
             var without = current.RemoveAt(index);
-            _selectedTagsByTab[tab] = without.Contains(e.NewName, StringComparer.OrdinalIgnoreCase)
-                ? without
-                : without.Insert(index, e.NewName);
+
+            _selectedTagsByTab[tab] = without.Contains(e.NewName, StringComparer.OrdinalIgnoreCase) ?
+                without :
+                without.Insert(index, e.NewName);
         }
     }
 
@@ -729,7 +768,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
         if (!result.Accepted) { return; }
 
-        ApplyImportPreflight(preflight, FilterLibraryCommands, FilterLibraryState.Value.Entries);
+        ApplyImportPreflight(preflight, FilterLibraryCommands, LibraryEntries.Current);
 
         var ambiguousCount = preflight.AmbiguousMatches.Count;
         var updatedCount = CountDistinctUpdates(preflight);
@@ -781,7 +820,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     {
         if (_rowRefs.Count == 0) { return; }
 
-        var liveIds = FilterLibraryState.Value.Entries.Select(e => e.Id).ToHashSet();
+        var liveIds = LibraryEntries.Current.Select(e => e.Id).ToHashSet();
 
         List<(LibraryTab Tab, LibraryEntryId Id)>? stale = null;
 
@@ -812,7 +851,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private ImmutableList<string> SelectedTagsInLibrary(LibraryTab tab)
     {
-        var available = FilterLibraryState.Value.Entries
+        var available = LibraryEntries.Current
             .SelectMany(e => e.Tags)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 

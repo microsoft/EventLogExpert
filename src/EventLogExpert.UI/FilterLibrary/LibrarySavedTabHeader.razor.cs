@@ -7,7 +7,6 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.UI.Common;
-using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
 
@@ -33,11 +32,11 @@ public sealed partial class LibrarySavedTabHeader : ComponentBase
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
     private IEnumerable<LibraryEntry> ExistingLibraryEntries =>
-        FilterLibraryState.Value.Entries.Concat(ExistingSavedFilters);
+        LibraryEntries.Current.Concat(ExistingSavedFilters);
 
     [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
 
-    [Inject] private IState<FilterLibraryState> FilterLibraryState { get; init; } = null!;
+    [Inject] private ILibraryEntriesSource LibraryEntries { get; init; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

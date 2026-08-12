@@ -7,10 +7,8 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
-using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.StatusBar;
-using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -19,45 +17,32 @@ namespace EventLogExpert.UI.Tests.StatusBar;
 
 public sealed class StatusBarTests : BunitContext
 {
-    private readonly IStateSelection<EventLogState, (Filter, bool, int, bool, int)> _eventLog =
-        Substitute.For<IStateSelection<EventLogState, (Filter, bool, int, bool, int)>>();
+    private readonly IFilterAppliedSource _filterApplied = Substitute.For<IFilterAppliedSource>();
+    private readonly IFilterLensSource _lensSource = Substitute.For<IFilterLensSource>();
+    private readonly IStatusBarSource _statusBarSource = Substitute.For<IStatusBarSource>();
+    private readonly IOrderedViewSource _viewSource = Substitute.For<IOrderedViewSource>();
 
-    private readonly IStateSelection<FilterPaneState, bool> _filterActive =
-        Substitute.For<IStateSelection<FilterPaneState, bool>>();
-
-    private readonly IStateSelection<FilterLensState, int> _lensCount =
-        Substitute.For<IStateSelection<FilterLensState, int>>();
-
-    private readonly IStateSelection<LogTableState, (
-        EventLogId?, ImmutableList<LogView>, int, ImmutableDictionary<EventLogId, int>, ImmutableList<LogTabGroup>)> _logTable =
-        Substitute.For<IStateSelection<LogTableState, (
-            EventLogId?, ImmutableList<LogView>, int, ImmutableDictionary<EventLogId, int>, ImmutableList<LogTabGroup>)>>();
-
-    private readonly IStateSelection<RawEventCountState, (int, ImmutableDictionary<EventLogId, int>)> _rawCount =
-        Substitute.For<IStateSelection<RawEventCountState, (int, ImmutableDictionary<EventLogId, int>)>>();
-
-    private readonly IStateSelection<StatusBarState, (ImmutableDictionary<StatusActivityId, (int, int)>, string)> _statusBar =
-        Substitute.For<IStateSelection<StatusBarState, (ImmutableDictionary<StatusActivityId, (int, int)>, string)>>();
+    private EventLogId _activeLogId;
+    private StatusBarPresentation _status = new();
 
     public StatusBarTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
 
-        Services.AddFluxor(options => options.ScanAssemblies(typeof(UI.StatusBar.StatusBar).Assembly));
-        Services.AddSingleton(_eventLog);
-        Services.AddSingleton(_logTable);
-        Services.AddSingleton(_rawCount);
-        Services.AddSingleton(_statusBar);
-        Services.AddSingleton(_filterActive);
-        Services.AddSingleton(_lensCount);
+        Services.AddSingleton(_filterApplied);
+        Services.AddSingleton(_lensSource);
+        Services.AddSingleton(_statusBarSource);
+        Services.AddSingleton(_viewSource);
 
-        _eventLog.Value.Returns((Unfiltered, false, 0, false, 0));
-        _logTable.Value.Returns((null, ImmutableList<LogView>.Empty, 0,
-            ImmutableDictionary<EventLogId, int>.Empty, ImmutableList<LogTabGroup>.Empty));
-        _rawCount.Value.Returns((0, ImmutableDictionary<EventLogId, int>.Empty));
-        _statusBar.Value.Returns((ImmutableDictionary<StatusActivityId, (int, int)>.Empty, string.Empty));
-        _filterActive.Value.Returns(false);
-        _lensCount.Value.Returns(0);
+        Services.AddSingleton(provider => new DisplayIndicatorGate(provider.GetRequiredService<IOrderedViewSource>()));
+
+        _statusBarSource.Current.Returns(_ => _status);
+        _filterApplied.IsFilteringEnabled.Returns(false);
+        _lensSource.Lenses.Returns(ImmutableList<FilterLensSummary>.Empty);
+
+        var emptyPresentation = PresentationWithCount(0, EventLogId.Create());
+
+        _viewSource.Current.Returns(emptyPresentation);
     }
 
     private static Filter Filtered => new(new DateFilter { IsEnabled = true }, []);
@@ -65,14 +50,88 @@ public sealed class StatusBarTests : BunitContext
     private static Filter Unfiltered => new(null, []);
 
     [Fact]
+    public void ACountFromASettledView_IsStillReportedAsAFilteredResult()
+    {
+        SetActiveLog(total: 1500, shown: 0, filter: Filtered, selected: 0);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Contains($"0 of {1500:N0} shown", cut.Markup);
+    }
+
+    [Fact]
+    public void ACountFromAViewStillBeingBuilt_IsNotPassedOffAsAFilteredResult()
+    {
+        SetActiveLog(total: 1500, shown: 0, filter: Filtered, selected: 0);
+
+        _viewSource.Current.Returns(new OrderedViewPresentation(
+            LogTableState.EmptyView, _activeLogId, default, PresentationState.Updating, Revision: 2));
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.DoesNotContain("0 of", cut.Markup);
+        Assert.Contains($"{1500:N0} events", cut.Markup);
+    }
+
+    [Fact]
+    public void ADisplayThatKeepsTheUserWaiting_IsAnnouncedThroughTheOneLiveRegion()
+    {
+        var delay = new ManualDelay();
+
+        Services.AddSingleton(_ => new DisplayIndicatorGate(_viewSource, delay.Delay));
+
+        var id = EventLogId.Create();
+        _activeLogId = id;
+
+        var pending = new OrderedViewPresentation(
+            LogTableState.EmptyView, id, default, PresentationState.Updating, Revision: 1);
+
+        _status = new StatusBarPresentation
+        {
+            Tabs = ImmutableList.Create(new LogView(id) { LogName = "Application", LogPathType = LogPathType.Channel }),
+            ActiveTabId = id,
+            RawEventCountsByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(id, 0)
+        };
+        _viewSource.Current.Returns(pending);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.DoesNotContain("Loading events", cut.Find(".status-bar-announce").TextContent);
+
+        delay.Elapse();
+
+        cut.WaitForAssertion(() =>
+            Assert.Contains("Loading events", cut.Find(".status-bar-announce").TextContent));
+    }
+
+    [Fact]
+    public void ALensChangeAfterRender_RepaintsTheLensTooltip_ThroughTheSource()
+    {
+        _lensSource.Lenses.Returns(LensSummaries(2));
+        SetActiveLog(total: 1500, shown: 300, filter: Filtered, selected: 0);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Equal("2 lenses", cut.Find(".status-bar-filter").GetAttribute("title"));
+
+        _lensSource.Lenses.Returns(LensSummaries(3));
+        cut.InvokeAsync(() => _lensSource.Changed += Raise.Event<Action>());
+
+        cut.WaitForAssertion(() => Assert.Equal("3 lenses", cut.Find(".status-bar-filter").GetAttribute("title")));
+    }
+
+    [Fact]
     public void ChannelNewEventsCounter_IsNotAnnounced()
     {
         var id = EventLogId.Create();
         var channel = new LogView(id) { LogName = "Application", LogPathType = LogPathType.Channel };
-        _logTable.Value.Returns((id, ImmutableList.Create(channel), 0,
-            ImmutableDictionary<EventLogId, int>.Empty.Add(id, 0), ImmutableList<LogTabGroup>.Empty));
-        _rawCount.Value.Returns((0, ImmutableDictionary<EventLogId, int>.Empty.Add(id, 0)));
-        _eventLog.Value.Returns((Unfiltered, false, 42, false, 0));
+        _status = new StatusBarPresentation
+        {
+            Tabs = ImmutableList.Create(channel),
+            ActiveTabId = id,
+            RawEventCountsByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(id, 0),
+            NewEventBufferCount = 42
+        };
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
@@ -81,10 +140,25 @@ public sealed class StatusBarTests : BunitContext
     }
 
     [Fact]
+    public async Task Disposal_UnsubscribesFromTheSource()
+    {
+        SetActiveLog(total: 500, shown: 500, filter: Unfiltered, selected: 0);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        await cut.Instance.DisposeAsync();
+
+        _viewSource.Received(1).Updated -= Arg.Any<Action<OrderedViewPresentation>>();
+        _statusBarSource.Received(1).Changed -= Arg.Any<Action>();
+        _filterApplied.Received(1).Changed -= Arg.Any<Action>();
+        _lensSource.Received(1).Changed -= Arg.Any<Action>();
+    }
+
+    [Fact]
     public void Filtered_ShowsShownOfTotal_AndFilteredIndicator()
     {
-        _filterActive.Value.Returns(true);
         SetActiveLog(total: 1500, shown: 200, filter: Filtered, selected: 0);
+        _status = _status with { IsPersistentFilterActive = true };
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
@@ -97,10 +171,7 @@ public sealed class StatusBarTests : BunitContext
     [Fact]
     public void LensOnlyNarrowing_ShowsShown_AndLensTooltip()
     {
-        // Persistent filter off, but lenses narrow the composed AppliedFilter - the "shown" count and funnel must still
-        // appear (the corrected lens-awareness), and the tooltip names the lens mechanism.
-        _filterActive.Value.Returns(false);
-        _lensCount.Value.Returns(2);
+        _lensSource.Lenses.Returns(LensSummaries(2));
         SetActiveLog(total: 1500, shown: 300, filter: Filtered, selected: 0);
 
         var cut = Render<UI.StatusBar.StatusBar>();
@@ -110,12 +181,27 @@ public sealed class StatusBarTests : BunitContext
     }
 
     [Fact]
+    public void LoadingActivity_RendersLoadedAndFailedCounts()
+    {
+        _status = new StatusBarPresentation
+        {
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(new StatusActivityId(Guid.NewGuid()), new LoadingProgress(12, 3))
+        };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Contains("Loading: 12", cut.Markup);
+        Assert.Contains("Failed: 3", cut.Markup);
+    }
+
+    [Fact]
     public void MultiSelect_ShowsSelectedSuffix_SingleSelectDoesNot()
     {
         SetActiveLog(total: 500, shown: 500, filter: Unfiltered, selected: 3);
         Assert.Contains("3 selected", Render<UI.StatusBar.StatusBar>().Markup);
 
-        _eventLog.Value.Returns((Unfiltered, false, 0, false, 1));
+        _status = _status with { SelectionCount = 1 };
         Assert.DoesNotContain("selected", Render<UI.StatusBar.StatusBar>().Markup);
     }
 
@@ -126,6 +212,40 @@ public sealed class StatusBarTests : BunitContext
 
         Assert.Contains("No log open", cut.Markup);
         Assert.Empty(cut.FindAll(".status-bar-counts"));
+    }
+
+    [Fact]
+    public void PresentationForADifferentTab_NeverPairsThisTabsTotalWithThatTabsCount()
+    {
+        SetActiveLog(total: 1500, shown: 200, filter: Filtered, selected: 0);
+
+        var otherTab = PresentationWithCount(200, EventLogId.Create());
+
+        _viewSource.Current.Returns(otherTab);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.DoesNotContain($"{200:N0} of {1500:N0} shown", cut.Markup);
+        Assert.DoesNotContain("shown", cut.Markup);
+
+        Assert.Contains($"{1500:N0} events", cut.Markup);
+    }
+
+    [Fact]
+    public void PublishedPresentation_RendersTheNewCount()
+    {
+        SetActiveLog(total: 1500, shown: 200, filter: Filtered, selected: 0);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Contains($"{200:N0} of {1500:N0} shown", cut.Markup);
+
+        var grown = PresentationWithCount(275, _activeLogId);
+
+        _viewSource.Current.Returns(grown);
+        _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(grown);
+
+        cut.WaitForAssertion(() => Assert.Contains($"{275:N0} of {1500:N0} shown", cut.Markup));
     }
 
     [Fact]
@@ -156,14 +276,67 @@ public sealed class StatusBarTests : BunitContext
         Assert.Empty(cut.FindAll(".status-bar-filter"));
     }
 
+    private static ImmutableList<FilterLensSummary> LensSummaries(int count) =>
+        [.. Enumerable.Range(0, count).Select(index => new FilterLensSummary(FilterLensId.Create(), $"lens {index + 1}"))];
+
+    private static OrderedViewPresentation PresentationWithCount(int count, EventLogId tabId)
+    {
+        var view = Substitute.For<IEventColumnView>();
+        view.Count.Returns(count);
+
+        return new OrderedViewPresentation(
+            view,
+            tabId,
+            default,
+            PresentationState.Current,
+            Revision: 1);
+    }
+
     private void SetActiveLog(int total, int shown, Filter filter, int selected)
     {
         var id = EventLogId.Create();
+        _activeLogId = id;
         var log = new LogView(id) { LogName = "Application", LogPathType = LogPathType.Channel };
+        var presentation = PresentationWithCount(shown, id);
 
-        _logTable.Value.Returns((id, ImmutableList.Create(log), shown,
-            ImmutableDictionary<EventLogId, int>.Empty.Add(id, shown), ImmutableList<LogTabGroup>.Empty));
-        _rawCount.Value.Returns((total, ImmutableDictionary<EventLogId, int>.Empty.Add(id, total)));
-        _eventLog.Value.Returns((filter, false, 0, false, selected));
+        _viewSource.Current.Returns(presentation);
+        _filterApplied.IsFilteringEnabled.Returns(filter.IsFilteringEnabled);
+        _status = new StatusBarPresentation
+        {
+            Tabs = ImmutableList.Create(log),
+            ActiveTabId = id,
+            RawEventTotal = total,
+            RawEventCountsByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(id, total),
+            SelectionCount = selected
+        };
+    }
+
+    private sealed class ManualDelay
+    {
+        private readonly List<TaskCompletionSource> _pending = [];
+        private readonly Lock _sync = new();
+
+        public Task Delay(TimeSpan duration, CancellationToken token)
+        {
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            lock (_sync) { _pending.Add(completion); }
+
+            return completion.Task;
+        }
+
+        public void Elapse()
+        {
+            TaskCompletionSource[] outstanding;
+
+            lock (_sync)
+            {
+                outstanding = [.. _pending];
+
+                _pending.Clear();
+            }
+
+            foreach (var completion in outstanding) { completion.TrySetResult(); }
+        }
     }
 }

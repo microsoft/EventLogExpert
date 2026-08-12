@@ -5,18 +5,10 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Database;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.Modal;
 
 namespace EventLogExpert.UI.Database;
 
-/// <summary>
-///     Coordinates the recovery banner and modal lifecycle in response to
-///     <see cref="IDatabaseService.EntriesChanged" />. Registered as a singleton and force-instantiated in MauiProgram so
-///     it begins observing state at startup. Crashes in event handlers route through
-///     <see cref="ICriticalErrorService.ReportCritical(Exception)" /> to preserve the original Main.razor placement intent
-///     (UnhandledExceptionHandler coverage equivalent).
-/// </summary>
 public sealed class DatabaseRecoveryHost : IDisposable
 {
     private readonly ICriticalErrorService _criticalErrorService;

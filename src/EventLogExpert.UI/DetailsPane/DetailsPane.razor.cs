@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Logging.Abstractions;
@@ -12,7 +11,6 @@ using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common.Interop;
-using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.Xml;
@@ -26,18 +24,14 @@ public sealed partial class DetailsPane
 
     private DetailsTab _activeTab = DetailsTab.Reader;
     private IJSObjectReference? _detailsPaneModule;
+    private bool _disposed;
     private DotNetObjectReference<DetailsPane>? _dotNetRef;
     private bool _hasOpened;
     private bool _isExpanded;
     private DetailsReaderModel? _model;
     private string? _resolvedXml;
     private ResolvedEvent? _selectedEvent;
-    /// <summary>
-    ///     Locator of the current focus, used to detect a stale async XML resolution: a re-resolve mid-fetch mints a new
-    ///     <see cref="ResolvedEvent" />, so reference identity can't gate the result but the locator can.
-    /// </summary>
     private EventLocator? _selectedHandle;
-    /// <summary>Cancels any in-flight XML resolution when the selection changes again before completion.</summary>
     private CancellationTokenSource? _xmlResolveCts;
 
     private enum DetailsTab
@@ -46,21 +40,21 @@ public sealed partial class DetailsPane
         Xml
     }
 
-    [Inject] private IStateSelection<LogTableState, EventLogId?> ActiveLog { get; init; } = null!;
+    [Inject] private IActiveEventLogSource ActiveEventLog { get; init; } = null!;
 
     [Inject] private IClipboardService Clipboard { get; init; } = null!;
+
+    [Inject] private IEventDetailResolver DetailResolver { get; init; } = null!;
+
+    [Inject] private IEventFocusSource EventFocus { get; init; } = null!;
 
     [Inject] private IEventXmlResolver EventXmlResolver { get; init; } = null!;
 
     [Inject] private IFilterLensCommands FilterLensCommands { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, SelectionEntry?> Focus { get; init; } = null!;
-
     private string IsExpanded => _isExpanded.ToString().ToLowerInvariant();
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
-
-    [Inject] private IState<LogTableState> LogTableState { get; init; } = null!;
 
     [Inject] private IDetailsPanePreferencesProvider PreferencesProvider { get; init; } = null!;
 
@@ -81,8 +75,8 @@ public sealed partial class DetailsPane
     {
         if (disposing)
         {
-            Focus.SelectedValueChanged -= OnFocusChanged;
-            ActiveLog.SelectedValueChanged -= OnActiveLogChanged;
+            _disposed = true;
+
             Settings.TimeZoneChanged -= OnTimeZoneChanged;
 
             try { _xmlResolveCts?.Cancel(); } catch (ObjectDisposedException) { /* CTS already disposed; cancel is moot. */ }
@@ -122,22 +116,14 @@ public sealed partial class DetailsPane
 
     protected override void OnInitialized()
     {
-        Focus.Select(s => s.Focus);
-        Focus.SelectedValueChanged += OnFocusChanged;
+        ObserveSource(EventFocus, OnFocusChangedAsync);
+        ObserveSource(ActiveEventLog, OnActiveLogChangedAsync);
 
-        // The active tab / log is the reset signal for the view tab (NOT the selected event's member log, which varies
-        // per selection inside a combined view).
-        ActiveLog.Select(s => s.ActiveEventLogId);
-        ActiveLog.SelectedValueChanged += OnActiveLogChanged;
-
-        // The reader model pre-renders timestamps in the configured zone, so a zone change must rebuild it.
         Settings.TimeZoneChanged += OnTimeZoneChanged;
 
-        // Seed from the current store value so the pane reflects an existing focus (e.g., a restore that completed
-        // before this component subscribed) instead of staying empty until the next change event.
-        if (Focus.Value is not null)
+        if (EventFocus.Current is not null)
         {
-            OnFocusChanged(this, Focus.Value);
+            _ = OnFocusChangedAsync();
         }
 
         base.OnInitialized();
@@ -177,33 +163,30 @@ public sealed partial class DetailsPane
 
     private bool IsFieldExpanded(int index) => _expandedFields.Contains(index);
 
-    private async void OnActiveLogChanged(object? sender, EventLogId? activeLog)
+    private Task OnActiveLogChangedAsync()
     {
-        try
+        if (!_disposed)
         {
             _activeTab = DetailsTab.Reader;
+            StateHasChanged();
+        }
 
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (Exception ex)
-        {
-            TraceLogger.Error($"{nameof(DetailsPane)}: failed to handle active-log change: {ex}");
-        }
+        return Task.CompletedTask;
     }
 
-    private async void OnFocusChanged(object? sender, SelectionEntry? focus)
+    private async Task OnFocusChangedAsync()
     {
         try
         {
+            if (_disposed) { return; }
+
+            var focus = EventFocus.Current;
             var handle = focus?.CurrentHandle;
             _selectedHandle = handle;
 
-            // A null CurrentHandle (a selection whose row could not be re-resolved after a reload) resolves to nothing,
-            // leaving _selectedEvent/_model null so the pane hides.
             ResolvedEvent? selectedEvent = null;
 
-            if (handle is { } locator
-                && LogTableState.Value.EventsForLog(locator.LogId).TryGetDetail(locator, out var detail))
+            if (handle is { } locator && DetailResolver.TryResolve(locator, out var detail))
             {
                 selectedEvent = detail;
             }
@@ -212,8 +195,6 @@ public sealed partial class DetailsPane
             _model = selectedEvent is { } resolved ? DetailsReaderFormatter.BuildModel(resolved, Settings.TimeZoneInfo) : null;
             _expandedFields.Clear();
 
-            // Cancel any in-flight resolution from a prior selection so a stale fetch
-            // can't overwrite the resolved XML for the now-current selection.
             try { _xmlResolveCts?.Cancel(); } catch (ObjectDisposedException) { /* CTS already disposed; cancel is moot. */ }
 
             _xmlResolveCts?.Dispose();
@@ -223,29 +204,23 @@ public sealed partial class DetailsPane
 
             if (selectedEvent is null)
             {
-                await InvokeAsync(StateHasChanged);
+                StateHasChanged();
 
                 return;
             }
 
-            // The pane stays closed until the user opens something: auto-expand on the FIRST selection, but after the
-            // user has toggled it (_hasOpened) respect their choice on later selections unless the preference opts into
-            // always-expand-on-select.
             if (!_hasOpened || PreferencesProvider.DisplayPaneSelectionPreference) { _isExpanded = true; }
 
-            // Short-circuit: live-watcher events arrive with XML already pre-rendered. Skip the
-            // resolver round-trip (and the "Resolving XML..." flicker) when we already have it.
             if (!string.IsNullOrEmpty(selectedEvent.Xml))
             {
                 _resolvedXml = selectedEvent.Xml;
 
-                await InvokeAsync(StateHasChanged);
+                StateHasChanged();
 
                 return;
             }
 
-            // Render once with the loading sentinel before kicking off the async fetch.
-            await InvokeAsync(StateHasChanged);
+            StateHasChanged();
 
             var cts = new CancellationTokenSource();
             _xmlResolveCts = cts;
@@ -268,9 +243,10 @@ public sealed partial class DetailsPane
                 {
                     TraceLogger.Error($"{nameof(DetailsPane)}: XML resolution failed for selected event: {ex}");
 
-                    // Only surface the failure if we're still the current selection; otherwise a newer selection owns
-                    // _resolvedXml. A re-resolve mints a new event instance, so compare the stable locator, not object identity.
-                    if (_selectedHandle == handle && ReferenceEquals(_xmlResolveCts, cts))
+                    // Only surface the failure if we're still the current selection (locally AND per the source);
+                    // otherwise a newer selection owns _resolvedXml. A re-resolve mints a new event instance, so compare
+                    // the stable locator, not object identity.
+                    if (!_disposed && _selectedHandle == handle && ReferenceEquals(_xmlResolveCts, cts) && EventFocus.Current == focus)
                     {
                         _resolvedXml = string.Empty;
                     }
@@ -278,8 +254,7 @@ public sealed partial class DetailsPane
                     return;
                 }
 
-                // Selection changed while the fetch was in flight; discard the stale result.
-                if (cts.IsCancellationRequested || _selectedHandle != handle)
+                if (_disposed || cts.IsCancellationRequested || _selectedHandle != handle || EventFocus.Current != focus)
                 {
                     return;
                 }
@@ -288,8 +263,6 @@ public sealed partial class DetailsPane
             }
             finally
             {
-                // Always release the per-selection CTS (success, cancel, or failure), but guard against clobbering a
-                // newer CTS installed by a subsequent OnFocusChanged during our await.
                 if (ReferenceEquals(_xmlResolveCts, cts))
                 {
                     _xmlResolveCts = null;
@@ -297,7 +270,7 @@ public sealed partial class DetailsPane
 
                 cts.Dispose();
 
-                await InvokeAsync(StateHasChanged);
+                if (!_disposed) { StateHasChanged(); }
             }
         }
         catch (Exception e)

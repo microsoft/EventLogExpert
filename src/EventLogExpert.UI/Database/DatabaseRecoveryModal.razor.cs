@@ -4,7 +4,6 @@
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
-using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
 
