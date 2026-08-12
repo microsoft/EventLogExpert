@@ -22,10 +22,6 @@ public sealed class LogRoutingPolicy
         _globalBaseline = globalBaseline;
     }
 
-    // The file sink writes a category at its configured throttle where one is set (channel-authoritative); every other
-    // category follows the live global baseline, so raising the global level never un-floors a configured throttle.
-    // Precedence returns on the first matching tier: runtime overrides (troubleshooting toggles) beat shipped
-    // throttles, which beat the global baseline.
     public LogLevel FileMinimumFor(string category)
     {
         if (string.IsNullOrEmpty(category)) { return _globalBaseline; }
@@ -35,12 +31,6 @@ public sealed class LogRoutingPolicy
         return TryMatchLongestPrefix(_fileOverrides, category, out LogLevel fileLevel) ? fileLevel : _globalBaseline;
     }
 
-    // Runtime per-category override (e.g. the verbose-resolution troubleshooting toggle): raise or reset a category
-    // live without touching the shipped throttles or the global baseline. The read-modify-write runs under _writeLock
-    // so concurrent writers cannot lose updates; readers take a single lock-free volatile snapshot. Because
-    // FileMinimumFor returns on the first matching tier, a broad runtime prefix (e.g. "Resolution") shadows a narrower
-    // shipped override ("Resolution.Sub") regardless of specificity - intended for the toggle, and harmless today
-    // because no shipped "Resolution.*" override exists.
     public void SetCategoryOverride(string category, LogLevel? level)
     {
         ArgumentException.ThrowIfNullOrEmpty(category);
@@ -59,7 +49,7 @@ public sealed class LogRoutingPolicy
         }
     }
 
-    public LogLevel UiMinimumFor(bool verbose) => verbose ? LogLevel.Trace : LogLevel.Information;
+    public LogLevel UIMinimumFor(bool verbose) => verbose ? LogLevel.Trace : LogLevel.Information;
 
     public void UpdateGlobalBaseline(LogLevel level) => _globalBaseline = level;
 
@@ -72,8 +62,6 @@ public sealed class LogRoutingPolicy
             .OrderByDescending(static entry => entry.Prefix.Length)];
     }
 
-    // Segment-boundary match: "Offline" covers "Offline.Wim" but not "OfflineExtras". Overrides are pre-sorted
-    // longest-first, so the first match is the most specific.
     private static bool IsSegmentPrefix(string prefix, string category)
     {
         if (!category.StartsWith(prefix, StringComparison.Ordinal)) { return false; }

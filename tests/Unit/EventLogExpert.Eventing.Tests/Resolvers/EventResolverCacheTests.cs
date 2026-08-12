@@ -8,47 +8,42 @@ namespace EventLogExpert.Eventing.Tests.Resolvers;
 
 public sealed class EventResolverCacheTests
 {
+    private const int ClearAllInterleaveDelayMilliseconds = 5;
+
     public enum CacheKind { Description, Value }
 
     [Fact]
     public void ClearAll_AfterAddingItems_ShouldClearBothCaches()
     {
-        // Arrange
         var cache = new EventResolverCache();
 
-        // Force new string instances to avoid string interning
         var testDesc = new string("Test Description".ToCharArray());
         var testValue = new string("Test Value".ToCharArray());
 
         var oldDesc = cache.GetOrAddDescription(testDesc);
         var oldValue = cache.GetOrAddValue(testValue);
 
-        // Act
         cache.ClearAll();
 
-        // Assert
-        // After clearing, calling GetOrAdd with new instances should return those new instances
         var newDescInput = new string("Test Description".ToCharArray());
         var newValueInput = new string("Test Value".ToCharArray());
 
         var newDesc = cache.GetOrAddDescription(newDescInput);
         var newValue = cache.GetOrAddValue(newValueInput);
 
-        Assert.NotSame(oldDesc, newDesc); // Different reference after clear (description cache)
-        Assert.NotSame(oldValue, newValue); // Different reference after clear (value cache)
+        Assert.NotSame(oldDesc, newDesc);
+        Assert.NotSame(oldValue, newValue);
 
-        // But subsequent calls with the same inputs should return cached instances
         var desc2 = cache.GetOrAddDescription(new string("Test Description".ToCharArray()));
         var value2 = cache.GetOrAddValue(new string("Test Value".ToCharArray()));
 
-        Assert.Same(newDesc, desc2); // Should cache the new description instance
-        Assert.Same(newValue, value2); // Should cache the new value instance
+        Assert.Same(newDesc, desc2);
+        Assert.Same(newValue, value2);
     }
 
     [Fact]
     public void ClearAll_ConcurrentCalls_ShouldHandleThreadSafely()
     {
-        // Arrange
         var cache = new EventResolverCache();
         for (int i = 0; i < 100; i++)
         {
@@ -56,13 +51,10 @@ public sealed class EventResolverCacheTests
             cache.GetOrAddValue($"Value{i}");
         }
 
-        // Act
         var exception = Record.Exception(() => Parallel.For(0, 10, _ => cache.ClearAll()));
 
-        // Assert
         Assert.Null(exception);
 
-        // Verify post-condition: after clear, new inputs return new instances
         var newInput = new string("PostClear".ToCharArray());
         var result = cache.GetOrAddDescription(newInput);
         Assert.Same(newInput, result);
@@ -71,138 +63,28 @@ public sealed class EventResolverCacheTests
     [Fact]
     public void ClearAll_WithEmptyCaches_ShouldNotThrow()
     {
-        // Arrange
         var cache = new EventResolverCache();
 
-        // Act
         var exception = Record.Exception(() => cache.ClearAll());
 
-        // Assert
         Assert.Null(exception);
-    }
-
-    [Theory]
-    [InlineData(CacheKind.Description)]
-    [InlineData(CacheKind.Value)]
-    public void GetOrAdd_CalledMultipleTimes_ShouldReturnSameReference(CacheKind kind)
-    {
-        // Arrange
-        var cache = new EventResolverCache();
-        var input = $"Test {kind}";
-
-        // Act
-        var result1 = GetOrAdd(cache, kind, input);
-        var result2 = GetOrAdd(cache, kind, input);
-        var result3 = GetOrAdd(cache, kind, input);
-
-        // Assert
-        Assert.Same(result1, result2);
-        Assert.Same(result2, result3);
-    }
-
-    [Theory]
-    [InlineData(CacheKind.Description)]
-    [InlineData(CacheKind.Value)]
-    public void GetOrAdd_ConcurrentCalls_ShouldHandleThreadSafely(CacheKind kind)
-    {
-        // Arrange
-        var cache = new EventResolverCache();
-        var results = new string[100];
-
-        // Act
-        Parallel.For(0, 100, i =>
-        {
-            results[i] = GetOrAdd(cache, kind, $"{kind}{i % 10}");
-        });
-
-        // Assert
-        // 100 calls were spread across 10 distinct keys ("{kind}0" .. "{kind}9"), 10 calls per key.
-        // For each key, every occurrence must be the same reference (de-dup contract under
-        // contention). The previous loop only stepped i by 10, which meant i % 10 was always 0
-        // and only key "{kind}0" was actually validated; iterating each key 0..9 explicitly
-        // covers all ten distinct cache slots so a regression in any one of them fails the test.
-        for (int key = 0; key < 10; key++)
-        {
-            var expected = results[key];
-            Assert.NotNull(expected);
-
-            for (int occurrence = 1; occurrence < 10; occurrence++)
-            {
-                Assert.Same(expected, results[key + (occurrence * 10)]);
-            }
-        }
-    }
-
-    [Theory]
-    [InlineData(CacheKind.Description, "Description 1", "Description 2")]
-    [InlineData(CacheKind.Value, "Value 1", "Value 2")]
-    public void GetOrAdd_WithDifferentInputs_ShouldReturnDifferentReferences(CacheKind kind, string a, string b)
-    {
-        // Arrange
-        var cache = new EventResolverCache();
-
-        // Act
-        var result1 = GetOrAdd(cache, kind, a);
-        var result2 = GetOrAdd(cache, kind, b);
-
-        // Assert
-        Assert.NotSame(result1, result2);
-        Assert.Equal(a, result1);
-        Assert.Equal(b, result2);
-    }
-
-    [Theory]
-    [InlineData(CacheKind.Description)]
-    [InlineData(CacheKind.Value)]
-    public void GetOrAdd_WithEmptyString_ShouldReturnSameEmptyStringReference(CacheKind kind)
-    {
-        // Arrange
-        var cache = new EventResolverCache();
-
-        // Act
-        var result1 = GetOrAdd(cache, kind, string.Empty);
-        var result2 = GetOrAdd(cache, kind, string.Empty);
-
-        // Assert
-        Assert.Same(result1, result2);
-        Assert.Equal(string.Empty, result1);
-    }
-
-    [Theory]
-    [InlineData(CacheKind.Description)]
-    [InlineData(CacheKind.Value)]
-    public void GetOrAdd_WithNewString_ShouldAddToCache(CacheKind kind)
-    {
-        // Arrange
-        var cache = new EventResolverCache();
-        var input = new string("Test".ToCharArray()); // Force new string instance
-
-        // Act
-        var result = GetOrAdd(cache, kind, input);
-
-        // Assert
-        Assert.Equal(input, result);
     }
 
     [Fact]
     public void GetOrAddDescription_AtCap_ShouldStopCachingButKeepServingExistingHits()
     {
-        // Arrange - a tiny cap so the bound is reachable without inserting 131072 entries.
         var cache = new EventResolverCache(maxDescriptionCacheSize: 2);
 
         var first = cache.GetOrAddDescription(new string("desc-A".ToCharArray()));
         var second = cache.GetOrAddDescription(new string("desc-B".ToCharArray()));
 
-        // Act - the third distinct description is at the cap, so it is returned as-is (not cached).
         var overflowInput = new string("desc-C".ToCharArray());
         var overflow = cache.GetOrAddDescription(overflowInput);
         var overflowAgain = cache.GetOrAddDescription(new string("desc-C".ToCharArray()));
 
-        // Assert - overflow entry is never interned (different instance each time)...
         Assert.Same(overflowInput, overflow);
         Assert.NotSame(overflow, overflowAgain);
 
-        // ...but entries cached before the cap still dedupe (sharing is preserved, no thrash/clear).
         Assert.Same(first, cache.GetOrAddDescription(new string("desc-A".ToCharArray())));
         Assert.Same(second, cache.GetOrAddDescription(new string("desc-B".ToCharArray())));
     }
@@ -210,14 +92,11 @@ public sealed class EventResolverCacheTests
     [Fact]
     public void GetOrAddDescription_BelowCap_ShouldInternIdenticalDescriptions()
     {
-        // Arrange
         var cache = new EventResolverCache();
 
-        // Act - two distinct instances with identical content (mirrors many events sharing a description).
         var a = cache.GetOrAddDescription(new string("recurring description".ToCharArray()));
         var b = cache.GetOrAddDescription(new string("recurring description".ToCharArray()));
 
-        // Assert - interned to one shared instance.
         Assert.Same(a, b);
     }
 
@@ -399,6 +278,89 @@ public sealed class EventResolverCacheTests
         Assert.Same(first, second);
     }
 
+    [Theory]
+    [InlineData(CacheKind.Description)]
+    [InlineData(CacheKind.Value)]
+    public void GetOrAdd_CalledMultipleTimes_ShouldReturnSameReference(CacheKind kind)
+    {
+        var cache = new EventResolverCache();
+        var input = $"Test {kind}";
+
+        var result1 = GetOrAdd(cache, kind, input);
+        var result2 = GetOrAdd(cache, kind, input);
+        var result3 = GetOrAdd(cache, kind, input);
+
+        Assert.Same(result1, result2);
+        Assert.Same(result2, result3);
+    }
+
+    [Theory]
+    [InlineData(CacheKind.Description)]
+    [InlineData(CacheKind.Value)]
+    public void GetOrAdd_ConcurrentCalls_ShouldHandleThreadSafely(CacheKind kind)
+    {
+        var cache = new EventResolverCache();
+        var results = new string[100];
+
+        Parallel.For(0, 100, i =>
+        {
+            results[i] = GetOrAdd(cache, kind, $"{kind}{i % 10}");
+        });
+
+        for (int key = 0; key < 10; key++)
+        {
+            var expected = results[key];
+            Assert.NotNull(expected);
+
+            for (int occurrence = 1; occurrence < 10; occurrence++)
+            {
+                Assert.Same(expected, results[key + (occurrence * 10)]);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(CacheKind.Description, "Description 1", "Description 2")]
+    [InlineData(CacheKind.Value, "Value 1", "Value 2")]
+    public void GetOrAdd_WithDifferentInputs_ShouldReturnDifferentReferences(CacheKind kind, string a, string b)
+    {
+        var cache = new EventResolverCache();
+
+        var result1 = GetOrAdd(cache, kind, a);
+        var result2 = GetOrAdd(cache, kind, b);
+
+        Assert.NotSame(result1, result2);
+        Assert.Equal(a, result1);
+        Assert.Equal(b, result2);
+    }
+
+    [Theory]
+    [InlineData(CacheKind.Description)]
+    [InlineData(CacheKind.Value)]
+    public void GetOrAdd_WithEmptyString_ShouldReturnSameEmptyStringReference(CacheKind kind)
+    {
+        var cache = new EventResolverCache();
+
+        var result1 = GetOrAdd(cache, kind, string.Empty);
+        var result2 = GetOrAdd(cache, kind, string.Empty);
+
+        Assert.Same(result1, result2);
+        Assert.Equal(string.Empty, result1);
+    }
+
+    [Theory]
+    [InlineData(CacheKind.Description)]
+    [InlineData(CacheKind.Value)]
+    public void GetOrAdd_WithNewString_ShouldAddToCache(CacheKind kind)
+    {
+        var cache = new EventResolverCache();
+        var input = new string("Test".ToCharArray());
+
+        var result = GetOrAdd(cache, kind, input);
+
+        Assert.Equal(input, result);
+    }
+
     [Fact]
     public void MixedOperations_AllCachesConcurrentWithClearAll_ShouldHandleThreadSafely()
     {
@@ -409,7 +371,7 @@ public sealed class EventResolverCacheTests
                 () => { for (int i = 0; i < 100; i++) { cache.GetOrAddValue($"Value{i}"); } },
                 () => { for (int i = 0; i < 100; i++) { cache.GetOrAddKeywords(new List<string> { $"Keyword{i % 10}" }); } },
                 () => { for (int i = 0; i < 100; i++) { cache.GetOrAddSid(new SecurityIdentifier($"S-1-5-{18 + (i % 3)}")); } },
-                () => { for (int i = 0; i < 10; i++) { Thread.Sleep(5); cache.ClearAll(); } }));
+                () => { for (int i = 0; i < 10; i++) { Thread.Sleep(ClearAllInterleaveDelayMilliseconds); cache.ClearAll(); } }));
 
         Assert.Null(exception);
     }
@@ -417,10 +379,8 @@ public sealed class EventResolverCacheTests
     [Fact]
     public void MixedOperations_ConcurrentDescriptionAndValueAccess_ShouldHandleThreadSafely()
     {
-        // Arrange
         var cache = new EventResolverCache();
 
-        // Act
         var exception = Record.Exception(() =>
             Parallel.For(0, 100, i =>
             {
@@ -434,17 +394,14 @@ public sealed class EventResolverCacheTests
                 }
             }));
 
-        // Assert
         Assert.Null(exception);
     }
 
     [Fact]
     public void MixedOperations_ConcurrentWithClearAll_ShouldHandleThreadSafely()
     {
-        // Arrange
         var cache = new EventResolverCache();
 
-        // Act
         var exception = Record.Exception(() =>
             Parallel.Invoke(
                 () =>
@@ -465,30 +422,24 @@ public sealed class EventResolverCacheTests
                 {
                     for (int i = 0; i < 10; i++)
                     {
-                        Thread.Sleep(5);
+                        Thread.Sleep(ClearAllInterleaveDelayMilliseconds);
                         cache.ClearAll();
                     }
                 }
             ));
 
-        // Assert
         Assert.Null(exception);
     }
 
     [Fact]
     public void SeparateCaches_DescriptionAndValue_ShouldNotInterfere()
     {
-        // Arrange
         var cache = new EventResolverCache();
         var sharedString = "Shared";
 
-        // Act
         var description = cache.GetOrAddDescription(sharedString);
         var value = cache.GetOrAddValue(sharedString);
 
-        // Assert
-        // Even though they have the same content, they should be cached separately
-        // and both should work independently
         Assert.Equal(sharedString, description);
         Assert.Equal(sharedString, value);
     }
