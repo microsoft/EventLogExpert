@@ -369,6 +369,34 @@ public sealed class OrderedViewBulkBuildTests
         }
     }
 
+    [Theory]
+    [InlineData(303)]
+    [InlineData(1717)]
+    public void MemoryBudget_ForcesDelegatingFallback_WithIdenticalOrder(int seed)
+    {
+        // A tiny budget makes EstimateBulkPeakBytes exceed it, so TryBuildBulk returns null and BuildIndex falls back
+        // to the bounded-memory delegating path. That fallback must be order-identical to the (huge-budget) bulk path.
+        var sample = new OrderedViewSample(seed, logCount: 1);
+        sample.SeedInterleaved(totalEvents: 400);
+        IEventColumnReader reader = sample.Reader(0);
+        EventLogId logId = sample.LogId(0);
+
+        foreach (SortContext context in AllContexts())
+        {
+            var state = new OrderedViewState();
+            state.ReconcileLog(logId, reader);
+            RebuildRequest request = state.BeginRebuild(static (_, _) => true, context);
+
+            ChunkedOrderIndex bulk = OrderedViewState.BuildIndex(
+                request, CancellationToken.None, bulkThreshold: 0, memoryBudgetBytes: long.MaxValue);
+            ChunkedOrderIndex fallback = OrderedViewState.BuildIndex(
+                request, CancellationToken.None, bulkThreshold: 0, memoryBudgetBytes: 1);
+
+            IComparer<OrderKey> comparer = OrderKeyComparerFactory.Create(context, request.BeginResolver);
+            AssertSnapshotsEqual(bulk.Publish(comparer, 0), fallback.Publish(comparer, 0), $"seed={seed} {Describe(context)}");
+        }
+    }
+
     private static OrderedViewSnapshot AdoptCombinedWithTailReplay(OrderedViewSample sample, SortContext context, int bulkThreshold)
     {
         var state = new OrderedViewState();

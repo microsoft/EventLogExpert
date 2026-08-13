@@ -23,6 +23,14 @@ internal sealed record RebuildRequest(
 internal sealed class OrderedViewState
 {
     internal const int DefaultBulkBuildThreshold = 50_000;
+
+    // Conservative weights for the bulk peak-memory estimate; over-estimating only falls back to the delegating path
+    // sooner (safe). OrderKey wraps EventLocator (24 B); an SoA lane is bounded by Guid[16]+bool[1]; a pooled-rank
+    // entry is int[4]+bool[1].
+    private const int BulkOrderKeyBytes = 24;
+    private const int BulkPooledRankBytesPerEntry = 5;
+    private const int BulkSoaLaneBytesPerRow = 17;
+
     private readonly Dictionary<EventLogId, int> _activeGeneration = [];
     private readonly Dictionary<LogGeneration, IEventColumnReader> _latestReaders = [];
     private readonly LiveReaderResolver _liveResolver;
@@ -65,7 +73,7 @@ internal sealed class OrderedViewState
     public static ChunkedOrderIndex BuildIndex(RebuildRequest request) => BuildIndex(request, CancellationToken.None);
 
     public static ChunkedOrderIndex BuildIndex(RebuildRequest request, CancellationToken cancellationToken) =>
-        BuildIndex(request, cancellationToken, DefaultBulkBuildThreshold);
+        BuildIndex(request, cancellationToken, DefaultBulkBuildThreshold, DefaultMemoryBudgetBytes());
 
     public RebuildRequest BeginRebuild(Func<EventLocator, IEventColumnReader, bool> newPredicate, SortContext newContext, bool? hold = null)
     {
@@ -295,9 +303,16 @@ internal sealed class OrderedViewState
         return true;
     }
 
-    internal static ChunkedOrderIndex BuildIndex(RebuildRequest request, CancellationToken cancellationToken, int bulkThreshold)
+    internal static ChunkedOrderIndex BuildIndex(RebuildRequest request, CancellationToken cancellationToken, int bulkThreshold) =>
+        BuildIndex(request, cancellationToken, bulkThreshold, DefaultMemoryBudgetBytes());
+
+    internal static ChunkedOrderIndex BuildIndex(
+        RebuildRequest request,
+        CancellationToken cancellationToken,
+        int bulkThreshold,
+        long memoryBudgetBytes)
     {
-        if (TryBuildBulk(request, cancellationToken, bulkThreshold) is { } bulk) { return bulk; }
+        if (TryBuildBulk(request, cancellationToken, bulkThreshold, memoryBudgetBytes) is { } bulk) { return bulk; }
 
         var rebuilt = new ChunkedOrderIndex(OrderKeyComparerFactory.Create(request.Context, request.BeginResolver));
         int examined = 0;
@@ -322,6 +337,17 @@ internal sealed class OrderedViewState
         }
 
         return rebuilt;
+    }
+
+    // Half the currently-free heap headroom: total available minus the bytes currently allocated (which include the
+    // live old published index and the raw event store), so the estimate is measured against real remaining room.
+    // GC.GetTotalMemory reflects allocations since the last GC, unlike GCMemoryInfo.HeapSizeBytes (a last-GC snapshot).
+    internal static long DefaultMemoryBudgetBytes()
+    {
+        long available = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+        long headroom = available - GC.GetTotalMemory(forceFullCollection: false);
+
+        return headroom > 0 ? headroom / 2 : 0;
     }
 
     private static ChunkedOrderIndex BuildCombinedBulk(
@@ -410,6 +436,44 @@ internal sealed class OrderedViewState
         return keys;
     }
 
+    // Peak estimate. The SoA columns + the whole-pool rank arrays are materialized one log at a time, so their peak is
+    // the largest single log; the two coexisting OrderKey[] sets, the permutation, and the survivor lists all live
+    // across the whole merge. (Keyword order/group never reaches here - TryBuildBulk routes it to the delegating path.)
+    private static long EstimateBulkPeakBytes(
+        RebuildRequest request,
+        List<(LogGeneration Key, int Covered)> keys,
+        long totalCovered)
+    {
+        checked
+        {
+            SortContext context = request.Context;
+
+            int lanes = 2; // RecordId + OwningLog are always materialized.
+
+            if (context.GroupBy is not null || context.OrderBy is null) { lanes++; } // DateAndTime
+
+            if (context.OrderBy is not null) { lanes++; }
+
+            if (context.GroupBy is not null) { lanes++; }
+
+            long soaBytesPerRow = (long)lanes * BulkSoaLaneBytesPerRow;
+            long soaPeak = 0;
+
+            foreach ((LogGeneration key, int covered) in keys)
+            {
+                IEventColumnReader reader = request.BeginResolver.Resolve(new EventLocator(key.LogId, key.Generation, 0));
+                long perLog = (covered * soaBytesPerRow) + ((long)reader.Pool.Count * BulkPooledRankBytesPerEntry);
+
+                if (perLog > soaPeak) { soaPeak = perLog; }
+            }
+
+            long orderKeyPeak = 2L * BulkOrderKeyBytes * totalCovered;
+            long scratch = 2L * sizeof(int) * totalCovered; // the int[] permutation + the survivor int lists
+
+            return soaPeak + orderKeyPeak + scratch;
+        }
+    }
+
     private static OrderKey HeadKey(LogGeneration key, int[] run, int cursor) =>
         new(new EventLocator(key.LogId, key.Generation, run[cursor]));
 
@@ -440,7 +504,11 @@ internal sealed class OrderedViewState
             cancellationToken);
     }
 
-    private static ChunkedOrderIndex? TryBuildBulk(RebuildRequest request, CancellationToken cancellationToken, int bulkThreshold)
+    private static ChunkedOrderIndex? TryBuildBulk(
+        RebuildRequest request,
+        CancellationToken cancellationToken,
+        int bulkThreshold,
+        long memoryBudgetBytes)
     {
         List<(LogGeneration Key, int Covered)> keys = CollectInScopeCurrentKeys(request, cancellationToken);
 
@@ -455,6 +523,15 @@ internal sealed class OrderedViewState
         }
 
         if (totalCovered < bulkThreshold) { return null; }
+
+        // Keyword order/group joins arbitrary-length strings per row, so its bake memory cannot be bounded - always
+        // delegate. Otherwise fall back when the estimated transient peak would exceed the budget.
+        if (request.Context.OrderBy is ColumnName.Keywords || request.Context.GroupBy is ColumnName.Keywords)
+        {
+            return null;
+        }
+
+        if (EstimateBulkPeakBytes(request, keys, totalCovered) > memoryBudgetBytes) { return null; }
 
         IComparer<OrderKey> comparer = OrderKeyComparerFactory.Create(request.Context, request.BeginResolver);
 
