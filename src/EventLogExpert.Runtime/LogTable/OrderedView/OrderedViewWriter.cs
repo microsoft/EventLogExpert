@@ -11,6 +11,9 @@ namespace EventLogExpert.Runtime.LogTable.OrderedView;
 
 internal sealed class OrderedViewWriter : IAsyncDisposable
 {
+    private const int DefaultTailBreachLimit = 3;
+    private const int DefaultTailReplayBudget = 50_000;
+
     private readonly Task? _cadence;
     private readonly Channel<Command> _commandChannel;
     private readonly Task _owner;
@@ -18,6 +21,8 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
     private readonly int _publishEvery;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly OrderedViewState _state = new();
+    private readonly int _tailBreachLimit;
+    private readonly long _tailReplayBudget;
 
     private SortContext _adoptedConfig;
     private Filter _adoptedFilter;
@@ -54,10 +59,17 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
 
     private ImmutableHashSet<LogGeneration>? _singleLogInScope;
     private LogGeneration? _singleLogInScopeKey;
+    private int _tailBreaches;
 
-    public OrderedViewWriter(int publishEvery = 256, int publishIntervalMs = 16)
+    public OrderedViewWriter(
+        int publishEvery = 256,
+        int publishIntervalMs = 16,
+        long tailReplayBudget = DefaultTailReplayBudget,
+        int tailBreachLimit = DefaultTailBreachLimit)
     {
         _publishEvery = Math.Max(1, publishEvery);
+        _tailReplayBudget = Math.Max(0, tailReplayBudget);
+        _tailBreachLimit = Math.Max(1, tailBreachLimit);
         _commandChannel = Channel.CreateUnbounded<Command>(new UnboundedChannelOptions { SingleReader = true });
         _owner = Task.Run(RunAsync);
 
@@ -315,37 +327,52 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
                 _rebuildRequired = false;
                 _faultAnnounced = false;
                 _seededRowsAwaitingBuild = false;
+                _tailBreaches = 0;
 
                 break;
             case CommandKind.Adopt:
                 try
                 {
-                    if (command.Request is { } request && command.Rebuilt is { } rebuilt && _state.TryAdoptRebuild(request, rebuilt))
+                    AdoptOutcome outcome = AdoptOutcome.DroppedStale;
+
+                    if (command is { Request: { } request, Rebuilt: { } rebuilt })
                     {
-                        _dirty = false;
-                        _sincePublish = 0;
+                        outcome = _state.TryAdoptRebuild(request, rebuilt, _tailReplayBudget, _tailBreaches < _tailBreachLimit);
 
-                        _adoptedLog = request.SingleLog;
-                        _adoptedScopeLogCount = request.Scope.LogCount;
-
-                        _adoptedGeneration = _adoptedLog is { } adoptedLog ?
-                            request.RequestedGeneration.GetValueOrDefault(adoptedLog) : 0;
-
-                        _adoptedConfig = request.Context;
-                        _adoptedFilter = _pendingFilter;
-
-                        if (_pending is { } adopting && adopting.EngineGeneration == request.Generation)
+                        if (outcome == AdoptOutcome.Adopted)
                         {
-                            _adoptedIdentity = adopting.Identity;
-                            _adoptedSequence = adopting.Sequence;
-                            _pending = null;
-                        }
+                            _tailBreaches = 0;
+                            _dirty = false;
+                            _sincePublish = 0;
 
-                        _rebuildRequired = false;
-                        _faultAnnounced = false;
-                        _seededRowsAwaitingBuild = false;
+                            _adoptedLog = request.SingleLog;
+                            _adoptedScopeLogCount = request.Scope.LogCount;
+
+                            _adoptedGeneration = _adoptedLog is { } adoptedLog ?
+                                request.RequestedGeneration.GetValueOrDefault(adoptedLog) : 0;
+
+                            _adoptedConfig = request.Context;
+                            _adoptedFilter = _pendingFilter;
+
+                            if (_pending is { } adopting && adopting.EngineGeneration == request.Generation)
+                            {
+                                _adoptedIdentity = adopting.Identity;
+                                _adoptedSequence = adopting.Sequence;
+                                _pending = null;
+                            }
+
+                            _rebuildRequired = false;
+                            _faultAnnounced = false;
+                            _seededRowsAwaitingBuild = false;
+                        }
                     }
-                    else if (_seededRowsAwaitingBuild)
+
+                    if (outcome == AdoptOutcome.AbandonedTail)
+                    {
+                        _tailBreaches++;
+                        RebindAndStart(_state.CaptureScopeReseed());
+                    }
+                    else if (outcome != AdoptOutcome.Adopted && _seededRowsAwaitingBuild)
                     {
                         // rows a retag seeded onto it, exactly as a throwing one would.
                         RequireRebuild();
@@ -460,6 +487,7 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
             CancelRunningBuild();
             _desiredBuild = null;
             _pending = null;
+            _tailBreaches = 0;
 
             _state.RestoreRequestedFromAdopted();
             _pendingFilter = _adoptedFilter;
@@ -476,6 +504,7 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
 
         RebuildRequest rebuild = _state.BeginRebuild(request.Predicate, request.Context, request.Hold);
 
+        _tailBreaches = 0;
         _pending = new PendingBuild(request.Identity, request.Sequence, rebuild.Generation);
         StartRebuild(rebuild);
     }

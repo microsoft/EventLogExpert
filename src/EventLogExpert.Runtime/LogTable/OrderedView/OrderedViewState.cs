@@ -21,6 +21,13 @@ internal sealed record RebuildRequest(
     long ScopeVersion,
     EventLogId? SingleLog);
 
+internal enum AdoptOutcome
+{
+    Adopted,
+    DroppedStale,
+    AbandonedTail
+}
+
 internal sealed class OrderedViewState
 {
     internal const int DefaultBulkBuildThreshold = 50_000;
@@ -237,9 +244,16 @@ internal sealed class OrderedViewState
 
     public void SupersedeInFlight() => Interlocked.Increment(ref _generation);
 
-    public bool TryAdoptRebuild(RebuildRequest request, ChunkedOrderIndex rebuilt)
+    public AdoptOutcome TryAdoptRebuild(RebuildRequest request, ChunkedOrderIndex rebuilt, long tailBudget, bool allowAbandon)
     {
-        if (Volatile.Read(ref _generation) != request.Generation) { return false; }
+        if (Volatile.Read(ref _generation) != request.Generation) { return AdoptOutcome.DroppedStale; }
+
+        if (allowAbandon && MeasureTail(request) > tailBudget)
+        {
+            _holdIngest = false;
+
+            return AdoptOutcome.AbandonedTail;
+        }
 
         IReaderResolver commitResolver = FreezeReaders();
         rebuilt.RebindInsertComparer(OrderKeyComparerFactory.Create(request.Context, commitResolver));
@@ -292,8 +306,11 @@ internal sealed class OrderedViewState
         _index.RebindInsertComparer(OrderKeyComparerFactory.Create(_activeContext, _liveResolver));
         PublishWith(FreezeReaders());
 
-        return true;
+        return AdoptOutcome.Adopted;
     }
+
+    public bool TryAdoptRebuild(RebuildRequest request, ChunkedOrderIndex rebuilt) =>
+        TryAdoptRebuild(request, rebuilt, long.MaxValue, allowAbandon: false) == AdoptOutcome.Adopted;
 
     public bool TrySetActiveScope(IReadOnlyCollection<EventLogId> scopeLogs, long scopeVersion)
     {
@@ -606,6 +623,22 @@ internal sealed class OrderedViewState
 
     private FrozenReaderResolver FreezeReaders() =>
         new(new Dictionary<LogGeneration, IEventColumnReader>(_latestReaders));
+
+    private long MeasureTail(RebuildRequest request)
+    {
+        long tail = 0;
+
+        foreach (LogGeneration key in _scopeState.Keys)
+        {
+            if (!request.Scope.Includes(key.LogId)) { continue; }
+
+            if (!IsCurrent(key, _requestedGeneration)) { continue; }
+
+            tail += _scopeState.Coverage(key) - request.Coverage.CoverageOf(key);
+        }
+
+        return tail;
+    }
 
     private void PruneReleasedReaders()
     {
