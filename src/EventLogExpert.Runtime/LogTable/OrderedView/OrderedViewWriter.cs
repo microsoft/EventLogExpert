@@ -53,6 +53,8 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
 
     private bool _rebuildRequired;
 
+    private bool _replaceAwaitingRebuild;
+
     private bool _seededRowsAwaitingBuild;
 
     private int _sincePublish;
@@ -252,6 +254,11 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
             _desiredBuild = null;
             StartRebuild(desired);
         }
+        else if (_replaceAwaitingRebuild && _pendingRebuilds == 0)
+        {
+            _replaceAwaitingRebuild = false;
+            ForceRebuild();
+        }
 
         if (_pendingRebuilds != 0 || _pendingDrain.Count <= 0)
         {
@@ -281,10 +288,11 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
                 if (command.Reader is { } reconcileReader)
                 {
                     bool reconciled;
+                    bool requiresRebuild;
 
                     try
                     {
-                        reconciled = _state.ReconcileLog(command.LogId, reconcileReader);
+                        reconciled = _state.ReconcileLog(command.LogId, reconcileReader, out requiresRebuild);
                     }
                     catch (Exception reconcileFault)
                     {
@@ -294,12 +302,23 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
                         break;
                     }
 
-                    if (reconciled)
+                    if (requiresRebuild)
+                    {
+                        if (_pendingRebuilds > 0 || _rebuildRequired)
+                        {
+                            _replaceAwaitingRebuild = true;
+                            _state.SupersedeInFlight();
+                        }
+                        else
+                        {
+                            RequireRebuild();
+                        }
+                    }
+                    else if (reconciled)
                     {
                         _dirty = true;
 
-                        if (_state.Current.Count == 0) { PublishNow(); }
-                        else if (++_sincePublish >= _publishEvery) { PublishNow(); }
+                        if (_state.Current.Count == 0 || ++_sincePublish >= _publishEvery) { PublishNow(); }
                     }
                 }
 
@@ -327,6 +346,7 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
                 _rebuildRequired = false;
                 _faultAnnounced = false;
                 _seededRowsAwaitingBuild = false;
+                _replaceAwaitingRebuild = false;
                 _tailBreaches = 0;
 
                 break;
@@ -479,6 +499,7 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
 
         if (!_rebuildRequired &&
             !_seededRowsAwaitingBuild &&
+            !_replaceAwaitingRebuild &&
             _adoptedIdentity is { } adoptedIdentity &&
             request.Identity.CoversSameViewAs(adoptedIdentity) &&
             _state.CanRestampAdopted(request.ScopeLogs, request.ScopeReaders))
@@ -580,13 +601,18 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
         catch (Exception) { /* a broken fault subscriber must not mask the original fault or kill the owner loop */ }
     }
 
+    private void ForceRebuild()
+    {
+        _rebuildRequired = true;
+
+        RebindAndStart(_state.CaptureScopeReseed());
+    }
+
     private void RequireRebuild()
     {
         if (_rebuildRequired) { return; }
 
-        _rebuildRequired = true;
-
-        RebindAndStart(_state.CaptureScopeReseed());
+        ForceRebuild();
     }
 
     private async Task RunAsync()
