@@ -191,12 +191,14 @@ internal sealed class OrderedViewState
             }
         }
 
-        bool displaysThisGeneration = reader.Count > 0 &&
-            _adoptedScope.Includes(logId) &&
+        bool currentGeneration = reader.Count > 0 &&
             _activeGeneration.TryGetValue(logId, out int active) &&
             active == reader.Generation;
 
-        requiresRebuild = sameCountReplace && displaysThisGeneration;
+        bool displaysThisGeneration = currentGeneration && _adoptedScope.Includes(logId);
+
+        requiresRebuild = sameCountReplace && currentGeneration &&
+            (_adoptedScope.Includes(logId) || _scopeState.Includes(logId));
 
         return mutated ||
             (displaysThisGeneration && !_adoptedInScope.Contains(readerKey)) ||
