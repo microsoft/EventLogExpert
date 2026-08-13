@@ -104,6 +104,28 @@ public sealed class ReconcileLogStaleOrderTests
     }
 
     [Fact]
+    public void ReconcileLog_SameCountReplaceOfLogEnteringScope_SignalsRebuild()
+    {
+        EventLogId adopted = EventLogId.Create();
+        EventLogId entering = EventLogId.Create();
+
+        var state = new OrderedViewState();
+        AdoptSourceView(
+            state,
+            [adopted],
+            new Dictionary<EventLogId, IEventColumnReader> { [adopted] = Reader(adopted, contentVersion: 0, ("AAA", 0), ("BBB", 1)) });
+
+        Assert.True(state.TrySetActiveScope([adopted, entering], ViewRequests.NextSequence()));
+        state.ReconcileLog(entering, Reader(entering, contentVersion: 0, ("CCC", 0), ("DDD", 1)));
+
+        state.ReconcileLog(
+            entering,
+            Reader(entering, contentVersion: 1, ("DDD", 0), ("CCC", 1)),
+            out bool requiresRebuild);
+        Assert.True(requiresRebuild);
+    }
+
+    [Fact]
     public async Task Writer_SameCountHigherContentVersion_RepublishesReorderedSnapshot()
     {
         EventLogId logId = EventLogId.Create();
