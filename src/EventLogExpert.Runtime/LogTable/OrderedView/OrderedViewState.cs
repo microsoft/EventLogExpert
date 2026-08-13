@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
+using static EventLogExpert.Runtime.Concurrency.CooperativeCancellation;
 
 namespace EventLogExpert.Runtime.LogTable.OrderedView;
 
@@ -325,7 +326,7 @@ internal sealed class OrderedViewState
 
             for (int index = 0; index < covered; index++)
             {
-                if ((examined++ & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+                if ((examined++ & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
                 var locator = new EventLocator(key.LogId, key.Generation, index);
 
@@ -378,7 +379,7 @@ internal sealed class OrderedViewState
 
         for (int run = 0; run < runs.Count; run++)
         {
-            if ((run & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+            if ((run & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
             queue.Enqueue(run, HeadKey(runKeys[run], runs[run], 0));
         }
@@ -387,7 +388,7 @@ internal sealed class OrderedViewState
 
         while (queue.TryDequeue(out int run, out OrderKey head))
         {
-            if ((emitted & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+            if ((emitted & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
             merged[emitted++] = head;
             int next = ++cursors[run];
@@ -408,7 +409,7 @@ internal sealed class OrderedViewState
 
         for (int display = 0; display < sortedIndices.Length; display++)
         {
-            if ((display & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+            if ((display & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
             sortedOrder[display] = new OrderKey(new EventLocator(key.LogId, key.Generation, sortedIndices[display]));
         }
@@ -424,7 +425,7 @@ internal sealed class OrderedViewState
 
         foreach ((LogGeneration key, int covered) in request.Coverage.Entries)
         {
-            if ((scanned++ & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+            if ((scanned++ & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
             if (!request.Scope.Includes(key.LogId)) { continue; }
 
@@ -487,7 +488,7 @@ internal sealed class OrderedViewState
 
         for (int index = 0; index < covered; index++)
         {
-            if ((index & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+            if ((index & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
             var locator = new EventLocator(key.LogId, key.Generation, index);
 
@@ -517,7 +518,7 @@ internal sealed class OrderedViewState
 
         foreach ((LogGeneration _, int covered) in keys)
         {
-            if ((summed++ & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+            if ((summed++ & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
             totalCovered += covered;
         }

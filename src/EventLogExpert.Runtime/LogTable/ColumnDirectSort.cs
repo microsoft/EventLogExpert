@@ -2,11 +2,35 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using static EventLogExpert.Runtime.Concurrency.CooperativeCancellation;
 
 namespace EventLogExpert.Runtime.LogTable;
 
 internal static class ColumnDirectSort
 {
+    private const int IntrosortSizeThreshold = 16;
+
+    internal static void CancellableSort(int[] keys, Comparison<int> comparison, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        ArgumentNullException.ThrowIfNull(comparison);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (keys.Length < 2) { return; }
+
+        IntroSort(keys, 0, keys.Length - 1, 2 * FloorLog2(keys.Length), comparison, cancellationToken);
+    }
+
+    internal static void HeapSortForTest(int[] keys, Comparison<int> comparison, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        ArgumentNullException.ThrowIfNull(comparison);
+
+        if (keys.Length < 2) { return; }
+
+        HeapSort(keys, 0, keys.Length - 1, comparison, cancellationToken);
+    }
+
     internal static int[] SortColumnDirect(
         IEventColumnReader reader,
         ReadOnlySpan<int> survivors,
@@ -24,11 +48,165 @@ internal static class ColumnDirectSort
 
         var keys = ColumnDirectKeys.Materialize(reader, orderBy, groupBy, cancellationToken);
         Comparison<int> comparison = keys.BuildComparison(orderBy, isDescending, groupBy, isGroupDescending);
-        cancellationToken.ThrowIfCancellationRequested();
-        Array.Sort(result, comparison);
-        cancellationToken.ThrowIfCancellationRequested();
+        CancellableSort(result, comparison, cancellationToken);
 
         return result;
+    }
+
+    private static void DownHeap(int[] keys, int position, int count, int low, Comparison<int> comparison)
+    {
+        int value = keys[low + position - 1];
+
+        while (position <= count / 2)
+        {
+            int child = 2 * position;
+
+            if (child < count && comparison(keys[low + child - 1], keys[low + child]) < 0) { child++; }
+
+            if (comparison(value, keys[low + child - 1]) >= 0) { break; }
+
+            keys[low + position - 1] = keys[low + child - 1];
+            position = child;
+        }
+
+        keys[low + position - 1] = value;
+    }
+
+    private static int FloorLog2(int value)
+    {
+        int result = 0;
+
+        while (value >= 2)
+        {
+            value >>= 1;
+            result++;
+        }
+
+        return result;
+    }
+
+    private static void HeapSort(int[] keys, int low, int high, Comparison<int> comparison, CancellationToken cancellationToken)
+    {
+        int count = high - low + 1;
+        int sinceCheck = 0;
+
+        for (int parent = count / 2; parent >= 1; parent--)
+        {
+            if ((sinceCheck++ & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
+            DownHeap(keys, parent, count, low, comparison);
+        }
+
+        for (int remaining = count; remaining > 1; remaining--)
+        {
+            if ((sinceCheck++ & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
+            Swap(keys, low, low + remaining - 1);
+            DownHeap(keys, 1, remaining - 1, low, comparison);
+        }
+    }
+
+    private static void InsertionSort(int[] keys, int low, int high, Comparison<int> comparison, CancellationToken cancellationToken)
+    {
+        for (int index = low; index < high; index++)
+        {
+            if ((index & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
+            int current = keys[index + 1];
+            int position = index;
+
+            while (position >= low && comparison(current, keys[position]) < 0)
+            {
+                keys[position + 1] = keys[position];
+                position--;
+            }
+
+            keys[position + 1] = current;
+        }
+    }
+
+    private static void IntroSort(
+        int[] keys, int low, int high, int depthLimit, Comparison<int> comparison, CancellationToken cancellationToken)
+    {
+        while (high > low)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            int partitionSize = high - low + 1;
+
+            if (partitionSize <= IntrosortSizeThreshold)
+            {
+                InsertionSort(keys, low, high, comparison, cancellationToken);
+
+                return;
+            }
+
+            if (depthLimit == 0)
+            {
+                HeapSort(keys, low, high, comparison, cancellationToken);
+
+                return;
+            }
+
+            depthLimit--;
+            int pivotPosition = PickPivotAndPartition(keys, low, high, comparison, cancellationToken);
+            IntroSort(keys, pivotPosition + 1, high, depthLimit, comparison, cancellationToken);
+            high = pivotPosition - 1;
+        }
+    }
+
+    private static int PickPivotAndPartition(
+        int[] keys, int low, int high, Comparison<int> comparison, CancellationToken cancellationToken)
+    {
+        int middle = low + ((high - low) >> 1);
+
+        SwapIfGreater(keys, comparison, low, middle);
+        SwapIfGreater(keys, comparison, low, high);
+        SwapIfGreater(keys, comparison, middle, high);
+
+        int pivot = keys[middle];
+        Swap(keys, middle, high - 1);
+        int left = low;
+        int right = high - 1;
+        int sinceCheck = 0;
+
+        while (left < right)
+        {
+            if ((sinceCheck++ & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+
+            while (comparison(keys[++left], pivot) < 0)
+            {
+                if ((sinceCheck++ & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+            }
+
+            while (comparison(pivot, keys[--right]) < 0)
+            {
+                if ((sinceCheck++ & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+            }
+
+            if (left >= right) { break; }
+
+            Swap(keys, left, right);
+        }
+
+        Swap(keys, left, high - 1);
+
+        return left;
+    }
+
+    private static void Swap(int[] keys, int first, int second)
+    {
+        if (first == second) { return; }
+
+        (keys[first], keys[second]) = (keys[second], keys[first]);
+    }
+
+    private static void SwapIfGreater(int[] keys, Comparison<int> comparison, int first, int second)
+    {
+        if (first != second && comparison(keys[first], keys[second]) > 0)
+        {
+            (keys[first], keys[second]) = (keys[second], keys[first]);
+        }
     }
 
     private sealed class ColumnDirectKeys
@@ -114,7 +292,7 @@ internal static class ColumnDirectSort
 
             foreach (int poolIndex in rawPoolIndices)
             {
-                if ((scanned++ & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+                if ((scanned++ & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
                 if (poolIndex >= 0 && !seen[poolIndex])
                 {
@@ -133,21 +311,19 @@ internal static class ColumnDirectSort
 
             for (int index = 0; index < length; index++)
             {
-                if ((index & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+                if ((index & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
                 order[index] = index;
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
-            Array.Sort(order, (x, y) => string.Compare(values[x], values[y], StringComparison.Ordinal));
-            cancellationToken.ThrowIfCancellationRequested();
+            CancellableSort(order, (x, y) => string.Compare(values[x], values[y], StringComparison.Ordinal), cancellationToken);
 
             int rank = 0;
             rankByPosition[order[0]] = 0;
 
             for (int position = 1; position < length; position++)
             {
-                if ((position & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+                if ((position & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
                 if (!string.Equals(values[order[position]], values[order[position - 1]], StringComparison.Ordinal))
                 {
@@ -276,7 +452,7 @@ internal static class ColumnDirectSort
 
             for (int index = 0; index < Count; index++)
             {
-                if ((index & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+                if ((index & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
                 values[index] = reader.GetField(reader.LocatorAt(index), EventFieldId.KeywordsDisplay).AsString();
             }
@@ -321,7 +497,7 @@ internal static class ColumnDirectSort
         {
             for (int index = 0; index < poolIndices.Length; index++)
             {
-                if ((index & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+                if ((index & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
                 int poolIndex = poolIndices[index];
                 rankByRow[index] = poolIndex < 0 ? _nullRank : _rankByPoolIndex[poolIndex];
@@ -350,7 +526,7 @@ internal static class ColumnDirectSort
 
                 for (int index = 0; index < used.Count; index++)
                 {
-                    if ((index & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+                    if ((index & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
                     usedStrings[index] = pool[used[index]] ?? string.Empty;
                 }
@@ -360,7 +536,7 @@ internal static class ColumnDirectSort
 
                 for (int index = 0; index < used.Count; index++)
                 {
-                    if ((index & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+                    if ((index & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
                     _rankByPoolIndex[used[index]] = rankByPosition[index];
                 }
