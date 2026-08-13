@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using static EventLogExpert.Runtime.Concurrency.CooperativeCancellation;
 
 namespace EventLogExpert.Runtime.LogTable.OrderedView;
 
@@ -118,7 +119,7 @@ internal sealed class ChunkedOrderIndex
 
         for (int position = 0; position < sortedOrder.Length; position++)
         {
-            if ((position & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+            if ((position & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
             var generationKey = new LogGeneration(sortedOrder[position].Locator.LogId, sortedOrder[position].Locator.Generation);
             int index = sortedOrder[position].Locator.Index;
@@ -134,7 +135,7 @@ internal sealed class ChunkedOrderIndex
 
         for (int position = 0; position < sortedOrder.Length; position++)
         {
-            if ((position & 8191) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
+            if ((position & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
             EventLocator locator = sortedOrder[position].Locator;
             var generationKey = new LogGeneration(locator.LogId, locator.Generation);
