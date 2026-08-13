@@ -163,8 +163,12 @@ internal sealed class OrderedViewState
 
     public OrderedViewSnapshot Publish() => PublishWith(FreezeReaders());
 
-    public bool ReconcileLog(EventLogId logId, IEventColumnReader reader)
+    public bool ReconcileLog(EventLogId logId, IEventColumnReader reader) => ReconcileLog(logId, reader, out _);
+
+    public bool ReconcileLog(EventLogId logId, IEventColumnReader reader, out bool requiresRebuild)
     {
+        requiresRebuild = false;
+
         if (!TryAdmitReader(logId, reader, out LogGeneration readerKey, out bool sameCountReplace)) { return false; }
 
         int from = _scopeState.Coverage(readerKey);
@@ -191,6 +195,8 @@ internal sealed class OrderedViewState
             _adoptedScope.Includes(logId) &&
             _activeGeneration.TryGetValue(logId, out int active) &&
             active == reader.Generation;
+
+        requiresRebuild = sameCountReplace && displaysThisGeneration;
 
         return mutated ||
             (displaysThisGeneration && !_adoptedInScope.Contains(readerKey)) ||
