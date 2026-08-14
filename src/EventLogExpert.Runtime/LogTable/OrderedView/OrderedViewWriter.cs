@@ -356,6 +356,11 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
                 {
                     AdoptOutcome outcome = AdoptOutcome.DroppedStale;
 
+                    // Latch before TryAdoptRebuild clears it on a successful adopt: a coalesced view request may have
+                    // seeded a grow the seed path could not tell apart from a replace, so ANY seeded outcome (adopt
+                    // included) must re-derive the order, not only the non-adopt outcomes.
+                    bool seededThisBuild = _seededRowsAwaitingBuild;
+
                     if (command is { Request: { } request, Rebuilt: { } rebuilt })
                     {
                         outcome = _state.TryAdoptRebuild(request, rebuilt, _tailReplayBudget, _tailBreaches < _tailBreachLimit);
@@ -394,9 +399,12 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
                         _tailBreaches++;
                         RebindAndStart(_state.CaptureScopeReseed());
                     }
-                    else if (outcome != AdoptOutcome.Adopted && _seededRowsAwaitingBuild)
+                    else if (seededThisBuild)
                     {
-                        // rows a retag seeded onto it, exactly as a throwing one would.
+                        // A coalesced view request seeded rows onto this build. A non-adopt outcome never placed them;
+                        // a successful adopt placed them by tail-replay, which is correct for an append but leaves the
+                        // prior rows stale if the seed was actually a re-resolution (the seed path cannot tell them
+                        // apart). Re-derive from the reseeded readers either way. (AbandonedTail already recaptures.)
                         RequireRebuild();
                     }
                 }
