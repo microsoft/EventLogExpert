@@ -207,6 +207,71 @@ public sealed class ReconcileLogStaleOrderTests
     }
 
     [Fact]
+    public async Task Writer_CoalescedReorderReplace_RepublishesFullySortedOrder()
+    {
+        EventLogId logId = EventLogId.Create();
+
+        using var parked = new ManualResetEventSlim(false);
+        using var entered = new ManualResetEventSlim(false);
+        CancellationToken token = TestContext.Current.CancellationToken;
+
+        await using var writer = new OrderedViewWriter(publishEvery: 1, publishIntervalMs: 0);
+
+        var original = new Dictionary<EventLogId, IEventColumnReader>
+        {
+            [logId] = Reader(logId, contentVersion: 0, ("AAA", 0), ("BBB", 1))
+        };
+
+        // Adopt a first view (RecordId sort) to establish the log's readers and coverage.
+        writer.EnqueueViewRequest(ViewRequests.For(
+            new SortContext(ColumnName.RecordId, false, null, false),
+            ViewRequests.EmptyFilter,
+            [logId],
+            static (_, _) => true,
+            readers: original));
+        await writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, token);
+
+        // Re-sort by Source with a gated predicate so THAT build (a different view) parks in flight, then coalesce a
+        // reordered grow-REPLACE onto it. The seed path admits the replacement as an append; the tail-replay leaves
+        // the prior rows stale, so the corrective rebuild is the only thing that re-sorts them by the replaced content.
+        writer.EnqueueViewRequest(ViewRequests.For(
+            s_sourceAscending,
+            ViewRequests.EmptyFilter,
+            [logId],
+            (_, _) =>
+            {
+                entered.Set();
+                parked.Wait(OrderedViewTestTimeouts.Default, token);
+
+                return true;
+            },
+            readers: original));
+
+        Assert.True(entered.Wait(OrderedViewTestTimeouts.Default, token));
+
+        var replaced = new Dictionary<EventLogId, IEventColumnReader>
+        {
+            [logId] = Reader(logId, contentVersion: 1, ("CCC", 0), ("BBB", 1), ("AAA", 2))
+        };
+        writer.EnqueueViewRequest(
+            ViewRequests.For(s_sourceAscending, ViewRequests.EmptyFilter, [logId], static (_, _) => true, readers: replaced));
+
+        parked.Set();
+        await writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, token);
+        await writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, token);
+
+        Assert.True(
+            SpinWait.SpinUntil(
+                () => writer.Current.Count == 3 &&
+                    writer.Current.At(0).Locator.Index == 2 &&
+                    writer.Current.At(1).Locator.Index == 1 &&
+                    writer.Current.At(2).Locator.Index == 0,
+                OrderedViewTestTimeouts.Default),
+            "the corrective rebuild must republish the fully sorted replaced order");
+        Assert.Null(writer.Faulted);
+    }
+
+    [Fact]
     public async Task Writer_GrowReplaceHigherContentVersion_RepublishesReorderedSnapshot()
     {
         EventLogId logId = EventLogId.Create();
