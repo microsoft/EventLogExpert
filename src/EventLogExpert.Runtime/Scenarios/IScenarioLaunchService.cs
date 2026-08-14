@@ -16,11 +16,11 @@ public interface IScenarioLaunchService
     Task<ScenarioLaunchResult> LaunchAsync(ScenarioDefinition scenario, DateFilter? dateWindow, bool combineLog = false);
 
     /// <summary>
-    ///     Prompts for a folder, opens the exported <c>.evtx</c> files whose channel matches the scenario, and applies
-    ///     the scenario's filters to a fresh view. The scenario's filters and channels are read from the definition, so this
-    ///     works even for logs not present on the local host. The folder enumeration and per-file channel probe run off the
-    ///     caller's thread and honor <paramref name="cancellationToken" />, returning
-    ///     <see cref="ScenarioFolderOutcome.Cancelled" /> if the scan is abandoned before any log is opened.
+    ///     Prompts for a folder, opens the exported <c>.evtx</c> files (optionally recursing into subfolders) whose
+    ///     channel matches the scenario, and applies the scenario's filters to a fresh view. The scenario's filters and
+    ///     channels are read from the definition, so this works even for logs not present on the local host. The folder
+    ///     enumeration and per-file channel probe run off the caller's thread and honor <paramref name="cancellationToken" />,
+    ///     returning <see cref="ScenarioFolderOutcome.Cancelled" /> if the scan is abandoned before any log is opened.
     ///     <paramref name="onPhase" />, when supplied, is invoked as the operation crosses each
     ///     <see cref="ScenarioFolderPhase" /> boundary so a caller can show a cancellable busy indicator only while
     ///     cancellation is still meaningful.
@@ -28,6 +28,7 @@ public interface IScenarioLaunchService
     Task<ScenarioFolderLaunchResult> LaunchFromFolderAsync(
         ScenarioDefinition scenario,
         DateFilter? dateWindow,
+        bool includeSubfolders = false,
         CancellationToken cancellationToken = default,
         Func<ScenarioFolderPhase, Task>? onPhase = null);
 }

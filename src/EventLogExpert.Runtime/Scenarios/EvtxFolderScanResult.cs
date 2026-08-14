@@ -6,8 +6,8 @@ using System.Collections.Immutable;
 namespace EventLogExpert.Runtime.Scenarios;
 
 /// <summary>
-///     Discriminated result for <see cref="IEvtxFolderEnumerator.EnumerateTopLevel" /> so a folder that cannot be read
-///     is reported distinctly from one that merely holds no <c>.evtx</c> files.
+///     Discriminated result for <see cref="IEvtxFolderEnumerator.Enumerate" /> so a folder that cannot be read is
+///     reported distinctly from one that merely holds no <c>.evtx</c> files.
 /// </summary>
 public abstract record EvtxFolderScanResult
 {

@@ -10,23 +10,14 @@
             </div>
         </div>
         <div class="empty-dashboard__masthead-actions">
-            @if (_scanningScenario is { } scanning)
+            @if (_folderScanActive)
             {
                 <div class="empty-dashboard__chip empty-dashboard__chip--scanning" role="status">
                     <i aria-hidden="true" class="bi bi-arrow-repeat loader-spin"></i>
-                    @if (_openingLogs)
+                    <span class="empty-dashboard__chip-text">@FolderScanStatusText()</span>
+                    @if (!_openingLogs && !_cancelRequested)
                     {
-                        <span class="empty-dashboard__chip-text">Opening logs for @scanning.Name...</span>
-                    }
-                    else if (_cancelRequested)
-                    {
-                        <span class="empty-dashboard__chip-text">Cancelling folder scan for @scanning.Name...</span>
-                    }
-                    else
-                    {
-                        <span class="empty-dashboard__chip-text">Scanning @scanning.Name folder for logs...</span>
-
-                        <Button OnClick="CancelFolderScan" aria-label="@($"Cancel folder scan for {scanning.Name}")" @ref="_cancelScanButton">Cancel</Button>
+                        <Button OnClick="CancelFolderScan" aria-label="@FolderScanCancelLabel()" @ref="_cancelScanButton">Cancel</Button>
                     }
                 </div>
             }
@@ -95,6 +86,10 @@
             <ChromelessButton CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-folder2-open" OnClick="OpenFolderAsync" aria-label="Open Folder...">
                 <span>Folder...</span>
             </ChromelessButton>
+            <label class="empty-dashboard__subfolders">
+                <input type="checkbox" @bind="_includeSubfolders" disabled="@_isBusy" />
+                <span>Include subfolders</span>
+            </label>
         </div>
     </section>
 
@@ -120,7 +115,7 @@
                         IsScenarioDisabled="IsScenarioDisabled"
                         OnEnableChannel="EnableChannelAsync"
                         OnLaunch="LaunchScenarioAsync"
-                        OnLaunchFromFolder="LaunchScenarioFromFolderAsync"
+                        OnLaunchFromFolder="request => LaunchScenarioFromFolderAsync(request.Scenario, request.IncludeSubfolders)"
                         OnSelect="scenario => Select(category, scenario)"
                         OnToggleFavorite="ToggleFavorite"
                         Scenarios="ScenariosFor(category)"

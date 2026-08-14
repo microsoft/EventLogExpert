@@ -16,6 +16,8 @@ public sealed partial class ScenarioDetail
     private readonly string _nameId = ComponentId.NewUnique().Value;
     private readonly string _offlineId = ComponentId.NewUnique().Value;
 
+    private bool _includeSubfolders = true;
+
     [Parameter] public bool CanEnableChannels { get; set; }
 
     [Parameter] public IReadOnlyList<ChannelReadiness> ChannelReadiness { get; set; } = [];
@@ -32,7 +34,7 @@ public sealed partial class ScenarioDetail
 
     [Parameter] public EventCallback OnLaunch { get; set; }
 
-    [Parameter] public EventCallback OnLaunchFromFolder { get; set; }
+    [Parameter] public EventCallback<bool> OnLaunchFromFolder { get; set; }
 
     [Parameter] public EventCallback OnToggleFavorite { get; set; }
 
@@ -111,7 +113,7 @@ public sealed partial class ScenarioDetail
     {
         if (IsBusy) { return; }
 
-        await OnLaunchFromFolder.InvokeAsync();
+        await OnLaunchFromFolder.InvokeAsync(_includeSubfolders);
     }
 
     private readonly record struct FilterLine(string Text, HighlightColor Color);

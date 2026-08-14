@@ -179,7 +179,8 @@ public sealed partial class MenuBar
         return
         [
             MenuItem.Item("File", () => Actions.OpenFileAsync(combineLog), combineLog ? null : "Ctrl+O"),
-            MenuItem.Item("Folder", () => Actions.OpenFolderAsync(combineLog)),
+            MenuItem.Item("Folder", () => Actions.OpenFolderAsync(combineLog, includeSubfolders: true)),
+            MenuItem.Item("Folder (top level only)", () => Actions.OpenFolderAsync(combineLog, includeSubfolders: false)),
             MenuItem.SubMenu("Live",
             [
                 MenuItem.Item(LogChannelNames.ApplicationLog,

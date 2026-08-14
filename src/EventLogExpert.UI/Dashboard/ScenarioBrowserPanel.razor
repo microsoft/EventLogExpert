@@ -24,20 +24,20 @@
         </ul>
 
         <div class="scenario-browser__detail">
-            @if (Selected is not null)
+            @if (Selected is { } selected)
             {
                 <ScenarioDetail CanEnableChannels="CanEnableChannels"
-                    ChannelReadiness="GetChannelReadiness(Selected)"
+                    ChannelReadiness="GetChannelReadiness(selected)"
                     IsBusy="IsBusy"
-                    IsDisabled="IsScenarioDisabled(Selected)"
-                    IsFavored="IsFavored(Selected)"
-                    IsLivePresent="IsLivePresent(Selected)"
+                    IsDisabled="IsScenarioDisabled(selected)"
+                    IsFavored="IsFavored(selected)"
+                    IsLivePresent="IsLivePresent(selected)"
                     OnEnableChannel="OnEnableChannel"
-                    OnLaunch="() => OnLaunch.InvokeAsync(Selected)"
-                    OnLaunchFromFolder="() => OnLaunchFromFolder.InvokeAsync(Selected)"
-                    OnToggleFavorite="() => OnToggleFavorite.InvokeAsync(Selected)"
-                    OptionalChannelReadiness="GetOptionalChannelReadiness(Selected)"
-                    Scenario="Selected" />
+                    OnLaunch="() => OnLaunch.InvokeAsync(selected)"
+                    OnLaunchFromFolder="includeSubfolders => OnLaunchFromFolder.InvokeAsync(new ScenarioFolderOpenRequest(selected, includeSubfolders))"
+                    OnToggleFavorite="() => OnToggleFavorite.InvokeAsync(selected)"
+                    OptionalChannelReadiness="GetOptionalChannelReadiness(selected)"
+                    Scenario="selected" />
             }
         </div>
     }

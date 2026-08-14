@@ -269,3 +269,16 @@
     color: var(--text-secondary);
     cursor: default;
 }
+
+.scenario-detail__subfolders {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.scenario-detail__subfolders input {
+    cursor: pointer;
+}

@@ -21,7 +21,7 @@ The newest events paint first (usually within about a second) while the rest str
 
 ### Folder
 
-`File` → `Open` → `Folder` opens a folder picker. Every `.evtx` in the picked folder (top-level only, no recursion) is loaded as a separate log.
+`File` → `Open` → `Folder` opens a folder picker and loads every `.evtx` in the picked folder as a separate log. Subfolders are scanned by default, so nested collections (for example KAPE or triage output) load in one step. To load only the picked folder's top-level `.evtx` files, uncheck **Include subfolders** next to the start page's **Folder...** button or a scenario's **Open from folder** action, or use `File` → `Open` → `Folder (top level only)`. Recursive scans skip subfolders that cannot be read and do not follow reparse points (junctions and symlinks). The scan runs off the UI thread and, on the start page, shows a progress indicator you can cancel.
 
 Use this when you've been handed a folder of `.evtx` exports from one or more machines and want to load the lot in one step.
 

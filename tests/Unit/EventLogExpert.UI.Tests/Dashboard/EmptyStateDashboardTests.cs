@@ -301,9 +301,24 @@ public sealed class EmptyStateDashboardTests : BunitContext
     }
 
     [Fact]
+    public void DetailOpenFromFolder_ByDefault_ScansSubfolders()
+    {
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .Returns(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.Completed, Opened = 1, Matched = 1 });
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailOpenFolder)));
+        cut.Find(ActiveDetailOpenFolder).Click();
+
+        cut.WaitForAssertion(() => _scenarioLaunch.Received(1).LaunchFromFolderAsync(
+            Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), true, Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>()));
+    }
+
+    [Fact]
     public void DetailOpenFromFolder_WhenCompleted_AnnouncesWithoutAlert()
     {
-        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
             .Returns(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.Completed, Opened = 1, Matched = 1 });
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
@@ -322,7 +337,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailOpenFromFolder_WhenError_ShowsErrorAlert()
     {
-        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
             .Returns(ScenarioFolderLaunchResult.Error("access denied"));
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
@@ -337,7 +352,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     [Fact]
     public void DetailOpenFromFolder_WhenNoMatchingLogs_ShowsVisibleAlert()
     {
-        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
             .Returns(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.NoMatchingLogs });
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
@@ -347,6 +362,22 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.Find(ActiveDetailOpenFolder).Click();
 
         cut.WaitForAssertion(() => _alertDialog.Received(1).ShowAlert("Open from folder", Arg.Any<string>(), "OK"));
+    }
+
+    [Fact]
+    public void DetailOpenFromFolder_WhenSubfoldersUnchecked_ScansTopLevelOnly()
+    {
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .Returns(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.Completed, Opened = 1, Matched = 1 });
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailOpenFolder)));
+        cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__subfolders input").Change(false);
+        cut.Find(ActiveDetailOpenFolder).Click();
+
+        cut.WaitForAssertion(() => _scenarioLaunch.Received(1).LaunchFromFolderAsync(
+            Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), false, Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>()));
     }
 
     [Fact]
@@ -492,7 +523,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         var release = new TaskCompletionSource<ScenarioFolderLaunchResult>();
         CancellationToken captured = default;
         _scenarioLaunch
-            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
             .Returns(async ci =>
             {
                 captured = ci.Arg<CancellationToken>();
@@ -544,7 +575,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         var pickerGate = new TaskCompletionSource();
         var release = new TaskCompletionSource<ScenarioFolderLaunchResult>();
         _scenarioLaunch
-            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
             .Returns(async ci =>
             {
                 await pickerGate.Task;
@@ -590,7 +621,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     {
         var release = new TaskCompletionSource<ScenarioFolderLaunchResult>();
         _scenarioLaunch
-            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
             .Returns(async ci =>
             {
                 var onPhase = ci.Arg<Func<ScenarioFolderPhase, Task>>()!;
@@ -620,7 +651,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     {
         var release = new TaskCompletionSource<ScenarioFolderLaunchResult>();
         _scenarioLaunch
-            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
             .Returns(async ci =>
             {
                 await ci.Arg<Func<ScenarioFolderPhase, Task>>()!(ScenarioFolderPhase.Scanning);
@@ -651,7 +682,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     {
         var release = new TaskCompletionSource<ScenarioFolderLaunchResult>();
         _scenarioLaunch
-            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
             .Returns(async ci =>
             {
                 await ci.Arg<Func<ScenarioFolderPhase, Task>>()!(ScenarioFolderPhase.Scanning);
@@ -700,6 +731,114 @@ public sealed class EmptyStateDashboardTests : BunitContext
         var cut = Render<EmptyStateDashboard>();
 
         Assert.NotEmpty(cut.FindAll(".empty-dashboard__brand-mark .bi-journal-text"));
+    }
+
+    [Fact]
+    public void OpenFolder_ByDefault_ScansSubfolders()
+    {
+        _actions.OpenFolderAsync(Arg.Is(false), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<FolderOpenPhase, Task>?>())
+            .Returns(Task.CompletedTask);
+
+        var cut = Render<EmptyStateDashboard>();
+        FindLaunch(cut, "Open Folder...").Click();
+
+        cut.WaitForAssertion(() => _actions.Received(1).OpenFolderAsync(
+            false, true, Arg.Any<CancellationToken>(), Arg.Any<Func<FolderOpenPhase, Task>?>()));
+    }
+
+    [Fact]
+    public void OpenFolder_WhenCancelClicked_CancelsTokenAndShowsCancelling()
+    {
+        var release = new TaskCompletionSource();
+        CancellationToken captured = default;
+        _actions.OpenFolderAsync(Arg.Is(false), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<FolderOpenPhase, Task>?>())
+            .Returns(async ci =>
+            {
+                captured = ci.Arg<CancellationToken>();
+                await ci.Arg<Func<FolderOpenPhase, Task>>()!(FolderOpenPhase.Scanning);
+                await release.Task;
+            });
+
+        var cut = Render<EmptyStateDashboard>();
+        FindLaunch(cut, "Open Folder...").Click();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".empty-dashboard__chip--scanning button")));
+
+        cut.Find(".empty-dashboard__chip--scanning button").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Cancelling", cut.Find(".empty-dashboard__chip--scanning").TextContent);
+            Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning button"));
+        });
+        Assert.True(captured.IsCancellationRequested);
+
+        release.SetResult();
+    }
+
+    [Fact]
+    public void OpenFolder_WhenOpeningPhase_RelabelsAndDropsCancel()
+    {
+        var release = new TaskCompletionSource();
+        _actions.OpenFolderAsync(Arg.Is(false), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<FolderOpenPhase, Task>?>())
+            .Returns(async ci =>
+            {
+                var onPhase = ci.Arg<Func<FolderOpenPhase, Task>>()!;
+                await onPhase(FolderOpenPhase.Scanning);
+                await onPhase(FolderOpenPhase.Opening);
+                await release.Task;
+            });
+
+        var cut = Render<EmptyStateDashboard>();
+        FindLaunch(cut, "Open Folder...").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var chip = cut.Find(".empty-dashboard__chip--scanning");
+            Assert.Contains("Opening logs", chip.TextContent);
+            Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning button"));
+        });
+
+        release.SetResult();
+    }
+
+    [Fact]
+    public void OpenFolder_WhenScanning_ShowsGenericScanChipWithCancel()
+    {
+        var release = new TaskCompletionSource();
+        _actions.OpenFolderAsync(Arg.Is(false), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<FolderOpenPhase, Task>?>())
+            .Returns(async ci =>
+            {
+                await ci.Arg<Func<FolderOpenPhase, Task>>()!(FolderOpenPhase.Scanning);
+                await release.Task;
+            });
+
+        var cut = Render<EmptyStateDashboard>();
+        FindLaunch(cut, "Open Folder...").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var chip = cut.Find(".empty-dashboard__chip--scanning");
+            Assert.Contains("Scanning folder for logs", chip.TextContent);
+            Assert.NotEmpty(cut.FindAll(".empty-dashboard__chip--scanning button"));
+        });
+
+        release.SetResult();
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning")));
+    }
+
+    [Fact]
+    public void OpenFolder_WhenSubfoldersUnchecked_ScansTopLevelOnly()
+    {
+        _actions.OpenFolderAsync(Arg.Is(false), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<FolderOpenPhase, Task>?>())
+            .Returns(Task.CompletedTask);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".empty-dashboard__empty")));
+        cut.Find(".empty-dashboard__subfolders input").Change(false);
+        FindLaunch(cut, "Open Folder...").Click();
+
+        cut.WaitForAssertion(() => _actions.Received(1).OpenFolderAsync(
+            false, false, Arg.Any<CancellationToken>(), Arg.Any<Func<FolderOpenPhase, Task>?>()));
     }
 
     [Fact]

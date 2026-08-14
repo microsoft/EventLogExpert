@@ -3,10 +3,6 @@
 
 namespace EventLogExpert.WindowsPlatform.Activation;
 
-/// <summary>
-///     Discriminated record hierarchy for <see cref="EvtxFolderEnumerator.EnumerateEvtxTopLevel" /> so callers can
-///     apply distinct UX per failure mode without losing diagnostic detail.
-/// </summary>
 public abstract record EvtxEnumerationResult
 {
     private EvtxEnumerationResult() { }

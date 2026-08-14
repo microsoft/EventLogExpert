@@ -215,6 +215,19 @@
     background-color: var(--border-divider);
 }
 
+.empty-dashboard__subfolders {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.empty-dashboard__subfolders input {
+    cursor: pointer;
+}
+
 .empty-dashboard__catalog {
     flex: 1 1 0;
     min-height: 0;
