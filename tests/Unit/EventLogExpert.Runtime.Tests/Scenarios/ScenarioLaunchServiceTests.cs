@@ -334,11 +334,11 @@ public sealed class ScenarioLaunchServiceTests
         var (service, _, menu, picker, enumerator, reader, scenario) =
             CreateFolder(FolderScenario() with { ActivatesTimeline = true }, timelineVisible: false);
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
         reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
         menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
 
-        await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+        await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken);
 
         menu.Received(1).SetHistogramVisible(true);
     }
@@ -353,11 +353,11 @@ public sealed class ScenarioLaunchServiceTests
                 TimelineDimension = ScenarioTimelineDimension.Log
             });
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
         reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
         menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
 
-        await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+        await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken);
 
         dispatcher.Received(1).Dispatch(
             Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.Log));
@@ -375,11 +375,11 @@ public sealed class ScenarioLaunchServiceTests
                 },
                 timelineVisible: true);
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
         reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
         menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
 
-        await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+        await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken);
 
         dispatcher.Received(1).Dispatch(
             Arg.Is<RequestHistogramDimensionAction>(action => action != null && action.Dimension == HistogramDimension.Source));
@@ -391,11 +391,11 @@ public sealed class ScenarioLaunchServiceTests
         var (service, dispatcher, menu, picker, enumerator, reader, scenario) =
             CreateFolder(FolderScenario() with { ActivatesTimeline = true });
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
         reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
         menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
 
-        await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+        await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken);
 
         dispatcher.DidNotReceive().Dispatch(Arg.Any<RequestHistogramDimensionAction>());
     }
@@ -406,7 +406,7 @@ public sealed class ScenarioLaunchServiceTests
         var (service, _, _, picker, enumerator, _, scenario) = CreateFolder(FolderScenario());
         using var cts = new CancellationTokenSource();
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>())
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
                 cts.Cancel();
@@ -416,7 +416,7 @@ public sealed class ScenarioLaunchServiceTests
         var phases = new List<ScenarioFolderPhase>();
 
         var result = await service.LaunchFromFolderAsync(
-            scenario, dateWindow: null, cts.Token, phase => { phases.Add(phase); return Task.CompletedTask; });
+            scenario, dateWindow: null, cancellationToken: cts.Token, onPhase: phase => { phases.Add(phase); return Task.CompletedTask; });
 
         // Scanning is emitted before enumeration, so a mid-scan cancellation leaves it already reported; Opening is not.
         Assert.Equal(ScenarioFolderOutcome.Cancelled, result.Outcome);
@@ -432,7 +432,7 @@ public sealed class ScenarioLaunchServiceTests
 
         // The enumerator observes cancellation mid-scan and returns a normal (non-throwing) Empty result; the service must
         // re-check the token after the off-thread enumeration and report Cancelled instead of opening logs or alerting.
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>())
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
                 cts.Cancel();
@@ -440,7 +440,7 @@ public sealed class ScenarioLaunchServiceTests
                 return EvtxFolderScanResult.Empty.Instance;
             });
 
-        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cts.Token);
+        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: cts.Token);
 
         Assert.Equal(ScenarioFolderOutcome.Cancelled, result.Outcome);
         await menu.DidNotReceive().OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<bool>());
@@ -453,7 +453,7 @@ public sealed class ScenarioLaunchServiceTests
         var (service, dispatcher, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
         using var cts = new CancellationTokenSource();
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>())
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
 
         // The per-file probe observes cancellation as it completes; the parallel loop still produces a match, so the
@@ -465,7 +465,7 @@ public sealed class ScenarioLaunchServiceTests
             return EvtxChannelReadResult.FromChannel("System");
         });
 
-        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cts.Token);
+        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: cts.Token);
 
         Assert.Equal(ScenarioFolderOutcome.Cancelled, result.Outcome);
         await menu.DidNotReceive().OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<bool>());
@@ -479,10 +479,10 @@ public sealed class ScenarioLaunchServiceTests
         using var cts = new CancellationTokenSource();
         cts.Cancel();
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>())
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
 
-        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cts.Token);
+        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: cts.Token);
 
         Assert.Equal(ScenarioFolderOutcome.Cancelled, result.Outcome);
         await menu.DidNotReceive().OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<bool>());
@@ -494,13 +494,13 @@ public sealed class ScenarioLaunchServiceTests
     {
         var (service, _, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>())
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx", "C:\\bundle\\bad.evtx"]));
         reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
         reader.ReadChannel("C:\\bundle\\bad.evtx").Returns(EvtxChannelReadResult.Unreadable);
         menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
 
-        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(ScenarioFolderOutcome.Completed, result.Outcome);
         Assert.Equal(1, result.Matched);
@@ -512,9 +512,9 @@ public sealed class ScenarioLaunchServiceTests
     {
         var (service, _, menu, picker, enumerator, _, scenario) = CreateFolder(FolderScenario());
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(EvtxFolderScanResult.Empty.Instance);
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(EvtxFolderScanResult.Empty.Instance);
 
-        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(ScenarioFolderOutcome.NoMatchingLogs, result.Outcome);
         await menu.DidNotReceive().OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<bool>(), Arg.Any<bool>());
@@ -525,12 +525,25 @@ public sealed class ScenarioLaunchServiceTests
     {
         var (service, _, _, picker, enumerator, _, scenario) = CreateFolder(FolderScenario());
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.AccessDenied("access denied"));
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.AccessDenied("access denied"));
 
-        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(ScenarioFolderOutcome.Error, result.Outcome);
         Assert.Equal("access denied", result.Message);
+    }
+
+    [Fact]
+    public async Task LaunchFromFolderAsync_ForwardsIncludeSubfoldersToEnumerator()
+    {
+        var (service, _, _, picker, enumerator, _, scenario) = CreateFolder(FolderScenario());
+        picker.PickFolderAsync().Returns("C:\\bundle");
+        enumerator.Enumerate("C:\\bundle", true, Arg.Any<CancellationToken>()).Returns(EvtxFolderScanResult.Empty.Instance);
+
+        await service.LaunchFromFolderAsync(
+            scenario, dateWindow: null, includeSubfolders: true, cancellationToken: TestContext.Current.CancellationToken);
+
+        enumerator.Received(1).Enumerate("C:\\bundle", true, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -538,11 +551,11 @@ public sealed class ScenarioLaunchServiceTests
     {
         var (service, dispatcher, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
         reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
         menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
 
-        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(ScenarioFolderOutcome.Completed, result.Outcome);
         Assert.Equal(1, result.Opened);
@@ -565,11 +578,11 @@ public sealed class ScenarioLaunchServiceTests
     {
         var (service, dispatcher, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
         reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
         menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(0, 1, 0, 0, []));
 
-        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(ScenarioFolderOutcome.NoLogsOpened, result.Outcome);
         Assert.Equal(1, result.Empty);
@@ -582,10 +595,10 @@ public sealed class ScenarioLaunchServiceTests
     {
         var (service, _, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\other.evtx"]));
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\other.evtx"]));
         reader.ReadChannel("C:\\bundle\\other.evtx").Returns(EvtxChannelReadResult.FromChannel("Application"));
 
-        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(ScenarioFolderOutcome.NoMatchingLogs, result.Outcome);
         Assert.Contains("System", result.MissingChannels);
@@ -597,10 +610,10 @@ public sealed class ScenarioLaunchServiceTests
     {
         var (service, _, _, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\corrupt.evtx"]));
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\corrupt.evtx"]));
         reader.ReadChannel("C:\\bundle\\corrupt.evtx").Returns(EvtxChannelReadResult.Unreadable);
 
-        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(ScenarioFolderOutcome.Error, result.Outcome);
         Assert.Equal(1, result.Unreadable);
@@ -612,7 +625,7 @@ public sealed class ScenarioLaunchServiceTests
         var (service, dispatcher, menu, picker, _, _, scenario) = CreateFolder(FolderScenario());
         picker.PickFolderAsync().Returns((string?)null);
 
-        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(ScenarioFolderOutcome.Cancelled, result.Outcome);
         await menu.DidNotReceive().OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<bool>(), Arg.Any<bool>());
@@ -625,7 +638,7 @@ public sealed class ScenarioLaunchServiceTests
         var (service, _, _, picker, _, _, scenario) = CreateFolder(FolderScenario());
         picker.PickFolderAsync().ThrowsAsync(new InvalidOperationException("picker boom"));
 
-        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, TestContext.Current.CancellationToken);
+        var result = await service.LaunchFromFolderAsync(scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(ScenarioFolderOutcome.Error, result.Outcome);
         Assert.Equal("picker boom", result.Message);
@@ -637,7 +650,7 @@ public sealed class ScenarioLaunchServiceTests
         var (service, dispatcher, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
         using var cts = new CancellationTokenSource();
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
         reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
         menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
 
@@ -646,8 +659,8 @@ public sealed class ScenarioLaunchServiceTests
         var result = await service.LaunchFromFolderAsync(
             scenario,
             dateWindow: null,
-            cts.Token,
-            phase =>
+            cancellationToken: cts.Token,
+            onPhase: phase =>
             {
                 if (phase == ScenarioFolderPhase.Opening) { cts.Cancel(); }
 
@@ -664,12 +677,12 @@ public sealed class ScenarioLaunchServiceTests
     {
         var (service, _, _, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\other.evtx"]));
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\other.evtx"]));
         reader.ReadChannel("C:\\bundle\\other.evtx").Returns(EvtxChannelReadResult.FromChannel("Application"));
         var phases = new List<ScenarioFolderPhase>();
 
         var result = await service.LaunchFromFolderAsync(
-            scenario, dateWindow: null, TestContext.Current.CancellationToken, phase => { phases.Add(phase); return Task.CompletedTask; });
+            scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken, onPhase: phase => { phases.Add(phase); return Task.CompletedTask; });
 
         // Zero matched paths never open anything, so Opening (gated on a nonempty match) is never reported.
         Assert.Equal(ScenarioFolderOutcome.NoMatchingLogs, result.Outcome);
@@ -684,7 +697,7 @@ public sealed class ScenarioLaunchServiceTests
         var phases = new List<ScenarioFolderPhase>();
 
         await service.LaunchFromFolderAsync(
-            scenario, dateWindow: null, TestContext.Current.CancellationToken, phase => { phases.Add(phase); return Task.CompletedTask; });
+            scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken, onPhase: phase => { phases.Add(phase); return Task.CompletedTask; });
 
         Assert.Empty(phases);
     }
@@ -694,13 +707,13 @@ public sealed class ScenarioLaunchServiceTests
     {
         var (service, _, menu, picker, enumerator, reader, scenario) = CreateFolder(FolderScenario());
         picker.PickFolderAsync().Returns("C:\\bundle");
-        enumerator.EnumerateTopLevel("C:\\bundle", Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
+        enumerator.Enumerate("C:\\bundle", Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(new EvtxFolderScanResult.Files(["C:\\bundle\\System.evtx"]));
         reader.ReadChannel("C:\\bundle\\System.evtx").Returns(EvtxChannelReadResult.FromChannel("System"));
         menu.OpenLogFilesAsync(Arg.Any<IEnumerable<string>>(), false, false).Returns(new OpenLogsBatchResult(1, 0, 0, 0, []));
         var phases = new List<ScenarioFolderPhase>();
 
         var result = await service.LaunchFromFolderAsync(
-            scenario, dateWindow: null, TestContext.Current.CancellationToken, phase => { phases.Add(phase); return Task.CompletedTask; });
+            scenario, dateWindow: null, cancellationToken: TestContext.Current.CancellationToken, onPhase: phase => { phases.Add(phase); return Task.CompletedTask; });
 
         Assert.Equal(ScenarioFolderOutcome.Completed, result.Outcome);
         Assert.Equal([ScenarioFolderPhase.Scanning, ScenarioFolderPhase.Opening], phases);

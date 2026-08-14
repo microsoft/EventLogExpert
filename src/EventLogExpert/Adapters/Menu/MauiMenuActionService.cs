@@ -69,6 +69,7 @@ public sealed class MauiMenuActionService(
 
     private CancellationTokenSource _cancellationTokenSource = new();
     private bool _disposed;
+    private bool _folderOpenInProgress;
 
     public async Task CheckForUpdatesAsync()
     {
@@ -149,41 +150,74 @@ public sealed class MauiMenuActionService(
         await OpenLogsBatchAsync(paths.Select(path => (path, LogPathType.File)), combineLog);
     }
 
-    public async Task OpenFolderAsync(bool combineLog)
+    public async Task OpenFolderAsync(
+        bool combineLog,
+        bool includeSubfolders = false,
+        CancellationToken cancellationToken = default,
+        Func<FolderOpenPhase, Task>? onPhase = null)
     {
-        string? folderPath;
+        // Enumeration runs on a background thread, so without this guard a second folder-open (the menu has no busy
+        // guard of its own) could race an in-flight scan and open the wrong folder's logs.
+        if (_folderOpenInProgress) { return; }
+
+        _folderOpenInProgress = true;
 
         try
         {
-            folderPath = await _folderPickerService.PickFolderAsync();
+            string? folderPath;
+
+            try
+            {
+                folderPath = await _folderPickerService.PickFolderAsync();
+            }
+            catch (InvalidOperationException ex)
+            {
+                await _dialogService.ShowAlert("Open Folder Failed", ex.Message, "Ok");
+
+                return;
+            }
+
+            if (folderPath is null || cancellationToken.IsCancellationRequested) { return; }
+
+            if (onPhase is not null) { await onPhase(FolderOpenPhase.Scanning); }
+
+            EvtxEnumerationResult result;
+
+            try
+            {
+                result = await Task.Run(
+                    () => EvtxFolderEnumerator.EnumerateEvtx(folderPath, includeSubfolders, cancellationToken), cancellationToken);
+
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            if (EvtxFolderEnumerator.ToAlertCopy(result) is { } copy)
+            {
+                await _dialogService.ShowAlert(copy.Title, copy.Message, "Ok");
+
+                return;
+            }
+
+            if (result is not EvtxEnumerationResult.Success success || cancellationToken.IsCancellationRequested) { return; }
+
+            if (onPhase is not null) { await onPhase(FolderOpenPhase.Opening); }
+
+            if (cancellationToken.IsCancellationRequested) { return; }
+
+            var files = success.Files
+                .Select(file => (file, LogPathType.File))
+                .ToList();
+
+            await OpenLogsBatchAsync(files, combineLog);
         }
-        catch (InvalidOperationException ex)
+        finally
         {
-            await _dialogService.ShowAlert("Open Folder Failed", ex.Message, "Ok");
-
-            return;
+            _folderOpenInProgress = false;
         }
-
-        if (folderPath is null) { return; }
-
-        var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(folderPath);
-
-        var alertCopy = EvtxFolderEnumerator.ToAlertCopy(result);
-
-        if (alertCopy is { } copy)
-        {
-            await _dialogService.ShowAlert(copy.Title, copy.Message, "Ok");
-
-            return;
-        }
-
-        if (result is not EvtxEnumerationResult.Success success) { return; }
-
-        var files = success.Files
-            .Select(file => (file, LogPathType.File))
-            .ToList();
-
-        await OpenLogsBatchAsync(files, combineLog);
     }
 
     public Task OpenIssueAsync() => OpenBrowserAsync("https://github.com/microsoft/EventLogExpert/issues/new");

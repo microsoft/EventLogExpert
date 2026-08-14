@@ -9,8 +9,8 @@ namespace EventLogExpert.Adapters.FilePicker;
 /// <summary>MAUI adapter that maps <see cref="EvtxFolderEnumerator" /> onto the Runtime folder-scan contract.</summary>
 internal sealed class MauiEvtxFolderEnumerator : IEvtxFolderEnumerator
 {
-    public EvtxFolderScanResult EnumerateTopLevel(string folderPath, CancellationToken cancellationToken) =>
-        EvtxFolderEnumerator.EnumerateEvtxTopLevel(folderPath, cancellationToken) switch
+    public EvtxFolderScanResult Enumerate(string folderPath, bool includeSubfolders, CancellationToken cancellationToken) =>
+        EvtxFolderEnumerator.EnumerateEvtx(folderPath, includeSubfolders, cancellationToken) switch
         {
             EvtxEnumerationResult.Success success => new EvtxFolderScanResult.Files([.. success.Files]),
             EvtxEnumerationResult.Empty => EvtxFolderScanResult.Empty.Instance,

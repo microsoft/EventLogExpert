@@ -38,7 +38,7 @@ public sealed partial class ScenarioBrowserPanel : IAsyncDisposable
 
     [Parameter] public EventCallback<ScenarioDefinition> OnLaunch { get; set; }
 
-    [Parameter] public EventCallback<ScenarioDefinition> OnLaunchFromFolder { get; set; }
+    [Parameter] public EventCallback<ScenarioFolderOpenRequest> OnLaunchFromFolder { get; set; }
 
     [Parameter] public EventCallback<ScenarioDefinition> OnSelect { get; set; }
 

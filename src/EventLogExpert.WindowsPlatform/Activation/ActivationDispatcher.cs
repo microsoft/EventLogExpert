@@ -100,7 +100,7 @@ public sealed class ActivationDispatcher : IActivationDispatcher
 
         foreach (var folder in args.FolderPaths)
         {
-            var result = EvtxFolderEnumerator.EnumerateEvtxTopLevel(folder);
+            var result = EvtxFolderEnumerator.EnumerateEvtx(folder, includeSubfolders: false);
 
             if (result is EvtxEnumerationResult.Success success)
             {

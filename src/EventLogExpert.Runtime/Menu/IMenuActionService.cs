@@ -26,7 +26,11 @@ public interface IMenuActionService
 
     Task OpenFileAsync(bool combineLog);
 
-    Task OpenFolderAsync(bool combineLog);
+    Task OpenFolderAsync(
+        bool combineLog,
+        bool includeSubfolders = false,
+        CancellationToken cancellationToken = default,
+        Func<FolderOpenPhase, Task>? onPhase = null);
 
     Task OpenIssueAsync();
 

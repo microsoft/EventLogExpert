@@ -49,6 +49,9 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
     private ElementReference _dashboardRoot;
     private bool _disposed;
     private CancellationTokenSource? _folderLaunchCts;
+    private bool _folderScanActive;
+    private string? _folderScanLabel;
+    private bool _includeSubfolders = true;
     private bool _isBusy;
     private LivePresence _livePresence = new(false, FrozenSet<string>.Empty);
     private bool _openingLogs;
@@ -57,7 +60,6 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
     private bool _pendingTabFocus;
     private IReadOnlyDictionary<string, ChannelReadiness> _readinessByChannel =
         new Dictionary<string, ChannelReadiness>(StringComparer.OrdinalIgnoreCase);
-    private ScenarioDefinition? _scanningScenario;
     private SidebarTabs<SplashCategory>? _sidebarTabs;
     private IReadOnlyList<ScenarioDefinition>? _splashScenarios;
     private IReadOnlyList<(SplashCategory Tab, string Label)> _tabs = [];
@@ -325,6 +327,24 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
                 .OrderBy(scenario => scenario.Priority)
                 .ThenBy(scenario => scenario.Order);
 
+    private string FolderScanCancelLabel() =>
+        _folderScanLabel is { } label ? $"Cancel folder scan for {label}" : "Cancel folder scan";
+
+    private string FolderScanStatusText()
+    {
+        if (_openingLogs)
+        {
+            return _folderScanLabel is { } openingLabel ? $"Opening logs for {openingLabel}..." : "Opening logs...";
+        }
+
+        if (_cancelRequested)
+        {
+            return _folderScanLabel is { } cancellingLabel ? $"Cancelling folder scan for {cancellingLabel}..." : "Cancelling folder scan...";
+        }
+
+        return _folderScanLabel is { } scanningLabel ? $"Scanning {scanningLabel} folder for logs..." : "Scanning folder for logs...";
+    }
+
     private IReadOnlyList<ChannelReadiness> GetChannelReadiness(ScenarioDefinition scenario) =>
         ReadinessFor(scenario.Channels);
 
@@ -353,7 +373,7 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
                     "Launch scenario",
                     message,
                     "Open from folder",
-                    () => LaunchScenarioFromFolderAsync(scenario));
+                    () => LaunchScenarioFromFolderAsync(scenario, includeSubfolders: true));
             }
             else
             {
@@ -361,10 +381,10 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
             }
         });
 
-    private Task LaunchScenarioFromFolderAsync(ScenarioDefinition scenario) =>
-        RunGuardedAsync(() => LaunchScenarioFromFolderCoreAsync(scenario));
+    private Task LaunchScenarioFromFolderAsync(ScenarioDefinition scenario, bool includeSubfolders = false) =>
+        RunGuardedAsync(() => LaunchScenarioFromFolderCoreAsync(scenario, includeSubfolders));
 
-    private async Task LaunchScenarioFromFolderCoreAsync(ScenarioDefinition scenario)
+    private async Task LaunchScenarioFromFolderCoreAsync(ScenarioDefinition scenario, bool includeSubfolders)
     {
         var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts.Token);
         _folderLaunchCts = cts;
@@ -373,7 +393,7 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
 
         try
         {
-            result = await ScenarioLaunch.LaunchFromFolderAsync(scenario, null, cts.Token, OnFolderScanPhaseAsync);
+            result = await ScenarioLaunch.LaunchFromFolderAsync(scenario, null, includeSubfolders, cts.Token, OnFolderScanPhaseAsync);
         }
         finally
         {
@@ -381,9 +401,10 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
 
             cts.Dispose();
 
-            if (_scanningScenario is not null)
+            if (_folderScanActive)
             {
-                _scanningScenario = null;
+                _folderScanActive = false;
+                _folderScanLabel = null;
                 _openingLogs = false;
                 _cancelRequested = false;
                 _pendingCancelFocus = false;
@@ -422,7 +443,8 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
                 {
                     case ScenarioFolderPhase.Scanning:
                         scanStarted = true;
-                        _scanningScenario = scenario;
+                        _folderScanActive = true;
+                        _folderScanLabel = scenario.Name;
                         _openingLogs = false;
                         _cancelRequested = false;
                         _pendingTabFocus = false;
@@ -464,7 +486,65 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
 
     private Task OpenFileAsync() => RunGuardedAsync(() => Actions.OpenFileAsync(false));
 
-    private Task OpenFolderAsync() => RunGuardedAsync(() => Actions.OpenFolderAsync(false));
+    private Task OpenFolderAsync() => RunGuardedAsync(() => OpenFolderCoreAsync(_includeSubfolders));
+
+    private async Task OpenFolderCoreAsync(bool includeSubfolders)
+    {
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts.Token);
+        _folderLaunchCts = cts;
+        var scanStarted = false;
+
+        try
+        {
+            await Actions.OpenFolderAsync(false, includeSubfolders, cts.Token, OnFolderOpenPhaseAsync);
+        }
+        finally
+        {
+            if (ReferenceEquals(_folderLaunchCts, cts)) { _folderLaunchCts = null; }
+
+            cts.Dispose();
+
+            if (_folderScanActive)
+            {
+                _folderScanActive = false;
+                _folderScanLabel = null;
+                _openingLogs = false;
+                _cancelRequested = false;
+                _pendingCancelFocus = false;
+                _pendingScanEndFocus = false;
+
+                await SafeInvokeAsync(StateHasChanged);
+            }
+        }
+
+        if (scanStarted) { RestoreFocusAfterScan(); }
+
+        async Task OnFolderOpenPhaseAsync(FolderOpenPhase phase) =>
+            await SafeInvokeAsync(() =>
+            {
+                switch (phase)
+                {
+                    case FolderOpenPhase.Scanning:
+                        scanStarted = true;
+                        _folderScanActive = true;
+                        _folderScanLabel = null;
+                        _openingLogs = false;
+                        _cancelRequested = false;
+                        _pendingTabFocus = false;
+                        _pendingScanEndFocus = false;
+                        _pendingCancelFocus = true;
+                        break;
+                    case FolderOpenPhase.Opening:
+                        _openingLogs = true;
+                        _pendingCancelFocus = false;
+                        _pendingTabFocus = false;
+                        _pendingScanEndFocus = true;
+                        break;
+                }
+
+                StateHasChanged();
+            });
+    }
 
     private Task OpenSecurityAsync() => RunGuardedAsync(() => Actions.OpenLiveLogAsync(LogChannelNames.SecurityLog, false));
 

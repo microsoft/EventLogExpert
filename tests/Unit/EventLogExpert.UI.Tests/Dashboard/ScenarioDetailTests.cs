@@ -379,7 +379,7 @@ public sealed class ScenarioDetailTests : BunitContext
 
         var cut = Render<ScenarioDetail>(parameters => parameters
             .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
-            .Add(detail => detail.OnLaunchFromFolder, () => launched = true));
+            .Add(detail => detail.OnLaunchFromFolder, _ => launched = true));
 
         cut.Find(".scenario-detail__open-folder").Click();
 
@@ -397,7 +397,7 @@ public sealed class ScenarioDetailTests : BunitContext
             .Add(detail => detail.Scenario, Scenario("application-crashes", "Application crashes"))
             .Add(detail => detail.IsDisabled, true)
             .Add(detail => detail.IsLivePresent, false)
-            .Add(detail => detail.OnLaunchFromFolder, () => launched = true));
+            .Add(detail => detail.OnLaunchFromFolder, _ => launched = true));
 
         var folder = cut.Find(".scenario-detail__open-folder");
 

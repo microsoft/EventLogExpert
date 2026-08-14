@@ -77,6 +77,7 @@ internal sealed class ScenarioLaunchService(
     public async Task<ScenarioFolderLaunchResult> LaunchFromFolderAsync(
         ScenarioDefinition scenario,
         DateFilter? dateWindow,
+        bool includeSubfolders = false,
         CancellationToken cancellationToken = default,
         Func<ScenarioFolderPhase, Task>? onPhase = null)
     {
@@ -104,7 +105,7 @@ internal sealed class ScenarioLaunchService(
         try
         {
             var scan = await Task.Run(
-                () => _folderEnumerator.EnumerateTopLevel(folder, cancellationToken), cancellationToken);
+                () => _folderEnumerator.Enumerate(folder, includeSubfolders, cancellationToken), cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 

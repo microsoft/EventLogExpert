@@ -8,7 +8,7 @@ public static class EvtxFolderEnumerator
     private const string EvtxSearchPattern = "*.evtx";
     private const string OpenFolderFailedTitle = "Open Folder Failed";
 
-    public static EvtxEnumerationResult EnumerateEvtxTopLevel(string folderPath, CancellationToken cancellationToken = default)
+    public static EvtxEnumerationResult EnumerateEvtx(string folderPath, bool includeSubfolders, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
 
@@ -18,15 +18,33 @@ public static class EvtxFolderEnumerator
 
             var files = new List<string>();
 
-            foreach (var file in Directory.EnumerateFiles(folderPath, EvtxSearchPattern, SearchOption.TopDirectoryOnly))
+            CollectTopLevelEvtx(folderPath, files, cancellationToken);
+
+            if (includeSubfolders)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                files.Add(file);
+                var pendingDirectories = new Stack<string>();
+                PushSubdirectories(folderPath, pendingDirectories, cancellationToken);
+
+                while (pendingDirectories.Count > 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var directory = pendingDirectories.Pop();
+
+                    try
+                    {
+                        CollectTopLevelEvtx(directory, files, cancellationToken);
+                        PushSubdirectories(directory, pendingDirectories, cancellationToken);
+                    }
+                    catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+                    {
+                        // Skip a descendant that became unreadable mid-scan; only a failure reading the selected root surfaces.
+                    }
+                }
             }
 
-            // A folder that yields no matches never enters the loop body, and Directory.EnumerateFiles has no overload that
-            // observes the token mid-scan, so re-check here: cancellation requested while the directory was being walked is
-            // then surfaced as OperationCanceledException rather than a normal Empty/Success result.
+            // Directory enumeration has no overload that observes the token mid-scan, so re-check: a cancel requested while
+            // an empty directory was walked surfaces here as OperationCanceledException rather than a normal result.
             cancellationToken.ThrowIfCancellationRequested();
 
             if (files.Count == 0)
@@ -56,4 +74,38 @@ public static class EvtxFolderEnumerator
         EvtxEnumerationResult.IoError i => (OpenFolderFailedTitle, i.Message),
         _ => null,
     };
+
+    private static void CollectTopLevelEvtx(string directory, List<string> files, CancellationToken cancellationToken)
+    {
+        foreach (var file in Directory.EnumerateFiles(directory, EvtxSearchPattern, SearchOption.TopDirectoryOnly))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            files.Add(file);
+        }
+    }
+
+    private static void PushSubdirectories(string directory, Stack<string> pendingDirectories, CancellationToken cancellationToken)
+    {
+        foreach (var subdirectory in Directory.EnumerateDirectories(directory))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            bool isReparsePoint;
+
+            try
+            {
+                isReparsePoint = (File.GetAttributes(subdirectory) & FileAttributes.ReparsePoint) != 0;
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+            {
+                // A child whose attributes cannot be read (denied, or removed mid-scan) is skipped, not fatal to the scan.
+                continue;
+            }
+
+            // Do not descend reparse points (junctions / symlinks): they can escape the selected tree or cycle indefinitely.
+            if (isReparsePoint) { continue; }
+
+            pendingDirectories.Push(subdirectory);
+        }
+    }
 }
