@@ -165,11 +165,14 @@ internal sealed class OrderedViewState
 
     public bool ReconcileLog(EventLogId logId, IEventColumnReader reader) => ReconcileLog(logId, reader, out _);
 
-    public bool ReconcileLog(EventLogId logId, IEventColumnReader reader, out bool requiresRebuild)
+    public bool ReconcileLog(EventLogId logId, IEventColumnReader reader, out bool requiresRebuild) =>
+        ReconcileLog(logId, reader, isReplace: false, out requiresRebuild);
+
+    public bool ReconcileLog(EventLogId logId, IEventColumnReader reader, bool isReplace, out bool requiresRebuild)
     {
         requiresRebuild = false;
 
-        if (!TryAdmitReader(logId, reader, out LogGeneration readerKey, out bool sameCountReplace)) { return false; }
+        if (!TryAdmitReader(logId, reader, isReplace, out LogGeneration readerKey, out bool contentReplaced)) { return false; }
 
         int from = _scopeState.Coverage(readerKey);
 
@@ -197,12 +200,12 @@ internal sealed class OrderedViewState
 
         bool displaysThisGeneration = currentGeneration && _adoptedScope.Includes(logId);
 
-        requiresRebuild = sameCountReplace && currentGeneration &&
+        requiresRebuild = contentReplaced && currentGeneration &&
             (_adoptedScope.Includes(logId) || _scopeState.Includes(logId));
 
         return mutated ||
             (displaysThisGeneration && !_adoptedInScope.Contains(readerKey)) ||
-            (displaysThisGeneration && sameCountReplace);
+            (displaysThisGeneration && contentReplaced);
     }
 
     public bool ReconcileScopeReaders(IReadOnlyDictionary<EventLogId, IEventColumnReader> scopeReaders)
@@ -233,7 +236,7 @@ internal sealed class OrderedViewState
 
     public bool SeedScopeReader(EventLogId logId, IEventColumnReader reader)
     {
-        bool admitted = TryAdmitReader(logId, reader, out LogGeneration readerKey, out _);
+        bool admitted = TryAdmitReader(logId, reader, isReplace: false, out LogGeneration readerKey, out _);
 
         if ((admitted || _latestReaders.ContainsKey(readerKey)) &&
             reader.Generation > _requestedGeneration.GetValueOrDefault(logId, int.MinValue))
@@ -682,10 +685,10 @@ internal sealed class OrderedViewState
     }
 
     private bool TryAdmitReader(
-        EventLogId logId, IEventColumnReader reader, out LogGeneration readerKey, out bool sameCountReplace)
+        EventLogId logId, IEventColumnReader reader, bool isReplace, out LogGeneration readerKey, out bool contentReplaced)
     {
         readerKey = new LogGeneration(logId, reader.Generation);
-        sameCountReplace = false;
+        contentReplaced = false;
 
         if (!_scopeState.Includes(logId)) { return false; }
 
@@ -700,7 +703,8 @@ internal sealed class OrderedViewState
 
             if (!strictlyNewer) { return false; }
 
-            sameCountReplace = reader.Count == existing.Count;
+            contentReplaced = reader.ContentVersion > existing.ContentVersion &&
+                (reader.Count <= existing.Count || isReplace);
         }
 
         _latestReaders[readerKey] = reader;

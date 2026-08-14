@@ -154,7 +154,10 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
     public void EnqueueFlush() => _commandChannel.Writer.TryWrite(Command.ForFlush());
 
     public void EnqueueReconcile(EventLogId logId, IEventColumnReader reader) =>
-        _commandChannel.Writer.TryWrite(Command.ForReconcile(logId, reader));
+        EnqueueReconcile(logId, reader, isReplace: false);
+
+    public void EnqueueReconcile(EventLogId logId, IEventColumnReader reader, bool isReplace) =>
+        _commandChannel.Writer.TryWrite(Command.ForReconcile(logId, reader, isReplace));
 
     public void EnqueueRemoveLog(EventLogId logId) =>
         _commandChannel.Writer.TryWrite(Command.ForRemoveLog(logId));
@@ -292,7 +295,7 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
 
                     try
                     {
-                        reconciled = _state.ReconcileLog(command.LogId, reconcileReader, out requiresRebuild);
+                        reconciled = _state.ReconcileLog(command.LogId, reconcileReader, command.IsReplace, out requiresRebuild);
                     }
                     catch (Exception reconcileFault)
                     {
@@ -543,6 +546,13 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
         _pendingDrain.Clear();
     }
 
+    private void ForceRebuild()
+    {
+        _rebuildRequired = true;
+
+        RebindAndStart(_state.CaptureScopeReseed());
+    }
+
     private void PublishNow()
     {
         _state.Publish();
@@ -599,13 +609,6 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
 
         try { FaultRaised?.Invoke(fault, identity); }
         catch (Exception) { /* a broken fault subscriber must not mask the original fault or kill the owner loop */ }
-    }
-
-    private void ForceRebuild()
-    {
-        _rebuildRequired = true;
-
-        RebindAndStart(_state.CaptureScopeReseed());
     }
 
     private void RequireRebuild()
@@ -711,14 +714,16 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
 
         public ViewRequest? ViewRequest { get; private init; }
 
+        public bool IsReplace { get; private init; }
+
         public static Command ForViewRequest(ViewRequest request) =>
             new() { Kind = CommandKind.ViewRequest, ViewRequest = request };
 
         public static Command ForReset(EventLogId logId, int generation) =>
             new() { Kind = CommandKind.Reset, LogId = logId, Generation = generation };
 
-        public static Command ForReconcile(EventLogId logId, IEventColumnReader reader) =>
-            new() { Kind = CommandKind.Reconcile, LogId = logId, Reader = reader };
+        public static Command ForReconcile(EventLogId logId, IEventColumnReader reader, bool isReplace) =>
+            new() { Kind = CommandKind.Reconcile, LogId = logId, Reader = reader, IsReplace = isReplace };
 
         public static Command ForRemoveLog(EventLogId logId) =>
             new() { Kind = CommandKind.RemoveLog, LogId = logId };

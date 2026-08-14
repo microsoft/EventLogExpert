@@ -71,7 +71,7 @@ internal sealed class OrderedViewShadowEffects(
         {
             Sync();
 
-            foreach (EventLogId logId in action.EventsByLog.Keys) { Reconcile(logId); }
+            foreach (EventLogId logId in action.EventsByLog.Keys) { Reconcile(logId, action.Mode == RawIngestMode.Replace); }
         });
 
     [EffectMethod(typeof(LoadColumnsCompletedAction))]
@@ -82,7 +82,7 @@ internal sealed class OrderedViewShadowEffects(
         Shadow(() =>
         {
             Sync();
-            Reconcile(action.LogData.Id);
+            Reconcile(action.LogData.Id, isReplace: true);
         });
 
     [EffectMethod]
@@ -90,7 +90,7 @@ internal sealed class OrderedViewShadowEffects(
         Shadow(() =>
         {
             Sync();
-            Reconcile(action.LogData.Id);
+            Reconcile(action.LogData.Id, isReplace: false);
         });
 
     [EffectMethod(typeof(MoveTabToGroupAction))]
@@ -140,11 +140,11 @@ internal sealed class OrderedViewShadowEffects(
     [EffectMethod(typeof(ToggleSortingAction))]
     public Task HandleToggleSorting(IDispatcher dispatcher) => Shadow(Sync);
 
-    private void Reconcile(EventLogId logId)
+    private void Reconcile(EventLogId logId, bool isReplace)
     {
         if (_rawEventStore.Value.ByLog.TryGetValue(logId, out var store))
         {
-            _writer.EnqueueReconcile(logId, store.CreateReader(logId));
+            _writer.EnqueueReconcile(logId, store.CreateReader(logId), isReplace);
         }
     }
 

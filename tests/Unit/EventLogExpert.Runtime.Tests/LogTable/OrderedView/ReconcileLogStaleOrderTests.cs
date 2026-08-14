@@ -15,6 +15,42 @@ public sealed class ReconcileLogStaleOrderTests
     private static readonly SortContext s_sourceAscending = new(ColumnName.Source, false, null, false);
 
     [Fact]
+    public void ReconcileLog_GrowAppendHigherContentVersion_DoesNotSignalRebuild()
+    {
+        EventLogId logId = EventLogId.Create();
+        IEventColumnReader original = Reader(logId, contentVersion: 0, ("AAA", 0), ("BBB", 1));
+        IEventColumnReader grownAppend = Reader(logId, contentVersion: 1, ("AAA", 0), ("BBB", 1), ("CCC", 2));
+
+        var state = new OrderedViewState();
+        AdoptSourceView(state, [logId], new Dictionary<EventLogId, IEventColumnReader> { [logId] = original });
+
+        state.ReconcileLog(logId, grownAppend, isReplace: false, out bool requiresRebuild);
+        Assert.False(requiresRebuild);
+    }
+
+    [Fact]
+    public void ReconcileLog_GrowReplaceHigherContentVersion_SignalsRebuildAndReorders()
+    {
+        EventLogId logId = EventLogId.Create();
+        IEventColumnReader original = Reader(logId, contentVersion: 0, ("AAA", 0), ("BBB", 1));
+        IEventColumnReader grownReplace = Reader(logId, contentVersion: 1, ("CCC", 0), ("BBB", 1), ("AAA", 2));
+
+        var state = new OrderedViewState();
+        AdoptSourceView(state, [logId], new Dictionary<EventLogId, IEventColumnReader> { [logId] = original });
+        Assert.Equal(0, state.Current.At(0).Locator.Index);
+
+        Assert.True(state.ReconcileLog(logId, grownReplace, isReplace: true, out bool requiresRebuild));
+        Assert.True(requiresRebuild);
+
+        RebuildRequest reseed = state.CaptureScopeReseed();
+        Assert.True(state.TryAdoptRebuild(reseed, OrderedViewState.BuildIndex(reseed, CancellationToken.None)));
+        Assert.Equal(3, state.Current.Count);
+        Assert.Equal(2, state.Current.At(0).Locator.Index);
+        Assert.Equal(1, state.Current.At(1).Locator.Index);
+        Assert.Equal(0, state.Current.At(2).Locator.Index);
+    }
+
+    [Fact]
     public void ReconcileLog_HigherContentVersionWithMoreRows_DoesNotSignalRebuild()
     {
         EventLogId logId = EventLogId.Create();
@@ -123,6 +159,33 @@ public sealed class ReconcileLogStaleOrderTests
             Reader(entering, contentVersion: 1, ("DDD", 0), ("CCC", 1)),
             out bool requiresRebuild);
         Assert.True(requiresRebuild);
+    }
+
+    [Fact]
+    public async Task Writer_GrowReplaceHigherContentVersion_RepublishesReorderedSnapshot()
+    {
+        EventLogId logId = EventLogId.Create();
+        IEventColumnReader original = Reader(logId, contentVersion: 0, ("AAA", 0), ("BBB", 1));
+        IEventColumnReader grownReplace = Reader(logId, contentVersion: 1, ("CCC", 0), ("BBB", 1), ("AAA", 2));
+
+        await using var writer = new OrderedViewWriter(publishEvery: 5000);
+
+        writer.EnqueueReconcile(logId, original);
+        writer.EnqueueViewRequest(ViewRequests.For(s_sourceAscending, ViewRequests.EmptyFilter, [logId]));
+        OrderedViewSnapshot adopted =
+            await writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, TestContext.Current.CancellationToken);
+        Assert.Equal(2, adopted.Count);
+        Assert.Equal(0, adopted.At(0).Locator.Index);
+
+        writer.EnqueueReconcile(logId, grownReplace, isReplace: true);
+        OrderedViewSnapshot republished =
+            await writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, republished.Count);
+        Assert.Equal(2, republished.At(0).Locator.Index);
+        Assert.Equal(1, republished.At(1).Locator.Index);
+        Assert.Equal(0, republished.At(2).Locator.Index);
+        Assert.Null(writer.Faulted);
     }
 
     [Fact]
