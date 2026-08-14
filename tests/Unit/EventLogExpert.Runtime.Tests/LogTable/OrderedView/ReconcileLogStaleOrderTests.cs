@@ -162,6 +162,51 @@ public sealed class ReconcileLogStaleOrderTests
     }
 
     [Fact]
+    public void ReconcileLog_ShrinkReplace_InvalidatesSignalsRebuildAndReorders()
+    {
+        EventLogId logId = EventLogId.Create();
+        IEventColumnReader original = Reader(logId, contentVersion: 0, ("AAA", 0), ("BBB", 1), ("CCC", 2));
+        IEventColumnReader shrunkReplace = Reader(logId, contentVersion: 1, ("BBB", 0), ("AAA", 1));
+
+        var state = new OrderedViewState();
+        AdoptSourceView(state, [logId], new Dictionary<EventLogId, IEventColumnReader> { [logId] = original });
+        Assert.Equal(3, state.Current.Count);
+
+        Assert.True(state.ReconcileLog(logId, shrunkReplace, isReplace: true, out bool requiresRebuild));
+        Assert.True(requiresRebuild);
+        Assert.True(state.LiveIndexInvalidated);
+
+        RebuildRequest reseed = state.CaptureScopeReseed();
+        Assert.True(state.TryAdoptRebuild(reseed, OrderedViewState.BuildIndex(reseed, CancellationToken.None)));
+        Assert.False(state.LiveIndexInvalidated);
+        Assert.Equal(2, state.Current.Count);
+        Assert.Equal(1, state.Current.At(0).Locator.Index);
+        Assert.Equal(0, state.Current.At(1).Locator.Index);
+    }
+
+    [Fact]
+    public void ReconcileLog_ShrinkToZeroReplace_InvalidatesSignalsRebuildAndEmpties()
+    {
+        EventLogId logId = EventLogId.Create();
+
+        var state = new OrderedViewState();
+        AdoptSourceView(
+            state,
+            [logId],
+            new Dictionary<EventLogId, IEventColumnReader> { [logId] = Reader(logId, contentVersion: 0, ("AAA", 0), ("BBB", 1)) });
+        Assert.Equal(2, state.Current.Count);
+
+        state.ReconcileLog(logId, Reader(logId, contentVersion: 1), isReplace: true, out bool requiresRebuild);
+        Assert.True(requiresRebuild);
+        Assert.True(state.LiveIndexInvalidated);
+
+        RebuildRequest reseed = state.CaptureScopeReseed();
+        Assert.True(state.TryAdoptRebuild(reseed, OrderedViewState.BuildIndex(reseed, CancellationToken.None)));
+        Assert.False(state.LiveIndexInvalidated);
+        Assert.Equal(0, state.Current.Count);
+    }
+
+    [Fact]
     public async Task Writer_GrowReplaceHigherContentVersion_RepublishesReorderedSnapshot()
     {
         EventLogId logId = EventLogId.Create();
@@ -250,6 +295,75 @@ public sealed class ReconcileLogStaleOrderTests
             await writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, final.At(0).Locator.Index);
+        Assert.Null(writer.Faulted);
+    }
+
+    [Fact]
+    public async Task Writer_ShrinkReplace_PublishAndConcurrentAppendDuringRebuildDoNotFault()
+    {
+        EventLogId logId = EventLogId.Create();
+        EventLogId other = EventLogId.Create();
+
+        using var entered = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
+        int gateArmed = 0;
+
+        bool Predicate(EventLocator locator, IEventColumnReader reader)
+        {
+            if (Volatile.Read(ref gateArmed) == 1 && Interlocked.Exchange(ref gateArmed, 0) == 1)
+            {
+                entered.Set();
+                release.Wait(OrderedViewTestTimeouts.Default);
+            }
+
+            return true;
+        }
+
+        await using var writer = new OrderedViewWriter(publishEvery: 5000);
+
+        writer.EnqueueReconcile(logId, Reader(logId, contentVersion: 0, ("AAA", 0), ("BBB", 1), ("CCC", 2)));
+        writer.EnqueueReconcile(other, Reader(other, contentVersion: 0, ("DDD", 0), ("EEE", 1)));
+        writer.EnqueueViewRequest(ViewRequests.For(s_sourceAscending, ViewRequests.EmptyFilter, [logId, other], Predicate));
+        OrderedViewSnapshot adopted =
+            await writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, TestContext.Current.CancellationToken);
+        Assert.Equal(5, adopted.Count);
+
+        Volatile.Write(ref gateArmed, 1);
+        writer.EnqueueReconcile(logId, Reader(logId, contentVersion: 1, ("AAA", 0)), isReplace: true);
+        Assert.True(entered.Wait(OrderedViewTestTimeouts.Default, TestContext.Current.CancellationToken));
+
+        writer.EnqueueFlush();
+        writer.EnqueueReconcile(other, Reader(other, contentVersion: 1, ("DDD", 0), ("EEE", 1), ("FFF", 2)));
+
+        release.Set();
+
+        OrderedViewSnapshot final =
+            await writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, TestContext.Current.CancellationToken);
+
+        Assert.Null(writer.Faulted);
+        Assert.Equal(4, final.Count);
+    }
+
+    [Fact]
+    public async Task Writer_ShrinkReplace_RepublishesShrunkSnapshotWithoutFault()
+    {
+        EventLogId logId = EventLogId.Create();
+
+        await using var writer = new OrderedViewWriter(publishEvery: 5000);
+
+        writer.EnqueueReconcile(logId, Reader(logId, contentVersion: 0, ("AAA", 0), ("BBB", 1), ("CCC", 2)));
+        writer.EnqueueViewRequest(ViewRequests.For(s_sourceAscending, ViewRequests.EmptyFilter, [logId]));
+        OrderedViewSnapshot adopted =
+            await writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, TestContext.Current.CancellationToken);
+        Assert.Equal(3, adopted.Count);
+
+        writer.EnqueueReconcile(logId, Reader(logId, contentVersion: 1, ("BBB", 0), ("AAA", 1)), isReplace: true);
+        OrderedViewSnapshot shrunk =
+            await writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, shrunk.Count);
+        Assert.Equal(1, shrunk.At(0).Locator.Index);
+        Assert.Equal(0, shrunk.At(1).Locator.Index);
         Assert.Null(writer.Faulted);
     }
 

@@ -51,6 +51,7 @@ internal sealed class OrderedViewState
     private OrderedViewSnapshot _current = OrderedViewSnapshot.Empty;
     private long _generation;
     private bool _holdIngest;
+    private bool _liveIndexInvalidated;
     private ChunkedOrderIndex _index;
     private Func<EventLocator, IEventColumnReader, bool> _predicate = static (_, _) => true;
     private long _publishVersion;
@@ -69,6 +70,8 @@ internal sealed class OrderedViewState
     public OrderedViewSnapshot Current => Volatile.Read(ref _current);
 
     public long Generation => Volatile.Read(ref _generation);
+
+    public bool LiveIndexInvalidated => _liveIndexInvalidated;
 
     public int RowCount => _scopeState.FreezeCoverage().RowCount;
 
@@ -117,7 +120,7 @@ internal sealed class OrderedViewState
 
             if (!_activeGeneration.TryGetValue(logId, out int active) || active != reader.Generation) { return false; }
 
-            if (_scopeState.Coverage(new LogGeneration(logId, reader.Generation)) < reader.Count) { return false; }
+            if (_scopeState.Coverage(new LogGeneration(logId, reader.Generation)) != reader.Count) { return false; }
         }
 
         return true;
@@ -138,6 +141,7 @@ internal sealed class OrderedViewState
         _activeContext = new SortContext(null, false, null, false);
         _requestedContext = new SortContext(null, false, null, false);
         _holdIngest = false;
+        _liveIndexInvalidated = false;
         _index = new ChunkedOrderIndex(OrderKeyComparerFactory.Create(_activeContext, _liveResolver));
 
         return PublishWith(FreezeReaders());
@@ -176,11 +180,26 @@ internal sealed class OrderedViewState
 
         int from = _scopeState.Coverage(readerKey);
 
-        _scopeState.AdvanceCoverage(readerKey, reader.Count);
+        if (contentReplaced)
+        {
+            _scopeState.SetCoverage(readerKey, reader.Count);
+        }
+        else
+        {
+            _scopeState.AdvanceCoverage(readerKey, reader.Count);
+        }
+
+        bool activeGenerationMatch =
+            _activeGeneration.TryGetValue(logId, out int active) && active == reader.Generation;
+
+        if (contentReplaced && _adoptedScope.Includes(logId) && activeGenerationMatch && reader.Count < from)
+        {
+            _liveIndexInvalidated = true;
+        }
 
         bool mutated = false;
 
-        if (_adoptedScope.Includes(logId) && !_holdIngest && IsCurrent(readerKey, _activeGeneration))
+        if (_adoptedScope.Includes(logId) && !_holdIngest && !_liveIndexInvalidated && activeGenerationMatch)
         {
             for (int index = from; index < reader.Count; index++)
             {
@@ -194,13 +213,9 @@ internal sealed class OrderedViewState
             }
         }
 
-        bool currentGeneration = reader.Count > 0 &&
-            _activeGeneration.TryGetValue(logId, out int active) &&
-            active == reader.Generation;
+        bool displaysThisGeneration = reader.Count > 0 && activeGenerationMatch && _adoptedScope.Includes(logId);
 
-        bool displaysThisGeneration = currentGeneration && _adoptedScope.Includes(logId);
-
-        requiresRebuild = contentReplaced && currentGeneration &&
+        requiresRebuild = contentReplaced && activeGenerationMatch &&
             (_adoptedScope.Includes(logId) || _scopeState.Includes(logId));
 
         return mutated ||
@@ -277,14 +292,19 @@ internal sealed class OrderedViewState
 
                 if (!IsCurrent(key, _requestedGeneration)) { continue; }
 
+                if (!commitResolver.TryResolve(new EventLocator(key.LogId, key.Generation, 0), out IEventColumnReader? reader))
+                {
+                    continue;
+                }
+
                 int from = request.Coverage.CoverageOf(key);
-                int to = _scopeState.Coverage(key);
+                int to = Math.Min(_scopeState.Coverage(key), reader.Count);
 
                 for (int index = from; index < to; index++)
                 {
                     var locator = new EventLocator(key.LogId, key.Generation, index);
 
-                    if (request.Predicate(locator, commitResolver.Resolve(locator)))
+                    if (request.Predicate(locator, reader))
                     {
                         rebuilt.Insert(new OrderKey(locator));
                     }
@@ -309,6 +329,7 @@ internal sealed class OrderedViewState
         _predicate = request.Predicate;
         _activeContext = request.Context;
         _holdIngest = false;
+        _liveIndexInvalidated = false;
 
         _scopeState.EvictOutOfScope(_adoptedScope, _activeGeneration);
         EvictGenerationsOutOfScope();
@@ -352,13 +373,20 @@ internal sealed class OrderedViewState
 
             if (!IsCurrent(key, request.RequestedGeneration)) { continue; }
 
-            for (int index = 0; index < covered; index++)
+            if (!request.BeginResolver.TryResolve(new EventLocator(key.LogId, key.Generation, 0), out IEventColumnReader? reader))
+            {
+                continue;
+            }
+
+            int limit = Math.Min(covered, reader.Count);
+
+            for (int index = 0; index < limit; index++)
             {
                 if ((examined++ & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
                 var locator = new EventLocator(key.LogId, key.Generation, index);
 
-                if (request.Predicate(locator, request.BeginResolver.Resolve(locator)))
+                if (request.Predicate(locator, reader))
                 {
                     rebuilt.Insert(new OrderKey(locator));
                 }
@@ -459,7 +487,12 @@ internal sealed class OrderedViewState
 
             if (!IsCurrent(key, request.RequestedGeneration)) { continue; }
 
-            keys.Add((key, covered));
+            if (!request.BeginResolver.TryResolve(new EventLocator(key.LogId, key.Generation, 0), out IEventColumnReader? reader))
+            {
+                continue;
+            }
+
+            keys.Add((key, Math.Min(covered, reader.Count)));
         }
 
         return keys;
@@ -645,7 +678,7 @@ internal sealed class OrderedViewState
 
             if (!IsCurrent(key, _requestedGeneration)) { continue; }
 
-            tail += _scopeState.Coverage(key) - request.Coverage.CoverageOf(key);
+            tail += Math.Max(0, _scopeState.Coverage(key) - request.Coverage.CoverageOf(key));
         }
 
         return tail;
@@ -698,10 +731,11 @@ internal sealed class OrderedViewState
 
         if (_latestReaders.TryGetValue(readerKey, out var existing))
         {
-            bool strictlyNewer = reader.Count > existing.Count ||
-                (reader.Count == existing.Count && reader.ContentVersion > existing.ContentVersion);
+            bool admit = reader.Count > existing.Count ||
+                (reader.ContentVersion > existing.ContentVersion &&
+                    (reader.Count >= existing.Count || isReplace));
 
-            if (!strictlyNewer) { return false; }
+            if (!admit) { return false; }
 
             contentReplaced = reader.ContentVersion > existing.ContentVersion &&
                 (reader.Count <= existing.Count || isReplace);
