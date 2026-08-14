@@ -7,8 +7,8 @@ namespace EventLogExpert.Filtering.Emit;
 
 /// <summary>
 ///     Source-agnostic structural queries over the lowered <see cref="FilterNode" /> filter graph, shared by the row
-///     <see cref="Emitter" /> and the column <see cref="ColumnEmitter" />: the <c>RequiresXml</c> flag and the And/Or
-///     chain flatteners.
+///     <see cref="Emitter" /> and the column <see cref="ColumnEmitter" />: the <c>RequiresXml</c> flag, the And/Or chain
+///     flatteners, and the cheap-versus-XML condition partition.
 /// </summary>
 internal static class FilterNodeMetadata
 {
@@ -67,5 +67,19 @@ internal static class FilterNodeMetadata
                 accumulator.Add(current);
             }
         }
+    }
+
+    public static (List<FilterNode> CheapConditions, List<FilterNode> XmlConditions) PartitionAndChain(FilterNode node)
+    {
+        List<FilterNode> cheapConditions = [];
+        List<FilterNode> xmlConditions = [];
+
+        foreach (var condition in FlattenAndChain(node))
+        {
+            if (ContainsXmlReference(condition)) { xmlConditions.Add(condition); }
+            else { cheapConditions.Add(condition); }
+        }
+
+        return (cheapConditions, xmlConditions);
     }
 }
