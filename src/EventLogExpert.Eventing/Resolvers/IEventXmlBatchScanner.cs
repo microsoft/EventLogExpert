@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 
 namespace EventLogExpert.Eventing.Resolvers;
 
-internal interface IEventXmlBatchScanner
+public interface IEventXmlBatchScanner
 {
     /// <summary>
     ///     Streams each event's record id and freshly rendered XML from a single sequential scan of

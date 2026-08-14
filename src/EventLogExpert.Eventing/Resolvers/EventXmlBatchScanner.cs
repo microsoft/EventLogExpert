@@ -13,7 +13,7 @@ namespace EventLogExpert.Eventing.Resolvers;
 ///     Renders event XML on demand by scanning a log once with <c>EvtQuery</c> and rendering only the records a
 ///     caller selects, so an XML-referencing filter can be evaluated without reopening every log with pre-rendered XML.
 /// </summary>
-internal sealed class EventXmlBatchScanner : IEventXmlBatchScanner
+public sealed class EventXmlBatchScanner : IEventXmlBatchScanner
 {
     private const string AllEventsQuery = "*";
 
