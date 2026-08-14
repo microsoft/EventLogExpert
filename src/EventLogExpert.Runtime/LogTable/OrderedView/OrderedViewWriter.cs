@@ -13,6 +13,7 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
 {
     private const int DefaultTailBreachLimit = 3;
     private const int DefaultTailReplayBudget = 50_000;
+    private const int InvalidatedRebuildRetryLimit = 3;
 
     private readonly Task? _cadence;
     private readonly Channel<Command> _commandChannel;
@@ -29,36 +30,24 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
     private int _adoptedGeneration;
     private ViewIdentity? _adoptedIdentity;
     private EventLogId? _adoptedLog;
-
     private int _adoptedScopeLogCount;
-
     private long _adoptedSequence;
-
     private int _buildsStarted;
-
     private (Task Task, CancellationTokenSource Cts)? _currentBuild;
     private RebuildRequest? _desiredBuild;
     private bool _dirty;
-
     private bool _faultAnnounced;
-
     private volatile Exception? _faulted;
-
     private long _highestSequence;
+    private int _invalidatedRebuildRetries;
     private long _lastUpdateVersion;
-
     private PendingBuild? _pending;
     private Filter _pendingFilter;
     private int _pendingRebuilds;
-
     private bool _rebuildRequired;
-
     private bool _replaceAwaitingRebuild;
-
     private bool _seededRowsAwaitingBuild;
-
     private int _sincePublish;
-
     private ImmutableHashSet<LogGeneration>? _singleLogInScope;
     private LogGeneration? _singleLogInScopeKey;
     private int _tailBreaches;
@@ -262,6 +251,12 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
             _replaceAwaitingRebuild = false;
             ForceRebuild();
         }
+        else if (_state.LiveIndexInvalidated && _pendingRebuilds == 0 &&
+            _invalidatedRebuildRetries < InvalidatedRebuildRetryLimit)
+        {
+            _invalidatedRebuildRetries++;
+            ForceRebuild();
+        }
 
         if (_pendingRebuilds != 0 || _pendingDrain.Count <= 0)
         {
@@ -307,14 +302,16 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
 
                     if (requiresRebuild)
                     {
-                        if (_pendingRebuilds > 0 || _rebuildRequired)
+                        if (_state.LiveIndexInvalidated) { _invalidatedRebuildRetries = 0; }
+
+                        if (_pendingRebuilds > 0)
                         {
                             _replaceAwaitingRebuild = true;
                             _state.SupersedeInFlight();
                         }
                         else
                         {
-                            RequireRebuild();
+                            ForceRebuild();
                         }
                     }
                     else if (reconciled)
@@ -351,6 +348,7 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
                 _seededRowsAwaitingBuild = false;
                 _replaceAwaitingRebuild = false;
                 _tailBreaches = 0;
+                _invalidatedRebuildRetries = 0;
 
                 break;
             case CommandKind.Adopt:
@@ -387,6 +385,7 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
                             _rebuildRequired = false;
                             _faultAnnounced = false;
                             _seededRowsAwaitingBuild = false;
+                            _invalidatedRebuildRetries = 0;
                         }
                     }
 
@@ -555,6 +554,8 @@ internal sealed class OrderedViewWriter : IAsyncDisposable
 
     private void PublishNow()
     {
+        if (_state.LiveIndexInvalidated) { return; }
+
         _state.Publish();
         _dirty = false;
         _sincePublish = 0;

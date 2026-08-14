@@ -119,6 +119,8 @@ internal sealed class OrderedViewScopeState
         return matched == _scopeLogs.Count;
     }
 
+    public void SetCoverage(in LogGeneration key, int coveredCount) => _coverage[key] = coveredCount;
+
     public bool TrySetScope(IReadOnlyCollection<EventLogId> scopeLogs, long scopeVersion)
     {
         if (scopeVersion < ScopeVersion) { return false; }
