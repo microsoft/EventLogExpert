@@ -326,13 +326,20 @@ public sealed class OrderedViewWriterFaultStateTests
         EventLogId logId = EventLogId.Create();
         int raised = 0;
 
+        using var buildEntered = new ManualResetEventSlim(false);
+        using var releaseBuild = new ManualResetEventSlim(false);
+        int gateArmed = 1;
+
         await using var writer = new OrderedViewWriter(publishEvery: 1, publishIntervalMs: 0);
 
         writer.Updated += _ => Interlocked.Increment(ref raised);
 
         writer.EnqueueReconcile(logId, Reader(logId, count: 3000));
-        writer.EnqueueViewRequest(Request(logId, static (locator, _) => locator.Index >= 3000 ? throw new InvalidOperationException("tail") : true));
+        writer.EnqueueViewRequest(Request(logId, Predicate));
+        Assert.True(buildEntered.Wait(SignalTimeout, TestContext.Current.CancellationToken));
+
         writer.EnqueueReconcile(logId, Reader(logId, count: 3200));
+        releaseBuild.Set();
         await writer.DrainAsync().WaitAsync(Timeout, TestContext.Current.CancellationToken);
 
         Assert.NotNull(writer.Faulted);
@@ -342,7 +349,27 @@ public sealed class OrderedViewWriterFaultStateTests
         writer.EnqueueReconcile(logId, Reader(logId, count: 3400));
         await writer.DrainAsync().WaitAsync(Timeout, TestContext.Current.CancellationToken);
 
-        Assert.True(Volatile.Read(ref raised) > before, "publishing must continue after a fault that damaged nothing");
+        // The recovery publish raises Updated in RaiseUpdateIfAdvanced, which runs AFTER the drain's TrySetResult
+        // completes the await, so wait for the raise rather than reading the counter the instant the drain returns.
+        Assert.True(
+            SpinWait.SpinUntil(() => Volatile.Read(ref raised) > before, SignalTimeout),
+            "publishing must continue after a fault that damaged nothing");
+
+        return;
+
+        // Gate the build at its first row so the growing tail (3200) is enqueued BEFORE the build's adopt is queued.
+        // FIFO delivery then guarantees the tail is covered when the adopt runs, so the failure lands in the tail
+        // REPLAY (which damaged nothing) rather than in a live insert (which would legitimately require a rebuild).
+        bool Predicate(EventLocator locator, IEventColumnReader reader)
+        {
+            if (locator.Index == 0 && Interlocked.Exchange(ref gateArmed, 0) == 1)
+            {
+                buildEntered.Set();
+                releaseBuild.Wait(SignalTimeout);
+            }
+
+            return locator.Index >= 3000 ? throw new InvalidOperationException("tail") : true;
+        }
     }
 
     [Fact]
