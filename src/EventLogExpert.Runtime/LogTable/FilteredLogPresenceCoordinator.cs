@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.EventLog;
 using Fluxor;
@@ -19,13 +18,10 @@ internal sealed class FilteredLogPresenceCoordinator : IDisposable
     private readonly IDispatcher _dispatcher;
     private readonly IState<EventLogState> _eventLogState;
     private readonly Lock _gate = new();
+    private readonly XmlFilterMatchCache _matchCache;
     private readonly IState<FilteredLogPresenceState> _presenceState;
     private readonly IState<RawEventStoreState> _rawEventStore;
-
     private readonly bool _scanInline;
-
-    internal Action? OnBatchDrainedForTest { get; set; }
-
     private readonly Dictionary<EventLogId, ScanPosition> _scanPositions = [];
 
     private bool _disposed;
@@ -37,8 +33,9 @@ internal sealed class FilteredLogPresenceCoordinator : IDisposable
         IState<EventLogState> eventLogState,
         IState<RawEventStoreState> rawEventStore,
         IState<FilteredLogPresenceState> presenceState,
-        EventLogConcurrencyState concurrencyState)
-        : this(dispatcher, eventLogState, rawEventStore, presenceState, concurrencyState, scanInline: false) { }
+        EventLogConcurrencyState concurrencyState,
+        XmlFilterMatchCache matchCache)
+        : this(dispatcher, eventLogState, rawEventStore, presenceState, concurrencyState, matchCache, scanInline: false) { }
 
     internal FilteredLogPresenceCoordinator(
         IDispatcher dispatcher,
@@ -46,6 +43,7 @@ internal sealed class FilteredLogPresenceCoordinator : IDisposable
         IState<RawEventStoreState> rawEventStore,
         IState<FilteredLogPresenceState> presenceState,
         EventLogConcurrencyState concurrencyState,
+        XmlFilterMatchCache matchCache,
         bool scanInline)
     {
         ArgumentNullException.ThrowIfNull(dispatcher);
@@ -53,14 +51,18 @@ internal sealed class FilteredLogPresenceCoordinator : IDisposable
         ArgumentNullException.ThrowIfNull(rawEventStore);
         ArgumentNullException.ThrowIfNull(presenceState);
         ArgumentNullException.ThrowIfNull(concurrencyState);
+        ArgumentNullException.ThrowIfNull(matchCache);
 
         _dispatcher = dispatcher;
         _eventLogState = eventLogState;
         _rawEventStore = rawEventStore;
         _presenceState = presenceState;
         _concurrencyState = concurrencyState;
+        _matchCache = matchCache;
         _scanInline = scanInline;
     }
+
+    internal Action? OnBatchDrainedForTest { get; set; }
 
     public void Discard(EventLogId logId)
     {
@@ -147,6 +149,9 @@ internal sealed class FilteredLogPresenceCoordinator : IDisposable
         ScheduleScan();
     }
 
+    /// <summary>Re-attempts a scan that was deferred while on-demand XML match was still being computed.</summary>
+    public void RetryScan() => ScheduleScan();
+
     private static bool ScanFrom(
         EventColumnStore store,
         EventLogId logId,
@@ -215,7 +220,7 @@ internal sealed class FilteredLogPresenceCoordinator : IDisposable
 
             int start = ResumePoint(logId, store);
 
-            survives ??= FilterService.CompileSurvivorPredicate(filter);
+            survives ??= XmlFilterGate.BuildSurvivorPredicate(filter, _concurrencyState, _matchCache);
 
             bool found = ScanFrom(store, logId, start, survives);
 
@@ -295,10 +300,6 @@ internal sealed class FilteredLogPresenceCoordinator : IDisposable
         }
     }
 
-    private bool XmlDeferralActive(EventLogState eventLogState) =>
-        eventLogState.AppliedFilter.RequiresXml &&
-        eventLogState.OpenLogs.Values.Any(log => !_concurrencyState.IsLoadedWithXml(log.Id));
-
     private void ScheduleScan()
     {
         lock (_gate)
@@ -319,6 +320,10 @@ internal sealed class FilteredLogPresenceCoordinator : IDisposable
 
         _ = Task.Run(RunScanLoop);
     }
+
+    private bool XmlDeferralActive(EventLogState eventLogState) =>
+        XmlFilterGate.IsDeferred(
+            eventLogState.AppliedFilter, eventLogState, _rawEventStore.Value, _concurrencyState, _matchCache);
 
     private readonly record struct ScanPosition(int ScannedCount, int Generation);
 }

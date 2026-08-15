@@ -8,24 +8,24 @@ using EventLogExpert.Eventing.Resolvers;
 namespace EventLogExpert.Filtering.Evaluation;
 
 /// <summary>
-///     Computes per-log membership for a filter that references event XML without reopening the log with pre-rendered
+///     Computes per-log matches for a filter that references event XML without reopening the log with pre-rendered
 ///     XML: cheaper predicates narrow the candidate rows, an injected <see cref="IEventXmlBatchScanner" /> renders XML for
 ///     those candidates on demand, and the complete filter is evaluated per candidate via the row path.
 /// </summary>
-internal sealed class XmlFilterMembershipMatcher
+public sealed class XmlFilterMatcher : IXmlFilterMatcher
 {
     private readonly IEventXmlBatchScanner _scanner;
 
-    public XmlFilterMembershipMatcher() : this(new EventXmlBatchScanner()) { }
+    public XmlFilterMatcher() : this(new EventXmlBatchScanner()) { }
 
-    internal XmlFilterMembershipMatcher(IEventXmlBatchScanner scanner)
+    internal XmlFilterMatcher(IEventXmlBatchScanner scanner)
     {
         ArgumentNullException.ThrowIfNull(scanner);
 
         _scanner = scanner;
     }
 
-    public XmlFilterMembership ComputeMembership(
+    public XmlFilterMatch ComputeMatch(
         IEventColumnReader reader,
         Filter filter,
         string owningLog,
@@ -36,14 +36,14 @@ internal sealed class XmlFilterMembershipMatcher
         ArgumentException.ThrowIfNullOrEmpty(owningLog);
 
         int count = reader.Count;
-        bool[] membership = new bool[count];
+        bool[] matches = new bool[count];
 
         long[] recordIds = new long[count];
         bool[] hasRecordId = new bool[count];
         reader.CopyInt64Column(EventFieldId.RecordId, recordIds, hasRecordId);
 
         // Phase 1 (cheap, columnar): candidate = date-surviving rows with a record id. The date range is a necessary
-        // condition for membership, so a date-excluded row is a non-member and never needs its XML rendered.
+        // condition for a match, so a date-excluded row is a non-match and never needs its XML rendered.
         Dictionary<long, int> candidateIndexByRecordId = new(count);
         List<int> unmappableRows = [];
         DateFilter? activeDateFilter = filter.DateFilter is { IsEnabled: true } enabledDateFilter ? enabledDateFilter : null;
@@ -69,7 +69,7 @@ internal sealed class XmlFilterMembershipMatcher
             if (!candidateIndexByRecordId.TryGetValue(scanned.RecordId, out int index)) { continue; }
 
             evaluated[index] = true;
-            membership[index] = Matches(reader, reader.LocatorAt(index), filter, scanned.Xml);
+            matches[index] = Matches(reader, reader.LocatorAt(index), filter, scanned.Xml);
         }
 
         // Phase 3 (defensive): candidates the scan never yielded (record rolled out between snapshot and scan) and rows
@@ -80,17 +80,17 @@ internal sealed class XmlFilterMembershipMatcher
 
             if (evaluated[index]) { continue; }
 
-            membership[index] = Matches(reader, reader.LocatorAt(index), filter, string.Empty);
+            matches[index] = Matches(reader, reader.LocatorAt(index), filter, string.Empty);
         }
 
         foreach (int index in unmappableRows)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            membership[index] = Matches(reader, reader.LocatorAt(index), filter, string.Empty);
+            matches[index] = Matches(reader, reader.LocatorAt(index), filter, string.Empty);
         }
 
-        return new XmlFilterMembership(reader.LogId, reader.Generation, reader.ContentVersion, count, membership);
+        return new XmlFilterMatch(reader.LogId, reader.Generation, reader.ContentVersion, count, matches);
     }
 
     private static bool DateSurvives(IEventColumnReader reader, EventLocator locator, DateFilter dateFilter)

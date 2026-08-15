@@ -201,7 +201,7 @@ public sealed class EffectsTests
             .Add(Constants.LogNameLog1, logData1)
             .Add(Constants.LogNameLog2, logData2);
 
-        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs, appliedFilter: XmlContainsFilter());
 
         var closeTasks = new List<Task>();
 
@@ -252,7 +252,7 @@ public sealed class EffectsTests
         {
             OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty.Add(Constants.LogNameTestLog, new OpenLogInfo(logData.Id, LogPathType.Channel)),
             Selection = [RestoreEntry(selectedEvent, logData.Id)],
-            AppliedFilter = new Filter(null, [])
+            AppliedFilter = XmlContainsFilter()
         });
 
         var mockFilterService = Substitute.For<IFilterService>();
@@ -321,7 +321,7 @@ public sealed class EffectsTests
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
-        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs, appliedFilter: XmlContainsFilter());
 
         var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
@@ -379,7 +379,7 @@ public sealed class EffectsTests
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
-        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs, appliedFilter: XmlContainsFilter());
 
         var closeTasks = new List<Task>();
 
@@ -415,7 +415,7 @@ public sealed class EffectsTests
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
-        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs, appliedFilter: XmlContainsFilter());
 
         var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
@@ -475,7 +475,7 @@ public sealed class EffectsTests
         {
             OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty.Add(Constants.LogNameTestLog, new OpenLogInfo(logData.Id, LogPathType.Channel)),
             Selection = [RestoreEntry(selectedEvent, logData.Id)],
-            AppliedFilter = new Filter(null, [])
+            AppliedFilter = XmlContainsFilter()
         });
 
         var mockFilterService = Substitute.For<IFilterService>();
@@ -537,7 +537,7 @@ public sealed class EffectsTests
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
-        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs, appliedFilter: XmlContainsFilter());
 
         var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
@@ -1420,10 +1420,18 @@ public sealed class EffectsTests
         var logTableState = Substitute.For<IState<LogTableState>>();
         logTableState.Value.Returns(logTableStateValue ?? new LogTableState());
 
+        var rawStoreForFiltering = Substitute.For<IState<RawEventStoreState>>();
+        rawStoreForFiltering.Value.Returns(new RawEventStoreState());
+
         var filtering = new FilteringEffects(
             eventLogState,
+            rawStoreForFiltering,
             new LiveTailIngestCoordinator(dispatcher, Timeout.InfiniteTimeSpan),
-            new XmlReloadCoordinator(eventLogState, closeCoordinator, concurrencyState, logger));
+            new XmlReloadCoordinator(eventLogState, closeCoordinator, concurrencyState, logger),
+            new XmlFilterMatcher(),
+            new XmlFilterMatchCache(),
+            concurrencyState,
+            logger);
 
         var openLog = new OpenLogEffects(
             eventLogState,
@@ -1764,7 +1772,8 @@ public sealed class EffectsTests
         IFilterService mockFilterService) CreateEffectsWithServices(
             bool continuouslyUpdate = false,
             ImmutableDictionary<string, EventLogData>? activeLogs = null,
-            List<ResolvedEvent>? newEventBuffer = null)
+            List<ResolvedEvent>? newEventBuffer = null,
+            Filter? appliedFilter = null)
     {
         var effectiveActiveLogs = activeLogs ?? ImmutableDictionary<string, EventLogData>.Empty;
         var (openLogs, rawStore) = BuildOpenLogsAndRawStore(effectiveActiveLogs);
@@ -1776,7 +1785,7 @@ public sealed class EffectsTests
             ContinuouslyUpdate = continuouslyUpdate,
             OpenLogs = openLogs,
             NewEventBuffer = newEventBuffer ?? [],
-            AppliedFilter = new Filter(null, [])
+            AppliedFilter = appliedFilter ?? new Filter(null, [])
         });
 
         var mockFilterService = Substitute.For<IFilterService>();
@@ -1874,6 +1883,9 @@ public sealed class EffectsTests
             .OfType<LoadEventsAction>()
             .Single()
             .Events;
+
+    private static Filter XmlContainsFilter() =>
+        new(null, [FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true)]);
 
     private sealed class EffectsHarness(
         FilteringEffects filtering,

@@ -24,6 +24,14 @@ internal sealed class ViewRequestIssuer
 
     public Exception? LastFault => Volatile.Read(ref _lastFault);
 
+    public void ForceReissue()
+    {
+        lock (_gate)
+        {
+            _lastIssuedIdentity = null;
+        }
+    }
+
     public void RecordFault(Exception fault) => Volatile.Write(ref _lastFault, fault);
 
     public long ResetForClear()

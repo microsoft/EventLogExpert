@@ -10,7 +10,7 @@ using EventLogExpert.Filtering.TestUtils;
 
 namespace EventLogExpert.Filtering.Tests.Evaluation;
 
-public sealed class XmlFilterMembershipMatcherTests
+public sealed class XmlFilterMatcherTests
 {
     private const string OwningLog = "TestLog";
 
@@ -19,68 +19,68 @@ public sealed class XmlFilterMembershipMatcherTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
-    public void ComputeMembership_ProducesStampMatchingReaderSnapshot()
+    public void ComputeMatch_ProducesStampMatchingReaderSnapshot()
     {
         ResolvedEvent[] events = [Event(1), Event(2)];
         (IEventColumnReader reader, EventLogId logId) = BuildReader(events, generation: 3, contentVersion: 7);
-        XmlFilterMembershipMatcher matcher = new(EmptyScanner());
+        XmlFilterMatcher matcher = new(EmptyScanner());
 
-        XmlFilterMembership membership =
-            matcher.ComputeMembership(reader, IncludeFilter("Xml.Contains(\"x\")"), OwningLog, LogPathType.File, Ct);
+        XmlFilterMatch match =
+            matcher.ComputeMatch(reader, IncludeFilter("Xml.Contains(\"x\")"), OwningLog, LogPathType.File, Ct);
 
-        Assert.Equal(logId, membership.LogId);
-        Assert.Equal(3, membership.Generation);
-        Assert.Equal(7, membership.ContentVersion);
-        Assert.Equal(2, membership.Count);
+        Assert.Equal(logId, match.LogId);
+        Assert.Equal(3, match.Generation);
+        Assert.Equal(7, match.ContentVersion);
+        Assert.Equal(2, match.Count);
     }
 
     [Fact]
-    public void ComputeMembership_WhenCancellationRequested_Throws()
+    public void ComputeMatch_WhenCancellationRequested_Throws()
     {
         ResolvedEvent[] events = [Event(1), Event(2)];
         (IEventColumnReader reader, _) = BuildReader(events);
-        XmlFilterMembershipMatcher matcher = new(EmptyScanner());
+        XmlFilterMatcher matcher = new(EmptyScanner());
         using CancellationTokenSource cancellation = new();
         cancellation.Cancel();
 
         Assert.ThrowsAny<OperationCanceledException>(() =>
-            matcher.ComputeMembership(reader, IncludeFilter("Xml.Contains(\"x\")"), OwningLog, LogPathType.File, cancellation.Token));
+            matcher.ComputeMatch(reader, IncludeFilter("Xml.Contains(\"x\")"), OwningLog, LogPathType.File, cancellation.Token));
     }
 
     [Fact]
-    public void ComputeMembership_WhenCandidateRecordRolledOut_EvaluatesWithEmptyXmlNotUnconditionalNoMatch()
+    public void ComputeMatch_WhenCandidateRecordRolledOut_EvaluatesWithEmptyXmlNotUnconditionalNoMatch()
     {
         // record id 5 rolled out of the log (scanner never yields it); record id 6 is present and matches the exclude.
         ResolvedEvent[] events = [Event(5), Event(6)];
         (IEventColumnReader reader, _) = BuildReader(events);
         FakeBatchScanner scanner = new(new Dictionary<long, string> { [6] = "<Event>secret</Event>" });
-        XmlFilterMembershipMatcher matcher = new(scanner);
+        XmlFilterMatcher matcher = new(scanner);
 
-        XmlFilterMembership membership =
-            matcher.ComputeMembership(reader, ExcludeFilter("Xml.Contains(\"secret\")"), OwningLog, LogPathType.File, Ct);
+        XmlFilterMatch match =
+            matcher.ComputeMatch(reader, ExcludeFilter("Xml.Contains(\"secret\")"), OwningLog, LogPathType.File, Ct);
 
-        // Row 5's XML is unresolved (empty) so the exclude does NOT fire -> the row stays visible (member); an
+        // Row 5's XML is unresolved (empty) so the exclude does NOT fire -> the row stays visible (a match); an
         // unconditional no-match would have wrongly hidden it. Row 6's rendered XML matches the exclude -> hidden.
-        Assert.True(membership.IsMember(reader.LocatorAt(0)));
-        Assert.False(membership.IsMember(reader.LocatorAt(1)));
+        Assert.True(match.IsMatch(reader.LocatorAt(0)));
+        Assert.False(match.IsMatch(reader.LocatorAt(1)));
     }
 
     [Fact]
-    public void ComputeMembership_WhenRowHasNoRecordId_EvaluatesWithEmptyXml()
+    public void ComputeMatch_WhenRowHasNoRecordId_EvaluatesWithEmptyXml()
     {
         ResolvedEvent[] events = [FilterEventBuilder.CreateTestEvent(id: 1, recordId: null, level: "Error"), Event(2, level: "Information")];
         (IEventColumnReader reader, _) = BuildReader(events);
-        XmlFilterMembershipMatcher matcher = new(EmptyScanner());
+        XmlFilterMatcher matcher = new(EmptyScanner());
 
-        XmlFilterMembership membership =
-            matcher.ComputeMembership(reader, ExcludeFilter("Xml.Contains(\"secret\")"), OwningLog, LogPathType.File, Ct);
+        XmlFilterMatch match =
+            matcher.ComputeMatch(reader, ExcludeFilter("Xml.Contains(\"secret\")"), OwningLog, LogPathType.File, Ct);
 
-        // The record-id-less row is evaluated with empty XML: the exclude does not fire, so it remains a member.
-        Assert.True(membership.IsMember(reader.LocatorAt(0)));
+        // The record-id-less row is evaluated with empty XML: the exclude does not fire, so it remains a match.
+        Assert.True(match.IsMatch(reader.LocatorAt(0)));
     }
 
     [Fact]
-    public void ComputeMembership_WithDateFilter_ExcludesOutOfRangeRowsAndSkipsTheirXmlRender()
+    public void ComputeMatch_WithDateFilter_ExcludesOutOfRangeRowsAndSkipsTheirXmlRender()
     {
         ResolvedEvent[] events =
         [
@@ -92,23 +92,23 @@ public sealed class XmlFilterMembershipMatcherTests
             [1] = "<Event>keep</Event>", [2] = "<Event>keep</Event>", [3] = "<Event>keep</Event>",
             [4] = "<Event>keep</Event>", [5] = "<Event>keep</Event>"
         });
-        XmlFilterMembershipMatcher matcher = new(scanner);
+        XmlFilterMatcher matcher = new(scanner);
         Filter filter = new(EnabledDate(s_baseTime.AddMinutes(1), s_baseTime.AddMinutes(3)), [Include("Xml.Contains(\"keep\")")]);
 
-        XmlFilterMembership membership = matcher.ComputeMembership(reader, filter, OwningLog, LogPathType.File, Ct);
+        XmlFilterMatch match = matcher.ComputeMatch(reader, filter, OwningLog, LogPathType.File, Ct);
 
-        Assert.False(membership.IsMember(reader.LocatorAt(0)));
-        Assert.True(membership.IsMember(reader.LocatorAt(1)));
-        Assert.True(membership.IsMember(reader.LocatorAt(2)));
-        Assert.True(membership.IsMember(reader.LocatorAt(3)));
-        Assert.False(membership.IsMember(reader.LocatorAt(4)));
+        Assert.False(match.IsMatch(reader.LocatorAt(0)));
+        Assert.True(match.IsMatch(reader.LocatorAt(1)));
+        Assert.True(match.IsMatch(reader.LocatorAt(2)));
+        Assert.True(match.IsMatch(reader.LocatorAt(3)));
+        Assert.False(match.IsMatch(reader.LocatorAt(4)));
 
         // The two date-excluded rows (record ids 1 and 5) must never have their XML rendered.
         Assert.Equal([2, 3, 4], scanner.RenderedRecordIds.Order());
     }
 
     [Fact]
-    public void ComputeMembership_WithMixedCheapAndXmlFilter_MatchesOnlyRowsSatisfyingBoth()
+    public void ComputeMatch_WithMixedCheapAndXmlFilter_MatchesOnlyRowsSatisfyingBoth()
     {
         ResolvedEvent[] events = [Event(1, level: "Error"), Event(2, level: "Error"), Event(3, level: "Warning")];
         (IEventColumnReader reader, _) = BuildReader(events);
@@ -116,31 +116,31 @@ public sealed class XmlFilterMembershipMatcherTests
         {
             [1] = "<Event>data</Event>", [2] = "<Event>none</Event>", [3] = "<Event>data</Event>"
         });
-        XmlFilterMembershipMatcher matcher = new(scanner);
+        XmlFilterMatcher matcher = new(scanner);
 
-        XmlFilterMembership membership = matcher.ComputeMembership(
+        XmlFilterMatch match = matcher.ComputeMatch(
             reader, IncludeFilter("Level == \"Error\" && Xml.Contains(\"data\")"), OwningLog, LogPathType.File, Ct);
 
-        Assert.True(membership.IsMember(reader.LocatorAt(0)));   // Error + data
-        Assert.False(membership.IsMember(reader.LocatorAt(1)));  // Error but no data
-        Assert.False(membership.IsMember(reader.LocatorAt(2)));  // data but Warning
+        Assert.True(match.IsMatch(reader.LocatorAt(0)));   // Error + data
+        Assert.False(match.IsMatch(reader.LocatorAt(1)));  // Error but no data
+        Assert.False(match.IsMatch(reader.LocatorAt(2)));  // data but Warning
     }
 
     [Fact]
-    public void ComputeMembership_WithNullReaderOrEmptyOwningLog_Throws()
+    public void ComputeMatch_WithNullReaderOrEmptyOwningLog_Throws()
     {
         (IEventColumnReader reader, _) = BuildReader([Event(1)]);
-        XmlFilterMembershipMatcher matcher = new(EmptyScanner());
+        XmlFilterMatcher matcher = new(EmptyScanner());
         Filter filter = IncludeFilter("Xml.Contains(\"x\")");
 
         Assert.Throws<ArgumentNullException>(() =>
-            matcher.ComputeMembership(null!, filter, OwningLog, LogPathType.File, Ct));
+            matcher.ComputeMatch(null!, filter, OwningLog, LogPathType.File, Ct));
         Assert.Throws<ArgumentException>(() =>
-            matcher.ComputeMembership(reader, filter, string.Empty, LogPathType.File, Ct));
+            matcher.ComputeMatch(reader, filter, string.Empty, LogPathType.File, Ct));
     }
 
     [Fact]
-    public void ComputeMembership_WithXmlExcludeFilter_VetoesRowsWhoseRenderedXmlMatches()
+    public void ComputeMatch_WithXmlExcludeFilter_VetoesRowsWhoseRenderedXmlMatches()
     {
         ResolvedEvent[] events = [Event(1), Event(2)];
         (IEventColumnReader reader, _) = BuildReader(events);
@@ -148,17 +148,17 @@ public sealed class XmlFilterMembershipMatcherTests
         {
             [1] = "<Event>secret</Event>", [2] = "<Event>clean</Event>"
         });
-        XmlFilterMembershipMatcher matcher = new(scanner);
+        XmlFilterMatcher matcher = new(scanner);
 
-        XmlFilterMembership membership =
-            matcher.ComputeMembership(reader, ExcludeFilter("Xml.Contains(\"secret\")"), OwningLog, LogPathType.File, Ct);
+        XmlFilterMatch match =
+            matcher.ComputeMatch(reader, ExcludeFilter("Xml.Contains(\"secret\")"), OwningLog, LogPathType.File, Ct);
 
-        Assert.False(membership.IsMember(reader.LocatorAt(0)));
-        Assert.True(membership.IsMember(reader.LocatorAt(1)));
+        Assert.False(match.IsMatch(reader.LocatorAt(0)));
+        Assert.True(match.IsMatch(reader.LocatorAt(1)));
     }
 
     [Fact]
-    public void ComputeMembership_WithXmlIncludeFilter_MarksOnlyRowsWhoseRenderedXmlMatches()
+    public void ComputeMatch_WithXmlIncludeFilter_MarksOnlyRowsWhoseRenderedXmlMatches()
     {
         ResolvedEvent[] events = [Event(1), Event(2), Event(3)];
         (IEventColumnReader reader, _) = BuildReader(events);
@@ -166,18 +166,18 @@ public sealed class XmlFilterMembershipMatcherTests
         {
             [1] = "<Event>alpha</Event>", [2] = "<Event>beta</Event>", [3] = "<Event>alpha</Event>"
         });
-        XmlFilterMembershipMatcher matcher = new(scanner);
+        XmlFilterMatcher matcher = new(scanner);
 
-        XmlFilterMembership membership =
-            matcher.ComputeMembership(reader, IncludeFilter("Xml.Contains(\"alpha\")"), OwningLog, LogPathType.File, Ct);
+        XmlFilterMatch match =
+            matcher.ComputeMatch(reader, IncludeFilter("Xml.Contains(\"alpha\")"), OwningLog, LogPathType.File, Ct);
 
-        Assert.True(membership.IsMember(reader.LocatorAt(0)));
-        Assert.False(membership.IsMember(reader.LocatorAt(1)));
-        Assert.True(membership.IsMember(reader.LocatorAt(2)));
+        Assert.True(match.IsMatch(reader.LocatorAt(0)));
+        Assert.False(match.IsMatch(reader.LocatorAt(1)));
+        Assert.True(match.IsMatch(reader.LocatorAt(2)));
     }
 
     [Fact]
-    public void ComputeMembership_WithXmlUnderOr_MatchesRowsViaEitherBranch()
+    public void ComputeMatch_WithXmlUnderOr_MatchesRowsViaEitherBranch()
     {
         ResolvedEvent[] events = [Event(1, level: "Error"), Event(2, level: "Information"), Event(3, level: "Information")];
         (IEventColumnReader reader, _) = BuildReader(events);
@@ -185,18 +185,18 @@ public sealed class XmlFilterMembershipMatcherTests
         {
             [1] = "<Event>none</Event>", [2] = "<Event>needle</Event>", [3] = "<Event>none</Event>"
         });
-        XmlFilterMembershipMatcher matcher = new(scanner);
+        XmlFilterMatcher matcher = new(scanner);
 
-        XmlFilterMembership membership = matcher.ComputeMembership(
+        XmlFilterMatch match = matcher.ComputeMatch(
             reader, IncludeFilter("Level == \"Error\" || Xml.Contains(\"needle\")"), OwningLog, LogPathType.File, Ct);
 
-        Assert.True(membership.IsMember(reader.LocatorAt(0)));   // Error branch
-        Assert.True(membership.IsMember(reader.LocatorAt(1)));   // Xml branch
-        Assert.False(membership.IsMember(reader.LocatorAt(2)));  // neither
+        Assert.True(match.IsMatch(reader.LocatorAt(0)));   // Error branch
+        Assert.True(match.IsMatch(reader.LocatorAt(1)));   // Xml branch
+        Assert.False(match.IsMatch(reader.LocatorAt(2)));  // neither
     }
 
     [Fact]
-    public void ComputeMembership_WithoutDateFilter_RendersEveryRowAsCandidate()
+    public void ComputeMatch_WithoutDateFilter_RendersEveryRowAsCandidate()
     {
         ResolvedEvent[] events = [Event(1), Event(2), Event(3)];
         (IEventColumnReader reader, _) = BuildReader(events);
@@ -204,33 +204,33 @@ public sealed class XmlFilterMembershipMatcherTests
         {
             [1] = "<Event/>", [2] = "<Event/>", [3] = "<Event/>"
         });
-        XmlFilterMembershipMatcher matcher = new(scanner);
+        XmlFilterMatcher matcher = new(scanner);
 
-        matcher.ComputeMembership(reader, IncludeFilter("Xml.Contains(\"x\")"), OwningLog, LogPathType.File, Ct);
+        matcher.ComputeMatch(reader, IncludeFilter("Xml.Contains(\"x\")"), OwningLog, LogPathType.File, Ct);
 
         Assert.Equal([1, 2, 3], scanner.RenderedRecordIds.Order());
     }
 
     [Fact]
     public void Constructor_WithNullScanner_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => new XmlFilterMembershipMatcher(null!));
+        Assert.Throws<ArgumentNullException>(() => new XmlFilterMatcher(null!));
 
     [Fact]
-    public void IsMember_ForForeignLogGenerationOrOutOfRangeLocator_ReturnsFalse()
+    public void IsMatch_ForForeignLogGenerationOrOutOfRangeLocator_ReturnsFalse()
     {
         ResolvedEvent[] events = [Event(1)];
         (IEventColumnReader reader, EventLogId logId) = BuildReader(events);
         FakeBatchScanner scanner = new(new Dictionary<long, string> { [1] = "<Event>alpha</Event>" });
-        XmlFilterMembershipMatcher matcher = new(scanner);
+        XmlFilterMatcher matcher = new(scanner);
 
-        XmlFilterMembership membership =
-            matcher.ComputeMembership(reader, IncludeFilter("Xml.Contains(\"alpha\")"), OwningLog, LogPathType.File, Ct);
+        XmlFilterMatch match =
+            matcher.ComputeMatch(reader, IncludeFilter("Xml.Contains(\"alpha\")"), OwningLog, LogPathType.File, Ct);
 
-        Assert.True(membership.IsMember(reader.LocatorAt(0)));
-        Assert.False(membership.IsMember(new EventLocator(logId, Generation: 99, Index: 0)));
-        Assert.False(membership.IsMember(new EventLocator(EventLogId.Create(), Generation: 0, Index: 0)));
-        Assert.False(membership.IsMember(new EventLocator(logId, Generation: 0, Index: 1)));
-        Assert.False(membership.IsMember(new EventLocator(logId, Generation: 0, Index: -1)));
+        Assert.True(match.IsMatch(reader.LocatorAt(0)));
+        Assert.False(match.IsMatch(new EventLocator(logId, Generation: 99, Index: 0)));
+        Assert.False(match.IsMatch(new EventLocator(EventLogId.Create(), Generation: 0, Index: 0)));
+        Assert.False(match.IsMatch(new EventLocator(logId, Generation: 0, Index: 1)));
+        Assert.False(match.IsMatch(new EventLocator(logId, Generation: 0, Index: -1)));
     }
 
     private static (IEventColumnReader Reader, EventLogId LogId) BuildReader(

@@ -5,6 +5,7 @@ using EventLogExpert.DatabaseTools.DependencyInjection;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Eventing.Writers;
+using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Configuration;
 using EventLogExpert.Logging.Routing;
@@ -138,6 +139,8 @@ public static class RuntimeServiceCollectionExtensions
             // Coordinators and concurrency
             services.AddSingleton<LogCloseCoordinator>();
             services.AddSingleton<EventLogConcurrencyState>();
+            services.AddSingleton<XmlFilterMatchCache>();
+            services.AddSingleton<IXmlFilterMatcher, XmlFilterMatcher>();
             services.AddSingleton<XmlReloadCoordinator>();
             services.AddSingleton<LiveTailIngestCoordinator>();
             services.AddSingleton<FilteredLogPresenceCoordinator>();
