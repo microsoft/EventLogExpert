@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Histogram;
@@ -21,7 +20,8 @@ internal sealed class OrderedViewShadowEffects(
     ViewRequestIssuer issuer,
     OrderedViewDispatchBridge bridge,
     IDispatcher dispatcher,
-    EventLogConcurrencyState concurrencyState)
+    EventLogConcurrencyState concurrencyState,
+    XmlFilterMatchCache matchCache)
 {
     private readonly OrderedViewDispatchBridge _bridge = bridge;
     private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
@@ -29,6 +29,7 @@ internal sealed class OrderedViewShadowEffects(
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly ViewRequestIssuer _issuer = issuer;
     private readonly IState<LogTableState> _logTableState = logTableState;
+    private readonly XmlFilterMatchCache _matchCache = matchCache;
     private readonly IState<RawEventStoreState> _rawEventStore = rawEventStore;
     private readonly OrderedViewWriter _writer = writer;
 
@@ -71,6 +72,8 @@ internal sealed class OrderedViewShadowEffects(
         {
             Sync();
 
+            if (XmlDeferred()) { return; }
+
             foreach (EventLogId logId in action.EventsByLog.Keys) { Reconcile(logId, action.Mode == RawIngestMode.Replace); }
         });
 
@@ -82,7 +85,8 @@ internal sealed class OrderedViewShadowEffects(
         Shadow(() =>
         {
             Sync();
-            Reconcile(action.LogData.Id, isReplace: true);
+
+            if (!XmlDeferred()) { Reconcile(action.LogData.Id, isReplace: true); }
         });
 
     [EffectMethod]
@@ -90,7 +94,8 @@ internal sealed class OrderedViewShadowEffects(
         Shadow(() =>
         {
             Sync();
-            Reconcile(action.LogData.Id, isReplace: false);
+
+            if (!XmlDeferred()) { Reconcile(action.LogData.Id, isReplace: false); }
         });
 
     [EffectMethod(typeof(MoveTabToGroupAction))]
@@ -140,6 +145,16 @@ internal sealed class OrderedViewShadowEffects(
     [EffectMethod(typeof(ToggleSortingAction))]
     public Task HandleToggleSorting(IDispatcher dispatcher) => Shadow(Sync);
 
+    [EffectMethod(typeof(XmlFilterMatchReadyAction))]
+    public Task HandleXmlFilterMatchReady(IDispatcher dispatcher) =>
+        Shadow(() =>
+        {
+            // ViewIdentity excludes the store/match stamp, so a same-identity Sync would be
+            // deduplicated by the issuer. Force a fresh issue to rebuild over the current readers.
+            _issuer.ForceReissue();
+            Sync();
+        });
+
     private void Reconcile(EventLogId logId, bool isReplace)
     {
         if (_rawEventStore.Value.ByLog.TryGetValue(logId, out var store))
@@ -183,15 +198,15 @@ internal sealed class OrderedViewShadowEffects(
         ViewIdentity identity = state.ViewIdentity;
         Filter filter = identity.Filter;
 
-        if (filter.RequiresXml &&
-            _eventLogState.Value.OpenLogs.Values.Any(log => !_concurrencyState.IsLoadedWithXml(log.Id)))
+        if (XmlFilterGate.IsDeferred(filter, _eventLogState.Value, _rawEventStore.Value, _concurrencyState, _matchCache))
         {
             return;
         }
 
         if (_issuer.TryIssue(identity) is not { } sequence) { return; }
 
-        Func<IEventColumnReader, EventLocator, bool> survives = FilterService.CompileSurvivorPredicate(filter);
+        Func<IEventColumnReader, EventLocator, bool> survives =
+            XmlFilterGate.BuildSurvivorPredicate(filter, _concurrencyState, _matchCache);
 
         _dispatcher.Dispatch(new ViewRequestInvalidatedAction(sequence));
 
@@ -205,4 +220,12 @@ internal sealed class OrderedViewShadowEffects(
                 filter,
                 (locator, reader) => survives(reader, locator)));
     }
+
+    private bool XmlDeferred() =>
+        XmlFilterGate.IsDeferred(
+            _logTableState.Value.ViewIdentity.Filter,
+            _eventLogState.Value,
+            _rawEventStore.Value,
+            _concurrencyState,
+            _matchCache);
 }

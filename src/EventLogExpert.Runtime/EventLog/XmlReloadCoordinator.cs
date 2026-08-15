@@ -153,13 +153,14 @@ internal sealed class XmlReloadCoordinator(
         }
     }
 
-    public PendingXmlReload Resolve(Filter filter)
+    public PendingXmlReload Resolve(Filter filter, LogPathType? restrictTo = null)
     {
         long reloadToken = _concurrencyState.GetCurrentReloadToken();
 
         var logs = filter.RequiresXml && !_eventLogState.Value.OpenLogs.IsEmpty ?
             _eventLogState.Value.OpenLogs
                 .Where(entry => !_concurrencyState.IsLoadedWithXml(entry.Value.Id))
+                .Where(entry => restrictTo is null || entry.Value.Type == restrictTo)
                 .Select(entry => (entry.Value.Id, Name: entry.Key, entry.Value.Type))
                 .ToList() : [];
 

@@ -65,4 +65,12 @@ internal sealed class FilteredLogPresenceEffects(FilteredLogPresenceCoordinator 
 
         return Task.CompletedTask;
     }
+
+    [EffectMethod(typeof(XmlFilterMatchReadyAction))]
+    public Task HandleXmlFilterMatchReady(IDispatcher dispatcher)
+    {
+        _coordinator.RetryScan();
+
+        return Task.CompletedTask;
+    }
 }

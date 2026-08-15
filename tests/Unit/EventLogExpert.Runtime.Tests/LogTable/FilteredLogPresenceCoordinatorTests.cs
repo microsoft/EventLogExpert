@@ -250,6 +250,7 @@ public sealed class FilteredLogPresenceCoordinatorTests
                 _rawEventStore,
                 _presenceState,
                 _concurrencyState,
+                new XmlFilterMatchCache(),
                 scanInline: true);
         }
 

@@ -1062,6 +1062,42 @@ public sealed class OrderedViewShadowTests
         Assert.Null(harness.Issuer.LastFault);
     }
 
+    [Fact]
+    public async Task XmlFilter_MidLoadApplyThenTerminalLoad_ForcesReissueRebuildingToTheGrownStore()
+    {
+        // Scenario X regression: an XML view issued over a mid-load PARTIAL store must, when match becomes ready,
+        // force a fresh full re-issue and rebuild over the GROWN store. ViewIdentity excludes the store stamp, so a
+        // same-identity Sync would be deduped by the issuer - without ForceReissue the terminal rows are dropped, and
+        // without a content-aware rebuild the writer would restamp the stale partial reader.
+        const string logName = "FileLog";
+        EventLogId logId = EventLogId.Create();
+        var filter = new Filter(null, [SavedFilter.TryCreate("Xml.Contains(\"x\")") ??
+            throw new InvalidOperationException("XML filter failed to compile.")]);
+
+        await using var harness = new OrderedViewShadowHarness();
+
+        List<ResolvedEvent> partial = SourcedRows(logName, (1, 0, "A"), (2, 10, "B"), (3, 20, "C"));
+        EventColumnStore partialStore = EventColumnStore.Build(partial, generation: 0, contentVersion: 0);
+        StampMatch(harness, filter, logId, partialStore);
+        harness.SetState(XmlFilteredLogTable(logId, filter), StoreOf(logId, partialStore), OpenFileLog(logId, logName, filter));
+
+        await harness.Effects.HandleLoadEvents(
+            new LoadEventsAction(new EventLogData(logName, LogPathType.File) { Id = logId }, partial), harness.Dispatcher);
+
+        Assert.Equal(partial.Count, (await harness.Writer.DrainAsync()).Count);
+
+        // Terminal load grows the store (same generation, higher content version); the view identity is unchanged.
+        List<ResolvedEvent> all = SourcedRows(logName, (1, 0, "A"), (2, 10, "B"), (3, 20, "C"), (4, 30, "D"), (5, 40, "E"));
+        EventColumnStore terminalStore = partialStore.Append([.. all.Skip(partial.Count)]);
+        StampMatch(harness, filter, logId, terminalStore);
+        harness.SetState(XmlFilteredLogTable(logId, filter), StoreOf(logId, terminalStore), OpenFileLog(logId, logName, filter));
+
+        await harness.Effects.HandleXmlFilterMatchReady(harness.Dispatcher);
+
+        Assert.Equal(all.Count, (await harness.Writer.DrainAsync()).Count);
+        Assert.Null(harness.Issuer.LastFault);
+    }
+
     private static void AssertReferenceOrderChanges(
         IReadOnlyList<ResolvedEvent> events,
         SortContext before,
@@ -1200,6 +1236,13 @@ public sealed class OrderedViewShadowTests
 
     private static EventLogData LogData(EventLogId logId) => new("Log0", LogPathType.Channel) { Id = logId };
 
+    private static EventLogState OpenFileLog(EventLogId logId, string logName, Filter filter) =>
+        new()
+        {
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty.Add(logName, new OpenLogInfo(logId, LogPathType.File)),
+            AppliedFilter = filter
+        };
+
     private static LogTableState PendingSortState(RoutedSetup setup)
     {
         LogTableState pending = setup.Routed with { GroupBy = null, IsGroupDescending = false };
@@ -1306,6 +1349,23 @@ public sealed class OrderedViewShadowTests
         return events;
     }
 
+    private static void StampMatch(OrderedViewShadowHarness harness, Filter filter, EventLogId logId, EventColumnStore store)
+    {
+        bool[] matches = new bool[store.Count];
+        Array.Fill(matches, true);
+
+        harness.MatchCache.Set(
+            filter,
+            new Dictionary<EventLogId, XmlFilterMatch>
+            {
+                [logId] = new XmlFilterMatch(logId, store.Generation, store.ContentVersion, store.Count, matches)
+            },
+            harness.MatchCache.NextSequence());
+    }
+
+    private static RawEventStoreState StoreOf(EventLogId logId, EventColumnStore store) =>
+        new() { ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty.Add(logId, store) };
+
     private static (LogTableState LogTable, RawEventStoreState RawStore) TwoLogs(
         EventLogId log0, IReadOnlyList<ResolvedEvent> events0,
         EventLogId log1, IReadOnlyList<ResolvedEvent> events1, bool descending)
@@ -1327,6 +1387,16 @@ public sealed class OrderedViewShadowTests
 
         return (logTable, rawStore);
     }
+
+    private static LogTableState XmlFilteredLogTable(EventLogId logId, Filter filter) =>
+        new()
+        {
+            ActiveEventLogId = logId,
+            EventTables = [new LogView(logId)],
+            IsDescending = true,
+            RequestedIsDescending = true,
+            AppliedFilter = filter
+        };
 
     private sealed record RoutedSetup(
         LogTableState Routed,

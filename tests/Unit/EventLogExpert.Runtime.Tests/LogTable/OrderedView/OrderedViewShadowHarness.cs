@@ -37,16 +37,21 @@ internal sealed class OrderedViewShadowHarness : IAsyncDisposable
             Issuer,
             Bridge,
             Dispatcher,
-            new EventLogConcurrencyState());
+            ConcurrencyState,
+            MatchCache);
     }
 
     public OrderedViewDispatchBridge Bridge { get; }
+
+    public EventLogConcurrencyState ConcurrencyState { get; } = new();
 
     public IDispatcher Dispatcher { get; } = Substitute.For<IDispatcher>();
 
     public OrderedViewShadowEffects Effects { get; }
 
     public ViewRequestIssuer Issuer { get; } = new();
+
+    public XmlFilterMatchCache MatchCache { get; } = new();
 
     public OrderedViewWriter Writer { get; } = new(publishIntervalMs: 0);
 
