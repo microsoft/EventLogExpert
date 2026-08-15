@@ -4,7 +4,9 @@
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Structured;
+using EventLogExpert.Filtering.Emit;
 using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Filtering.Lowering;
 using EventLogExpert.Filtering.Persistence;
 using System.Collections.Immutable;
 using System.Runtime.ExceptionServices;
@@ -159,6 +161,63 @@ public sealed class FilterService : IFilterService
                 e.MatchesFilters(filter.Filters))
             .ToList()
             .AsReadOnly();
+    }
+
+    /// <summary>
+    ///     Compiles a columnar predicate that decides which rows COULD match an XML-referencing filter and therefore need
+    ///     their event XML rendered on demand. A row is a candidate when at least one XML-referencing filter's cheap (non-XML)
+    ///     top-level AND-conjuncts do not decisively fail (their tri-state columnar result is not
+    ///     <see cref="FilterMatch.NoMatch" />). A non-candidate has every XML-referencing filter decisively at
+    ///     <see cref="FilterMatch.NoMatch" /> regardless of XML, so its match result is XML-independent and can be computed
+    ///     without a render. Any XML filter that cannot be narrowed - no cheap conjuncts (XML under a top-level OR/NOT, or a
+    ///     pure-XML filter), or a lowering/emit failure - forces every row to be a candidate, the conservative choice that
+    ///     never drops a row that might match.
+    /// </summary>
+    internal static Func<IEventColumnReader, EventLocator, bool> CompileXmlCandidatePredicate(Filter filter)
+    {
+        var cheapEvaluators = new List<Func<IEventColumnReader, EventLocator, FilterMatch>>();
+
+        foreach (var savedFilter in filter.Filters)
+        {
+            if (savedFilter.Compiled?.RequiresXml != true) { continue; }
+
+            if (!FilterCompiler.TryLower(savedFilter.ComparisonText, out var node, out _))
+            {
+                return static (_, _) => true;
+            }
+
+            var (cheapConditions, _) = FilterNodeMetadata.PartitionAndChain(node);
+
+            if (cheapConditions.Count == 0) { return static (_, _) => true; }
+
+            FilterNode folded = cheapConditions[0];
+
+            for (int index = 1; index < cheapConditions.Count; index++)
+            {
+                folded = new AndNode(folded, cheapConditions[index]);
+            }
+
+            if (!ColumnEmitter.TryEmit(folded, out var cheapCompiled, out _))
+            {
+                return static (_, _) => true;
+            }
+
+            cheapEvaluators.Add(cheapCompiled.Evaluate);
+        }
+
+        if (cheapEvaluators.Count == 0) { return static (_, _) => true; }
+
+        var evaluators = cheapEvaluators.ToArray();
+
+        return (reader, locator) =>
+        {
+            foreach (var cheapEvaluator in evaluators)
+            {
+                if (cheapEvaluator(reader, locator) != FilterMatch.NoMatch) { return true; }
+            }
+
+            return false;
+        };
     }
 
     private static List<(ColumnCompiledFilter Compiled, bool IsExcluded)> CompileColumnFilters(
