@@ -88,6 +88,41 @@ internal static class FilterParser
         return true;
     }
 
+    public static bool TryLower(
+        string? filterText,
+        [NotNullWhen(true)] out FilterNode? node,
+        [NotNullWhen(false)] out string? error)
+    {
+        node = null;
+
+        if (string.IsNullOrWhiteSpace(filterText))
+        {
+            error = "Expression is empty.";
+
+            return false;
+        }
+
+        if (!Tokenizer.TryTokenize(filterText, out var tokens, out error))
+        {
+            return false;
+        }
+
+        if (!Parser.TryParse(tokens, out var syntax, out error))
+        {
+            return false;
+        }
+
+        if (!Lowerer.TryLower(syntax!, out var loweredNode, out error))
+        {
+            return false;
+        }
+
+        node = loweredNode!;
+        error = null;
+
+        return true;
+    }
+
     public static bool TryValidate(string? filterText, [NotNullWhen(false)] out string? error)
     {
         if (string.IsNullOrWhiteSpace(filterText))

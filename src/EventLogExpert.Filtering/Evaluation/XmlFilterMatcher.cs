@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.Filtering.Compilation;
 
 namespace EventLogExpert.Filtering.Evaluation;
 
@@ -42,38 +43,50 @@ public sealed class XmlFilterMatcher : IXmlFilterMatcher
         bool[] hasRecordId = new bool[count];
         reader.CopyInt64Column(EventFieldId.RecordId, recordIds, hasRecordId);
 
-        // Phase 1 (cheap, columnar): candidate = date-surviving rows with a record id. The date range is a necessary
-        // condition for a match, so a date-excluded row is a non-match and never needs its XML rendered.
+        Func<IEventColumnReader, EventLocator, bool> isXmlCandidate = FilterService.CompileXmlCandidatePredicate(filter);
+
+        // Phase 1 (cheap, columnar): a candidate is a date-surviving row with a record id whose cheap (non-XML) filter
+        // conjuncts do not decisively fail - only those rows need their XML rendered. The date range is a global
+        // necessary condition, so a date-excluded row is a non-match. A date-surviving row that every XML filter rules
+        // out via a cheap conjunct is XML-independent: it evaluates the same with empty XML, so it joins the rows that
+        // have no record id on the empty-XML path and is never rendered.
         Dictionary<long, int> candidateIndexByRecordId = new(count);
-        List<int> unmappableRows = [];
+        List<int> emptyXmlRows = [];
         DateFilter? activeDateFilter = filter.DateFilter is { IsEnabled: true } enabledDateFilter ? enabledDateFilter : null;
 
         for (int index = 0; index < count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (!hasRecordId[index]) { unmappableRows.Add(index); continue; }
+            if (!hasRecordId[index]) { emptyXmlRows.Add(index); continue; }
 
-            if (activeDateFilter is not null && !DateSurvives(reader, reader.LocatorAt(index), activeDateFilter)) { continue; }
+            EventLocator locator = reader.LocatorAt(index);
 
-            candidateIndexByRecordId[recordIds[index]] = index;
+            if (activeDateFilter is not null && !DateSurvives(reader, locator, activeDateFilter)) { continue; }
+
+            if (isXmlCandidate(reader, locator)) { candidateIndexByRecordId[recordIds[index]] = index; }
+            else { emptyXmlRows.Add(index); }
         }
 
         // Phase 2 (on demand): the scanner renders XML only for candidate record ids; evaluate the complete filter with
-        // the rendered XML spliced into the rehydrated row.
+        // the rendered XML spliced into the rehydrated row. Skipped entirely when nothing is a candidate - no log scan.
         bool[] evaluated = new bool[count];
 
-        foreach (ScannedEventXml scanned in
-            _scanner.Scan(owningLog, pathType, candidateIndexByRecordId.ContainsKey, cancellationToken))
+        if (candidateIndexByRecordId.Count > 0)
         {
-            if (!candidateIndexByRecordId.TryGetValue(scanned.RecordId, out int index)) { continue; }
+            foreach (ScannedEventXml scanned in
+                _scanner.Scan(owningLog, pathType, candidateIndexByRecordId.ContainsKey, cancellationToken))
+            {
+                if (!candidateIndexByRecordId.TryGetValue(scanned.RecordId, out int index)) { continue; }
 
-            evaluated[index] = true;
-            matches[index] = Matches(reader, reader.LocatorAt(index), filter, scanned.Xml);
+                evaluated[index] = true;
+                matches[index] = Matches(reader, reader.LocatorAt(index), filter, scanned.Xml);
+            }
         }
 
-        // Phase 3 (defensive): candidates the scan never yielded (record rolled out between snapshot and scan) and rows
-        // without a record id are evaluated with empty XML - an unresolved XML is empty, NOT an unconditional no-match.
+        // Phase 3: candidates the scan never yielded (record rolled out between snapshot and scan), rows without a
+        // record id, and non-candidate rows are evaluated with empty XML - an unresolved or XML-independent row is
+        // evaluated with empty XML, NOT an unconditional no-match. This runs even when the Phase 2 scan was skipped.
         foreach ((_, int index) in candidateIndexByRecordId)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -83,7 +96,7 @@ public sealed class XmlFilterMatcher : IXmlFilterMatcher
             matches[index] = Matches(reader, reader.LocatorAt(index), filter, string.Empty);
         }
 
-        foreach (int index in unmappableRows)
+        foreach (int index in emptyXmlRows)
         {
             cancellationToken.ThrowIfCancellationRequested();
 

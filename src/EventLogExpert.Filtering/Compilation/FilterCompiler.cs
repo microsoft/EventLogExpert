@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Filtering.Lowering;
 using EventLogExpert.Filtering.Parsing;
 using System.Diagnostics.CodeAnalysis;
 
@@ -47,4 +48,15 @@ internal static class FilterCompiler
         [NotNullWhen(true)] out ColumnCompiledFilter? compiled,
         [NotNullWhen(false)] out string? error) =>
         FilterParser.TryCompileColumn(expression, out compiled, out error);
+
+    /// <summary>
+    ///     Lowers the supplied filter expression to its <see cref="FilterNode" /> graph without emitting a predicate.
+    ///     Used by the on-demand XML candidate narrowing to partition an XML-referencing filter's cheap (non-XML) conjuncts.
+    ///     Delegates to <see cref="FilterParser.TryLower" />.
+    /// </summary>
+    public static bool TryLower(
+        string? expression,
+        [NotNullWhen(true)] out FilterNode? node,
+        [NotNullWhen(false)] out string? error) =>
+        FilterParser.TryLower(expression, out node, out error);
 }
