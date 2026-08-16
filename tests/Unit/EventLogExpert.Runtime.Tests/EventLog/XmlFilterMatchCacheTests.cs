@@ -40,6 +40,40 @@ public sealed class XmlFilterMatchCacheTests
     }
 
     [Fact]
+    public void RemoveNotIn_EvictsLogsOutsideTheOpenSet_AndAllowsReAdd()
+    {
+        XmlFilterMatchCache state = new();
+        EventLogId kept = EventLogId.Create();
+        EventLogId evicted = EventLogId.Create();
+        Filter filter = XmlFilter();
+
+        state.Set(
+            filter,
+            new Dictionary<EventLogId, XmlFilterMatch>
+            {
+                [kept] = new(kept, 0, 0, 0, []),
+                [evicted] = new(evicted, 0, 0, 0, [])
+            },
+            state.NextSequence());
+
+        state.RemoveNotIn(new HashSet<EventLogId> { kept });
+
+        Assert.NotNull(state.GetMatch(filter, kept));
+        Assert.Null(state.GetMatch(filter, evicted));
+
+        state.Set(
+            filter,
+            new Dictionary<EventLogId, XmlFilterMatch>
+            {
+                [kept] = new(kept, 0, 0, 0, []),
+                [evicted] = new(evicted, 0, 0, 0, [])
+            },
+            state.NextSequence());
+
+        Assert.NotNull(state.GetMatch(filter, evicted));
+    }
+
+    [Fact]
     public void Remove_EvictsOnlyTheGivenLogsMatch()
     {
         XmlFilterMatchCache state = new();
@@ -51,8 +85,8 @@ public sealed class XmlFilterMatchCacheTests
             filter,
             new Dictionary<EventLogId, XmlFilterMatch>
             {
-                [kept] = new XmlFilterMatch(kept, 0, 0, 0, []),
-                [removed] = new XmlFilterMatch(removed, 0, 0, 0, [])
+                [kept] = new(kept, 0, 0, 0, []),
+                [removed] = new(removed, 0, 0, 0, [])
             },
             state.NextSequence());
 
