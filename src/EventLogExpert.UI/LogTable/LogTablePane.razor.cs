@@ -659,23 +659,9 @@ public sealed partial class LogTablePane
 
         var representative = _activeDisplayedEvents.GetDetailLean(_activeDisplayedEvents.LocatorAt(group.StartIndex));
 
-        string? value = Presentation.Ordering.GroupBy switch
-        {
-            ColumnName.RecordId => representative.RecordId?.ToString(),
-            ColumnName.Level => representative.Level,
-            ColumnName.DateAndTime => representative.TimeCreated.ConvertTimeZone(_timeZoneSettings).ToString(),
-            ColumnName.ActivityId => representative.ActivityId?.ToString(),
-            ColumnName.Log => representative.LogName,
-            ColumnName.ComputerName => representative.ComputerName,
-            ColumnName.Source => representative.Source,
-            ColumnName.EventId => representative.Id.ToString(),
-            ColumnName.TaskCategory => representative.TaskCategory,
-            ColumnName.Keywords => representative.KeywordsDisplayName,
-            ColumnName.ProcessId => representative.ProcessId?.ToString(),
-            ColumnName.ThreadId => representative.ThreadId?.ToString(),
-            ColumnName.User => representative.UserDisplayName,
-            _ => null
-        };
+        string value = Presentation.Ordering.GroupBy is { } groupBy ?
+            ColumnDescriptors.GetGroupText(representative, groupBy, new ColumnFormatContext(_timeZoneSettings)) :
+            string.Empty;
 
         return string.IsNullOrEmpty(value) ? "(none)" : value;
     }

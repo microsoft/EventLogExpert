@@ -20,7 +20,7 @@ internal static partial class ResolvedEventOrdering
         EventLocator b,
         ColumnName column)
     {
-        EventFieldId field = ColumnFieldMap.ToFieldId(column);
+        EventFieldId field = ColumnDescriptors.GetFieldId(column);
         EventFieldValue left = readerA.GetField(a, field);
         EventFieldValue right = readerB.GetField(b, field);
 

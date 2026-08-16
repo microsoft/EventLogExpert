@@ -102,48 +102,8 @@ internal sealed class EventCopyFormatter(IEventDetailResolver detailResolver, IE
             case EventCopyFormat.Default:
                 foreach ((ColumnName column, _) in request.EnabledColumns.Where(x => x.Value))
                 {
-                    switch (column)
-                    {
-                        case ColumnName.RecordId:
-                            builder.Append($"\"{@event.RecordId}\" ");
-                            break;
-                        case ColumnName.Level:
-                            builder.Append($"\"{@event.Level}\" ");
-                            break;
-                        case ColumnName.DateAndTime:
-                            builder.Append($"\"{@event.TimeCreated.ConvertTimeZone(request.TimeZone)}\" ");
-                            break;
-                        case ColumnName.ActivityId:
-                            builder.Append($"\"{@event.ActivityId}\" ");
-                            break;
-                        case ColumnName.Log:
-                            builder.Append($"\"{OwningLogDisplay.ShortName(@event.OwningLog)}\" ");
-                            break;
-                        case ColumnName.ComputerName:
-                            builder.Append($"\"{@event.ComputerName}\" ");
-                            break;
-                        case ColumnName.Source:
-                            builder.Append($"\"{@event.Source}\" ");
-                            break;
-                        case ColumnName.EventId:
-                            builder.Append($"\"{@event.Id}\" ");
-                            break;
-                        case ColumnName.TaskCategory:
-                            builder.Append($"\"{@event.TaskCategory}\" ");
-                            break;
-                        case ColumnName.Keywords:
-                            builder.Append($"\"{@event.KeywordsDisplayName}\" ");
-                            break;
-                        case ColumnName.ProcessId:
-                            builder.Append($"\"{@event.ProcessId}\" ");
-                            break;
-                        case ColumnName.ThreadId:
-                            builder.Append($"\"{@event.ThreadId}\" ");
-                            break;
-                        case ColumnName.User:
-                            builder.Append($"\"{@event.UserDisplayName}\" ");
-                            break;
-                    }
+                    builder.Append(
+                        $"\"{ColumnDescriptors.GetCellText(@event, column, new ColumnFormatContext(request.TimeZone))}\" ");
                 }
 
                 builder.Append($"\"{@event.Description}\"");
