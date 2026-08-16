@@ -101,6 +101,54 @@ internal sealed class ModernEventMatcher(TemplateAnalyzer templates, ITraceLogge
     }
 
     /// <summary>
+    ///     Drops short-id matches whose encoded qualifier conflicts with the event's, so a different provider's message
+    ///     that merely shares the low-16 id is never rendered.
+    /// </summary>
+    public static IReadOnlyList<MessageModel> FilterByQualifier(EventRecord eventRecord, IReadOnlyList<MessageModel> legacyMessages)
+    {
+        // Classic events resolve by full 32-bit id (Qualifiers in the high 16 bits), so a message whose high-16 is a
+        // different non-zero value is a collision from another module that happens to share the low-16 short id (e.g.
+        // netevent.dll's 7001 vs a driver's 7001). Keep the exact-qualifier matches; when there are none, keep the
+        // provider's own unqualified (high-16 == 0) messages ONLY if no conflicting-qualifier collision is present -
+        // otherwise prefer no match over rendering a message that is provably not this event's.
+        if (eventRecord.Qualifiers is not { } qualifier || legacyMessages.Count == 0)
+        {
+            return legacyMessages;
+        }
+
+        int exactMatchCount = 0;
+        bool anyConflictingQualifier = false;
+
+        for (int i = 0; i < legacyMessages.Count; i++)
+        {
+            ushort high = (ushort)((legacyMessages[i].RawId >> 16) & 0xFFFF);
+
+            if (high == qualifier) { exactMatchCount++; }
+            else if (high != 0) { anyConflictingQualifier = true; }
+        }
+
+        // Return the original list (no allocation) when it is already exactly the compatible set.
+        if (exactMatchCount == legacyMessages.Count) { return legacyMessages; }
+
+        if (exactMatchCount == 0) { return anyConflictingQualifier ? [] : legacyMessages; }
+
+        var exactMatches = new List<MessageModel>(exactMatchCount);
+
+        for (int i = 0; i < legacyMessages.Count; i++)
+        {
+            MessageModel message = legacyMessages[i];
+
+            if ((ushort)((message.RawId >> 16) & 0xFFFF) == qualifier) { exactMatches.Add(message); }
+        }
+
+        return exactMatches;
+    }
+
+    /// <summary>Legacy short-id messages for the event, with qualifier-conflicting collisions removed.</summary>
+    public static IReadOnlyList<MessageModel> GetCompatibleLegacyMessages(ProviderDetails details, EventRecord eventRecord) =>
+        FilterByQualifier(eventRecord, details.GetMessagesByShortId(eventRecord.Id));
+
+    /// <summary>
     ///     Locates the <see cref="EventModel" /> in <paramref name="details" /> whose template matches the
     ///     <paramref name="eventRecord" />, walking the documented fallback chain. Returns null when no candidate passes both
     ///     Id/Version/LogName and template-property-count checks.

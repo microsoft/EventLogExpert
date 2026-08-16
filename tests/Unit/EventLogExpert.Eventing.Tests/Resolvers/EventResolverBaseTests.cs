@@ -266,6 +266,23 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_MSExchangeReplEvent_ShouldResolveCorrectly()
+    {
+        // Arrange
+        var providerDetails = EventUtils.CreateExchangeProviderDetails();
+        var resolver = new TestEventResolver([providerDetails]);
+        var eventRecord = EventUtils.CreateExchangeEventRecord();
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal(Constants.ExchangeFormattedDescription, displayEvent.Description);
+        Assert.Equal("Service", displayEvent.TaskCategory);
+    }
+
+    [Fact]
     public void ResolveEvent_ModernTemplateWithMatchingProperties_PopulatesNamedEventData()
     {
         var (details, eventRecord) = EventUtils.CreateModernEvent(
@@ -283,23 +300,6 @@ public sealed class EventResolverBaseTests
         Assert.Equal("alice", user.AsString());
         Assert.True(resolved.EventData.TryGetValue("Source", out var source));
         Assert.Equal("10.0.0.1", source.AsString());
-    }
-
-    [Fact]
-    public void ResolveEvent_MSExchangeReplEvent_ShouldResolveCorrectly()
-    {
-        // Arrange
-        var providerDetails = EventUtils.CreateExchangeProviderDetails();
-        var resolver = new TestEventResolver([providerDetails]);
-        var eventRecord = EventUtils.CreateExchangeEventRecord();
-
-        // Act
-        var displayEvent = resolver.ResolveEvent(eventRecord);
-
-        // Assert
-        Assert.NotNull(displayEvent);
-        Assert.Equal(Constants.ExchangeFormattedDescription, displayEvent.Description);
-        Assert.Equal("Service", displayEvent.TaskCategory);
     }
 
     [Fact]
@@ -577,6 +577,69 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithAmbiguousPrimaryLegacyAndSupplementalMatch_ShouldUseSupplementalDescription()
+    {
+        // Arrange - primary has 2 legacy messages for the same event ID with no LogLink
+        // and identical severity (so disambiguation fails). Supplemental has a matching
+        // modern event. Should fall back to supplemental's description.
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel { ShortId = 500, RawId = 0x40000500, Text = Constants.PrimaryMessageA, LogLink = null },
+                new MessageModel { ShortId = 500, RawId = 0x40000500, Text = Constants.PrimaryMessageB, LogLink = null }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 500,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Supplemental modern: %1",
+                    Keywords = [],
+                    Template = "<template><data name=\"Val\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>"
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 500,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["resolved"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Supplemental modern: resolved", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithAmbiguousPrimaryLegacyAndSupplemental_ShouldAlsoUseSupplementalForKeywordsAndTask()
     {
         // Arrange - regression for the cross-issue case: when primary has ambiguous legacy
@@ -641,69 +704,6 @@ public sealed class EventResolverBaseTests
         Assert.Contains(Constants.SupplementalDescription, displayEvent.Description);
         Assert.Equal(Constants.SupplementalTask, displayEvent.TaskCategory);
         Assert.Contains(Constants.SupplementalKeyword, displayEvent.Keywords);
-    }
-
-    [Fact]
-    public void ResolveEvent_WithAmbiguousPrimaryLegacyAndSupplementalMatch_ShouldUseSupplementalDescription()
-    {
-        // Arrange - primary has 2 legacy messages for the same event ID with no LogLink
-        // and identical severity (so disambiguation fails). Supplemental has a matching
-        // modern event. Should fall back to supplemental's description.
-        var primaryDetails = new ProviderDetails
-        {
-            ProviderName = Constants.TestProviderName,
-            Events = [],
-            Messages =
-            [
-                new MessageModel { ShortId = 500, RawId = 0x40000500, Text = Constants.PrimaryMessageA, LogLink = null },
-                new MessageModel { ShortId = 500, RawId = 0x40000500, Text = Constants.PrimaryMessageB, LogLink = null }
-            ],
-            Parameters = [],
-            Keywords = new Dictionary<long, string>(),
-            Opcodes = new Dictionary<int, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
-
-        var supplementalDetails = new ProviderDetails
-        {
-            ProviderName = Constants.TestProviderName,
-            Events =
-            [
-                new EventModel
-                {
-                    Id = 500,
-                    Version = 0,
-                    LogName = Constants.ApplicationLogName,
-                    Description = "Supplemental modern: %1",
-                    Keywords = [],
-                    Template = "<template><data name=\"Val\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>"
-                }
-            ],
-            Messages = [],
-            Parameters = [],
-            Keywords = new Dictionary<long, string>(),
-            Opcodes = new Dictionary<int, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
-
-        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
-
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.TestProviderName,
-            Id = 500,
-            Version = 0,
-            Level = 4,
-            LogName = Constants.ApplicationLogName,
-            Properties = ["resolved"]
-        };
-
-        // Act
-        var displayEvent = resolver.ResolveEvent(eventRecord);
-
-        // Assert
-        Assert.NotNull(displayEvent);
-        Assert.Contains("Supplemental modern: resolved", displayEvent.Description);
     }
 
     [Fact]
@@ -953,6 +953,57 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithCollidingSystemAndDriverMessages_ShouldResolveToTheQualifierMatch()
+    {
+        // Arrange - the mtkwecx case: a shared system DLL (netevent) and the driver both expose a short-id 7001
+        // message, but only the driver's full id (0x40021B59) matches the event's Qualifiers (0x4002).
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 7001,
+                    RawId = unchecked(0xC0001B59), // netevent SCM message, Qualifier 0xC000
+                    Text = "The %1 service depends on the %2 service which failed to start because of the following error: %3"
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 7001,
+                    RawId = 0x40021B59, // driver message, Qualifier 0x4002
+                    Text = "Power Save Information"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 7001,
+            Qualifiers = 0x4002,
+            Level = 4,
+            LogName = Constants.SystemLogName,
+            Properties = ["", new byte[] { 0x00 }]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal("Power Save Information", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithDataElementsMissingOutType_ShouldResolveDescription()
     {
         // Arrange - template has 3 data elements, only first has outType
@@ -998,6 +1049,44 @@ public sealed class EventResolverBaseTests
         Assert.NotNull(displayEvent);
         Assert.Contains("TestValue", displayEvent.Description);
         Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithEmptyPrimaryAndNoSupplemental_ShouldReturnEventDataTail()
+    {
+        // Arrange - empty primary AND no supplemental should fall through to the
+        // no-metadata fallback. With multiple properties present, that surfaces them
+        // under the "included with the event" header (mmc-style payload dump).
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], null);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 9999,
+            Properties = ["a", "b", "c"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("The following information was included with the event:", displayEvent.Description);
+        Assert.Contains("a", displayEvent.Description);
+        Assert.Contains("b", displayEvent.Description);
+        Assert.Contains("c", displayEvent.Description);
+        Assert.DoesNotContain("No matching message", displayEvent.Description);
     }
 
     [Fact]
@@ -1057,44 +1146,6 @@ public sealed class EventResolverBaseTests
         Assert.Contains("No matching message", displayEvent.Description);
         Assert.DoesNotContain("No matching provider", displayEvent.Description);
         Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
-    }
-
-    [Fact]
-    public void ResolveEvent_WithEmptyPrimaryAndNoSupplemental_ShouldReturnEventDataTail()
-    {
-        // Arrange - empty primary AND no supplemental should fall through to the
-        // no-metadata fallback. With multiple properties present, that surfaces them
-        // under the "included with the event" header (mmc-style payload dump).
-        var primaryDetails = new ProviderDetails
-        {
-            ProviderName = Constants.TestProviderName,
-            Events = [],
-            Messages = [],
-            Parameters = [],
-            Keywords = new Dictionary<long, string>(),
-            Opcodes = new Dictionary<int, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
-
-        var resolver = new SupplementalTestResolver([primaryDetails], null);
-
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.TestProviderName,
-            Id = 9999,
-            Properties = ["a", "b", "c"]
-        };
-
-        // Act
-        var displayEvent = resolver.ResolveEvent(eventRecord);
-
-        // Assert
-        Assert.NotNull(displayEvent);
-        Assert.Contains("The following information was included with the event:", displayEvent.Description);
-        Assert.Contains("a", displayEvent.Description);
-        Assert.Contains("b", displayEvent.Description);
-        Assert.Contains("c", displayEvent.Description);
-        Assert.DoesNotContain("No matching message", displayEvent.Description);
     }
 
     [Fact]
@@ -1385,22 +1436,6 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
-    public void ResolveEvent_WithGuid_ShouldFormatWithBraces()
-    {
-        var (details, eventRecord) = EventUtils.CreateModernEvent(
-            "Id: %1",
-            """<template><data name="Id" inType="win:GUID"/></template>""",
-            [new Guid("12345678-1234-1234-1234-123456789abc")]);
-
-        var resolver = new TestEventResolver([details]);
-
-        var displayEvent = resolver.ResolveEvent(eventRecord);
-
-        Assert.NotNull(displayEvent);
-        Assert.Contains("{12345678-1234-1234-1234-123456789abc}", displayEvent.Description);
-    }
-
-    [Fact]
     public void ResolveEvent_WithGuidProperty_ShouldRenderWithBraces()
     {
         // Arrange - Windows renders GUID insertions wrapped in braces.
@@ -1422,6 +1457,42 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Contains("Volume Id: {4cff5b8e-e659-4f3a-8b2f-1a2b3c4d5e6f}", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithGuid_ShouldFormatWithBraces()
+    {
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Id: %1",
+            """<template><data name="Id" inType="win:GUID"/></template>""",
+            [new Guid("12345678-1234-1234-1234-123456789abc")]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        Assert.NotNull(displayEvent);
+        Assert.Contains("{12345678-1234-1234-1234-123456789abc}", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithHResultOutType_ShouldResolveDynamically()
+    {
+        // Arrange - win:HResult with a common error code should resolve dynamically
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Error: %1",
+            """<template><data name="Error" inType="win:Int32" outType="win:HResult"/></template>""",
+            [unchecked((int)0x80070005)]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - 0x80070005 is ACCESS_DENIED; resolved message should not contain the raw hex code
+        Assert.NotNull(displayEvent);
+        Assert.DoesNotContain("0x80070005", displayEvent.Description);
+        Assert.DoesNotContain("0x00000005", displayEvent.Description);
     }
 
     [Fact]
@@ -1561,26 +1632,6 @@ public sealed class EventResolverBaseTests
 
         Assert.NotNull(displayEvent);
         Assert.Contains("18446744073709551615", displayEvent.Description);
-    }
-
-    [Fact]
-    public void ResolveEvent_WithHResultOutType_ShouldResolveDynamically()
-    {
-        // Arrange - win:HResult with a common error code should resolve dynamically
-        var (details, eventRecord) = EventUtils.CreateModernEvent(
-            "Error: %1",
-            """<template><data name="Error" inType="win:Int32" outType="win:HResult"/></template>""",
-            [unchecked((int)0x80070005)]);
-
-        var resolver = new TestEventResolver([details]);
-
-        // Act
-        var displayEvent = resolver.ResolveEvent(eventRecord);
-
-        // Assert - 0x80070005 is ACCESS_DENIED; resolved message should not contain the raw hex code
-        Assert.NotNull(displayEvent);
-        Assert.DoesNotContain("0x80070005", displayEvent.Description);
-        Assert.DoesNotContain("0x00000005", displayEvent.Description);
     }
 
     [Fact]
@@ -2284,6 +2335,59 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithMultipleLegacyMessagesSameSeverity_ShouldDisambiguateByQualifier()
+    {
+        // Arrange - reproduces the Microsoft-Windows-Defrag EventID 258 case where two
+        // messages share the same EventId and severity but differ in their high 16 bits
+        // (Qualifier). Windows identifies the right entry by full message ID, so
+        // RawId == (Qualifiers << 16) | EventId.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 258,
+                    RawId = 0x00000102, // Qualifier=0, severity 00=Success
+                    Text = "The storage optimizer successfully completed %1 on %2"
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 258,
+                    RawId = 0x09000102, // Qualifier=0x900, severity 00=Success
+                    Text = "The retrim operation was skipped"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 258,
+            Qualifiers = 0,
+            Level = 0,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["defragmentation", "Data (E:)"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal("The storage optimizer successfully completed defragmentation on Data (E:)", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithMultipleLegacyMessages_ShouldDisambiguateByLogLink()
     {
         // Arrange - two messages with same ShortId, but different LogLinks
@@ -2416,59 +2520,6 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Contains("No matching message", displayEvent.Description);
-    }
-
-    [Fact]
-    public void ResolveEvent_WithMultipleLegacyMessagesSameSeverity_ShouldDisambiguateByQualifier()
-    {
-        // Arrange - reproduces the Microsoft-Windows-Defrag EventID 258 case where two
-        // messages share the same EventId and severity but differ in their high 16 bits
-        // (Qualifier). Windows identifies the right entry by full message ID, so
-        // RawId == (Qualifiers << 16) | EventId.
-        var providerDetails = new ProviderDetails
-        {
-            ProviderName = Constants.TestProviderName,
-            Events = [],
-            Messages =
-            [
-                new MessageModel
-                {
-                    ProviderName = Constants.TestProviderName,
-                    ShortId = 258,
-                    RawId = 0x00000102, // Qualifier=0, severity 00=Success
-                    Text = "The storage optimizer successfully completed %1 on %2"
-                },
-                new MessageModel
-                {
-                    ProviderName = Constants.TestProviderName,
-                    ShortId = 258,
-                    RawId = 0x09000102, // Qualifier=0x900, severity 00=Success
-                    Text = "The retrim operation was skipped"
-                }
-            ],
-            Parameters = [],
-            Keywords = new Dictionary<long, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
-
-        var resolver = new TestEventResolver([providerDetails]);
-
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.TestProviderName,
-            Id = 258,
-            Qualifiers = 0,
-            Level = 0,
-            LogName = Constants.ApplicationLogName,
-            Properties = ["defragmentation", "Data (E:)"]
-        };
-
-        // Act
-        var displayEvent = resolver.ResolveEvent(eventRecord);
-
-        // Assert
-        Assert.NotNull(displayEvent);
-        Assert.Equal("The storage optimizer successfully completed defragmentation on Data (E:)", displayEvent.Description);
     }
 
     [Fact]
@@ -2606,6 +2657,29 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithNoProviderDetails_ShouldReturnDefaultDescription()
+    {
+        // Arrange
+        var resolver = new TestEventResolver();
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.NonExistentProviderName,
+            Id = 1000,
+            ComputerName = Constants.TestComputer,
+            LogName = Constants.ApplicationLogName
+        };
+
+        // Act
+        resolver.LoadProviderDetails(eventRecord);
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("No matching provider", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithNonClassicEventIdZeroAndNoProviderMetadata_ShouldNotPrependSystemMessage()
     {
         // Arrange - regression guard: only classic-keyword events get the Win32
@@ -2646,29 +2720,6 @@ public sealed class EventResolverBaseTests
 
         Assert.Contains("The following information was included with the event:", displayEvent.Description);
         Assert.Contains("payload-a", displayEvent.Description);
-    }
-
-    [Fact]
-    public void ResolveEvent_WithNoProviderDetails_ShouldReturnDefaultDescription()
-    {
-        // Arrange
-        var resolver = new TestEventResolver();
-
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.NonExistentProviderName,
-            Id = 1000,
-            ComputerName = Constants.TestComputer,
-            LogName = Constants.ApplicationLogName
-        };
-
-        // Act
-        resolver.LoadProviderDetails(eventRecord);
-        var displayEvent = resolver.ResolveEvent(eventRecord);
-
-        // Assert
-        Assert.NotNull(displayEvent);
-        Assert.Contains("No matching provider", displayEvent.Description);
     }
 
     [Fact]
@@ -2897,6 +2948,97 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Equal(string.Empty, displayEvent.Xml);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithOnlyAConflictingSystemMessage_ShouldReportNoMatch()
+    {
+        // Arrange - only the shared system DLL's short-id 7001 (Qualifier 0xC000) is loaded; the event carries 0x4002.
+        // The old behavior rendered this unrelated SCM template (with the event's binary blob as %2). The resolver must
+        // report no matching message rather than mis-resolve.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 7001,
+                    RawId = unchecked(0xC0001B59),
+                    Text = "The %1 service depends on the %2 service which failed to start because of the following error: %3"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 7001,
+            Qualifiers = 0x4002,
+            Level = 4,
+            LogName = Constants.SystemLogName,
+            Properties = ["", new byte[] { 0x00 }]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.DoesNotContain("service depends on", displayEvent.Description);
+        Assert.Contains("No matching message", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithOnlyUnqualifiedMessageAndQualifierSet_ShouldStillResolveIt()
+    {
+        // Arrange - the provider stores only an unqualified (high 0) message and the event carries a non-zero
+        // Qualifier. With no conflicting-qualifier collision present, the provider's own generic message is used (the
+        // pre-existing unqualified-provider fallback).
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 300,
+                    RawId = 0x0000012C, // high 0, only candidate
+                    Text = "Generic: %1"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 300,
+            Qualifiers = 0x4002,
+            Level = 4,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["payload"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal("Generic: payload", displayEvent.Description);
     }
 
     [Fact]
@@ -3361,42 +3503,6 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
-    public void ResolveEvent_WithProviderKeywords_ShouldResolveKeywords()
-    {
-        // Arrange
-        var providerDetails = new ProviderDetails
-        {
-            ProviderName = Constants.TestProviderName,
-            Events = [],
-            Messages = [],
-            Parameters = [],
-            Keywords = new Dictionary<long, string>
-            {
-                { 0x1, "CustomKeyword1" },
-                { 0x2, "CustomKeyword2" }
-            },
-            Tasks = new Dictionary<int, string>()
-        };
-
-        var resolver = new TestEventResolver([providerDetails]);
-
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.TestProviderName,
-            Id = 1000,
-            Keywords = 0x3 // Both custom keywords
-        };
-
-        // Act
-        var displayEvent = resolver.ResolveEvent(eventRecord);
-
-        // Assert
-        Assert.NotNull(displayEvent);
-        Assert.Contains("CustomKeyword1", displayEvent.Keywords);
-        Assert.Contains("CustomKeyword2", displayEvent.Keywords);
-    }
-
-    [Fact]
     public void ResolveEvent_WithProviderKeywordsInBits32To47_ShouldResolveKeywords()
     {
         // Arrange - keyword in bit 32 (0x100000000), which was previously masked out
@@ -3430,6 +3536,42 @@ public sealed class EventResolverBaseTests
         Assert.NotNull(displayEvent);
         Assert.Contains("HighBitKeyword", displayEvent.Keywords);
         Assert.Contains("LowBitKeyword", displayEvent.Keywords);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithProviderKeywords_ShouldResolveKeywords()
+    {
+        // Arrange
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>
+            {
+                { 0x1, "CustomKeyword1" },
+                { 0x2, "CustomKeyword2" }
+            },
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            Keywords = 0x3 // Both custom keywords
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("CustomKeyword1", displayEvent.Keywords);
+        Assert.Contains("CustomKeyword2", displayEvent.Keywords);
     }
 
     [Fact]
@@ -3495,10 +3637,12 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
-    public void ResolveEvent_WithQualifierMismatch_ShouldFallThroughToSeverity()
+    public void ResolveEvent_WithQualifierMatchingNoLoadedMessage_ShouldReportNoMatchRatherThanGuess()
     {
-        // Arrange - event has a Qualifier value that no message matches; disambiguation
-        // must fall through to the existing severity-based check rather than failing.
+        // Arrange - the event's Qualifier (0x1234) matches neither message: one is unqualified (high 0) and one carries
+        // a different, conflicting qualifier (0xC000). Rendering either - e.g. the Error message via a severity guess -
+        // would be a mis-resolution, so with a conflicting-qualifier collision present and no exact match the resolver
+        // reports no matching message.
         var providerDetails = new ProviderDetails
         {
             ProviderName = Constants.TestProviderName,
@@ -3527,7 +3671,7 @@ public sealed class EventResolverBaseTests
 
         var resolver = new TestEventResolver([providerDetails]);
 
-        // Qualifier 0x1234 matches no message in the table.
+        // No properties so the empty result reaches DefaultNoMatchingDescription rather than the single-property dump.
         var eventRecord = new EventRecord
         {
             ProviderName = Constants.TestProviderName,
@@ -3535,15 +3679,17 @@ public sealed class EventResolverBaseTests
             Qualifiers = 0x1234,
             Level = 2,
             LogName = Constants.ApplicationLogName,
-            Properties = ["payload"]
+            Properties = []
         };
 
         // Act
         var displayEvent = resolver.ResolveEvent(eventRecord);
 
-        // Assert - Level=2 maps to severity 11=Error, so fall-through picks the Error message.
+        // Assert
         Assert.NotNull(displayEvent);
-        Assert.Contains("Error: payload", displayEvent.Description);
+        Assert.DoesNotContain("Error", displayEvent.Description);
+        Assert.DoesNotContain("Success", displayEvent.Description);
+        Assert.Contains("No matching message", displayEvent.Description);
     }
 
     [Fact]
@@ -3815,6 +3961,49 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Equal("This is the description from property", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithSingleQualifierMatchingMessage_ShouldResolveIt()
+    {
+        // Arrange - the driver's short-id 1035 (0x4002040B) is the only match and its qualifier matches the event.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 1035,
+                    RawId = 0x4002040B,
+                    Text = "Send EAPOL"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1035,
+            Qualifiers = 0x4002,
+            Level = 4,
+            LogName = Constants.SystemLogName,
+            Properties = ["", new byte[] { 0x00 }]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal("Send EAPOL", displayEvent.Description);
     }
 
     [Fact]
@@ -4179,6 +4368,57 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.EndsWith("\r\n", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithUnqualifiedAndExactMessages_ShouldPreferTheExactQualifierMatch()
+    {
+        // Arrange - the provider stores both an unqualified (high 0) generic and an exact-qualifier variant for one
+        // short id; the exact-qualifier match wins.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 200,
+                    RawId = 0x000000C8, // high 0, unqualified generic
+                    Text = "Generic: %1"
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 200,
+                    RawId = 0x400200C8, // high 0x4002, exact qualifier
+                    Text = "Exact: %1"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 200,
+            Qualifiers = 0x4002,
+            Level = 4,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["payload"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal("Exact: payload", displayEvent.Description);
     }
 
     [Fact]

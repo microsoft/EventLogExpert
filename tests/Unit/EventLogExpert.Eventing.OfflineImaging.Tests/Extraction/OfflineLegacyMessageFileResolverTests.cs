@@ -33,18 +33,20 @@ public sealed class OfflineLegacyMessageFileResolverTests
     }
 
     [Fact]
-    public void GetMessageFiles_FiltersNonDllExeExtensions()
+    public void GetMessageFiles_DeduplicatesModulesThatResolveToTheSamePath()
     {
         using OfflineTestImage image = OfflineTestImage.Create(seedSystem: system =>
         {
             SetCurrentControlSet(system, 1);
-            using RegistryKey provider = system.CreateSubKey(@"ControlSet001\Services\EventLog\Application\DriverProvider");
-            provider.SetValue("EventMessageFile", @"C:\Windows\System32\drivers\flt.sys;C:\Windows\System32\evt.dll", RegistryValueKind.ExpandString);
+            using RegistryKey provider = system.CreateSubKey(@"ControlSet001\Services\EventLog\Application\DupProvider");
+            provider.SetValue("EventMessageFile", @"C:\Windows\System32\evt.dll;C:\Windows\System32\evt.dll", RegistryValueKind.ExpandString);
         });
         using OfflineHiveFile hive = LoadSystemHive(image);
 
-        IReadOnlyList<string> files = ResolverFor(image, hive).GetMessageFilesForLegacyProvider("DriverProvider");
+        IReadOnlyList<string> files = ResolverFor(image, hive).GetMessageFilesForLegacyProvider("DupProvider");
 
+        // The same module listed twice in EventMessageFile resolves to one path; loading it twice would feed duplicate
+        // messages into disambiguation, so it must appear once.
         Assert.Equal(Path.Combine(image.RootDirectory, "Windows", "System32", "evt.dll"), Assert.Single(files), ignoreCase: true);
     }
 
@@ -62,6 +64,25 @@ public sealed class OfflineLegacyMessageFileResolverTests
         IReadOnlyList<string> files = ResolverFor(image, hive).GetMessageFilesForLegacyProvider("OnSetTwo");
 
         Assert.Equal(Path.Combine(image.RootDirectory, "Windows", "System32", "two.dll"), Assert.Single(files), ignoreCase: true);
+    }
+
+    [Fact]
+    public void GetMessageFiles_IncludesSysDriverModulesAndFiltersUnsupportedExtensions()
+    {
+        using OfflineTestImage image = OfflineTestImage.Create(seedSystem: system =>
+        {
+            SetCurrentControlSet(system, 1);
+            using RegistryKey provider = system.CreateSubKey(@"ControlSet001\Services\EventLog\Application\DriverProvider");
+            provider.SetValue("EventMessageFile", @"C:\Windows\System32\drivers\flt.sys;C:\Windows\System32\evt.dll;C:\Windows\System32\notes.txt", RegistryValueKind.ExpandString);
+        });
+        using OfflineHiveFile hive = LoadSystemHive(image);
+
+        IReadOnlyList<string> files = ResolverFor(image, hive).GetMessageFilesForLegacyProvider("DriverProvider");
+
+        // The driver .sys is kept (its message table is authoritative); the unsupported .txt is filtered out.
+        Assert.Equal(2, files.Count);
+        Assert.Equal(Path.Combine(image.RootDirectory, "Windows", "System32", "drivers", "flt.sys"), files[0], ignoreCase: true);
+        Assert.Equal(Path.Combine(image.RootDirectory, "Windows", "System32", "evt.dll"), files[1], ignoreCase: true);
     }
 
     [Fact]

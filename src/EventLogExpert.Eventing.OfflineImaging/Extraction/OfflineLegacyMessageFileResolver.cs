@@ -13,8 +13,6 @@ internal sealed class OfflineLegacyMessageFileResolver(
     OfflineImagePathResolver pathResolver,
     ITraceLogger? logger) : ILegacyMessageFileResolver
 {
-    private static readonly string[] s_supportedExtensions = [".dll", ".exe"];
-
     public IReadOnlyList<string> EnumerateProviderNames()
     {
         using IOfflineRegistryKey? eventLogKey = OpenEventLogKey();
@@ -116,11 +114,7 @@ internal sealed class OfflineLegacyMessageFileResolver(
 
     private IReadOnlyList<string> ResolveProviderFiles(string eventMessageFile, string? categoryMessageFile)
     {
-        // Filter raw registrations to .dll/.exe because some providers register .sys drivers that must not be loaded.
-        var messageFiles = eventMessageFile
-            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(path => s_supportedExtensions.Contains(Path.GetExtension(path).ToLowerInvariant()))
-            .ToList();
+        IReadOnlyList<string> messageFiles = LegacyMessageFilePaths.GetSupportedModulePaths(eventMessageFile);
 
         var orderedRawFiles = new List<string>();
 
@@ -128,18 +122,22 @@ internal sealed class OfflineLegacyMessageFileResolver(
         if (categoryMessageFile is not null)
         {
             orderedRawFiles.Add(categoryMessageFile);
-            orderedRawFiles.AddRange(messageFiles.Where(path => !string.Equals(path, categoryMessageFile, StringComparison.Ordinal)));
-        }
-        else
-        {
-            orderedRawFiles.AddRange(messageFiles);
         }
 
+        orderedRawFiles.AddRange(messageFiles);
+
+        // De-duplicate on the resolved image-local path: distinct raw registrations (category vs event-message-file,
+        // or %SystemRoot% vs an absolute path) can map to the same file, and loading it twice would feed duplicate
+        // messages into disambiguation.
         var resolved = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (string rawFile in orderedRawFiles)
         {
-            if (pathResolver.Resolve(rawFile, "legacy message file") is { } file) { resolved.Add(file); }
+            if (pathResolver.Resolve(rawFile, "legacy message file") is { } file && seen.Add(file))
+            {
+                resolved.Add(file);
+            }
         }
 
         return resolved;

@@ -54,28 +54,28 @@ internal sealed class RegistryProvider(ITraceLogger? logger = null) : ILegacyMes
             _logger?.Debug(
                 $"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}. EventMessageFile={eventMessageFilePath}, CategoryMessageFile={categoryMessageFilePath ?? "<null>"}, ParameterMessageFile={parameterMessageFilePath ?? "<null>"}.");
 
-            // Loading FltMgr's .sys EventMessageFile causes an access violation; only datafile DLL/EXE loads are safe.
-            var supportedExtensions = new[] { ".dll", ".exe" };
+            IReadOnlyList<string> messageFiles = LegacyMessageFilePaths.GetSupportedModulePaths(eventMessageFilePath);
 
-            var messageFiles = eventMessageFilePath
-                .Split(';')
-                .Where(path => supportedExtensions.Contains(Path.GetExtension(path).ToLower()))
-                .ToList();
+            var orderedFiles = new List<string>(messageFiles.Count + 1);
 
-            IEnumerable<string> files;
+            if (categoryMessageFilePath is not null) { orderedFiles.Add(categoryMessageFilePath); }
 
-            if (categoryMessageFilePath is not null)
+            orderedFiles.AddRange(messageFiles);
+
+            // Expand first, then de-duplicate on the resolved path: the same module can appear as both the category and
+            // an event-message-file entry, or via %SystemRoot% vs an absolute path, and loading it twice would feed
+            // duplicate messages into disambiguation.
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var result = new List<string>(orderedFiles.Count);
+
+            for (int i = 0; i < orderedFiles.Count; i++)
             {
-                var fileList = new List<string> { categoryMessageFilePath };
-                fileList.AddRange(messageFiles.Where(f => f != categoryMessageFilePath));
-                files = fileList;
-            }
-            else
-            {
-                files = messageFiles;
+                string file = Environment.ExpandEnvironmentVariables(orderedFiles[i]);
+
+                if (seen.Add(file)) { result.Add(file); }
             }
 
-            return files.Select(Environment.ExpandEnvironmentVariables).ToList();
+            return result;
         }
 
         _logger?.Debug($"No legacy EventMessageFile found for provider {providerName}");
