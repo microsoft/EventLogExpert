@@ -33,7 +33,7 @@ internal sealed class FilteringEffects(
     private readonly IState<RawEventStoreState> _rawEventStore = rawEventStore;
     private readonly XmlReloadCoordinator _xmlReloadCoordinator = xmlReloadCoordinator;
 
-    private (long Sequence, CancellationTokenSource Cts)? _activeCompute;
+    private (long Sequence, Filter Filter, CancellationTokenSource Cts)? _activeCompute;
 
     private enum MatchComputeOutcome
     {
@@ -63,7 +63,7 @@ internal sealed class FilteringEffects(
 
         if (!filter.RequiresXml || _eventLogState.Value.OpenLogs.IsEmpty)
         {
-            _matchCache.Clear();
+            CancelSupersededScan();
 
             return;
         }
@@ -80,7 +80,7 @@ internal sealed class FilteringEffects(
     [EffectMethod(typeof(CloseAllLogsAction))]
     public Task HandleCloseAllLogs(IDispatcher dispatcher)
     {
-        _matchCache.Clear();
+        CancelSupersededScan();
 
         return Task.CompletedTask;
     }
@@ -118,7 +118,7 @@ internal sealed class FilteringEffects(
 
     // Sequence + swap under one lock keeps the superseded token strictly older and serialises its cancel against
     // EndActiveScan's dispose; the snapshot is read AFTER this so a stale-snapshot compute cannot out-sequence its recompute.
-    private CancellationTokenSource BeginActiveScan(out long sequence)
+    private CancellationTokenSource BeginActiveScan(Filter filter, out long sequence)
     {
         CancellationTokenSource computeCts = new();
 
@@ -126,16 +126,31 @@ internal sealed class FilteringEffects(
         {
             sequence = _matchCache.NextSequence();
             CancellationTokenSource? superseded = _activeCompute?.Cts;
-            _activeCompute = (sequence, computeCts);
+            _activeCompute = (sequence, filter, computeCts);
             superseded?.Cancel();
         }
 
         return computeCts;
     }
 
+    private void CancelSupersededScan()
+    {
+        lock (_computeGate)
+        {
+            if (_activeCompute is not { } active) { return; }
+
+            EventLogState state = _eventLogState.Value;
+
+            if (state.OpenLogs.IsEmpty || active.Filter.HasFilteringChangedFrom(state.AppliedFilter))
+            {
+                active.Cts.Cancel();
+            }
+        }
+    }
+
     private async Task<MatchComputeOutcome> ComputeFileMatchesAsync(Filter filter, IDispatcher dispatcher)
     {
-        CancellationTokenSource computeCts = BeginActiveScan(out long sequence);
+        CancellationTokenSource computeCts = BeginActiveScan(filter, out long sequence);
 
         try
         {
