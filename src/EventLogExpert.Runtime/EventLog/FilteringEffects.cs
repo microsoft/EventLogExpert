@@ -23,6 +23,7 @@ internal sealed class FilteringEffects(
     EventLogConcurrencyState concurrencyState,
     [FromKeyedServices(LogCategories.EventLog)] ITraceLogger logger)
 {
+    private readonly Lock _computeGate = new();
     private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly LiveTailIngestCoordinator _liveTailCoordinator = liveTailCoordinator;
@@ -31,6 +32,8 @@ internal sealed class FilteringEffects(
     private readonly IXmlFilterMatcher _matcher = matcher;
     private readonly IState<RawEventStoreState> _rawEventStore = rawEventStore;
     private readonly XmlReloadCoordinator _xmlReloadCoordinator = xmlReloadCoordinator;
+
+    private (long Sequence, CancellationTokenSource Cts)? _activeCompute;
 
     private enum MatchComputeOutcome
     {
@@ -113,80 +116,121 @@ internal sealed class FilteringEffects(
         return Task.CompletedTask;
     }
 
+    // Sequence + swap under one lock keeps the superseded token strictly older and serialises its cancel against
+    // EndActiveScan's dispose; the snapshot is read AFTER this so a stale-snapshot compute cannot out-sequence its recompute.
+    private CancellationTokenSource BeginActiveScan(out long sequence)
+    {
+        CancellationTokenSource computeCts = new();
+
+        lock (_computeGate)
+        {
+            sequence = _matchCache.NextSequence();
+            CancellationTokenSource? superseded = _activeCompute?.Cts;
+            _activeCompute = (sequence, computeCts);
+            superseded?.Cancel();
+        }
+
+        return computeCts;
+    }
+
     private async Task<MatchComputeOutcome> ComputeFileMatchesAsync(Filter filter, IDispatcher dispatcher)
     {
-        long sequence = _matchCache.NextSequence();
-        EventLogState state = _eventLogState.Value;
-        RawEventStoreState rawStore = _rawEventStore.Value;
-        Dictionary<EventLogId, XmlFilterMatch> matches = new(state.OpenLogs.Count);
-        bool recomputed = false;
+        CancellationTokenSource computeCts = BeginActiveScan(out long sequence);
 
         try
         {
-            foreach ((string name, OpenLogInfo info) in state.OpenLogs)
+            EventLogState state = _eventLogState.Value;
+            RawEventStoreState rawStore = _rawEventStore.Value;
+            Dictionary<EventLogId, XmlFilterMatch> matches = new(state.OpenLogs.Count);
+            bool recomputed = false;
+
+            try
             {
-                // Only at-rest File logs not already loaded with a materialized XML column use on-demand matching.
-                if (info.Type != LogPathType.File || _concurrencyState.IsLoadedWithXml(info.Id)) { continue; }
-
-                if (!rawStore.ByLog.TryGetValue(info.Id, out EventColumnStore? store)) { continue; }
-
-                // Reuse a still-current match to avoid a redundant native rescan of a stable log.
-                if (_matchCache.GetMatch(filter, info.Id) is { } current &&
-                    current.Generation == store.Generation &&
-                    current.ContentVersion == store.ContentVersion &&
-                    current.Count == store.Count)
+                foreach ((string name, OpenLogInfo info) in state.OpenLogs)
                 {
-                    matches[info.Id] = current;
+                    // Only at-rest File logs not already loaded with a materialized XML column use on-demand matching.
+                    if (info.Type != LogPathType.File || _concurrencyState.IsLoadedWithXml(info.Id)) { continue; }
 
-                    continue;
+                    if (!rawStore.ByLog.TryGetValue(info.Id, out EventColumnStore? store)) { continue; }
+
+                    // Reuse a still-current match to avoid a redundant native rescan of a stable log.
+                    if (_matchCache.GetMatch(filter, info.Id) is { } current &&
+                        current.Generation == store.Generation &&
+                        current.ContentVersion == store.ContentVersion &&
+                        current.Count == store.Count)
+                    {
+                        matches[info.Id] = current;
+
+                        continue;
+                    }
+
+                    IEventColumnReader reader = store.CreateReader(info.Id);
+
+                    matches[info.Id] = await Task.Run(
+                        () => _matcher.ComputeMatch(reader, filter, name, info.Type, computeCts.Token));
+
+                    recomputed = true;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // A newer compute cancelled this scan mid-render; that compute owns the republish, so this one bows out
+                // without falling back to the reload escape hatch.
+                return MatchComputeOutcome.Superseded;
+            }
+            catch (Exception ex)
+            {
+                // A native scan fault falls back to the full reload escape hatch, unless a newer filter has already
+                // superseded this compute - then the newer apply owns recovery and this branch must not act.
+                if (_eventLogState.Value.AppliedFilter.HasFilteringChangedFrom(filter))
+                {
+                    return MatchComputeOutcome.Superseded;
                 }
 
-                IEventColumnReader reader = store.CreateReader(info.Id);
+                _logger.Trace(
+                    $"{nameof(ComputeFileMatchesAsync)}: on-demand XML match faulted ({ex.Message}); falling back to reload.");
 
-                matches[info.Id] = await Task.Run(
-                    () => _matcher.ComputeMatch(reader, filter, name, info.Type, CancellationToken.None));
+                await ReloadEscapeHatchAsync(filter, dispatcher);
 
-                recomputed = true;
+                return MatchComputeOutcome.FaultReloaded;
             }
-        }
-        catch (Exception ex)
-        {
-            // A native scan fault falls back to the full reload escape hatch, unless a newer filter has already
-            // superseded this compute - then the newer apply owns recovery and this branch must not act.
+
+            // Discard a superseded result: a newer filter was applied while the scan ran.
             if (_eventLogState.Value.AppliedFilter.HasFilteringChangedFrom(filter))
             {
                 return MatchComputeOutcome.Superseded;
             }
 
-            _logger.Trace(
-                $"{nameof(ComputeFileMatchesAsync)}: on-demand XML match faulted ({ex.Message}); falling back to reload.");
+            // Nothing was rescanned: the stored match already covers every current File log, so the gate is already
+            // satisfied - skip a redundant publish + ordered-view rebuild.
+            if (!recomputed) { return MatchComputeOutcome.Published; }
 
-            await ReloadEscapeHatchAsync(filter, dispatcher);
+            // Monotonic publish: a lower-sequence (older-snapshot) compute cannot overwrite a newer one's match.
+            if (!_matchCache.Set(filter, matches, sequence)) { return MatchComputeOutcome.Superseded; }
 
-            return MatchComputeOutcome.FaultReloaded;
+            // Evict any log that closed during the scan/publish from the just-published map using a fresh open-log
+            // snapshot. This is remove-only, so a close racing the publish cannot leave an orphaned bitset: it is dropped
+            // here if the close is already visible, or by the close handler's Remove/Clear if the close lands afterward.
+            _matchCache.RemoveNotIn(_eventLogState.Value.OpenLogs.Values.Select(log => log.Id).ToHashSet());
+
+            dispatcher.Dispatch(new XmlFilterMatchReadyAction());
+
+            return MatchComputeOutcome.Published;
         }
-
-        // Discard a superseded result: a newer filter was applied while the scan ran.
-        if (_eventLogState.Value.AppliedFilter.HasFilteringChangedFrom(filter))
+        finally
         {
-            return MatchComputeOutcome.Superseded;
+            EndActiveScan(computeCts);
         }
+    }
 
-        // Nothing was rescanned: the stored match already covers every current File log, so the gate is already
-        // satisfied - skip a redundant publish + ordered-view rebuild.
-        if (!recomputed) { return MatchComputeOutcome.Published; }
+    private void EndActiveScan(CancellationTokenSource computeCts)
+    {
+        lock (_computeGate)
+        {
+            if (_activeCompute?.Cts == computeCts) { _activeCompute = null; }
 
-        // Monotonic publish: a lower-sequence (older-snapshot) compute cannot overwrite a newer one's match.
-        if (!_matchCache.Set(filter, matches, sequence)) { return MatchComputeOutcome.Superseded; }
-
-        // Evict any log that closed during the scan/publish from the just-published map using a fresh open-log
-        // snapshot. This is remove-only, so a close racing the publish cannot leave an orphaned bitset: it is dropped
-        // here if the close is already visible, or by the close handler's Remove/Clear if the close lands afterward.
-        _matchCache.RemoveNotIn(_eventLogState.Value.OpenLogs.Values.Select(log => log.Id).ToHashSet());
-
-        dispatcher.Dispatch(new XmlFilterMatchReadyAction());
-
-        return MatchComputeOutcome.Published;
+            computeCts.Dispose();
+        }
     }
 
     private async Task RecomputeFileMatchesAsync(IDispatcher dispatcher)
