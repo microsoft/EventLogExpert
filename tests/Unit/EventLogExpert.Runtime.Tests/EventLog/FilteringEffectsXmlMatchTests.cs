@@ -100,6 +100,75 @@ public sealed class FilteringEffectsXmlMatchTests
     }
 
     [Fact]
+    public async Task HandleApplyFilter_WhenANonXmlApplySupersedesAnInFlightScan_CancelsIt()
+    {
+        EventLogId logId = EventLogId.Create();
+        Filter xml = XmlFilter();
+        Filter nonXml = NonXmlFilter();
+        Harness harness = new();
+        harness.SetState(xml, (logId, FileLog, LogPathType.File));
+        harness.SetStore((logId, EmptyStore(0)));
+
+        // Mid-scan, a NEWER non-XML filter becomes authoritative; its no-compute apply must cancel the now-superseded scan.
+        harness.Matcher.DuringCompute = () =>
+        {
+            harness.Matcher.DuringCompute = null;
+            harness.SetState(nonXml, (logId, FileLog, LogPathType.File));
+            harness.Effects.HandleApplyFilter(new ApplyFilterAction(nonXml), harness.Dispatcher).GetAwaiter().GetResult();
+        };
+
+        await harness.Effects.HandleApplyFilter(new ApplyFilterAction(xml), harness.Dispatcher);
+
+        Assert.True(harness.Matcher.CapturedTokens[0].IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_WhenAStaleNonXmlApplyRunsWhileAnXmlFilterIsCurrent_RetainsTheLiveMatch()
+    {
+        EventLogId logId = EventLogId.Create();
+        Filter current = XmlFilter();
+        Filter staleNonXml = NonXmlFilter();
+        Harness harness = new();
+        harness.SetState(current, (logId, FileLog, LogPathType.File));
+        harness.SetStore((logId, EmptyStore(0)));
+
+        await harness.Effects.HandleApplyFilter(new ApplyFilterAction(current), harness.Dispatcher);
+        Assert.NotNull(harness.MatchCache.GetMatch(current, logId));
+
+        // The non-XML apply is stale: `current` is still authoritative, so dropping the cache clear must leave its live
+        // match intact (the pre-existing unconditional clear would have wiped it).
+        await harness.Effects.HandleApplyFilter(new ApplyFilterAction(staleNonXml), harness.Dispatcher);
+
+        Assert.NotNull(harness.MatchCache.GetMatch(current, logId));
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_WhenAStaleNonXmlApplyRunsWhileTheCurrentXmlScanIsLive_DoesNotCancelIt()
+    {
+        EventLogId logId = EventLogId.Create();
+        Filter current = XmlFilter();
+        Filter staleNonXml = NonXmlFilter();
+        Harness harness = new();
+        harness.SetState(current, (logId, FileLog, LogPathType.File));
+        harness.SetStore((logId, EmptyStore(0)));
+
+        // A stale non-XML apply's effect runs LATE while `current` is still the authoritative AppliedFilter and its scan
+        // is live (seeded here via DuringCompute). The dispatch-ordered guard must NOT cancel the current compute:
+        // active.Filter == AppliedFilter AND OpenLogs is non-empty, so neither cancel condition holds. Seeding the live
+        // compute is required - otherwise CancelSupersededScan no-ops and the test passes vacuously under the injection.
+        harness.Matcher.DuringCompute = () =>
+        {
+            harness.Matcher.DuringCompute = null;
+            harness.Effects.HandleApplyFilter(new ApplyFilterAction(staleNonXml), harness.Dispatcher).GetAwaiter().GetResult();
+        };
+
+        await harness.Effects.HandleApplyFilter(new ApplyFilterAction(current), harness.Dispatcher);
+
+        Assert.False(harness.Matcher.CapturedTokens[0].IsCancellationRequested);
+        Assert.NotNull(harness.MatchCache.GetMatch(current, logId));
+    }
+
+    [Fact]
     public async Task HandleApplyFilter_WhenFileNotLoadedWithXml_ComputesMatchAndPublishesReady()
     {
         EventLogId logId = EventLogId.Create();
@@ -117,7 +186,7 @@ public sealed class FilteringEffectsXmlMatchTests
     }
 
     [Fact]
-    public async Task HandleApplyFilter_WhenFilterDoesNotRequireXml_ClearsWithoutScanningOrReloading()
+    public async Task HandleApplyFilter_WhenFilterDoesNotRequireXml_DoesNotScanOrReload()
     {
         EventLogId logId = EventLogId.Create();
         Filter filter = NonXmlFilter();
@@ -173,7 +242,7 @@ public sealed class FilteringEffectsXmlMatchTests
     }
 
     [Fact]
-    public async Task HandleCloseAllLogs_ClearsAllMatch()
+    public async Task HandleCloseAllLogs_RetainsInertMatchInsteadOfEagerlyClearing()
     {
         EventLogId logId = EventLogId.Create();
         Filter filter = XmlFilter();
@@ -186,7 +255,33 @@ public sealed class FilteringEffectsXmlMatchTests
 
         await harness.Effects.HandleCloseAllLogs(harness.Dispatcher);
 
-        Assert.Null(harness.MatchCache.GetMatch(filter, logId));
+        // Close-all no longer eagerly clears the cache (an eager clear would race a re-added log's live match). The
+        // filter-stamped match is retained inert - the gate short-circuits on empty OpenLogs - and is reclaimed by the
+        // next XML publish's wholesale Set or a reopen, never wiping a live match mid-flight.
+        Assert.NotNull(harness.MatchCache.GetMatch(filter, logId));
+    }
+
+    [Fact]
+    public async Task HandleCloseAllLogs_WhileAScanIsInFlight_CancelsIt()
+    {
+        EventLogId logId = EventLogId.Create();
+        Filter xml = XmlFilter();
+        Harness harness = new();
+        harness.SetState(xml, (logId, FileLog, LogPathType.File));
+        harness.SetStore((logId, EmptyStore(0)));
+
+        // Mid-scan, every log closes; the scan's result is dead (IsDeferred short-circuits on empty OpenLogs) so close-all
+        // must cancel it.
+        harness.Matcher.DuringCompute = () =>
+        {
+            harness.Matcher.DuringCompute = null;
+            harness.SetState(xml);
+            harness.Effects.HandleCloseAllLogs(harness.Dispatcher).GetAwaiter().GetResult();
+        };
+
+        await harness.Effects.HandleApplyFilter(new ApplyFilterAction(xml), harness.Dispatcher);
+
+        Assert.True(harness.Matcher.CapturedTokens[0].IsCancellationRequested);
     }
 
     [Fact]
