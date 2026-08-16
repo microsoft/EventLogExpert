@@ -63,7 +63,7 @@ public class EventResolverBase : IDisposable
             return CreateEventModel(eventRecord, modernEvent, details, descriptionDetails, supplemental, null);
         }
 
-        var primaryLegacyCount = details.GetMessagesByShortId(eventRecord.Id).Count;
+        var primaryLegacyCount = ModernEventMatcher.GetCompatibleLegacyMessages(details, eventRecord).Count;
 
         if (primaryLegacyCount == 1)
         {
@@ -90,7 +90,7 @@ public class EventResolverBase : IDisposable
                 modernEvent = supplementalModernEvent;
                 descriptionDetails = supplemental;
             }
-            else if (supplemental.GetMessagesByShortId(eventRecord.Id).Count > 0)
+            else if (ModernEventMatcher.GetCompatibleLegacyMessages(supplemental, eventRecord).Count > 0)
             {
                 // Supplemental has legacy messages for this EventId
                 descriptionDetails = supplemental;

@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 namespace EventLogExpert.Eventing.ProviderMetadata;
 
 /// <summary>
-///     Reads a provider DLL's RT_MESSAGETABLE. Every walk is bounds-checked against the resource size from
+///     Reads a provider module's (DLL/EXE/SYS) RT_MESSAGETABLE. Every walk is bounds-checked against the resource size from
 ///     <see cref="NativeMethods.SizeofResource" /> so a malformed offset/length can never read outside the mapped
 ///     resource: CountEntries returns -1 when the table is malformed anywhere (callers treat it as no table), while
 ///     per-id extraction stops at the first malformed region and returns only the matches from the well-formed prefix,

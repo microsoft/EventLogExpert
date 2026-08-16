@@ -66,7 +66,7 @@ internal sealed partial class DescriptionFormatter(
                 PickParameterSourceForDescription(modernEvent.Description, primaryDetails, descriptionFromSupplemental, ref supplemental, eventRecord));
         }
 
-        var legacyMessages = descriptionDetails.GetMessagesByShortId(eventRecord.Id);
+        var legacyMessages = ModernEventMatcher.GetCompatibleLegacyMessages(descriptionDetails, eventRecord);
 
         if (legacyMessages.Count == 1)
         {
@@ -107,7 +107,7 @@ internal sealed partial class DescriptionFormatter(
                         PickParameterSourceForDescription(supplementalModernEvent.Description, primaryDetails, true, ref supplemental, eventRecord));
                 }
 
-                var supplementalLegacy = supplemental.GetMessagesByShortId(eventRecord.Id);
+                var supplementalLegacy = ModernEventMatcher.GetCompatibleLegacyMessages(supplemental, eventRecord);
                 var supplementalBest = ModernEventMatcher.DisambiguateLegacyMessage(eventRecord, supplementalLegacy);
 
                 if (supplementalBest is not null)

@@ -75,26 +75,6 @@ public sealed class RegistryProviderTests
         Assert.NotNull(result);
     }
 
-    [Fact]
-    public void GetMessageFilesForLegacyProvider_WhenCalled_ShouldNotIncludeSysFiles()
-    {
-        // Arrange
-        var provider = new RegistryProvider();
-
-        // Act
-        var result = FindAnyLegacyProviderFiles(provider);
-
-        // Assert
-        Assert.NotEmpty(result);
-
-        Assert.All(result,
-            path =>
-            {
-                var extension = Path.GetExtension(path).ToLower();
-                Assert.NotEqual(".sys", extension);
-            });
-    }
-
     [Theory]
     [InlineData(Constants.ApplicationLogName)]
     [InlineData(Constants.SystemLogName)]
@@ -307,7 +287,7 @@ public sealed class RegistryProviderTests
     }
 
     [Fact]
-    public void GetMessageFilesForLegacyProvider_WhenReturnedPaths_ShouldBeDllOrExe()
+    public void GetMessageFilesForLegacyProvider_WhenReturnedPaths_ShouldBeDllExeOrSys()
     {
         // Arrange
         var provider = new RegistryProvider();
@@ -323,8 +303,8 @@ public sealed class RegistryProviderTests
             {
                 var extension = Path.GetExtension(path).ToLower();
 
-                Assert.True(extension is ".dll" or ".exe",
-                    $"Expected .dll or .exe, but got {extension} for path: {path}");
+                Assert.True(extension is ".dll" or ".exe" or ".sys",
+                    $"Expected .dll, .exe, or .sys, but got {extension} for path: {path}");
             });
     }
 
