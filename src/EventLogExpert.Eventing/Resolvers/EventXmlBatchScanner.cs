@@ -57,7 +57,7 @@ public sealed class EventXmlBatchScanner : IEventXmlBatchScanner
             int error = Marshal.GetLastWin32Error();
 
             // ERROR_NO_MORE_ITEMS is the normal end of the result set; any other failure truncated the scan and must
-            // fault so a partial - and therefore wrong - membership set is never derived from it.
+            // fault so a partial - and therefore wrong - match set is never derived from it.
             if (error != Win32ErrorCodes.ERROR_NO_MORE_ITEMS) { NativeMethods.ThrowEventLogException(error); }
 
             endOfResults = true;

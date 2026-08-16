@@ -150,6 +150,29 @@ public sealed class FilteringEffectsXmlMatchTests
     }
 
     [Fact]
+    public async Task HandleApplyFilter_WhenSupersededByANewerFilter_CancelsThePriorScan()
+    {
+        EventLogId logId = EventLogId.Create();
+        Filter first = XmlFilter("first");
+        Filter second = XmlFilter("second");
+        Harness harness = new();
+        harness.SetState(first, (logId, FileLog, LogPathType.File));
+        harness.SetStore((logId, EmptyStore(0)));
+
+        harness.Matcher.DuringCompute = () =>
+        {
+            harness.Matcher.DuringCompute = null;
+            harness.SetState(second, (logId, FileLog, LogPathType.File));
+            harness.Effects.HandleApplyFilter(new ApplyFilterAction(second), harness.Dispatcher).GetAwaiter().GetResult();
+        };
+
+        await harness.Effects.HandleApplyFilter(new ApplyFilterAction(first), harness.Dispatcher);
+
+        Assert.True(harness.Matcher.CapturedTokens[0].IsCancellationRequested);
+        Assert.Null(harness.MatchCache.GetMatch(first, logId));
+    }
+
+    [Fact]
     public async Task HandleCloseAllLogs_ClearsAllMatch()
     {
         EventLogId logId = EventLogId.Create();
@@ -204,6 +227,34 @@ public sealed class FilteringEffectsXmlMatchTests
         harness.Dispatcher.Received(2).Dispatch(Arg.Any<XmlFilterMatchReadyAction>());
     }
 
+    [Fact]
+    public async Task HandleLoadEvents_WhenRecomputeSupersedesTheScan_CancelsItWithoutReloading()
+    {
+        EventLogId logId = EventLogId.Create();
+        Filter filter = XmlFilter();
+        Harness harness = new();
+        harness.SetState(filter, (logId, FileLog, LogPathType.File));
+        harness.SetStore((logId, EmptyStore(contentVersion: 0)));
+
+        harness.Matcher.DuringCompute = () =>
+        {
+            harness.Matcher.DuringCompute = null;
+            harness.SetStore((logId, EmptyStore(contentVersion: 1)));
+            harness.Effects
+                .HandleLoadEvents(
+                    new LoadEventsAction(new EventLogData(FileLog, LogPathType.File) { Id = logId }, []),
+                    harness.Dispatcher)
+                .GetAwaiter()
+                .GetResult();
+        };
+
+        await harness.Effects.HandleApplyFilter(new ApplyFilterAction(filter), harness.Dispatcher);
+
+        Assert.True(harness.Matcher.CapturedTokens[0].IsCancellationRequested);
+        harness.Dispatcher.DidNotReceive().Dispatch(Arg.Any<CloseLogAction>());
+        Assert.Equal(1, harness.MatchCache.GetMatch(filter, logId)!.ContentVersion);
+    }
+
     private static EventColumnStore EmptyStore(long contentVersion) =>
         EventColumnStore.Build([], generation: 0, contentVersion);
 
@@ -215,6 +266,8 @@ public sealed class FilteringEffectsXmlMatchTests
 
     private sealed class FakeMatcher : IXmlFilterMatcher
     {
+        public List<CancellationToken> CapturedTokens { get; } = [];
+
         public Action? DuringCompute { get; set; }
 
         public List<string> RenderedLogs { get; } = [];
@@ -229,10 +282,13 @@ public sealed class FilteringEffectsXmlMatchTests
             CancellationToken cancellationToken)
         {
             RenderedLogs.Add(owningLog);
+            CapturedTokens.Add(cancellationToken);
 
             if (ShouldThrow) { throw new InvalidOperationException("scan faulted"); }
 
             DuringCompute?.Invoke();
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             return new XmlFilterMatch(
                 reader.LogId, reader.Generation, reader.ContentVersion, reader.Count, new bool[reader.Count]);
