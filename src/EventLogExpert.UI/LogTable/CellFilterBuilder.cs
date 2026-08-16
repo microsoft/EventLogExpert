@@ -14,19 +14,7 @@ namespace EventLogExpert.UI.LogTable;
 internal static class CellFilterBuilder
 {
     public static EventProperty? MapColumn(ColumnName column) =>
-        column switch
-        {
-            ColumnName.EventId => EventProperty.Id,
-            ColumnName.ActivityId => EventProperty.ActivityId,
-            ColumnName.Level => EventProperty.Level,
-            ColumnName.Keywords => EventProperty.Keywords,
-            ColumnName.Source => EventProperty.Source,
-            ColumnName.TaskCategory => EventProperty.TaskCategory,
-            ColumnName.ProcessId => EventProperty.ProcessId,
-            ColumnName.ThreadId => EventProperty.ThreadId,
-            ColumnName.User => EventProperty.UserDisplayName,
-            _ => null
-        };
+        ColumnDescriptors.GetFilterProperty(column);
 
     public static bool TryBuild(ResolvedEvent @event, EventProperty property, bool exclude, out SavedFilter filter)
     {

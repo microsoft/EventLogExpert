@@ -439,7 +439,7 @@ internal static class ColumnDirectSort
 
             var values = new Guid[Count];
             var has = new bool[Count];
-            reader.CopyGuidColumn(ColumnFieldMap.ToFieldId(column), values, has);
+            reader.CopyGuidColumn(ColumnDescriptors.GetFieldId(column), values, has);
             _guidValues[(int)column] = values;
             _guidHas[(int)column] = has;
         }
@@ -468,7 +468,7 @@ internal static class ColumnDirectSort
 
             var values = new long[Count];
             var has = new bool[Count];
-            reader.CopyInt64Column(ColumnFieldMap.ToFieldId(column), values, has);
+            reader.CopyInt64Column(ColumnDescriptors.GetFieldId(column), values, has);
             _numericValues[(int)column] = values;
             _numericHas[(int)column] = has;
         }
@@ -484,7 +484,7 @@ internal static class ColumnDirectSort
             if (_stringRank[(int)column] is not null) { return; }
 
             var poolIndices = new int[Count];
-            reader.CopyPoolIndexColumn(ColumnFieldMap.ToFieldId(column), poolIndices);
+            reader.CopyPoolIndexColumn(ColumnDescriptors.GetFieldId(column), poolIndices);
 
             _stringRank[(int)column] = poolIndices;
             _pooledColumns.Add((int)column);

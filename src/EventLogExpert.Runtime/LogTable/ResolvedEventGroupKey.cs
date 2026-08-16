@@ -18,11 +18,10 @@ internal static class ResolvedEventGroupKey
     {
         if (column != ColumnName.DateAndTime)
         {
-            return reader.GetField(locator, ColumnFieldMap.ToFieldId(column)).AsString();
+            return reader.GetField(locator, ColumnDescriptors.GetFieldId(column)).AsString();
         }
 
-        return reader.GetField(locator, EventFieldId.TimeCreated).TryGetDateTime(out DateTime timeCreated)
-            ? timeCreated.Ticks.ToString(CultureInfo.InvariantCulture)
-            : string.Empty;
+        return reader.GetField(locator, EventFieldId.TimeCreated).TryGetDateTime(out DateTime timeCreated) ?
+            timeCreated.Ticks.ToString(CultureInfo.InvariantCulture) : string.Empty;
     }
 }
