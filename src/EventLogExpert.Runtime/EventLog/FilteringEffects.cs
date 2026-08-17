@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Runtime.Memory;
 using Fluxor;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -8,17 +9,20 @@ namespace EventLogExpert.Runtime.EventLog;
 
 internal sealed class FilteringEffects(
     IState<EventLogState> eventLogState,
+    IState<MemoryGovernorState> memoryGovernorState,
     LiveTailIngestCoordinator liveTailCoordinator,
     XmlReloadCoordinator xmlReloadCoordinator)
 {
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly LiveTailIngestCoordinator _liveTailCoordinator = liveTailCoordinator;
+    private readonly IState<MemoryGovernorState> _memoryGovernorState = memoryGovernorState;
     private readonly XmlReloadCoordinator _xmlReloadCoordinator = xmlReloadCoordinator;
 
     [EffectMethod]
     public Task HandleAddEvent(AddEventAction action, IDispatcher dispatcher)
     {
         if (!_eventLogState.Value.ContinuouslyUpdate ||
+            _memoryGovernorState.Value.Level == MemoryPressureLevel.Paused ||
             !_eventLogState.Value.OpenLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog))
         {
             return Task.CompletedTask;

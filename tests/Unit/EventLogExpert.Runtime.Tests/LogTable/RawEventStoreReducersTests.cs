@@ -97,6 +97,29 @@ public sealed class RawEventStoreReducersTests
     }
 
     [Fact]
+    public void ReduceLoadEventsPartial_ForAnOpenLog_AppendsAfterExistingEvents()
+    {
+        var (state, log) = OpenedLog();
+        state = Ingest(state, log.Id, RawIngestMode.Append, Ev(1), Ev(2));
+
+        state = RawEventStoreReducers.ReduceLoadEventsPartial(state, new LoadEventsPartialAction(log, [Ev(3)]));
+
+        Assert.Equal([1, 2, 3], Ids(state, log.Id));
+    }
+
+    [Fact]
+    public void ReduceLoadEventsPartial_ForAnUnopenedLog_IsSkipped()
+    {
+        var log = new EventLogData("LogA", LogPathType.Channel);
+
+        var state = RawEventStoreReducers.ReduceLoadEventsPartial(
+            new RawEventStoreState(),
+            new LoadEventsPartialAction(log, [Ev(1)]));
+
+        Assert.False(state.ByLog.ContainsKey(log.Id));
+    }
+
+    [Fact]
     public void ReduceLoadEvents_File_StoreAndEventLogReducers_AcceptAndRejectInLockstep()
     {
         var openLog = new EventLogData("LogA", LogPathType.File);
@@ -154,26 +177,18 @@ public sealed class RawEventStoreReducersTests
     }
 
     [Fact]
-    public void ReduceLoadEventsPartial_ForAnOpenLog_AppendsAfterExistingEvents()
+    public void ReduceLoadEvents_WhenStoreAlreadyBuilt_ReturnsStateUnchangedAndSkipsRebuild()
     {
         var (state, log) = OpenedLog();
         state = Ingest(state, log.Id, RawIngestMode.Append, Ev(1), Ev(2));
 
-        state = RawEventStoreReducers.ReduceLoadEventsPartial(state, new LoadEventsPartialAction(log, [Ev(3)]));
+        var result = RawEventStoreReducers.ReduceLoadEvents(
+            state,
+            new LoadEventsAction(log, [Ev(9)], StoreAlreadyBuilt: true));
 
-        Assert.Equal([1, 2, 3], Ids(state, log.Id));
-    }
-
-    [Fact]
-    public void ReduceLoadEventsPartial_ForAnUnopenedLog_IsSkipped()
-    {
-        var log = new EventLogData("LogA", LogPathType.Channel);
-
-        var state = RawEventStoreReducers.ReduceLoadEventsPartial(
-            new RawEventStoreState(),
-            new LoadEventsPartialAction(log, [Ev(1)]));
-
-        Assert.False(state.ByLog.ContainsKey(log.Id));
+        Assert.Same(state, result);
+        Assert.Same(state.ByLog, result.ByLog);
+        Assert.Equal([1, 2], Ids(result, log.Id));
     }
 
     private static ResolvedEvent Ev(int id) => new("LogA", LogPathType.Channel) { Id = id };

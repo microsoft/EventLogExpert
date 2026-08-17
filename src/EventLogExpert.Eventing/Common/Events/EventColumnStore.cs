@@ -76,6 +76,9 @@ internal sealed class EventDataSchemaBuilder
 /// </summary>
 public sealed class EventColumnStore
 {
+    private const int EstimatedColumnarBytesPerRow = 48;
+    private const int EstimatedPooledEntryBytes = 64;
+    private const int EstimatedSealedChunkBytes = 512;
     // Resolve the tiny update-provider allowlist on the stack; a larger eligibility set falls back to the heap.
     private const int MaxStackProviderNames = 32;
     // Per-scan EventData field-index memo sentinels: a schema not yet looked up, and a schema that lacks the field.
@@ -219,6 +222,11 @@ public sealed class EventColumnStore
     /// <param name="logId">The log identity the returned reader records on the locators it produces.</param>
     /// <returns>A reader bound to this immutable snapshot and <paramref name="logId" />.</returns>
     public IEventColumnReader CreateReader(EventLogId logId) => new EventColumnStoreReader(logId, this);
+
+    public long EstimateResidentBytes() =>
+        ((long)Count * EstimatedColumnarBytesPerRow) +
+        ((long)PoolDistinctCount * EstimatedPooledEntryBytes) +
+        ((long)SealedChunkCount * EstimatedSealedChunkBytes);
 
     /// <summary>
     ///     The <see cref="ResolvedEvent.TimeCreated" /> UTC-tick span across every row: <c>true</c> with [
@@ -1644,8 +1652,11 @@ public sealed class EventColumnStore
                 if (rankByPhysical[offset + row] < 0) { continue; }
 
                 long ticks = column[row];
+
                 if (ticks < min) { min = ticks; }
+                
                 if (ticks > max) { max = ticks; }
+                
                 any = true;
             }
 
@@ -1657,8 +1668,11 @@ public sealed class EventColumnStore
             if (rankByPhysical[index] < 0) { continue; }
 
             long ticks = Pending(index).TimeCreated.Ticks;
+            
             if (ticks < min) { min = ticks; }
+            
             if (ticks > max) { max = ticks; }
+            
             any = true;
         }
 

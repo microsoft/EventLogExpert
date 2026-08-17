@@ -115,6 +115,38 @@ public sealed class EventColumnStoreTests
     }
 
     [Fact]
+    public void BuildMultiChunkThenAppend_MinMaxSpanSealedChunksAndPendingTail()
+    {
+        // Build columnarizes the whole batch into sealed chunks (empty tail); a short Append then stays in the pending
+        // tail, so the global min sits in a sealed chunk and the global max in the pending tail.
+        const int SealedRows = 4096 * 2; // Two full sealed chunks.
+        const int TailRows = 37;         // Below the reseal threshold, so it remains pending.
+
+        long baseTicks = new DateTime(2021, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+
+        ResolvedEvent[] sealedBatch = new ResolvedEvent[SealedRows];
+        for (int i = 0; i < SealedRows; i++) { sealedBatch[i] = EventAt(i, baseTicks + 1000 + i); }
+
+        long expectedMin = baseTicks; // Below every other value; placed in the second sealed chunk, not at a physical end.
+        sealedBatch[SealedRows - 100] = EventAt(SealedRows - 100, expectedMin);
+
+        ResolvedEvent[] tailBatch = new ResolvedEvent[TailRows];
+        for (int i = 0; i < TailRows; i++) { tailBatch[i] = EventAt(SealedRows + i, baseTicks + 2000 + i); }
+
+        long expectedMax = baseTicks + 10_000_000; // Above every other value; placed in the pending tail, not the last row.
+        tailBatch[TailRows - 5] = EventAt(SealedRows + TailRows - 5, expectedMax);
+
+        EventColumnStore store = EventColumnStore.Build(sealedBatch, generation: 1, contentVersion: 1).Append(tailBatch);
+
+        Assert.Equal(2, store.SealedChunkCount);
+        Assert.Equal(SealedRows, store.SealedCount);
+        Assert.Equal(TailRows, store.Count - store.SealedCount);
+        Assert.True(store.TryGetTimeRange(out long minTicks, out long maxTicks));
+        Assert.Equal(expectedMin, minTicks);
+        Assert.Equal(expectedMax, maxTicks);
+    }
+
+    [Fact]
     public void Build_AbsentNullableScalars_HasFlagsFalse()
     {
         ResolvedEvent resolvedEvent = new("live", LogPathType.Channel);
@@ -463,29 +495,6 @@ public sealed class EventColumnStoreTests
     }
 
     [Fact]
-    public void Build_UserData_RoundTripsPathValuesTruncatedAndIncomplete()
-    {
-        ResolvedEvent resolvedEvent = new("live", LogPathType.Channel)
-        {
-            UserData = ImmutableArray.Create(
-                new UserDataField("Result/@value", ImmutableArray.Create("ok", "retry"), IsTruncated: true)),
-            UserDataIncomplete = true
-        };
-
-        EventColumnStore store = EventColumnStore.Build([resolvedEvent], generation: 1, contentVersion: 1);
-
-        Assert.True(store.RawUserDataIncomplete(0));
-        Assert.Equal(1, store.RawUserDataCount(0));
-        Assert.Equal("Result/@value", store.PoolGet(store.RawUserDataPathIndex(0, 0)));
-        Assert.True(store.RawUserDataTruncated(0, 0));
-
-        ReadOnlySpan<int> values = store.RawUserDataValues(0, 0);
-        Assert.Equal(2, values.Length);
-        Assert.Equal("ok", store.PoolGet(values[0]));
-        Assert.Equal("retry", store.PoolGet(values[1]));
-    }
-
-    [Fact]
     public void Build_UserDataMultipleFieldsAndRows_NestsWithoutCrossFieldBleed()
     {
         ResolvedEvent first = new("live", LogPathType.Channel)
@@ -520,35 +529,26 @@ public sealed class EventColumnStoreTests
     }
 
     [Fact]
-    public void BuildMultiChunkThenAppend_MinMaxSpanSealedChunksAndPendingTail()
+    public void Build_UserData_RoundTripsPathValuesTruncatedAndIncomplete()
     {
-        // Build columnarizes the whole batch into sealed chunks (empty tail); a short Append then stays in the pending
-        // tail, so the global min sits in a sealed chunk and the global max in the pending tail.
-        const int SealedRows = 4096 * 2; // Two full sealed chunks.
-        const int TailRows = 37;         // Below the reseal threshold, so it remains pending.
+        ResolvedEvent resolvedEvent = new("live", LogPathType.Channel)
+        {
+            UserData = ImmutableArray.Create(
+                new UserDataField("Result/@value", ImmutableArray.Create("ok", "retry"), IsTruncated: true)),
+            UserDataIncomplete = true
+        };
 
-        long baseTicks = new DateTime(2021, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+        EventColumnStore store = EventColumnStore.Build([resolvedEvent], generation: 1, contentVersion: 1);
 
-        ResolvedEvent[] sealedBatch = new ResolvedEvent[SealedRows];
-        for (int i = 0; i < SealedRows; i++) { sealedBatch[i] = EventAt(i, baseTicks + 1000 + i); }
+        Assert.True(store.RawUserDataIncomplete(0));
+        Assert.Equal(1, store.RawUserDataCount(0));
+        Assert.Equal("Result/@value", store.PoolGet(store.RawUserDataPathIndex(0, 0)));
+        Assert.True(store.RawUserDataTruncated(0, 0));
 
-        long expectedMin = baseTicks; // Below every other value; placed in the second sealed chunk, not at a physical end.
-        sealedBatch[SealedRows - 100] = EventAt(SealedRows - 100, expectedMin);
-
-        ResolvedEvent[] tailBatch = new ResolvedEvent[TailRows];
-        for (int i = 0; i < TailRows; i++) { tailBatch[i] = EventAt(SealedRows + i, baseTicks + 2000 + i); }
-
-        long expectedMax = baseTicks + 10_000_000; // Above every other value; placed in the pending tail, not the last row.
-        tailBatch[TailRows - 5] = EventAt(SealedRows + TailRows - 5, expectedMax);
-
-        EventColumnStore store = EventColumnStore.Build(sealedBatch, generation: 1, contentVersion: 1).Append(tailBatch);
-
-        Assert.Equal(2, store.SealedChunkCount);
-        Assert.Equal(SealedRows, store.SealedCount);
-        Assert.Equal(TailRows, store.Count - store.SealedCount);
-        Assert.True(store.TryGetTimeRange(out long minTicks, out long maxTicks));
-        Assert.Equal(expectedMin, minTicks);
-        Assert.Equal(expectedMax, maxTicks);
+        ReadOnlySpan<int> values = store.RawUserDataValues(0, 0);
+        Assert.Equal(2, values.Length);
+        Assert.Equal("ok", store.PoolGet(values[0]));
+        Assert.Equal("retry", store.PoolGet(values[1]));
     }
 
     [Fact]
@@ -608,6 +608,32 @@ public sealed class EventColumnStoreTests
     {
         Assert.Equal(0, EventColumnStore.Empty.Count);
         Assert.False(EventColumnStore.Empty.TryGetTimeRange(out _, out _));
+    }
+
+    [Fact]
+    public void EstimateResidentBytes_EmptyStore_ReturnsZero() =>
+        Assert.Equal(0, EventColumnStore.Empty.EstimateResidentBytes());
+
+    [Fact]
+    public void EstimateResidentBytes_GrowsMonotonicallyOnAppend()
+    {
+        EventColumnStore store = EventColumnStore.Build([Event(0), Event(1)], generation: 1, contentVersion: 1);
+
+        Assert.True(store.Append([Event(2), Event(3)]).EstimateResidentBytes() > store.EstimateResidentBytes());
+    }
+
+    [Fact]
+    public void EstimateResidentBytes_IncreasesWithRowsAndSealedChunks()
+    {
+        EventColumnStore small = EventColumnStore.Build([Event(0)], generation: 1, contentVersion: 1);
+
+        ResolvedEvent[] many = new ResolvedEvent[5000];
+        for (int i = 0; i < many.Length; i++) { many[i] = Event(i); }
+
+        EventColumnStore large = EventColumnStore.Build(many, generation: 1, contentVersion: 1);
+
+        Assert.True(large.SealedChunkCount >= 1);
+        Assert.True(large.EstimateResidentBytes() > small.EstimateResidentBytes());
     }
 
     [Fact]

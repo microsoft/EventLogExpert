@@ -17,15 +17,15 @@ internal sealed class RawEventStoreReducers
 
     [ReducerMethod(typeof(CloseAllLogsAction))]
     public static RawEventStoreState ReduceCloseAll(RawEventStoreState state) =>
-        state.ByLog.IsEmpty
-            ? state
-            : state with { ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty };
+        state.ByLog.IsEmpty ?
+            state :
+            state with { ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty };
 
     [ReducerMethod]
     public static RawEventStoreState ReduceCloseLog(RawEventStoreState state, CloseLogAction action) =>
-        state.ByLog.ContainsKey(action.LogId)
-            ? state with { ByLog = state.ByLog.Remove(action.LogId) }
-            : state;
+        state.ByLog.ContainsKey(action.LogId) ?
+            state with { ByLog = state.ByLog.Remove(action.LogId) } :
+            state;
 
     [ReducerMethod]
     public static RawEventStoreState ReduceIngestRawEvents(RawEventStoreState state, IngestRawEventsAction action)
@@ -67,7 +67,8 @@ internal sealed class RawEventStoreReducers
     [ReducerMethod]
     public static RawEventStoreState ReduceLoadEvents(RawEventStoreState state, LoadEventsAction action)
     {
-        if (!state.ByLog.TryGetValue(action.LogData.Id, out var existing) ||
+        if (action.StoreAlreadyBuilt ||
+            !state.ByLog.TryGetValue(action.LogData.Id, out var existing) ||
             (existing.Count == 0 && action.Events.Count == 0)) { return state; }
 
         // Full (re)build with a monotonic ContentVersion (M1) so the filter effect's pre-Task.Run capture detects the
@@ -84,8 +85,8 @@ internal sealed class RawEventStoreReducers
 
         var updated = existing.Append(action.Events);
 
-        return ReferenceEquals(updated, existing)
-            ? state
-            : state with { ByLog = state.ByLog.SetItem(action.LogData.Id, updated) };
+        return ReferenceEquals(updated, existing) ?
+            state :
+            state with { ByLog = state.ByLog.SetItem(action.LogData.Id, updated) };
     }
 }

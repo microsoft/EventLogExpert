@@ -20,6 +20,10 @@ public interface ISettingsService
 
     Action? LogLevelChanged { get; set; }
 
+    long MemoryBudgetBytes { get; set; }
+
+    Action? MemoryBudgetChanged { get; set; }
+
     Theme Theme { get; set; }
 
     Action? ThemeChanged { get; set; }

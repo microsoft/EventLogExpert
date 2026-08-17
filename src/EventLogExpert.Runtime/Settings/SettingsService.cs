@@ -14,6 +14,7 @@ internal sealed class SettingsService(ISettingsPreferencesProvider preferences) 
     private bool? _hasEverEnabledPreRelease;
     private bool? _isPreReleaseEnabled;
     private LogLevel? _logLevel;
+    private long? _memoryBudgetBytes;
     private Theme? _theme;
     private string? _timeZoneId;
     private bool? _verboseResolution;
@@ -103,6 +104,26 @@ internal sealed class SettingsService(ISettingsPreferencesProvider preferences) 
     }
 
     public Action? LogLevelChanged { get; set; }
+
+    public long MemoryBudgetBytes
+    {
+        get
+        {
+            _memoryBudgetBytes ??= _preferences.MemoryBudgetBytesPreference;
+
+            return _memoryBudgetBytes ?? 0;
+        }
+        set
+        {
+            if (_memoryBudgetBytes == value) { return; }
+
+            _memoryBudgetBytes = value;
+            _preferences.MemoryBudgetBytesPreference = value;
+            MemoryBudgetChanged?.Invoke();
+        }
+    }
+
+    public Action? MemoryBudgetChanged { get; set; }
 
     public Theme Theme
     {

@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Memory;
 
 namespace EventLogExpert.Runtime.StatusBar;
 
@@ -55,6 +56,40 @@ public static class StatusBarFormatter
         return selectedCount >= 2 ? $"{head} \u00b7 {selectedCount:N0} selected" : head;
     }
 
+    public static string? FormatMemory(long usedBytes, long budgetBytes) =>
+        budgetBytes is <= 0 or long.MaxValue ?
+            null :
+            $"Memory: {FormatBytes(usedBytes)} / {FormatBytes(budgetBytes)}";
+
+    public static string? FormatMemoryStatus(MemoryPressureLevel level, int partiallyLoadedCount, string? heaviestLogName)
+    {
+        string? pressure = level switch
+        {
+            MemoryPressureLevel.Paused => heaviestLogName is null ?
+                "Live updates paused (memory)" :
+                $"Live updates paused (memory); close {heaviestLogName} to recover the most",
+            MemoryPressureLevel.Warning => heaviestLogName is null ?
+                "Memory pressure high" :
+                $"Memory pressure high; close {heaviestLogName} to recover the most",
+            _ => null
+        };
+
+        string? partial = partiallyLoadedCount switch
+        {
+            <= 0 => null,
+            1 => "1 log partially loaded (memory); reopen to load fully",
+            _ => $"{partiallyLoadedCount} logs partially loaded (memory); reopen to load fully"
+        };
+
+        return (pressure, partial) switch
+        {
+            (null, null) => null,
+            (not null, null) => pressure,
+            (null, not null) => partial,
+            _ => $"{pressure} \u00b7 {partial}"
+        };
+    }
+
     public static string FormatSource(
         LogView? active,
         IReadOnlyList<LogView> eventTables,
@@ -84,5 +119,20 @@ public static class StatusBarFormatter
         if (group is null) { return "Combined"; }
 
         return string.IsNullOrEmpty(group.Name) ? $"Combined ({group.MemberIds.Count} logs)" : group.Name;
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        const long OneKibibyte = 1024;
+        const long OneMebibyte = OneKibibyte * 1024;
+        const long OneGibibyte = OneMebibyte * 1024;
+
+        return bytes switch
+        {
+            >= OneGibibyte => $"{bytes / (double)OneGibibyte:0.0} GB",
+            >= OneMebibyte => $"{bytes / (double)OneMebibyte:0} MB",
+            >= OneKibibyte => $"{bytes / (double)OneKibibyte:0} KB",
+            _ => $"{bytes} B"
+        };
     }
 }

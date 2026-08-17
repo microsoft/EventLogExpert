@@ -14,6 +14,8 @@ public interface ISettingsPreferencesProvider
 
     LogLevel LogLevelPreference { get; set; }
 
+    long MemoryBudgetBytesPreference { get; set; }
+
     bool PreReleasePreference { get; set; }
 
     Theme ThemePreference { get; set; }

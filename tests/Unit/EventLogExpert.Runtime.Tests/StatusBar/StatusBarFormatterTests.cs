@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Memory;
 using EventLogExpert.Runtime.StatusBar;
 
 namespace EventLogExpert.Runtime.Tests.StatusBar;
@@ -92,6 +93,41 @@ public sealed class StatusBarFormatterTests
     [Fact]
     public void FormatCounts_Unfiltered_ShowsTotalEvents() =>
         Assert.Equal($"{1234:N0} events", StatusBarFormatter.FormatCounts(1234, 1234, isFiltered: false, selectedCount: 0));
+
+    [Fact]
+    public void FormatMemoryStatus_NormalWithoutPartials_ReturnsNull() =>
+        Assert.Null(StatusBarFormatter.FormatMemoryStatus(MemoryPressureLevel.Normal, partiallyLoadedCount: 0, heaviestLogName: null));
+
+    [Fact]
+    public void FormatMemoryStatus_PartialLoads_ReportsReopenGuidance() =>
+        Assert.Equal(
+            "2 logs partially loaded (memory); reopen to load fully",
+            StatusBarFormatter.FormatMemoryStatus(MemoryPressureLevel.Normal, partiallyLoadedCount: 2, heaviestLogName: null));
+
+    [Fact]
+    public void FormatMemoryStatus_PausedWithoutHeaviest_ReportsPauseOnly() =>
+        Assert.Equal(
+            "Live updates paused (memory)",
+            StatusBarFormatter.FormatMemoryStatus(MemoryPressureLevel.Paused, partiallyLoadedCount: 0, heaviestLogName: null));
+
+    [Fact]
+    public void FormatMemoryStatus_Paused_ReportsPauseAndHeaviestLog() =>
+        Assert.Equal(
+            "Live updates paused (memory); close Application to recover the most",
+            StatusBarFormatter.FormatMemoryStatus(MemoryPressureLevel.Paused, partiallyLoadedCount: 0, heaviestLogName: "Application"));
+
+    [Fact]
+    public void FormatMemory_UnsetOrUnboundedBudget_ReturnsNull()
+    {
+        Assert.Null(StatusBarFormatter.FormatMemory(usedBytes: 100, budgetBytes: 0));
+        Assert.Null(StatusBarFormatter.FormatMemory(usedBytes: 100, budgetBytes: long.MaxValue));
+    }
+
+    [Fact]
+    public void FormatMemory_WithBudget_FormatsUsedOverBudget() =>
+        Assert.Equal(
+            "Memory: 100 MB / 900 MB",
+            StatusBarFormatter.FormatMemory(100L * 1024 * 1024, 900L * 1024 * 1024));
 
     [Fact]
     public void FormatSource_AllLogs_CountsOnlyStandaloneTabs()

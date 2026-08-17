@@ -19,6 +19,9 @@
         hasChannel && status.ContinuouslyUpdate,
         status.ResolverStatus,
         ResolveIndicator());
+
+    var memoryLine = StatusBarFormatter.FormatMemory(status.MemoryUsedBytes, status.MemoryBudgetBytes);
+    var memoryStatus = StatusBarFormatter.FormatMemoryStatus(status.MemoryLevel, status.PartiallyLoadedForMemory.Count, status.HeaviestMemoryLogName);
 }
 
 <div class="status-bar">
@@ -47,6 +50,16 @@
 
     <div class="status-bar-right">
         <span aria-atomic="true" aria-live="polite" class="status-bar-announce" role="status">@announcement</span>
+
+        @if (memoryLine is not null)
+        {
+            <span class="status-bar-activity">@memoryLine</span>
+        }
+
+        @if (memoryStatus is not null)
+        {
+            <span aria-live="polite" class="status-bar-activity status-bar-warn" role="status">@memoryStatus</span>
+        }
 
         @foreach (var loadingProgress in status.LoadingActivities)
         {

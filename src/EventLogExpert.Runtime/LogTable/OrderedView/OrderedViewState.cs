@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Runtime.Memory;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using static EventLogExpert.Runtime.Concurrency.CooperativeCancellation;
@@ -396,15 +397,11 @@ internal sealed class OrderedViewState
         return rebuilt;
     }
 
-    // Half the currently-free heap headroom: total available minus the bytes currently allocated (which include the
-    // live old published index and the raw event store), so the estimate is measured against real remaining room.
-    // GC.GetTotalMemory reflects allocations since the last GC, unlike GCMemoryInfo.HeapSizeBytes (a last-GC snapshot).
     internal static long DefaultMemoryBudgetBytes()
     {
-        long available = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
-        long headroom = available - GC.GetTotalMemory(forceFullCollection: false);
+        GCMemoryInfo info = GC.GetGCMemoryInfo();
 
-        return headroom > 0 ? headroom / 2 : 0;
+        return PhysicalMemory.AvailableBytesFrom(info.TotalAvailableMemoryBytes, info.MemoryLoadBytes) / 2;
     }
 
     private static ChunkedOrderIndex BuildCombinedBulk(

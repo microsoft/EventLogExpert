@@ -14,6 +14,7 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Memory;
 using EventLogExpert.Runtime.StatusBar;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using Fluxor;
@@ -189,6 +190,37 @@ public sealed class EffectsTests
         await effects.HandleAddEvent(action, mockDispatcher);
 
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<object>());
+    }
+
+    [Fact]
+    public async Task HandleAddEvent_WhenMemoryPaused_DoesNotEnqueueOrDispatch()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+
+        var eventLogState = Substitute.For<IState<EventLogState>>();
+        eventLogState.Value.Returns(new EventLogState
+        {
+            ContinuouslyUpdate = true,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
+                .Add(Constants.LogNameTestLog, new OpenLogInfo(logData.Id, LogPathType.Channel))
+        });
+
+        var memoryState = Substitute.For<IState<MemoryGovernorState>>();
+        memoryState.Value.Returns(new MemoryGovernorState { Level = MemoryPressureLevel.Paused });
+
+        var dispatcher = Substitute.For<IDispatcher>();
+        var closeCoordinator = new LogCloseCoordinator();
+        var concurrencyState = new EventLogConcurrencyState();
+        var filtering = new FilteringEffects(
+            eventLogState,
+            memoryState,
+            new LiveTailIngestCoordinator(dispatcher, Timeout.InfiniteTimeSpan),
+            new XmlReloadCoordinator(eventLogState, closeCoordinator, concurrencyState, Substitute.For<ITraceLogger>()));
+
+        var newEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
+        await filtering.HandleAddEvent(new AddEventAction(newEvent), dispatcher);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<IngestRawEventsAction>());
     }
 
     [Fact]
@@ -1001,7 +1033,7 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleOpenLog_ReverseEagerLoad_DispatchesExactlyOneEagerPartialBeforeFinal()
+    public async Task HandleOpenLog_ReverseEagerLoad_EmitsFirstPaintPartialsThenCompleteFinal()
     {
         const int total = 250;
         var fakeFactory = new FakeEventLogReaderFactory(
@@ -1012,8 +1044,9 @@ public sealed class EffectsTests
         await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
 
         var partials = AllPartialActions(dispatcher);
-        Assert.Single(partials);
-        Assert.NotEmpty(partials[0].Events);
+        Assert.NotEmpty(partials);
+        Assert.All(partials, partial => Assert.NotEmpty(partial.Events));
+        Assert.Equal(total, SingleFinalEvents(dispatcher).Count);
     }
 
     [Fact]
@@ -1226,6 +1259,29 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleOpenLog_WhenBudgetExceeded_StopsEarlyAndMarksPartiallyLoaded()
+    {
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(total: 300, batchSize: 30), newestBookmark: "NEWEST"));
+
+        var meter = Substitute.For<IProcessMemoryMeter>();
+        meter.GetProcessUsedBytes(Arg.Any<bool>()).Returns(10_000_000_000);
+
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(
+            fakeFactory,
+            meter: meter,
+            governorState: new MemoryGovernorState { BudgetBytes = 1_000_000_000 });
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        var marks = dispatcher.ReceivedCalls()
+            .Select(call => call.GetArguments()[0])
+            .OfType<MarkPartiallyLoadedForMemoryAction>()
+            .ToList();
+        Assert.Single(marks);
+    }
+
+    [Fact]
     public async Task HandleOpenLog_WhenCancelled_ShouldDispatchCloseAndClearStatus()
     {
         var logData = new EventLogData(Constants.LogNameApplication, LogPathType.Channel);
@@ -1420,8 +1476,13 @@ public sealed class EffectsTests
         var logTableState = Substitute.For<IState<LogTableState>>();
         logTableState.Value.Returns(logTableStateValue ?? new LogTableState());
 
+        var memoryGovernorState = Substitute.For<IState<MemoryGovernorState>>();
+        memoryGovernorState.Value.Returns(new MemoryGovernorState());
+        var memoryMeter = Substitute.For<IProcessMemoryMeter>();
+
         var filtering = new FilteringEffects(
             eventLogState,
+            memoryGovernorState,
             new LiveTailIngestCoordinator(dispatcher, Timeout.InfiniteTimeSpan),
             new XmlReloadCoordinator(eventLogState, closeCoordinator, concurrencyState, logger));
 
@@ -1437,7 +1498,9 @@ public sealed class EffectsTests
             closeCoordinator,
             concurrencyState,
             new LiveTailIngestCoordinator(dispatcher, Timeout.InfiniteTimeSpan),
-            new EventLogReaderFactory());
+            new EventLogReaderFactory(),
+            memoryMeter,
+            memoryGovernorState);
 
         var logReload = new LogReloadEffects(
             eventLogState,
@@ -1507,7 +1570,9 @@ public sealed class EffectsTests
 
     private static (OpenLogEffects openLog, IDispatcher dispatcher, ILogWatcherService watcher) CreateEagerLoadEffects(
         IEventLogReaderFactory readerFactory,
-        Func<long?, int>? resolveDelayMs = null)
+        Func<long?, int>? resolveDelayMs = null,
+        IProcessMemoryMeter? meter = null,
+        MemoryGovernorState? governorState = null)
     {
         var logData = new EventLogData(Constants.LogNameApplication, LogPathType.Channel);
 
@@ -1557,6 +1622,9 @@ public sealed class EffectsTests
         var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
         rawEventStore.Value.Returns(new RawEventStoreState());
 
+        var memoryGovernorStateForOpen = Substitute.For<IState<MemoryGovernorState>>();
+        memoryGovernorStateForOpen.Value.Returns(governorState ?? new MemoryGovernorState());
+
         var openLog = new OpenLogEffects(
             eventLogState,
             Substitute.For<ITraceLogger>(),
@@ -1569,7 +1637,9 @@ public sealed class EffectsTests
             new LogCloseCoordinator(),
             new EventLogConcurrencyState(),
             new LiveTailIngestCoordinator(dispatcher, Timeout.InfiniteTimeSpan),
-            readerFactory);
+            readerFactory,
+            meter ?? Substitute.For<IProcessMemoryMeter>(),
+            memoryGovernorStateForOpen);
 
         return (openLog, dispatcher, watcher);
     }

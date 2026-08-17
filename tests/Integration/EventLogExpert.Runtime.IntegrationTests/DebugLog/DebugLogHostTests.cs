@@ -100,26 +100,6 @@ public sealed class DebugLogHostTests : IDisposable
     }
 
     [Fact]
-    public void Trace_WhenLogLevelChangedAtRuntime_ShouldRespectNewLevel()
-    {
-        TestSettingsService settings = new() { LogLevel = LogLevel.Information };
-        LogRoutingPolicy routingPolicy = CreateRoutingPolicy(settings.LogLevel);
-        using FileLogSink fileSink = new(_testLogPath, routingPolicy, DebugLogFormatter.Format);
-        using DebugLogHost host = new(fileSink, routingPolicy, settings);
-
-        fileSink.Information("message before change");
-        settings.LogLevel = LogLevel.Warning;
-        settings.RaiseLogLevelChanged();
-        fileSink.Information("filtered information after change");
-        fileSink.Warning("warning message after change");
-
-        string content = ReadLogFile();
-        Assert.Contains("message before change", content);
-        Assert.DoesNotContain("filtered information after change", content);
-        Assert.Contains("warning message after change", content);
-    }
-
-    [Fact]
     public void TraceIfEnabled_WhenLogLevelChangedAtRuntime_ShouldRespectNewLevel()
     {
         TestSettingsService settings = new() { LogLevel = LogLevel.Debug };
@@ -139,6 +119,26 @@ public sealed class DebugLogHostTests : IDisposable
         string content = ReadLogFile();
         Assert.Contains("debug message before change", content);
         Assert.DoesNotContain("debug message after change", content);
+        Assert.Contains("warning message after change", content);
+    }
+
+    [Fact]
+    public void Trace_WhenLogLevelChangedAtRuntime_ShouldRespectNewLevel()
+    {
+        TestSettingsService settings = new() { LogLevel = LogLevel.Information };
+        LogRoutingPolicy routingPolicy = CreateRoutingPolicy(settings.LogLevel);
+        using FileLogSink fileSink = new(_testLogPath, routingPolicy, DebugLogFormatter.Format);
+        using DebugLogHost host = new(fileSink, routingPolicy, settings);
+
+        fileSink.Information("message before change");
+        settings.LogLevel = LogLevel.Warning;
+        settings.RaiseLogLevelChanged();
+        fileSink.Information("filtered information after change");
+        fileSink.Warning("warning message after change");
+
+        string content = ReadLogFile();
+        Assert.Contains("message before change", content);
+        Assert.DoesNotContain("filtered information after change", content);
         Assert.Contains("warning message after change", content);
     }
 
@@ -205,6 +205,10 @@ public sealed class DebugLogHostTests : IDisposable
         public LogLevel LogLevel { get; set; }
 
         public Action? LogLevelChanged { get; set; }
+
+        public long MemoryBudgetBytes { get; set; }
+
+        public Action? MemoryBudgetChanged { get; set; }
 
         public Theme Theme { get; set; }
 

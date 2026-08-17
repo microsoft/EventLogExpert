@@ -2,10 +2,12 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Memory;
 using EventLogExpert.Runtime.StatusBar;
 using Fluxor;
 using NSubstitute;
@@ -209,6 +211,33 @@ public sealed class StatusBarSourceTests
     }
 
     [Fact]
+    public void Current_ProjectsMemoryFieldsAndIntersectsPartialSetWithOpenLogs()
+    {
+        var harness = new Harness();
+        var openId = EventLogId.Create();
+        var closedId = EventLogId.Create();
+        harness.RawEventStore = new RawEventStoreState
+        {
+            ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty.Add(openId, EventColumnStore.Empty)
+        };
+        harness.MemoryGovernor = new MemoryGovernorState
+        {
+            Level = MemoryPressureLevel.Paused,
+            CurrentBytes = 210,
+            BudgetBytes = 200,
+            PartiallyLoadedForMemory = ImmutableHashSet.Create(openId, closedId)
+        };
+
+        var presentation = harness.Source.Current;
+
+        Assert.Equal(210, presentation.MemoryUsedBytes);
+        Assert.Equal(200, presentation.MemoryBudgetBytes);
+        Assert.Equal(MemoryPressureLevel.Paused, presentation.MemoryLevel);
+        Assert.Contains(openId, presentation.PartiallyLoadedForMemory);
+        Assert.DoesNotContain(closedId, presentation.PartiallyLoadedForMemory);
+    }
+
+    [Fact]
     public void Current_ReadsEveryBackingStateLive()
     {
         var harness = new Harness();
@@ -237,7 +266,7 @@ public sealed class StatusBarSourceTests
     }
 
     [Fact]
-    public void Dispose_UnsubscribesFromAllFiveStates()
+    public void Dispose_UnsubscribesFromAllSubscribedStates()
     {
         var eventLog = Substitute.For<IState<EventLogState>>();
         eventLog.Value.Returns(new EventLogState());
@@ -249,7 +278,12 @@ public sealed class StatusBarSourceTests
         statusBar.Value.Returns(new StatusBarState());
         var logTable = Substitute.For<IState<LogTableState>>();
         logTable.Value.Returns(new LogTableState());
-        var source = new StatusBarSource(eventLog, filterPane, rawCount, statusBar, logTable, Substitute.For<ITraceLogger>());
+        var memoryGovernor = Substitute.For<IState<MemoryGovernorState>>();
+        memoryGovernor.Value.Returns(new MemoryGovernorState());
+        var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
+        rawEventStore.Value.Returns(new RawEventStoreState());
+        var source = new StatusBarSource(
+            eventLog, filterPane, rawCount, statusBar, logTable, memoryGovernor, rawEventStore, Substitute.For<ITraceLogger>());
 
         source.Dispose();
 
@@ -258,6 +292,25 @@ public sealed class StatusBarSourceTests
         rawCount.Received().StateChanged -= Arg.Any<EventHandler>();
         statusBar.Received().StateChanged -= Arg.Any<EventHandler>();
         logTable.Received().StateChanged -= Arg.Any<EventHandler>();
+        memoryGovernor.Received().StateChanged -= Arg.Any<EventHandler>();
+    }
+
+    [Fact]
+    public void MemoryStateChange_RaisesChanged()
+    {
+        var harness = new Harness();
+        var raised = 0;
+        harness.Source.Changed += () => raised++;
+
+        harness.MemoryGovernor = harness.MemoryGovernor with
+        {
+            Level = MemoryPressureLevel.Paused,
+            CurrentBytes = 5,
+            BudgetBytes = 10
+        };
+        harness.RaiseMemory();
+
+        Assert.Equal(1, raised);
     }
 
     [Fact]
@@ -278,15 +331,20 @@ public sealed class StatusBarSourceTests
         IState<FilterPaneState>? filterPane = null,
         IState<RawEventCountState>? rawCount = null,
         IState<StatusBarState>? statusBar = null,
-        IState<LogTableState>? logTable = null)
+        IState<LogTableState>? logTable = null,
+        IState<MemoryGovernorState>? memoryGovernor = null,
+        IState<RawEventStoreState>? rawEventStore = null)
     {
         eventLog ??= StateOf(new EventLogState());
         filterPane ??= StateOf(new FilterPaneState());
         rawCount ??= StateOf(new RawEventCountState());
         statusBar ??= StateOf(new StatusBarState());
         logTable ??= StateOf(new LogTableState());
+        memoryGovernor ??= StateOf(new MemoryGovernorState());
+        rawEventStore ??= StateOf(new RawEventStoreState());
 
-        return new StatusBarSource(eventLog, filterPane, rawCount, statusBar, logTable, Substitute.For<ITraceLogger>());
+        return new StatusBarSource(
+            eventLog, filterPane, rawCount, statusBar, logTable, memoryGovernor, rawEventStore, Substitute.For<ITraceLogger>());
     }
 
     private static IState<TState> StateOf<TState>(TState value)
@@ -302,7 +360,9 @@ public sealed class StatusBarSourceTests
         private readonly IState<EventLogState> _eventLog = Substitute.For<IState<EventLogState>>();
         private readonly IState<FilterPaneState> _filterPane = Substitute.For<IState<FilterPaneState>>();
         private readonly IState<LogTableState> _logTable = Substitute.For<IState<LogTableState>>();
+        private readonly IState<MemoryGovernorState> _memoryGovernor = Substitute.For<IState<MemoryGovernorState>>();
         private readonly IState<RawEventCountState> _rawCount = Substitute.For<IState<RawEventCountState>>();
+        private readonly IState<RawEventStoreState> _rawEventStore = Substitute.For<IState<RawEventStoreState>>();
         private readonly IState<StatusBarState> _statusBar = Substitute.For<IState<StatusBarState>>();
 
         public Harness()
@@ -312,8 +372,11 @@ public sealed class StatusBarSourceTests
             _rawCount.Value.Returns(_ => RawCount);
             _statusBar.Value.Returns(_ => StatusBar);
             _logTable.Value.Returns(_ => LogTable);
+            _memoryGovernor.Value.Returns(_ => MemoryGovernor);
+            _rawEventStore.Value.Returns(_ => RawEventStore);
             Source = new StatusBarSource(
-                _eventLog, _filterPane, _rawCount, _statusBar, _logTable, Substitute.For<ITraceLogger>());
+                _eventLog, _filterPane, _rawCount, _statusBar, _logTable, _memoryGovernor, _rawEventStore,
+                Substitute.For<ITraceLogger>());
         }
 
         public EventLogState EventLog { get; set; } = new();
@@ -322,7 +385,11 @@ public sealed class StatusBarSourceTests
 
         public LogTableState LogTable { get; set; } = new();
 
+        public MemoryGovernorState MemoryGovernor { get; set; } = new();
+
         public RawEventCountState RawCount { get; set; } = new();
+
+        public RawEventStoreState RawEventStore { get; set; } = new();
 
         public StatusBarSource Source { get; }
 
@@ -336,6 +403,9 @@ public sealed class StatusBarSourceTests
 
         public void RaiseLogTable() =>
             _logTable.StateChanged += Raise.Event<EventHandler>(_logTable, EventArgs.Empty);
+
+        public void RaiseMemory() =>
+            _memoryGovernor.StateChanged += Raise.Event<EventHandler>(_memoryGovernor, EventArgs.Empty);
 
         public void RaiseRawCount() =>
             _rawCount.StateChanged += Raise.Event<EventHandler>(_rawCount, EventArgs.Empty);

@@ -12,6 +12,7 @@ internal sealed class SettingsPreferencesAdapter : ISettingsPreferencesProvider
     private const string HasEverEnabledPreRelease = "has-ever-enabled-prerelease";
     private const string KeyboardCopyFormat = "keyboard-copy-format";
     private const string LoggingLevel = "logging-level";
+    private const string MemoryBudgetBytes = "memory-budget-bytes";
     private const string PreReleaseEnabled = "prerelease-enabled";
     private const string ThemeName = "theme";
     private const string TimeZone = "timezone";
@@ -37,6 +38,12 @@ internal sealed class SettingsPreferencesAdapter : ISettingsPreferencesProvider
             out LogLevel value) ?
             value : LogLevel.Information;
         set => Preferences.Default.Set(LoggingLevel, value.ToString());
+    }
+
+    public long MemoryBudgetBytesPreference
+    {
+        get => Preferences.Default.Get(MemoryBudgetBytes, 0L);
+        set => Preferences.Default.Set(MemoryBudgetBytes, value);
     }
 
     public bool PreReleasePreference

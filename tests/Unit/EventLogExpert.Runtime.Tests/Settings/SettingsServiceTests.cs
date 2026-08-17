@@ -71,20 +71,6 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public void CopyFormat_WhenSet_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.CopyFormat = EventCopyFormat.Full;
-
-        // Assert
-        mockPreferences.Received(1).KeyboardCopyFormatPreference = EventCopyFormat.Full;
-    }
-
-    [Fact]
     public void CopyFormat_WhenSetToDifferentValue_ShouldInvokeChangedEvent()
     {
         // Arrange
@@ -157,6 +143,20 @@ public sealed class SettingsServiceTests
 
         // Assert
         mockPreferences.DidNotReceive().KeyboardCopyFormatPreference = Arg.Any<EventCopyFormat>();
+    }
+
+    [Fact]
+    public void CopyFormat_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.CopyFormat = EventCopyFormat.Full;
+
+        // Assert
+        mockPreferences.Received(1).KeyboardCopyFormatPreference = EventCopyFormat.Full;
     }
 
     [Fact]
@@ -290,20 +290,6 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public void IsPreReleaseEnabled_WhenSet_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.IsPreReleaseEnabled = true;
-
-        // Assert
-        mockPreferences.Received(1).PreReleasePreference = true;
-    }
-
-    [Fact]
     public void IsPreReleaseEnabled_WhenSetToFalse_ShouldNotChangeStickyBit()
     {
         // Arrange
@@ -375,6 +361,20 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void IsPreReleaseEnabled_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.IsPreReleaseEnabled = true;
+
+        // Assert
+        mockPreferences.Received(1).PreReleasePreference = true;
+    }
+
+    [Fact]
     public void LogLevel_WhenAccessedMultipleTimes_ShouldCacheValue()
     {
         // Arrange
@@ -421,20 +421,6 @@ public sealed class SettingsServiceTests
 
         // Assert
         Assert.Equal(LogLevel.Trace, result);
-    }
-
-    [Fact]
-    public void LogLevel_WhenSet_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.LogLevel = LogLevel.Warning;
-
-        // Assert
-        mockPreferences.Received(1).LogLevelPreference = LogLevel.Warning;
     }
 
     [Fact]
@@ -513,6 +499,54 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void LogLevel_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.LogLevel = LogLevel.Warning;
+
+        // Assert
+        mockPreferences.Received(1).LogLevelPreference = LogLevel.Warning;
+    }
+
+    [Fact]
+    public void MemoryBudgetBytes_ReadsFromPreferences()
+    {
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        mockPreferences.MemoryBudgetBytesPreference.Returns(1_073_741_824);
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        Assert.Equal(1_073_741_824, settingsService.MemoryBudgetBytes);
+    }
+
+    [Fact]
+    public void MemoryBudgetBytes_Set_PersistsAndRaisesChanged()
+    {
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+        var eventInvoked = false;
+        settingsService.MemoryBudgetChanged = () => eventInvoked = true;
+
+        settingsService.MemoryBudgetBytes = 500_000_000;
+
+        Assert.Equal(500_000_000, settingsService.MemoryBudgetBytes);
+        mockPreferences.Received().MemoryBudgetBytesPreference = 500_000_000;
+        Assert.True(eventInvoked);
+    }
+
+    [Fact]
+    public void MemoryBudgetBytes_WhenUnset_DefaultsToZero()
+    {
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        Assert.Equal(0, settingsService.MemoryBudgetBytes);
+    }
+
+    [Fact]
     public void Theme_WhenAccessedMultipleTimes_ShouldCacheValue()
     {
         // Arrange
@@ -559,20 +593,6 @@ public sealed class SettingsServiceTests
 
         // Assert
         Assert.Equal(Theme.System, result);
-    }
-
-    [Fact]
-    public void Theme_WhenSet_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.Theme = Theme.Dark;
-
-        // Assert
-        mockPreferences.Received(1).ThemePreference = Theme.Dark;
     }
 
     [Fact]
@@ -648,6 +668,20 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void Theme_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.Theme = Theme.Dark;
+
+        // Assert
+        mockPreferences.Received(1).ThemePreference = Theme.Dark;
+    }
+
+    [Fact]
     public void TimeZoneId_WhenAccessedMultipleTimes_ShouldCacheValue()
     {
         // Arrange
@@ -695,20 +729,6 @@ public sealed class SettingsServiceTests
 
         // Assert
         Assert.Equal(TimeZoneInfo.Local.Id, result);
-    }
-
-    [Fact]
-    public void TimeZoneId_WhenSet_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.TimeZoneId = Constants.TimeZoneEastern;
-
-        // Assert
-        mockPreferences.Received(1).TimeZonePreference = Constants.TimeZoneEastern;
     }
 
     [Fact]
@@ -772,6 +792,20 @@ public sealed class SettingsServiceTests
 
         // Assert
         mockPreferences.DidNotReceive().TimeZonePreference = Arg.Any<string>();
+    }
+
+    [Fact]
+    public void TimeZoneId_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.TimeZoneId = Constants.TimeZoneEastern;
+
+        // Assert
+        mockPreferences.Received(1).TimeZonePreference = Constants.TimeZoneEastern;
     }
 
     [Fact]
@@ -850,20 +884,6 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public void VerboseResolution_WhenSet_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.VerboseResolution = true;
-
-        // Assert
-        mockPreferences.Received(1).VerboseResolutionPreference = true;
-    }
-
-    [Fact]
     public void VerboseResolution_WhenSetToDifferentValue_ShouldInvokeChangedEvent()
     {
         // Arrange
@@ -898,6 +918,20 @@ public sealed class SettingsServiceTests
 
         // Assert
         Assert.False(eventInvoked);
+    }
+
+    [Fact]
+    public void VerboseResolution_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.VerboseResolution = true;
+
+        // Assert
+        mockPreferences.Received(1).VerboseResolutionPreference = true;
     }
 
     private static SettingsService CreateSettingsService(ISettingsPreferencesProvider? preferencesProvider = null) =>

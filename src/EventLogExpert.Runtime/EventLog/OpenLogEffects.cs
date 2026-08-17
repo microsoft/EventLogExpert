@@ -11,6 +11,7 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Memory;
 using EventLogExpert.Runtime.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,15 +37,22 @@ internal sealed class OpenLogEffects(
     LogCloseCoordinator closeCoordinator,
     EventLogConcurrencyState concurrencyState,
     LiveTailIngestCoordinator liveTailCoordinator,
-    IEventLogReaderFactory readerFactory)
+    IEventLogReaderFactory readerFactory,
+    IProcessMemoryMeter meter,
+    IState<MemoryGovernorState> memoryGovernorState)
 {
+    private const int AdaptiveCalibrationThreshold = 4096;
     private const int EagerFirstPaintThreshold = 200;
-
+    private const int MemoryPartialTriggerCount = 8192;
+    private const int MeterSampleBatchInterval = 16;
+    private const long MinPerEventReserveBytes = 4096;
     private const int ReadBatchSize = 256;
 
     private static readonly int s_maxGlobalConcurrency = ConcurrencyLimits.MaxBackgroundIoParallelism;
     private static readonly TimeSpan s_partialDispatchInterval = TimeSpan.FromSeconds(3);
     private static readonly PrioritySemaphore s_resolutionGate = new(s_maxGlobalConcurrency);
+    private static readonly long s_maxInFlightEvents =
+        (((s_maxGlobalConcurrency * 2) + s_maxGlobalConcurrency + 1) * (long)ReadBatchSize) + MemoryPartialTriggerCount;
 
     private readonly LogCloseCoordinator _closeCoordinator = closeCoordinator;
     private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
@@ -58,6 +66,8 @@ internal sealed class OpenLogEffects(
     private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logLoadCompletions = new();
     private readonly ILogWatcherService _logWatcherService = logWatcherService;
     private readonly ITraceLogger _logger = logger;
+    private readonly IState<MemoryGovernorState> _memoryGovernorState = memoryGovernorState;
+    private readonly IProcessMemoryMeter _meter = meter;
     private readonly IEventLogReaderFactory _readerFactory = readerFactory;
     private readonly IEventResolverCache _resolverCache = resolverCache;
     private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
@@ -309,7 +319,9 @@ internal sealed class OpenLogEffects(
         int lastPartialIndex = 0;
         int timerTick = 0;
         int eagerFired = 0;
+        int lastCountTrigger = 0;
         long highAdmitted = 0;
+        bool memoryLimited = false;
 
         dispatcher.Dispatch(new AddTableAction(logData));
 
@@ -343,19 +355,45 @@ internal sealed class OpenLogEffects(
 
         using var reader = _readerFactory.CreateReader(action.LogName, action.LogPathType, renderXml, reverseDirection: true);
 
+        long memoryBudgetBytes = _memoryGovernorState.Value.BudgetBytes;
+        long usedAtLoadStart = _meter.GetProcessUsedBytes(forceFullCollection: false);
+
         var producerTask = Task.Run(async () =>
         {
             long sequence = 0;
+            long used = usedAtLoadStart;
+            int batchesSinceMeterSample = 0;
 
             try
             {
-                while (reader.TryGetEvents(out EventRecord[] batch, ReadBatchSize))
+                while (true)
                 {
                     token.ThrowIfCancellationRequested();
+
+                    if (batchesSinceMeterSample == 0)
+                    {
+                        used = _meter.GetProcessUsedBytes(forceFullCollection: false);
+                    }
+
+                    long resolvedSoFar = Volatile.Read(ref resolved);
+                    long perEventBytes = resolvedSoFar >= AdaptiveCalibrationThreshold ?
+                        Math.Max(MinPerEventReserveBytes, (used - usedAtLoadStart) / resolvedSoFar) :
+                        MinPerEventReserveBytes;
+
+                    if (used >= memoryBudgetBytes - (s_maxInFlightEvents * perEventBytes))
+                    {
+                        memoryLimited = true;
+
+                        break;
+                    }
+
+                    if (!reader.TryGetEvents(out EventRecord[] batch, ReadBatchSize)) { break; }
 
                     if (batch.Length == 0) { continue; }
 
                     await channel.Writer.WriteAsync((sequence++, batch), token);
+
+                    batchesSinceMeterSample = (batchesSinceMeterSample + 1) % MeterSampleBatchInterval;
                 }
             }
             catch (Exception ex)
@@ -429,6 +467,7 @@ internal sealed class OpenLogEffects(
                         }
 
                         bool dispatchEager = false;
+                        bool dispatchCountBounded = false;
 
                         lock (events)
                         {
@@ -444,11 +483,17 @@ internal sealed class OpenLogEffects(
                             {
                                 dispatchEager = true;
                             }
+
+                            if (events.Count - lastCountTrigger >= MemoryPartialTriggerCount)
+                            {
+                                lastCountTrigger = events.Count;
+                                dispatchCountBounded = true;
+                            }
                         }
 
                         Interlocked.Add(ref resolved, localResolved);
 
-                        if (dispatchEager) { TryDispatchPartial(); }
+                        if (dispatchEager || dispatchCountBounded) { TryDispatchPartial(); }
                     }
                     finally
                     {
@@ -522,7 +567,11 @@ internal sealed class OpenLogEffects(
             _concurrencyState.MarkLoadedWithXml(logData.Id);
         }
 
-        dispatcher.Dispatch(new LoadEventsAction(logData, events.AsReadOnly()));
+        TryDispatchPartial();
+
+        dispatcher.Dispatch(new LoadEventsAction(logData, events.AsReadOnly(), StoreAlreadyBuilt: true));
+
+        if (memoryLimited) { dispatcher.Dispatch(new MarkPartiallyLoadedForMemoryAction(logData.Id)); }
 
         dispatcher.Dispatch(new SetEventsLoadingAction(activityId, 0, 0));
 

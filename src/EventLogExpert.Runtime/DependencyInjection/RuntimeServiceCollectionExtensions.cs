@@ -29,6 +29,7 @@ using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.LogTable.OrderedView;
+using EventLogExpert.Runtime.Memory;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Runtime.Settings;
@@ -142,6 +143,7 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<LiveTailIngestCoordinator>();
             services.AddSingleton<FilteredLogPresenceCoordinator>();
             services.AddSingleton<IEventLogReaderFactory, EventLogReaderFactory>();
+            services.AddSingleton<IProcessMemoryMeter, ProcessMemoryMeter>();
 
             // Ordered-view engine
             services.AddSingleton<OrderedViewWriter>(static _ => new OrderedViewWriter());

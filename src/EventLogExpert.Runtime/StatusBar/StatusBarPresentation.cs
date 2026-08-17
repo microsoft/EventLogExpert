@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Memory;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.StatusBar;
@@ -22,6 +23,17 @@ public sealed record StatusBarPresentation
     public bool IsPersistentFilterActive { get; init; }
 
     public int RawEventTotal { get; init; }
+
+    public long MemoryUsedBytes { get; init; }
+
+    public long MemoryBudgetBytes { get; init; }
+
+    public MemoryPressureLevel MemoryLevel { get; init; }
+
+    public string? HeaviestMemoryLogName { get; init; }
+
+    public ImmutableHashSet<EventLogId> PartiallyLoadedForMemory { get; init; } =
+        ImmutableHashSet<EventLogId>.Empty;
 
     public ImmutableDictionary<EventLogId, int> RawEventCountsByLog { get; init; } =
         ImmutableDictionary<EventLogId, int>.Empty;
