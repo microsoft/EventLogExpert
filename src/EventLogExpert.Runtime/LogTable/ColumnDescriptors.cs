@@ -61,6 +61,8 @@ public static class ColumnDescriptors
             new(EventFieldId.ThreadId, EventProperty.ThreadId, static (e, _) => e.ThreadId?.ToString() ?? string.Empty);
         accessors[(int)ColumnName.User] =
             new(EventFieldId.UserDisplayName, EventProperty.UserDisplayName, static (e, _) => e.UserDisplayName);
+        accessors[(int)ColumnName.Opcode] =
+            new(EventFieldId.Opcode, EventProperty.Opcode, static (e, _) => e.Opcode);
 
         return accessors;
     }

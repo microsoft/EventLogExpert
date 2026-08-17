@@ -33,6 +33,8 @@ internal static class AosReferenceOrdering
         (a, b) => WithTieBreaker(Nullable.Compare(a.ThreadId, b.ThreadId), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByUser =
         (a, b) => WithTieBreaker(CompareText(a.UserDisplayName, b.UserDisplayName), a, b);
+    private static readonly Comparison<ResolvedEvent> s_ascByOpcode =
+        (a, b) => WithTieBreaker(CompareText(a.Opcode, b.Opcode), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByRecordId =
         (a, b) => WithTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
     private static readonly Comparison<ResolvedEvent> s_ascByDefault =
@@ -55,6 +57,7 @@ internal static class AosReferenceOrdering
     private static readonly Comparison<ResolvedEvent> s_descByKeywords = (a, b) => s_ascByKeywords(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByLevel = (a, b) => s_ascByLevel(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByLog = (a, b) => s_ascByLog(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByOpcode = (a, b) => s_ascByOpcode(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByProcessId = (a, b) => s_ascByProcessId(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByRecordId = (a, b) => s_ascByRecordId(b, a);
     private static readonly Comparison<ResolvedEvent> s_descBySource = (a, b) => s_ascBySource(b, a);
@@ -129,6 +132,7 @@ internal static class AosReferenceOrdering
             ColumnName.ProcessId => Nullable.Compare(a.ProcessId, b.ProcessId),
             ColumnName.ThreadId => Nullable.Compare(a.ThreadId, b.ThreadId),
             ColumnName.User => CompareText(a.UserDisplayName, b.UserDisplayName),
+            ColumnName.Opcode => CompareText(a.Opcode, b.Opcode),
             _ => 0
         };
 
@@ -155,6 +159,7 @@ internal static class AosReferenceOrdering
                 ColumnName.ProcessId => s_descByProcessId,
                 ColumnName.ThreadId => s_descByThreadId,
                 ColumnName.User => s_descByUser,
+                ColumnName.Opcode => s_descByOpcode,
                 _ => s_descByDefault
             }
             : orderBy switch
@@ -172,6 +177,7 @@ internal static class AosReferenceOrdering
                 ColumnName.ProcessId => s_ascByProcessId,
                 ColumnName.ThreadId => s_ascByThreadId,
                 ColumnName.User => s_ascByUser,
+                ColumnName.Opcode => s_ascByOpcode,
                 _ => s_ascByDefault
             };
 

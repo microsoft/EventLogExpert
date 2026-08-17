@@ -19,5 +19,6 @@ public enum ColumnName
     Keywords,
     [EnumMember(Value = "Process ID")] ProcessId,
     [EnumMember(Value = "Thread ID")] ThreadId,
-    User
+    User,
+    Opcode
 }

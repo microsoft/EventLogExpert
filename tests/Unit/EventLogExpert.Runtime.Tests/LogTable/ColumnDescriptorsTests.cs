@@ -32,6 +32,7 @@ public sealed class ColumnDescriptorsTests
     [InlineData(ColumnName.Source, "TestSource")]
     [InlineData(ColumnName.EventId, "4242")]
     [InlineData(ColumnName.TaskCategory, "TestCategory")]
+    [InlineData(ColumnName.Opcode, "Start")]
     [InlineData(ColumnName.Keywords, "AuditKeyword")]
     [InlineData(ColumnName.ProcessId, "111")]
     [InlineData(ColumnName.ThreadId, "222")]
@@ -53,6 +54,7 @@ public sealed class ColumnDescriptorsTests
     [InlineData(ColumnName.Source, EventFieldId.Source)]
     [InlineData(ColumnName.EventId, EventFieldId.Id)]
     [InlineData(ColumnName.TaskCategory, EventFieldId.TaskCategory)]
+    [InlineData(ColumnName.Opcode, EventFieldId.Opcode)]
     [InlineData(ColumnName.Keywords, EventFieldId.KeywordsDisplay)]
     [InlineData(ColumnName.ProcessId, EventFieldId.ProcessId)]
     [InlineData(ColumnName.ThreadId, EventFieldId.ThreadId)]
@@ -67,6 +69,7 @@ public sealed class ColumnDescriptorsTests
     [InlineData(ColumnName.Keywords, EventProperty.Keywords)]
     [InlineData(ColumnName.Source, EventProperty.Source)]
     [InlineData(ColumnName.TaskCategory, EventProperty.TaskCategory)]
+    [InlineData(ColumnName.Opcode, EventProperty.Opcode)]
     [InlineData(ColumnName.ProcessId, EventProperty.ProcessId)]
     [InlineData(ColumnName.ThreadId, EventProperty.ThreadId)]
     [InlineData(ColumnName.User, EventProperty.UserDisplayName)]
@@ -117,6 +120,7 @@ public sealed class ColumnDescriptorsTests
             ComputerName = "TEST-PC",
             Source = "TestSource",
             TaskCategory = "TestCategory",
+            Opcode = "Start",
             Keywords = ["AuditKeyword"],
             ProcessId = 111,
             ThreadId = 222,

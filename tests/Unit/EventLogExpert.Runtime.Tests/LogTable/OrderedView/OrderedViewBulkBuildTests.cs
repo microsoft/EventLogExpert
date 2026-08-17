@@ -26,7 +26,8 @@ public sealed class OrderedViewBulkBuildTests
         ColumnName.Keywords,
         ColumnName.ProcessId,
         ColumnName.ThreadId,
-        ColumnName.User
+        ColumnName.User,
+        ColumnName.Opcode
     ];
     private static readonly ColumnName?[] s_groupBys =
     [
@@ -209,7 +210,8 @@ public sealed class OrderedViewBulkBuildTests
                 Id = 1000 + (i % 6),
                 Level = level,
                 Source = i % 5 == 0 ? "" : $"Src.{i % 7}",
-                TaskCategory = i % 2 == 0 ? "" : "Logon"
+                TaskCategory = i % 2 == 0 ? "" : "Logon",
+                Opcode = (i % 3) switch { 0 => "", 1 => "Start", _ => "Stop" }
             });
         }
 

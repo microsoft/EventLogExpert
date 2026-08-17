@@ -101,5 +101,6 @@ public sealed class EventTableColumnFormatterTests
     {
         Assert.Equal("Event ID", EventTableColumnFormatter.GetColumnHeader(ColumnName.EventId, s_plusTwo));
         Assert.Equal("Record ID", EventTableColumnFormatter.GetColumnHeader(ColumnName.RecordId, s_plusTwo));
+        Assert.Equal("Opcode", EventTableColumnFormatter.GetColumnHeader(ColumnName.Opcode, s_plusTwo));
     }
 }

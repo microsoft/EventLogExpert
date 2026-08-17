@@ -50,6 +50,7 @@ internal static class CellFilterBuilder
             EventProperty.Keywords => @event.KeywordsDisplayName,
             EventProperty.Source => @event.Source,
             EventProperty.TaskCategory => @event.TaskCategory,
+            EventProperty.Opcode => @event.Opcode,
             EventProperty.ProcessId => @event.ProcessId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             EventProperty.ThreadId => @event.ThreadId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             EventProperty.UserDisplayName => @event.UserDisplayName,

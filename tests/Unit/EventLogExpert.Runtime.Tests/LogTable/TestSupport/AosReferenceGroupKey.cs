@@ -31,6 +31,7 @@ internal static class AosReferenceGroupKey
             ColumnName.ProcessId => @event.ProcessId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             ColumnName.ThreadId => @event.ThreadId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             ColumnName.User => @event.UserDisplayName,
+            ColumnName.Opcode => @event.Opcode,
             _ => string.Empty
         };
 }

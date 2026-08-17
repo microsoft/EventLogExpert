@@ -73,7 +73,7 @@ public sealed class AosReferenceViewTests
     [Fact]
     public void MatrixIsFullCrossProduct()
     {
-        Assert.Equal(756, s_allConfigs.Count);
+        Assert.Equal(870, s_allConfigs.Count);
     }
 
     [Fact]
@@ -188,9 +188,9 @@ public sealed class AosReferenceViewTests
 
         return
         [
-            FilterEventBuilder.CreateTestEvent(id: 5, recordId: 1, source: "Alpha", level: "Information", computerName: "Host-A", logName: "AppLog", taskCategory: "Cat-A", keywords: ["K1"], processId: 30, threadId: 9, activityId: guidA, userId: sidLow, timeCreated: middle),
-            FilterEventBuilder.CreateTestEvent(id: 5, recordId: 2, source: "Beta", level: "Error", computerName: "Host-B", logName: "SysLog", taskCategory: "Cat-B", keywords: ["K2"], processId: 10, threadId: 1, activityId: guidC, userId: sidHigh, timeCreated: early),
-            FilterEventBuilder.CreateTestEvent(id: 1, recordId: 3, source: "Gamma", level: "Warning", computerName: "Host-C", logName: "SecLog", taskCategory: "Cat-C", keywords: [], processId: null, threadId: 4, activityId: null, userId: sidMid, timeCreated: late),
+            FilterEventBuilder.CreateTestEvent(id: 5, recordId: 1, source: "Alpha", level: "Information", computerName: "Host-A", logName: "AppLog", taskCategory: "Cat-A", keywords: ["K1"], processId: 30, threadId: 9, activityId: guidA, userId: sidLow, timeCreated: middle, opcode: "Start"),
+            FilterEventBuilder.CreateTestEvent(id: 5, recordId: 2, source: "Beta", level: "Error", computerName: "Host-B", logName: "SysLog", taskCategory: "Cat-B", keywords: ["K2"], processId: 10, threadId: 1, activityId: guidC, userId: sidHigh, timeCreated: early, opcode: "Stop"),
+            FilterEventBuilder.CreateTestEvent(id: 1, recordId: 3, source: "Gamma", level: "Warning", computerName: "Host-C", logName: "SecLog", taskCategory: "Cat-C", keywords: [], processId: null, threadId: 4, activityId: null, userId: sidMid, timeCreated: late, opcode: "Info"),
             FilterEventBuilder.CreateTestEvent(id: 3, recordId: 4, source: "Alpha", level: "Critical", computerName: "Host-A", logName: "AppLog", taskCategory: "Cat-B", keywords: ["K1", "K3"], processId: 30, threadId: null, activityId: guidB, userId: sidLow, timeCreated: early),
             FilterEventBuilder.CreateTestEvent(id: 3, recordId: 5, source: "Delta", level: "Information", computerName: "Host-B", logName: "SysLog", taskCategory: "Cat-A", keywords: ["K2"], processId: 22, threadId: 9, activityId: guidA, userId: sidHigh, timeCreated: middle),
             FilterEventBuilder.CreateTestEvent(id: 8, recordId: 6, source: "Beta", level: "Warning", computerName: "Host-C", logName: "AppLog", taskCategory: "Cat-C", keywords: ["K1"], processId: null, threadId: 1, activityId: guidC, userId: sidMid, timeCreated: late),

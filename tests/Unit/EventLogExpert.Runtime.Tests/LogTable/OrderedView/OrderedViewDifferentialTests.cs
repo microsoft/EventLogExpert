@@ -25,7 +25,8 @@ public sealed class OrderedViewDifferentialTests
         ColumnName.Keywords,
         ColumnName.ProcessId,
         ColumnName.ThreadId,
-        ColumnName.User
+        ColumnName.User,
+        ColumnName.Opcode
     ];
     private static readonly ColumnName?[] s_groupBys =
     [
@@ -51,7 +52,8 @@ public sealed class OrderedViewDifferentialTests
         ColumnName.ThreadId,
         ColumnName.Log,
         ColumnName.User,
-        ColumnName.Keywords
+        ColumnName.Keywords,
+        ColumnName.Opcode
     ];
 
     [Theory]
