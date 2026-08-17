@@ -20,9 +20,9 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
     private readonly ITestOutputHelper _output = output;
 
     [Fact]
-    public void MatrixCovers756Configs_AcrossOrderGroupAscendingDescending()
+    public void MatrixCovers870Configs_AcrossOrderGroupAscendingDescending()
     {
-        Assert.Equal(756, s_allConfigs.Count);
+        Assert.Equal(870, s_allConfigs.Count);
         Assert.Contains(s_allConfigs, config => config.OrderBy is null && config is { IsDescending: true, GroupBy: null });
         Assert.Contains(s_allConfigs, config => config.OrderBy is null && config is { IsDescending: true, GroupBy: not null });
     }
@@ -160,8 +160,8 @@ public sealed class ColumnDirectSortKernelTests(ITestOutputHelper output)
 
         return
         [
-            FilterEventBuilder.CreateTestEvent(id: 2, recordId: 2, processId: 2, threadId: 2, source: "Alpha", level: "Information", timeCreated: early, activityId: guidLow, userId: sidLow),
-            FilterEventBuilder.CreateTestEvent(id: 10, recordId: 10, processId: 10, threadId: 10, source: "Alpha", level: "Information", timeCreated: early, activityId: guidHigh, userId: sidHigh),
+            FilterEventBuilder.CreateTestEvent(id: 2, recordId: 2, processId: 2, threadId: 2, source: "Alpha", level: "Information", timeCreated: early, activityId: guidLow, userId: sidLow, opcode: "Start"),
+            FilterEventBuilder.CreateTestEvent(id: 10, recordId: 10, processId: 10, threadId: 10, source: "Alpha", level: "Information", timeCreated: early, activityId: guidHigh, userId: sidHigh, opcode: "Stop"),
             FilterEventBuilder.CreateTestEvent(id: 1, recordId: 5, source: "Beta", level: "Error", timeCreated: middle),
             FilterEventBuilder.CreateTestEvent(id: 1, recordId: 7, source: "Beta", level: "Error", timeCreated: middle),
             FilterEventBuilder.CreateTestEvent(id: 3, source: "Gamma", level: "Warning", timeCreated: late),

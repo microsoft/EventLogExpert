@@ -22,6 +22,7 @@ public sealed class CellFilterBuilderTests
     [InlineData(ColumnName.Keywords, EventProperty.Keywords)]
     [InlineData(ColumnName.Source, EventProperty.Source)]
     [InlineData(ColumnName.TaskCategory, EventProperty.TaskCategory)]
+    [InlineData(ColumnName.Opcode, EventProperty.Opcode)]
     [InlineData(ColumnName.ProcessId, EventProperty.ProcessId)]
     [InlineData(ColumnName.ThreadId, EventProperty.ThreadId)]
     [InlineData(ColumnName.User, EventProperty.UserDisplayName)]
@@ -63,6 +64,7 @@ public sealed class CellFilterBuilderTests
     [InlineData(EventProperty.Keywords)]
     [InlineData(EventProperty.Source)]
     [InlineData(EventProperty.TaskCategory)]
+    [InlineData(EventProperty.Opcode)]
     [InlineData(EventProperty.ProcessId)]
     [InlineData(EventProperty.ThreadId)]
     [InlineData(EventProperty.UserDisplayName)]
@@ -147,6 +149,7 @@ public sealed class CellFilterBuilderTests
     [InlineData(EventProperty.ThreadId)]
     [InlineData(EventProperty.Level)]
     [InlineData(EventProperty.Keywords)]
+    [InlineData(EventProperty.Opcode)]
     public void TryBuild_WhenCellHasNoValue_ReturnsFalse(EventProperty property)
     {
         var emptyEvent = EmptyFor(property);
@@ -165,6 +168,7 @@ public sealed class CellFilterBuilderTests
     [InlineData(EventProperty.ProcessId)]
     [InlineData(EventProperty.ThreadId)]
     [InlineData(EventProperty.UserDisplayName)]
+    [InlineData(EventProperty.Opcode)]
     public void TryGetDisplayValue_PreviouslyUnmappedProperties_ReturnNonEmptyValue(EventProperty property)
     {
         Assert.True(CellFilterBuilder.TryGetDisplayValue(FullEvent(), property, out var value));
@@ -180,6 +184,7 @@ public sealed class CellFilterBuilderTests
             EventProperty.ThreadId => FullEvent() with { ThreadId = null },
             EventProperty.Level => FullEvent() with { Level = string.Empty },
             EventProperty.Keywords => FullEvent() with { Keywords = [] },
+            EventProperty.Opcode => FullEvent() with { Opcode = string.Empty },
             _ => FullEvent()
         };
 
@@ -191,6 +196,7 @@ public sealed class CellFilterBuilderTests
             Level = "Warning",
             Source = "TestSource",
             TaskCategory = "TestCategory",
+            Opcode = "Start",
             Keywords = ["AuditKeyword"],
             ProcessId = 111,
             ThreadId = 222,

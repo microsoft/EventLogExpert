@@ -26,7 +26,8 @@ public static class FilterEventBuilder
         SecurityIdentifier? userId = null,
         string? userDisplayName = null,
         IReadOnlyList<string>? keywords = null,
-        string owningLog = "TestLog") =>
+        string owningLog = "TestLog",
+        string opcode = "") =>
         new(owningLog, LogPathType.Channel)
         {
             Id = id,
@@ -35,6 +36,7 @@ public static class FilterEventBuilder
             Description = description,
             ComputerName = computerName,
             TaskCategory = taskCategory,
+            Opcode = opcode,
             LogName = logName,
             TimeCreated = timeCreated ?? new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc),
             RecordId = recordId,

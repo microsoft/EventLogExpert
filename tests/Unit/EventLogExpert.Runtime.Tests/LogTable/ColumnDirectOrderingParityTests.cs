@@ -70,9 +70,9 @@ public sealed class ColumnDirectOrderingParityTests
     }
 
     [Fact]
-    public void MatrixCovers756Configs_IncludingNullOrderByDescendingInBothArms()
+    public void MatrixCovers870Configs_IncludingNullOrderByDescendingInBothArms()
     {
-        Assert.Equal(756, s_allConfigs.Count);
+        Assert.Equal(870, s_allConfigs.Count);
         Assert.Contains(s_allConfigs, config => config.OrderBy is null && config.IsDescending && config.GroupBy is null);
         Assert.Contains(s_allConfigs, config => config.OrderBy is null && config.IsDescending && config.GroupBy is not null);
     }
@@ -89,8 +89,8 @@ public sealed class ColumnDirectOrderingParityTests
 
         return
         [
-            FilterEventBuilder.CreateTestEvent(id: 2, recordId: 2, processId: 2, threadId: 2, source: "Alpha", level: "Information", timeCreated: early, activityId: guidLow, userId: sidLow),
-            FilterEventBuilder.CreateTestEvent(id: 10, recordId: 10, processId: 10, threadId: 10, source: "Alpha", level: "Information", timeCreated: early, activityId: guidHigh, userId: sidHigh),
+            FilterEventBuilder.CreateTestEvent(id: 2, recordId: 2, processId: 2, threadId: 2, source: "Alpha", level: "Information", timeCreated: early, activityId: guidLow, userId: sidLow, opcode: "Start"),
+            FilterEventBuilder.CreateTestEvent(id: 10, recordId: 10, processId: 10, threadId: 10, source: "Alpha", level: "Information", timeCreated: early, activityId: guidHigh, userId: sidHigh, opcode: "Stop"),
 
             FilterEventBuilder.CreateTestEvent(id: 1, recordId: 5, source: "Beta", level: "Error", timeCreated: middle),
             FilterEventBuilder.CreateTestEvent(id: 1, recordId: 7, source: "Beta", level: "Error", timeCreated: middle),

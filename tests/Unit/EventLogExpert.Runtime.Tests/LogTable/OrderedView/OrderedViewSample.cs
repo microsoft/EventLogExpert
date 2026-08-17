@@ -14,6 +14,7 @@ internal sealed class OrderedViewSample
     private static readonly string[] s_computers = ["HOST-1", "HOST-2"];
     private static readonly string[][] s_keywords = [[], ["Audit Success"], ["Audit Failure"]];
     private static readonly string[] s_levels = ["Information", "Warning", "Error", "Critical", ""];
+    private static readonly string[] s_opcodes = ["", "Info", "Start", "Stop"];
     private static readonly string[] s_sources = ["Provider.A", "Provider.B", "Provider.C"];
     private static readonly string[] s_tasks = ["", "Logon", "Service"];
 
@@ -91,6 +92,7 @@ internal sealed class OrderedViewSample
             Level = s_levels[_rng.Next(s_levels.Length)],
             Source = s_sources[_rng.Next(s_sources.Length)],
             TaskCategory = s_tasks[_rng.Next(s_tasks.Length)],
+            Opcode = s_opcodes[_rng.Next(s_opcodes.Length)],
             ComputerName = s_computers[_rng.Next(s_computers.Length)],
             LogName = $"Channel{logIndex}",
             Keywords = s_keywords[_rng.Next(s_keywords.Length)],
