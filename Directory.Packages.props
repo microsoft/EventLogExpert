@@ -8,7 +8,7 @@
   <ItemGroup>
     <PackageVersion Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageVersion Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
-    <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="10.0.10" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
     <!-- Pinned to the version transitively resolved through Microsoft.Maui.Controls (per
              dotnet list package, include-transitive) so the ExplorerExtension companion exe and
@@ -39,15 +39,6 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="xunit.v3.mtp-off" Version="3.2.2" />
-    <PackageVersion Include="bunit" Version="2.7.2" />
-    <!-- Security override for CVE-2026-54570 (GHSA-pgww-w46g-26qg, moderate).
-         bunit 2.7.2 (test-only) transitively resolves AngleSharp 1.4.0, which mis-parses
-         MathML annotation-xml HTML integration points and does not escape &lt; or &gt; when
-         serializing attribute values (a mutation-XSS vector that can bypass sanitizers built
-         on AngleSharp). The fix first shipped in AngleSharp 1.5.0 and there is no 1.4.x patch,
-         so this pins the transitively-resolved core package to 1.5.2 (latest 1.5.x stable).
-         The sibling AngleSharp.Css / AngleSharp.Diffing packages are not covered by the
-         advisory. Remove once bunit ships an AngleSharp reference >= 1.5.0. -->
-    <PackageVersion Include="AngleSharp" Version="1.5.2" />
+    <PackageVersion Include="bunit" Version="2.9.0" />
   </ItemGroup>
 </Project>
