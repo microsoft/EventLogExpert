@@ -31,6 +31,16 @@
                     type="button">
                     XML
                 </button>
+                <button aria-controls="details-tabpanel-correlation"
+                    aria-selected="@(_activeTab == DetailsTab.Correlation ? "true" : "false")"
+                    class="details-tab"
+                    data-active="@(_activeTab == DetailsTab.Correlation ? "true" : "false")"
+                    id="details-tab-correlation"
+                    @onclick="() => SetTab(DetailsTab.Correlation)"
+                    role="tab"
+                    type="button">
+                    Correlation
+                </button>
             </div>
         }
         else
@@ -247,6 +257,16 @@
                     }
                 }
             </p>
+
+            <div aria-labelledby="details-tab-correlation"
+                class="details-correlation-tab"
+                hidden="@(_activeTab != DetailsTab.Correlation)"
+                id="details-tabpanel-correlation"
+                role="tabpanel">
+                <ActivityCorrelationPanel FocusedHandle="_selectedHandle"
+                    IsActive="_activeTab == DetailsTab.Correlation"
+                    SelectedEvent="_selectedEvent" />
+            </div>
         }
     </div>
 </div>

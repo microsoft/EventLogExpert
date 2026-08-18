@@ -76,15 +76,10 @@ internal sealed class Reducers
         var newSelection = state.Selection
             .RemoveAll(entry => entry.OriginHandle.LogId == action.LogId);
 
-        var newFocus =
-            state.Focus is { } focus && focus.OriginHandle.LogId == action.LogId
-                ? null
-                : state.Focus;
+        var newFocus = state.Focus is { } focus && focus.OriginHandle.LogId == action.LogId ? null : state.Focus;
 
-        var newPendingRevealFocus =
-            state.PendingRevealFocus is { } reveal && reveal.LogId == action.LogId
-                ? null
-                : state.PendingRevealFocus;
+        var newPendingRevealFocus = state.PendingRevealFocus is { } reveal && reveal.Target.LogId == action.LogId ?
+            null : state.PendingRevealFocus;
 
         var newNamesByLog = state.NamesByLog.Remove(action.LogName);
 
@@ -138,9 +133,7 @@ internal sealed class Reducers
             return state;
         }
 
-        var existingSet = state.NamesByLog.TryGetValue(action.LogData.Name, out var current)
-            ? current
-            : s_emptyNames;
+        var existingSet = state.NamesByLog.TryGetValue(action.LogData.Name, out var current) ? current : s_emptyNames;
 
         var newSet = existingSet.Union(DistinctLogNames(action.Events));
 
@@ -177,9 +170,9 @@ internal sealed class Reducers
 
         var openLogId = action.PreassignedId ?? EventLogId.Create();
 
-        var perLogNames = action.LogPathType == LogPathType.Channel
-            ? s_emptyNames.Add(action.LogName)
-            : s_emptyNames;
+        var perLogNames = action.LogPathType == LogPathType.Channel ?
+            s_emptyNames.Add(action.LogName) :
+            s_emptyNames;
 
         var newNamesByLog = state.NamesByLog.SetItem(action.LogName, perLogNames);
 
@@ -192,13 +185,17 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceRequestRevealFocus(EventLogState state, RequestRevealFocusAction action) =>
-        state.PendingRevealFocus == action.Target ? state : state with { PendingRevealFocus = action.Target };
+    public static EventLogState ReduceRequestRevealFocus(EventLogState state, RequestRevealFocusAction action)
+    {
+        var request = new RevealFocusRequest(action.Target, action.WaitForView);
+
+        return state.PendingRevealFocus == request ? state : state with { PendingRevealFocus = request };
+    }
 
     [ReducerMethod]
     public static EventLogState ReduceRevealFocusConsumed(EventLogState state, RevealFocusConsumedAction action)
     {
-        if (state.PendingRevealFocus != action.Target) { return state; }
+        if (state.PendingRevealFocus != action.Request) { return state; }
 
         return state with { PendingRevealFocus = null };
     }
@@ -229,9 +226,9 @@ internal sealed class Reducers
 
         if (action.ShouldStaySelected)
         {
-            return FocusEqualsByOriginHandle(state.Focus, action.Selection)
-                ? state
-                : state with { Focus = action.Selection };
+            return FocusEqualsByOriginHandle(state.Focus, action.Selection) ?
+                state :
+                state with { Focus = action.Selection };
         }
 
         return state with { Selection = [action.Selection], Focus = action.Selection };

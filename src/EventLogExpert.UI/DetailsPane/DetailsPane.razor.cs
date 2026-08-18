@@ -37,7 +37,8 @@ public sealed partial class DetailsPane
     private enum DetailsTab
     {
         Reader,
-        Xml
+        Xml,
+        Correlation
     }
 
     [Inject] private IActiveEventLogSource ActiveEventLog { get; init; } = null!;

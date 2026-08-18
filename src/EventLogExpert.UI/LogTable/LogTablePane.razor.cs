@@ -251,30 +251,37 @@ public sealed partial class LogTablePane
             }
         }
 
-        if (RevealFocusSource.Current is { } revealTarget)
+        if (RevealFocusSource.Current is { } reveal)
         {
             var liveSelection = Selection.Current;
-            var currentFocusTarget = Focus.Current?.CurrentHandle
-                ?? (liveSelection.Count > 0 ? liveSelection[^1].CurrentHandle : null);
+            var currentFocusTarget = Focus.Current?.CurrentHandle ??
+                (liveSelection.Count > 0 ? liveSelection[^1].CurrentHandle : null);
 
-            if (currentFocusTarget != revealTarget)
+            if (currentFocusTarget != reveal.Target)
             {
-                EventLogCommands.ConsumeRevealFocus(revealTarget);
+                EventLogCommands.ConsumeRevealFocus(reveal);
             }
             else
             {
                 try
                 {
-                    if (await TryScrollToRow(revealTarget))
+                    if (await TryScrollToRow(reveal.Target))
                     {
-                        EventLogCommands.ConsumeRevealFocus(revealTarget);
+                        EventLogCommands.ConsumeRevealFocus(reveal);
                         rescrollRequested = false;
+                    }
+                    else if (!reveal.WaitForView)
+                    {
+                        // One-shot selection-driven reveal: the target is not in the current settled view, so discard it
+                        // instead of leaving it pending. Only a wait-for-settle reveal (reload restoration) lingers until a
+                        // rebuilt view contains the target.
+                        EventLogCommands.ConsumeRevealFocus(reveal);
                     }
                 }
                 catch (JSDisconnectedException) { /* Circuit gone; leave the reveal pending so a reconnected or remounted pane can retry. */ }
                 catch (Exception e)
                 {
-                    EventLogCommands.ConsumeRevealFocus(revealTarget);
+                    EventLogCommands.ConsumeRevealFocus(reveal);
                     TraceLogger.Error($"Failed to scroll to the restored selection: {e}");
                 }
             }

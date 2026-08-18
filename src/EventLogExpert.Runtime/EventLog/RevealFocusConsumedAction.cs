@@ -1,8 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Events;
-
 namespace EventLogExpert.Runtime.EventLog;
 
-internal sealed record RevealFocusConsumedAction(EventLocator Target);
+internal sealed record RevealFocusConsumedAction(RevealFocusRequest Request);

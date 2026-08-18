@@ -11,7 +11,13 @@ internal sealed class EventDetailResolver(IState<RawEventStoreState> rawEventSto
 {
     private readonly IState<RawEventStoreState> _rawEventStore = rawEventStore;
 
-    public bool TryResolve(EventLocator locator, [NotNullWhen(true)] out ResolvedEvent? detail)
+    public bool TryResolve(EventLocator locator, [NotNullWhen(true)] out ResolvedEvent? detail) =>
+        TryReconstruct(locator, lean: false, out detail);
+
+    public bool TryResolveLean(EventLocator locator, [NotNullWhen(true)] out ResolvedEvent? detail) =>
+        TryReconstruct(locator, lean: true, out detail);
+
+    private bool TryReconstruct(EventLocator locator, bool lean, [NotNullWhen(true)] out ResolvedEvent? detail)
     {
         detail = null;
 
@@ -23,7 +29,7 @@ internal sealed class EventDetailResolver(IState<RawEventStoreState> rawEventSto
 
         if (locator.Index < 0 || locator.Index >= reader.Count) { return false; }
 
-        detail = reader.GetDetail(locator);
+        detail = lean ? reader.GetDetailLean(locator) : reader.GetDetail(locator);
 
         return true;
     }

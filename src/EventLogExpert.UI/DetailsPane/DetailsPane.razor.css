@@ -334,3 +334,10 @@
     text-wrap: pretty;
     white-space: pre-wrap;
 }
+
+.details-correlation-tab {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+}

@@ -62,15 +62,15 @@ public sealed class LogTablePaneViewSourceTests : BunitContext
         _settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
         _selectedEvent.Current.Returns((SelectionEntry?)null);
         _selectedEvents.Current.Returns(ImmutableList<SelectionEntry>.Empty);
-        _revealFocus.Current.Returns((EventLocator?)null);
+        _revealFocus.Current.Returns((RevealFocusRequest?)null);
 
         _eventLogCommands
-            .When(commands => commands.ConsumeRevealFocus(Arg.Any<EventLocator>()))
+            .When(commands => commands.ConsumeRevealFocus(Arg.Any<RevealFocusRequest>()))
             .Do(call =>
             {
-                if (_revealFocus.Current == call.Arg<EventLocator>())
+                if (_revealFocus.Current == call.Arg<RevealFocusRequest>())
                 {
-                    _revealFocus.Current.Returns((EventLocator?)null);
+                    _revealFocus.Current.Returns((RevealFocusRequest?)null);
                 }
             });
 
@@ -411,13 +411,13 @@ public sealed class LogTablePaneViewSourceTests : BunitContext
         SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
         _viewSource.Current.Returns(DisplayViewTestFactory.Presentation(_logId, [Event(1, "Alpha"), Event(2, "Beta")]));
         _selectedEvent.Current.Returns(EntryFor(Event(2, "Beta")));
-        _revealFocus.Current.Returns(target);
+        _revealFocus.Current.Returns(new RevealFocusRequest(target, true));
 
         var cut = Render<LogTablePane>();
 
         cut.WaitForAssertion(() => Assert.Equal(1, ScrollCount()));
         Assert.Equal(1, LastScrollRow());
-        _eventLogCommands.Received().ConsumeRevealFocus(target);
+        _eventLogCommands.Received().ConsumeRevealFocus(Arg.Is<RevealFocusRequest>(request => request.Target == target));
     }
 
     [Fact]
@@ -435,12 +435,12 @@ public sealed class LogTablePaneViewSourceTests : BunitContext
 
         var target = new EventLocator(_logId, 0, 1);
         _selectedEvent.Current.Returns(EntryFor(Event(2, "Beta")));
-        _revealFocus.Current.Returns(target);
+        _revealFocus.Current.Returns(new RevealFocusRequest(target, true));
         cut.InvokeAsync(() => _revealFocus.Changed += Raise.Event<Action>());
 
         cut.WaitForAssertion(() => Assert.Equal(scrollsAfterReloadPublish + 1, ScrollCount()));
         Assert.Equal(1, LastScrollRow());
-        _eventLogCommands.Received().ConsumeRevealFocus(target);
+        _eventLogCommands.Received().ConsumeRevealFocus(Arg.Is<RevealFocusRequest>(request => request.Target == target));
     }
 
     [Fact]
@@ -455,12 +455,12 @@ public sealed class LogTablePaneViewSourceTests : BunitContext
 
         Assert.Equal(0, ScrollCount());
 
-        _revealFocus.Current.Returns(target);
+        _revealFocus.Current.Returns(new RevealFocusRequest(target, true));
         cut.InvokeAsync(() => _revealFocus.Changed += Raise.Event<Action>());
 
         cut.WaitForAssertion(() => Assert.Equal(1, ScrollCount()));
         Assert.Equal(1, LastScrollRow());
-        _eventLogCommands.Received().ConsumeRevealFocus(target);
+        _eventLogCommands.Received().ConsumeRevealFocus(Arg.Is<RevealFocusRequest>(request => request.Target == target));
     }
 
     [Fact]
@@ -470,12 +470,12 @@ public sealed class LogTablePaneViewSourceTests : BunitContext
         SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"), Event(3, "Gamma"));
         _viewSource.Current.Returns(DisplayViewTestFactory.Presentation(_logId, [Event(1, "Alpha"), Event(2, "Beta")]));
         _selectedEvent.Current.Returns(EntryFor(Event(3, "Gamma")));
-        _revealFocus.Current.Returns(target);
+        _revealFocus.Current.Returns(new RevealFocusRequest(target, true));
 
         var cut = Render<LogTablePane>();
 
         Assert.Equal(0, ScrollCount());
-        _eventLogCommands.DidNotReceive().ConsumeRevealFocus(Arg.Any<EventLocator>());
+        _eventLogCommands.DidNotReceive().ConsumeRevealFocus(Arg.Any<RevealFocusRequest>());
 
         var withGamma = DisplayViewTestFactory.Presentation(
             _logId, [Event(1, "Alpha"), Event(2, "Beta"), Event(3, "Gamma")], revision: 2);
@@ -483,7 +483,7 @@ public sealed class LogTablePaneViewSourceTests : BunitContext
 
         cut.WaitForAssertion(() => Assert.Equal(1, ScrollCount()));
         Assert.Equal(2, LastScrollRow());
-        _eventLogCommands.Received().ConsumeRevealFocus(target);
+        _eventLogCommands.Received().ConsumeRevealFocus(Arg.Is<RevealFocusRequest>(request => request.Target == target));
     }
 
     [Fact]
@@ -493,11 +493,11 @@ public sealed class LogTablePaneViewSourceTests : BunitContext
         SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
         _viewSource.Current.Returns(DisplayViewTestFactory.Presentation(_logId, [Event(1, "Alpha"), Event(2, "Beta")]));
         _selectedEvent.Current.Returns(EntryFor(Event(2, "Beta")));
-        _revealFocus.Current.Returns(staleTarget);
+        _revealFocus.Current.Returns(new RevealFocusRequest(staleTarget, true));
 
         var cut = Render<LogTablePane>();
 
-        cut.WaitForAssertion(() => _eventLogCommands.Received().ConsumeRevealFocus(staleTarget));
+        cut.WaitForAssertion(() => _eventLogCommands.Received().ConsumeRevealFocus(Arg.Is<RevealFocusRequest>(request => request.Target == staleTarget)));
         Assert.Equal(0, ScrollCount());
     }
 
@@ -511,6 +511,39 @@ public sealed class LogTablePaneViewSourceTests : BunitContext
 
         Assert.Contains("Beta", cut.Markup);
         Assert.Contains("Gamma", cut.Markup);
+    }
+
+    [Fact]
+    public void SelectionReveal_WhenTheTargetIsInTheView_ScrollsAndConsumes()
+    {
+        var target = new EventLocator(_logId, 0, 1);
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+        _viewSource.Current.Returns(DisplayViewTestFactory.Presentation(_logId, [Event(1, "Alpha"), Event(2, "Beta")]));
+        _selectedEvent.Current.Returns(EntryFor(Event(2, "Beta")));
+        _revealFocus.Current.Returns(new RevealFocusRequest(target, false));
+
+        var cut = Render<LogTablePane>();
+
+        cut.WaitForAssertion(() => Assert.Equal(1, ScrollCount()));
+        Assert.Equal(1, LastScrollRow());
+        _eventLogCommands.Received().ConsumeRevealFocus(Arg.Is<RevealFocusRequest>(request => request.Target == target));
+    }
+
+    [Fact]
+    public void SelectionReveal_WhenTheTargetIsNotInTheView_DiscardsWithoutScrolling()
+    {
+        // A one-shot (WaitForView=false) reveal whose target is filtered out of the current settled view is discarded
+        // rather than left pending - contrast with the reload reveal above, which lingers until the row appears.
+        var target = new EventLocator(_logId, 0, 2);
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"), Event(3, "Gamma"));
+        _viewSource.Current.Returns(DisplayViewTestFactory.Presentation(_logId, [Event(1, "Alpha"), Event(2, "Beta")]));
+        _selectedEvent.Current.Returns(EntryFor(Event(3, "Gamma")));
+        _revealFocus.Current.Returns(new RevealFocusRequest(target, false));
+
+        var cut = Render<LogTablePane>();
+
+        cut.WaitForAssertion(() => _eventLogCommands.Received().ConsumeRevealFocus(Arg.Is<RevealFocusRequest>(request => request.Target == target)));
+        Assert.Equal(0, ScrollCount());
     }
 
     [Fact]
