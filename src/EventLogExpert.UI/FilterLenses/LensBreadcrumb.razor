@@ -17,10 +17,10 @@
         @foreach (var lens in lenses)
         {
             var lensId = lens.Id;
-            <span class="lens-lens">
-                <span class="lens-lens-label" title="@lens.Label">@lens.Label</span>
+            <span class="lens-chip">
+                <span class="lens-chip-label" title="@lens.Label">@lens.Label</span>
                 <button aria-label="@($"Remove lens: {lens.Label}")"
-                    class="lens-lens-remove"
+                    class="lens-chip-remove"
                     @onclick="@(() => Commands.RemoveLens(lensId))"
                     type="button">
                     &times;
