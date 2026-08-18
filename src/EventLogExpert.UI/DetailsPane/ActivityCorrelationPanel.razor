@@ -5,18 +5,18 @@
     RenderFragment Timeline(ActivityNode node) =>
         @<text>
              <ul class="correlation-timeline">
-                 @foreach (var leaf in node.Leaves)
+                 @foreach (var correlatedEvent in node.Events)
                  {
-                     LeafDisplay display = ResolveLeaf(leaf);
+                     EventDisplay display = ResolveEvent(correlatedEvent);
 
-                     <li class="correlation-row @(IsSelected(leaf) ? "selected" : null)">
+                     <li class="correlation-row @(IsSelected(correlatedEvent) ? "selected" : null)">
                          <button class="correlation-row-button"
                              disabled="@_stale"
-                             @onclick="() => OnLeafActivated(leaf)"
+                             @onclick="() => OnEventActivated(correlatedEvent)"
                              title="@(display.MessageSnippet.Length > 0 ? display.MessageSnippet : "No message")"
                              type="button">
                              <span aria-hidden="true" class="correlation-row-severity @SeverityIconClass(display.Severity)"></span>
-                             <span class="correlation-row-time">@FormatTime(leaf.TimeTicks)</span>
+                             <span class="correlation-row-time">@FormatTime(correlatedEvent.TimeTicks)</span>
                              @if (display.EventId is { } eventId)
                              {
                                  <span class="correlation-row-id">@eventId</span>
@@ -36,16 +36,16 @@
                      </li>
                  }
              </ul>
-             @if (node.LeavesTruncated)
+             @if (node.EventsTruncated)
              {
                  <p class="correlation-truncated details-muted">
                      @if (node.IsSharedOversized)
                      {
-                         @:Shared Activity ID: showing @node.Leaves.Count of @node.EventCount events (the selected event and the most recent errors/events).
+                         @:Shared Activity ID: showing @node.Events.Count of @node.EventCount events (the selected event and the most recent errors/events).
                      }
                      else
                      {
-                         @:Showing the newest @node.Leaves.Count of @node.EventCount events (plus the selected event).
+                         @:Showing the newest @node.Events.Count of @node.EventCount events (plus the selected event).
                      }
                  </p>
              }

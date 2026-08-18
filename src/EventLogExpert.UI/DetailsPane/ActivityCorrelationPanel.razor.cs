@@ -17,9 +17,9 @@ namespace EventLogExpert.UI.DetailsPane;
 public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
 {
     private const int SnippetMaxLength = 120;
+    private readonly Dictionary<EventLocator, EventDisplay> _eventCache = [];
 
     private readonly HashSet<Guid> _expanded = [];
-    private readonly Dictionary<EventLocator, LeafDisplay> _leafCache = [];
 
     private CancellationTokenSource? _buildCts;
     private bool _building;
@@ -192,7 +192,7 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
         // If the store changed while this build ran, the freshly built view is already stale: offer Refresh and block
         // navigation immediately rather than presenting content the live store has moved past.
         _stale = IsStale();
-        _leafCache.Clear();
+        _eventCache.Clear();
         SeedExpansion(view);
         StateHasChanged();
     }
@@ -223,17 +223,14 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
 
     private bool IsExpanded(ActivityNode node) => _expanded.Contains(node.ActivityId);
 
-    private bool IsSelected(CorrelationEventLeaf leaf) => FocusedHandle == leaf.Locator;
+    private bool IsSelected(CorrelatedEvent correlatedEvent) => FocusedHandle == correlatedEvent.Locator;
 
     private bool IsStale() =>
         _view is { } view && (!CorrelationService.TryGetContentToken(view.LogId, out var token) || token != view.Token);
 
-    private void OnFilterToActivity(Guid activityId) =>
-        FilterLensCommands.ShowRelatedByActivityId(activityId, SelectedEvent?.OwningLog);
-
-    private void OnLeafActivated(CorrelationEventLeaf leaf)
+    private void OnEventActivated(CorrelatedEvent correlatedEvent)
     {
-        // Navigation is disabled while the tree is stale (its locators may address replaced content); Refresh rebuilds it.
+        // Navigation is disabled while the correlation view is stale (its locators may address replaced content); Refresh rebuilds it.
         // Re-validate the snapshot synchronously too, closing the window between a live-tail change and its async notification.
         if (_stale || IsStale())
         {
@@ -243,13 +240,16 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
             return;
         }
 
-        var entry = new SelectionEntry(leaf.Locator, leaf.Locator, null);
+        var entry = new SelectionEntry(correlatedEvent.Locator, correlatedEvent.Locator, null);
         EventLogCommands.SetSelectedEvents([entry], entry);
 
         // One-shot reveal: scrolls the table if the row is in the current view, otherwise the consumer discards it - so a
-        // filtered-out leaf still selects (details resolve from raw storage) without leaving a pending reveal.
-        EventLogCommands.RequestRevealFocus(leaf.Locator, waitForView: false);
+        // filtered-out event still selects (details resolve from raw storage) without leaving a pending reveal.
+        EventLogCommands.RequestRevealFocus(correlatedEvent.Locator, waitForView: false);
     }
+
+    private void OnFilterToActivity(Guid activityId) =>
+        FilterLensCommands.ShowRelatedByActivityId(activityId, SelectedEvent?.OwningLog);
 
     private Task OnStoreChangedAsync()
     {
@@ -267,19 +267,19 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
         if (FocusedHandle is { } handle) { await BuildAsync(handle); }
     }
 
-    private LeafDisplay ResolveLeaf(CorrelationEventLeaf leaf)
+    private EventDisplay ResolveEvent(CorrelatedEvent correlatedEvent)
     {
-        if (_leafCache.TryGetValue(leaf.Locator, out var cached)) { return cached; }
+        if (_eventCache.TryGetValue(correlatedEvent.Locator, out var cached)) { return cached; }
 
         // Only timezone-independent fields are cached; the row time is formatted at render from TimeTicks so a timezone
         // change is reflected without invalidating this cache.
-        LeafDisplay display = DetailResolver.TryResolveLean(leaf.Locator, out var detail) ?
-            new LeafDisplay(detail.Id,
+        EventDisplay display = DetailResolver.TryResolveLean(correlatedEvent.Locator, out var detail) ?
+            new EventDisplay(detail.Id,
                 detail.Source,
                 BuildSnippet(detail.Description),
-                LevelSeverity.FromLevelName(detail.Level)) : new LeafDisplay(null, string.Empty, string.Empty, null);
+                LevelSeverity.FromLevelName(detail.Level)) : new EventDisplay(null, string.Empty, string.Empty, null);
 
-        _leafCache[leaf.Locator] = display;
+        _eventCache[correlatedEvent.Locator] = display;
 
         return display;
     }
@@ -312,5 +312,5 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
         if (!_expanded.Add(activityId)) { _expanded.Remove(activityId); }
     }
 
-    private readonly record struct LeafDisplay(int? EventId, string Source, string MessageSnippet, SeverityLevel? Severity);
+    private readonly record struct EventDisplay(int? EventId, string Source, string MessageSnippet, SeverityLevel? Severity);
 }

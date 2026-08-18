@@ -10,7 +10,7 @@ namespace EventLogExpert.Runtime.ActivityCorrelation;
 
 internal sealed class ActivityCorrelationService(IState<RawEventStoreState> rawStore) : IActivityCorrelationService
 {
-    private const int MaxLeavesPerNode = 200;
+    private const int MaxEventsPerActivity = 200;
     private const int SharedActivityThreshold = 500;
     private const int SharedPreviewCap = 25;
 
@@ -139,7 +139,7 @@ internal sealed class ActivityCorrelationService(IState<RawEventStoreState> rawS
         var childRowsByActivity = new Dictionary<Guid, List<int>>();
 
         // Second pass: gather ALL rows of each parent and child activity (not just the linking rows), so a node's count,
-        // span, tallies, leaves, and false-fusion flag reflect the activity's full membership.
+        // span, tallies, events, and false-fusion flag reflect the activity's full membership.
         if (parentsOfFocus.Count > 0 || childActivities.Count > 0)
         {
             for (int i = 0; i < count; i++)
@@ -253,7 +253,7 @@ internal sealed class ActivityCorrelationService(IState<RawEventStoreState> rawS
     {
         int eventCount = rows.Count;
         bool oversized = eventCount > SharedActivityThreshold;
-        int cap = oversized ? SharedPreviewCap : MaxLeavesPerNode;
+        int cap = oversized ? SharedPreviewCap : MaxEventsPerActivity;
 
         long minTicks = long.MaxValue;
         long maxTicks = long.MinValue;
@@ -320,11 +320,11 @@ internal sealed class ActivityCorrelationService(IState<RawEventStoreState> rawS
             return byTime != 0 ? byTime : right.Row.CompareTo(left.Row);
         });
 
-        var leaves = new List<CorrelationEventLeaf>(chosen.Count);
+        var events = new List<CorrelatedEvent>(chosen.Count);
 
         foreach (var candidate in chosen)
         {
-            leaves.Add(new CorrelationEventLeaf(reader.LocatorAt(candidate.Row), candidate.Ticks));
+            events.Add(new CorrelatedEvent(reader.LocatorAt(candidate.Row), candidate.Ticks));
         }
 
         return new ActivityNode
@@ -340,8 +340,8 @@ internal sealed class ActivityCorrelationService(IState<RawEventStoreState> rawS
             CriticalCount = critical,
             ErrorCount = error,
             WarningCount = warning,
-            Leaves = leaves,
-            LeavesTruncated = eventCount > leaves.Count
+            Events = events,
+            EventsTruncated = eventCount > events.Count
         };
     }
 
