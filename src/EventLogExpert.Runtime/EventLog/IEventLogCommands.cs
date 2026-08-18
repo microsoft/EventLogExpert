@@ -13,11 +13,13 @@ public interface IEventLogCommands
 
     void CloseLog(EventLogId logId, string logName);
 
-    void ConsumeRevealFocus(EventLocator target);
+    void ConsumeRevealFocus(RevealFocusRequest request);
 
     void LoadNewEvents();
 
     void OpenLog(string logName, LogPathType logPathType, CancellationToken token = default);
+
+    void RequestRevealFocus(EventLocator target, bool waitForView = true);
 
     void SetContinuouslyUpdate(bool continuouslyUpdate);
 

@@ -1,0 +1,221 @@
+.correlation-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.4rem 0.2rem;
+    font-size: 12px;
+}
+
+.details-muted {
+    margin: 0.25rem 0;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.correlation-stale {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--clr-yellow);
+    border-radius: 4px;
+    color: var(--text-primary);
+}
+
+.correlation-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--border-divider);
+}
+
+.correlation-summary-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.correlation-summary-count {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.correlation-summary-span {
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.correlation-summary-error {
+    color: var(--clr-red, #e05a5a);
+    font-weight: 600;
+}
+
+.correlation-summary-warning {
+    color: var(--clr-yellow);
+    font-weight: 600;
+}
+
+.correlation-activity-id {
+    margin-left: auto;
+    color: var(--text-secondary);
+    font-family: var(--font-mono, monospace);
+}
+
+.correlation-summary-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.correlation-warn {
+    color: var(--clr-yellow);
+    font-weight: 600;
+}
+
+.correlation-filter-action {
+    padding: 0.1rem 0.45rem;
+    border: 1px solid var(--border-divider);
+    border-radius: 4px;
+    background: none;
+    color: var(--text-primary);
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.correlation-timeline {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.correlation-row {
+    border-left: 2px solid transparent;
+}
+
+.correlation-row.selected {
+    border-left-color: var(--clr-lightblue, #4aa3df);
+    background: var(--bg-hover, rgba(127, 127, 127, 0.12));
+}
+
+.correlation-row-button {
+    display: grid;
+    grid-template-columns: 1.2rem auto auto auto 1fr;
+    align-items: baseline;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.15rem 0.35rem;
+    border: none;
+    background: none;
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+}
+
+.correlation-row-button:hover:not(:disabled) {
+    background: var(--bg-hover, rgba(127, 127, 127, 0.15));
+}
+
+.correlation-row-button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.correlation-row-severity {
+    justify-self: center;
+}
+
+.correlation-row-severity.critical,
+.correlation-row-severity.error {
+    color: var(--clr-red, #e05a5a);
+}
+
+.correlation-row-severity.warning {
+    color: var(--clr-yellow);
+}
+
+.correlation-row-time {
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.correlation-row-id {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.correlation-row-source {
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.correlation-row-message {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-primary);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.correlation-truncated,
+.correlation-missing {
+    margin: 0.2rem 0 0.2rem 0.35rem;
+}
+
+.correlation-related {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--border-divider);
+}
+
+.correlation-related-title {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.correlation-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.correlation-chip-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.15rem 0.2rem;
+    border: none;
+    background: none;
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+}
+
+.correlation-role {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.correlation-chip-head[data-role="focus"] .correlation-role {
+    color: var(--clr-accent, var(--text-primary));
+}
+
+.correlation-count {
+    color: var(--text-secondary);
+}
+
+.correlation-chip-actions {
+    margin: 0.1rem 0 0.3rem 1.2rem;
+}

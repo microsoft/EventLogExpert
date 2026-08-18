@@ -12,6 +12,7 @@ using EventLogExpert.Logging.Routing;
 using EventLogExpert.Logging.Sinks;
 using EventLogExpert.Provider.Maintenance;
 using EventLogExpert.Provider.Resolution;
+using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.AppTitle;
@@ -170,6 +171,7 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IScenarioFavoritesSource, ScenarioFavoritesSource>();
             services.AddSingleton<ILogTabBarSource, LogTabBarSource>();
             services.AddSingleton<IStatusBarSource, StatusBarSource>();
+            services.AddSingleton<IActivityCorrelationSource, ActivityCorrelationSource>();
 
             // Change notifiers (concrete raises; interface subscribes; one shared instance)
             services.AddSingleton<GroupCollapseNotifier>();
@@ -184,6 +186,7 @@ public static class RuntimeServiceCollectionExtensions
             // Indicators, resolvers, formatters, and selectors
             services.AddSingleton<DisplayIndicatorGate>();
             services.AddSingleton<IEventDetailResolver, EventDetailResolver>();
+            services.AddSingleton<IActivityCorrelationService, ActivityCorrelationService>();
             services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
             services.AddSingleton<IEventCopyFormatter, EventCopyFormatter>();
             services.AddSingleton<IHighlightSelector, HighlightSelector>();

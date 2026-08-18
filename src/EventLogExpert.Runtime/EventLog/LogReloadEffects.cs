@@ -112,6 +112,6 @@ internal sealed class LogReloadEffects(
         SelectionEntry? focused = focusEntry ?? (restored.Count > 0 ? restored[^1] : null);
         dispatcher.Dispatch(new SetSelectedEventsAction(restored, focused));
 
-        dispatcher.Dispatch(new RequestRevealFocusAction(focused!.Value.OriginHandle));
+        dispatcher.Dispatch(new RequestRevealFocusAction(focused!.Value.OriginHandle, WaitForView: true));
     }
 }

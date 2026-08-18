@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
@@ -59,7 +58,7 @@ internal static class LogTablePaneDependenciesExtensions
             services.AddSingleton(Substitute.For<IGroupCollapseNotifier>());
 
             var revealFocus = Substitute.For<IRevealFocusSource>();
-            revealFocus.Current.Returns((EventLocator?)null);
+            revealFocus.Current.Returns((RevealFocusRequest?)null);
             services.AddSingleton(revealFocus);
 
             var presenceState = Substitute.For<IState<FilteredLogPresenceState>>();

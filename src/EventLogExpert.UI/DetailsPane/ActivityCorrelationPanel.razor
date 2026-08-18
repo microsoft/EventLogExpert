@@ -1,0 +1,184 @@
+@using EventLogExpert.Runtime.ActivityCorrelation
+@inherits AppStateComponentBase
+
+@{
+    RenderFragment Timeline(ActivityNode node) =>
+        @<text>
+             <ul class="correlation-timeline">
+                 @foreach (var leaf in node.Leaves)
+                 {
+                     LeafDisplay display = ResolveLeaf(leaf);
+
+                     <li class="correlation-row @(IsSelected(leaf) ? "selected" : null)">
+                         <button class="correlation-row-button"
+                             disabled="@_stale"
+                             @onclick="() => OnLeafActivated(leaf)"
+                             title="@(display.MessageSnippet.Length > 0 ? display.MessageSnippet : "No message")"
+                             type="button">
+                             <span aria-hidden="true" class="correlation-row-severity @SeverityIconClass(display.Severity)"></span>
+                             <span class="correlation-row-time">@FormatTime(leaf.TimeTicks)</span>
+                             @if (display.EventId is { } eventId)
+                             {
+                                 <span class="correlation-row-id">@eventId</span>
+                             }
+                             @if (display.Source.Length > 0)
+                             {
+                                 <span class="correlation-row-source">@display.Source</span>
+                             }
+                             <span class="correlation-row-message">
+                                 @if (display.MessageSnippet.Length > 0) { @display.MessageSnippet }
+                                 else
+                                 {
+                                     <span class="details-muted">No message</span>
+                                 }
+                             </span>
+                         </button>
+                     </li>
+                 }
+             </ul>
+             @if (node.LeavesTruncated)
+             {
+                 <p class="correlation-truncated details-muted">
+                     @if (node.IsSharedOversized)
+                     {
+                         @:Shared Activity ID: showing @node.Leaves.Count of @node.EventCount events (the selected event and the most recent errors/events).
+                     }
+                     else
+                     {
+                         @:Showing the newest @node.Leaves.Count of @node.EventCount events (plus the selected event).
+                     }
+                 </p>
+             }
+    </text>;
+}
+
+<div class="correlation-panel">
+    @if (SelectedEvent?.ActivityId is not { } activity || activity == Guid.Empty)
+    {
+        <p class="details-muted">The selected event has no Activity ID, so there is nothing to correlate.</p>
+    }
+    else if (_building)
+    {
+        <p class="details-muted">Building correlation&hellip;</p>
+    }
+    else if (_view is null)
+    {
+        <p class="details-muted">Correlation is unavailable for the current selection.</p>
+    }
+    else if (_view.IsEmpty)
+    {
+        <p class="details-muted">No related events were found for this activity in this log.</p>
+    }
+    else
+    {
+        var focus = _view.Activities.First(node => node.Role == ActivityNodeRole.Focus);
+        var related = _view.Activities.Where(node => node.Role != ActivityNodeRole.Focus).ToList();
+
+        @if (_stale)
+        {
+            <div class="correlation-stale" role="status">
+                <span>The log changed since this correlation was built, so it may be out of date.</span>
+                <button class="button" @onclick="RefreshAsync" type="button">Refresh</button>
+            </div>
+        }
+
+        <div class="correlation-summary">
+            <div class="correlation-summary-line">
+                <span class="correlation-summary-count">@FormatEventCount(focus.EventCount)</span>
+                @if (focus.EventCount > 0)
+                {
+                    <span class="correlation-summary-span">@FormatSpan(focus)</span>
+                }
+                @if (focus.ErrorTotal > 0)
+                {
+                    <span class="correlation-summary-error" title="Critical and Error events (counts reflect events within this log only).">
+                        <i aria-hidden="true" class="bi bi-exclamation-circle"></i> @focus.ErrorTotal error@(focus.ErrorTotal == 1 ? "" : "s")
+                    </span>
+                }
+                @if (focus.WarningCount > 0)
+                {
+                    <span class="correlation-summary-warning" title="Warning events (counts reflect events within this log only).">
+                        <i aria-hidden="true" class="bi bi-exclamation-triangle"></i> @focus.WarningCount warning@(focus.WarningCount == 1 ? "" : "s")
+                    </span>
+                }
+                <span class="correlation-activity-id" title="@focus.ActivityId">@FormatActivityId(focus.ActivityId)</span>
+            </div>
+            <div class="correlation-summary-actions">
+                <button class="correlation-filter-action"
+                    @onclick="() => OnFilterToActivity(focus.ActivityId)"
+                    title="Narrow the event table to this Activity ID (a filter lens; existing filters may still hide events)."
+                    type="button">
+                    Filter table to this activity
+                </button>
+                @if (focus.IsSharedOversized)
+                {
+                    <span class="correlation-warn" title="This Activity ID is attached to an unusually large number of events and may span unrelated operations; showing the selected event and the most recent errors/events.">
+                        shared Activity ID
+                    </span>
+                }
+            </div>
+        </div>
+
+        @Timeline(focus)
+
+        @if (related.Count > 0)
+        {
+            <div class="correlation-related">
+                <h4 class="correlation-related-title">Related activities</h4>
+                @foreach (var node in related)
+                {
+                    <div class="correlation-chip" data-role="@node.Role.ToString().ToLowerInvariant()">
+                        <button aria-expanded="@(IsExpanded(node) ? "true" : "false")"
+                            class="correlation-chip-head"
+                            @onclick="() => ToggleExpand(node.ActivityId)"
+                            type="button">
+                            <i aria-hidden="true" class="bi @(IsExpanded(node) ? "bi-caret-down-fill" : "bi-caret-right-fill")"></i>
+                            <span class="correlation-role">@RoleLabel(node.Role)</span>
+                            <span class="correlation-activity-id" title="@node.ActivityId">@FormatActivityId(node.ActivityId)</span>
+                            <span class="correlation-count">@FormatEventCount(node.EventCount)</span>
+                            @if (node.ErrorTotal > 0)
+                            {
+                                <span class="correlation-summary-error">@node.ErrorTotal error@(node.ErrorTotal == 1 ? "" : "s")</span>
+                            }
+                            @if (node.WarningCount > 0)
+                            {
+                                <span class="correlation-summary-warning">@node.WarningCount warning@(node.WarningCount == 1 ? "" : "s")</span>
+                            }
+                            @if (node.IsCycle)
+                            {
+                                <span class="correlation-warn" title="This activity both references and is referenced by the selected event's activity (a cycle).">cycle</span>
+                            }
+                            @if (node.HasMultipleParents)
+                            {
+                                <span class="correlation-warn" title="This activity is referenced by more than one parent activity.">multiple parents</span>
+                            }
+                            @if (node.IsSharedOversized)
+                            {
+                                <span class="correlation-warn" title="Unusually large activity; may span unrelated operations.">shared Activity ID</span>
+                            }
+                        </button>
+                        @if (IsExpanded(node))
+                        {
+                            @if (node.EventCount == 0)
+                            {
+                                <p class="correlation-missing details-muted">This activity is referenced but has no events in this log.</p>
+                            }
+                            else
+                            {
+                                @Timeline(node)
+                                <div class="correlation-chip-actions">
+                                    <button class="correlation-filter-action"
+                                        @onclick="() => OnFilterToActivity(node.ActivityId)"
+                                        title="Narrow the event table to this Activity ID."
+                                        type="button">
+                                        Filter table to this activity
+                                    </button>
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>

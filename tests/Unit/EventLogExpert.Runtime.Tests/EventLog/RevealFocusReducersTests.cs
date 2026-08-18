@@ -15,7 +15,7 @@ public sealed class RevealFocusReducersTests
     [Fact]
     public void ReduceCloseAll_ClearsThePendingReveal()
     {
-        var state = new EventLogState { PendingRevealFocus = new EventLocator(s_logA, 0, 7) };
+        var state = new EventLogState { PendingRevealFocus = new RevealFocusRequest(new EventLocator(s_logA, 0, 7), true) };
 
         state = Reducers.ReduceCloseAll(state);
 
@@ -25,7 +25,7 @@ public sealed class RevealFocusReducersTests
     [Fact]
     public void ReduceCloseLog_ClearsThePendingReveal_WhenItTargetsTheClosedLog()
     {
-        var state = new EventLogState { PendingRevealFocus = new EventLocator(s_logA, 0, 7) };
+        var state = new EventLogState { PendingRevealFocus = new RevealFocusRequest(new EventLocator(s_logA, 0, 7), true) };
 
         state = Reducers.ReduceCloseLog(state, new CloseLogAction(s_logA, "Application"));
 
@@ -35,12 +35,23 @@ public sealed class RevealFocusReducersTests
     [Fact]
     public void ReduceCloseLog_KeepsThePendingReveal_WhenItTargetsADifferentLog()
     {
-        var revealForA = new EventLocator(s_logA, 0, 7);
+        var revealForA = new RevealFocusRequest(new EventLocator(s_logA, 0, 7), true);
         var state = new EventLogState { PendingRevealFocus = revealForA };
 
         state = Reducers.ReduceCloseLog(state, new CloseLogAction(s_logB, "System"));
 
         Assert.Equal(revealForA, state.PendingRevealFocus);
+    }
+
+    [Fact]
+    public void ReduceRequestRevealFocus_ADifferentWaitForView_Supersedes()
+    {
+        var target = new EventLocator(s_logA, 0, 7);
+        var state = Reducers.ReduceRequestRevealFocus(new EventLogState(), new RequestRevealFocusAction(target, WaitForView: true));
+
+        state = Reducers.ReduceRequestRevealFocus(state, new RequestRevealFocusAction(target, WaitForView: false));
+
+        Assert.Equal(new RevealFocusRequest(target, false), state.PendingRevealFocus);
     }
 
     [Fact]
@@ -52,7 +63,17 @@ public sealed class RevealFocusReducersTests
 
         state = Reducers.ReduceRequestRevealFocus(state, new RequestRevealFocusAction(second));
 
-        Assert.Equal(second, state.PendingRevealFocus);
+        Assert.Equal(new RevealFocusRequest(second, true), state.PendingRevealFocus);
+    }
+
+    [Fact]
+    public void ReduceRequestRevealFocus_CarriesTheWaitForViewFlag()
+    {
+        var target = new EventLocator(s_logA, 0, 7);
+
+        var state = Reducers.ReduceRequestRevealFocus(new EventLogState(), new RequestRevealFocusAction(target, WaitForView: false));
+
+        Assert.Equal(new RevealFocusRequest(target, false), state.PendingRevealFocus);
     }
 
     [Fact]
@@ -73,7 +94,7 @@ public sealed class RevealFocusReducersTests
 
         var state = Reducers.ReduceRequestRevealFocus(new EventLogState(), new RequestRevealFocusAction(target));
 
-        Assert.Equal(target, state.PendingRevealFocus);
+        Assert.Equal(new RevealFocusRequest(target, true), state.PendingRevealFocus);
     }
 
     [Fact]
@@ -82,7 +103,7 @@ public sealed class RevealFocusReducersTests
         var target = new EventLocator(s_logA, 0, 7);
         var state = Reducers.ReduceRequestRevealFocus(new EventLogState(), new RequestRevealFocusAction(target));
 
-        state = Reducers.ReduceRevealFocusConsumed(state, new RevealFocusConsumedAction(target));
+        state = Reducers.ReduceRevealFocusConsumed(state, new RevealFocusConsumedAction(new RevealFocusRequest(target, true)));
 
         Assert.Null(state.PendingRevealFocus);
     }
@@ -91,11 +112,24 @@ public sealed class RevealFocusReducersTests
     public void ReduceRevealFocusConsumed_DoesNotClearANewerTarget_WhenConsumingAnOlderOne()
     {
         var older = new EventLocator(s_logA, 0, 1);
-        var newer = new EventLocator(s_logB, 0, 3);
+        var newerLocator = new EventLocator(s_logB, 0, 3);
+        var newer = new RevealFocusRequest(newerLocator, true);
         var state = new EventLogState { PendingRevealFocus = newer };
 
-        state = Reducers.ReduceRevealFocusConsumed(state, new RevealFocusConsumedAction(older));
+        state = Reducers.ReduceRevealFocusConsumed(state, new RevealFocusConsumedAction(new RevealFocusRequest(older, true)));
 
         Assert.Equal(newer, state.PendingRevealFocus);
+    }
+
+    [Fact]
+    public void ReduceRevealFocusConsumed_DoesNotClear_WhenOnlyWaitForViewDiffers()
+    {
+        var target = new EventLocator(s_logA, 0, 7);
+        var state = Reducers.ReduceRequestRevealFocus(new EventLogState(), new RequestRevealFocusAction(target, WaitForView: true));
+
+        // A stale one-shot consumer (WaitForView=false) must not clear the newer wait-for-view (reload) request.
+        state = Reducers.ReduceRevealFocusConsumed(state, new RevealFocusConsumedAction(new RevealFocusRequest(target, false)));
+
+        Assert.Equal(new RevealFocusRequest(target, true), state.PendingRevealFocus);
     }
 }

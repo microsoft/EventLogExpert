@@ -38,5 +38,5 @@ public sealed record EventLogState
 
     public ImmutableList<SelectionEntry> Selection { get; init; } = [];
 
-    public EventLocator? PendingRevealFocus { get; init; }
+    public RevealFocusRequest? PendingRevealFocus { get; init; }
 }

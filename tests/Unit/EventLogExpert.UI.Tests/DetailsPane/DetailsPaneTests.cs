@@ -10,6 +10,7 @@ using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Eventing.Structured;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.EventLog;
@@ -28,8 +29,11 @@ public sealed class DetailsPaneTests : BunitContext
 {
     private readonly IActiveEventLogSource _activeEventLog = Substitute.For<IActiveEventLogSource>();
     private readonly IClipboardService _clipboard = Substitute.For<IClipboardService>();
+    private readonly IActivityCorrelationService _correlationService = Substitute.For<IActivityCorrelationService>();
+    private readonly IActivityCorrelationSource _correlationSource = Substitute.For<IActivityCorrelationSource>();
     private readonly IEventDetailResolver _detailResolver = Substitute.For<IEventDetailResolver>();
     private readonly IEventFocusSource _eventFocus = Substitute.For<IEventFocusSource>();
+    private readonly IEventLogCommands _eventLogCommands = Substitute.For<IEventLogCommands>();
     private readonly IFilterLensCommands _filterLensCommands = Substitute.For<IFilterLensCommands>();
     private readonly EventLogId _logId = EventLogId.Create();
     private readonly IDetailsPanePreferencesProvider _preferences = Substitute.For<IDetailsPanePreferencesProvider>();
@@ -54,6 +58,9 @@ public sealed class DetailsPaneTests : BunitContext
         Services.AddSingleton(_settings);
         Services.AddSingleton(_traceLogger);
         Services.AddSingleton(_xmlResolver);
+        Services.AddSingleton(_correlationService);
+        Services.AddSingleton(_correlationSource);
+        Services.AddSingleton(_eventLogCommands);
     }
 
     [Fact]
@@ -191,6 +198,26 @@ public sealed class DetailsPaneTests : BunitContext
         var button = Assert.Single(cut.FindAll(".details-correlation-action"));
 
         Assert.Contains("Show related events", button.TextContent);
+    }
+
+    [Fact]
+    public void CorrelationTab_IsPresentAndLinkedToItsPanel()
+    {
+        var cut = SelectAndRender(EventWithData(("LogonType", 3)));
+
+        Assert.Equal("details-tabpanel-correlation", cut.Find("#details-tab-correlation").GetAttribute("aria-controls"));
+        Assert.Equal("details-tab-correlation", cut.Find("#details-tabpanel-correlation").GetAttribute("aria-labelledby"));
+    }
+
+    [Fact]
+    public void CorrelationTab_WhenSelectedEventHasNoActivityId_ActivatesAndShowsEmptyState()
+    {
+        var cut = SelectAndRender(EventWithData(("LogonType", 3)));
+
+        CorrelationTab(cut).Click();
+
+        cut.WaitForAssertion(() => Assert.Equal("true", CorrelationTab(cut).GetAttribute("aria-selected")));
+        Assert.Contains("no Activity ID", cut.Markup);
     }
 
     [Fact]
@@ -486,6 +513,8 @@ public sealed class DetailsPaneTests : BunitContext
             Description = "A logon occurred.",
             Xml = "<Event/>"
         };
+
+    private static IElement CorrelationTab(IRenderedComponent<DetailsPaneComponent> cut) => cut.FindAll(".details-tab")[2];
 
     private static ResolvedEvent EventWithData(params (string Name, object? Value)[] fields) =>
         BaseEvent().WithEventData(fields);
