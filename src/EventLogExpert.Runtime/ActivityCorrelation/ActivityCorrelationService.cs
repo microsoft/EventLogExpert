@@ -264,9 +264,10 @@ internal sealed class ActivityCorrelationService(IState<RawEventStoreState> rawS
         // Reserve one display slot for the selected (pinned) event so it is never capped out.
         int heapCap = pinnedRow is null ? cap : Math.Max(cap - 1, 0);
 
-        // A bounded min-heap keeps the top heapCap rows by priority (lowest-priority evicted): non-errors before errors
-        // (oversized only), then oldest, then lowest index. This bounds display selection to O(cap) memory and
-        // O(eventCount log cap), and the single tally/span/selection pass stays cancellable.
+        // A bounded min-heap of size heapCap keeps the highest-priority rows and evicts the lowest on overflow. Priority
+        // (Rank, Ticks, Row): for an oversized node Critical/Error rows (Rank 1) outrank non-errors (Rank 0), then newer
+        // outranks older, then higher row index. So the heap retains errors and the newest events, evicting
+        // non-errors/oldest/lowest-index first.
         var heap = new PriorityQueue<RowInfo, (int Rank, long Ticks, int Row)>(heapCap + 1);
         RowInfo? pinned = null;
 

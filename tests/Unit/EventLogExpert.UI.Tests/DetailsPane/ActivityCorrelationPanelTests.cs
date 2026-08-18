@@ -58,6 +58,32 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
     }
 
     [Fact]
+    public void DeactivatingTheTab_CancelsTheInFlightBuild()
+    {
+        var pendingBuild = new TaskCompletionSource<ActivityCorrelationView?>();
+        CancellationToken buildToken = default;
+        _service.BuildAsync(Arg.Any<EventLocator>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                buildToken = call.Arg<CancellationToken>();
+
+                return pendingBuild.Task;
+            });
+
+        var cut = RenderActive();
+        cut.WaitForAssertion(() => Assert.Contains("Building correlation", cut.Markup));
+
+        // Deactivating while the build is still in flight must cancel its token, not leave it running.
+        cut.Render(parameters => parameters.Add(panel => panel.IsActive, false));
+
+        Assert.True(buildToken.IsCancellationRequested);
+
+        // A stale build that completes after cancellation must not surface a timeline.
+        pendingBuild.SetResult(ViewWithLeaf(new EventLocator(_logId, 0, 0)));
+        Assert.Empty(cut.FindAll(".correlation-timeline"));
+    }
+
+    [Fact]
     public void EmptyDescription_ShowsTheNoMessageFallback()
     {
         _detailResolver.TryResolveLean(Arg.Any<EventLocator>(), out Arg.Any<ResolvedEvent?>())
@@ -166,6 +192,53 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
         Assert.Contains("OPERATIONSTART", cut.Markup);
         Assert.DoesNotContain("SECONDLINEMARKER", cut.Markup);
         Assert.DoesNotContain(new string('x', 300), cut.Markup);
+    }
+
+    [Fact]
+    public void ReactivatingAfterACompletedBuild_ReusesItWithoutRebuilding()
+    {
+        StubBuild(ViewWithLeaf(new EventLocator(_logId, 0, 0)));
+
+        var cut = RenderActive();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".correlation-timeline")));
+
+        // A completed view survives tab toggles: leaving and returning reuses it rather than rebuilding.
+        cut.Render(parameters => parameters.Add(panel => panel.IsActive, false));
+        cut.Render(parameters => parameters.Add(panel => panel.IsActive, true));
+
+        _service.Received(1).BuildAsync(Arg.Any<EventLocator>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void ReactivatingAfterAFailedBuild_Retries()
+    {
+        _service.BuildAsync(Arg.Any<EventLocator>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ActivityCorrelationView?>(new InvalidOperationException("boom")));
+
+        var cut = RenderActive();
+        cut.WaitForAssertion(() => Assert.Contains("unavailable", cut.Markup));
+
+        // A faulted build must not strand the panel: returning to the tab retries.
+        cut.Render(parameters => parameters.Add(panel => panel.IsActive, false));
+        cut.Render(parameters => parameters.Add(panel => panel.IsActive, true));
+
+        _service.Received(2).BuildAsync(Arg.Any<EventLocator>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void ReactivatingAfterAnUnavailableBuild_Retries()
+    {
+        _service.BuildAsync(Arg.Any<EventLocator>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<ActivityCorrelationView?>(null));
+
+        var cut = RenderActive();
+        cut.WaitForAssertion(() => Assert.Contains("unavailable", cut.Markup));
+
+        // A null (unavailable) result is not a durable build: returning to the tab retries instead of sticking.
+        cut.Render(parameters => parameters.Add(panel => panel.IsActive, false));
+        cut.Render(parameters => parameters.Add(panel => panel.IsActive, true));
+
+        _service.Received(2).BuildAsync(Arg.Any<EventLocator>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

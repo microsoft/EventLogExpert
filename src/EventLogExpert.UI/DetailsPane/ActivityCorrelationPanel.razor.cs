@@ -64,8 +64,20 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
 
     protected override async Task OnParametersSetAsync()
     {
-        // Lazy: only build while the Correlation tab is the active tab.
-        if (!IsActive) { return; }
+        // Lazy: only build while the Correlation tab is active. On deactivation cancel any in-flight build; if one was
+        // actually running, drop the built handle so re-activation rebuilds. A completed view is retained for instant reuse.
+        if (!IsActive)
+        {
+            CancelBuild();
+
+            if (_building)
+            {
+                _builtHandle = null;
+                _building = false;
+            }
+
+            return;
+        }
 
         if (SelectedEvent?.ActivityId is not { } activity || activity == Guid.Empty || FocusedHandle is not { } handle)
         {
@@ -161,6 +173,7 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
             {
                 _building = false;
                 _view = null;
+                _builtHandle = null;
                 StateHasChanged();
             }
 
@@ -171,6 +184,10 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
 
         _view = view;
         _building = false;
+
+        // A null result (log not yet in the store, or a superseded locator) is not a durable build: drop the built
+        // handle so re-activation or a re-selection retries instead of sticking on the unavailable state.
+        if (view is null) { _builtHandle = null; }
 
         // If the store changed while this build ran, the freshly built view is already stale: offer Refresh and block
         // navigation immediately rather than presenting content the live store has moved past.

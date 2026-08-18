@@ -514,14 +514,14 @@ public sealed class DetailsPaneTests : BunitContext
             Xml = "<Event/>"
         };
 
-    private static IElement CorrelationTab(IRenderedComponent<DetailsPaneComponent> cut) => cut.FindAll(".details-tab")[2];
+    private static IElement CorrelationTab(IRenderedComponent<DetailsPaneComponent> cut) => cut.Find("#details-tab-correlation");
 
     private static ResolvedEvent EventWithData(params (string Name, object? Value)[] fields) =>
         BaseEvent().WithEventData(fields);
 
-    private static IElement ReaderTab(IRenderedComponent<DetailsPaneComponent> cut) => cut.FindAll(".details-tab")[0];
+    private static IElement ReaderTab(IRenderedComponent<DetailsPaneComponent> cut) => cut.Find("#details-tab-reader");
 
-    private static IElement XmlTab(IRenderedComponent<DetailsPaneComponent> cut) => cut.FindAll(".details-tab")[1];
+    private static IElement XmlTab(IRenderedComponent<DetailsPaneComponent> cut) => cut.Find("#details-tab-xml");
 
     private void RaiseFocusChanged(ResolvedEvent @event)
     {
