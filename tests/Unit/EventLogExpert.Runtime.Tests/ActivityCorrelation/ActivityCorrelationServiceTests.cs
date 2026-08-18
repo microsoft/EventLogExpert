@@ -75,7 +75,7 @@ public sealed class ActivityCorrelationServiceTests
         var child = view!.Activities.Single(node => node.Role == ActivityNodeRole.Child);
         Assert.Equal(s_child, child.ActivityId);
         Assert.Equal(3, child.EventCount);
-        Assert.Equal(3, child.Leaves.Count);
+        Assert.Equal(3, child.Events.Count);
     }
 
     [Fact]
@@ -87,13 +87,13 @@ public sealed class ActivityCorrelationServiceTests
 
         var (service, _) = ServiceWith(1, 1, events);
 
-        // Focus the OLDEST event (index 0): it must be retained without pushing the total past MaxLeavesPerNode.
+        // Focus the OLDEST event (index 0): it must be retained without pushing the total past the per-activity display cap.
         var view = await service.BuildAsync(Locator(1, 0), Ct);
 
         var focus = view!.Activities.Single(node => node.Role == ActivityNodeRole.Focus);
-        Assert.True(focus.LeavesTruncated);
-        Assert.Equal(200, focus.Leaves.Count);
-        Assert.Contains(focus.Leaves, leaf => leaf.Locator.Index == 0);
+        Assert.True(focus.EventsTruncated);
+        Assert.Equal(200, focus.Events.Count);
+        Assert.Contains(focus.Events, correlatedEvent => correlatedEvent.Locator.Index == 0);
     }
 
     [Fact]
@@ -136,10 +136,10 @@ public sealed class ActivityCorrelationServiceTests
 
         var focus = view!.Activities.Single(node => node.Role == ActivityNodeRole.Focus);
         Assert.True(focus.IsSharedOversized);
-        Assert.True(focus.LeavesTruncated);
+        Assert.True(focus.EventsTruncated);
         Assert.Equal(600, focus.EventCount);
-        Assert.Equal(25, focus.Leaves.Count);
-        Assert.Contains(focus.Leaves, leaf => leaf.Locator.Index == 0);
+        Assert.Equal(25, focus.Events.Count);
+        Assert.Contains(focus.Events, correlatedEvent => correlatedEvent.Locator.Index == 0);
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public sealed class ActivityCorrelationServiceTests
         var focus = Assert.Single(view.Activities);
         Assert.Equal(ActivityNodeRole.Focus, focus.Role);
         Assert.Equal(2, focus.EventCount);
-        Assert.Equal(2, focus.Leaves.Count);
+        Assert.Equal(2, focus.Events.Count);
         Assert.Empty(focus.Parents);
     }
 
@@ -196,7 +196,7 @@ public sealed class ActivityCorrelationServiceTests
     }
 
     [Fact]
-    public async Task BuildAsync_NodeSpanCoversAllRows_NotJustTheDisplayedLeaves()
+    public async Task BuildAsync_NodeSpanCoversAllRows_NotJustTheDisplayedEvents()
     {
         var events = new ResolvedEvent[300];
 
@@ -207,13 +207,13 @@ public sealed class ActivityCorrelationServiceTests
         var view = await service.BuildAsync(Locator(1, 299), Ct);
 
         var focus = view!.Activities.Single(node => node.Role == ActivityNodeRole.Focus);
-        Assert.True(focus.LeavesTruncated);
-        Assert.Equal(200, focus.Leaves.Count);
+        Assert.True(focus.EventsTruncated);
+        Assert.Equal(200, focus.Events.Count);
         Assert.Equal(299, TimeSpan.FromTicks(focus.MaxTicks - focus.MinTicks).TotalSeconds);
     }
 
     [Fact]
-    public async Task BuildAsync_OrdersLeavesNewestFirst()
+    public async Task BuildAsync_OrdersEventsNewestFirst()
     {
         var (service, _) = ServiceWith(1, 1,
             Event(1, s_focus, offset: 0),
@@ -223,9 +223,9 @@ public sealed class ActivityCorrelationServiceTests
         var view = await service.BuildAsync(Locator(1, 0), Ct);
 
         var focus = view!.Activities.Single(node => node.Role == ActivityNodeRole.Focus);
-        Assert.Equal(3, focus.Leaves.Count);
-        Assert.True(focus.Leaves[0].TimeTicks >= focus.Leaves[1].TimeTicks);
-        Assert.True(focus.Leaves[1].TimeTicks >= focus.Leaves[2].TimeTicks);
+        Assert.Equal(3, focus.Events.Count);
+        Assert.True(focus.Events[0].TimeTicks >= focus.Events[1].TimeTicks);
+        Assert.True(focus.Events[1].TimeTicks >= focus.Events[2].TimeTicks);
     }
 
     [Fact]
@@ -274,8 +274,8 @@ public sealed class ActivityCorrelationServiceTests
         var view = await service.BuildAsync(Locator(1, 0), Ct);
 
         var focus = view!.Activities.Single(node => node.Role == ActivityNodeRole.Focus);
-        Assert.True(focus.LeavesTruncated);
-        Assert.Contains(focus.Leaves, leaf => leaf.Locator.Index == 0);
+        Assert.True(focus.EventsTruncated);
+        Assert.Contains(focus.Events, correlatedEvent => correlatedEvent.Locator.Index == 0);
     }
 
     [Fact]
@@ -321,7 +321,7 @@ public sealed class ActivityCorrelationServiceTests
         var parent = view!.Activities.Single(node => node.Role == ActivityNodeRole.Parent);
         Assert.Equal(s_parent, parent.ActivityId);
         Assert.Equal(0, parent.EventCount);
-        Assert.Empty(parent.Leaves);
+        Assert.Empty(parent.Events);
         Assert.True(view.HasHierarchy);
     }
 

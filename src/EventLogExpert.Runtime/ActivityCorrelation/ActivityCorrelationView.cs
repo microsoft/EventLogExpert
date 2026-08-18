@@ -24,7 +24,7 @@ public enum ActivityNodeRole
 ///     selects/reveals it plus its timestamp for sorting); display fields (level, source, event id) are resolved lazily by
 ///     the UI for the rows it actually renders, so the neighborhood never materializes strings for the whole log.
 /// </summary>
-public readonly record struct CorrelationEventLeaf(EventLocator Locator, long TimeTicks);
+public readonly record struct CorrelatedEvent(EventLocator Locator, long TimeTicks);
 
 /// <summary>The snapshot identity a correlation view was built from, for freshness comparison against the live store.</summary>
 public readonly record struct CorrelationContentToken(EventLogId LogId, int Generation, long ContentVersion, int Count);
@@ -38,13 +38,13 @@ public sealed record ActivityNode
     /// <summary>Whether this is the focus activity, a parent, or a child.</summary>
     public required ActivityNodeRole Role { get; init; }
 
-    /// <summary>The total number of member events in this log (may exceed <see cref="Leaves" />.Count when truncated).</summary>
+    /// <summary>The total number of member events in this log (may exceed <see cref="Events" />.Count when truncated).</summary>
     public required int EventCount { get; init; }
 
-    /// <summary>The UTC-tick timestamp of the earliest built leaf (0 when the activity has no rows in this log).</summary>
+    /// <summary>The UTC-tick timestamp of the earliest built event (0 when the activity has no rows in this log).</summary>
     public required long MinTicks { get; init; }
 
-    /// <summary>The UTC-tick timestamp of the latest built leaf (0 when the activity has no rows in this log).</summary>
+    /// <summary>The UTC-tick timestamp of the latest built event (0 when the activity has no rows in this log).</summary>
     public required long MaxTicks { get; init; }
 
     /// <summary>
@@ -72,10 +72,13 @@ public sealed record ActivityNode
     public int ErrorTotal => CriticalCount + ErrorCount;
 
     /// <summary>The member events (capped for display), sorted by time.</summary>
-    public IReadOnlyList<CorrelationEventLeaf> Leaves { get; init; } = [];
+    public IReadOnlyList<CorrelatedEvent> Events { get; init; } = [];
 
-    /// <summary>True when <see cref="EventCount" /> exceeds the per-node display cap, so <see cref="Leaves" /> is a prefix.</summary>
-    public bool LeavesTruncated { get; init; }
+    /// <summary>
+    ///     True when <see cref="EventCount" /> exceeds the per-activity display cap, so <see cref="Events" /> is a
+    ///     prefix.
+    /// </summary>
+    public bool EventsTruncated { get; init; }
 
     /// <summary>True when this node has more than one distinct parent activity (parentage cannot be a single tree edge).</summary>
     public bool HasMultipleParents => Parents.Count > 1;

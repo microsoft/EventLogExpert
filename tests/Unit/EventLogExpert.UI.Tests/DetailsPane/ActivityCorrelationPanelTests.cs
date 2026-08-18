@@ -79,7 +79,7 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
         Assert.True(buildToken.IsCancellationRequested);
 
         // A stale build that completes after cancellation must not surface a timeline.
-        pendingBuild.SetResult(ViewWithLeaf(new EventLocator(_logId, 0, 0)));
+        pendingBuild.SetResult(ViewWithEvent(new EventLocator(_logId, 0, 0)));
         Assert.Empty(cut.FindAll(".correlation-timeline"));
     }
 
@@ -93,7 +93,7 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
 
                 return true;
             });
-        StubBuild(ViewWithLeaf(new EventLocator(_logId, 0, 3)));
+        StubBuild(ViewWithEvent(new EventLocator(_logId, 0, 3)));
 
         var cut = RenderActive();
 
@@ -102,45 +102,10 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
     }
 
     [Fact]
-    public void FilterToActivity_DispatchesTheActivityIdLens()
+    public void EventClick_SelectsAndRequestsAOneShotReveal()
     {
-        StubBuild(ViewWithLeaf(new EventLocator(_logId, 0, 0)));
-
-        var cut = RenderActive();
-        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".correlation-filter-action")));
-
-        cut.Find(".correlation-filter-action").Click();
-
-        _lensCommands.Received().ShowRelatedByActivityId(s_focus, Arg.Any<string?>());
-    }
-
-    [Fact]
-    public void HeaderShowsErrorAndWarningCounts()
-    {
-        StubBuild(ViewWithLeaf(new EventLocator(_logId, 0, 0), errorCount: 2, warningCount: 1));
-
-        var cut = RenderActive();
-
-        cut.WaitForAssertion(() => Assert.Contains("2 errors", cut.Markup));
-        Assert.Contains("1 warning", cut.Markup);
-    }
-
-    [Fact]
-    public void HighlightsTheSelectedEventRow()
-    {
-        // The rendered focus handle (0,0) matches this leaf, so its row is the selected one.
-        StubBuild(ViewWithLeaf(new EventLocator(_logId, 0, 0)));
-
-        var cut = RenderActive();
-
-        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".correlation-row.selected")));
-    }
-
-    [Fact]
-    public void LeafClick_SelectsAndRequestsAOneShotReveal()
-    {
-        var leafLocator = new EventLocator(_logId, 0, 3);
-        StubBuild(ViewWithLeaf(leafLocator));
+        var eventLocator = new EventLocator(_logId, 0, 3);
+        StubBuild(ViewWithEvent(eventLocator));
 
         var cut = RenderActive();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".correlation-row-button")));
@@ -148,13 +113,13 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
         cut.Find(".correlation-row-button").Click();
 
         _commands.Received().SetSelectedEvents(Arg.Any<IReadOnlyCollection<SelectionEntry>>(), Arg.Any<SelectionEntry?>());
-        _commands.Received().RequestRevealFocus(leafLocator, false);
+        _commands.Received().RequestRevealFocus(eventLocator, false);
     }
 
     [Fact]
-    public void LeafClick_WhenSnapshotChangedBeforeTheAsyncNotification_RevalidatesAndBlocksNavigation()
+    public void EventClick_WhenSnapshotChangedBeforeTheAsyncNotification_RevalidatesAndBlocksNavigation()
     {
-        StubBuild(ViewWithLeaf(new EventLocator(_logId, 0, 3)));
+        StubBuild(ViewWithEvent(new EventLocator(_logId, 0, 3)));
 
         var cut = RenderActive();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".correlation-row-button")));
@@ -174,6 +139,41 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
     }
 
     [Fact]
+    public void FilterToActivity_DispatchesTheActivityIdLens()
+    {
+        StubBuild(ViewWithEvent(new EventLocator(_logId, 0, 0)));
+
+        var cut = RenderActive();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".correlation-filter-action")));
+
+        cut.Find(".correlation-filter-action").Click();
+
+        _lensCommands.Received().ShowRelatedByActivityId(s_focus, Arg.Any<string?>());
+    }
+
+    [Fact]
+    public void HeaderShowsErrorAndWarningCounts()
+    {
+        StubBuild(ViewWithEvent(new EventLocator(_logId, 0, 0), errorCount: 2, warningCount: 1));
+
+        var cut = RenderActive();
+
+        cut.WaitForAssertion(() => Assert.Contains("2 errors", cut.Markup));
+        Assert.Contains("1 warning", cut.Markup);
+    }
+
+    [Fact]
+    public void HighlightsTheSelectedEventRow()
+    {
+        // The rendered focus handle (0,0) matches this event, so its row is the selected one.
+        StubBuild(ViewWithEvent(new EventLocator(_logId, 0, 0)));
+
+        var cut = RenderActive();
+
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".correlation-row.selected")));
+    }
+
+    [Fact]
     public void MessageSnippet_IsBoundedToTheFirstLineAndKeepsTheFullDescriptionOutOfTheDom()
     {
         string description = "OPERATIONSTART " + new string('x', 300) + "\nSECONDLINEMARKER should not render";
@@ -184,7 +184,7 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
 
                 return true;
             });
-        StubBuild(ViewWithLeaf(new EventLocator(_logId, 0, 3)));
+        StubBuild(ViewWithEvent(new EventLocator(_logId, 0, 3)));
 
         var cut = RenderActive();
 
@@ -197,7 +197,7 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
     [Fact]
     public void ReactivatingAfterACompletedBuild_ReusesItWithoutRebuilding()
     {
-        StubBuild(ViewWithLeaf(new EventLocator(_logId, 0, 0)));
+        StubBuild(ViewWithEvent(new EventLocator(_logId, 0, 0)));
 
         var cut = RenderActive();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".correlation-timeline")));
@@ -244,7 +244,7 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
     [Fact]
     public void RendersTheFocusTimelineWithMessageSnippetViaLeanResolve()
     {
-        StubBuild(ViewWithLeaf(new EventLocator(_logId, 0, 3)));
+        StubBuild(ViewWithEvent(new EventLocator(_logId, 0, 3)));
 
         var cut = RenderActive();
 
@@ -256,9 +256,9 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
     }
 
     [Fact]
-    public void StaleTree_ShowsRefreshAndBlocksLeafNavigation()
+    public void StaleView_ShowsRefreshAndBlocksEventNavigation()
     {
-        StubBuild(ViewWithLeaf(new EventLocator(_logId, 0, 3)));
+        StubBuild(ViewWithEvent(new EventLocator(_logId, 0, 3)));
 
         var cut = RenderActive();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".correlation-row-button")));
@@ -333,10 +333,10 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
         _service.BuildAsync(Arg.Any<EventLocator>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<ActivityCorrelationView?>(view));
 
-    private ActivityCorrelationView ViewWithLeaf(EventLocator leafLocator, int errorCount = 0, int warningCount = 0)
+    private ActivityCorrelationView ViewWithEvent(EventLocator eventLocator, int errorCount = 0, int warningCount = 0)
     {
         long ticks = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
-        var leaf = new CorrelationEventLeaf(leafLocator, ticks);
+        var correlatedEvent = new CorrelatedEvent(eventLocator, ticks);
 
         var focus = new ActivityNode
         {
@@ -350,8 +350,8 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
             CriticalCount = 0,
             ErrorCount = errorCount,
             WarningCount = warningCount,
-            Leaves = [leaf],
-            LeavesTruncated = false
+            Events = [correlatedEvent],
+            EventsTruncated = false
         };
 
         return new ActivityCorrelationView
