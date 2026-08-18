@@ -83,7 +83,7 @@ public sealed class LensBreadcrumbTests : BunitContext
 
         Assert.Contains("Activity ID = abc", cut.Markup);
 
-        cut.Find(".lens-lens-remove").Click();
+        cut.Find(".lens-chip-remove").Click();
 
         _commands.Received(1).RemoveLens(lens.Id);
     }
