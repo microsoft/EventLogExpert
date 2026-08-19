@@ -497,6 +497,15 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         _store.CountFieldValues(rankByPhysical, ToColumnField(field), counts, cancellationToken);
     }
 
+    public void CountSeverity(ReadOnlySpan<int> rankByPhysical, int[] slotCounts, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(slotCounts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slotCounts.Length, LevelSeverity.SlotCount);
+
+        _store.CountSeverity(rankByPhysical, slotCounts, cancellationToken);
+    }
+
     public EventDataFieldEnumerator EnumerateEventData(EventLocator locator)
     {
         int index = Resolve(locator);

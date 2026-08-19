@@ -42,6 +42,27 @@
     font-weight: 600;
 }
 
+.status-bar-stats {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 0 4px;
+    border: none;
+    border-radius: 2px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.status-bar-stats:hover { background: color-mix(in srgb, var(--clr-white) 18%, transparent); }
+
+.status-bar-stats:focus-visible {
+    outline: 1px solid var(--clr-white);
+    outline-offset: -1px;
+}
+
 /* White (inherited) text keeps WCAG AA contrast on the blue status bar; weight distinguishes the state. A color-coded
    status palette that meets AA on the status-bar fill is deferred to v2. */
 .status-bar-warn,

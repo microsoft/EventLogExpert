@@ -35,7 +35,14 @@
             var shown = Presentation.View.Count;
 
             <span aria-hidden="true" class="status-bar-sep">|</span>
-            <span class="status-bar-counts">@StatusBarFormatter.FormatCounts(total, shown, isFiltered && describesActiveTab, status.SelectionCount)</span>
+            <button aria-expanded="@(StatsVisibility.IsVisible ? "true" : "false")"
+                class="status-bar-stats"
+                @onclick="ToggleStats"
+                title="Show statistics for these events"
+                type="button">
+                <span class="status-bar-counts">@StatusBarFormatter.FormatCounts(total, shown, isFiltered && describesActiveTab, status.SelectionCount)</span>
+                <i aria-hidden="true" class="bi bi-caret-@(StatsVisibility.IsVisible ? "down" : "up")"></i>
+            </button>
         }
 
         @if (isFiltered)

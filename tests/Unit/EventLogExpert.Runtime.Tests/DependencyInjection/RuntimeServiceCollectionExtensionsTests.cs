@@ -30,6 +30,7 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.Runtime.Stats;
 using EventLogExpert.Runtime.StatusBar;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
@@ -166,6 +167,9 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IFilterLensSource))]
     [InlineData(typeof(IOpenLogsPresenceSource))]
     [InlineData(typeof(IHistogramVisibilitySource))]
+    [InlineData(typeof(IStatsVisibilitySource))]
+    [InlineData(typeof(IStatsCommands))]
+    [InlineData(typeof(IStatsService))]
     [InlineData(typeof(IEventFocusSource))]
     [InlineData(typeof(IActiveEventLogSource))]
     [InlineData(typeof(IFilterAppliedSource))]
@@ -252,6 +256,9 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         var histogramState = Substitute.For<IState<HistogramState>>();
         histogramState.Value.Returns(new HistogramState());
         services.AddSingleton(histogramState);
+        var statsState = Substitute.For<IState<StatsState>>();
+        statsState.Value.Returns(new StatsState());
+        services.AddSingleton(statsState);
         var filterLibraryState = Substitute.For<IState<FilterLibraryState>>();
         filterLibraryState.Value.Returns(new FilterLibraryState());
         services.AddSingleton(filterLibraryState);
@@ -379,6 +386,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IState<RawEventStoreState>>());
         services.AddSingleton(Substitute.For<IState<FilteredLogPresenceState>>());
         services.AddSingleton(Substitute.For<IState<HistogramState>>());
+        services.AddSingleton(Substitute.For<IState<StatsState>>());
         services.AddSingleton(Substitute.For<IState<FilterLibraryState>>());
         services.AddSingleton(Substitute.For<IState<ScenarioFavoritesState>>());
         services.AddSingleton(Substitute.For<IStateSelection<EventLogState, bool>>());

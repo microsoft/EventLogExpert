@@ -1,0 +1,69 @@
+@using EventLogExpert.Runtime.Stats
+@inherits ModalBase<bool>
+
+<ModalChrome AriaLabel="@($"All {Dimension.DisplayName()} values")"
+    CloseLabel="Close"
+    Footer="FooterPreset.CloseOnly"
+    Height="70%"
+    InlineAlert="@CurrentInlineAlert"
+    MaxWidth="40rem"
+    MinWidth="26rem"
+    OnClose="OnCancelAsync"
+    OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
+    Title="@($"All {Dimension.DisplayName()} values")"
+    @ref="ChromeRef">
+    <ChildContent>
+        <div class="stats-detail">
+            <input aria-label="Filter values"
+                @bind="_search"
+                @bind:event="oninput"
+                class="input stats-detail-search"
+                placeholder="Filter values..."
+                type="text" />
+
+            @if (_loading)
+            {
+                <div class="stats-detail-status">Computing...</div>
+            }
+            else if (_failed)
+            {
+                <div class="stats-detail-status">These values could not be computed.</div>
+            }
+            else
+            {
+                @if (_distinct > _all.Count)
+                {
+                    <div class="stats-detail-truncated">Showing the top @FormatCount(_all.Count) of @FormatCount(_distinct) values.</div>
+                }
+
+                <div class="stats-detail-list">
+                    @foreach (var row in VisibleRows)
+                    {
+                        <div class="stats-detail-row">
+                            <span class="stats-detail-value" title="@row.Value">@row.Value</span>
+                            <span class="stats-detail-count">@FormatCount(row.Count)</span>
+                            <span class="stats-detail-percent">@FormatShare(row.Count)</span>
+                            <span class="stats-detail-actions">
+                                <button aria-label="@($"Filter to {Dimension.DisplayName()} {row.Value}")"
+                                    class="stats-detail-include"
+                                    @onclick="() => Include(row)"
+                                    title="Filter to only this value"
+                                    type="button">
+                                    <i aria-hidden="true" class="bi bi-plus-circle"></i>
+                                </button>
+                                <button aria-label="@($"Exclude {Dimension.DisplayName()} {row.Value}")"
+                                    class="stats-detail-exclude"
+                                    @onclick="() => Exclude(row)"
+                                    title="Exclude this value"
+                                    type="button">
+                                    <i aria-hidden="true" class="bi bi-dash-circle"></i>
+                                </button>
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </ChildContent>
+</ModalChrome>

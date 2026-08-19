@@ -40,8 +40,9 @@ public sealed class UIFluxorBoundaryTests
     [Fact]
     public void EveryModal_IsCoveredByTheBoundaryEnumeration() =>
         // Guards the reflection discovery against finding nothing and pins the known modal set; update the count
-        // deliberately when a modal is added or removed (currently the seven built-in modals plus FilterLibraryModal).
-        Assert.Equal(8, s_modalTypes.Length);
+        // deliberately when a modal is added or removed (the seven built-in modals plus FilterLibraryModal and
+        // StatsDetailModal).
+        Assert.Equal(9, s_modalTypes.Length);
 
     [Theory]
     [MemberData(nameof(ModalTypes))]

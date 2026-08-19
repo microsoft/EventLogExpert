@@ -8,6 +8,7 @@ using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Stats;
 using EventLogExpert.Runtime.StatusBar;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -19,6 +20,8 @@ public sealed class StatusBarTests : BunitContext
 {
     private readonly IFilterAppliedSource _filterApplied = Substitute.For<IFilterAppliedSource>();
     private readonly IFilterLensSource _lensSource = Substitute.For<IFilterLensSource>();
+    private readonly IStatsCommands _statsCommands = Substitute.For<IStatsCommands>();
+    private readonly IStatsVisibilitySource _statsVisibility = Substitute.For<IStatsVisibilitySource>();
     private readonly IStatusBarSource _statusBarSource = Substitute.For<IStatusBarSource>();
     private readonly IOrderedViewSource _viewSource = Substitute.For<IOrderedViewSource>();
 
@@ -31,6 +34,8 @@ public sealed class StatusBarTests : BunitContext
 
         Services.AddSingleton(_filterApplied);
         Services.AddSingleton(_lensSource);
+        Services.AddSingleton(_statsCommands);
+        Services.AddSingleton(_statsVisibility);
         Services.AddSingleton(_statusBarSource);
         Services.AddSingleton(_viewSource);
 
@@ -262,6 +267,18 @@ public sealed class StatusBarTests : BunitContext
         var announce = cut.Find(".status-bar-announce");
         Assert.Equal("status", announce.GetAttribute("role"));
         Assert.Equal("polite", announce.GetAttribute("aria-live"));
+    }
+
+    [Fact]
+    public void StatsChip_TogglesStatisticsVisibility_ThroughTheCommand()
+    {
+        SetActiveLog(total: 100, shown: 100, filter: Unfiltered, selected: 0);
+        _statsVisibility.IsVisible.Returns(false);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find("button.status-bar-stats").Click();
+
+        _statsCommands.Received(1).SetVisible(true);
     }
 
     [Fact]

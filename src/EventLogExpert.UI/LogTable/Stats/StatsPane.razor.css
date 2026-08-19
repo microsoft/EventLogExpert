@@ -1,0 +1,341 @@
+.stats-pane {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    container: stats-pane / inline-size;
+    height: 100%;
+    margin: 0 5px;
+    padding: 2px 0 4px;
+    border-top: solid var(--background-darkgray);
+    overflow: hidden;
+    color: var(--text-secondary);
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.stats-header {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    padding: 1px 2px;
+}
+
+.stats-title {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.stats-headline {
+    min-width: 0;
+    color: var(--text-secondary);
+}
+
+.stats-empty {
+    padding: 6px 2px;
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+.stats-section-empty {
+    padding: 2px 2px 4px 1.2em;
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+/* Severity composition band: the bar and its legend share one line, wrapping only when the pane is narrow. */
+.stats-severity {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    padding: 3px 2px 5px;
+}
+
+.stats-severity-bar {
+    display: flex;
+    flex: 1 1 160px;
+    min-width: 120px;
+    height: 12px;
+    gap: 1px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.stats-severity-seg {
+    flex-basis: 0;
+    min-width: 2px;
+    height: 100%;
+}
+
+.stats-severity-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 12px;
+}
+
+.stats-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.stats-legend-swatch {
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+    flex: 0 0 auto;
+}
+
+.stats-legend-label { color: var(--text-secondary); }
+
+.stats-legend-count {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+}
+
+/* Severity slot colors: critical is darkened red so it reads apart from error while staying in the table's red family. */
+.stats-sev-critical { background: color-mix(in srgb, var(--clr-red), black 22%); }
+.stats-sev-error { background: var(--clr-red); }
+.stats-sev-warning { background: var(--clr-yellow); }
+.stats-sev-information { background: var(--toggle-accent); }
+.stats-sev-verbose { background: var(--text-secondary); }
+.stats-sev-unknown { background: color-mix(in srgb, var(--text-secondary) 40%, transparent); }
+
+/* Contributor dimensions as side-by-side columns; the grid reflows 2 -> 4 columns by the pane's own width. Below the
+   two-column breakpoint the pane is too narrow to show the columns usefully, so they are hidden entirely and only the
+   header + severity band remain (they return, 2 then 4 across, as the pane widens). */
+.stats-sections {
+    display: none;
+    grid-auto-rows: minmax(0, 1fr);
+    flex: 1 1 auto;
+    min-height: 0;
+    border-top: 1px solid var(--background-darkgray);
+}
+
+@container stats-pane (min-width: 42rem) {
+    .stats-sections {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@container stats-pane (min-width: 75rem) {
+    /* Source values are the longest, so its column gets a little more room than the others. */
+    .stats-sections { grid-template-columns: 1.3fr 1fr 1fr 1fr; }
+}
+
+.stats-section {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    padding: 0 0 2px;
+    overflow: hidden;
+    container: stats-column / inline-size;
+}
+
+.stats-section:not(:last-child) { border-inline-end: 1px solid var(--background-darkgray); }
+
+.stats-section-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 6px;
+    color: var(--text-primary);
+}
+
+.stats-section-title { font-weight: 600; }
+
+.stats-section-distinct {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+}
+
+.stats-updating {
+    margin-inline-start: auto;
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+.stats-rows {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    margin: 0;
+    padding: 0 6px 2px;
+    list-style: none;
+}
+
+/* value | count | percent | proportion bar | +/- actions */
+.stats-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 3.2em minmax(32px, 72px) 40px;
+    align-items: center;
+    gap: 6px;
+    padding: 1px 0;
+}
+
+/* Very narrow column: the proportion bar can no longer convey magnitude, so drop it (count + percent stay). */
+@container stats-column (max-width: 13rem) {
+    .stats-row { grid-template-columns: minmax(0, 1fr) auto 3.2em 40px; }
+    .stats-row-bar { display: none; }
+}
+
+.stats-row:hover:not(.stats-row-none) { background: color-mix(in srgb, var(--text-secondary) 8%, transparent); }
+
+.stats-row-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-primary);
+}
+
+.stats-row-count {
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+    color: var(--text-primary);
+}
+
+.stats-row-percent {
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+    color: var(--text-secondary);
+}
+
+.stats-row-bar {
+    display: block;
+    height: 8px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--text-secondary) 16%, transparent);
+    overflow: hidden;
+}
+
+.stats-row-bar-fill {
+    display: block;
+    height: 100%;
+    background: var(--toggle-accent);
+}
+
+.stats-row-none {
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+.stats-row-none .stats-row-value,
+.stats-row-none .stats-row-count { color: var(--text-secondary); }
+
+/* The absent/empty bucket is a pinned summary row below the ranked (overflow-clipped) list: it stays out of the
+   clipped area so it is always fully visible and reads as an intentional footer, not the last ranked row. */
+.stats-none-pinned {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    padding-inline: 6px;
+    box-shadow: inset 0 1px 0 var(--background-darkgray);
+}
+
+/* Include (+) / Exclude (-) actions: a fixed-width group reserved even at rest so hover never reflows the row,
+   revealed on row hover / keyboard focus. */
+.stats-row-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+}
+
+.stats-row:hover .stats-row-actions,
+.stats-row:focus-within .stats-row-actions { opacity: 1; }
+
+.stats-include,
+.stats-exclude {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: none;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.stats-include { color: var(--toggle-accent); }
+.stats-include:hover:not(:disabled) { background: color-mix(in srgb, var(--toggle-accent) 16%, transparent); }
+
+.stats-exclude { color: var(--clr-red); }
+.stats-exclude:hover:not(:disabled) { background: color-mix(in srgb, var(--clr-red) 16%, transparent); }
+
+.stats-include:focus-visible,
+.stats-exclude:focus-visible {
+    outline: 1px solid Highlight;
+    outline-offset: 1px;
+}
+
+/* While a scan is in flight the rows are provisional, so the filter actions stay hidden even on hover. */
+.stats-include:disabled,
+.stats-exclude:disabled {
+    opacity: 0;
+    cursor: default;
+    pointer-events: none;
+}
+
+.stats-actions-spacer { width: 40px; }
+
+.stats-more {
+    padding: 0 6px;
+    border: 1px solid var(--background-darkgray);
+    border-radius: 3px;
+    background: none;
+    color: var(--text-primary);
+    font: inherit;
+    cursor: pointer;
+}
+
+.stats-more:hover:not(:disabled) { background: color-mix(in srgb, var(--toggle-accent) 15%, transparent); }
+
+.stats-more:focus-visible {
+    outline: 1px solid Highlight;
+    outline-offset: 1px;
+}
+
+.stats-more:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.stats-coverage {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 1px 6px 2px;
+    color: var(--text-secondary);
+    font-size: 0.85em;
+}
+
+/* Recomputing: prior rows stay visible but read as provisional while the scan is in flight. */
+.stats-stale { opacity: 0.6; }
+
+@media (forced-colors: active) {
+    .stats-severity-seg,
+    .stats-legend-swatch {
+        forced-color-adjust: none;
+        border: 1px solid CanvasText;
+    }
+
+    .stats-sev-critical { background: CanvasText; }
+    .stats-sev-error { background: LinkText; }
+    .stats-sev-warning { background: Mark; }
+    .stats-sev-information { background: Highlight; }
+    .stats-sev-verbose { background: GrayText; }
+    .stats-sev-unknown { background: Canvas; }
+
+    .stats-row-bar { border: 1px solid CanvasText; }
+    .stats-row-bar-fill { background: Highlight; }
+}

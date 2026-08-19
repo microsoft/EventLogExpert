@@ -4,6 +4,7 @@
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Stats;
 using EventLogExpert.Runtime.StatusBar;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
@@ -19,6 +20,10 @@ public sealed partial class StatusBar
     [Inject] private DisplayIndicatorGate IndicatorGate { get; init; } = null!;
 
     [Inject] private IFilterLensSource LensSource { get; init; } = null!;
+
+    [Inject] private IStatsCommands StatsCommands { get; init; } = null!;
+
+    [Inject] private IStatsVisibilitySource StatsVisibility { get; init; } = null!;
 
     [Inject] private IStatusBarSource StatusBarSource { get; init; } = null!;
 
@@ -39,6 +44,7 @@ public sealed partial class StatusBar
         ObserveSource(StatusBarSource);
         ObserveSource(FilterApplied);
         ObserveSource(LensSource);
+        ObserveSource(StatsVisibility);
 
         base.OnInitialized();
     }
@@ -67,4 +73,6 @@ public sealed partial class StatusBar
 
         return shown.Sentence;
     }
+
+    private void ToggleStats() => StatsCommands.SetVisible(!StatsVisibility.IsVisible);
 }

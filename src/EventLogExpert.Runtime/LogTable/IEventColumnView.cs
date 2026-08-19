@@ -146,6 +146,8 @@ public interface IEventColumnView
 
     void CountFieldValues(EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken);
 
+    void CountSeverity(int[] slotCounts, CancellationToken cancellationToken);
+
     byte[] EnsureHighlightWinners(
         IReadOnlyList<SavedFilter> orderedColoredFilters,
         int planKey,

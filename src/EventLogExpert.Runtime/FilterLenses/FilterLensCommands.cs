@@ -1,7 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Common.Filtering;
 using Fluxor;
+using System.Globalization;
 
 namespace EventLogExpert.Runtime.FilterLenses;
 
@@ -10,6 +12,18 @@ internal sealed class FilterLensCommands(IDispatcher dispatcher) : IFilterLensCo
     private readonly IDispatcher _dispatcher = dispatcher;
 
     public void ClearLenses() => _dispatcher.Dispatch(new ClearFilterLensesAction());
+
+    public void ExcludeEventId(int eventId, string? originLog = null) =>
+        PushLens(FilterLensFactory.ForExcludedValue(EventProperty.Id, eventId.ToString(CultureInfo.InvariantCulture), originLog));
+
+    public void ExcludeValue(EventProperty property, string value, string? originLog = null) =>
+        PushLens(FilterLensFactory.ForExcludedValue(property, value, originLog));
+
+    public void IncludeEventId(int eventId, string? originLog = null) =>
+        PushLens(FilterLensFactory.ForIncludedValue(EventProperty.Id, eventId.ToString(CultureInfo.InvariantCulture), originLog));
+
+    public void IncludeValue(EventProperty property, string value, string? originLog = null) =>
+        PushLens(FilterLensFactory.ForIncludedValue(property, value, originLog));
 
     public void RemoveLens(FilterLensId id) => _dispatcher.Dispatch(new RemoveFilterLensAction(id));
 

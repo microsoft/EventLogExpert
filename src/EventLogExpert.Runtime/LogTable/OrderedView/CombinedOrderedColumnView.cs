@@ -471,6 +471,16 @@ internal sealed class CombinedOrderedColumnView : IEventColumnView
         }
     }
 
+    public void CountSeverity(int[] slotCounts, CancellationToken cancellationToken)
+    {
+        Partition partition = GetPartition();
+
+        for (int slot = 0; slot < _readers.Length; slot++)
+        {
+            _readers[slot].CountSeverity(partition.RankByPhysical[slot], slotCounts, cancellationToken);
+        }
+    }
+
     public byte[] EnsureHighlightWinners(
         IReadOnlyList<SavedFilter> orderedColoredFilters,
         int planKey,

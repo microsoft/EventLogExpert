@@ -56,6 +56,27 @@ public sealed class EffectiveFilterBuilderTests
     }
 
     [Fact]
+    public void Build_TimeWindowLensFromFactory_KeepsEventsWithinRadius_IncludingInclusiveBoundsAndSource()
+    {
+        // The factory-built centered window [T-1h, T+1h] keeps the source event at T and neighbors exactly on the
+        // inclusive bounds, and hides anything past them.
+        var anchor = At(12);
+        var source = FilterEventBuilder.CreateTestEvent(id: 1, timeCreated: anchor);
+        var onLowerBound = FilterEventBuilder.CreateTestEvent(id: 2, timeCreated: At(11));
+        var onUpperBound = FilterEventBuilder.CreateTestEvent(id: 3, timeCreated: At(13));
+        var belowWindow = FilterEventBuilder.CreateTestEvent(id: 4, timeCreated: At(10));
+        var aboveWindow = FilterEventBuilder.CreateTestEvent(id: 5, timeCreated: At(14));
+
+        var lens = FilterLensFactory.ForTimeWindow(anchor, TimeSpan.FromHours(1), TimeZoneInfo.Utc);
+        var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [lens]);
+
+        var result = s_filterService.GetFilteredEvents(
+            [source, onLowerBound, onUpperBound, belowWindow, aboveWindow], composed);
+
+        Assert.Equal([1, 2, 3], result.Select(e => e.Id).OrderBy(id => id));
+    }
+
+    [Fact]
     public void Build_TimeWindowLens_IntersectsWithBaseDate_TwoSidedEnabled()
     {
         // Arrange - base date [10:00, 14:00]; lens window [12:00, 16:00]; intersection [12:00, 14:00].
@@ -107,27 +128,6 @@ public sealed class EffectiveFilterBuilderTests
     }
 
     [Fact]
-    public void Build_TimeWindowLensFromFactory_KeepsEventsWithinRadius_IncludingInclusiveBoundsAndSource()
-    {
-        // The factory-built centered window [T-1h, T+1h] keeps the source event at T and neighbors exactly on the
-        // inclusive bounds, and hides anything past them.
-        var anchor = At(12);
-        var source = FilterEventBuilder.CreateTestEvent(id: 1, timeCreated: anchor);
-        var onLowerBound = FilterEventBuilder.CreateTestEvent(id: 2, timeCreated: At(11));
-        var onUpperBound = FilterEventBuilder.CreateTestEvent(id: 3, timeCreated: At(13));
-        var belowWindow = FilterEventBuilder.CreateTestEvent(id: 4, timeCreated: At(10));
-        var aboveWindow = FilterEventBuilder.CreateTestEvent(id: 5, timeCreated: At(14));
-
-        var lens = FilterLensFactory.ForTimeWindow(anchor, TimeSpan.FromHours(1), TimeZoneInfo.Utc);
-        var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [lens]);
-
-        var result = s_filterService.GetFilteredEvents(
-            [source, onLowerBound, onUpperBound, belowWindow, aboveWindow], composed);
-
-        Assert.Equal([1, 2, 3], result.Select(e => e.Id).OrderBy(id => id));
-    }
-
-    [Fact]
     public void Build_WithActivityIdLensOnBaseInclude_NarrowsToIntersection()
     {
         // Arrange - base includes Level == Error (OR-combined include list); the lens must AND-narrow, so only the
@@ -163,6 +163,104 @@ public sealed class EffectiveFilterBuilderTests
 
         var result = s_filterService.GetFilteredEvents([matching, other, absent], composed);
 
+        Assert.Equal([1], result.Select(e => e.Id).OrderBy(id => id));
+    }
+
+    [Fact]
+    public void Build_WithExcludeEventIdLens_HidesMatchingId_KeepsOthers()
+    {
+        var drop = FilterEventBuilder.CreateTestEvent(id: 4624);
+        var keep = FilterEventBuilder.CreateTestEvent(id: 4625);
+
+        var lens = FilterLensFactory.ForExcludedValue(EventProperty.Id, "4624");
+        Assert.NotNull(lens);
+
+        var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [lens]);
+        var result = s_filterService.GetFilteredEvents([drop, keep], composed);
+
+        Assert.Equal([4625], result.Select(e => e.Id).OrderBy(id => id));
+    }
+
+    [Fact]
+    public void Build_WithExcludeSourceLens_HidesMatchingSource_KeepsOthers()
+    {
+        var noisy1 = FilterEventBuilder.CreateTestEvent(id: 1, source: "NoisySource");
+        var noisy2 = FilterEventBuilder.CreateTestEvent(id: 2, source: "NoisySource");
+        var quiet = FilterEventBuilder.CreateTestEvent(id: 3, source: "QuietSource");
+
+        var lens = FilterLensFactory.ForExcludedValue(EventProperty.Source, "NoisySource");
+        Assert.NotNull(lens);
+        Assert.Equal("Source \u2260 NoisySource", lens!.Label);
+
+        var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [lens]);
+        var result = s_filterService.GetFilteredEvents([noisy1, noisy2, quiet], composed);
+
+        Assert.Equal([3], result.Select(e => e.Id).OrderBy(id => id));
+    }
+
+    [Fact]
+    public void Build_WithExcludeUserLens_HidesMatchingUser_KeepsOthers()
+    {
+        // Locks that User (EventProperty.UserDisplayName) is actually filterable, so the User exclude button binds.
+        var system = FilterEventBuilder.CreateTestEvent(id: 1, userDisplayName: "SYSTEM");
+        var alice = FilterEventBuilder.CreateTestEvent(id: 2, userDisplayName: "CONTOSO\\alice");
+
+        var lens = FilterLensFactory.ForExcludedValue(EventProperty.UserDisplayName, "SYSTEM");
+        Assert.NotNull(lens);
+
+        var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [lens]);
+        var result = s_filterService.GetFilteredEvents([system, alice], composed);
+
+        Assert.Equal([2], result.Select(e => e.Id).OrderBy(id => id));
+    }
+
+    [Fact]
+    public void Build_WithIncludeEventIdLens_KeepsMatchingId_HidesOthers()
+    {
+        var keep = FilterEventBuilder.CreateTestEvent(id: 4624);
+        var drop = FilterEventBuilder.CreateTestEvent(id: 4625);
+
+        var lens = FilterLensFactory.ForIncludedValue(EventProperty.Id, "4624");
+        Assert.NotNull(lens);
+
+        var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [lens]);
+        var result = s_filterService.GetFilteredEvents([keep, drop], composed);
+
+        Assert.Equal([4624], result.Select(e => e.Id).OrderBy(id => id));
+    }
+
+    [Fact]
+    public void Build_WithIncludeSourceLens_KeepsMatchingSource_HidesOthers()
+    {
+        var keep1 = FilterEventBuilder.CreateTestEvent(id: 1, source: "TargetSource");
+        var keep2 = FilterEventBuilder.CreateTestEvent(id: 2, source: "TargetSource");
+        var other = FilterEventBuilder.CreateTestEvent(id: 3, source: "OtherSource");
+
+        var lens = FilterLensFactory.ForIncludedValue(EventProperty.Source, "TargetSource");
+        Assert.NotNull(lens);
+        Assert.Equal("Source = TargetSource", lens!.Label);
+
+        var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [lens]);
+        var result = s_filterService.GetFilteredEvents([keep1, keep2, other], composed);
+
+        Assert.Equal([1, 2], result.Select(e => e.Id).OrderBy(id => id));
+    }
+
+    [Fact]
+    public void Build_WithIncludeUserLens_KeepsMatchingUser_HidesOthersAndNoUserEvents()
+    {
+        var system = FilterEventBuilder.CreateTestEvent(id: 1, userDisplayName: "SYSTEM");
+        var alice = FilterEventBuilder.CreateTestEvent(id: 2, userDisplayName: "CONTOSO\\alice");
+        var noUser = FilterEventBuilder.CreateTestEvent(id: 3);
+
+        var lens = FilterLensFactory.ForIncludedValue(EventProperty.UserDisplayName, "SYSTEM");
+        Assert.NotNull(lens);
+
+        var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [lens]);
+        var result = s_filterService.GetFilteredEvents([system, alice, noUser], composed);
+
+        // The User field is presence-gated, so "User != SYSTEM" is NoMatch (kept) for the no-user event; the include
+        // lens must add a second "User == null" exclude clause so keep-only genuinely drops it, not just other users.
         Assert.Equal([1], result.Select(e => e.Id).OrderBy(id => id));
     }
 

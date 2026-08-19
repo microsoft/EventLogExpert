@@ -1,0 +1,94 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.Runtime.FilterLenses;
+using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Stats;
+using EventLogExpert.UI.Modal;
+using Microsoft.AspNetCore.Components;
+using System.Globalization;
+
+namespace EventLogExpert.UI.LogTable.Stats;
+
+public sealed partial class StatsDetailModal : ModalBase<bool>
+{
+    // Bounds the full-list scan so a dimension with near-event-count cardinality (Source / User) can't build an
+    // unbounded list; the search box narrows within what was collected.
+    private const int MaxRows = 2000;
+
+    private readonly CancellationTokenSource _cts = new();
+
+    private IReadOnlyList<StatsContributor> _all = [];
+    private int _distinct;
+    private bool _failed;
+    private bool _loading = true;
+    private string _search = string.Empty;
+    private int _total;
+
+    [EditorRequired]
+    [Parameter] public StatsDimension Dimension { get; set; }
+
+    [Parameter] public string? OriginLog { get; set; }
+
+    [EditorRequired]
+    [Parameter] public IEventColumnView View { get; set; } = null!;
+
+    [Inject] private IFilterLensCommands FilterLensCommands { get; init; } = null!;
+
+    [Inject] private IStatsService StatsService { get; init; } = null!;
+
+    private IEnumerable<StatsContributor> VisibleRows =>
+        string.IsNullOrWhiteSpace(_search) ?
+            _all :
+            _all.Where(row => row.Value.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    protected override ValueTask DisposeAsyncCore(bool disposing)
+    {
+        if (disposing)
+        {
+            _cts.Cancel();
+            _cts.Dispose();
+        }
+
+        return base.DisposeAsyncCore(disposing);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        try
+        {
+            DimensionStats stats = await Task.Run(
+                () => StatsService.BuildDimension(View, Dimension, MaxRows, _cts.Token), _cts.Token);
+
+            _all = stats.Top;
+            _distinct = stats.DistinctCount;
+            _total = stats.Total;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception)
+        {
+            _failed = true;
+        }
+        finally
+        {
+            if (!IsDisposed)
+            {
+                _loading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private static string FormatCount(int value) => value.ToString("N0", CultureInfo.CurrentCulture);
+
+    private void Exclude(StatsContributor row) =>
+        Dimension.PushRowFilter(FilterLensCommands, row.Value, OriginLog, include: false);
+
+    private string FormatShare(int count) =>
+        _total == 0 ? "0%" : (count * 100.0 / _total).ToString("0.0", CultureInfo.CurrentCulture) + "%";
+
+    private void Include(StatsContributor row) =>
+        Dimension.PushRowFilter(FilterLensCommands, row.Value, OriginLog, include: true);
+}

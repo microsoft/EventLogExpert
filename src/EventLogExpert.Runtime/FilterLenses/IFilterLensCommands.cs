@@ -1,13 +1,21 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Common.Filtering;
 
 namespace EventLogExpert.Runtime.FilterLenses;
 
 public interface IFilterLensCommands
 {
     void ClearLenses();
+
+    void ExcludeEventId(int eventId, string? originLog = null);
+
+    void ExcludeValue(EventProperty property, string value, string? originLog = null);
+
+    void IncludeEventId(int eventId, string? originLog = null);
+
+    void IncludeValue(EventProperty property, string value, string? originLog = null);
 
     void RemoveLens(FilterLensId id);
 
