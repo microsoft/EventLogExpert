@@ -248,6 +248,8 @@ public sealed partial class StatsPane
         section.Dimension.PushRowFilter(FilterLensCommands, contributor.Value, Presentation.ActiveLogName, include);
     }
 
+    private bool AreRowActionsDisabled(DimensionSection section) => section.Stats is null || IsSectionStale(section);
+
     private void ExcludeContributor(DimensionSection section, StatsContributor contributor) =>
         ApplyRowLens(section, contributor, include: false);
 
@@ -295,8 +297,6 @@ public sealed partial class StatsPane
 
     private void IncludeContributor(DimensionSection section, StatsContributor contributor) =>
         ApplyRowLens(section, contributor, include: true);
-
-    private bool IsExcludeDisabled(DimensionSection section) => section.Stats is null || IsSectionStale(section);
 
     private bool IsSectionStale(DimensionSection section) => section.StatsToken != _currentToken;
 
