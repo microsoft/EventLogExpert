@@ -37,10 +37,16 @@ public sealed partial class StatsDetailModal : ModalBase<bool>
 
     [Inject] private IStatsService StatsService { get; init; } = null!;
 
-    private IEnumerable<StatsContributor> VisibleRows =>
-        string.IsNullOrWhiteSpace(_search) ?
-            _all :
-            _all.Where(row => row.Value.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
+    private IEnumerable<StatsContributor> VisibleRows
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_search)) { return _all; }
+
+            string needle = _search.Trim();
+            return _all.Where(row => row.Value.Contains(needle, StringComparison.OrdinalIgnoreCase));
+        }
+    }
 
     protected override ValueTask DisposeAsyncCore(bool disposing)
     {
