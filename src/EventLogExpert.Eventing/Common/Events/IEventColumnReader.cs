@@ -229,6 +229,8 @@ public interface IEventColumnReader
     /// </summary>
     void CountFieldValues(ReadOnlySpan<int> rankByPhysical, EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken);
 
+    void CountSeverity(ReadOnlySpan<int> rankByPhysical, int[] slotCounts, CancellationToken cancellationToken);
+
     EventDataFieldEnumerator EnumerateEventData(EventLocator locator);
 
     UserDataFieldEnumerator EnumerateUserData(EventLocator locator);

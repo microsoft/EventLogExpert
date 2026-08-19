@@ -35,6 +35,7 @@ using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.StatusBar;
+using EventLogExpert.Runtime.Stats;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
 using EventLogExpert.Scenarios.Catalog;
@@ -129,6 +130,8 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IFilterLibraryCommands, FilterLibraryCommands>();
             services.AddSingleton<IFilterPaneCommands, FilterPaneCommands>();
             services.AddSingleton<IHistogramCommands, HistogramCommands>();
+            services.AddSingleton<IStatsCommands, StatsCommands>();
+            services.AddSingleton<IStatsService, StatsService>();
             services.AddSingleton<ILogTableCommands, LogTableCommands>();
             services.AddSingleton<IScenarioFavoriteCommands, ScenarioFavoriteCommands>();
 
@@ -157,6 +160,7 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IFilterLensSource, FilterLensSource>();
             services.AddSingleton<IOpenLogsPresenceSource, OpenLogsPresenceSource>();
             services.AddSingleton<IHistogramVisibilitySource, HistogramVisibilitySource>();
+            services.AddSingleton<IStatsVisibilitySource, StatsVisibilitySource>();
             services.AddSingleton<IFilterAppliedSource, FilterAppliedSource>();
             services.AddSingleton<IEventFocusSource, EventFocusSource>();
             services.AddSingleton<IActiveEventLogSource, ActiveEventLogSource>();

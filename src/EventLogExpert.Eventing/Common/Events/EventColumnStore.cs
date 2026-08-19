@@ -1322,6 +1322,52 @@ public sealed class EventColumnStore
         }
     }
 
+    internal void CountSeverity(ReadOnlySpan<int> rankByPhysical, int[] slotCounts, CancellationToken cancellationToken)
+    {
+        // Severity totals over the survivor projection: the un-bucketed sibling of BucketTimeTicksBySeverity. Resolve the
+        // five level names to pool indices once (missing -> int.MinValue) so sealed rows map level by integer compare; a
+        // null-level row (-1) falls to slot 0 (Unknown). Slots are ADDED to, so a combined view can accumulate readers.
+        int criticalIndex = _pool.TryGetIndex(nameof(SeverityLevel.Critical), out int critical) ? critical : int.MinValue;
+        int errorIndex = _pool.TryGetIndex(nameof(SeverityLevel.Error), out int error) ? error : int.MinValue;
+        int warningIndex = _pool.TryGetIndex(nameof(SeverityLevel.Warning), out int warning) ? warning : int.MinValue;
+        int informationIndex = _pool.TryGetIndex(nameof(SeverityLevel.Information), out int information) ? information : int.MinValue;
+        int verboseIndex = _pool.TryGetIndex(nameof(SeverityLevel.Verbose), out int verbose) ? verbose : int.MinValue;
+
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<int> levelColumn = chunk.PoolIndexColumn(EventColumnField.Level);
+
+            for (int row = 0; row < levelColumn.Length; row++)
+            {
+                if (rankByPhysical[offset + row] < 0) { continue; }
+
+                slotCounts[SlotOf(levelColumn[row])]++;
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            slotCounts[LevelSeverity.Slot(LevelSeverity.FromLevelName(Pending(index).Level))]++;
+        }
+
+        return;
+
+        int SlotOf(int levelPoolIndex) =>
+            levelPoolIndex == criticalIndex ? (int)SeverityLevel.Critical :
+            levelPoolIndex == errorIndex ? (int)SeverityLevel.Error :
+            levelPoolIndex == warningIndex ? (int)SeverityLevel.Warning :
+            levelPoolIndex == informationIndex ? (int)SeverityLevel.Information :
+            levelPoolIndex == verboseIndex ? (int)SeverityLevel.Verbose : 0;
+    }
+
     /// <summary>
     ///     Reconstructs a byte-faithful <see cref="ResolvedEvent" /> for the row at <paramref name="index" />,
     ///     reproducing every field's observable value. A pending row is returned as-is (perfect fidelity, zero work); a sealed

@@ -15,6 +15,51 @@ public sealed class EventColumnStoreReaderTests
     private static readonly EventLogId s_logId = EventLogId.Create();
     private static readonly DateTime s_time = new(2021, 6, 15, 10, 20, 30, DateTimeKind.Utc);
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CountSeverity_SkipsFilteredRows(bool sealRows)
+    {
+        ResolvedEvent[] sample = [Ev(1, "Critical"), Ev(2, "Error"), Ev(3, "Error")];
+
+        IEventColumnReader reader = ReaderOver(sample, sealRows);
+        int[] slots = new int[LevelSeverity.SlotCount];
+        int[] rank = new int[reader.Count];
+        rank[0] = -1; // filter out the Critical row
+
+        reader.CountSeverity(rank, slots, TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, slots[(int)SeverityLevel.Critical]);
+        Assert.Equal(2, slots[(int)SeverityLevel.Error]);
+        Assert.Equal(2, slots.Sum());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CountSeverity_TalliesSurvivorsBySlot_AbsentAndUnknownToSlotZero(bool sealRows)
+    {
+        ResolvedEvent[] sample =
+        [
+            Ev(1, "Critical"), Ev(2, "Error"), Ev(3, "Error"), Ev(4, "Warning"),
+            Ev(5, "Information"), Ev(6, "Verbose"), Ev(7, ""), Ev(8, "Bogus")
+        ];
+
+        IEventColumnReader reader = ReaderOver(sample, sealRows);
+        int[] slots = new int[LevelSeverity.SlotCount];
+        int[] rank = new int[reader.Count]; // all >= 0 -> every row survives
+
+        reader.CountSeverity(rank, slots, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, slots[(int)SeverityLevel.Critical]);
+        Assert.Equal(2, slots[(int)SeverityLevel.Error]);
+        Assert.Equal(1, slots[(int)SeverityLevel.Warning]);
+        Assert.Equal(1, slots[(int)SeverityLevel.Information]);
+        Assert.Equal(1, slots[(int)SeverityLevel.Verbose]);
+        Assert.Equal(2, slots[0]); // absent + unrecognized level -> Unknown
+        Assert.Equal(sample.Length, slots.Sum());
+    }
+
     [Fact]
     public void GetField_ForeignLogIdLocator_ThrowsArgumentException()
     {
@@ -54,6 +99,9 @@ public sealed class EventColumnStoreReaderTests
         Assert.Empty(reader.GetKeywords(reader.LocatorAt(1)));
         Assert.Equal(["Classic"], reader.GetKeywords(reader.LocatorAt(2)));
     }
+
+    private static ResolvedEvent Ev(int id, string level) =>
+        new("Application", LogPathType.Channel) { Id = id, Level = level, TimeCreated = s_time };
 
     private static IEventColumnReader ReaderOver(ResolvedEvent[] sample, bool sealRows) =>
         (sealRows

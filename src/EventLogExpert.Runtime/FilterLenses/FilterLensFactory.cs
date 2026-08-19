@@ -16,6 +16,70 @@ internal static class FilterLensFactory
     public static FilterLens? ForActivityId(Guid activityId, string? originLog = null, string? label = null) =>
         BuildEqualityLens(EventProperty.ActivityId, activityId, label ?? $"Activity ID = {activityId}", originLog);
 
+    public static FilterLens? ForExcludedValue(EventProperty property, string value, string? originLog = null)
+    {
+        // Hide every event whose property equals this value: an EXCLUDED Equal comparison (the mirror of the keep-only
+        // NotEqual comparison BuildEqualityLens uses). The resulting view keeps events where property != value.
+        if (!TryFormatEqual(property, value, out var comparisonText)) { return null; }
+
+        var excluded = SavedFilter.TryCreate(
+            comparisonText,
+            isExcluded: true,
+            isEnabled: true,
+            mode: FilterMode.Advanced);
+
+        if (excluded?.Compiled is null) { return null; }
+
+        return new FilterLens
+        {
+            Label = $"{PropertyDisplayName(property)} \u2260 {value}",
+            Kind = LensKind.Property,
+            ExcludeFilters = [excluded],
+            OriginLog = originLog
+        };
+    }
+
+    public static FilterLens? ForIncludedValue(EventProperty property, string value, string? originLog = null)
+    {
+        // Keep only events whose property equals this value by EXCLUDING everything that does not match: an excluded
+        // NotEqual comparison (the same keep-only mechanism BuildEqualityLens uses for activity ids).
+        if (!TryFormatNotEqual(property, value, out var comparisonText)) { return null; }
+
+        var complement = SavedFilter.TryCreate(
+            comparisonText,
+            isExcluded: true,
+            isEnabled: true,
+            mode: FilterMode.Advanced);
+
+        if (complement?.Compiled is null) { return null; }
+
+        // The merged User field is presence-gated: `User != value` is NoMatch (i.e. kept) for events with no user
+        // identity, so the NotEqual complement alone would leak every no-user event into this keep-only view. Drop
+        // those rows with a second exclude clause (`User == null` matches exactly the no-identity events) so the kept
+        // set is precisely `User == value`. Source/Event ID/Task Category negate totally, so their lone complement
+        // already excludes absent values and needs no second clause.
+        SavedFilter? absentComplement = null;
+
+        if (property == EventProperty.UserDisplayName)
+        {
+            absentComplement = SavedFilter.TryCreate(
+                "User == null",
+                isExcluded: true,
+                isEnabled: true,
+                mode: FilterMode.Advanced);
+
+            if (absentComplement?.Compiled is null) { return null; }
+        }
+
+        return new FilterLens
+        {
+            Label = $"{PropertyDisplayName(property)} = {value}",
+            Kind = LensKind.Property,
+            ExcludeFilters = absentComplement is null ? [complement] : [complement, absentComplement],
+            OriginLog = originLog
+        };
+    }
+
     public static FilterLens? ForRelatedActivityId(Guid relatedActivityId, string? originLog = null) =>
         BuildEqualityLens(
             EventProperty.RelatedActivityId,
@@ -100,6 +164,28 @@ internal static class FilterLensFactory
         { Seconds: 0, Milliseconds: 0 } => $"{radius.TotalMinutes:0}m",
         _ => $"{radius.TotalSeconds:0}s"
     };
+
+    private static string PropertyDisplayName(EventProperty property) => property switch
+    {
+        EventProperty.Source => "Source",
+        EventProperty.Id => "Event ID",
+        EventProperty.TaskCategory => "Task Category",
+        EventProperty.UserDisplayName => "User",
+        _ => property.ToString()
+    };
+
+    private static bool TryFormatEqual(EventProperty property, string value, out string comparisonText)
+    {
+        var comparison = new FilterComparison
+        {
+            Property = property,
+            Operator = ComparisonOperator.Equals,
+            MatchMode = MatchMode.Single,
+            Value = value
+        };
+
+        return BasicFilterFormatter.TryFormat(new BasicFilter(comparison, []), out comparisonText);
+    }
 
     private static bool TryFormatNotEqual(EventProperty property, string value, out string comparisonText)
     {

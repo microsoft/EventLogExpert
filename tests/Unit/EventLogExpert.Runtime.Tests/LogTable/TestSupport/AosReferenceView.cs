@@ -298,6 +298,9 @@ internal sealed class AosReferenceView : IEventColumnView
         CancellationToken cancellationToken) =>
         _reader.CountFieldValues(_rankByPhysical, field, counts, cancellationToken);
 
+    public void CountSeverity(int[] slotCounts, CancellationToken cancellationToken) =>
+        _reader.CountSeverity(_rankByPhysical, slotCounts, cancellationToken);
+
     public byte[] EnsureHighlightWinners(
         IReadOnlyList<SavedFilter> orderedColoredFilters,
         int planKey,

@@ -1,0 +1,129 @@
+@using EventLogExpert.Runtime.Stats
+@inherits PresentationViewComponentBase
+
+<div aria-label="Statistics" class="stats-pane" @ref="_paneElement" role="region">
+    <div class="stats-header">
+        <span class="stats-title">Statistics</span>
+        <span class="stats-headline@(IsSeverityStale ? " stats-stale" : "")">@HeadlineText()</span>
+    </div>
+
+    @if (_scanFailed)
+    {
+        <div class="stats-empty">Statistics could not be built for these events.</div>
+    }
+    else if (_severity is { Total: > 0 })
+    {
+        <div class="stats-severity@(IsSeverityStale ? " stats-stale" : "")">
+            <div aria-label="@SeverityBarAria()" class="stats-severity-bar" role="img">
+                @foreach (var segment in SeveritySegments())
+                {
+                    <span class="stats-severity-seg @segment.CssClass"
+                        style="flex-grow:@Css(segment.Percent)"
+                        title="@($"{segment.Label}: {FormatCount(segment.Count)} ({FormatPercent(segment.Percent)})")">
+                    </span>
+                }
+            </div>
+            <div class="stats-severity-legend">
+                @foreach (var segment in SeveritySegments())
+                {
+                    <span class="stats-legend-item">
+                        <span aria-hidden="true" class="stats-legend-swatch @segment.CssClass"></span>
+                        <span class="stats-legend-label">@segment.Label</span>
+                        <span class="stats-legend-count">@FormatCount(segment.Count)</span>
+                    </span>
+                }
+            </div>
+        </div>
+
+        <div class="stats-sections">
+            @foreach (var section in _sections)
+            {
+                <section class="stats-section@(IsSectionStale(section) ? " stats-stale" : "")">
+                    <div class="stats-section-header">
+                        <span class="stats-section-title">@section.Dimension.DisplayName()</span>
+                        @if (section.Stats is { } headerStats)
+                        {
+                            <span class="stats-section-distinct">@FormatCount(headerStats.DistinctCount)</span>
+                        }
+                        @if (IsSectionStale(section))
+                        {
+                            <span class="stats-updating">Updating...</span>
+                        }
+                    </div>
+
+                    @if (section.Stats is { } stats)
+                    {
+                        @if (stats.Top.Count == 0 && stats.MissingCount == 0)
+                        {
+                            <div class="stats-section-empty">No values in the current view.</div>
+                        }
+                        else
+                        {
+                            <ol class="stats-rows">
+                                @foreach (var contributor in stats.Top)
+                                {
+                                    <li class="stats-row">
+                                        <span class="stats-row-value" title="@contributor.Value">@contributor.Value</span>
+                                        <span class="stats-row-count">@FormatCount(contributor.Count)</span>
+                                        <span class="stats-row-percent">@FormatPercent(Share(contributor.Count, stats.Total))</span>
+                                        <span aria-hidden="true" class="stats-row-bar">
+                                            <span class="stats-row-bar-fill" style="width:@Css(Share(contributor.Count, stats.Total))%"></span>
+                                        </span>
+                                        <span aria-label="Filter actions" class="stats-row-actions" role="group">
+                                            <button aria-label="@($"Filter to {section.Dimension.DisplayName()} {contributor.Value}")"
+                                                class="stats-include"
+                                                disabled="@IsExcludeDisabled(section)"
+                                                @onclick="() => IncludeContributor(section, contributor)"
+                                                title="Filter to only this value"
+                                                type="button">
+                                                <i aria-hidden="true" class="bi bi-plus-circle"></i>
+                                            </button>
+                                            <button aria-label="@($"Exclude {section.Dimension.DisplayName()} {contributor.Value}")"
+                                                class="stats-exclude"
+                                                disabled="@IsExcludeDisabled(section)"
+                                                @onclick="() => ExcludeContributor(section, contributor)"
+                                                title="Exclude this value"
+                                                type="button">
+                                                <i aria-hidden="true" class="bi bi-dash-circle"></i>
+                                            </button>
+                                        </span>
+                                    </li>
+                                }
+                            </ol>
+
+                            @if (stats.MissingCount > 0 && section.Dimension != StatsDimension.EventId)
+                            {
+                                <div class="stats-none-pinned stats-row stats-row-none">
+                                    <span class="stats-row-value">(none)</span>
+                                    <span class="stats-row-count">@FormatCount(stats.MissingCount)</span>
+                                    <span class="stats-row-percent">@FormatPercent(Share(stats.MissingCount, stats.Total))</span>
+                                    <span aria-hidden="true" class="stats-row-bar">
+                                        <span class="stats-row-bar-fill" style="width:@Css(Share(stats.MissingCount, stats.Total))%"></span>
+                                    </span>
+                                    <span class="stats-actions-spacer"></span>
+                                </div>
+                            }
+
+                            <div class="stats-coverage">
+                                <span class="stats-coverage-text">@CoverageText(stats)</span>
+                                @if (stats.DistinctCount > stats.Top.Count)
+                                {
+                                    <button class="stats-more"
+                                        disabled="@IsSectionStale(section)"
+                                        @onclick="() => OpenDetail(section.Dimension)"
+                                        type="button">
+                                        View all
+                                    </button>
+                                }
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="stats-section-empty">Computing...</div>
+                    }
+                </section>
+            }
+        </div>
+    }
+</div>

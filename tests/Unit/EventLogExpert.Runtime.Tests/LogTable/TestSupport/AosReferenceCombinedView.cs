@@ -384,6 +384,14 @@ internal sealed class AosReferenceCombinedView : IEventColumnView
         }
     }
 
+    public void CountSeverity(int[] slotCounts, CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.CountSeverity(slotCounts, cancellationToken);
+        }
+    }
+
     public byte[] EnsureHighlightWinners(
         IReadOnlyList<SavedFilter> orderedColoredFilters,
         int planKey,

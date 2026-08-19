@@ -1,0 +1,32 @@
+/* Slide-up drawer between the main content and the footer status bar (VS Code panel model): expanding it pushes the
+   main content up rather than overlaying it, because .page is a flex column and .page-content flexes. Height lives in
+   the --stats-drawer-height custom property (drag-resizable) so the collapsed height:0 rule still wins. */
+.stats-drawer {
+    position: relative;
+    flex: 0 0 auto;
+    height: 0;
+    max-height: 80vh;
+    overflow: hidden;
+    transition: height 0.2s ease;
+}
+
+.stats-drawer-open { height: var(--stats-drawer-height, 240px); }
+
+/* Applied by the resizer while dragging so the height tracks the pointer instead of easing. */
+.stats-drawer-resizing { transition: none; }
+
+.stats-drawer-resizer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    z-index: 1;
+    cursor: n-resize;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .stats-drawer { transition: none; }
+}
