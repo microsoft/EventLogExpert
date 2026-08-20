@@ -1170,6 +1170,24 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleOpenLog_ReverseEagerLoad_SuccessfulLoad_ClearsLoadingStatusOnCompletion()
+    {
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(60, batchSize: 30), newestBookmark: "NEWEST"));
+
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory);
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Any<ClearStatusAction>());
+
+        var dispatched = dispatcher.ReceivedCalls().Select(call => call.GetArguments()[0]).ToList();
+        var lastLoadingIndex = dispatched.FindLastIndex(action => action is SetEventsLoadingAction);
+        var clearIndex = dispatched.FindLastIndex(action => action is ClearStatusAction);
+        Assert.True(clearIndex > lastLoadingIndex, "ClearStatusAction must be the terminal loading dispatch.");
+    }
+
+    [Fact]
     public async Task HandleOpenLog_ReverseEagerLoad_WhenReadStopsOnError_SurfacesLoadFailureNotFinalLoad()
     {
         const int total = 60;
@@ -1243,7 +1261,21 @@ public sealed class EffectsTests
         await effects.HandleOpenLog(action, mockDispatcher);
 
         mockDispatcher.Received().Dispatch(Arg.Any<CloseLogAction>());
-        mockDispatcher.Received().Dispatch(Arg.Any<ClearStatusAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<ClearStatusAction>());
+    }
+
+    [Fact]
+    public async Task HandleOpenLog_WhenFileLogNotInOpenLogs_ErrorLeadsWithBasenameAndKeepsFullPath()
+    {
+        var (effects, mockDispatcher) = CreateEffects(hasEventResolver: true);
+        var action = new OpenLogAction(@"C:\logs\Security.evtx", LogPathType.File);
+
+        await effects.HandleOpenLog(action, mockDispatcher);
+
+        mockDispatcher.Received(1)
+            .Dispatch(Arg.Is<SetResolverStatusAction>(a => a != null &&
+                a.ResolverStatus.StartsWith("Error: Failed to open Security.evtx") &&
+                a.ResolverStatus.Contains(@"C:\logs\Security.evtx")));
     }
 
     [Fact]
@@ -1276,6 +1308,18 @@ public sealed class EffectsTests
         mockDispatcher.Received(1)
             .Dispatch(Arg.Is<SetResolverStatusAction>(a => a != null &&
                 a.ResolverStatus.Contains("Error")));
+    }
+
+    [Fact]
+    public async Task HandleOpenLog_WhenReaderCreationThrows_ClosesLogAndClearsStatus()
+    {
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(new ThrowingReaderFactory());
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Any<ClearStatusAction>());
+        dispatcher.Received().Dispatch(Arg.Any<CloseLogAction>());
+        dispatcher.Received().Dispatch(Arg.Is<SetResolverStatusAction>(action => action != null && action.ResolverStatus.Contains("Error")));
     }
 
     [Fact]
@@ -1970,5 +2014,11 @@ public sealed class EffectsTests
 
             return reader;
         }
+    }
+
+    private sealed class ThrowingReaderFactory : IEventLogReaderFactory
+    {
+        public IEventLogReader CreateReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false) =>
+            throw new InvalidOperationException("Simulated reader creation failure.");
     }
 }

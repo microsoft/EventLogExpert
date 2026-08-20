@@ -34,6 +34,12 @@
     white-space: nowrap;
 }
 
+.status-bar-resolver {
+    max-width: 32ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .status-bar-sep {
     opacity: 0.5;
 }

@@ -147,7 +147,7 @@ internal sealed class OpenLogEffects(
         {
             _logger.Warning($"Open '{action.LogName}' aborted: log not found in OpenLogs (no prior AddLog dispatch).");
 
-            dispatcher.Dispatch(new SetResolverStatusAction($"Error: Failed to open {action.LogName}"));
+            dispatcher.Dispatch(new SetResolverStatusAction($"Error: Failed to open {DescribeLog(action)}"));
 
             return;
         }
@@ -240,6 +240,11 @@ internal sealed class OpenLogEffects(
         }
     }
 
+    private static string DescribeLog(OpenLogAction action) =>
+        action.LogPathType == LogPathType.File ?
+            $"{Path.GetFileName(action.LogName)} ({action.LogName})" :
+            action.LogName;
+
     private void CancelAllLoads()
     {
         CancellationTokenSource oldGlobalCts;
@@ -326,216 +331,219 @@ internal sealed class OpenLogEffects(
 
         var partialDispatchGate = new object();
 
-        await using var timer = new Timer(
-            _ =>
-            {
-                dispatcher.Dispatch(new SetEventsLoadingAction(activityId, Volatile.Read(ref resolved), Volatile.Read(ref failed)));
-
-                if (Interlocked.Increment(ref timerTick) <= 1) { return; }
-
-                TryDispatchPartial();
-            },
-            null,
-            TimeSpan.Zero,
-            s_partialDispatchInterval);
-
-        bool renderXml = _eventLogState.Value.AppliedFilter.RequiresXml;
-
-        using var reader = _readerFactory.CreateReader(action.LogName, action.LogPathType, renderXml, reverseDirection: true);
-
-        var producerTask = Task.Run(async () =>
-        {
-            long sequence = 0;
-
-            try
-            {
-                while (reader.TryGetEvents(out EventRecord[] batch, ReadBatchSize))
-                {
-                    token.ThrowIfCancellationRequested();
-
-                    if (batch.Length == 0) { continue; }
-
-                    await channel.Writer.WriteAsync((sequence++, batch), token);
-                }
-            }
-            catch (Exception ex)
-            {
-                channel.Writer.Complete(ex);
-
-                throw;
-            }
-
-            channel.Writer.Complete();
-        }, token);
-
         try
         {
-            if (!reader.IsValid)
+            dispatcher.Dispatch(new SetEventsLoadingAction(activityId, 0, 0));
+
+            bool renderXml = _eventLogState.Value.AppliedFilter.RequiresXml;
+
+            using var reader = TryCreateReader(action, logData, renderXml, dispatcher, stopwatch);
+
+            if (reader is null) { return; }
+
+            var producerTask = Task.Run(async () =>
             {
-                int openError = reader.OpenErrorCode ?? 0;
+                long sequence = 0;
 
-                throw new Win32Exception(openError, $"Opening '{action.LogName}' failed (Win32 {openError}: {Marshal.GetPInvokeErrorMessage(openError)}).");
-            }
-
-            await Parallel.ForEachAsync(
-                channel.Reader.ReadAllAsync(token),
-                new ParallelOptions
+                try
                 {
-                    CancellationToken = token,
-                    MaxDegreeOfParallelism = s_maxGlobalConcurrency
-                },
-                async (item, innerToken) =>
-                {
-                    EventRecord[] batch = item.Batch;
-
-                    var priority = Volatile.Read(ref highAdmitted) < EagerFirstPaintThreshold ?
-                        ResolutionPriority.FirstScreenful :
-                        ResolutionPriority.Bulk;
-
-                    if (priority == ResolutionPriority.FirstScreenful)
+                    while (reader.TryGetEvents(out EventRecord[] batch, ReadBatchSize))
                     {
-                        Interlocked.Add(ref highAdmitted, batch.Length);
+                        token.ThrowIfCancellationRequested();
+
+                        if (batch.Length == 0) { continue; }
+
+                        await channel.Writer.WriteAsync((sequence++, batch), token);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    channel.Writer.Complete(ex);
+
+                    throw;
+                }
+
+                channel.Writer.Complete();
+            }, token);
+
+            await using (var timer = new Timer(
+                    _ =>
+                    {
+                        dispatcher.Dispatch(new SetEventsLoadingAction(activityId, Volatile.Read(ref resolved), Volatile.Read(ref failed)));
+
+                        if (Interlocked.Increment(ref timerTick) <= 1) { return; }
+
+                        TryDispatchPartial();
+                    },
+                    null,
+                    TimeSpan.Zero,
+                    s_partialDispatchInterval))
+            {
+                try
+                {
+                    if (!reader.IsValid)
+                    {
+                        int openError = reader.OpenErrorCode ?? 0;
+
+                        throw new Win32Exception(openError, $"Opening '{action.LogName}' failed (Win32 {openError}: {Marshal.GetPInvokeErrorMessage(openError)}).");
                     }
 
-                    await s_resolutionGate.WaitAsync(priority, innerToken);
-
-                    try
-                    {
-                        List<ResolvedEvent> localBatch = new(batch.Length);
-                        int localResolved = 0;
-
-                        foreach (var @event in batch)
+                    await Parallel.ForEachAsync(
+                        channel.Reader.ReadAllAsync(token),
+                        new ParallelOptions
                         {
-                            innerToken.ThrowIfCancellationRequested();
+                            CancellationToken = token,
+                            MaxDegreeOfParallelism = s_maxGlobalConcurrency
+                        },
+                        async (item, innerToken) =>
+                        {
+                            EventRecord[] batch = item.Batch;
+
+                            var priority = Volatile.Read(ref highAdmitted) < EagerFirstPaintThreshold ?
+                                ResolutionPriority.FirstScreenful :
+                                ResolutionPriority.Bulk;
+
+                            if (priority == ResolutionPriority.FirstScreenful)
+                            {
+                                Interlocked.Add(ref highAdmitted, batch.Length);
+                            }
+
+                            await s_resolutionGate.WaitAsync(priority, innerToken);
 
                             try
                             {
-                                if (!@event.IsSuccess)
+                                List<ResolvedEvent> localBatch = new(batch.Length);
+                                int localResolved = 0;
+
+                                foreach (var @event in batch)
                                 {
-                                    Interlocked.Increment(ref failed);
+                                    innerToken.ThrowIfCancellationRequested();
 
-                                    _logger.Warning($"{@event.PathName}: Bad Event: {@event.Error}");
+                                    try
+                                    {
+                                        if (!@event.IsSuccess)
+                                        {
+                                            Interlocked.Increment(ref failed);
 
-                                    continue;
+                                            _logger.Warning($"{@event.PathName}: Bad Event: {@event.Error}");
+
+                                            continue;
+                                        }
+
+                                        localBatch.Add(eventResolver.ResolveEvent(@event));
+                                        localResolved++;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        _logger.Warning($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}");
+                                    }
                                 }
 
-                                localBatch.Add(eventResolver.ResolveEvent(@event));
-                                localResolved++;
+                                bool dispatchEager = false;
+
+                                lock (events)
+                                {
+                                    resolvedBySeq[item.Seq] = localBatch;
+
+                                    while (resolvedBySeq.Remove(nextDrainSeq, out var ready))
+                                    {
+                                        events.AddRange(ready);
+                                        nextDrainSeq++;
+                                    }
+
+                                    if (events.Count >= EagerFirstPaintThreshold && Interlocked.Exchange(ref eagerFired, 1) == 0)
+                                    {
+                                        dispatchEager = true;
+                                    }
+                                }
+
+                                Interlocked.Add(ref resolved, localResolved);
+
+                                if (dispatchEager) { TryDispatchPartial(); }
                             }
-                            catch (Exception ex)
+                            finally
                             {
-                                _logger.Warning($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}");
+                                s_resolutionGate.Release();
                             }
-                        }
+                        });
 
-                        bool dispatchEager = false;
+                    await producerTask;
 
-                        lock (events)
-                        {
-                            resolvedBySeq[item.Seq] = localBatch;
+                    lastEvent = reader.NewestBookmark;
 
-                            while (resolvedBySeq.Remove(nextDrainSeq, out var ready))
-                            {
-                                events.AddRange(ready);
-                                nextDrainSeq++;
-                            }
-
-                            if (events.Count >= EagerFirstPaintThreshold && Interlocked.Exchange(ref eagerFired, 1) == 0)
-                            {
-                                dispatchEager = true;
-                            }
-                        }
-
-                        Interlocked.Add(ref resolved, localResolved);
-
-                        if (dispatchEager) { TryDispatchPartial(); }
-                    }
-                    finally
+                    if (reader.LastErrorCode is { } readErrorCode)
                     {
-                        s_resolutionGate.Release();
+                        throw new Win32Exception(readErrorCode, $"Reading '{action.LogName}' stopped (Win32 {readErrorCode}: {Marshal.GetPInvokeErrorMessage(readErrorCode)}).");
                     }
-                });
+                }
+                catch (OperationCanceledException)
+                {
+                    await EventLogEffectsUtility.StopProducerAsync(producerTask);
 
-            await producerTask;
+                    _closeCoordinator.ClearPendingRestore(logData.Name);
 
-            lastEvent = reader.NewestBookmark;
+                    _logger.Trace($"Open '{action.LogName}': canceled after {stopwatch.ElapsedMilliseconds}ms ({Volatile.Read(ref resolved)} resolved, {Volatile.Read(ref failed)} failed).");
 
-            if (reader.LastErrorCode is { } readErrorCode)
-            {
-                throw new Win32Exception(readErrorCode, $"Reading '{action.LogName}' stopped (Win32 {readErrorCode}: {Marshal.GetPInvokeErrorMessage(readErrorCode)}).");
+                    if (_eventLogState.Value.OpenLogs.TryGetValue(logData.Name, out var currentLog)
+                        && currentLog.Id == logData.Id)
+                    {
+                        dispatcher.Dispatch(new CloseLogAction(logData.Id, logData.Name));
+                    }
+
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Failed to load log {action.LogName} after {stopwatch.ElapsedMilliseconds}ms: {ex.Message}");
+
+                    await EventLogEffectsUtility.StopProducerAsync(producerTask);
+
+                    _closeCoordinator.ClearPendingRestore(logData.Name);
+
+                    if (_eventLogState.Value.OpenLogs.TryGetValue(logData.Name, out var currentLog)
+                        && currentLog.Id == logData.Id)
+                    {
+                        dispatcher.Dispatch(new CloseLogAction(logData.Id, logData.Name));
+                    }
+
+                    dispatcher.Dispatch(new SetResolverStatusAction($"Error: Failed to load {DescribeLog(action)}"));
+
+                    return;
+                }
             }
+
+            token.ThrowIfCancellationRequested();
+
+            if (!_eventLogState.Value.OpenLogs.TryGetValue(logData.Name, out var activeLog) ||
+                activeLog.Id != logData.Id)
+            {
+                _logger.Trace($"Open '{action.LogName}': log was closed or replaced after producer completed; discarding {events.Count} resolved events after {stopwatch.ElapsedMilliseconds}ms.");
+
+                _closeCoordinator.ClearPendingRestore(logData.Name);
+
+                return;
+            }
+
+            if (renderXml)
+            {
+                _concurrencyState.MarkLoadedWithXml(logData.Id);
+            }
+
+            dispatcher.Dispatch(new LoadEventsAction(logData, events.AsReadOnly()));
+
+            if (action.LogPathType == LogPathType.Channel)
+            {
+                _logWatcherService.AddLog(action.LogName, lastEvent, renderXml);
+            }
+
+            dispatcher.Dispatch(new SetResolverStatusAction(string.Empty));
+
+            _logger.Debug($"Loaded '{action.LogName}': {events.Count} events ({failed} failed) in {stopwatch.ElapsedMilliseconds}ms.");
         }
-        catch (OperationCanceledException)
+        finally
         {
-            await EventLogEffectsUtility.StopProducerAsync(producerTask);
-
-            _closeCoordinator.ClearPendingRestore(logData.Name);
-
-            _logger.Trace($"Open '{action.LogName}': canceled after {stopwatch.ElapsedMilliseconds}ms ({Volatile.Read(ref resolved)} resolved, {Volatile.Read(ref failed)} failed).");
-
-            if (_eventLogState.Value.OpenLogs.TryGetValue(logData.Name, out var currentLog)
-                && currentLog.Id == logData.Id)
-            {
-                dispatcher.Dispatch(new CloseLogAction(logData.Id, logData.Name));
-            }
-
             dispatcher.Dispatch(new ClearStatusAction(activityId));
-
-            return;
         }
-        catch (Exception ex)
-        {
-            _logger.Error($"Failed to load log {action.LogName} after {stopwatch.ElapsedMilliseconds}ms: {ex.Message}");
-
-            await EventLogEffectsUtility.StopProducerAsync(producerTask);
-
-            _closeCoordinator.ClearPendingRestore(logData.Name);
-
-            if (_eventLogState.Value.OpenLogs.TryGetValue(logData.Name, out var currentLog)
-                && currentLog.Id == logData.Id)
-            {
-                dispatcher.Dispatch(new CloseLogAction(logData.Id, logData.Name));
-            }
-
-            dispatcher.Dispatch(new ClearStatusAction(activityId));
-            dispatcher.Dispatch(new SetResolverStatusAction($"Error: Failed to load {action.LogName}"));
-
-            return;
-        }
-
-        await timer.DisposeAsync();
-
-        token.ThrowIfCancellationRequested();
-
-        if (!_eventLogState.Value.OpenLogs.TryGetValue(logData.Name, out var activeLog)
-            || activeLog.Id != logData.Id)
-        {
-            _logger.Trace($"Open '{action.LogName}': log was closed or replaced after producer completed; discarding {events.Count} resolved events after {stopwatch.ElapsedMilliseconds}ms.");
-
-            _closeCoordinator.ClearPendingRestore(logData.Name);
-
-            return;
-        }
-
-        if (renderXml)
-        {
-            _concurrencyState.MarkLoadedWithXml(logData.Id);
-        }
-
-        dispatcher.Dispatch(new LoadEventsAction(logData, events.AsReadOnly()));
-
-        dispatcher.Dispatch(new SetEventsLoadingAction(activityId, 0, 0));
-
-        if (action.LogPathType == LogPathType.Channel)
-        {
-            _logWatcherService.AddLog(action.LogName, lastEvent, renderXml);
-        }
-
-        dispatcher.Dispatch(new SetResolverStatusAction(string.Empty));
-
-        _logger.Debug($"Loaded '{action.LogName}': {events.Count} events ({failed} failed) in {stopwatch.ElapsedMilliseconds}ms.");
-
-        return;
 
         void TryDispatchPartial()
         {
@@ -555,6 +563,35 @@ internal sealed class OpenLogEffects(
 
                 dispatcher.Dispatch(new LoadEventsPartialAction(logData, delta.AsReadOnly()));
             }
+        }
+    }
+
+    private IEventLogReader? TryCreateReader(
+        OpenLogAction action,
+        EventLogData logData,
+        bool renderXml,
+        IDispatcher dispatcher,
+        Stopwatch stopwatch)
+    {
+        try
+        {
+            return _readerFactory.CreateReader(action.LogName, action.LogPathType, renderXml, reverseDirection: true);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to create reader for {action.LogName} after {stopwatch.ElapsedMilliseconds}ms: {ex.Message}");
+
+            _closeCoordinator.ClearPendingRestore(logData.Name);
+
+            if (_eventLogState.Value.OpenLogs.TryGetValue(logData.Name, out var currentLog) &&
+                currentLog.Id == logData.Id)
+            {
+                dispatcher.Dispatch(new CloseLogAction(logData.Id, logData.Name));
+            }
+
+            dispatcher.Dispatch(new SetResolverStatusAction($"Error: Failed to load {DescribeLog(action)}"));
+
+            return null;
         }
     }
 }
