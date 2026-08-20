@@ -15,6 +15,8 @@ public sealed partial class StatusBar
 {
     private DisplayIndicatorState _indicatorState = null!;
 
+    [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
+
     [Inject] private IFilterAppliedSource FilterApplied { get; init; } = null!;
 
     [Inject] private DisplayIndicatorGate IndicatorGate { get; init; } = null!;
@@ -50,6 +52,8 @@ public sealed partial class StatusBar
 
         base.OnInitialized();
     }
+
+    private void LoadNewEvents() => EventLogCommands.LoadNewEvents();
 
     private void OpenCoverage() => _ = ModalCoordinator.OpenResolutionCoverageAsync();
 

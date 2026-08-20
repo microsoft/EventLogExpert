@@ -44,14 +44,14 @@ The submenu always lists `Application`, `System`, and `Security`. Below them, an
 Two `View` menu items only matter while a live log is open:
 
 - **`Continuously Update`** is a toggle. When `on`, new events stream into the table as they arrive. When `off`, new events accumulate in a buffer and the table view stays put.
-- **`Load New Events`** drains the buffer into the table once. Useful when `Continuously Update` is off but you want to catch up to "now" before going back to a static view.
+- **`Load New Events`** drains the buffer into the table once. Useful when `Continuously Update` is off but you want to catch up to "now" before going back to a static view. You can also click the `New Events: {n}` status-bar indicator to do the same.
 
 The status bar surfaces both:
 
 | Status bar token | Condition |
 | --- | --- |
 | `Continuously Updating` | At least one live log is open and `Continuously Update` is on. |
-| `New Events: {n}` | At least one live log is open and `Continuously Update` is off; `{n}` is the buffer size. |
+| `New Events: {n}` | At least one live log is open and `Continuously Update` is off; `{n}` is the buffer size. Click it to load the buffered events. |
 | `Buffer Full` | The new-event buffer reached its cap. Live watchers are stopped while this is set, so no further events arrive until either `Load New Events` drains the buffer or `Continuously Update` is turned on (both clear the buffer and restart the watchers). |
 
 ### Close All
