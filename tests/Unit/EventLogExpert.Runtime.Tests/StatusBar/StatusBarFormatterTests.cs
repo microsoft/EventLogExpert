@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.StatusBar;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.Tests.StatusBar;
 
@@ -94,6 +95,63 @@ public sealed class StatusBarFormatterTests
         Assert.Equal($"{1234:N0} events", StatusBarFormatter.FormatCounts(1234, 1234, isFiltered: false, selectedCount: 0));
 
     [Fact]
+    public void FormatLoading_ManyActivities_GroupsLogCountAndSumsFailedEvents()
+    {
+        var progresses = Enumerable.Range(0, 1500)
+            .Select(_ => new LoadingProgress(10, 1))
+            .ToArray();
+
+        var summary = StatusBarFormatter.FormatLoading(Loading(progresses));
+
+        Assert.NotNull(summary);
+        Assert.Equal($"Loading {1500:N0} logs...", summary.Value.Text);
+        Assert.Equal(1500, summary.Value.FailedEvents);
+    }
+
+    [Fact]
+    public void FormatLoading_NoActivities_ReturnsNull() =>
+        Assert.Null(StatusBarFormatter.FormatLoading(Loading()));
+
+    [Fact]
+    public void FormatLoading_SingleActivityAtZero_ShowsPendingText()
+    {
+        var summary = StatusBarFormatter.FormatLoading(Loading(new LoadingProgress(0, 0)));
+
+        Assert.NotNull(summary);
+        Assert.Equal("Loading...", summary.Value.Text);
+        Assert.Equal(0, summary.Value.FailedEvents);
+    }
+
+    [Fact]
+    public void FormatLoading_SingleActivityWithProgress_GroupsTheLoadedCount()
+    {
+        var summary = StatusBarFormatter.FormatLoading(Loading(new LoadingProgress(12_345, 0)));
+
+        Assert.NotNull(summary);
+        Assert.Equal($"Loading: {12345:N0}", summary.Value.Text);
+    }
+
+    [Fact]
+    public void FormatLoading_SingleFailedOnlyActivity_StaysPendingAndReportsFailures()
+    {
+        var summary = StatusBarFormatter.FormatLoading(Loading(new LoadingProgress(0, 3)));
+
+        Assert.NotNull(summary);
+        Assert.Equal("Loading...", summary.Value.Text);
+        Assert.Equal(3, summary.Value.FailedEvents);
+    }
+
+    [Fact]
+    public void FormatLoading_TwoActivities_SwitchesToLogCount()
+    {
+        var summary = StatusBarFormatter.FormatLoading(
+            Loading(new LoadingProgress(100, 0), new LoadingProgress(50, 0)));
+
+        Assert.NotNull(summary);
+        Assert.Equal("Loading 2 logs...", summary.Value.Text);
+    }
+
+    [Fact]
     public void FormatSource_AllLogs_CountsOnlyStandaloneTabs()
     {
         var allLogs = Combined(LogTabGroupId.AllLogs);
@@ -142,4 +200,16 @@ public sealed class StatusBarFormatterTests
 
     private static LogView File(string path) =>
         new(EventLogId.Create()) { FileName = path, LogPathType = LogPathType.File };
+
+    private static ImmutableDictionary<StatusActivityId, LoadingProgress> Loading(params LoadingProgress[] progresses)
+    {
+        var builder = ImmutableDictionary.CreateBuilder<StatusActivityId, LoadingProgress>();
+
+        foreach (var progress in progresses)
+        {
+            builder.Add(StatusActivityId.Create(), progress);
+        }
+
+        return builder.ToImmutable();
+    }
 }

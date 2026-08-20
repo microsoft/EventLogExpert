@@ -227,6 +227,45 @@ public sealed class StatusBarTests : BunitContext
     }
 
     [Fact]
+    public void MultipleLoadingActivities_RenderAsASingleAggregateChip()
+    {
+        _status = new StatusBarPresentation
+        {
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(new StatusActivityId(Guid.NewGuid()), new LoadingProgress(100, 0))
+                .Add(new StatusActivityId(Guid.NewGuid()), new LoadingProgress(50, 2))
+        };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Contains("Loading 2 logs...", cut.Markup);
+        Assert.DoesNotContain("Loading: 100", cut.Markup);
+        Assert.DoesNotContain("Loading: 50", cut.Markup);
+        Assert.Contains("Failed: 2", cut.Markup);
+    }
+
+    [Fact]
+    public void NewEventsCounter_StaysVisibleWhileAnotherLogLoads()
+    {
+        var id = EventLogId.Create();
+        var channel = new LogView(id) { LogName = "Application", LogPathType = LogPathType.Channel };
+        _status = new StatusBarPresentation
+        {
+            Tabs = ImmutableList.Create(channel),
+            ActiveTabId = id,
+            RawEventCountsByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(id, default),
+            NewEventBufferCount = 42,
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(new StatusActivityId(Guid.NewGuid()), new LoadingProgress(500, 0))
+        };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Contains("Loading: 500", cut.Markup);
+        Assert.Contains("New Events: 42", cut.Markup);
+    }
+
+    [Fact]
     public void NoActiveLog_ShowsNoLogOpen_AndNoCounts()
     {
         var cut = Render<UI.StatusBar.StatusBar>();
@@ -270,6 +309,17 @@ public sealed class StatusBarTests : BunitContext
     }
 
     [Fact]
+    public void ResolverError_RendersInATruncatingSpanWithFullTitle()
+    {
+        _status = new StatusBarPresentation { ResolverStatus = "Error: Failed to load Security.evtx" };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        var resolver = cut.Find(".status-bar-resolver");
+        Assert.Equal("Error: Failed to load Security.evtx", resolver.GetAttribute("title"));
+    }
+
+    [Fact]
     public void Root_HasNoLiveRegion_ButAnnounceRegionIsPoliteStatus()
     {
         SetActiveLog(total: 500, shown: 500, filter: Unfiltered, selected: 0);
@@ -283,6 +333,35 @@ public sealed class StatusBarTests : BunitContext
         var announce = cut.Find(".status-bar-announce");
         Assert.Equal("status", announce.GetAttribute("role"));
         Assert.Equal("polite", announce.GetAttribute("aria-live"));
+    }
+
+    [Fact]
+    public void SingleLoadingActivityAtZero_RendersPendingTextNotZero()
+    {
+        _status = new StatusBarPresentation
+        {
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(new StatusActivityId(Guid.NewGuid()), new LoadingProgress(0, 0))
+        };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Contains("Loading...", cut.Markup);
+        Assert.DoesNotContain("Loading: 0", cut.Markup);
+    }
+
+    [Fact]
+    public void SingleLoadingActivity_GroupsLargeFailedCount()
+    {
+        _status = new StatusBarPresentation
+        {
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(new StatusActivityId(Guid.NewGuid()), new LoadingProgress(5000, 1500))
+        };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Contains($"Failed: {1500:N0}", cut.Markup);
     }
 
     [Fact]

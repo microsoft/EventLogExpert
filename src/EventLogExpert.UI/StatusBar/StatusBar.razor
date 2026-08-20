@@ -10,6 +10,8 @@
     var isFiltered = FilterApplied.IsFilteringEnabled;
     var isLoading = !status.LoadingActivities.IsEmpty;
 
+    var loadingSummary = StatusBarFormatter.FormatLoading(status.LoadingActivities);
+
     var source = StatusBarFormatter.FormatSource(activeTable, status.Tabs, status.Groups);
     var filterTooltip = StatusBarFormatter.FilterIndicatorTooltip(status.IsPersistentFilterActive, LensSource.Lenses.Count);
 
@@ -68,13 +70,13 @@
     <div class="status-bar-right">
         <span aria-atomic="true" aria-live="polite" class="status-bar-announce" role="status">@announcement</span>
 
-        @foreach (var loadingProgress in status.LoadingActivities)
+        @if (loadingSummary is { } loading)
         {
-            <span class="status-bar-activity">Loading: @loadingProgress.Value.Loaded</span>
+            <span class="status-bar-activity">@loading.Text</span>
 
-            @if (loadingProgress.Value.Failed > 0)
+            @if (loading.FailedEvents > 0)
             {
-                <span class="status-bar-activity status-bar-warn">Failed: @loadingProgress.Value.Failed</span>
+                <span class="status-bar-activity status-bar-warn">Failed: @(loading.FailedEvents.ToString("N0"))</span>
             }
         }
 
@@ -97,7 +99,7 @@
 
         @if (!string.IsNullOrEmpty(status.ResolverStatus))
         {
-            <span class="status-bar-activity">@status.ResolverStatus</span>
+            <span class="status-bar-activity status-bar-resolver" title="@status.ResolverStatus">@status.ResolverStatus</span>
         }
     </div>
 </div>
