@@ -146,6 +146,14 @@ public interface IEventColumnView
 
     void CountFieldValues(EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken);
 
+    void CountResolutionBySource(IDictionary<string, ProviderResolutionCounts> counts, CancellationToken cancellationToken);
+
+    void CountResolutionDetailForSource(
+        string source,
+        IDictionary<int, ProviderResolutionCounts> byId,
+        ProviderResolutionCounts[] byLevelSlot,
+        CancellationToken cancellationToken);
+
     void CountSeverity(int[] slotCounts, CancellationToken cancellationToken);
 
     byte[] EnsureHighlightWinners(

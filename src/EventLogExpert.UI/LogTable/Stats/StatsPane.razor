@@ -5,6 +5,13 @@
     <div class="stats-header">
         <span class="stats-title">Statistics</span>
         <span class="stats-headline@(IsSeverityStale ? " stats-stale" : "")">@HeadlineText()</span>
+        <button aria-label="Open Resolution and Coverage"
+            class="stats-coverage-link"
+            @onclick="OpenCoverage"
+            title="Show unresolved events and provider coverage"
+            type="button">
+            Resolution &amp; Coverage
+        </button>
     </div>
 
     @if (_scanFailed)

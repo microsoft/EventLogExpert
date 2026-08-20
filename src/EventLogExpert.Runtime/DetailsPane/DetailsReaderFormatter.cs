@@ -181,6 +181,12 @@ public static class DetailsReaderFormatter
 
         AddIfPresent(properties, "Task Category", @event.TaskCategory);
         AddIfPresent(properties, "Opcode", @event.Opcode);
+
+        if (@event.ResolutionStatus != EventResolutionStatus.Resolved)
+        {
+            properties.Add(new DetailsProperty("Resolution Status", ResolutionStatusTokens.Format(@event.ResolutionStatus)));
+        }
+
         AddIfPresent(properties, "Keywords", @event.KeywordsDisplayName);
 
         if (@event.RecordId is { } recordId) { properties.Add(new DetailsProperty("Record ID", recordId.ToString(CultureInfo.InvariantCulture))); }

@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
@@ -38,7 +39,7 @@ internal sealed partial class DescriptionFormatter(
     private readonly Func<EventRecord, ProviderDetails?> _supplementalProvider = supplementalProvider;
     private readonly TemplateAnalyzer _templates = templates;
 
-    public string Resolve(
+    public ResolvedDescription Resolve(
         EventRecord eventRecord,
         ProviderDetails? primaryDetails,
         ProviderDetails? descriptionDetails,
@@ -51,7 +52,7 @@ internal sealed partial class DescriptionFormatter(
         {
             _logger?.Debug($"{nameof(Resolve)}: No provider details available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, RecordId={eventRecord.RecordId}");
 
-            return DefaultNoProviderDescription;
+            return new(DefaultNoProviderDescription, EventResolutionStatus.NoProvider);
         }
 
         var properties = GetFormattedProperties(primaryInfo?.Metadata ?? default, eventRecord.Properties, descriptionDetails.Maps);
@@ -125,19 +126,26 @@ internal sealed partial class DescriptionFormatter(
         {
             _logger?.Debug($"{nameof(Resolve)}: Using single-property description fallback - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
 
-            return FormatDescription(properties, null, null);
+            var singleProperty = FormatDescription(properties, null, null);
+
+            return singleProperty with
+            {
+                Status = descriptionDetails.IsEmpty && (supplemental is null || supplemental.IsEmpty) ?
+                    EventResolutionStatus.NoProvider :
+                    EventResolutionStatus.NoMessage
+            };
         }
 
         if (descriptionDetails.IsEmpty && (supplemental is null || supplemental.IsEmpty))
         {
             _logger?.Debug($"{nameof(Resolve)}: No provider metadata available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}, Keywords=0x{eventRecord.Keywords ?? 0:X16}");
 
-            return BuildNoMetadataFallbackDescription(eventRecord, properties);
+            return new(BuildNoMetadataFallbackDescription(eventRecord, properties), EventResolutionStatus.NoProvider);
         }
 
         _logger?.Debug($"{nameof(Resolve)}: No matching description found - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}");
 
-        return DefaultNoMatchingDescription;
+        return new(DefaultNoMatchingDescription, EventResolutionStatus.NoMessage);
     }
 
     private static string? BuildEventDataTail(List<string> properties)
@@ -406,7 +414,7 @@ internal sealed partial class DescriptionFormatter(
         return _cache?.GetOrAddDescription(systemMessage!) ?? systemMessage!;
     }
 
-    private string FormatDescription(
+    private ResolvedDescription FormatDescription(
         List<string> properties,
         string? descriptionTemplate,
         ProviderDetails? parameterSource)
@@ -416,18 +424,20 @@ internal sealed partial class DescriptionFormatter(
         if (string.IsNullOrWhiteSpace(descriptionTemplate))
         {
             // Single-property empty-template events can be literal descriptions; multi-property cases are not renderable.
-            return properties.Count == 1
-                ? properties[0].TrimEnd('\0', '\r', '\n')
-                : DefaultNoMatchingDescription;
+            string fallbackText = properties.Count == 1 ?
+                properties[0].TrimEnd('\0', '\r', '\n') :
+                DefaultNoMatchingDescription;
+
+            return new(fallbackText, EventResolutionStatus.NoMessage);
         }
 
         const int MaxStackAllocChars = 4096;
         int cleanupBufferSize = descriptionTemplate.Length * 2;
         char[]? cleanupRented = null;
 
-        Span<char> description = cleanupBufferSize <= MaxStackAllocChars
-            ? stackalloc char[cleanupBufferSize]
-            : (cleanupRented = ArrayPool<char>.Shared.Rent(cleanupBufferSize));
+        Span<char> description = cleanupBufferSize <= MaxStackAllocChars ?
+            stackalloc char[cleanupBufferSize] :
+            (cleanupRented = ArrayPool<char>.Shared.Rent(cleanupBufferSize));
 
         CleanupFormatting(descriptionTemplate, ref description, out int length);
 
@@ -439,7 +449,7 @@ internal sealed partial class DescriptionFormatter(
 
             if (cleanupRented is not null) { ArrayPool<char>.Shared.Return(cleanupRented); }
 
-            return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
+            return new(_cache?.GetOrAddDescription(returnDescription) ?? returnDescription, EventResolutionStatus.Resolved);
         }
 
         char[] buffer = ArrayPool<char>.Shared.Rent(description.Length * 2);
@@ -547,7 +557,7 @@ internal sealed partial class DescriptionFormatter(
             returnDescription = new string(updatedDescription[..currentLength]);
 
             // Intern repeated formatted descriptions; the bounded cache prevents high-cardinality growth.
-            return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
+            return new(_cache?.GetOrAddDescription(returnDescription) ?? returnDescription, EventResolutionStatus.Resolved);
         }
         catch (InvalidOperationException ex)
         {
@@ -555,13 +565,13 @@ internal sealed partial class DescriptionFormatter(
 
             returnDescription = description.ToString();
 
-            return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
+            return new(_cache?.GetOrAddDescription(returnDescription) ?? returnDescription, EventResolutionStatus.Resolved);
         }
         catch (Exception ex)
         {
             _logger?.Warning($"{nameof(FormatDescription)}: Unexpected exception - PropertyCount={properties.Count}, Template={descriptionTemplate}, Exception={ex}");
 
-            return DefaultFailedDescription;
+            return new(DefaultFailedDescription, EventResolutionStatus.Failed);
         }
         finally
         {

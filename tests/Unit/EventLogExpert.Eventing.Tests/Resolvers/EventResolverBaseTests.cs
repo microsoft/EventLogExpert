@@ -442,6 +442,25 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WhenModernEventResolves_ShouldReportResolvedStatus()
+    {
+        // Arrange
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "Service started: %1",
+            """<template><data name="Service" inType="win:UnicodeString"/></template>""",
+            ["TestService"]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Contains("TestService", displayEvent.Description);
+        Assert.Equal(EventResolutionStatus.Resolved, displayEvent.ResolutionStatus);
+    }
+
+    [Fact]
     public void ResolveEvent_WithAmbiguousPrimaryAndSupplementalDescription_ShouldUseSupplementalParameters()
     {
         // Arrange - regression: when the description is selected from supplemental, %%n
@@ -1090,6 +1109,61 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithEmptyPrimaryAndNonMatchingSupplemental_ShouldReportNoMessageStatus()
+    {
+        // Arrange - a supplemental source HAS metadata for the provider, just no match for THIS event id,
+        // so a provider is available (NoMessage) rather than absent (NoProvider).
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 100,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Some unrelated event: %1",
+                    Keywords = [],
+                    Template = "<template><data name=\"Val\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>"
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 9999,
+            Properties = ["a", "b", "c"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Contains("No matching message", displayEvent.Description);
+        Assert.Equal(EventResolutionStatus.NoMessage, displayEvent.ResolutionStatus);
+    }
+
+    [Fact]
     public void ResolveEvent_WithEmptyPrimaryAndNonMatchingSupplemental_ShouldReturnNoMatchingMessage()
     {
         // Arrange - primary provider returned an empty ProviderDetails (provider not installed
@@ -1264,6 +1338,38 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Equal(Constants.SupplementalTask, displayEvent.TaskCategory);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithEmptyProviderAndSingleProperty_ShouldReportNoProviderStatus()
+    {
+        // Arrange - a metadata-less provider with a single self-contained property still renders that
+        // property, but no template matched, so it is a NoProvider coverage gap.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            Properties = ["The entire description is this single string."]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal("The entire description is this single string.", displayEvent.Description);
+        Assert.Equal(EventResolutionStatus.NoProvider, displayEvent.ResolutionStatus);
     }
 
     [Fact]
@@ -2654,6 +2760,37 @@ public sealed class EventResolverBaseTests
         Assert.Contains("Admin", displayEvent.Description);
         Assert.Contains("Login", displayEvent.Description);
         Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithNoMetadataAndMultipleProperties_ShouldReportNoProviderStatus()
+    {
+        // Arrange
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 2000,
+            Properties = ["first", "second"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Contains("The following information was included with the event:", displayEvent.Description);
+        Assert.Equal(EventResolutionStatus.NoProvider, displayEvent.ResolutionStatus);
     }
 
     [Fact]

@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
-using System.Buffers;
 using System.Runtime.CompilerServices;
 
 namespace EventLogExpert.Runtime.Export;
@@ -11,8 +10,6 @@ namespace EventLogExpert.Runtime.Export;
 internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTableExporter
 {
     private const string ExportDateTimeFormat = "yyyy-MM-dd HH:mm:ss";
-
-    private static readonly SearchValues<char> s_formulaInjectionTriggers = SearchValues.Create("=+-@");
 
     public async Task ExportAsync(
         Stream destination,
@@ -49,22 +46,6 @@ internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTa
             .ConfigureAwait(false);
     }
 
-    private static string NeutralizeCsvFormula(string value)
-    {
-        if (value.Length == 0) { return value; }
-
-        if (value[0] is '\t' or '\r') { return "'" + value; }
-
-        foreach (char character in value)
-        {
-            if (char.IsWhiteSpace(character)) { continue; }
-
-            return s_formulaInjectionTriggers.Contains(character) ? "'" + value : value;
-        }
-
-        return value;
-    }
-
     private static async IAsyncEnumerable<IReadOnlyList<string?>> ProjectRows(
         IEventColumnView events,
         IReadOnlyList<ColumnName> columns,
@@ -87,14 +68,14 @@ internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTa
             for (int i = 0; i < columns.Count; i++)
             {
                 string cell = EventTableColumnFormatter.GetCellText(@event, columns[i], timeZone, ExportDateTimeFormat);
-                cells[i] = neutralizeCsvFormula ? NeutralizeCsvFormula(cell) : cell;
+                cells[i] = neutralizeCsvFormula ? TabularCellSanitizer.NeutralizeFormula(cell) : cell;
             }
 
             if (includeDescription)
             {
                 cells[columns.Count] =
                     neutralizeCsvFormula ?
-                        NeutralizeCsvFormula(@event.Description) :
+                        TabularCellSanitizer.NeutralizeFormula(@event.Description) :
                         @event.Description;
             }
 

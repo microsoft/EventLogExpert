@@ -168,6 +168,7 @@ public static class EventPropertyValuesCache
         EventProperty.Source or
         EventProperty.TaskCategory or
         EventProperty.Opcode or
+        EventProperty.ResolutionStatus or
         EventProperty.UserDisplayName or
         EventProperty.LogName;
 }

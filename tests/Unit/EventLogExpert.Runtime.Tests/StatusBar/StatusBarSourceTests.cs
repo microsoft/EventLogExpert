@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
@@ -27,7 +28,7 @@ public sealed class StatusBarSourceTests
         harness.Source.Changed += () => throw new InvalidOperationException("subscriber blew up");
         harness.Source.Changed += () => reachedSecond++;
 
-        harness.RawCount = new RawEventCountState { ByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(LogA, 5) };
+        harness.RawCount = new RawEventCountState { ByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(LogA, Counts(5)) };
         harness.RaiseRawCount();
 
         Assert.Equal(1, reachedSecond);
@@ -71,12 +72,12 @@ public sealed class StatusBarSourceTests
     public void Changed_DoesNotFire_WhenRawCountsByLogIsEquivalent()
     {
         var harness = new Harness();
-        harness.RawCount = new RawEventCountState { ByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(LogA, 5) };
+        harness.RawCount = new RawEventCountState { ByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(LogA, Counts(5)) };
         harness.RaiseRawCount();
         var raised = 0;
         harness.Source.Changed += () => raised++;
 
-        harness.RawCount = new RawEventCountState { ByLog = ImmutableDictionary.CreateRange([new KeyValuePair<EventLogId, int>(LogA, 5)]) };
+        harness.RawCount = new RawEventCountState { ByLog = ImmutableDictionary.CreateRange([new KeyValuePair<EventLogId, ProviderResolutionCounts>(LogA, Counts(5))]) };
         harness.RaiseRawCount();
 
         Assert.Equal(0, raised);
@@ -147,19 +148,41 @@ public sealed class StatusBarSourceTests
     public void Changed_Fires_WhenRawCountsRedistributeAtTheSameTotal()
     {
         var harness = new Harness();
-        harness.RawCount = new RawEventCountState { ByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(LogA, 5) };
+        harness.RawCount = new RawEventCountState { ByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(LogA, Counts(5)) };
         harness.RaiseRawCount();
         var raised = 0;
         harness.Source.Changed += () => raised++;
 
         harness.RawCount = new RawEventCountState
         {
-            ByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(LogA, 2).Add(LogB, 3)
+            ByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(LogA, Counts(2)).Add(LogB, Counts(3))
         };
         harness.RaiseRawCount();
 
         Assert.Equal(1, raised);
         Assert.Equal(5, harness.Source.Current.RawEventTotal);
+    }
+
+    [Fact]
+    public void Changed_Fires_WhenResolutionStatusChangesAtSameTotal()
+    {
+        var harness = new Harness();
+        harness.RawCount = new RawEventCountState
+        {
+            ByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(LogA, new ProviderResolutionCounts(5, 5, 0, 0, 0))
+        };
+        harness.RaiseRawCount();
+        var raised = 0;
+        harness.Source.Changed += () => raised++;
+
+        // Same total (5), different resolution breakdown - full-struct facet equality must still detect the change.
+        harness.RawCount = new RawEventCountState
+        {
+            ByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(LogA, new ProviderResolutionCounts(5, 3, 2, 0, 0))
+        };
+        harness.RaiseRawCount();
+
+        Assert.Equal(1, raised);
     }
 
     [Fact]
@@ -179,7 +202,7 @@ public sealed class StatusBarSourceTests
     [Fact]
     public void Construction_ReconcilesARawCountChangeBetweenSeedAndSubscribe_SoALaterUnchangedNotificationDoesNotRaise()
     {
-        var populated = new RawEventCountState { ByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(LogA, 7) };
+        var populated = new RawEventCountState { ByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(LogA, Counts(7)) };
         var rawCount = Substitute.For<IState<RawEventCountState>>();
         rawCount.Value.Returns(new RawEventCountState(), populated);
         using var source = NewSource(rawCount: rawCount);
@@ -215,7 +238,7 @@ public sealed class StatusBarSourceTests
 
         harness.EventLog = harness.EventLog with { ContinuouslyUpdate = true };
         harness.FilterPane = harness.FilterPane with { FilteredDateRange = new DateFilter { IsEnabled = true } };
-        harness.RawCount = new RawEventCountState { ByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(LogA, 9) };
+        harness.RawCount = new RawEventCountState { ByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(LogA, Counts(9)) };
         harness.LogTable = harness.LogTable with { ActiveEventLogId = LogA };
 
         var current = harness.Source.Current;
@@ -272,6 +295,8 @@ public sealed class StatusBarSourceTests
 
         Assert.Equal(0, raised);
     }
+
+    private static ProviderResolutionCounts Counts(int total) => new(total, total, 0, 0, 0);
 
     private static StatusBarSource NewSource(
         IState<EventLogState>? eventLog = null,

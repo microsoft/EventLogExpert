@@ -384,6 +384,22 @@ internal sealed class AosReferenceCombinedView : IEventColumnView
         }
     }
 
+    public void CountResolutionBySource(IDictionary<string, ProviderResolutionCounts> counts, CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.CountResolutionBySource(counts, cancellationToken);
+        }
+    }
+
+    public void CountResolutionDetailForSource(string source, IDictionary<int, ProviderResolutionCounts> byId, ProviderResolutionCounts[] byLevelSlot, CancellationToken cancellationToken)
+    {
+        foreach (var view in _views)
+        {
+            view.CountResolutionDetailForSource(source, byId, byLevelSlot, cancellationToken);
+        }
+    }
+
     public void CountSeverity(int[] slotCounts, CancellationToken cancellationToken)
     {
         foreach (var view in _views)

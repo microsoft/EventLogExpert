@@ -87,6 +87,16 @@
     --z-error-ui: 40;
     --z-menu-overlay: 60;
     --z-submenu: 80;
+
+    /* Typography scale. Use these tokens for text font-size; do not hardcode
+       px/em/rem for text (em is reserved for glyphs that track their own
+       label). Root is 10pt, so 1rem = 13.3px; xs/md/lg land on whole pixels. */
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.85rem;
+    --font-size-md: 0.9rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.2rem;
+    --font-size-xl: 1.4rem;
 }
 
 /* Explicit user choice overrides the OS preference. Setting color-scheme to a

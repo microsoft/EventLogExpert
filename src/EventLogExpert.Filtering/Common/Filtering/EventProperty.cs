@@ -23,5 +23,6 @@ public enum EventProperty
     [EnumMember(Value = "User Data")] UserData,
     Opcode,
     [EnumMember(Value = "Related Activity ID")] RelatedActivityId,
-    [EnumMember(Value = "User")] UserDisplayName
+    [EnumMember(Value = "User")] UserDisplayName,
+    [EnumMember(Value = "Resolution Status")] ResolutionStatus
 }

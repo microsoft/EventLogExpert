@@ -38,5 +38,6 @@ public static class FilterPropertyConstraints
             or EventProperty.TaskCategory
             or EventProperty.UserId
             or EventProperty.UserDisplayName
-            or EventProperty.Opcode;
+            or EventProperty.Opcode
+            or EventProperty.ResolutionStatus;
 }

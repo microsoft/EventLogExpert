@@ -171,6 +171,7 @@ internal static class FilterLensFactory
         EventProperty.Id => "Event ID",
         EventProperty.TaskCategory => "Task Category",
         EventProperty.UserDisplayName => "User",
+        EventProperty.ResolutionStatus => "Resolution Status",
         _ => property.ToString()
     };
 

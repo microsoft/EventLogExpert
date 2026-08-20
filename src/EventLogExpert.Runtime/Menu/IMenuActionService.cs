@@ -60,6 +60,8 @@ public interface IMenuActionService
 
     Task ShowReleaseNotesAsync();
 
+    Task ShowResolutionCoverageAsync();
+
     void ToggleGroupSortDirection();
 
     void ToggleShowAllEvents();

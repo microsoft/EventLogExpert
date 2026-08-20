@@ -24,5 +24,6 @@ public enum EventFieldId
     Opcode,
     RelatedActivityId,
     UserDisplayName,
-    UserIdSddl
+    UserIdSddl,
+    ResolutionStatus
 }

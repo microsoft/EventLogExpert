@@ -143,11 +143,20 @@ public class EventResolverBase : IDisposable
         var (eventDataValues, eventDataSchema) = BuildEventData(eventRecord, primaryInfo);
         var userId = _cache?.GetOrAddSid(eventRecord.UserId) ?? eventRecord.UserId;
 
+        var resolvedDescription = _descriptions.Resolve(
+            eventRecord,
+            details,
+            descriptionDetails,
+            modernEvent,
+            supplemental,
+            supplementalModernEvent,
+            primaryInfo);
+
         return new(eventRecord.PathName, eventRecord.LogPathType)
         {
             ActivityId = eventRecord.ActivityId,
             ComputerName = _cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
-            Description = _descriptions.Resolve(eventRecord, details, descriptionDetails, modernEvent, supplemental, supplementalModernEvent, primaryInfo),
+            Description = resolvedDescription.Text,
             EventDataValues = eventDataValues,
             EventDataSchema = eventDataSchema,
             Id = eventRecord.Id,
@@ -158,6 +167,7 @@ public class EventResolverBase : IDisposable
             ProcessId = eventRecord.ProcessId,
             RecordId = eventRecord.RecordId,
             RelatedActivityId = eventRecord.RelatedActivityId,
+            ResolutionStatus = resolvedDescription.Status,
             Source = _cache?.GetOrAddValue(eventRecord.ProviderName) ?? eventRecord.ProviderName,
             TaskCategory = _taskKeywords.ResolveTaskName(eventRecord, details, modernEvent, supplemental, supplementalModernEvent),
             ThreadId = eventRecord.ThreadId,

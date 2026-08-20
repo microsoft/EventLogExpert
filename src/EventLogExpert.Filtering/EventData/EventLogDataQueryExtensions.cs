@@ -58,6 +58,7 @@ internal static class EventLogDataQueryExtensions
                 EventProperty.Source => events.Select(e => e.Source).Distinct(),
                 EventProperty.TaskCategory => events.Select(e => e.TaskCategory).Distinct(),
                 EventProperty.Opcode => events.Select(e => e.Opcode).Distinct(),
+                EventProperty.ResolutionStatus => events.Select(e => ResolutionStatusTokens.Format(e.ResolutionStatus)).Distinct(),
                 EventProperty.UserDisplayName => events.Select(e => e.UserDisplayName).Where(name => name.Length != 0).Distinct(),
                 EventProperty.LogName => events.Select(e => e.LogName).Distinct(),
                 _ => [],

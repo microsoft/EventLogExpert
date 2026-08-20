@@ -6,8 +6,8 @@ using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Stats;
 using EventLogExpert.Runtime.StatusBar;
+using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
-using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.StatusBar;
 
@@ -20,6 +20,8 @@ public sealed partial class StatusBar
     [Inject] private DisplayIndicatorGate IndicatorGate { get; init; } = null!;
 
     [Inject] private IFilterLensSource LensSource { get; init; } = null!;
+
+    [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
 
     [Inject] private IStatsCommands StatsCommands { get; init; } = null!;
 
@@ -49,19 +51,7 @@ public sealed partial class StatusBar
         base.OnInitialized();
     }
 
-    private static int TotalRawCount(LogView activeTable, ImmutableList<LogTabGroup> groups, StatusBarPresentation status)
-    {
-        if (activeTable.GroupId?.IsAll == true) { return status.RawEventTotal; }
-
-        if (activeTable.GroupId is not { } groupId)
-        {
-            return status.RawEventCountsByLog.GetValueOrDefault(activeTable.Id, 0);
-        }
-
-        var group = groups.FirstOrDefault(candidate => candidate.Id == groupId);
-
-        return group is null ? 0 : group.MemberIds.Sum(id => status.RawEventCountsByLog.GetValueOrDefault(id, 0));
-    }
+    private void OpenCoverage() => _ = ModalCoordinator.OpenResolutionCoverageAsync();
 
     private void RequestIndicatorRender() => RequestGuardedRender(StateHasChanged);
 

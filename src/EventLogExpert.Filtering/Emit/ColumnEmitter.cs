@@ -67,6 +67,7 @@ internal static class ColumnEmitter
             ResolvedEventField.UserDisplayName => EventFieldId.UserDisplayName,
             ResolvedEventField.TaskCategory => EventFieldId.TaskCategory,
             ResolvedEventField.Opcode => EventFieldId.Opcode,
+            ResolvedEventField.ResolutionStatus => EventFieldId.ResolutionStatus,
             ResolvedEventField.Xml => EventFieldId.Xml,
             _ => throw new EmitException($"Cannot emit Contains for field '{field}'.")
         };
@@ -443,6 +444,7 @@ internal static class ColumnEmitter
             ResolvedEventField.Source => EmitMultiEqualsString(EventFieldId.Source, node.Values),
             ResolvedEventField.TaskCategory => EmitMultiEqualsString(EventFieldId.TaskCategory, node.Values),
             ResolvedEventField.Opcode => EmitMultiEqualsString(EventFieldId.Opcode, node.Values),
+            ResolvedEventField.ResolutionStatus => EmitMultiEqualsString(EventFieldId.ResolutionStatus, node.Values),
             ResolvedEventField.Xml => EmitMultiEqualsString(EventFieldId.Xml, node.Values),
             _ => throw new EmitException($"Cannot emit MultiEquals for field '{node.Field}'.")
         };
@@ -691,6 +693,7 @@ internal static class ColumnEmitter
             case ResolvedEventField.Source:
             case ResolvedEventField.TaskCategory:
             case ResolvedEventField.Opcode:
+            case ResolvedEventField.ResolutionStatus:
             case ResolvedEventField.Xml:
                 // String properties default to string.Empty and are never null; the row emits a constant without
                 // reading the field, so the column does the same.
@@ -740,6 +743,7 @@ internal static class ColumnEmitter
             ResolvedEventField.UserDisplayName => EmitUserStringCompare(op, value),
             ResolvedEventField.TaskCategory => FilterCompare.StringOrdinal(EventFieldId.TaskCategory, op, value),
             ResolvedEventField.Opcode => FilterCompare.StringOrdinal(EventFieldId.Opcode, op, value),
+            ResolvedEventField.ResolutionStatus => FilterCompare.StringOrdinal(EventFieldId.ResolutionStatus, op, value),
             ResolvedEventField.Xml => FilterCompare.StringOrdinal(EventFieldId.Xml, op, value),
             ResolvedEventField.UserId => FilterCompare.UserIdString(op, value),
             ResolvedEventField.Id => FilterCompare.StringOrdinal(EventFieldId.Id, op, value),

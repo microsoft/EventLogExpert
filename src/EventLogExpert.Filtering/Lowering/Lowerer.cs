@@ -200,7 +200,8 @@ internal static class Lowerer
             or ResolvedEventField.TaskCategory
             or ResolvedEventField.UserId
             or ResolvedEventField.UserDisplayName
-            or ResolvedEventField.Xml;
+            or ResolvedEventField.Xml
+            or ResolvedEventField.ResolutionStatus;
 
     private static bool IsNullCheckOnIdentifier(BinarySyntax bin, string identifier)
     {

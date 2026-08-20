@@ -26,7 +26,8 @@ internal enum EventColumnField : byte
     Xml,
     UserId,
     Opcode,
-    UserDisplayName
+    UserDisplayName,
+    ResolutionStatus
 }
 
 /// <summary>
@@ -101,6 +102,7 @@ internal sealed class EventColumnChunk
     private readonly bool[] _recordIdHas;
     private readonly Guid[] _relatedActivityId;
     private readonly bool[] _relatedActivityIdHas;
+    private readonly int[] _resolutionStatus;
     private readonly int[] _source;
     private readonly int[] _taskCategory;
     private readonly int[] _threadId;
@@ -108,7 +110,6 @@ internal sealed class EventColumnChunk
     private readonly long[] _timeTicks;
     private readonly int[] _userDataCount;
     private readonly bool[] _userDataIncomplete;
-
     private readonly int[] _userDataOffset;
     private readonly int[] _userDataPath;
     private readonly bool[] _userDataTruncated;
@@ -134,6 +135,7 @@ internal sealed class EventColumnChunk
         _userId = builder.UserId;
         _userDisplayName = builder.UserDisplayName;
         _opcode = builder.Opcode;
+        _resolutionStatus = builder.ResolutionStatus;
 
         _id = builder.Id;
         _timeTicks = builder.TimeTicks;
@@ -236,6 +238,7 @@ internal sealed class EventColumnChunk
         EventColumnField.UserId => _userId,
         EventColumnField.Opcode => _opcode,
         EventColumnField.UserDisplayName => _userDisplayName,
+        EventColumnField.ResolutionStatus => _resolutionStatus,
         _ => throw new ArgumentOutOfRangeException(nameof(column), column, null)
     };
 
@@ -283,6 +286,7 @@ internal sealed class EventColumnChunk
         EventColumnField.UserId => _userId[row],
         EventColumnField.Opcode => _opcode[row],
         EventColumnField.UserDisplayName => _userDisplayName[row],
+        EventColumnField.ResolutionStatus => _resolutionStatus[row],
         _ => throw new ArgumentOutOfRangeException(nameof(column), column, null)
     };
 
@@ -400,6 +404,7 @@ internal sealed class EventColumnChunk
         internal readonly bool[] RecordIdHas;
         internal readonly Guid[] RelatedActivityId;
         internal readonly bool[] RelatedActivityIdHas;
+        internal readonly int[] ResolutionStatus;
         internal readonly int[] Source;
         internal readonly int[] TaskCategory;
         internal readonly int[] ThreadId;
@@ -433,6 +438,7 @@ internal sealed class EventColumnChunk
             UserId = new int[count];
             UserDisplayName = new int[count];
             Opcode = new int[count];
+            ResolutionStatus = new int[count];
 
             Id = new int[count];
             TimeTicks = new long[count];
@@ -478,6 +484,7 @@ internal sealed class EventColumnChunk
             UserId[row] = pool.Intern(resolvedEvent.UserId?.Value);
             UserDisplayName[row] = pool.Intern(resolvedEvent.UserDisplayName.Length == 0 ? null : resolvedEvent.UserDisplayName);
             Opcode[row] = pool.Intern(resolvedEvent.Opcode);
+            ResolutionStatus[row] = pool.Intern(ResolutionStatusTokens.Format(resolvedEvent.ResolutionStatus));
 
             Id[row] = resolvedEvent.Id;
             TimeTicks[row] = resolvedEvent.TimeCreated.Ticks;

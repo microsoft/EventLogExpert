@@ -188,6 +188,7 @@ internal static class Emitter
             ResolvedEventField.UserDisplayName => EmitUserContains(needle, comparison, negated: false),
             ResolvedEventField.TaskCategory => resolvedEvent => resolvedEvent.TaskCategory.Contains(needle, comparison),
             ResolvedEventField.Opcode => resolvedEvent => resolvedEvent.Opcode.Contains(needle, comparison),
+            ResolvedEventField.ResolutionStatus => resolvedEvent => ResolutionStatusTokens.Format(resolvedEvent.ResolutionStatus).Contains(needle, comparison),
             ResolvedEventField.Xml => resolvedEvent => resolvedEvent.Xml.Contains(needle, comparison),
             _ => throw new EmitException($"Cannot emit Contains for field '{node.Field}'.")
         };
@@ -423,6 +424,7 @@ internal static class Emitter
             ResolvedEventField.Source => static resolvedEvent => resolvedEvent.Source,
             ResolvedEventField.TaskCategory => static resolvedEvent => resolvedEvent.TaskCategory,
             ResolvedEventField.Opcode => static resolvedEvent => resolvedEvent.Opcode,
+            ResolvedEventField.ResolutionStatus => static resolvedEvent => ResolutionStatusTokens.Format(resolvedEvent.ResolutionStatus),
             ResolvedEventField.Xml => static resolvedEvent => resolvedEvent.Xml,
             _ => throw new EmitException($"Cannot emit MultiContains for field '{node.Field}'.")
         };
@@ -533,6 +535,7 @@ internal static class Emitter
             ResolvedEventField.Source => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Source, node.Values),
             ResolvedEventField.TaskCategory => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.TaskCategory, node.Values),
             ResolvedEventField.Opcode => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Opcode, node.Values),
+            ResolvedEventField.ResolutionStatus => EmitMultiEqualsString(static resolvedEvent => ResolutionStatusTokens.Format(resolvedEvent.ResolutionStatus), node.Values),
             ResolvedEventField.Xml => EmitMultiEqualsString(static resolvedEvent => resolvedEvent.Xml, node.Values),
             _ => throw new EmitException($"Cannot emit MultiEquals for field '{node.Field}'.")
         };
@@ -777,6 +780,7 @@ internal static class Emitter
             case ResolvedEventField.Source:
             case ResolvedEventField.TaskCategory:
             case ResolvedEventField.Opcode:
+            case ResolvedEventField.ResolutionStatus:
             case ResolvedEventField.Xml:
                 // ResolvedEvent string properties default to string.Empty and writer paths never assign null.
                 return op switch
@@ -877,6 +881,7 @@ internal static class Emitter
             ResolvedEventField.UserDisplayName => EmitUserStringCompare(op, value),
             ResolvedEventField.TaskCategory => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.TaskCategory, op, value),
             ResolvedEventField.Opcode => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.Opcode, op, value),
+            ResolvedEventField.ResolutionStatus => EmitDirectStringCompare(static resolvedEvent => ResolutionStatusTokens.Format(resolvedEvent.ResolutionStatus), op, value),
             ResolvedEventField.Xml => EmitDirectStringCompare(static resolvedEvent => resolvedEvent.Xml, op, value),
             ResolvedEventField.UserId => EmitUserIdStringCompare(op, value),
             ResolvedEventField.Id => EmitIntegerStringCompare(

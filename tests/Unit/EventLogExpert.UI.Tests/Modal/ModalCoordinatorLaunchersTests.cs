@@ -6,6 +6,7 @@ using EventLogExpert.UI.Database;
 using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.FilterLibrary;
+using EventLogExpert.UI.LogTable.Resolution;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Update;
@@ -91,6 +92,18 @@ public sealed class ModalCoordinatorLaunchersTests
 
         await coordinator.Received(1).PushAsync<ReleaseNotesModal, bool>(
             Arg.Is<IDictionary<string, object?>?>(d => d != null && d.ContainsKey(nameof(ReleaseNotesModal.Content)) && content.Equals((ReleaseNotesContent)d[nameof(ReleaseNotesModal.Content)]!)));
+    }
+
+    [Fact]
+    public async Task OpenResolutionCoverageAsync_DelegatesToPushAsync()
+    {
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.PushAsync<ResolutionCoverageModal, bool>(Arg.Any<IDictionary<string, object?>?>())
+            .Returns(new ModalOpenResult<bool>(false, WasOpened: true));
+
+        await coordinator.OpenResolutionCoverageAsync();
+
+        await coordinator.Received(1).PushAsync<ResolutionCoverageModal, bool>(Arg.Any<IDictionary<string, object?>?>());
     }
 
     [Fact]

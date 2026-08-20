@@ -18,6 +18,66 @@ public sealed class EventColumnStoreReaderTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public void CountResolutionDetailForSource_ScopesToProvider_TalliesByIdAndLevel(bool sealRows)
+    {
+        ResolvedEvent[] sample =
+        [
+            Detail(1, "Prov", "Error", EventResolutionStatus.NoProvider),
+            Detail(1, "Prov", "Error", EventResolutionStatus.NoProvider),
+            Detail(2, "Prov", "Critical", EventResolutionStatus.Resolved),
+            Detail(9, "Other", "Error", EventResolutionStatus.NoProvider),
+            Detail(3, "Prov", "", EventResolutionStatus.NoMessage)
+        ];
+
+        IEventColumnReader reader = ReaderOver(sample, sealRows);
+        int[] rank = new int[reader.Count]; // all survive
+        var byId = new Dictionary<int, ProviderResolutionCounts>();
+        var byLevel = new ProviderResolutionCounts[LevelSeverity.SlotCount];
+
+        reader.CountResolutionDetailForSource(rank, "Prov", byId, byLevel, TestContext.Current.CancellationToken);
+
+        // Only "Prov" rows contribute: id 1 (x2 NoProvider), id 2 (Resolved), id 3 (NoMessage). "Other" is excluded.
+        Assert.Equal(3, byId.Count);
+        Assert.Equal(2, byId[1].NoProvider);
+        Assert.Equal(2, byId[1].Total);
+        Assert.Equal(1, byId[2].Resolved);
+        Assert.Equal(1, byId[3].NoMessage);
+
+        Assert.Equal(2, byLevel[(int)SeverityLevel.Error].Total);
+        Assert.Equal(1, byLevel[(int)SeverityLevel.Critical].Total);
+        Assert.Equal(1, byLevel[0].Total); // empty level -> Unknown slot
+
+        // Invariant: Sum(byId totals) == Sum(byLevel totals) == the provider's surviving row count.
+        Assert.Equal(4, byId.Values.Sum(counts => counts.Total));
+        Assert.Equal(4, byLevel.Sum(counts => counts.Total));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CountResolutionDetailForSource_SkipsFilteredRows(bool sealRows)
+    {
+        ResolvedEvent[] sample =
+        [
+            Detail(1, "Prov", "Error", EventResolutionStatus.NoProvider),
+            Detail(1, "Prov", "Error", EventResolutionStatus.NoProvider)
+        ];
+
+        IEventColumnReader reader = ReaderOver(sample, sealRows);
+        int[] rank = new int[reader.Count];
+        rank[0] = -1; // filter out the first row
+        var byId = new Dictionary<int, ProviderResolutionCounts>();
+        var byLevel = new ProviderResolutionCounts[LevelSeverity.SlotCount];
+
+        reader.CountResolutionDetailForSource(rank, "Prov", byId, byLevel, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, byId[1].Total);
+        Assert.Equal(1, byLevel[(int)SeverityLevel.Error].Total);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public void CountSeverity_SkipsFilteredRows(bool sealRows)
     {
         ResolvedEvent[] sample = [Ev(1, "Critical"), Ev(2, "Error"), Ev(3, "Error")];
@@ -99,6 +159,9 @@ public sealed class EventColumnStoreReaderTests
         Assert.Empty(reader.GetKeywords(reader.LocatorAt(1)));
         Assert.Equal(["Classic"], reader.GetKeywords(reader.LocatorAt(2)));
     }
+
+    private static ResolvedEvent Detail(int id, string source, string level, EventResolutionStatus status) =>
+        new("Application", LogPathType.Channel) { Id = id, Source = source, Level = level, ResolutionStatus = status, TimeCreated = s_time };
 
     private static ResolvedEvent Ev(int id, string level) =>
         new("Application", LogPathType.Channel) { Id = id, Level = level, TimeCreated = s_time };

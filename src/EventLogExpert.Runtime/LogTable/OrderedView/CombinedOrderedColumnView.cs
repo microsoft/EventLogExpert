@@ -471,6 +471,30 @@ internal sealed class CombinedOrderedColumnView : IEventColumnView
         }
     }
 
+    public void CountResolutionBySource(IDictionary<string, ProviderResolutionCounts> counts, CancellationToken cancellationToken)
+    {
+        Partition partition = GetPartition();
+
+        for (int slot = 0; slot < _readers.Length; slot++)
+        {
+            _readers[slot].CountResolutionBySource(partition.RankByPhysical[slot], counts, cancellationToken);
+        }
+    }
+
+    public void CountResolutionDetailForSource(
+        string source,
+        IDictionary<int, ProviderResolutionCounts> byId,
+        ProviderResolutionCounts[] byLevelSlot,
+        CancellationToken cancellationToken)
+    {
+        Partition partition = GetPartition();
+
+        for (int slot = 0; slot < _readers.Length; slot++)
+        {
+            _readers[slot].CountResolutionDetailForSource(partition.RankByPhysical[slot], source, byId, byLevelSlot, cancellationToken);
+        }
+    }
+
     public void CountSeverity(int[] slotCounts, CancellationToken cancellationToken)
     {
         Partition partition = GetPartition();
