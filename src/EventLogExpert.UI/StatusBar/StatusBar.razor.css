@@ -69,6 +69,26 @@
     outline-offset: -1px;
 }
 
+/* The New Events counter is a button (click to load buffered live-tail events) but keeps the normal counter weight -
+   weight-600 below is reserved to encode state (warn/live), and bolding the counter would dilute the adjacent
+   "Buffer full" chip. */
+.status-bar-newevents {
+    padding: 0 4px;
+    border: none;
+    border-radius: 2px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.status-bar-newevents:hover { background: color-mix(in srgb, var(--clr-white) 18%, transparent); }
+
+.status-bar-newevents:focus-visible {
+    outline: 1px solid var(--clr-white);
+    outline-offset: -1px;
+}
+
 /* White (inherited) text keeps WCAG AA contrast on the blue status bar; weight distinguishes the state. A color-coded
    status palette that meets AA on the status-bar fill is deferred to v2. */
 .status-bar-warn,

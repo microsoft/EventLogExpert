@@ -21,6 +21,7 @@ namespace EventLogExpert.UI.Tests.StatusBar;
 
 public sealed class StatusBarTests : BunitContext
 {
+    private readonly IEventLogCommands _eventLogCommands = Substitute.For<IEventLogCommands>();
     private readonly IFilterAppliedSource _filterApplied = Substitute.For<IFilterAppliedSource>();
     private readonly IFilterLensSource _lensSource = Substitute.For<IFilterLensSource>();
     private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
@@ -36,6 +37,7 @@ public sealed class StatusBarTests : BunitContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
 
+        Services.AddSingleton(_eventLogCommands);
         Services.AddSingleton(_filterApplied);
         Services.AddSingleton(_lensSource);
         Services.AddSingleton(_modalCoordinator);
@@ -150,6 +152,17 @@ public sealed class StatusBarTests : BunitContext
     }
 
     [Fact]
+    public void ContinuouslyUpdating_RendersNoNewEventsButton()
+    {
+        SetChannelStatus(newEventCount: 5, continuous: true);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Empty(cut.FindAll("button.status-bar-newevents"));
+        Assert.Contains("Continuously updating", cut.Find(".status-bar-live").TextContent);
+    }
+
+    [Fact]
     public void CoverageChip_Click_OpensCoverageModal()
     {
         SetActiveLog(total: 100, shown: 100, filter: Unfiltered, selected: 0);
@@ -173,6 +186,22 @@ public sealed class StatusBarTests : BunitContext
         _statusBarSource.Received(1).Changed -= Arg.Any<Action>();
         _filterApplied.Received(1).Changed -= Arg.Any<Action>();
         _lensSource.Received(1).Changed -= Arg.Any<Action>();
+    }
+
+    [Fact]
+    public void FileLogOnly_RendersNoNewEventsButton()
+    {
+        var id = EventLogId.Create();
+        _activeLogId = id;
+        var file = new LogView(id) { LogName = "app.evtx", LogPathType = LogPathType.File };
+        _status = new StatusBarPresentation
+        {
+            Tabs = ImmutableList.Create(file),
+            ActiveTabId = id,
+            RawEventCountsByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(id, default)
+        };
+
+        Assert.Empty(Render<UI.StatusBar.StatusBar>().FindAll("button.status-bar-newevents"));
     }
 
     [Fact]
@@ -263,6 +292,48 @@ public sealed class StatusBarTests : BunitContext
 
         Assert.Contains("Loading: 500", cut.Markup);
         Assert.Contains("New Events: 42", cut.Markup);
+    }
+
+    [Fact]
+    public void NewEventsButton_BufferFull_CoexistsWithWarnChip_AndIsClickable()
+    {
+        SetChannelStatus(newEventCount: 1000, bufferFull: true);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        var button = cut.Find("button.status-bar-newevents");
+        Assert.False(button.HasAttribute("disabled"));
+        Assert.Contains(cut.FindAll(".status-bar-warn"), node => node.TextContent.Contains("Buffer full"));
+
+        button.Click();
+
+        _eventLogCommands.Received(1).LoadNewEvents();
+    }
+
+    [Fact]
+    public void NewEventsButton_Click_LoadsNewEvents()
+    {
+        SetChannelStatus(newEventCount: 42);
+
+        var button = Render<UI.StatusBar.StatusBar>().Find("button.status-bar-newevents");
+        Assert.Contains("New Events: 42", button.TextContent);
+        Assert.False(button.HasAttribute("aria-label"));
+        Assert.Equal("Load new events into the view", button.GetAttribute("title"));
+
+        button.Click();
+
+        _eventLogCommands.Received(1).LoadNewEvents();
+    }
+
+    [Fact]
+    public void NewEventsButton_ZeroCount_IsRenderedAndEnabled()
+    {
+        SetChannelStatus(newEventCount: 0);
+
+        var button = Render<UI.StatusBar.StatusBar>().Find("button.status-bar-newevents");
+
+        Assert.False(button.HasAttribute("disabled"));
+        Assert.Contains("New Events: 0", button.TextContent);
+        Assert.Equal("No new events to load", button.GetAttribute("title"));
     }
 
     [Fact]
@@ -420,6 +491,22 @@ public sealed class StatusBarTests : BunitContext
             RawEventTotal = total,
             RawEventCountsByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(id, new ProviderResolutionCounts(total, total, 0, 0, 0)),
             SelectionCount = selected
+        };
+    }
+
+    private void SetChannelStatus(int newEventCount, bool bufferFull = false, bool continuous = false)
+    {
+        var id = EventLogId.Create();
+        _activeLogId = id;
+        var channel = new LogView(id) { LogName = "Application", LogPathType = LogPathType.Channel };
+        _status = new StatusBarPresentation
+        {
+            Tabs = ImmutableList.Create(channel),
+            ActiveTabId = id,
+            RawEventCountsByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(id, default),
+            NewEventBufferCount = newEventCount,
+            NewEventBufferIsFull = bufferFull,
+            ContinuouslyUpdate = continuous
         };
     }
 

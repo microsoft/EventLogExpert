@@ -88,7 +88,13 @@
             }
             else
             {
-                <span aria-live="off" class="status-bar-activity">New Events: @status.NewEventBufferCount</span>
+                <button aria-live="off"
+                    class="status-bar-activity status-bar-newevents"
+                    @onclick="LoadNewEvents"
+                    title="@(status.NewEventBufferCount == 0 ? "No new events to load" : "Load new events into the view")"
+                    type="button">
+                    New Events: @status.NewEventBufferCount
+                </button>
 
                 @if (status.NewEventBufferIsFull)
                 {
