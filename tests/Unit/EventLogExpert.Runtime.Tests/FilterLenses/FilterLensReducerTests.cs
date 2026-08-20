@@ -28,6 +28,29 @@ public sealed class FilterLensReducerTests
     }
 
     [Fact]
+    public void CommitPromoted_RemovesLensById()
+    {
+        var a = Lens("a");
+        var b = Lens("b");
+        var state = new FilterLensState { Lenses = [a, b] };
+
+        var result = Reducers.ReduceCommitPromoted(state, new CommitPromotedLensAction(a.Id, [], null));
+
+        Assert.Single(result.Lenses);
+        Assert.Same(b, result.Lenses[0]);
+    }
+
+    [Fact]
+    public void CommitPromoted_UnknownId_ReturnsSameStateInstance()
+    {
+        var state = new FilterLensState { Lenses = [Lens("a")] };
+
+        var result = Reducers.ReduceCommitPromoted(state, new CommitPromotedLensAction(Lens("other").Id, [], null));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
     public void Push_AddsLensToTopOfStack()
     {
         var a = Lens("a");

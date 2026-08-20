@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
@@ -59,6 +60,82 @@ public sealed class FilterLensEffectsTests
     }
 
     [Fact]
+    public async Task HandlePromote_AbsentLens_DoesNotAnnounceOrCommit()
+    {
+        var lens = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
+        var (effects, dispatcher, announcer) =
+            CreateEffectsWithAnnouncer(new FilterLensState { Lenses = [lens] }, new FilterPaneState());
+
+        await effects.HandlePromote(new PromoteFilterLensAction(FilterLensId.Create()), dispatcher);
+
+        announcer.DidNotReceive().Announce(Arg.Any<string>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<CommitPromotedLensAction>());
+    }
+
+    [Fact]
+    public async Task HandlePromote_DegenerateLens_DoesNotAnnounceOrCommit()
+    {
+        var lens = new FilterLens { Label = "empty", Kind = LensKind.Property, ExcludeFilters = [] };
+        var (effects, dispatcher, announcer) =
+            CreateEffectsWithAnnouncer(new FilterLensState { Lenses = [lens] }, new FilterPaneState());
+
+        await effects.HandlePromote(new PromoteFilterLensAction(lens.Id), dispatcher);
+
+        announcer.DidNotReceive().Announce(Arg.Any<string>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<CommitPromotedLensAction>());
+    }
+
+    [Fact]
+    public async Task HandlePromote_HideLens_DispatchesExcludeFallback()
+    {
+        var lens = FilterLensFactory.ForExcludedValue(EventProperty.Source, "Contoso")!;
+        var (effects, dispatcher, announcer) =
+            CreateEffectsWithAnnouncer(new FilterLensState { Lenses = [lens] }, new FilterPaneState());
+
+        await effects.HandlePromote(new PromoteFilterLensAction(lens.Id), dispatcher);
+
+        announcer.Received(1).Announce(Arg.Any<string>());
+
+        // A hide lens has no positive promote form, so it falls back to its natural exclude.
+        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action =>
+            action != null && action.Id == lens.Id && action.Filters.Count == 1 &&
+            action.Filters[0].IsExcluded && action.Window == null));
+    }
+
+    [Fact]
+    public async Task HandlePromote_KeepOnlyLens_AnnouncesAndDispatchesPositiveInclude()
+    {
+        var lens = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
+        var (effects, dispatcher, announcer) =
+            CreateEffectsWithAnnouncer(new FilterLensState { Lenses = [lens] }, new FilterPaneState());
+
+        await effects.HandlePromote(new PromoteFilterLensAction(lens.Id), dispatcher);
+
+        announcer.Received(1).Announce(Arg.Is<string>(message =>
+            message != null && message.Contains(lens.Label, StringComparison.Ordinal)));
+
+        // A keep-only lens promotes as a single POSITIVE INCLUDE (== value), not the transient exclude-of-complement.
+        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action =>
+            action != null && action.Id == lens.Id && action.Filters.Count == 1 &&
+            !action.Filters[0].IsExcluded && action.Filters[0].Compiled != null && action.Window == null));
+    }
+
+    [Fact]
+    public async Task HandlePromote_TimeWindowLens_DispatchesCommitWithWindow()
+    {
+        var lens = FilterLensFactory.ForTimeWindow(DateTime.UtcNow, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
+        var (effects, dispatcher, announcer) =
+            CreateEffectsWithAnnouncer(new FilterLensState { Lenses = [lens] }, new FilterPaneState());
+
+        await effects.HandlePromote(new PromoteFilterLensAction(lens.Id), dispatcher);
+
+        announcer.Received(1).Announce(Arg.Any<string>());
+        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action =>
+            action != null && action.Id == lens.Id && action.Filters.IsEmpty &&
+            action.Window != null && action.Window.IsEnabled));
+    }
+
+    [Fact]
     public async Task HandlePush_ComposesLensOntoBase_DispatchesApplyFilter_WithoutTouchingBase()
     {
         // The base is a single include (Level == Error). Pushing an ActivityId lens must dispatch an effective filter
@@ -92,12 +169,23 @@ public sealed class FilterLensEffectsTests
         FilterLensState lensState,
         FilterPaneState paneState)
     {
+        var (effects, dispatcher, _) = CreateEffectsWithAnnouncer(lensState, paneState);
+
+        return (effects, dispatcher);
+    }
+
+    private static (LensEffects Effects, IDispatcher Dispatcher, IAnnouncementService Announcer) CreateEffectsWithAnnouncer(
+        FilterLensState lensState,
+        FilterPaneState paneState)
+    {
         var lens = Substitute.For<IState<FilterLensState>>();
         lens.Value.Returns(lensState);
 
         var pane = Substitute.For<IState<FilterPaneState>>();
         pane.Value.Returns(paneState);
 
-        return (new LensEffects(lens, pane), Substitute.For<IDispatcher>());
+        var announcer = Substitute.For<IAnnouncementService>();
+
+        return (new LensEffects(lens, pane, announcer), Substitute.For<IDispatcher>(), announcer);
     }
 }

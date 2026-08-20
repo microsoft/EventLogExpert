@@ -12,6 +12,14 @@ internal sealed class Reducers
         state.Lenses.IsEmpty ? state : new FilterLensState();
 
     [ReducerMethod]
+    public static FilterLensState ReduceCommitPromoted(FilterLensState state, CommitPromotedLensAction action)
+    {
+        var updated = state.Lenses.RemoveAll(lens => lens.Id == action.Id);
+
+        return updated.Count == state.Lenses.Count ? state : state with { Lenses = updated };
+    }
+
+    [ReducerMethod]
     public static FilterLensState ReducePush(FilterLensState state, PushFilterLensAction action) =>
         state with { Lenses = state.Lenses.Add(action.Lens) };
 

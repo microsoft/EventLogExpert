@@ -102,7 +102,8 @@ public sealed class EffectsTests
 
         var effects = new Effects(
             appliedFilter, rawEventStore, filterPaneState, lensState,
-            notifier, new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()));
+            notifier, new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()),
+            new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
 
         await effects.HandleClearAllFilters(Substitute.For<IDispatcher>());
         await effects.HandleClearAllFilters(Substitute.For<IDispatcher>());
@@ -120,6 +121,57 @@ public sealed class EffectsTests
         await effects.HandleClearAllFilters(mockDispatcher);
 
         mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
+    }
+
+    [Fact]
+    public async Task HandleCommitPromoted_AppliesEvenWhenFilteringUnchanged()
+    {
+        // The empty candidate equals the empty applied filter, so the guarded path would suppress. The unconditional
+        // promote apply must dispatch anyway so it lands last and wins any race with a queued wide apply.
+        var (effects, dispatcher, promotedRaised, _) = CreateCommitPromotedEffects(
+            new FilterPaneState(),
+            appliedFilter: new Filter(null, []));
+
+        await effects.HandleCommitPromoted(new CommitPromotedLensAction(FilterLensId.Create(), [], null), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
+        Assert.Equal(1, promotedRaised());
+    }
+
+    [Fact]
+    public async Task HandleCommitPromoted_PropertyLens_DispatchesBakedFilter_RaisesPromoted_NotDateResync()
+    {
+        var promoted = FilterBuilder.CreateTestFilter(isEnabled: true, isExcluded: true);
+        var (effects, dispatcher, promotedRaised, dateResyncRaised) = CreateCommitPromotedEffects(
+            new FilterPaneState { Filters = [promoted] },
+            appliedFilter: new Filter(null, []));
+
+        await effects.HandleCommitPromoted(new CommitPromotedLensAction(FilterLensId.Create(), [], null), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<ApplyFilterAction>(applied =>
+            applied != null && applied.Filter.Filters.Count == 1 && applied.Filter.Filters[0].IsExcluded));
+        Assert.Equal(1, promotedRaised());
+        Assert.Equal(0, dateResyncRaised());
+    }
+
+    [Fact]
+    public async Task HandleCommitPromoted_TimeWindow_RaisesDateResyncNotifier()
+    {
+        // A promoted window writes FilteredDateRange, so the date editor must be told to resync its model.
+        var window = new DateFilter
+        {
+            After = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Before = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc),
+            IsEnabled = true
+        };
+        var (effects, dispatcher, promotedRaised, dateResyncRaised) = CreateCommitPromotedEffects(
+            new FilterPaneState { FilteredDateRange = window },
+            appliedFilter: new Filter(null, []));
+
+        await effects.HandleCommitPromoted(new CommitPromotedLensAction(FilterLensId.Create(), [], window), dispatcher);
+
+        Assert.Equal(1, dateResyncRaised());
+        Assert.Equal(1, promotedRaised());
     }
 
     [Fact]
@@ -162,7 +214,8 @@ public sealed class EffectsTests
 
         var effects = new Effects(
             appliedFilter, rawEventStore, filterPaneState, lensState,
-            new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), notifier);
+            new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), notifier,
+            new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
 
         await effects.HandleSetFilterDateRangeSuccess(Substitute.For<IDispatcher>());
         await effects.HandleSetFilterDateRangeSuccess(Substitute.For<IDispatcher>());
@@ -526,6 +579,38 @@ public sealed class EffectsTests
             },
             []);
 
+    private static (Effects Effects, IDispatcher Dispatcher, Func<int> PromotedRaised, Func<int> DateResyncRaised)
+        CreateCommitPromotedEffects(FilterPaneState paneState, Filter appliedFilter)
+    {
+        var filterPaneState = Substitute.For<IState<FilterPaneState>>();
+        filterPaneState.Value.Returns(paneState);
+
+        var applied = Substitute.For<IStateSelection<EventLogState, Filter>>();
+        applied.Value.Returns(appliedFilter);
+
+        var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
+        rawEventStore.Value.Returns(new RawEventStoreState());
+
+        var lensState = Substitute.For<IState<FilterLensState>>();
+        lensState.Value.Returns(new FilterLensState());
+
+        var promotedNotifier = new FilterPromotedNotifier(Substitute.For<ITraceLogger>());
+        var promotedRaised = 0;
+        promotedNotifier.Promoted += () => promotedRaised++;
+
+        var dateResyncNotifier = new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>());
+        var dateResyncRaised = 0;
+        dateResyncNotifier.Succeeded += () => dateResyncRaised++;
+
+        var effects = new Effects(
+            applied, rawEventStore, filterPaneState, lensState,
+            new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()),
+            dateResyncNotifier,
+            promotedNotifier);
+
+        return (effects, Substitute.For<IDispatcher>(), () => promotedRaised, () => dateResyncRaised);
+    }
+
     private static (Effects effects, IDispatcher mockDispatcher) CreateEffects(
         bool isEnabled = false,
         ImmutableList<SavedFilter>? filters = null,
@@ -564,7 +649,7 @@ public sealed class EffectsTests
         var mockLensState = Substitute.For<IState<FilterLensState>>();
         mockLensState.Value.Returns(new FilterLensState());
 
-        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState, mockLensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()));
+        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState, mockLensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()), new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
         var mockDispatcher = Substitute.For<IDispatcher>();
 
         return (effects, mockDispatcher);

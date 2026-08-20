@@ -96,7 +96,7 @@ public sealed class ReplaceFiltersTests
         var mockLensState = Substitute.For<IState<FilterLensState>>();
         mockLensState.Value.Returns(new FilterLensState());
 
-        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState, mockLensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()));
+        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState, mockLensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()), new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
         var dispatcher = Substitute.For<IDispatcher>();
 
         return (effects, dispatcher);

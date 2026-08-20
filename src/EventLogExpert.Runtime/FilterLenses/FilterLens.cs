@@ -20,19 +20,11 @@ public sealed record FilterLens
 
     public required LensKind Kind { get; init; }
 
-    /// <summary>
-    ///     Exclude criteria whose "hide everything else" arm is decisive (Match) for an absent field value, so the lens
-    ///     narrows to exactly the intended rows without leaking absent-field rows. Only <see cref="FilterLensFactory" /> may
-    ///     produce these, which is what enforces the total-operator invariant.
-    /// </summary>
     public ImmutableList<SavedFilter> ExcludeFilters { get; init; } = [];
+
+    public ImmutableList<SavedFilter> PromoteFilters { get; init; } = [];
 
     public DateFilter? Window { get; init; }
 
-    /// <summary>
-    ///     The owning log the lens originated from - the source event's <c>OwningLog</c> (the app's internal log name,
-    ///     which is also the name carried by a user-initiated log close). Used only for lifecycle: the lens is dropped when
-    ///     that log is closed by the user. A null origin clears only on close-all.
-    /// </summary>
     public string? OriginLog { get; init; }
 }

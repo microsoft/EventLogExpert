@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Runtime.FilterLenses;
 using Fluxor;
 using System.Collections.Immutable;
 
@@ -16,6 +17,48 @@ internal sealed class Reducers
 
     [ReducerMethod(typeof(ClearAllFiltersAction))]
     public static FilterPaneState ReduceClearFilters(FilterPaneState state) => new() { IsEnabled = state.IsEnabled };
+
+    [ReducerMethod]
+    public static FilterPaneState ReduceCommitPromoted(FilterPaneState state, CommitPromotedLensAction action)
+    {
+        var filters = state.Filters;
+
+        foreach (var promoted in action.Filters)
+        {
+            // Match only a USABLE (compiled) equivalent, ordinal-exact so case-variant values stay distinct predicates
+            // (filter string equality is ordinal, unlike the lowercased library MRU in ReduceMergeFilters). A dead
+            // (uncompiled) ordinal match narrows nothing, so it is passed over and the working filter is added below.
+            var existingIndex = filters.FindIndex(filter =>
+                string.Equals(filter.ComparisonText, promoted.ComparisonText, StringComparison.Ordinal) &&
+                filter.Mode == promoted.Mode &&
+                filter.IsExcluded == promoted.IsExcluded &&
+                filter.Compiled is not null);
+
+            if (existingIndex >= 0)
+            {
+                var existing = filters[existingIndex];
+
+                // Re-enable a disabled equivalent in place so the promoted narrowing stays active; an already-enabled
+                // equivalent needs no change. Either way, no duplicate row.
+                if (!existing.IsEnabled)
+                {
+                    filters = filters.SetItem(existingIndex, existing with { IsEnabled = true });
+                }
+
+                continue;
+            }
+
+            filters = filters.Add(promoted with { Id = FilterId.Create(), IsEnabled = promoted.Compiled is not null });
+        }
+
+        var date = action.Window is { IsEnabled: true } window
+            ? EffectiveFilterBuilder.IntersectWindow(state.FilteredDateRange, window)
+            : state.FilteredDateRange;
+
+        return ReferenceEquals(filters, state.Filters) && date == state.FilteredDateRange
+            ? state
+            : state with { Filters = filters, FilteredDateRange = date };
+    }
 
     [ReducerMethod]
     public static FilterPaneState ReduceMergeFilters(FilterPaneState state, MergeFiltersAction action)

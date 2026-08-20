@@ -40,6 +40,7 @@ public sealed class FilterPaneTests : BunitContext
     private readonly IState<EventLogState> _eventLogStateMock = Substitute.For<IState<EventLogState>>();
     private readonly IFilterLibraryCommands _filterLibraryCommands = Substitute.For<IFilterLibraryCommands>();
     private readonly IFilterPaneCommands _filterPaneCommands = Substitute.For<IFilterPaneCommands>();
+    private readonly IFilterPromotedNotifier _filterPromotedNotifier = Substitute.For<IFilterPromotedNotifier>();
     private readonly IFilteredDateRangeSource _filteredDateRange = Substitute.For<IFilteredDateRangeSource>();
     private readonly ILibraryEntriesSource _libraryEntries = Substitute.For<ILibraryEntriesSource>();
     private readonly ILibraryLoadStatusSource _libraryLoadStatus = Substitute.For<ILibraryLoadStatusSource>();
@@ -112,6 +113,7 @@ public sealed class FilterPaneTests : BunitContext
 
         Services.AddSingleton(_clearAllFiltersNotifier);
         Services.AddSingleton(_setFilterDateRangeSucceededNotifier);
+        Services.AddSingleton(_filterPromotedNotifier);
 
         Services.AddFluxor(options => options.ScanAssemblies(typeof(UI.FilterPane.FilterPane).Assembly));
 
@@ -404,6 +406,22 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public async Task FilterPromotedNotifier_ExpandsTheCollapsedFilterList()
+    {
+        var promoted = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(promoted);
+        SetPaneState(new FilterPaneState { Filters = [promoted] });
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        // The list starts collapsed even though it has a filter (matches production: _isFilterListVisible defaults false).
+        Assert.Equal("false", component.Find(".filter-set").GetAttribute("data-toggle"));
+
+        await component.InvokeAsync(() => _filterPromotedNotifier.Promoted += Raise.Event<Action>());
+
+        Assert.Equal("true", component.Find(".filter-set").GetAttribute("data-toggle"));
+    }
+
+    [Fact]
     public void FilterSetReplaceButton_DisabledGatingMirrorsSelection()
     {
         var filterSet = BuildFilterSet("Picked");
@@ -528,6 +546,20 @@ public sealed class FilterPaneTests : BunitContext
         var reason = component.Instance.GetRecentDisabledReason();
 
         Assert.Equal(expectedReason, reason);
+    }
+
+    [Fact]
+    public void OnInitialized_HydratesDateModelFromAppliedRange_InLocalTime()
+    {
+        // A range applied externally (e.g. a promoted time-window lens) must render in the display zone, not UTC.
+        var timeZone = TimeZoneInfo.CreateCustomTimeZone("H+05", TimeSpan.FromHours(5), "H+05", "H+05");
+        _settings.TimeZoneInfo.Returns(timeZone);
+        var afterUtc = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        SetPaneState(new FilterPaneState { FilteredDateRange = new DateFilter { After = afterUtc, IsEnabled = true } });
+
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        Assert.Equal(TimeZoneInfo.ConvertTimeFromUtc(afterUtc, timeZone), GetDateModel(component).After);
     }
 
     [Fact]
@@ -752,6 +784,27 @@ public sealed class FilterPaneTests : BunitContext
         Assert.Contains(
             component.FindAll("button"),
             button => button.GetAttribute("aria-label")?.Contains("scenario JSON") == true);
+    }
+
+    [Fact]
+    public async Task Promote_TimeWindowOnMountedPane_ResyncsDateEditorAndExpands()
+    {
+        // Mirror the commit effect's production ordering for a window promote onto an already-mounted pane: the reducer
+        // has written FilteredDateRange, then both notifiers fire. The date editor model must resync (in local time)
+        // and the collapsed list must expand - the case the OnInitialized hydration cannot reach.
+        var timeZone = TimeZoneInfo.CreateCustomTimeZone("H+05", TimeSpan.FromHours(5), "H+05", "H+05");
+        _settings.TimeZoneInfo.Returns(timeZone);
+        SetPaneState(new FilterPaneState());
+        var component = Render<UI.FilterPane.FilterPane>();
+        Assert.Null(GetDateModel(component).After);
+
+        var afterUtc = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        SetPaneState(new FilterPaneState { FilteredDateRange = new DateFilter { After = afterUtc, IsEnabled = true } });
+        await component.InvokeAsync(() => _setFilterDateRangeSucceededNotifier.Succeeded += Raise.Event<Action>());
+        await component.InvokeAsync(() => _filterPromotedNotifier.Promoted += Raise.Event<Action>());
+
+        Assert.Equal(TimeZoneInfo.ConvertTimeFromUtc(afterUtc, timeZone), GetDateModel(component).After);
+        Assert.Equal("true", component.Find(".filter-set").GetAttribute("data-toggle"));
     }
 
     [Fact]
@@ -1022,11 +1075,16 @@ public sealed class FilterPaneTests : BunitContext
     [Fact]
     public async Task SetFilterDateRangeSucceededNotifier_ResyncsTheDateEditorFromTheSource_EvenWhenTheSourceIsSilent()
     {
-        var applied = new DateFilter { After = DateTimeOffset.UnixEpoch.UtcDateTime, IsEnabled = true };
-        SetPaneState(new FilterPaneState { FilteredDateRange = applied });
+        // Render with no applied range so the initial model is empty and the notifier - not an eager source read on
+        // init - is what drives this resync. Initial hydration of a present range is covered by
+        // OnInitialized_HydratesDateModelFromAppliedRange_InLocalTime.
+        SetPaneState(new FilterPaneState());
         var component = Render<UI.FilterPane.FilterPane>();
 
         Assert.Null(GetDateModel(component).After);
+
+        var applied = new DateFilter { After = DateTimeOffset.UnixEpoch.UtcDateTime, IsEnabled = true };
+        SetPaneState(new FilterPaneState { FilteredDateRange = applied });
 
         await component.InvokeAsync(() => _setFilterDateRangeSucceededNotifier.Succeeded += Raise.Event<Action>());
 
