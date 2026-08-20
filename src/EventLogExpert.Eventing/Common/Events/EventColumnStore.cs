@@ -1322,6 +1322,143 @@ public sealed class EventColumnStore
         }
     }
 
+    internal void CountResolutionBySource(
+        ReadOnlySpan<int> rankByPhysical,
+        IDictionary<string, ProviderResolutionCounts> counts,
+        CancellationToken cancellationToken)
+    {
+        // Resolve the three non-resolved status tokens to pool indices once (missing -> int.MinValue) so sealed rows
+        // classify by integer compare; anything else is Resolved. Aggregate by Source pool index and reverse-resolve
+        // each distinct source once.
+        int noProviderIndex = _pool.TryGetIndex(ResolutionStatusTokens.NoProvider, out int noProvider) ? noProvider : int.MinValue;
+        int noMessageIndex = _pool.TryGetIndex(ResolutionStatusTokens.NoMessage, out int noMessage) ? noMessage : int.MinValue;
+        int failedIndex = _pool.TryGetIndex(ResolutionStatusTokens.Failed, out int failed) ? failed : int.MinValue;
+
+        var bySourceIndex = new Dictionary<int, ProviderResolutionCounts>();
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<int> sourceColumn = chunk.PoolIndexColumn(EventColumnField.Source);
+            ReadOnlySpan<int> statusColumn = chunk.PoolIndexColumn(EventColumnField.ResolutionStatus);
+
+            for (int row = 0; row < sourceColumn.Length; row++)
+            {
+                if (rankByPhysical[offset + row] < 0) { continue; }
+
+                int sourceIndex = sourceColumn[row];
+                bySourceIndex.TryGetValue(sourceIndex, out var current);
+                bySourceIndex[sourceIndex] = current.WithStatus(StatusOf(statusColumn[row]));
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        foreach ((int sourceIndex, ProviderResolutionCounts value) in bySourceIndex)
+        {
+            string source = PoolGet(sourceIndex) ?? string.Empty;
+            counts[source] = counts.TryGetValue(source, out var existing) ? existing.Add(value) : value;
+        }
+
+        // Pending rows carry the enum directly (no pool index), so classify them by value.
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+            counts.TryGetValue(pending.Source, out var existing);
+            counts[pending.Source] = existing.WithStatus(pending.ResolutionStatus);
+        }
+
+        return;
+
+        EventResolutionStatus StatusOf(int statusIndex) =>
+            statusIndex == noProviderIndex ? EventResolutionStatus.NoProvider :
+            statusIndex == noMessageIndex ? EventResolutionStatus.NoMessage :
+            statusIndex == failedIndex ? EventResolutionStatus.Failed :
+            EventResolutionStatus.Resolved;
+    }
+
+    internal void CountResolutionDetailForSource(
+        ReadOnlySpan<int> rankByPhysical,
+        string source,
+        IDictionary<int, ProviderResolutionCounts> byId,
+        ProviderResolutionCounts[] byLevelSlot,
+        CancellationToken cancellationToken)
+    {
+        int sourceIndex = _pool.TryGetIndex(source, out int resolvedSource) ? resolvedSource : int.MinValue;
+        int noProviderIndex = _pool.TryGetIndex(ResolutionStatusTokens.NoProvider, out int noProvider) ? noProvider : int.MinValue;
+        int noMessageIndex = _pool.TryGetIndex(ResolutionStatusTokens.NoMessage, out int noMessage) ? noMessage : int.MinValue;
+        int failedIndex = _pool.TryGetIndex(ResolutionStatusTokens.Failed, out int failed) ? failed : int.MinValue;
+        int criticalIndex = _pool.TryGetIndex(nameof(SeverityLevel.Critical), out int critical) ? critical : int.MinValue;
+        int errorIndex = _pool.TryGetIndex(nameof(SeverityLevel.Error), out int error) ? error : int.MinValue;
+        int warningIndex = _pool.TryGetIndex(nameof(SeverityLevel.Warning), out int warning) ? warning : int.MinValue;
+        int informationIndex = _pool.TryGetIndex(nameof(SeverityLevel.Information), out int information) ? information : int.MinValue;
+        int verboseIndex = _pool.TryGetIndex(nameof(SeverityLevel.Verbose), out int verbose) ? verbose : int.MinValue;
+
+        int offset = 0;
+
+        foreach (EventColumnChunk chunk in _sealedChunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ReadOnlySpan<int> sourceColumn = chunk.PoolIndexColumn(EventColumnField.Source);
+            ReadOnlySpan<int> statusColumn = chunk.PoolIndexColumn(EventColumnField.ResolutionStatus);
+            ReadOnlySpan<int> levelColumn = chunk.PoolIndexColumn(EventColumnField.Level);
+            ReadOnlySpan<int> idColumn = chunk.IdColumn;
+
+            for (int row = 0; row < sourceColumn.Length; row++)
+            {
+                if (rankByPhysical[offset + row] < 0) { continue; }
+
+                if (sourceColumn[row] != sourceIndex) { continue; }
+
+                EventResolutionStatus status = StatusOf(statusColumn[row]);
+                int id = idColumn[row];
+
+                byId.TryGetValue(id, out var currentId);
+                byId[id] = currentId.WithStatus(status);
+
+                int slot = SlotOf(levelColumn[row]);
+                byLevelSlot[slot] = byLevelSlot[slot].WithStatus(status);
+            }
+
+            offset += chunk.RowCount;
+        }
+
+        for (int index = _sealedCount; index < Count; index++)
+        {
+            if (rankByPhysical[index] < 0) { continue; }
+
+            ResolvedEvent pending = Pending(index);
+
+            if (!string.Equals(pending.Source, source, StringComparison.Ordinal)) { continue; }
+
+            byId.TryGetValue(pending.Id, out var currentId);
+            byId[pending.Id] = currentId.WithStatus(pending.ResolutionStatus);
+
+            int slot = LevelSeverity.Slot(LevelSeverity.FromLevelName(pending.Level));
+            byLevelSlot[slot] = byLevelSlot[slot].WithStatus(pending.ResolutionStatus);
+        }
+
+        return;
+
+        EventResolutionStatus StatusOf(int statusIndex) =>
+            statusIndex == noProviderIndex ? EventResolutionStatus.NoProvider :
+            statusIndex == noMessageIndex ? EventResolutionStatus.NoMessage :
+            statusIndex == failedIndex ? EventResolutionStatus.Failed :
+            EventResolutionStatus.Resolved;
+
+        int SlotOf(int levelPoolIndex) =>
+            levelPoolIndex == criticalIndex ? (int)SeverityLevel.Critical :
+            levelPoolIndex == errorIndex ? (int)SeverityLevel.Error :
+            levelPoolIndex == warningIndex ? (int)SeverityLevel.Warning :
+            levelPoolIndex == informationIndex ? (int)SeverityLevel.Information :
+            levelPoolIndex == verboseIndex ? (int)SeverityLevel.Verbose : 0;
+    }
+
     internal void CountSeverity(ReadOnlySpan<int> rankByPhysical, int[] slotCounts, CancellationToken cancellationToken)
     {
         // Severity totals over the survivor projection: the un-bucketed sibling of BucketTimeTicksBySeverity. Resolve the
@@ -1825,6 +1962,7 @@ public sealed class EventColumnStore
         EventColumnField.ComputerName => pending.ComputerName,
         EventColumnField.OwningLog => pending.OwningLog,
         EventColumnField.UserDisplayName => pending.UserDisplayName,
+        EventColumnField.ResolutionStatus => ResolutionStatusTokens.Format(pending.ResolutionStatus),
         _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Field is not a supported group-by dimension.")
     };
 
@@ -2012,6 +2150,7 @@ public sealed class EventColumnStore
             Level = PoolGet(chunk.RowPoolIndex(EventColumnField.Level, row)) ?? string.Empty,
             LogName = PoolGet(chunk.RowPoolIndex(EventColumnField.LogName, row)) ?? string.Empty,
             Opcode = PoolGet(chunk.RowPoolIndex(EventColumnField.Opcode, row)) ?? string.Empty,
+            ResolutionStatus = ResolutionStatusTokens.Classify(PoolGet(chunk.RowPoolIndex(EventColumnField.ResolutionStatus, row)) ?? string.Empty),
             Source = PoolGet(chunk.RowPoolIndex(EventColumnField.Source, row)) ?? string.Empty,
             TaskCategory = PoolGet(chunk.RowPoolIndex(EventColumnField.TaskCategory, row)) ?? string.Empty,
             UserId = userIdPoolIndex < 0 ? null : new SecurityIdentifier(PoolGet(userIdPoolIndex)!),

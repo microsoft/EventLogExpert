@@ -1,0 +1,309 @@
+@using EventLogExpert.Eventing.Common.Events
+@using EventLogExpert.Runtime.ResolutionCoverage
+@inherits ModalBase<bool>
+
+<ModalChrome AriaLabel="Resolution and coverage"
+    CloseLabel="Close"
+    Footer="FooterPreset.CloseOnly"
+    Height="70%"
+    InlineAlert="@CurrentInlineAlert"
+    MaxWidth="min(72rem, calc(100vw - 2rem))"
+    MinWidth="min(30rem, calc(100vw - 2rem))"
+    OnClose="OnCancelAsync"
+    OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
+    Title="Resolution & Coverage"
+    @ref="ChromeRef">
+    <ChildContent>
+        <div class="resolution-coverage">
+            @if (_loading)
+            {
+                <div class="resolution-coverage-status">Computing...</div>
+            }
+            else if (_updating)
+            {
+                <div class="resolution-coverage-status">The view is still updating - reopen to see coverage.</div>
+            }
+            else if (_failed)
+            {
+                <div class="resolution-coverage-status">@(_faultCause is { Length: > 0 } cause ? $"Coverage is unavailable. {cause}" : "Coverage could not be computed.")</div>
+            }
+            else if (_report is not null && _report.Summary.Total == 0)
+            {
+                <div class="resolution-coverage-status">@(_isFiltered ? "No events match the current filter." : "No events to analyze.")</div>
+            }
+            else if (_report is not null)
+            {
+                var matched = FilteredSortedRows();
+                var shown = matched.Count > MaxProviders ? matched.Take(MaxProviders).ToList() : matched;
+
+                <div class="resolution-coverage-summary">
+                    <div class="resolution-coverage-scope">
+                        <span>@FormatCount(_report.Summary.Total) events in the current view</span>
+                        @if (_isFiltered)
+                        {
+                            <span class="resolution-coverage-badge" title="Coverage reflects the current filtered view, not all loaded events.">Filtered view</span>
+                        }
+                    </div>
+                    <div class="resolution-coverage-tallies">
+                        <span class="resolution-tally">Resolved: <strong>@FormatCount(_report.Summary.Resolved)</strong> (@FormatShare(_report.Summary.Resolved))</span>
+                        <span class="resolution-tally">Unresolved: <strong>@FormatCount(Unresolved)</strong> (@FormatShare(Unresolved))</span>
+                    </div>
+                    @{
+                        var segments = ProportionSegments().ToList();
+                    }
+                    @if (segments.Count > 0)
+                    {
+                        <div aria-label="@ProportionAriaLabel()" class="resolution-coverage-bar" role="img">
+                            @foreach (var segment in segments)
+                            {
+                                <div class="resolution-coverage-seg @segment.CssClass" style="@SegmentWidth(segment.Percent)" title="@segment.Label"></div>
+                            }
+                        </div>
+                    }
+                    <div class="resolution-coverage-breakdown">
+                        @foreach (var cause in CauseBreakdown())
+                        {
+                            @if (cause.Count > 0)
+                            {
+                                <button class="resolution-cause-filter"
+                                    @onclick="() => FilterByCauseAsync(cause.Token)"
+                                    title="@($"Filter the view to {cause.Token} events")"
+                                    type="button">
+                                    @cause.Token: @FormatCount(cause.Count)
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="resolution-cause-empty">@cause.Token: @FormatCount(cause.Count)</span>
+                            }
+                        }
+                    </div>
+                </div>
+
+                <input aria-label="Filter providers"
+                    @bind="_search"
+                    @bind:event="oninput"
+                    class="input resolution-coverage-search"
+                    placeholder="Filter providers..."
+                    type="text" />
+
+                @if (matched.Count > shown.Count)
+                {
+                    <div class="resolution-coverage-truncated">Showing the top @FormatCount(shown.Count) of @FormatCount(matched.Count) providers.</div>
+                }
+
+                <div class="resolution-coverage-table" role="table">
+                    <div class="resolution-coverage-head" role="row">
+                        <span aria-sort="@AriaSort(CoverageSortColumn.Provider)" role="columnheader">
+                            <button class="resolution-sort" @onclick="() => ToggleSort(CoverageSortColumn.Provider)" type="button">Provider</button>
+                        </span>
+                        <span aria-sort="@AriaSort(CoverageSortColumn.Total)" role="columnheader">
+                            <button class="resolution-num resolution-sort" @onclick="() => ToggleSort(CoverageSortColumn.Total)" type="button">Events</button>
+                        </span>
+                        <span aria-sort="@AriaSort(CoverageSortColumn.Resolved)" role="columnheader">
+                            <button class="resolution-num resolution-sort" @onclick="() => ToggleSort(CoverageSortColumn.Resolved)" type="button">Resolved</button>
+                        </span>
+                        <span aria-sort="@AriaSort(CoverageSortColumn.NoProvider)" role="columnheader" title="@ResolutionStatusTokens.NoProvider">
+                            <button class="resolution-num resolution-sort" @onclick="() => ToggleSort(CoverageSortColumn.NoProvider)" type="button">No provider</button>
+                        </span>
+                        <span aria-sort="@AriaSort(CoverageSortColumn.NoMessage)" role="columnheader" title="@ResolutionStatusTokens.NoMessage">
+                            <button class="resolution-num resolution-sort" @onclick="() => ToggleSort(CoverageSortColumn.NoMessage)" type="button">No message</button>
+                        </span>
+                        <span aria-sort="@AriaSort(CoverageSortColumn.Failed)" role="columnheader" title="@ResolutionStatusTokens.Failed">
+                            <button class="resolution-num resolution-sort" @onclick="() => ToggleSort(CoverageSortColumn.Failed)" type="button">Error</button>
+                        </span>
+                        <span aria-sort="@AriaSort(CoverageSortColumn.Coverage)" role="columnheader">
+                            <button class="resolution-cov resolution-sort" @onclick="() => ToggleSort(CoverageSortColumn.Coverage)" type="button">Coverage</button>
+                        </span>
+                        <span role="columnheader"></span>
+                    </div>
+                    @for (int index = 0; index < shown.Count; index++)
+                    {
+                        var row = shown[index];
+                        <div class="resolution-coverage-row@(index % 2 == 1 ? " resolution-row-alt" : null)" role="row">
+                            <span class="resolution-provider" role="cell" title="@row.Provider">
+                                @if (row.Status != CoverageStatus.Full && !string.IsNullOrWhiteSpace(row.Provider))
+                                {
+                                    <button aria-controls="@(IsExpanded(row) ? DetailId(index) : null)"
+                                        aria-expanded="@(IsExpanded(row) ? "true" : "false")"
+                                        class="resolution-provider-toggle"
+                                        @onclick="() => ToggleExpandAsync(row)"
+                                        type="button">
+                                        <i aria-hidden="true" class="bi bi-caret-@(IsExpanded(row) ? "down" : "right")"></i>
+                                        <span class="resolution-provider-name">@row.Provider</span>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="resolution-provider-name">@row.Provider</span>
+                                }
+                            </span>
+                            <span class="resolution-num" role="cell">@FormatCount(row.Counts.Total)</span>
+                            <span class="resolution-num" role="cell">@FormatCount(row.Counts.Resolved)</span>
+                            <span class="resolution-num" role="cell">@FormatCount(row.Counts.NoProvider)</span>
+                            <span class="resolution-num" role="cell">@FormatCount(row.Counts.NoMessage)</span>
+                            <span class="resolution-num" role="cell">@FormatCount(row.Counts.Failed)</span>
+                            <span class="resolution-cov" role="cell"><span class="@CoverageCssClass(row.Status)" title="@CoverageTooltip(row)">@CoverageStatusText.Label(row.Status)</span></span>
+                            <span class="resolution-actions" role="cell">
+                                <button aria-label="@($"Filter to {row.Provider}")"
+                                    class="resolution-include"
+                                    @onclick="() => IncludeProviderAsync(row)"
+                                    title="Filter to only this provider"
+                                    type="button">
+                                    <i aria-hidden="true" class="bi bi-plus-circle"></i>
+                                </button>
+                                <button aria-label="@($"Exclude {row.Provider}")"
+                                    class="resolution-exclude"
+                                    @onclick="() => ExcludeProviderAsync(row)"
+                                    title="Exclude this provider"
+                                    type="button">
+                                    <i aria-hidden="true" class="bi bi-dash-circle"></i>
+                                </button>
+                                @if (row.Status != CoverageStatus.Full && !string.IsNullOrWhiteSpace(row.Provider))
+                                {
+                                    <button aria-label="@($"Filter to {row.Provider}'s unresolved events")"
+                                        class="resolution-lens"
+                                        @onclick="() => FilterProviderUnresolvedAsync(row)"
+                                        title="Filter the view to this provider's unresolved events"
+                                        type="button">
+                                        <i aria-hidden="true" class="bi bi-funnel"></i>
+                                    </button>
+                                }
+                                @if (ShowDatabaseAction(row))
+                                {
+                                    <button aria-label="@($"Open Database Tools for {row.Provider}")"
+                                        class="resolution-dbtools"
+                                        @onclick="OpenDatabaseToolsAsync"
+                                        title="@DatabaseActionTooltip(row)"
+                                        type="button">
+                                        <i aria-hidden="true" class="bi bi-database-add"></i>
+                                    </button>
+                                }
+                            </span>
+                        </div>
+
+                        @if (IsExpanded(row))
+                        {
+                            <div class="resolution-coverage-detail" role="row">
+                                <div aria-colspan="8" class="resolution-detail-cell" role="cell">
+                                    <div aria-label="@($"Coverage details for {row.Provider}")" class="resolution-detail-region" id="@DetailId(index)" role="region">
+                                        @if (_detailLoading)
+                                        {
+                                            <div aria-busy="true" class="resolution-detail-status">Analyzing @row.Provider...</div>
+                                        }
+                                        else if (_detailFailed)
+                                        {
+                                            <div class="resolution-detail-status">
+                                                Could not analyze this provider.
+                                                <button class="resolution-cause-filter" @onclick="() => RetryDetailAsync(row)" type="button">Retry</button>
+                                            </div>
+                                        }
+                                        else if (_detail is { } detail)
+                                        {
+                                            <div class="resolution-detail-hint">@RemediationHint(row)</div>
+
+                                            @if (detail.Levels.Count > 0)
+                                            {
+                                                var sevSegments = SeveritySegments(detail).ToList();
+
+                                                <div class="resolution-detail-section">
+                                                    <div class="resolution-detail-heading">Unresolved by severity</div>
+                                                    @if (sevSegments.Count > 0)
+                                                    {
+                                                        <div aria-label="@SeverityBarLabel(detail)" class="resolution-detail-sevbar" role="img">
+                                                            @foreach (var seg in sevSegments)
+                                                            {
+                                                                <div class="resolution-detail-sevseg coverage-sev-@SeverityDisplay.Key(seg.Level)" style="@SegmentWidth(seg.Percent)" title="@($"{SeverityDisplay.Label(seg.Level)}: {FormatCount(seg.Unresolved)}")"></div>
+                                                            }
+                                                        </div>
+                                                    }
+                                                    <div class="resolution-detail-sevcounts">
+                                                        @foreach (var level in detail.Levels)
+                                                        {
+                                                            <span class="resolution-detail-sevcount"><span class="resolution-detail-sevdot coverage-sev-@SeverityDisplay.Key(level.Level)"></span>@SeverityDisplay.Label(level.Level): <strong>@FormatCount(level.Counts.Unresolved)</strong></span>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            }
+
+                                            @if (detail.EventIds.Count > 0)
+                                            {
+                                                <div class="resolution-detail-section">
+                                                    <div class="resolution-detail-heading">
+                                                        Unresolved event IDs
+                                                        @if (detail.DistinctUnresolvedEventIdCount > detail.EventIds.Count)
+                                                        {
+                                                            <span class="resolution-detail-note">top @FormatCount(detail.EventIds.Count) of @FormatCount(detail.DistinctUnresolvedEventIdCount)</span>
+                                                        }
+                                                    </div>
+                                                    <div class="resolution-detail-idtable" role="table">
+                                                        <div class="resolution-detail-idhead resolution-detail-idrow" role="row">
+                                                            <span role="columnheader">Event ID</span>
+                                                            <span class="resolution-num" role="columnheader">Total</span>
+                                                            <span class="resolution-num" role="columnheader">Unresolved</span>
+                                                            <span role="columnheader">Cause</span>
+                                                            <span role="columnheader"></span>
+                                                        </div>
+                                                        @foreach (var idRow in detail.EventIds)
+                                                        {
+                                                            <div class="resolution-detail-idrow" role="row">
+                                                                <span role="cell">@idRow.EventId</span>
+                                                                <span class="resolution-num" role="cell">@FormatCount(idRow.Counts.Total)</span>
+                                                                <span class="resolution-num" role="cell">@FormatCount(idRow.Counts.Unresolved)</span>
+                                                                <span role="cell">@DominantCauseLabel(idRow.Counts)</span>
+                                                                <span role="cell">
+                                                                    @if (!string.IsNullOrWhiteSpace(row.Provider))
+                                                                    {
+                                                                        <button aria-label="@($"Filter to event ID {idRow.EventId} unresolved events for {row.Provider}")"
+                                                                            class="resolution-lens"
+                                                                            @onclick="() => FilterEventIdUnresolvedAsync(row.Provider, idRow.EventId)"
+                                                                            title="Filter the view to this event ID's unresolved events"
+                                                                            type="button">
+                                                                            <i aria-hidden="true" class="bi bi-funnel"></i>
+                                                                        </button>
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            }
+        </div>
+    </ChildContent>
+    <ExtraFooterContent>
+        @if (HasReport)
+        {
+            <div class="resolution-coverage-footer">
+                @if (Unresolved > 0)
+                {
+                    <Button CssClass="resolution-coverage-filter"
+                        OnClick="ShowOnlyUnresolvedAsync"
+                        title="Filter the view to only unresolved events">
+                        Show only unresolved events
+                    </Button>
+                }
+                <Button CssClass="resolution-coverage-copy"
+                    Disabled="@_copying"
+                    OnClick="CopyTableAsync"
+                    title="Copy the coverage table as TSV">
+                    Copy table
+                </Button>
+                <span aria-live="polite" class="resolution-coverage-copied" role="status">
+                    @if (_showCopied)
+                    {
+                        <span class="resolution-coverage-copied-chip">Copied</span>
+                    }
+                </span>
+            </div>
+        }
+    </ExtraFooterContent>
+</ModalChrome>

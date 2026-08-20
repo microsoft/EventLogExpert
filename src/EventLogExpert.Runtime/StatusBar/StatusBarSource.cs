@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
@@ -26,7 +27,7 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
     private (bool ContinuouslyUpdate, int BufferCount, bool BufferFull, int SelectionCount) _eventLogFacets;
     private (ImmutableList<LogView> Tabs, ImmutableList<LogTabGroup> Groups, EventLogId? ActiveTabId) _logTableFacets;
     private bool _persistentFilterActive;
-    private (int Total, ImmutableDictionary<EventLogId, int> ByLog) _rawCountFacets;
+    private (int Total, ImmutableDictionary<EventLogId, ProviderResolutionCounts> ByLog) _rawCountFacets;
     private (ImmutableDictionary<StatusActivityId, (int, int)> Loading, string Resolver) _statusFacets;
 
     public StatusBarSource(
@@ -139,7 +140,7 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
         LogTableState state) =>
         (state.EventTables, state.Groups, state.ActiveEventLogId);
 
-    private static (int, ImmutableDictionary<EventLogId, int>) ProjectRawCount(RawEventCountState state) =>
+    private static (int, ImmutableDictionary<EventLogId, ProviderResolutionCounts>) ProjectRawCount(RawEventCountState state) =>
         (state.Total, state.ByLog);
 
     private static (ImmutableDictionary<StatusActivityId, (int, int)>, string) ProjectStatus(StatusBarState state) =>

@@ -27,10 +27,12 @@ public sealed class UIFluxorBoundaryTests
 
     // Every concrete modal, discovered by reflection so an omitted modal cannot silently escape the disposal-contract
     // check below (this is what regressed the DatabaseToolsModal coverage when the modal set was tracked by hand).
-    private static readonly Type[] s_modalTypes = typeof(ModalBase<>).Assembly.GetTypes()
-        .Where(type => type is { IsClass: true, IsAbstract: false } && InheritsModalBase(type))
-        .OrderBy(type => type.Name)
-        .ToArray();
+    private static readonly Type[] s_modalTypes =
+    [
+        .. typeof(ModalBase<>).Assembly.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && InheritsModalBase(type))
+            .OrderBy(type => type.Name)
+    ];
 
     public static TheoryData<Type> ModalTypes => [.. s_modalTypes];
 
@@ -40,9 +42,9 @@ public sealed class UIFluxorBoundaryTests
     [Fact]
     public void EveryModal_IsCoveredByTheBoundaryEnumeration() =>
         // Guards the reflection discovery against finding nothing and pins the known modal set; update the count
-        // deliberately when a modal is added or removed (the seven built-in modals plus FilterLibraryModal and
-        // StatsDetailModal).
-        Assert.Equal(9, s_modalTypes.Length);
+        // deliberately when a modal is added or removed (the seven built-in modals plus FilterLibraryModal,
+        // StatsDetailModal, and ResolutionCoverageModal).
+        Assert.Equal(10, s_modalTypes.Length);
 
     [Theory]
     [MemberData(nameof(ModalTypes))]

@@ -44,6 +44,8 @@ public sealed record ResolvedEvent(
 
     public Guid? RelatedActivityId { get; init; }
 
+    public EventResolutionStatus ResolutionStatus { get; init; } = EventResolutionStatus.Resolved;
+
     public string Source { get; init; } = string.Empty;
 
     public string TaskCategory { get; init; } = string.Empty;

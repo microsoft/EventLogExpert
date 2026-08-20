@@ -102,18 +102,18 @@
 
     background-color: rgba(255, 255, 255, 0.2);
     border-radius: .75rem;
-    font-size: .85rem;
+    font-size: var(--font-size-sm);
 }
 
 .banner-subtitle {
-    font-size: .85rem;
+    font-size: var(--font-size-sm);
     opacity: .9;
 }
 
 .banner-pagination {
     flex: 0 0 auto;
 
-    font-size: .85rem;
+    font-size: var(--font-size-sm);
     opacity: .85;
 }
 

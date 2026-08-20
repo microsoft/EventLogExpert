@@ -288,6 +288,16 @@ internal sealed class OrderedColumnView : IEventColumnView
     public void CountFieldValues(EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken) =>
         _reader.CountFieldValues(RankByPhysical(), field, counts, cancellationToken);
 
+    public void CountResolutionBySource(IDictionary<string, ProviderResolutionCounts> counts, CancellationToken cancellationToken) =>
+        _reader.CountResolutionBySource(RankByPhysical(), counts, cancellationToken);
+
+    public void CountResolutionDetailForSource(
+        string source,
+        IDictionary<int, ProviderResolutionCounts> byId,
+        ProviderResolutionCounts[] byLevelSlot,
+        CancellationToken cancellationToken) =>
+        _reader.CountResolutionDetailForSource(RankByPhysical(), source, byId, byLevelSlot, cancellationToken);
+
     public void CountSeverity(int[] slotCounts, CancellationToken cancellationToken) =>
         _reader.CountSeverity(RankByPhysical(), slotCounts, cancellationToken);
 

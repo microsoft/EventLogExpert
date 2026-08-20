@@ -1,3 +1,14 @@
+.stats-coverage-link {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    padding: 0;
+    text-decoration: underline;
+}
+
 .stats-pane {
     display: flex;
     flex-direction: column;

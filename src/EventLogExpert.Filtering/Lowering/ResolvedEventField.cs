@@ -30,5 +30,6 @@ internal enum ResolvedEventField
     TimeCreated,
     UserId,
     UserDisplayName,
-    Xml
+    Xml,
+    ResolutionStatus
 }

@@ -27,7 +27,7 @@
 
         @if (activeTable is not null)
         {
-            var total = TotalRawCount(activeTable, status.Groups, status);
+            var scoped = status.ScopedCounts(activeTable);
 
             var describesActiveTab = Presentation.ActiveTabId == activeTable.Id &&
                 Presentation.State == PresentationState.Current;
@@ -41,8 +41,20 @@
                 @onclick="ToggleStats"
                 title="@(StatsVisibility.IsVisible ? "Hide statistics for these events" : "Show statistics for these events")"
                 type="button">
-                <span class="status-bar-counts">@StatusBarFormatter.FormatCounts(total, shown, isFiltered && describesActiveTab, status.SelectionCount)</span>
+                <span class="status-bar-counts">
+                    @StatusBarFormatter.FormatCounts(scoped.Total, shown, isFiltered && describesActiveTab, status.SelectionCount)
+                </span>
                 <i aria-hidden="true" class="bi bi-caret-@(StatsVisibility.IsVisible ? "down" : "up")"></i>
+            </button>
+
+            <span aria-hidden="true" class="status-bar-sep">|</span>
+            <button aria-label="@($"Resolution and coverage: {StatusBarFormatter.FormatCoverageChip(scoped.Unresolved)}. Open for details.")"
+                class="status-bar-coverage status-bar-stats"
+                @onclick="OpenCoverage"
+                title="@StatusBarFormatter.CoverageChipTooltip(scoped.Unresolved, scoped.Total)"
+                type="button">
+                <i aria-hidden="true" class="bi bi-patch-question"></i>
+                <span class="status-bar-counts">@StatusBarFormatter.FormatCoverageChip(scoped.Unresolved)</span>
             </button>
         }
 

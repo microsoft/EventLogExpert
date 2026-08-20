@@ -497,6 +497,33 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         _store.CountFieldValues(rankByPhysical, ToColumnField(field), counts, cancellationToken);
     }
 
+    public void CountResolutionBySource(
+        ReadOnlySpan<int> rankByPhysical,
+        IDictionary<string, ProviderResolutionCounts> counts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(counts);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        _store.CountResolutionBySource(rankByPhysical, counts, cancellationToken);
+    }
+
+    public void CountResolutionDetailForSource(
+        ReadOnlySpan<int> rankByPhysical,
+        string source,
+        IDictionary<int, ProviderResolutionCounts> byId,
+        ProviderResolutionCounts[] byLevelSlot,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(byId);
+        ArgumentNullException.ThrowIfNull(byLevelSlot);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(byLevelSlot.Length, LevelSeverity.SlotCount);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(rankByPhysical.Length, Count);
+
+        _store.CountResolutionDetailForSource(rankByPhysical, source, byId, byLevelSlot, cancellationToken);
+    }
+
     public void CountSeverity(ReadOnlySpan<int> rankByPhysical, int[] slotCounts, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(slotCounts);
@@ -599,6 +626,8 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
                 return PooledField(EventColumnField.OwningLog, index);
             case EventFieldId.Opcode:
                 return PooledField(EventColumnField.Opcode, index);
+            case EventFieldId.ResolutionStatus:
+                return PooledField(EventColumnField.ResolutionStatus, index);
             case EventFieldId.RelatedActivityId:
             {
                 Guid value = _store.RawRelatedActivityId(index, out bool hasValue);
@@ -717,6 +746,7 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         EventColumnField.UserId => pending.UserId?.Value,
         EventColumnField.Opcode => pending.Opcode,
         EventColumnField.UserDisplayName => pending.UserDisplayName,
+        EventColumnField.ResolutionStatus => ResolutionStatusTokens.Format(pending.ResolutionStatus),
         _ => throw new ArgumentOutOfRangeException(nameof(column), column, null)
     };
 
@@ -733,6 +763,7 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
         EventFieldId.OwningLog => EventColumnField.OwningLog,
         EventFieldId.Opcode => EventColumnField.Opcode,
         EventFieldId.UserDisplayName => EventColumnField.UserDisplayName,
+        EventFieldId.ResolutionStatus => EventColumnField.ResolutionStatus,
         _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Not a single pooled string column.")
     };
 
@@ -755,6 +786,7 @@ internal sealed class EventColumnStoreReader : IEventColumnReader
             AddPendingValue(pending.UserId?.Value, indexByValue, extras);
             AddPendingValue(pending.UserDisplayName, indexByValue, extras);
             AddPendingValue(pending.Opcode, indexByValue, extras);
+            AddPendingValue(ResolutionStatusTokens.Format(pending.ResolutionStatus), indexByValue, extras);
         }
 
         return new PendingPoolExtension(_store.PoolDistinctCount, [.. extras], indexByValue);

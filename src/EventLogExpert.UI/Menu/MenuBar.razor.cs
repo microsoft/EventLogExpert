@@ -274,6 +274,7 @@ public sealed partial class MenuBar
         bool isGrouping = LogTableQueries.IsGrouping();
         bool isGroupDescending = LogTableQueries.IsGroupDescending();
         bool isHistogramVisible = HistogramVisibility.IsVisible;
+        bool hasActiveLogs = LogTableQueries.HasActiveLogs();
 
         return
         [
@@ -309,6 +310,11 @@ public sealed partial class MenuBar
                 "Timeline",
                 () => Actions.SetHistogramVisible(!isHistogramVisible),
                 isChecked: isHistogramVisible),
+            MenuItem.Item(
+                "Resolution & Coverage",
+                () => Actions.ShowResolutionCoverageAsync(),
+                isEnabled: hasActiveLogs,
+                disabledReason: hasActiveLogs ? null : "Open a log to view resolution coverage."),
         ];
     }
 

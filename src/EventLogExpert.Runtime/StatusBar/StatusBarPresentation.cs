@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
 using System.Collections.Immutable;
 
@@ -23,8 +24,8 @@ public sealed record StatusBarPresentation
 
     public int RawEventTotal { get; init; }
 
-    public ImmutableDictionary<EventLogId, int> RawEventCountsByLog { get; init; } =
-        ImmutableDictionary<EventLogId, int>.Empty;
+    public ImmutableDictionary<EventLogId, ProviderResolutionCounts> RawEventCountsByLog { get; init; } =
+        ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty;
 
     public ImmutableDictionary<StatusActivityId, LoadingProgress> LoadingActivities { get; init; } =
         ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty;
@@ -36,4 +37,43 @@ public sealed record StatusBarPresentation
     public ImmutableList<LogTabGroup> Groups { get; init; } = [];
 
     public EventLogId? ActiveTabId { get; init; }
+
+    /// <summary>
+    ///     Projects the per-log resolution tally for the active scope: the All-group sums every loaded log, a grouped tab
+    ///     sums its members, and an ungrouped tab reads its own entry. Returns the full tally so the stats chip reads
+    ///     <see cref="ProviderResolutionCounts.Total" /> and the coverage chip reads
+    ///     <see cref="ProviderResolutionCounts.Unresolved" /> from one call.
+    /// </summary>
+    public ProviderResolutionCounts ScopedCounts(LogView activeTable)
+    {
+        ArgumentNullException.ThrowIfNull(activeTable);
+
+        if (activeTable.GroupId?.IsAll == true)
+        {
+            return SumCounts(RawEventCountsByLog.Values);
+        }
+
+        if (activeTable.GroupId is not { } groupId)
+        {
+            return RawEventCountsByLog.GetValueOrDefault(activeTable.Id, default);
+        }
+
+        var group = Groups.FirstOrDefault(candidate => candidate.Id == groupId);
+
+        return group is null ?
+            default :
+            SumCounts(group.MemberIds.Select(id => RawEventCountsByLog.GetValueOrDefault(id, default)));
+    }
+
+    private static ProviderResolutionCounts SumCounts(IEnumerable<ProviderResolutionCounts> counts)
+    {
+        ProviderResolutionCounts total = default;
+
+        foreach (var value in counts)
+        {
+            total = total.Add(value);
+        }
+
+        return total;
+    }
 }

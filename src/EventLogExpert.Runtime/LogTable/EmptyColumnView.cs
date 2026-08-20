@@ -156,6 +156,14 @@ internal sealed class EmptyColumnView : IEventColumnView
 
     public void CountFieldValues(EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken) { }
 
+    public void CountResolutionBySource(IDictionary<string, ProviderResolutionCounts> counts, CancellationToken cancellationToken) { }
+
+    public void CountResolutionDetailForSource(
+        string source,
+        IDictionary<int, ProviderResolutionCounts> byId,
+        ProviderResolutionCounts[] byLevelSlot,
+        CancellationToken cancellationToken) { }
+
     public void CountSeverity(int[] slotCounts, CancellationToken cancellationToken) { }
 
     public byte[] EnsureHighlightWinners(

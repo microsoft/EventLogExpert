@@ -35,6 +35,7 @@ using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.StatusBar;
+using EventLogExpert.Runtime.ResolutionCoverage;
 using EventLogExpert.Runtime.Stats;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
@@ -132,6 +133,7 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IHistogramCommands, HistogramCommands>();
             services.AddSingleton<IStatsCommands, StatsCommands>();
             services.AddSingleton<IStatsService, StatsService>();
+            services.AddSingleton<IResolutionCoverageService, ResolutionCoverageService>();
             services.AddSingleton<ILogTableCommands, LogTableCommands>();
             services.AddSingleton<IScenarioFavoriteCommands, ScenarioFavoriteCommands>();
 

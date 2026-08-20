@@ -2,33 +2,30 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.EventLog;
 using Fluxor;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.LogTable;
 
-// Mirrors RawEventStoreReducers' FULL lifecycle so RawEventCountState.Total stays equal to the sum of the raw
-// store's per-log counts: AddTable seeds 0, CloseLog removes, CloseAll resets, IngestRawEvents replaces/adds by
-// mode. The same open-log guard (skip ids not currently present) prevents a stale post-close ingest from
-// resurrecting a count.
 internal sealed class RawEventCountReducers
 {
     [ReducerMethod]
     public static RawEventCountState ReduceAddTable(RawEventCountState state, AddTableAction action) =>
-        state with { ByLog = state.ByLog.SetItem(action.LogData.Id, 0) };
+        state with { ByLog = state.ByLog.SetItem(action.LogData.Id, default) };
 
     [ReducerMethod(typeof(CloseAllLogsAction))]
     public static RawEventCountState ReduceCloseAll(RawEventCountState state) =>
-        state.ByLog.IsEmpty
-            ? state
-            : state with { ByLog = ImmutableDictionary<EventLogId, int>.Empty };
+        state.ByLog.IsEmpty ?
+            state :
+            state with { ByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty };
 
     [ReducerMethod]
     public static RawEventCountState ReduceCloseLog(RawEventCountState state, CloseLogAction action) =>
-        state.ByLog.ContainsKey(action.LogId)
-            ? state with { ByLog = state.ByLog.Remove(action.LogId) }
-            : state;
+        state.ByLog.ContainsKey(action.LogId) ?
+            state with { ByLog = state.ByLog.Remove(action.LogId) } :
+            state;
 
     [ReducerMethod]
     public static RawEventCountState ReduceIngestRawEvents(RawEventCountState state, IngestRawEventsAction action)
@@ -42,14 +39,16 @@ internal sealed class RawEventCountReducers
         {
             if (!builder.TryGetValue(logId, out var existing)) { continue; }
 
+            var batch = CountBatch(events);
+
             var updated = action.Mode switch
             {
-                RawIngestMode.Replace => events.Count,
-                RawIngestMode.Append or RawIngestMode.Prepend => existing + events.Count,
+                RawIngestMode.Replace => batch,
+                RawIngestMode.Append or RawIngestMode.Prepend => existing.Add(batch),
                 _ => throw new ArgumentOutOfRangeException(nameof(action), action.Mode, "Unknown raw ingest mode.")
             };
 
-            if (updated == existing) { continue; }
+            if (updated.Equals(existing)) { continue; }
 
             builder[logId] = updated;
             changed = true;
@@ -63,9 +62,11 @@ internal sealed class RawEventCountReducers
     {
         if (!state.ByLog.TryGetValue(action.LogData.Id, out var existing)) { return state; }
 
-        return existing == action.Events.Count
-            ? state
-            : state with { ByLog = state.ByLog.SetItem(action.LogData.Id, action.Events.Count) };
+        var updated = CountBatch(action.Events);
+
+        return existing.Equals(updated) ?
+            state :
+            state with { ByLog = state.ByLog.SetItem(action.LogData.Id, updated) };
     }
 
     [ReducerMethod]
@@ -73,10 +74,22 @@ internal sealed class RawEventCountReducers
     {
         if (!state.ByLog.TryGetValue(action.LogData.Id, out var existing)) { return state; }
 
-        var updated = existing + action.Events.Count;
+        var updated = existing.Add(CountBatch(action.Events));
 
-        return updated == existing
-            ? state
-            : state with { ByLog = state.ByLog.SetItem(action.LogData.Id, updated) };
+        return updated.Equals(existing) ?
+            state :
+            state with { ByLog = state.ByLog.SetItem(action.LogData.Id, updated) };
+    }
+
+    private static ProviderResolutionCounts CountBatch(IReadOnlyList<ResolvedEvent> events)
+    {
+        ProviderResolutionCounts counts = default;
+
+        foreach (var resolvedEvent in events)
+        {
+            counts = counts.WithStatus(resolvedEvent.ResolutionStatus);
+        }
+
+        return counts;
     }
 }

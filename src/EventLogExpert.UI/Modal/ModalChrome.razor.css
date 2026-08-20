@@ -43,7 +43,7 @@ dialog:not(:modal) {
 
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-size: 1.1rem;
+    font-size: var(--font-size-lg);
     color: var(--clr-lightblue);
 }
 
@@ -111,7 +111,7 @@ dialog[data-body-layout="content"] .dialog-body {
 
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-size: 1.05rem;
+    font-size: var(--font-size-lg);
     color: var(--clr-lightblue);
 }
 
@@ -134,7 +134,7 @@ dialog[data-body-layout="content"] .dialog-body {
     color: var(--text-error);
     background: color-mix(in srgb, var(--clr-red) 8%, transparent);
     border-radius: .2rem;
-    font-size: .85rem;
+    font-size: var(--font-size-sm);
 }
 
 .inline-alert-buttons {

@@ -65,6 +65,11 @@ internal static class PropertyResolver
                 literalKind = TypedLiteralKind.String;
 
                 return true;
+            case "RESOLUTIONSTATUS":
+                field = ResolvedEventField.ResolutionStatus;
+                literalKind = TypedLiteralKind.String;
+
+                return true;
             case "PROCESSID":
                 field = ResolvedEventField.ProcessId;
                 literalKind = TypedLiteralKind.Int;

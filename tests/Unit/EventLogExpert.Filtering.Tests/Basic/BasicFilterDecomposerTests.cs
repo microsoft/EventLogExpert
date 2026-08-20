@@ -12,7 +12,8 @@ public sealed class BasicFilterDecomposerTests
         from property in new[]
         {
             EventProperty.Source, EventProperty.Level, EventProperty.LogName,
-            EventProperty.TaskCategory, EventProperty.UserId, EventProperty.Opcode
+            EventProperty.TaskCategory, EventProperty.UserId, EventProperty.Opcode,
+            EventProperty.ResolutionStatus
         }
         from op in new[] { ComparisonOperator.Contains, ComparisonOperator.NotEqual, ComparisonOperator.NotContains }
         select new object[] { property, op };
@@ -506,6 +507,7 @@ public sealed class BasicFilterDecomposerTests
             EventProperty.UserId => ["S-1-5-18", "S-1-5-19"],
             EventProperty.UserDisplayName => [@"CONTOSO\alice", @"NT AUTHORITY\SYSTEM"],
             EventProperty.LogName => ["Application", "System"],
+            EventProperty.ResolutionStatus => ["Resolved", "No provider metadata"],
             _ => null
         };
 
@@ -527,6 +529,7 @@ public sealed class BasicFilterDecomposerTests
             EventProperty.Description => "An error occurred",
             EventProperty.Xml => "<x/>",
             EventProperty.LogName => "Application",
+            EventProperty.ResolutionStatus => "Resolved",
             _ => null
         };
 }

@@ -6,7 +6,6 @@ using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Stats;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
-using System.Globalization;
 
 namespace EventLogExpert.UI.LogTable.Stats;
 
@@ -87,13 +86,12 @@ public sealed partial class StatsDetailModal : ModalBase<bool>
         }
     }
 
-    private static string FormatCount(int value) => value.ToString("N0", CultureInfo.CurrentCulture);
+    private static string FormatCount(int value) => TallyFormatter.Count(value);
 
     private void Exclude(StatsContributor row) =>
         Dimension.PushRowFilter(FilterLensCommands, row.Value, OriginLog, include: false);
 
-    private string FormatShare(int count) =>
-        _total == 0 ? "0%" : (count * 100.0 / _total).ToString("0.0", CultureInfo.CurrentCulture) + "%";
+    private string FormatShare(int count) => TallyFormatter.Share(count, _total);
 
     private void Include(StatsContributor row) =>
         Dimension.PushRowFilter(FilterLensCommands, row.Value, OriginLog, include: true);

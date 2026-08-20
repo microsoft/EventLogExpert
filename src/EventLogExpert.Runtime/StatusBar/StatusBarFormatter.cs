@@ -7,6 +7,10 @@ namespace EventLogExpert.Runtime.StatusBar;
 
 public static class StatusBarFormatter
 {
+    public static string CoverageChipTooltip(int unresolved, int total) =>
+        $"{unresolved:N0} unresolved of {total:N0} events loaded in this tab/group. " +
+        "Filters are not applied - open Coverage for the current view's breakdown.";
+
     public static string? FilterIndicatorTooltip(bool persistentActive, int lensCount)
     {
         var lensText = lensCount switch
@@ -54,6 +58,8 @@ public static class StatusBarFormatter
 
         return selectedCount >= 2 ? $"{head} \u00b7 {selectedCount:N0} selected" : head;
     }
+
+    public static string FormatCoverageChip(int unresolved) => $"{unresolved:N0} unresolved";
 
     public static string FormatSource(
         LogView? active,

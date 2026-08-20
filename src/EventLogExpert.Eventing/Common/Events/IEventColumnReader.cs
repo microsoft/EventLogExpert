@@ -229,6 +229,10 @@ public interface IEventColumnReader
     /// </summary>
     void CountFieldValues(ReadOnlySpan<int> rankByPhysical, EventFieldId field, IDictionary<string, int> counts, CancellationToken cancellationToken);
 
+    void CountResolutionBySource(ReadOnlySpan<int> rankByPhysical, IDictionary<string, ProviderResolutionCounts> counts, CancellationToken cancellationToken);
+
+    void CountResolutionDetailForSource(ReadOnlySpan<int> rankByPhysical, string source, IDictionary<int, ProviderResolutionCounts> byId, ProviderResolutionCounts[] byLevelSlot, CancellationToken cancellationToken);
+
     void CountSeverity(ReadOnlySpan<int> rankByPhysical, int[] slotCounts, CancellationToken cancellationToken);
 
     EventDataFieldEnumerator EnumerateEventData(EventLocator locator);

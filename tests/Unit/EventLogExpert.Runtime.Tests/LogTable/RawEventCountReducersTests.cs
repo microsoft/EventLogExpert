@@ -32,7 +32,7 @@ public sealed class RawEventCountReducersTests
 
         (store, count) = Ingest(store, count, RawIngestMode.Prepend, (logA.Id, Events(50, 2)));
         AssertInSync(store, count);
-        Assert.Equal(5, count.ByLog[logA.Id]);
+        Assert.Equal(5, count.ByLog[logA.Id].Total);
 
         (store, count) = Ingest(store, count, RawIngestMode.Append, (logB.Id, Events(10, 4)));
         AssertInSync(store, count);
@@ -45,7 +45,7 @@ public sealed class RawEventCountReducersTests
 
         (store, count) = Ingest(store, count, RawIngestMode.Replace, (logA.Id, Events(200, 1)));
         AssertInSync(store, count);
-        Assert.Equal(1, count.ByLog[logA.Id]);
+        Assert.Equal(1, count.ByLog[logA.Id].Total);
 
         (store, count) = CloseLog(store, count, logB.Id);
         AssertInSync(store, count);
@@ -72,11 +72,11 @@ public sealed class RawEventCountReducersTests
 
         (store, count) = LoadPartial(store, count, logA, Events(10, 2));
         AssertInSync(store, count);
-        Assert.Equal(5, count.ByLog[logA.Id]);
+        Assert.Equal(5, count.ByLog[logA.Id].Total);
 
         (store, count) = Load(store, count, logA, Events(100, 1));
         AssertInSync(store, count);
-        Assert.Equal(1, count.ByLog[logA.Id]);
+        Assert.Equal(1, count.ByLog[logA.Id].Total);
 
         var unopened = new EventLogData("LogB", LogPathType.Channel);
         (store, count) = Load(store, count, unopened, Events(1, 4));
@@ -90,13 +90,81 @@ public sealed class RawEventCountReducersTests
     }
 
     [Fact]
+    public void CountState_TalliesResolutionBreakdown_IngestAppendsThenReplaceResets()
+    {
+        // The partial/load test covers CountBatch via the load path; this locks the same breakdown on the ingest path
+        // where Append/Prepend ADD their batch and Replace re-tallies only its own batch.
+        var count = new RawEventCountState();
+        var logData = new EventLogData("LogA", LogPathType.Channel);
+        count = RawEventCountReducers.ReduceAddTable(count, new AddTableAction(logData));
+
+        count = IngestCount(count, RawIngestMode.Append, logData.Id, Mixed(
+            EventResolutionStatus.Resolved, EventResolutionStatus.NoProvider));
+        count = IngestCount(count, RawIngestMode.Prepend, logData.Id, Mixed(
+            EventResolutionStatus.NoMessage, EventResolutionStatus.Failed, EventResolutionStatus.Resolved));
+
+        var afterAdds = count.ByLog[logData.Id];
+        Assert.Equal(5, afterAdds.Total);
+        Assert.Equal(2, afterAdds.Resolved);
+        Assert.Equal(1, afterAdds.NoProvider);
+        Assert.Equal(1, afterAdds.NoMessage);
+        Assert.Equal(1, afterAdds.Failed);
+
+        count = IngestCount(count, RawIngestMode.Replace, logData.Id, Mixed(EventResolutionStatus.Failed));
+
+        var afterReplace = count.ByLog[logData.Id];
+        Assert.Equal(1, afterReplace.Total);
+        Assert.Equal(0, afterReplace.Resolved);
+        Assert.Equal(0, afterReplace.NoProvider);
+        Assert.Equal(0, afterReplace.NoMessage);
+        Assert.Equal(1, afterReplace.Failed);
+    }
+
+    [Fact]
+    public void CountState_TalliesResolutionBreakdown_PartialAddsThenLoadReplaces()
+    {
+        var count = new RawEventCountState();
+        var logData = new EventLogData("LogA", LogPathType.Channel);
+        count = RawEventCountReducers.ReduceAddTable(count, new AddTableAction(logData));
+
+        count = RawEventCountReducers.ReduceLoadEventsPartial(count, new LoadEventsPartialAction(logData, Mixed(
+            EventResolutionStatus.Resolved, EventResolutionStatus.Resolved, EventResolutionStatus.NoProvider)));
+
+        var afterFirst = count.ByLog[logData.Id];
+        Assert.Equal(3, afterFirst.Total);
+        Assert.Equal(2, afterFirst.Resolved);
+        Assert.Equal(1, afterFirst.NoProvider);
+
+        count = RawEventCountReducers.ReduceLoadEventsPartial(count, new LoadEventsPartialAction(logData, Mixed(
+            EventResolutionStatus.NoMessage, EventResolutionStatus.Failed)));
+
+        var afterSecond = count.ByLog[logData.Id];
+        Assert.Equal(5, afterSecond.Total);
+        Assert.Equal(2, afterSecond.Resolved);
+        Assert.Equal(1, afterSecond.NoProvider);
+        Assert.Equal(1, afterSecond.NoMessage);
+        Assert.Equal(1, afterSecond.Failed);
+
+        // The terminal full load re-tallies the whole cumulative list and REPLACES the accumulated partial tallies.
+        count = RawEventCountReducers.ReduceLoadEvents(count, new LoadEventsAction(logData, Mixed(
+            EventResolutionStatus.Resolved)));
+
+        var afterLoad = count.ByLog[logData.Id];
+        Assert.Equal(1, afterLoad.Total);
+        Assert.Equal(1, afterLoad.Resolved);
+        Assert.Equal(0, afterLoad.NoProvider);
+        Assert.Equal(0, afterLoad.NoMessage);
+        Assert.Equal(0, afterLoad.Failed);
+    }
+
+    [Fact]
     public void ReduceAddTable_SeedsZeroCount()
     {
         var logData = new EventLogData("LogA", LogPathType.Channel);
 
         var count = RawEventCountReducers.ReduceAddTable(new RawEventCountState(), new AddTableAction(logData));
 
-        Assert.Equal(0, count.ByLog[logData.Id]);
+        Assert.Equal(0, count.ByLog[logData.Id].Total);
         Assert.Equal(0, count.Total);
     }
 
@@ -112,11 +180,11 @@ public sealed class RawEventCountReducersTests
 
         (store, count) = Ingest(store, count, RawIngestMode.Replace, (logData.Id, Events(1, 5)));
         AssertInSync(store, count);
-        Assert.Equal(5, count.ByLog[logData.Id]);
+        Assert.Equal(5, count.ByLog[logData.Id].Total);
 
         (store, count) = Ingest(store, count, RawIngestMode.Replace, (logData.Id, Events(100, 5)));
         AssertInSync(store, count);
-        Assert.Equal(5, count.ByLog[logData.Id]);
+        Assert.Equal(5, count.ByLog[logData.Id].Total);
     }
 
     private static (RawEventStoreState, RawEventCountState) AddTable(
@@ -133,7 +201,7 @@ public sealed class RawEventCountReducersTests
         foreach (var (id, list) in store.ByLog)
         {
             Assert.True(count.ByLog.ContainsKey(id), $"count missing id {id.Value}");
-            Assert.Equal(list.Count, count.ByLog[id]);
+            Assert.Equal(list.Count, count.ByLog[id].Total);
         }
 
         Assert.Equal(store.ByLog.Values.Sum(list => list.Count), count.Total);
@@ -169,6 +237,17 @@ public sealed class RawEventCountReducersTests
             RawEventCountReducers.ReduceIngestRawEvents(count, action));
     }
 
+    private static RawEventCountState IngestCount(
+        RawEventCountState count,
+        RawIngestMode mode,
+        EventLogId id,
+        IReadOnlyList<ResolvedEvent> events) =>
+        RawEventCountReducers.ReduceIngestRawEvents(
+            count,
+            new IngestRawEventsAction(
+                new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [id] = events },
+                mode));
+
     private static (RawEventStoreState, RawEventCountState) Load(
         RawEventStoreState store,
         RawEventCountState count,
@@ -192,4 +271,8 @@ public sealed class RawEventCountReducersTests
         return (RawEventStoreReducers.ReduceLoadEventsPartial(store, action),
             RawEventCountReducers.ReduceLoadEventsPartial(count, action));
     }
+
+    private static IReadOnlyList<ResolvedEvent> Mixed(params EventResolutionStatus[] statuses) =>
+        [.. statuses.Select((status, index) =>
+            new ResolvedEvent("LogA", LogPathType.Channel) { Id = index + 1, ResolutionStatus = status })];
 }

@@ -320,6 +320,9 @@ public sealed partial class StatsPane
         catch (ObjectDisposedException) { /* Component torn down mid-failure; nothing to report. */ }
     }
 
+    private void OpenCoverage() =>
+        _ = ModalCoordinator.OpenResolutionCoverageAsync();
+
     private void OpenDetail(StatsDimension dimension) =>
         _ = ModalCoordinator.OpenStatsDetailAsync(dimension, ViewSource.Current.View, Presentation.ActiveLogName);
 

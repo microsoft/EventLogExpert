@@ -8,6 +8,7 @@ using EventLogExpert.UI.Database;
 using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.FilterLibrary;
+using EventLogExpert.UI.LogTable.Resolution;
 using EventLogExpert.UI.LogTable.Stats;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Update;
@@ -64,6 +65,13 @@ public static class ModalCoordinatorLaunchers
             ArgumentNullException.ThrowIfNull(coordinator);
 
             return coordinator.PushAsync<SettingsModal, bool>();
+        }
+
+        public Task<ModalOpenResult<bool>> OpenResolutionCoverageAsync()
+        {
+            ArgumentNullException.ThrowIfNull(coordinator);
+
+            return coordinator.PushAsync<ResolutionCoverageModal, bool>();
         }
 
         public Task<ModalOpenResult<bool>> OpenStatsDetailAsync(StatsDimension dimension, IEventColumnView view, string? originLog)

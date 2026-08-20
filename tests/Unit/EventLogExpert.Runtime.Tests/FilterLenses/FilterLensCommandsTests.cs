@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.FilterLenses;
 using Fluxor;
 using NSubstitute;
@@ -17,6 +18,31 @@ public sealed class FilterLensCommandsTests
         new FilterLensCommands(dispatcher).ClearLenses();
 
         dispatcher.Received(1).Dispatch(Arg.Any<ClearFilterLensesAction>());
+    }
+
+    [Fact]
+    public void IncludeEventId_PushesNonNullLens()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+
+        new FilterLensCommands(dispatcher).IncludeEventId(4624);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action => action != null && action.Lens != null));
+    }
+
+    [Theory]
+    [InlineData(ResolutionStatusTokens.NoProvider)]
+    [InlineData(ResolutionStatusTokens.NoMessage)]
+    [InlineData(ResolutionStatusTokens.Failed)]
+    public void IncludeValue_ResolutionStatus_PushesNonNullLens(string token)
+    {
+        // The coverage cause-filters rely on this producing a lens; PushLens silently swallows a null, so a formatter
+        // regression would make those buttons no-ops.
+        var dispatcher = Substitute.For<IDispatcher>();
+
+        new FilterLensCommands(dispatcher).IncludeValue(EventProperty.ResolutionStatus, token);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action => action != null && action.Lens != null));
     }
 
     [Fact]

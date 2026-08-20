@@ -11,8 +11,8 @@ public sealed class FilterComparisonJsonConverterTests
     [Fact]
     public void EventProperty_MemberCount_IsFrozenForWireCompatibility()
     {
-        // Members are appended at the end (Opcode=15, RelatedActivityId=16, UserDisplayName=17); appending is JSON-by-name wire-safe.
-        Assert.Equal(17, Enum.GetValues<EventProperty>().Length);
+        // Members are appended at the end (Opcode=15, RelatedActivityId=16, UserDisplayName=17, ResolutionStatus=18); appending is JSON-by-name wire-safe.
+        Assert.Equal(18, Enum.GetValues<EventProperty>().Length);
     }
 
     [Fact]

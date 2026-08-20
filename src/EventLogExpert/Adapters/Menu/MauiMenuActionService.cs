@@ -20,6 +20,7 @@ using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DebugLog;
+using EventLogExpert.UI.LogTable.Resolution;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.WindowsPlatform.Activation;
@@ -301,6 +302,11 @@ public sealed class MauiMenuActionService(
             _traceLogger.Error($"Failed to display release notes: {ex}");
         }
     }
+
+    public Task ShowResolutionCoverageAsync() =>
+        TryOpenModalAsync(
+            () => _modalCoordinator.OpenResolutionCoverageAsync(),
+            nameof(ResolutionCoverageModal));
 
     public void ToggleGroupSortDirection() => _logTableCommands.ToggleGroupSortDirection();
 

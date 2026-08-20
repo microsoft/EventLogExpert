@@ -51,6 +51,7 @@ internal static class CellFilterBuilder
             EventProperty.Source => @event.Source,
             EventProperty.TaskCategory => @event.TaskCategory,
             EventProperty.Opcode => @event.Opcode,
+            EventProperty.ResolutionStatus => ResolutionStatusTokens.Format(@event.ResolutionStatus),
             EventProperty.ProcessId => @event.ProcessId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             EventProperty.ThreadId => @event.ThreadId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             EventProperty.UserDisplayName => @event.UserDisplayName,

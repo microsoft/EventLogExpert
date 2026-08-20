@@ -4,12 +4,15 @@
 using Bunit;
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Stats;
 using EventLogExpert.Runtime.StatusBar;
+using EventLogExpert.UI.LogTable.Resolution;
+using EventLogExpert.UI.Modal;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -20,6 +23,7 @@ public sealed class StatusBarTests : BunitContext
 {
     private readonly IFilterAppliedSource _filterApplied = Substitute.For<IFilterAppliedSource>();
     private readonly IFilterLensSource _lensSource = Substitute.For<IFilterLensSource>();
+    private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
     private readonly IStatsCommands _statsCommands = Substitute.For<IStatsCommands>();
     private readonly IStatsVisibilitySource _statsVisibility = Substitute.For<IStatsVisibilitySource>();
     private readonly IStatusBarSource _statusBarSource = Substitute.For<IStatusBarSource>();
@@ -34,6 +38,7 @@ public sealed class StatusBarTests : BunitContext
 
         Services.AddSingleton(_filterApplied);
         Services.AddSingleton(_lensSource);
+        Services.AddSingleton(_modalCoordinator);
         Services.AddSingleton(_statsCommands);
         Services.AddSingleton(_statsVisibility);
         Services.AddSingleton(_statusBarSource);
@@ -95,7 +100,7 @@ public sealed class StatusBarTests : BunitContext
         {
             Tabs = ImmutableList.Create(new LogView(id) { LogName = "Application", LogPathType = LogPathType.Channel }),
             ActiveTabId = id,
-            RawEventCountsByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(id, 0)
+            RawEventCountsByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(id, default)
         };
         _viewSource.Current.Returns(pending);
 
@@ -134,7 +139,7 @@ public sealed class StatusBarTests : BunitContext
         {
             Tabs = ImmutableList.Create(channel),
             ActiveTabId = id,
-            RawEventCountsByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(id, 0),
+            RawEventCountsByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(id, default),
             NewEventBufferCount = 42
         };
 
@@ -142,6 +147,17 @@ public sealed class StatusBarTests : BunitContext
 
         var newEvents = cut.FindAll(".status-bar-activity").Single(node => node.TextContent.Contains("New Events"));
         Assert.Equal("off", newEvents.GetAttribute("aria-live"));
+    }
+
+    [Fact]
+    public void CoverageChip_Click_OpensCoverageModal()
+    {
+        SetActiveLog(total: 100, shown: 100, filter: Unfiltered, selected: 0);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find(".status-bar-coverage").Click();
+
+        _modalCoordinator.Received(1).PushAsync<ResolutionCoverageModal, bool>(Arg.Any<IDictionary<string, object?>?>());
     }
 
     [Fact]
@@ -323,7 +339,7 @@ public sealed class StatusBarTests : BunitContext
             Tabs = ImmutableList.Create(log),
             ActiveTabId = id,
             RawEventTotal = total,
-            RawEventCountsByLog = ImmutableDictionary<EventLogId, int>.Empty.Add(id, total),
+            RawEventCountsByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(id, new ProviderResolutionCounts(total, total, 0, 0, 0)),
             SelectionCount = selected
         };
     }

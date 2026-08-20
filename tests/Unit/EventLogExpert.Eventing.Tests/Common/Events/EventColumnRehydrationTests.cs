@@ -49,6 +49,16 @@ public sealed class EventColumnRehydrationTests
     }
 
     [Fact]
+    public void GetDetail_PendingRow_PreservesResolutionStatus()
+    {
+        ResolvedEvent pending = new("live", LogPathType.Channel) { Id = 1, ResolutionStatus = EventResolutionStatus.NoMessage };
+        EventColumnStore store = EventColumnStore.Build([], generation: 1, contentVersion: 1).Append([pending]);
+
+        Assert.True(store.IsPending(0));
+        Assert.Equal(EventResolutionStatus.NoMessage, store.GetDetail(0).ResolutionStatus);
+    }
+
+    [Fact]
     public void GetDetail_PendingRow_ReturnsSamePendingEvent()
     {
         ResolvedEvent pending = BuildRichEvent();
@@ -274,6 +284,26 @@ public sealed class EventColumnRehydrationTests
         Assert.Equal(string.Empty, store.GetDetail(0).KeywordsDisplayName);
         Assert.Equal("Classic", store.GetDetail(1).KeywordsDisplayName);
         Assert.Equal("Audit Success, Audit Failure, Classic", store.GetDetail(2).KeywordsDisplayName);
+    }
+
+    [Fact]
+    public void GetDetail_SealedRows_RoundTripResolutionStatus()
+    {
+        ResolvedEvent[] sources =
+        [
+            new("live", LogPathType.Channel) { Id = 1, ResolutionStatus = EventResolutionStatus.NoProvider },
+            new("live", LogPathType.Channel) { Id = 2, ResolutionStatus = EventResolutionStatus.NoMessage },
+            new("live", LogPathType.Channel) { Id = 3, ResolutionStatus = EventResolutionStatus.Failed },
+            new("live", LogPathType.Channel) { Id = 4, ResolutionStatus = EventResolutionStatus.Resolved }
+        ];
+
+        EventColumnStore store = EventColumnStore.Build(sources, generation: 1, contentVersion: 1);
+
+        Assert.False(store.IsPending(0));
+        Assert.Equal(EventResolutionStatus.NoProvider, store.GetDetail(0).ResolutionStatus);
+        Assert.Equal(EventResolutionStatus.NoMessage, store.GetDetail(1).ResolutionStatus);
+        Assert.Equal(EventResolutionStatus.Failed, store.GetDetail(2).ResolutionStatus);
+        Assert.Equal(EventResolutionStatus.Resolved, store.GetDetail(3).ResolutionStatus);
     }
 
     [Fact]

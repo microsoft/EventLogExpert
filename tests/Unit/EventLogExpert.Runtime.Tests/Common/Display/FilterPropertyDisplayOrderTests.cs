@@ -39,6 +39,7 @@ public sealed class FilterPropertyDisplayOrderTests
                 "Opcode",
                 "Process ID",
                 "Related Activity ID",
+                "Resolution Status",
                 "Source",
                 "Task Category",
                 "Thread ID",
