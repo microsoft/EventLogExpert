@@ -97,6 +97,8 @@ public sealed partial class FilterPane
 
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
+    [Inject] private IFilterPromotedNotifier FilterPromotedNotifier { get; init; } = null!;
+
     [Inject] private IFilteredDateRangeSource FilteredDateRange { get; init; } = null!;
 
     private bool HasClearableFilters =>
@@ -436,6 +438,12 @@ public sealed partial class FilterPane
 
     protected override void OnInitialized()
     {
+        // Seed the display zone and hydrate the date model from any already-applied range BEFORE binding the
+        // EditContext, so an externally-set FilteredDateRange (e.g. a promoted time-window lens) renders in local time
+        // rather than UTC, and the EditContext wraps the populated model.
+        _currentTimeZone = Settings.TimeZoneInfo;
+        UpdateFilterDate(FilteredDateRange.Current);
+
         _editContext = new EditContext(_model);
 
         ObserveSource(LibraryEntries);
@@ -471,6 +479,21 @@ public sealed partial class FilterPane
                 if (_disposed) { return Task.CompletedTask; }
 
                 UpdateFilterDate(FilteredDateRange.Current);
+                StateHasChanged();
+
+                return Task.CompletedTask;
+            });
+
+        ObserveSource(
+            handler => FilterPromotedNotifier.Promoted += handler,
+            handler => FilterPromotedNotifier.Promoted -= handler,
+            () =>
+            {
+                if (_disposed) { return Task.CompletedTask; }
+
+                // A promoted lens adds its row to the (possibly collapsed) filter list; expand it so the kept filter
+                // is visible, matching every other filter-adding path.
+                _isFilterListVisible = true;
                 StateHasChanged();
 
                 return Task.CompletedTask;

@@ -6,6 +6,7 @@ using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Common.Display;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.FilterLenses;
 
@@ -76,6 +77,7 @@ internal static class FilterLensFactory
             Label = $"{PropertyDisplayName(property)} = {value}",
             Kind = LensKind.Property,
             ExcludeFilters = absentComplement is null ? [complement] : [complement, absentComplement],
+            PromoteFilters = BuildKeepOnlyPromoteForm(property, value),
             OriginLog = originLog
         };
     }
@@ -154,8 +156,18 @@ internal static class FilterLensFactory
             Label = label,
             Kind = LensKind.Property,
             ExcludeFilters = [complement],
+            PromoteFilters = BuildKeepOnlyPromoteForm(property, value.ToString()),
             OriginLog = originLog
         };
+    }
+
+    private static ImmutableList<SavedFilter> BuildKeepOnlyPromoteForm(EventProperty property, string value)
+    {
+        if (!TryFormatEqual(property, value, out var comparisonText)) { return []; }
+
+        var include = SavedFilter.TryCreate(comparisonText, isExcluded: false, isEnabled: true, mode: FilterMode.Advanced);
+
+        return include?.Compiled is null ? [] : [include];
     }
 
     private static string FormatRadius(TimeSpan radius) => radius switch

@@ -17,6 +17,8 @@ public interface IFilterLensCommands
 
     void IncludeValue(EventProperty property, string value, string? originLog = null);
 
+    void PromoteLens(FilterLensId id);
+
     void RemoveLens(FilterLensId id);
 
     void ShowEventsNearTime(DateTime timeCreated, TimeSpan radius, TimeZoneInfo displayZone, string? originLog = null);

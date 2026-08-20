@@ -30,6 +30,25 @@ public sealed class FilterLensCommandsTests
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action => action != null && action.Lens != null));
     }
 
+    [Fact]
+    public void IncludeValue_ProducesKeepOnlyLens_WithPositiveIncludePromoteForm()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+
+        new FilterLensCommands(dispatcher).IncludeValue(EventProperty.Source, "Contoso");
+
+        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null &&
+            // Transient form stays an exclude-of-complement for master-toggle-independent live narrowing...
+            action.Lens.ExcludeFilters.Count == 1 &&
+            action.Lens.ExcludeFilters[0].IsExcluded &&
+            // ...but the promote form is a single positive include that reads as the user's intent.
+            action.Lens.PromoteFilters.Count == 1 &&
+            !action.Lens.PromoteFilters[0].IsExcluded &&
+            action.Lens.PromoteFilters[0].Compiled != null &&
+            action.Lens.PromoteFilters[0].ComparisonText!.Contains("==")));
+    }
+
     [Theory]
     [InlineData(ResolutionStatusTokens.NoProvider)]
     [InlineData(ResolutionStatusTokens.NoMessage)]
@@ -43,6 +62,24 @@ public sealed class FilterLensCommandsTests
         new FilterLensCommands(dispatcher).IncludeValue(EventProperty.ResolutionStatus, token);
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action => action != null && action.Lens != null));
+    }
+
+    [Fact]
+    public void IncludeValue_User_KeepsTwoExcludeComplement_ButPromotesToSinglePositiveInclude()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+
+        new FilterLensCommands(dispatcher).IncludeValue(EventProperty.UserDisplayName, "CONTOSO\\jdoe");
+
+        dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
+            action != null &&
+            // The presence-gated User keep-only lens needs TWO transient excludes (!= value + == null) to avoid
+            // leaking no-user rows...
+            action.Lens.ExcludeFilters.Count == 2 &&
+            // ...but promotes to a SINGLE positive include, since an include drops a no-user (NoMatch) row on its own.
+            action.Lens.PromoteFilters.Count == 1 &&
+            !action.Lens.PromoteFilters[0].IsExcluded &&
+            action.Lens.PromoteFilters[0].Compiled != null));
     }
 
     [Fact]

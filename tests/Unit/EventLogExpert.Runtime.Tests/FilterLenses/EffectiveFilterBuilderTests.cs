@@ -302,6 +302,26 @@ public sealed class EffectiveFilterBuilderTests
         Assert.Equal([1], result.Select(e => e.Id).OrderBy(id => id));
     }
 
+    [Fact]
+    public void PromoteForm_IncludeUserLens_KeepsMatchingUser_DropsOthersAndNoUserEvents()
+    {
+        // The keep-only lens's PROMOTE form is a single positive include (User == SYSTEM). Unlike the transient
+        // exclude-of-complement (which needs a second "User == null" clause), an include drops a no-user row on its own
+        // (a decisive NoMatch), so the promoted pane view keeps exactly the same set as the live lens.
+        var system = FilterEventBuilder.CreateTestEvent(id: 1, userDisplayName: "SYSTEM");
+        var alice = FilterEventBuilder.CreateTestEvent(id: 2, userDisplayName: "CONTOSO\\alice");
+        var noUser = FilterEventBuilder.CreateTestEvent(id: 3);
+
+        var lens = FilterLensFactory.ForIncludedValue(EventProperty.UserDisplayName, "SYSTEM");
+        Assert.NotNull(lens);
+        Assert.Single(lens!.PromoteFilters);
+        Assert.False(lens.PromoteFilters[0].IsExcluded);
+
+        var result = s_filterService.GetFilteredEvents([system, alice, noUser], new Filter(null, lens.PromoteFilters));
+
+        Assert.Equal([1], result.Select(e => e.Id).OrderBy(id => id));
+    }
+
     private static DateTime At(int hourUtc) => new(2024, 1, 1, hourUtc, 0, 0, DateTimeKind.Utc);
 
     private static SavedFilter SavedFilterFor(string comparisonText) =>

@@ -64,6 +64,22 @@ public sealed class LensBreadcrumbTests : BunitContext
     }
 
     [Fact]
+    public void KeepButton_DispatchesPromoteLens_AndHasAccessibleLabel()
+    {
+        var lens = Summary("Activity ID = abc");
+        _source.Lenses.Returns(ImmutableList.Create(lens));
+
+        var cut = Render<LensBreadcrumb>();
+
+        var keep = cut.Find(".lens-chip-keep");
+        Assert.Equal($"Keep lens as filter: {lens.Label}", keep.GetAttribute("aria-label"));
+
+        keep.Click();
+
+        _commands.Received(1).PromoteLens(lens.Id);
+    }
+
+    [Fact]
     public void NoLenses_RendersNothing()
     {
         _source.Lenses.Returns(ImmutableList<FilterLensSummary>.Empty);

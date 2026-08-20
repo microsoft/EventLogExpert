@@ -66,7 +66,7 @@ public sealed class RestoreFilterPaneStateTests
         var lensState = Substitute.For<IState<FilterLensState>>();
         lensState.Value.Returns(new FilterLensState());
 
-        var effects = new Effects(appliedFilter, rawEventStore, filterPaneState, lensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()));
+        var effects = new Effects(appliedFilter, rawEventStore, filterPaneState, lensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()), new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
 
         return (effects, Substitute.For<IDispatcher>());
     }

@@ -4,8 +4,10 @@
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Filtering.TestUtils.Constants;
+using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
 using System.Collections.Immutable;
+using Reducers = EventLogExpert.Runtime.FilterPane.Reducers;
 
 namespace EventLogExpert.Runtime.Tests.FilterPane;
 
@@ -228,6 +230,151 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
+    public void ReduceCommitPromoted_CaseVariantValue_TreatedAsDistinct()
+    {
+        // Ordinal-exact dedup: the lens preserves the EXACT predicate it matched, so a case-variant value is a
+        // distinct predicate and must NOT be folded the way the lowercased library MRU (ReduceMergeFilters) would.
+        var existing = PromotedExclude("Source == \"foo\"", isEnabled: false);
+        var promoted = PromotedExclude("Source == \"FOO\"");
+        Assert.NotEqual(existing.ComparisonText, promoted.ComparisonText);
+        var state = new FilterPaneState { Filters = [existing] };
+
+        var result = Reducers.ReduceCommitPromoted(
+            state,
+            new CommitPromotedLensAction(FilterLensId.Create(), [promoted], null));
+
+        Assert.Equal(2, result.Filters.Count);
+        Assert.False(result.Filters[0].IsEnabled);
+        Assert.True(result.Filters[1].IsEnabled);
+    }
+
+    [Fact]
+    public void ReduceCommitPromoted_DisabledEquivalent_ReEnabledInPlace()
+    {
+        var existing = PromotedExclude("Source != \"foo\"", isEnabled: false);
+        var state = new FilterPaneState { Filters = [existing] };
+
+        var result = Reducers.ReduceCommitPromoted(
+            state,
+            new CommitPromotedLensAction(FilterLensId.Create(), [PromotedExclude("Source != \"foo\"")], null));
+
+        Assert.Single(result.Filters);
+        Assert.True(result.Filters[0].IsEnabled);
+        Assert.Equal(existing.Id, result.Filters[0].Id);
+    }
+
+    [Fact]
+    public void ReduceCommitPromoted_EmptyPayload_ReturnsSameStateInstance()
+    {
+        var state = new FilterPaneState { Filters = [PromotedExclude("Source != \"foo\"")] };
+
+        var result = Reducers.ReduceCommitPromoted(
+            state,
+            new CommitPromotedLensAction(FilterLensId.Create(), [], null));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void ReduceCommitPromoted_EnabledEquivalent_LeavesStateUnchanged()
+    {
+        var state = new FilterPaneState { Filters = [PromotedExclude("Source != \"foo\"")] };
+
+        var result = Reducers.ReduceCommitPromoted(
+            state,
+            new CommitPromotedLensAction(FilterLensId.Create(), [PromotedExclude("Source != \"foo\"")], null));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void ReduceCommitPromoted_NetNewExclude_AddsEnabledWithFreshId()
+    {
+        var promoted = PromotedExclude("Source != \"foo\"");
+        var state = new FilterPaneState();
+
+        var result = Reducers.ReduceCommitPromoted(
+            state,
+            new CommitPromotedLensAction(FilterLensId.Create(), [promoted], null));
+
+        Assert.Single(result.Filters);
+        Assert.True(result.Filters[0].IsExcluded);
+        Assert.True(result.Filters[0].IsEnabled);
+        Assert.Equal(promoted.ComparisonText, result.Filters[0].ComparisonText);
+        Assert.NotEqual(promoted.Id, result.Filters[0].Id);
+    }
+
+    [Fact]
+    public void ReduceCommitPromoted_OrdinalMatchDisabledAndUncompiled_StillAddsWorkingPromotedFilter()
+    {
+        var promoted = PromotedExclude("Source != \"foo\"");
+        var deadExisting = promoted with { Id = FilterId.Create(), Compiled = null, IsEnabled = false };
+        var state = new FilterPaneState { Filters = [deadExisting] };
+
+        var result = Reducers.ReduceCommitPromoted(
+            state,
+            new CommitPromotedLensAction(FilterLensId.Create(), [promoted], null));
+
+        // The dead uncompiled row narrows nothing, so the working promoted filter must still be added, not dropped.
+        Assert.Equal(2, result.Filters.Count);
+        Assert.Contains(result.Filters, filter => filter.Compiled is not null && filter.IsEnabled && filter.IsExcluded);
+    }
+
+    [Fact]
+    public void ReduceCommitPromoted_PositiveInclude_AddsEnabledIncludeRow()
+    {
+        var include = SavedFilter.TryCreate("Source == \"foo\"", isExcluded: false, isEnabled: true, mode: FilterMode.Advanced);
+        Assert.NotNull(include);
+        var state = new FilterPaneState();
+
+        var result = Reducers.ReduceCommitPromoted(
+            state,
+            new CommitPromotedLensAction(FilterLensId.Create(), [include], null));
+
+        Assert.Single(result.Filters);
+        Assert.False(result.Filters[0].IsExcluded);
+        Assert.True(result.Filters[0].IsEnabled);
+        Assert.NotEqual(include.Id, result.Filters[0].Id);
+    }
+
+    [Fact]
+    public void ReduceCommitPromoted_SkipsDeadRowAndReusesLiveEquivalent_WithoutDuplicating()
+    {
+        var promoted = PromotedExclude("Source != \"foo\"");
+        var deadExisting = promoted with { Id = FilterId.Create(), Compiled = null, IsEnabled = false };
+        var liveExisting = promoted with { Id = FilterId.Create(), IsEnabled = true };
+        var state = new FilterPaneState { Filters = [deadExisting, liveExisting] };
+
+        var result = Reducers.ReduceCommitPromoted(
+            state,
+            new CommitPromotedLensAction(FilterLensId.Create(), [promoted], null));
+
+        // The dead row (lower index) is passed over; the live equivalent is reused, so no third row is added.
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void ReduceCommitPromoted_TimeWindow_IntersectsIntoDateRange()
+    {
+        var window = new DateFilter
+        {
+            After = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Before = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc),
+            IsEnabled = true
+        };
+        var state = new FilterPaneState();
+
+        var result = Reducers.ReduceCommitPromoted(
+            state,
+            new CommitPromotedLensAction(FilterLensId.Create(), [], window));
+
+        Assert.NotNull(result.FilteredDateRange);
+        Assert.True(result.FilteredDateRange.IsEnabled);
+        Assert.Equal(window.After, result.FilteredDateRange.After);
+        Assert.Equal(window.Before, result.FilteredDateRange.Before);
+    }
+
+    [Fact]
     public void ReduceMergeFilters_DifferentCaseSameTuple_DedupesAsDuplicate()
     {
         var existing = SavedFilter.TryCreate("Level == 4");
@@ -392,6 +539,46 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
+    public void ReduceSetFilterDateRangeSuccess_ShouldSetDateRange()
+    {
+        // Arrange
+        var state = new FilterPaneState();
+
+        var dateModel = new DateFilter
+        {
+            After = DateTime.UtcNow.AddDays(-1),
+            Before = DateTime.UtcNow
+        };
+
+        var action = new SetFilterDateRangeSuccessAction(dateModel);
+
+        // Act
+        var result = Reducers.ReduceSetFilterDateRangeSuccess(state, action);
+
+        // Assert
+        Assert.NotNull(result.FilteredDateRange);
+        Assert.Equal(dateModel, result.FilteredDateRange);
+    }
+
+    [Fact]
+    public void ReduceSetFilterDateRangeSuccess_WithNull_ShouldSetNullDateRange()
+    {
+        // Arrange
+        var state = new FilterPaneState
+        {
+            FilteredDateRange = new DateFilter { After = DateTime.UtcNow }
+        };
+
+        var action = new SetFilterDateRangeSuccessAction(null);
+
+        // Act
+        var result = Reducers.ReduceSetFilterDateRangeSuccess(state, action);
+
+        // Assert
+        Assert.Null(result.FilteredDateRange);
+    }
+
+    [Fact]
     public void ReduceSetFilter_ShouldReplaceFilter()
     {
         // Arrange
@@ -472,46 +659,6 @@ public sealed class FilterPaneReducerTests
         Assert.Equal(2, result.Filters.Count);
         Assert.Equal(FilterTestConstants.FilterIdEquals100, result.Filters[0].ComparisonText);
         Assert.Equal(FilterTestConstants.FilterIdEquals200, result.Filters[1].ComparisonText);
-    }
-
-    [Fact]
-    public void ReduceSetFilterDateRangeSuccess_ShouldSetDateRange()
-    {
-        // Arrange
-        var state = new FilterPaneState();
-
-        var dateModel = new DateFilter
-        {
-            After = DateTime.UtcNow.AddDays(-1),
-            Before = DateTime.UtcNow
-        };
-
-        var action = new SetFilterDateRangeSuccessAction(dateModel);
-
-        // Act
-        var result = Reducers.ReduceSetFilterDateRangeSuccess(state, action);
-
-        // Assert
-        Assert.NotNull(result.FilteredDateRange);
-        Assert.Equal(dateModel, result.FilteredDateRange);
-    }
-
-    [Fact]
-    public void ReduceSetFilterDateRangeSuccess_WithNull_ShouldSetNullDateRange()
-    {
-        // Arrange
-        var state = new FilterPaneState
-        {
-            FilteredDateRange = new DateFilter { After = DateTime.UtcNow }
-        };
-
-        var action = new SetFilterDateRangeSuccessAction(null);
-
-        // Act
-        var result = Reducers.ReduceSetFilterDateRangeSuccess(state, action);
-
-        // Assert
-        Assert.Null(result.FilteredDateRange);
     }
 
     [Fact]
@@ -616,6 +763,10 @@ public sealed class FilterPaneReducerTests
         // Assert
         Assert.True(result.IsEnabled);
     }
+
+    private static SavedFilter PromotedExclude(string text, bool isEnabled = true) =>
+        SavedFilter.TryCreate(text, isExcluded: true, isEnabled: isEnabled, mode: FilterMode.Advanced)
+        ?? throw new InvalidOperationException($"test filter failed to compile: {text}");
 }
 
 public sealed class FilterPaneIntegrationTests

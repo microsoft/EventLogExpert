@@ -19,6 +19,12 @@
             var lensId = lens.Id;
             <span class="lens-chip">
                 <span class="lens-chip-label" title="@lens.Label">@lens.Label</span>
+                <button aria-label="@($"Keep lens as filter: {lens.Label}")"
+                    class="lens-chip-keep"
+                    @onclick="@(() => Commands.PromoteLens(lensId))"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-pin-angle"></i>
+                </button>
                 <button aria-label="@($"Remove lens: {lens.Label}")"
                     class="lens-chip-remove"
                     @onclick="@(() => Commands.RemoveLens(lensId))"

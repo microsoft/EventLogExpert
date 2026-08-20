@@ -52,7 +52,7 @@ public sealed class ScenarioApplyIntegrationTests
         var lensState = Substitute.For<IState<FilterLensState>>();
         lensState.Value.Returns(new FilterLensState());
 
-        var effects = new FilterPaneEffects(appliedFilter, rawEventStore, paneStateAccessor, lensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()));
+        var effects = new FilterPaneEffects(appliedFilter, rawEventStore, paneStateAccessor, lensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()), new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
         var dispatcher = Substitute.For<IDispatcher>();
 
         ApplyFilterAction? captured = null;

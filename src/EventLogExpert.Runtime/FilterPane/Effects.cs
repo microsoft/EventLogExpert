@@ -16,6 +16,7 @@ internal sealed class Effects
     private readonly IStateSelection<EventLogState, Filter> _appliedFilter;
     private readonly ClearAllFiltersNotifier _clearAllFiltersNotifier;
     private readonly IState<FilterPaneState> _filterPaneState;
+    private readonly FilterPromotedNotifier _filterPromotedNotifier;
     private readonly IState<FilterLensState> _lensState;
     private readonly IState<RawEventStoreState> _rawEventStore;
     private readonly SetFilterDateRangeSucceededNotifier _setFilterDateRangeSucceededNotifier;
@@ -26,7 +27,8 @@ internal sealed class Effects
         IState<FilterPaneState> filterPaneState,
         IState<FilterLensState> lensState,
         ClearAllFiltersNotifier clearAllFiltersNotifier,
-        SetFilterDateRangeSucceededNotifier setFilterDateRangeSucceededNotifier)
+        SetFilterDateRangeSucceededNotifier setFilterDateRangeSucceededNotifier,
+        FilterPromotedNotifier filterPromotedNotifier)
     {
         _appliedFilter = appliedFilter;
         _rawEventStore = rawEventStore;
@@ -34,6 +36,7 @@ internal sealed class Effects
         _lensState = lensState;
         _clearAllFiltersNotifier = clearAllFiltersNotifier;
         _setFilterDateRangeSucceededNotifier = setFilterDateRangeSucceededNotifier;
+        _filterPromotedNotifier = filterPromotedNotifier;
 
         _appliedFilter.Select(static s => s.AppliedFilter);
     }
@@ -58,6 +61,21 @@ internal sealed class Effects
     {
         UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
         _clearAllFiltersNotifier.Raise();
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod]
+    public Task HandleCommitPromoted(CommitPromotedLensAction action, IDispatcher dispatcher)
+    {
+        dispatcher.Dispatch(new ApplyFilterAction(BuildCandidate(_filterPaneState.Value)));
+
+        if (action.Window is { IsEnabled: true })
+        {
+            _setFilterDateRangeSucceededNotifier.Raise();
+        }
+
+        _filterPromotedNotifier.Raise();
+
         return Task.CompletedTask;
     }
 
@@ -183,11 +201,12 @@ internal sealed class Effects
         return Task.CompletedTask;
     }
 
+    private Filter BuildCandidate(FilterPaneState filterPaneState) =>
+        EffectiveFilterBuilder.Build(FilterPaneFilterBuilder.Build(filterPaneState), _lensState.Value.Lenses);
+
     private void UpdateEventTableFilters(FilterPaneState filterPaneState, IDispatcher dispatcher)
     {
-        var candidate = EffectiveFilterBuilder.Build(
-            FilterPaneFilterBuilder.Build(filterPaneState),
-            _lensState.Value.Lenses);
+        var candidate = BuildCandidate(filterPaneState);
 
         if (!candidate.HasFilteringChangedFrom(_appliedFilter.Value))
         {

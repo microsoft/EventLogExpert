@@ -188,6 +188,8 @@ public static class RuntimeServiceCollectionExtensions
             services.Forward<IClearAllFiltersNotifier, ClearAllFiltersNotifier>();
             services.AddSingleton<SetFilterDateRangeSucceededNotifier>();
             services.Forward<ISetFilterDateRangeSucceededNotifier, SetFilterDateRangeSucceededNotifier>();
+            services.AddSingleton<FilterPromotedNotifier>();
+            services.Forward<IFilterPromotedNotifier, FilterPromotedNotifier>();
 
             // Indicators, resolvers, formatters, and selectors
             services.AddSingleton<DisplayIndicatorGate>();
