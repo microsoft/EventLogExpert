@@ -26,6 +26,7 @@ using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Memory;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Scenarios.Favorites;
@@ -249,6 +250,9 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         var logTableState = Substitute.For<IState<LogTableState>>();
         logTableState.Value.Returns(new LogTableState());
         services.AddSingleton(logTableState);
+        var memoryIndicatorState = Substitute.For<IState<MemoryIndicatorState>>();
+        memoryIndicatorState.Value.Returns(new MemoryIndicatorState());
+        services.AddSingleton(memoryIndicatorState);
         services.AddSingleton(Substitute.For<IState<RawEventStoreState>>());
         var filteredLogPresenceState = Substitute.For<IState<FilteredLogPresenceState>>();
         filteredLogPresenceState.Value.Returns(new FilteredLogPresenceState());
@@ -383,6 +387,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IState<StatusBarState>>());
         services.AddSingleton(Substitute.For<IState<FilterLensState>>());
         services.AddSingleton(Substitute.For<IState<LogTableState>>());
+        services.AddSingleton(Substitute.For<IState<MemoryIndicatorState>>());
         services.AddSingleton(Substitute.For<IState<RawEventStoreState>>());
         services.AddSingleton(Substitute.For<IState<FilteredLogPresenceState>>());
         services.AddSingleton(Substitute.For<IState<HistogramState>>());

@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Memory;
 using EventLogExpert.Runtime.StatusBar;
 using System.Collections.Immutable;
 
@@ -152,6 +153,21 @@ public sealed class StatusBarFormatterTests
     }
 
     [Fact]
+    public void FormatMemory_Elevated_AppendsTheLevelWord() =>
+        Assert.Equal("Memory: 1.0 GB \u00b7 Elevated", StatusBarFormatter.FormatMemory(1024, MemoryUsageLevel.Elevated));
+
+    [Fact]
+    public void FormatMemory_High_AppendsTheLevelWord() =>
+        Assert.Equal("Memory: 2.0 GB \u00b7 High", StatusBarFormatter.FormatMemory(2048, MemoryUsageLevel.High));
+
+    [Theory]
+    [InlineData(0, "Memory: 0 MB")]
+    [InlineData(512, "Memory: 512 MB")]
+    [InlineData(1536, "Memory: 1.5 GB")]
+    public void FormatMemory_Normal_ShowsValueWithoutTheLevelWord(long usedMebibytes, string expected) =>
+        Assert.Equal(expected, StatusBarFormatter.FormatMemory(usedMebibytes, MemoryUsageLevel.Normal));
+
+    [Fact]
     public void FormatSource_AllLogs_CountsOnlyStandaloneTabs()
     {
         var allLogs = Combined(LogTabGroupId.AllLogs);
@@ -191,6 +207,34 @@ public sealed class StatusBarFormatterTests
 
         Assert.Equal("Combined (3 logs)", StatusBarFormatter.FormatSource(active, [active], groups));
     }
+
+    [Theory]
+    [InlineData(MemoryUsageLevel.Normal, "Memory usage normal")]
+    [InlineData(MemoryUsageLevel.Elevated, "Memory usage elevated")]
+    [InlineData(MemoryUsageLevel.High, "Memory usage high")]
+    public void MemoryLevelAnnouncement_MapsBandToSpokenText(MemoryUsageLevel level, string expected) =>
+        Assert.Equal(expected, StatusBarFormatter.MemoryLevelAnnouncement(level));
+
+    [Theory]
+    [InlineData(MemoryUsageLevel.Normal, "")]
+    [InlineData(MemoryUsageLevel.Elevated, "status-bar-memory-elevated")]
+    [InlineData(MemoryUsageLevel.High, "status-bar-memory-high")]
+    public void MemoryLevelClass_MapsBandToModifier(MemoryUsageLevel level, string expected) =>
+        Assert.Equal(expected, StatusBarFormatter.MemoryLevelClass(level));
+
+    [Fact]
+    public void MemoryTooltip_DistinguishesManagedHeapFromWorkingSet()
+    {
+        var tooltip = StatusBarFormatter.MemoryTooltip(512, 900L * 1024 * 1024, MemoryUsageLevel.High);
+
+        Assert.Contains("Managed heap (app data): 512 MB", tooltip);
+        Assert.Contains("Process working set: 900 MB", tooltip);
+        Assert.Contains("Level: high.", tooltip);
+    }
+
+    [Fact]
+    public void MemoryTooltip_Normal_OmitsTheLevelSuffix() =>
+        Assert.DoesNotContain("Level:", StatusBarFormatter.MemoryTooltip(100, 200, MemoryUsageLevel.Normal));
 
     private static LogView Channel(string name) =>
         new(EventLogId.Create()) { LogName = name, LogPathType = LogPathType.Channel };

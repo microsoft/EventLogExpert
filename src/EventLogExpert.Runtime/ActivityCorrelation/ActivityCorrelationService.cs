@@ -8,7 +8,8 @@ using Fluxor;
 
 namespace EventLogExpert.Runtime.ActivityCorrelation;
 
-internal sealed class ActivityCorrelationService(IState<RawEventStoreState> rawStore) : IActivityCorrelationService
+internal sealed class ActivityCorrelationService(IState<RawEventStoreState> rawStore)
+    : IActivityCorrelationService, IActivityCorrelationCacheControl
 {
     private const int MaxEventsPerActivity = 200;
     private const int SharedActivityThreshold = 500;
@@ -47,9 +48,23 @@ internal sealed class ActivityCorrelationService(IState<RawEventStoreState> rawS
 
         var view = await Task.Run(() => BuildCore(store, focusedEvent, token, cancellationToken), cancellationToken);
 
-        lock (_cacheGate) { _cache = new CachedView(focusedEvent, token, view); }
+        // Cache only if the snapshot is still current: a close or content change during the build must not repopulate
+        // the neighborhood of a log that is no longer open. TryGetContentToken reads the live store, and the check runs
+        // under the same gate as Invalidate, so a close landing during the build always wins.
+        lock (_cacheGate)
+        {
+            if (TryGetContentToken(focusedEvent.LogId, out var current) && current == token)
+            {
+                _cache = new CachedView(focusedEvent, token, view);
+            }
+        }
 
         return view;
+    }
+
+    public void Invalidate()
+    {
+        lock (_cacheGate) { _cache = null; }
     }
 
     public bool TryGetContentToken(EventLogId logId, out CorrelationContentToken token)
