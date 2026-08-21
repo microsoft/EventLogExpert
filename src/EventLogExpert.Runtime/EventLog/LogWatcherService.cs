@@ -16,8 +16,8 @@ internal sealed class LogWatcherService : ILogWatcherService
     private readonly ITraceLogger _debugLogger;
     private readonly IDispatcher _dispatcher;
     private readonly List<string> _logsToWatch = [];
+    private readonly Dictionary<EventLogId, Task> _pendingDisposals = [];
     private readonly Dictionary<string, bool> _renderXmlByLog = [];
-    private readonly Dictionary<EventLogId, Task> _retiringWatchers = [];
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly Dictionary<string, EventLogId> _watchedLogIds = [];
     private readonly Dictionary<string, EventLogWatcher> _watchers = [];
@@ -39,8 +39,9 @@ internal sealed class LogWatcherService : ILogWatcherService
         {
             if (isFull)
             {
-                // Fire-and-forget: nothing downstream waits for the old per-event resolver scopes to finish disposing.
-                _ = StopAllWatchersAsync();
+                // Fire-and-forget stop; observe the aggregate so a disposal fault is logged, not an unobserved
+                // ThreadPool exception (observing the constituents does not observe the WhenAll aggregate).
+                ObserveFault(StopAllWatchersAsync());
             }
             else
             {
@@ -57,9 +58,9 @@ internal sealed class LogWatcherService : ILogWatcherService
             {
                 if (existingId == logId) { return; }
 
-                // Retire under the detach's lock so a concurrent close of the old id never sees a gap with neither
-                // the watcher nor its disposal.
-                if (DetachWatcher(logName) is { } staleWatcher) { RetireWatcher(existingId, logName, staleWatcher); }
+                // Register the displaced watcher's disposal under the detach's lock so a concurrent close of the old
+                // id never sees a gap with neither the watcher nor its disposal.
+                if (DetachWatcher(logName) is { } staleWatcher) { RegisterPendingDisposal(existingId, logName, staleWatcher); }
             }
 
             _watchedLogIds[logName] = logId;
@@ -78,47 +79,39 @@ internal sealed class LogWatcherService : ILogWatcherService
 
     public Task RemoveAllAsync()
     {
-        List<(string Name, EventLogWatcher Watcher)> detached = [];
-        List<Task> retiring;
-
         using (_watchersLock.EnterScope())
         {
-            // Snapshot: DetachWatcher mutates _logsToWatch below.
+            // Register every live watcher's disposal so close-all (and any concurrent single close) awaits it.
+            // DetachWatcher clears _watchedLogIds, so capture the id first; snapshot the names before iterating.
             foreach (var logName in _logsToWatch.ToArray())
             {
-                if (DetachWatcher(logName) is { } watcher) { detached.Add((logName, watcher)); }
+                var id = _watchedLogIds.TryGetValue(logName, out var watchedId) ? watchedId : default;
+
+                if (DetachWatcher(logName) is { } watcher) { RegisterPendingDisposal(id, logName, watcher); }
             }
 
-            // Also await any watcher already being disposed by a same-name replacement.
-            retiring = [.. _retiringWatchers.Values];
+            // Await every in-flight disposal (just-registered plus any prior replacement/buffer-full stop); the
+            // settlement continuation removes each on success.
+            return Task.WhenAll(_pendingDisposals.Values);
         }
-
-        List<Task> disposals = [];
-
-        foreach (var (name, watcher) in detached) { disposals.Add(DisposeWatcherAsync(name, watcher)); }
-
-        disposals.AddRange(retiring);
-
-        return Task.WhenAll(disposals);
     }
 
     public Task RemoveLogAsync(string logName, EventLogId logId)
     {
-        EventLogWatcher? watcher;
-
         using (_watchersLock.EnterScope())
         {
-            // A stale close for a prior open must not drop a same-name log reopened under a new id.
-            if (!_watchedLogIds.TryGetValue(logName, out var watchedId) || watchedId != logId)
+            // Register the live watcher's disposal (when this id is still the watched one) so a concurrent close-all
+            // sees it too; a stale close for a prior id just awaits any disposal already tracked for it.
+            if (_watchedLogIds.TryGetValue(logName, out var watchedId) && watchedId == logId &&
+                DetachWatcher(logName) is { } watcher)
             {
-                // If this id's watcher was displaced by a reopen, await its disposal so close still releases its handles.
-                return _retiringWatchers.TryGetValue(logId, out var retiring) ? retiring : Task.CompletedTask;
+                RegisterPendingDisposal(logId, logName, watcher);
             }
 
-            watcher = DetachWatcher(logName);
+            // Await whatever disposal is in flight for this id without claiming it; the settlement continuation
+            // removes it on success or retains a fault for a later close to observe.
+            return _pendingDisposals.TryGetValue(logId, out var pending) ? pending : Task.CompletedTask;
         }
-
-        return watcher is null ? Task.CompletedTask : DisposeWatcherAsync(logName, watcher);
     }
 
     // Call under _watchersLock; the caller disposes the returned watcher OFF the lock (deadlock rule).
@@ -134,21 +127,14 @@ internal sealed class LogWatcherService : ILogWatcherService
     }
 
     // Off-thread: EventLogWatcher.Unsubscribe blocks on in-flight callbacks that take _watchersLock, so disposing
-    // under the lock would deadlock.
+    // under the lock would deadlock. Faults propagate: an awaiting close (or the pending-disposal observer) must
+    // see a teardown failure rather than a false success.
     private Task DisposeWatcherAsync(string logName, EventLogWatcher watcher) =>
         Task.Run(() =>
         {
-            try
-            {
-                watcher.Dispose();
+            watcher.Dispose();
 
-                _debugLogger.Debug($"{nameof(LogWatcherService)} disposed the watcher for log {logName}.");
-            }
-            catch (Exception ex)
-            {
-                // Never fault: a fire-and-forget caller would surface an unobserved throw as an unhandled ThreadPool exception.
-                _debugLogger.Warning($"{nameof(LogWatcherService)} failed to dispose the watcher for log {logName}: {ex.Message}");
-            }
+            _debugLogger.Debug($"{nameof(LogWatcherService)} disposed the watcher for log {logName}.");
         });
 
     private bool IsWatching()
@@ -158,28 +144,47 @@ internal sealed class LogWatcherService : ILogWatcherService
         return _watchers.Keys.Count > 0;
     }
 
-    // Call under _watchersLock. Record the disposal BEFORE scheduling it so a concurrent close of the retired id can
-    // await teardown without leaking the entry.
-    private void RetireWatcher(EventLogId retiredId, string logName, EventLogWatcher watcher)
+    private void ObserveFault(Task task) =>
+        task.ContinueWith(
+            faulted => _debugLogger.Warning(
+                $"{nameof(LogWatcherService)} watcher teardown faulted: {faulted.Exception?.GetBaseException().Message}"),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+    // Call under _watchersLock; the blocking Dispose runs off-lock (deadlock rule). Tracks the disposal by id so a
+    // later close awaits it, chaining onto any in-flight disposal for the same id (a buffer-full stop reuses the id).
+    // Success self-removes; a fault is RETAINED (a later close sees it, not a false CompletedTask) and logged.
+    private Task RegisterPendingDisposal(EventLogId id, string logName, EventLogWatcher watcher)
     {
-        var retirement = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        _retiringWatchers[retiredId] = retirement.Task;
+        var disposal = DisposeWatcherAsync(logName, watcher);
+        var tracked = _pendingDisposals.TryGetValue(id, out var existing) ? Task.WhenAll(existing, disposal) : disposal;
+        _pendingDisposals[id] = tracked;
 
-        _ = CompleteWhenDisposedAsync();
-
-        async Task CompleteWhenDisposedAsync()
-        {
-            try
+        tracked.ContinueWith(
+            completed =>
             {
-                await DisposeWatcherAsync(logName, watcher);
-            }
-            finally
-            {
-                using (_watchersLock.EnterScope()) { _retiringWatchers.Remove(retiredId); }
+                using (_watchersLock.EnterScope())
+                {
+                    if (completed.IsCompletedSuccessfully &&
+                        _pendingDisposals.TryGetValue(id, out var current) &&
+                        ReferenceEquals(current, completed))
+                    {
+                        _pendingDisposals.Remove(id);
+                    }
+                }
 
-                retirement.TrySetResult();
-            }
-        }
+                if (completed.IsFaulted)
+                {
+                    _debugLogger.Warning(
+                        $"{nameof(LogWatcherService)} failed to dispose a retired watcher for log {logName}: {completed.Exception?.GetBaseException().Message}");
+                }
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        return tracked;
     }
 
     private void StartWatching()
@@ -197,6 +202,10 @@ internal sealed class LogWatcherService : ILogWatcherService
         using var scope = _watchersLock.EnterScope();
 
         if (_watchers.ContainsKey(logName)) { return; }
+
+        // The id the watcher is created for; stamped on every dispatched event so a stale watcher's events are
+        // dropped by the reopened log (they carry the old id) instead of being misrouted to it.
+        var watcherLogId = _watchedLogIds.TryGetValue(logName, out var currentId) ? currentId : default;
 
         bool renderXml = _renderXmlByLog.TryGetValue(logName, out var flag) && flag;
 
@@ -232,7 +241,7 @@ internal sealed class LogWatcherService : ILogWatcherService
                 return;
             }
 
-            _dispatcher.Dispatch(new AddEventAction(eventResolver.ResolveEvent(eventArgs)));
+            _dispatcher.Dispatch(new AddEventAction(eventResolver.ResolveEvent(eventArgs), watcherLogId));
         };
 
         // Enabling reads every event since the last bookmark; do it off the UI thread.
@@ -266,13 +275,14 @@ internal sealed class LogWatcherService : ILogWatcherService
 
     private Task StopWatchingAsync(string logName)
     {
-        EventLogWatcher? watcher;
+        using var scope = _watchersLock.EnterScope();
 
-        using (_watchersLock.EnterScope())
-        {
-            if (!_watchers.Remove(logName, out watcher)) { return Task.CompletedTask; }
-        }
+        if (!_watchers.Remove(logName, out var watcher)) { return Task.CompletedTask; }
 
-        return DisposeWatcherAsync(logName, watcher);
+        // The log stays watched (it can resume when the buffer clears), so track the disposal under its id: a close
+        // before it completes must still await the teardown. Reuses the id, so RegisterPendingDisposal chains.
+        var id = _watchedLogIds.TryGetValue(logName, out var watchedId) ? watchedId : default;
+
+        return RegisterPendingDisposal(id, logName, watcher);
     }
 }

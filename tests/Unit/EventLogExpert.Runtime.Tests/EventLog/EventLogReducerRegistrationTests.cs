@@ -24,18 +24,20 @@ public sealed class EventLogReducerRegistrationTests
 
         var feature = provider.GetRequiredService<IFeature<EventLogState>>();
 
+        var logId = EventLogId.Create();
+
         feature.RestoreState(feature.State with
         {
             ContinuouslyUpdate = false,
             OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
-                .Add(Constants.LogNameTestLog, new OpenLogInfo(EventLogId.Create(), LogPathType.Channel))
+                .Add(Constants.LogNameTestLog, new OpenLogInfo(logId, LogPathType.Channel))
         });
 
         var first = FilterEventBuilder.CreateTestEvent(100, owningLog: Constants.LogNameTestLog);
         var second = FilterEventBuilder.CreateTestEvent(200, owningLog: Constants.LogNameTestLog);
 
-        feature.ReceiveDispatchNotificationFromStore(new AddEventAction(first));
-        feature.ReceiveDispatchNotificationFromStore(new AddEventAction(second));
+        feature.ReceiveDispatchNotificationFromStore(new AddEventAction(first, logId));
+        feature.ReceiveDispatchNotificationFromStore(new AddEventAction(second, logId));
 
         Assert.Equal(2, feature.State.NewEventBuffer.Count);
         Assert.Same(second, feature.State.NewEventBuffer[0]);

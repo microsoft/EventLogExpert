@@ -82,7 +82,16 @@ internal sealed class OpenLogEffects(
         _concurrencyState.ClearAllLoadedWithXml();
         _closeCoordinator.ClearAllPendingRestore();
 
-        await _logWatcherService.RemoveAllAsync();
+        try
+        {
+            await _logWatcherService.RemoveAllAsync();
+        }
+        catch (Exception ex)
+        {
+            // Log-and-proceed: a watcher teardown fault should not surface as an unhandled effect exception; the
+            // close-all state was already cleared above.
+            _logger.Error($"{nameof(HandleCloseAll)}: watcher teardown faulted: {ex.Message}");
+        }
     }
 
     [EffectMethod]
@@ -112,7 +121,17 @@ internal sealed class OpenLogEffects(
                 }
             }
 
-            await _logWatcherService.RemoveLogAsync(action.LogName, action.LogId);
+            try
+            {
+                await _logWatcherService.RemoveLogAsync(action.LogName, action.LogId);
+            }
+            catch (Exception ex)
+            {
+                // A watcher teardown fault must not strand the rest of the close (state cleanup, CloseLogAction,
+                // reopen-waiter signal). Proceed and log; a leaked native handle is not actionable here since a
+                // reopen builds a fresh reader.
+                _logger.Error($"{nameof(HandleCloseLog)}: watcher teardown for '{action.LogName}' faulted: {ex.Message}");
+            }
 
             if (!(_eventLogState.Value.OpenLogs.TryGetValue(action.LogName, out var activeLog) && activeLog.Id != action.LogId))
             {

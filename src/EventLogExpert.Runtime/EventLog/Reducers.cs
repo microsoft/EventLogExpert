@@ -21,7 +21,11 @@ internal sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceAddEvent(EventLogState state, AddEventAction action)
     {
-        if (state.ContinuouslyUpdate || !state.OpenLogs.ContainsKey(action.NewEvent.OwningLog))
+        // Same id-guard as the live path (HandleAddEvent): a stale watcher's event (SourceLogId) must not be buffered
+        // into a same-name log reopened under a new id, which the paused-buffer flush re-attributes by name.
+        if (state.ContinuouslyUpdate ||
+            !state.OpenLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog) ||
+            owningLog.Id != action.SourceLogId)
         {
             return state;
         }

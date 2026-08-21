@@ -45,8 +45,11 @@ internal sealed class FilteringEffects(
     [EffectMethod]
     public Task HandleAddEvent(AddEventAction action, IDispatcher dispatcher)
     {
+        // Drop a stale watcher's event: SourceLogId is the id the event's watcher was created for; if the open log
+        // under that name is now a different id (a same-name reopen), routing it here would misattribute it.
         if (!_eventLogState.Value.ContinuouslyUpdate ||
-            !_eventLogState.Value.OpenLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog))
+            !_eventLogState.Value.OpenLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog) ||
+            owningLog.Id != action.SourceLogId)
         {
             return Task.CompletedTask;
         }
