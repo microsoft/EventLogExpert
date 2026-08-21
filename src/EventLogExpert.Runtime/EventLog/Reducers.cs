@@ -124,31 +124,6 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceLoadEventsPartial(EventLogState state, LoadEventsPartialAction action)
-    {
-        if (!state.OpenLogs.TryGetValue(action.LogData.Name, out var existingLog) ||
-            existingLog.Id != action.LogData.Id ||
-            action.LogData.Type != LogPathType.File)
-        {
-            return state;
-        }
-
-        var existingSet = state.NamesByLog.TryGetValue(action.LogData.Name, out var current) ? current : s_emptyNames;
-
-        var newSet = existingSet.Union(DistinctLogNames(action.Events));
-
-        if (ReferenceEquals(newSet, existingSet)) { return state; }
-
-        var newNamesByLog = state.NamesByLog.SetItem(action.LogData.Name, newSet);
-
-        return state with
-        {
-            NamesByLog = newNamesByLog,
-            LoadedLogNames = RecomputeLoadedLogNames(newNamesByLog, state.LoadedLogNames)
-        };
-    }
-
-    [ReducerMethod]
     public static EventLogState ReduceNewEventBufferConsumed(EventLogState state, NewEventBufferConsumedAction action)
     {
         if (action.ConsumedEvents.Count == 0) { return state; }

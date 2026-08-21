@@ -515,45 +515,6 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
-    public void ReduceLoadEventsPartial_WhenLogIdDoesNotMatch_ShouldReturnStateUnchanged()
-    {
-        // Arrange
-        var state = new EventLogState();
-
-        state = Reducers.ReduceOpenLog(state,
-            new OpenLogAction(Constants.LogNameTestLog, LogPathType.Channel));
-
-        var staleLogData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
-
-        // Act: stale partial with mismatched ID
-        var newState = Reducers.ReduceLoadEventsPartial(state,
-            new LoadEventsPartialAction(staleLogData, events));
-
-        // Assert: state unchanged, original log preserved with its ID
-        var originalId = state.OpenLogs[Constants.LogNameTestLog].Id;
-        Assert.NotEqual(originalId, staleLogData.Id);
-        Assert.Same(state, newState);
-        Assert.Equal(originalId, newState.OpenLogs[Constants.LogNameTestLog].Id);
-    }
-
-    [Fact]
-    public void ReduceLoadEventsPartial_WhenLogNotInOpenLogs_ShouldReturnStateUnchanged()
-    {
-        // Arrange: no logs open
-        var state = new EventLogState();
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
-
-        // Act
-        var newState = Reducers.ReduceLoadEventsPartial(state,
-            new LoadEventsPartialAction(logData, events));
-
-        // Assert
-        Assert.Same(state, newState);
-    }
-
-    [Fact]
     public void ReduceLoadEvents_WhenLogIdDoesNotMatch_ShouldReturnStateUnchanged()
     {
         // Arrange: open a log, then create stale logData with a different ID

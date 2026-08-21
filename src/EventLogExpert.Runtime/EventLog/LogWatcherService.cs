@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Logging.Abstractions;
@@ -16,7 +17,9 @@ internal sealed class LogWatcherService : ILogWatcherService
     private readonly IDispatcher _dispatcher;
     private readonly List<string> _logsToWatch = [];
     private readonly Dictionary<string, bool> _renderXmlByLog = [];
+    private readonly Dictionary<EventLogId, Task> _retiringWatchers = [];
     private readonly IServiceScopeFactory _serviceScopeFactory;
+    private readonly Dictionary<string, EventLogId> _watchedLogIds = [];
     private readonly Dictionary<string, EventLogWatcher> _watchers = [];
     private readonly Lock _watchersLock = new();
 
@@ -36,9 +39,7 @@ internal sealed class LogWatcherService : ILogWatcherService
         {
             if (isFull)
             {
-                // Buffer-full is a state change, not a coordinated delete: fire-and-forget
-                // is fine because nothing downstream is waiting for the old per-event
-                // resolver scopes to finish disposing.
+                // Fire-and-forget: nothing downstream waits for the old per-event resolver scopes to finish disposing.
                 _ = StopAllWatchersAsync();
             }
             else
@@ -48,84 +49,137 @@ internal sealed class LogWatcherService : ILogWatcherService
         };
     }
 
-    public void AddLog(string logName, string? bookmark, bool renderXml = false)
+    public void AddLog(string logName, EventLogId logId, string? bookmark, bool renderXml = false)
     {
-        using var scope = _watchersLock.EnterScope();
-
-        if (_logsToWatch.Contains(logName))
+        using (_watchersLock.EnterScope())
         {
-            throw new InvalidOperationException(
-                $"Attempted to add log {logName} which is already present in {nameof(LogWatcherService)}.");
-        }
+            if (_watchedLogIds.TryGetValue(logName, out var existingId))
+            {
+                if (existingId == logId) { return; }
 
-        _logsToWatch.Add(logName);
-        _bookmarks.Add(logName, bookmark);
-        _renderXmlByLog[logName] = renderXml;
+                // Retire under the detach's lock so a concurrent close of the old id never sees a gap with neither
+                // the watcher nor its disposal.
+                if (DetachWatcher(logName) is { } staleWatcher) { RetireWatcher(existingId, logName, staleWatcher); }
+            }
 
-        // If this is the first log added, or if we're already watching
-        // other logs, then we need to start watching this one.
-        //
-        // If we have _logsToWatch but no watchers, that means StopAllWatchersAsync()
-        // was called due to a full buffer. In that case we do not want to
-        // start watching the new log.
-        if (_logsToWatch.Count == 1 || IsWatching())
-        {
-            StartWatching(logName);
+            _watchedLogIds[logName] = logId;
+
+            if (!_logsToWatch.Contains(logName)) { _logsToWatch.Add(logName); }
+
+            _bookmarks[logName] = bookmark;
+            _renderXmlByLog[logName] = renderXml;
+
+            if (_logsToWatch.Count == 1 || IsWatching())
+            {
+                StartWatching(logName);
+            }
         }
     }
 
     public Task RemoveAllAsync()
     {
-        List<string> logNames;
+        List<(string Name, EventLogWatcher Watcher)> detached = [];
+        List<Task> retiring;
 
         using (_watchersLock.EnterScope())
         {
-            // Snapshot the names before iterating so RemoveLogAsync can mutate
-            // _logsToWatch without invalidating our enumerator.
-            logNames = [.. _logsToWatch];
+            // Snapshot: DetachWatcher mutates _logsToWatch below.
+            foreach (var logName in _logsToWatch.ToArray())
+            {
+                if (DetachWatcher(logName) is { } watcher) { detached.Add((logName, watcher)); }
+            }
+
+            // Also await any watcher already being disposed by a same-name replacement.
+            retiring = [.. _retiringWatchers.Values];
         }
 
-        var tasks = new List<Task>(logNames.Count);
+        List<Task> disposals = [];
 
-        foreach (var logName in logNames)
-        {
-            tasks.Add(RemoveLogAsync(logName));
-        }
+        foreach (var (name, watcher) in detached) { disposals.Add(DisposeWatcherAsync(name, watcher)); }
 
-        return Task.WhenAll(tasks);
+        disposals.AddRange(retiring);
+
+        return Task.WhenAll(disposals);
     }
 
-    public Task RemoveLogAsync(string logName)
+    public Task RemoveLogAsync(string logName, EventLogId logId)
     {
         EventLogWatcher? watcher;
 
         using (_watchersLock.EnterScope())
         {
-            _logsToWatch.Remove(logName);
-            _bookmarks.Remove(logName);
-            _renderXmlByLog.Remove(logName);
+            // A stale close for a prior open must not drop a same-name log reopened under a new id.
+            if (!_watchedLogIds.TryGetValue(logName, out var watchedId) || watchedId != logId)
+            {
+                // If this id's watcher was displaced by a reopen, await its disposal so close still releases its handles.
+                return _retiringWatchers.TryGetValue(logId, out var retiring) ? retiring : Task.CompletedTask;
+            }
 
-            if (!_watchers.Remove(logName, out watcher)) { return Task.CompletedTask; }
+            watcher = DetachWatcher(logName);
         }
 
-        // Always dispose on a background thread to avoid a deadlock if this is
-        // called on the UI thread. EventLogWatcher.Unsubscribe blocks until all
-        // in-flight ReadAndRaiseEvents callbacks have completed (so the per-event
-        // service scopes — and the SQLite handles they hold — are released
-        // before this Task completes).
-        return Task.Run(() =>
-        {
-            watcher.Dispose();
-
-            _debugLogger.Debug($"{nameof(LogWatcherService)} disposed the old watcher for log {logName}.");
-        });
+        return watcher is null ? Task.CompletedTask : DisposeWatcherAsync(logName, watcher);
     }
+
+    // Call under _watchersLock; the caller disposes the returned watcher OFF the lock (deadlock rule).
+    private EventLogWatcher? DetachWatcher(string logName)
+    {
+        _logsToWatch.Remove(logName);
+        _bookmarks.Remove(logName);
+        _renderXmlByLog.Remove(logName);
+        _watchedLogIds.Remove(logName);
+        _watchers.Remove(logName, out var watcher);
+
+        return watcher;
+    }
+
+    // Off-thread: EventLogWatcher.Unsubscribe blocks on in-flight callbacks that take _watchersLock, so disposing
+    // under the lock would deadlock.
+    private Task DisposeWatcherAsync(string logName, EventLogWatcher watcher) =>
+        Task.Run(() =>
+        {
+            try
+            {
+                watcher.Dispose();
+
+                _debugLogger.Debug($"{nameof(LogWatcherService)} disposed the watcher for log {logName}.");
+            }
+            catch (Exception ex)
+            {
+                // Never fault: a fire-and-forget caller would surface an unobserved throw as an unhandled ThreadPool exception.
+                _debugLogger.Warning($"{nameof(LogWatcherService)} failed to dispose the watcher for log {logName}: {ex.Message}");
+            }
+        });
 
     private bool IsWatching()
     {
         using var scope = _watchersLock.EnterScope();
 
         return _watchers.Keys.Count > 0;
+    }
+
+    // Call under _watchersLock. Record the disposal BEFORE scheduling it so a concurrent close of the retired id can
+    // await teardown without leaking the entry.
+    private void RetireWatcher(EventLogId retiredId, string logName, EventLogWatcher watcher)
+    {
+        var retirement = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _retiringWatchers[retiredId] = retirement.Task;
+
+        _ = CompleteWhenDisposedAsync();
+
+        async Task CompleteWhenDisposedAsync()
+        {
+            try
+            {
+                await DisposeWatcherAsync(logName, watcher);
+            }
+            finally
+            {
+                using (_watchersLock.EnterScope()) { _retiringWatchers.Remove(retiredId); }
+
+                retirement.TrySetResult();
+            }
+        }
     }
 
     private void StartWatching()
@@ -170,11 +224,8 @@ internal sealed class LogWatcherService : ILogWatcherService
 
             using var scope = _watchersLock.EnterScope();
 
-            // Guard against stale callbacks: a watcher being disposed asynchronously
-            // can still be mid-loop processing buffered events with the old renderXml
-            // setting. If the active watcher for this log is no longer this instance,
-            // discard the event so it doesn't pollute the re-opened log with the
-            // wrong XML state.
+            // Drop events from a watcher being disposed asynchronously: it may still be mid-loop with the old
+            // renderXml and would pollute the reopened log.
             if (!_watchers.TryGetValue(logName, out var activeWatcher) ||
                 !ReferenceEquals(activeWatcher, watcher))
             {
@@ -184,9 +235,7 @@ internal sealed class LogWatcherService : ILogWatcherService
             _dispatcher.Dispatch(new AddEventAction(eventResolver.ResolveEvent(eventArgs)));
         };
 
-        // When the watcher is enabled, it reads all the events since the
-        // last bookmark. Do this on a background thread so we don't tie
-        // up the UI.
+        // Enabling reads every event since the last bookmark; do it off the UI thread.
         Task.Run(() =>
         {
             watcher.Enabled = true;
@@ -201,7 +250,7 @@ internal sealed class LogWatcherService : ILogWatcherService
 
         using (_watchersLock.EnterScope())
         {
-            // Snapshot keys before iterating; StopWatchingAsync mutates the dict.
+            // Snapshot: StopWatchingAsync mutates _watchers below.
             logNames = [.. _watchers.Keys];
         }
 
@@ -224,11 +273,6 @@ internal sealed class LogWatcherService : ILogWatcherService
             if (!_watchers.Remove(logName, out watcher)) { return Task.CompletedTask; }
         }
 
-        return Task.Run(() =>
-        {
-            watcher.Dispose();
-
-            _debugLogger.Debug($"{nameof(LogWatcherService)} disposed the old watcher for log {logName}.");
-        });
+        return DisposeWatcherAsync(logName, watcher);
     }
 }

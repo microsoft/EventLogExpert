@@ -176,16 +176,6 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
-    public static LogTableState ReduceLoadEventsPartial(LogTableState state, LoadEventsPartialAction action)
-    {
-        if (action.Events.Count == 0) { return state; }
-
-        var tables = LatchComputerNameForLog(state.EventTables, action.LogData.Id, action.Events);
-
-        return ReferenceEquals(tables, state.EventTables) ? state : state with { EventTables = tables };
-    }
-
-    [ReducerMethod]
     public static LogTableState ReduceMoveTabToGroup(LogTableState state, MoveTabToGroupAction action)
     {
         var tab = state.EventTables.FirstOrDefault(table => table.Id == action.TabId);
