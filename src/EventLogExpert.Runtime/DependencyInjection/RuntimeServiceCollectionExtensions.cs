@@ -31,12 +31,13 @@ using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.LogTable.OrderedView;
+using EventLogExpert.Runtime.Memory;
+using EventLogExpert.Runtime.ResolutionCoverage;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Runtime.Settings;
-using EventLogExpert.Runtime.StatusBar;
-using EventLogExpert.Runtime.ResolutionCoverage;
 using EventLogExpert.Runtime.Stats;
+using EventLogExpert.Runtime.StatusBar;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
 using EventLogExpert.Scenarios.Catalog;
@@ -151,6 +152,7 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<LiveTailIngestCoordinator>();
             services.AddSingleton<FilteredLogPresenceCoordinator>();
             services.AddSingleton<IEventLogReaderFactory, EventLogReaderFactory>();
+            services.AddSingleton<IProcessMemoryMeter, ProcessMemoryMeter>();
 
             // Ordered-view engine
             services.AddSingleton<OrderedViewWriter>(static _ => new OrderedViewWriter());
@@ -194,7 +196,9 @@ public static class RuntimeServiceCollectionExtensions
             // Indicators, resolvers, formatters, and selectors
             services.AddSingleton<DisplayIndicatorGate>();
             services.AddSingleton<IEventDetailResolver, EventDetailResolver>();
-            services.AddSingleton<IActivityCorrelationService, ActivityCorrelationService>();
+            services.AddSingleton<ActivityCorrelationService>();
+            services.Forward<IActivityCorrelationService, ActivityCorrelationService>();
+            services.Forward<IActivityCorrelationCacheControl, ActivityCorrelationService>();
             services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
             services.AddSingleton<IEventCopyFormatter, EventCopyFormatter>();
             services.AddSingleton<IHighlightSelector, HighlightSelector>();

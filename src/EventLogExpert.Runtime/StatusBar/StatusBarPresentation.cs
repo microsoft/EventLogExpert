@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Memory;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.StatusBar;
@@ -37,6 +38,15 @@ public sealed record StatusBarPresentation
     public ImmutableList<LogTabGroup> Groups { get; init; } = [];
 
     public EventLogId? ActiveTabId { get; init; }
+
+    /// <summary>The managed heap quantized to whole MiB - the advisory memory indicator's displayed value.</summary>
+    public long MemoryUsedMebibytes { get; init; }
+
+    /// <summary>The process working set, shown in the indicator tooltip for reconciliation with Task Manager.</summary>
+    public long MemoryWorkingSetBytes { get; init; }
+
+    /// <summary>The advisory memory band that drives the indicator's chip color and announcement.</summary>
+    public MemoryUsageLevel MemoryLevel { get; init; }
 
     /// <summary>
     ///     Projects the per-log resolution tally for the active scope: the All-group sums every loaded log, a grouped tab

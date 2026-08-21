@@ -89,11 +89,38 @@
     outline-offset: -1px;
 }
 
-/* White (inherited) text keeps WCAG AA contrast on the blue status bar; weight distinguishes the state. A color-coded
-   status palette that meets AA on the status-bar fill is deferred to v2. */
+/* White (inherited) text keeps WCAG AA contrast on the blue status bar; weight distinguishes the warn/live states. */
 .status-bar-warn,
 .status-bar-live {
     font-weight: 600;
+}
+
+/* Advisory memory bands: Normal inherits the plain white chip text; Elevated/High use a colored fill with an
+   AA-compliant on-fill text token (the color-coded status palette previously deferred), plus a visible level word in
+   the chip so the band is never conveyed by color alone. */
+.status-bar-memory {
+    padding: 0 4px;
+    border-radius: 2px;
+}
+
+.status-bar-memory-elevated {
+    background: var(--clr-status-fill-elevated);
+    color: var(--clr-on-status-elevated);
+    font-weight: 600;
+}
+
+.status-bar-memory-high {
+    background: var(--clr-status-fill-high);
+    color: var(--clr-on-status-high);
+    font-weight: 600;
+}
+
+/* Forced-colors: keep a visible pill boundary; the level word still carries the state. */
+@media (forced-colors: active) {
+    .status-bar-memory-elevated,
+    .status-bar-memory-high {
+        border: 1px solid;
+    }
 }
 
 /* Screen-reader-only region: announces the coarse activity transition without showing a duplicate visual label. */

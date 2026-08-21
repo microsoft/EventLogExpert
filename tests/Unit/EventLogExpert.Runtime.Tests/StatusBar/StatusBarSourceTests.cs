@@ -7,6 +7,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Memory;
 using EventLogExpert.Runtime.StatusBar;
 using Fluxor;
 using NSubstitute;
@@ -79,6 +80,21 @@ public sealed class StatusBarSourceTests
 
         harness.RawCount = new RawEventCountState { ByLog = ImmutableDictionary.CreateRange([new KeyValuePair<EventLogId, ProviderResolutionCounts>(LogA, Counts(5))]) };
         harness.RaiseRawCount();
+
+        Assert.Equal(0, raised);
+    }
+
+    [Fact]
+    public void Changed_DoesNotFire_WhenTheMemoryFacetIsEquivalent()
+    {
+        var harness = new Harness();
+        harness.Memory = new MemoryIndicatorState { UsedMebibytes = 256, WorkingSetBytes = 10, Level = MemoryUsageLevel.Normal };
+        harness.RaiseMemory();
+        var raised = 0;
+        harness.Source.Changed += () => raised++;
+
+        harness.Memory = new MemoryIndicatorState { UsedMebibytes = 256, WorkingSetBytes = 10, Level = MemoryUsageLevel.Normal };
+        harness.RaiseMemory();
 
         Assert.Equal(0, raised);
     }
@@ -200,6 +216,19 @@ public sealed class StatusBarSourceTests
     }
 
     [Fact]
+    public void Changed_Fires_WhenTheMemoryFacetChanges()
+    {
+        var harness = new Harness();
+        var raised = 0;
+        harness.Source.Changed += () => raised++;
+
+        harness.Memory = harness.Memory with { UsedMebibytes = 256, Level = MemoryUsageLevel.Elevated };
+        harness.RaiseMemory();
+
+        Assert.Equal(1, raised);
+    }
+
+    [Fact]
     public void Construction_ReconcilesARawCountChangeBetweenSeedAndSubscribe_SoALaterUnchangedNotificationDoesNotRaise()
     {
         var populated = new RawEventCountState { ByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(LogA, Counts(7)) };
@@ -232,6 +261,26 @@ public sealed class StatusBarSourceTests
     }
 
     [Fact]
+    public void Current_ProjectsMemoryFacets()
+    {
+        var harness = new Harness
+        {
+            Memory = new MemoryIndicatorState
+            {
+                UsedMebibytes = 512,
+                WorkingSetBytes = 900_000_000,
+                Level = MemoryUsageLevel.Elevated
+            }
+        };
+
+        var presentation = harness.Source.Current;
+
+        Assert.Equal(512, presentation.MemoryUsedMebibytes);
+        Assert.Equal(900_000_000, presentation.MemoryWorkingSetBytes);
+        Assert.Equal(MemoryUsageLevel.Elevated, presentation.MemoryLevel);
+    }
+
+    [Fact]
     public void Current_ReadsEveryBackingStateLive()
     {
         var harness = new Harness();
@@ -260,7 +309,7 @@ public sealed class StatusBarSourceTests
     }
 
     [Fact]
-    public void Dispose_UnsubscribesFromAllFiveStates()
+    public void Dispose_UnsubscribesFromAllSixStates()
     {
         var eventLog = Substitute.For<IState<EventLogState>>();
         eventLog.Value.Returns(new EventLogState());
@@ -272,7 +321,9 @@ public sealed class StatusBarSourceTests
         statusBar.Value.Returns(new StatusBarState());
         var logTable = Substitute.For<IState<LogTableState>>();
         logTable.Value.Returns(new LogTableState());
-        var source = new StatusBarSource(eventLog, filterPane, rawCount, statusBar, logTable, Substitute.For<ITraceLogger>());
+        var memory = Substitute.For<IState<MemoryIndicatorState>>();
+        memory.Value.Returns(new MemoryIndicatorState());
+        var source = new StatusBarSource(eventLog, filterPane, rawCount, statusBar, logTable, memory, Substitute.For<ITraceLogger>());
 
         source.Dispose();
 
@@ -281,6 +332,7 @@ public sealed class StatusBarSourceTests
         rawCount.Received().StateChanged -= Arg.Any<EventHandler>();
         statusBar.Received().StateChanged -= Arg.Any<EventHandler>();
         logTable.Received().StateChanged -= Arg.Any<EventHandler>();
+        memory.Received().StateChanged -= Arg.Any<EventHandler>();
     }
 
     [Fact]
@@ -303,15 +355,17 @@ public sealed class StatusBarSourceTests
         IState<FilterPaneState>? filterPane = null,
         IState<RawEventCountState>? rawCount = null,
         IState<StatusBarState>? statusBar = null,
-        IState<LogTableState>? logTable = null)
+        IState<LogTableState>? logTable = null,
+        IState<MemoryIndicatorState>? memory = null)
     {
         eventLog ??= StateOf(new EventLogState());
         filterPane ??= StateOf(new FilterPaneState());
         rawCount ??= StateOf(new RawEventCountState());
         statusBar ??= StateOf(new StatusBarState());
         logTable ??= StateOf(new LogTableState());
+        memory ??= StateOf(new MemoryIndicatorState());
 
-        return new StatusBarSource(eventLog, filterPane, rawCount, statusBar, logTable, Substitute.For<ITraceLogger>());
+        return new StatusBarSource(eventLog, filterPane, rawCount, statusBar, logTable, memory, Substitute.For<ITraceLogger>());
     }
 
     private static IState<TState> StateOf<TState>(TState value)
@@ -327,6 +381,7 @@ public sealed class StatusBarSourceTests
         private readonly IState<EventLogState> _eventLog = Substitute.For<IState<EventLogState>>();
         private readonly IState<FilterPaneState> _filterPane = Substitute.For<IState<FilterPaneState>>();
         private readonly IState<LogTableState> _logTable = Substitute.For<IState<LogTableState>>();
+        private readonly IState<MemoryIndicatorState> _memory = Substitute.For<IState<MemoryIndicatorState>>();
         private readonly IState<RawEventCountState> _rawCount = Substitute.For<IState<RawEventCountState>>();
         private readonly IState<StatusBarState> _statusBar = Substitute.For<IState<StatusBarState>>();
 
@@ -337,8 +392,9 @@ public sealed class StatusBarSourceTests
             _rawCount.Value.Returns(_ => RawCount);
             _statusBar.Value.Returns(_ => StatusBar);
             _logTable.Value.Returns(_ => LogTable);
+            _memory.Value.Returns(_ => Memory);
             Source = new StatusBarSource(
-                _eventLog, _filterPane, _rawCount, _statusBar, _logTable, Substitute.For<ITraceLogger>());
+                _eventLog, _filterPane, _rawCount, _statusBar, _logTable, _memory, Substitute.For<ITraceLogger>());
         }
 
         public EventLogState EventLog { get; set; } = new();
@@ -346,6 +402,8 @@ public sealed class StatusBarSourceTests
         public FilterPaneState FilterPane { get; set; } = new();
 
         public LogTableState LogTable { get; set; } = new();
+
+        public MemoryIndicatorState Memory { get; set; } = new();
 
         public RawEventCountState RawCount { get; set; } = new();
 
@@ -361,6 +419,9 @@ public sealed class StatusBarSourceTests
 
         public void RaiseLogTable() =>
             _logTable.StateChanged += Raise.Event<EventHandler>(_logTable, EventArgs.Empty);
+
+        public void RaiseMemory() =>
+            _memory.StateChanged += Raise.Event<EventHandler>(_memory, EventArgs.Empty);
 
         public void RaiseRawCount() =>
             _rawCount.StateChanged += Raise.Event<EventHandler>(_rawCount, EventArgs.Empty);

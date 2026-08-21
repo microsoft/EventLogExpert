@@ -7,6 +7,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Memory;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Immutable;
@@ -20,12 +21,14 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
     private readonly Lock _gate = new();
     private readonly IState<LogTableState> _logTableState;
     private readonly ITraceLogger _logger;
+    private readonly IState<MemoryIndicatorState> _memoryState;
     private readonly IState<RawEventCountState> _rawCountState;
     private readonly IState<StatusBarState> _statusBarState;
 
     private bool _disposed;
     private (bool ContinuouslyUpdate, int BufferCount, bool BufferFull, int SelectionCount) _eventLogFacets;
     private (ImmutableList<LogView> Tabs, ImmutableList<LogTabGroup> Groups, EventLogId? ActiveTabId) _logTableFacets;
+    private (long UsedMebibytes, long WorkingSetBytes, MemoryUsageLevel Level) _memoryFacets;
     private bool _persistentFilterActive;
     private (int Total, ImmutableDictionary<EventLogId, ProviderResolutionCounts> ByLog) _rawCountFacets;
     private (ImmutableDictionary<StatusActivityId, (int, int)> Loading, string Resolver) _statusFacets;
@@ -36,6 +39,7 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
         IState<RawEventCountState> rawCountState,
         IState<StatusBarState> statusBarState,
         IState<LogTableState> logTableState,
+        IState<MemoryIndicatorState> memoryState,
         [FromKeyedServices(LogCategories.EventLog)] ITraceLogger logger)
     {
         ArgumentNullException.ThrowIfNull(eventLogState);
@@ -43,6 +47,7 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
         ArgumentNullException.ThrowIfNull(rawCountState);
         ArgumentNullException.ThrowIfNull(statusBarState);
         ArgumentNullException.ThrowIfNull(logTableState);
+        ArgumentNullException.ThrowIfNull(memoryState);
         ArgumentNullException.ThrowIfNull(logger);
 
         _eventLogState = eventLogState;
@@ -50,6 +55,7 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
         _rawCountState = rawCountState;
         _statusBarState = statusBarState;
         _logTableState = logTableState;
+        _memoryState = memoryState;
         _logger = logger;
 
         SeedFacets();
@@ -59,6 +65,7 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
         _rawCountState.StateChanged += OnRawCountChanged;
         _statusBarState.StateChanged += OnStatusBarChanged;
         _logTableState.StateChanged += OnLogTableChanged;
+        _memoryState.StateChanged += OnMemoryChanged;
 
         lock (_gate) { SeedFacets(); }
     }
@@ -70,7 +77,8 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
         _filterPaneState.Value,
         _rawCountState.Value,
         _statusBarState.Value,
-        _logTableState.Value);
+        _logTableState.Value,
+        _memoryState.Value);
 
     public void Dispose()
     {
@@ -86,6 +94,7 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
         _rawCountState.StateChanged -= OnRawCountChanged;
         _statusBarState.StateChanged -= OnStatusBarChanged;
         _logTableState.StateChanged -= OnLogTableChanged;
+        _memoryState.StateChanged -= OnMemoryChanged;
     }
 
     private static bool DictEquals<TKey, TValue>(
@@ -114,7 +123,8 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
         FilterPaneState filterPane,
         RawEventCountState rawCount,
         StatusBarState statusBar,
-        LogTableState logTable) =>
+        LogTableState logTable,
+        MemoryIndicatorState memory) =>
         new()
         {
             ContinuouslyUpdate = eventLog.ContinuouslyUpdate,
@@ -130,7 +140,10 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
             ResolverStatus = statusBar.ResolverStatus,
             Tabs = logTable.EventTables,
             Groups = logTable.Groups,
-            ActiveTabId = logTable.ActiveEventLogId
+            ActiveTabId = logTable.ActiveEventLogId,
+            MemoryUsedMebibytes = memory.UsedMebibytes,
+            MemoryWorkingSetBytes = memory.WorkingSetBytes,
+            MemoryLevel = memory.Level
         };
 
     private static (bool, int, bool, int) ProjectEventLog(EventLogState state) =>
@@ -139,6 +152,9 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
     private static (ImmutableList<LogView>, ImmutableList<LogTabGroup>, EventLogId?) ProjectLogTable(
         LogTableState state) =>
         (state.EventTables, state.Groups, state.ActiveEventLogId);
+
+    private static (long, long, MemoryUsageLevel) ProjectMemory(MemoryIndicatorState state) =>
+        (state.UsedMebibytes, state.WorkingSetBytes, state.Level);
 
     private static (int, ImmutableDictionary<EventLogId, ProviderResolutionCounts>) ProjectRawCount(RawEventCountState state) =>
         (state.Total, state.ByLog);
@@ -189,6 +205,20 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
             }
 
             _logTableFacets = next;
+        }
+
+        RaiseChanged();
+    }
+
+    private void OnMemoryChanged(object? sender, EventArgs e)
+    {
+        var next = ProjectMemory(_memoryState.Value);
+
+        lock (_gate)
+        {
+            if (_disposed || next == _memoryFacets) { return; }
+
+            _memoryFacets = next;
         }
 
         RaiseChanged();
@@ -249,5 +279,6 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
         _rawCountFacets = ProjectRawCount(_rawCountState.Value);
         _statusFacets = ProjectStatus(_statusBarState.Value);
         _logTableFacets = ProjectLogTable(_logTableState.Value);
+        _memoryFacets = ProjectMemory(_memoryState.Value);
     }
 }

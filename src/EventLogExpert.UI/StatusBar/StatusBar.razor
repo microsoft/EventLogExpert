@@ -70,6 +70,14 @@
     <div class="status-bar-right">
         <span aria-atomic="true" aria-live="polite" class="status-bar-announce" role="status">@announcement</span>
 
+        <span class="status-bar-activity status-bar-memory @StatusBarFormatter.MemoryLevelClass(status.MemoryLevel)"
+            title="@StatusBarFormatter.MemoryTooltip(status.MemoryUsedMebibytes, status.MemoryWorkingSetBytes, status.MemoryLevel)">
+            @StatusBarFormatter.FormatMemory(status.MemoryUsedMebibytes, status.MemoryLevel)
+        </span>
+        @* Always rendered so this live region is present from first paint - only its content changes, so a band
+           transition is announced but the initial Normal content on mount is not. *@
+        <span aria-live="polite" class="status-bar-announce" role="status">@StatusBarFormatter.MemoryLevelAnnouncement(status.MemoryLevel)</span>
+
         @if (loadingSummary is { } loading)
         {
             <span class="status-bar-activity">@loading.Text</span>
@@ -78,6 +86,11 @@
             {
                 <span class="status-bar-activity status-bar-warn">Failed: @(loading.FailedEvents.ToString("N0"))</span>
             }
+        }
+
+        @if (!string.IsNullOrEmpty(status.ResolverStatus))
+        {
+            <span class="status-bar-activity status-bar-resolver" title="@status.ResolverStatus">@status.ResolverStatus</span>
         }
 
         @if (hasChannel)
@@ -101,11 +114,6 @@
                     <span class="status-bar-activity status-bar-warn">Buffer full</span>
                 }
             }
-        }
-
-        @if (!string.IsNullOrEmpty(status.ResolverStatus))
-        {
-            <span class="status-bar-activity status-bar-resolver" title="@status.ResolverStatus">@status.ResolverStatus</span>
         }
     </div>
 </div>

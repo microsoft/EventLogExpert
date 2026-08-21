@@ -23,6 +23,13 @@
     --clr-find:    light-dark(#FFE066, #F8C84B);
     --clr-on-find: #1A1A1A;
 
+    /* Status-bar advisory memory bands. Colored fills (not foreground text, which fails WCAG AA on the blue bar) with
+       theme-flipped on-fill text; each fill/on-fill pair clears AA in both themes. */
+    --clr-status-fill-elevated: light-dark(#8A6D00, #F8C84B);
+    --clr-on-status-elevated:   light-dark(#FFF, #1A1A1A);
+    --clr-status-fill-high:     light-dark(#C0392B, #EF523B);
+    --clr-on-status-high:       light-dark(#FFF, #1A1A1A);
+
     --background-dark:     light-dark(#E0E0E0, #222222);
     --background-darkgray: light-dark(#CECECE, #353535);
 

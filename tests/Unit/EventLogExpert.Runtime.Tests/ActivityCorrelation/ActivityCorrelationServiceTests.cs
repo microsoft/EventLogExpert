@@ -378,6 +378,23 @@ public sealed class ActivityCorrelationServiceTests
     }
 
     [Fact]
+    public async Task Invalidate_DropsTheCachedView_SoTheNextBuildRebuilds()
+    {
+        var (service, _) = ServiceWith(1, 1,
+            Event(1, s_parent, offset: 0),
+            Event(2, s_focus, s_parent, offset: 1));
+
+        var first = await service.BuildAsync(Locator(1, 1), Ct);
+        var cached = await service.BuildAsync(Locator(1, 1), Ct);
+        Assert.Same(first, cached); // same reference proves the second call was served from cache
+
+        ((IActivityCorrelationCacheControl)service).Invalidate();
+        var rebuilt = await service.BuildAsync(Locator(1, 1), Ct);
+
+        Assert.NotSame(first, rebuilt);
+    }
+
+    [Fact]
     public void TryGetContentToken_ReturnsTheStoreTokenAndFalseForAnAbsentLog()
     {
         var (service, _) = ServiceWith(3, 7, Event(1, s_focus, offset: 0));
