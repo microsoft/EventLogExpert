@@ -9,6 +9,7 @@ using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Memory;
 using EventLogExpert.Runtime.Stats;
 using EventLogExpert.Runtime.StatusBar;
 using EventLogExpert.UI.LogTable.Resolution;
@@ -246,6 +247,82 @@ public sealed class StatusBarTests : BunitContext
     }
 
     [Fact]
+    public void MemoryChip_Elevated_RendersTheElevatedBandAndLevelWord()
+    {
+        _status = new StatusBarPresentation { MemoryLevel = MemoryUsageLevel.Elevated, MemoryUsedMebibytes = 100 };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        var chip = cut.Find(".status-bar-memory");
+        Assert.Contains("status-bar-memory-elevated", chip.ClassList);
+        Assert.Contains("Elevated", chip.TextContent);
+        Assert.Equal("Memory usage elevated", cut.Find(".status-bar-memory-announce").TextContent);
+    }
+
+    [Fact]
+    public void MemoryChip_High_RendersTheHighBandAndLevelWord()
+    {
+        _status = new StatusBarPresentation { MemoryLevel = MemoryUsageLevel.High, MemoryUsedMebibytes = 100 };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        var chip = cut.Find(".status-bar-memory");
+        Assert.Contains("status-bar-memory-high", chip.ClassList);
+        Assert.Contains("High", chip.TextContent);
+        Assert.Equal("Memory usage high", cut.Find(".status-bar-memory-announce").TextContent);
+    }
+
+    [Fact]
+    public void MemoryChip_Normal_RendersPlainTextWithoutABandClass()
+    {
+        _status = new StatusBarPresentation { MemoryLevel = MemoryUsageLevel.Normal, MemoryUsedMebibytes = 100 };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        var chip = cut.Find(".status-bar-memory");
+        Assert.Contains("Memory: 100 MB", chip.TextContent);
+        Assert.DoesNotContain("status-bar-memory-elevated", chip.ClassList);
+        Assert.DoesNotContain("status-bar-memory-high", chip.ClassList);
+        Assert.Equal("Memory usage normal", cut.Find(".status-bar-memory-announce").TextContent);
+    }
+
+    [Fact]
+    public void MemoryChip_Tooltip_ReconcilesManagedHeapAndWorkingSet()
+    {
+        _status = new StatusBarPresentation
+        {
+            MemoryLevel = MemoryUsageLevel.Normal,
+            MemoryUsedMebibytes = 100,
+            MemoryWorkingSetBytes = 256L * 1024 * 1024
+        };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        var tooltip = cut.Find(".status-bar-memory").GetAttribute("title");
+        Assert.Contains("Managed heap", tooltip);
+        Assert.Contains("Process working set", tooltip);
+    }
+
+    [Fact]
+    public void MemoryLevelChange_ThroughTheSource_RepaintsTheChipAndAnnouncement()
+    {
+        _status = new StatusBarPresentation { MemoryLevel = MemoryUsageLevel.Normal, MemoryUsedMebibytes = 100 };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.DoesNotContain("status-bar-memory-high", cut.Find(".status-bar-memory").ClassList);
+
+        _status = new StatusBarPresentation { MemoryLevel = MemoryUsageLevel.High, MemoryUsedMebibytes = 900 };
+        cut.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("status-bar-memory-high", cut.Find(".status-bar-memory").ClassList);
+            Assert.Equal("Memory usage high", cut.Find(".status-bar-memory-announce").TextContent);
+        });
+    }
+
+    [Fact]
     public void MultiSelect_ShowsSelectedSuffix_SingleSelectDoesNot()
     {
         SetActiveLog(total: 500, shown: 500, filter: Unfiltered, selected: 3);
@@ -271,27 +348,6 @@ public sealed class StatusBarTests : BunitContext
         Assert.DoesNotContain("Loading: 100", cut.Markup);
         Assert.DoesNotContain("Loading: 50", cut.Markup);
         Assert.Contains("Failed: 2", cut.Markup);
-    }
-
-    [Fact]
-    public void NewEventsCounter_StaysVisibleWhileAnotherLogLoads()
-    {
-        var id = EventLogId.Create();
-        var channel = new LogView(id) { LogName = "Application", LogPathType = LogPathType.Channel };
-        _status = new StatusBarPresentation
-        {
-            Tabs = ImmutableList.Create(channel),
-            ActiveTabId = id,
-            RawEventCountsByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(id, default),
-            NewEventBufferCount = 42,
-            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
-                .Add(new StatusActivityId(Guid.NewGuid()), new LoadingProgress(500, 0))
-        };
-
-        var cut = Render<UI.StatusBar.StatusBar>();
-
-        Assert.Contains("Loading: 500", cut.Markup);
-        Assert.Contains("New Events: 42", cut.Markup);
     }
 
     [Fact]
@@ -325,6 +381,24 @@ public sealed class StatusBarTests : BunitContext
     }
 
     [Fact]
+    public void NewEventsButton_IsTheLastRightClusterItem_EvenWhenBufferFull()
+    {
+        SetChannelStatus(newEventCount: 1000, bufferFull: true);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        var right = cut.Find(".status-bar-right");
+        var children = right.Children.ToList();
+        var memoryChip = right.QuerySelector(".status-bar-memory");
+        var newEventsButton = right.QuerySelector("button.status-bar-newevents");
+
+        Assert.NotNull(memoryChip);
+        Assert.NotNull(newEventsButton);
+        Assert.Equal(children.Count - 1, children.IndexOf(newEventsButton));
+        Assert.True(children.IndexOf(memoryChip) < children.IndexOf(newEventsButton));
+    }
+
+    [Fact]
     public void NewEventsButton_ZeroCount_IsRenderedAndEnabled()
     {
         SetChannelStatus(newEventCount: 0);
@@ -334,6 +408,27 @@ public sealed class StatusBarTests : BunitContext
         Assert.False(button.HasAttribute("disabled"));
         Assert.Contains("New Events: 0", button.TextContent);
         Assert.Equal("No new events to load", button.GetAttribute("title"));
+    }
+
+    [Fact]
+    public void NewEventsCounter_StaysVisibleWhileAnotherLogLoads()
+    {
+        var id = EventLogId.Create();
+        var channel = new LogView(id) { LogName = "Application", LogPathType = LogPathType.Channel };
+        _status = new StatusBarPresentation
+        {
+            Tabs = ImmutableList.Create(channel),
+            ActiveTabId = id,
+            RawEventCountsByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(id, default),
+            NewEventBufferCount = 42,
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(new StatusActivityId(Guid.NewGuid()), new LoadingProgress(500, 0))
+        };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Contains("Loading: 500", cut.Markup);
+        Assert.Contains("New Events: 42", cut.Markup);
     }
 
     [Fact]

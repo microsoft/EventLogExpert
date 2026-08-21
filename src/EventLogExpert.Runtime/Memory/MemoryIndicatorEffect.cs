@@ -1,14 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
 using IDispatcher = Fluxor.IDispatcher;
-using LogTableCloseLogAction = EventLogExpert.Runtime.LogTable.CloseLogAction;
 
 namespace EventLogExpert.Runtime.Memory;
 
@@ -16,10 +14,9 @@ namespace EventLogExpert.Runtime.Memory;
 ///     Samples the managed heap on a cheap 1 Hz cadence (no forced GC on the sampling path) and publishes an advisory
 ///     <see cref="MemoryIndicatorRecomputedAction" /> when the displayed whole-MiB value or the effective
 ///     <see cref="MemoryUsageLevel" /> changes. A user-initiated log close schedules one deadline-gated, non-blocking
-///     background gen2 so the reclaimed heap becomes visible without stalling the UI. The schedule is armed by the
-///     terminal close (after the store is actually unrooted) but only when a <see cref="LogClosedByUserAction" /> was
-///     recorded, so filter-driven XML reloads (which close-and-reopen via the same terminal action, without the user
-///     action) never trigger a collection.
+///     background gen2 so the reclaimed heap becomes visible without stalling the UI. That schedule is armed by
+///     <see cref="LogClosedByUserCompletedAction" />, which the close pipeline raises only after the store is unrooted and
+///     only for user closes, so filter-driven XML reloads (which close-and-reopen without it) never trigger a collection.
 /// </summary>
 internal sealed class MemoryIndicatorEffect : IDisposable
 {
@@ -31,7 +28,6 @@ internal sealed class MemoryIndicatorEffect : IDisposable
     private const double ElevatedAvailableFraction = 0.50;
     private const double HighAvailableFraction = 0.75;
 
-    private readonly Lock _closeGate = new();
     private readonly long _collectDelayTicks;
     private readonly IDispatcher _dispatcher;
     private readonly Lock _gate = new();
@@ -40,7 +36,6 @@ internal sealed class MemoryIndicatorEffect : IDisposable
     private readonly ITraceLogger _logger;
     private readonly IProcessMemoryMeter _meter;
     private readonly Func<long> _now;
-    private readonly HashSet<EventLogId> _pendingUserClosedLogs = [];
     private readonly Timer _timer;
 
     private MemoryUsageLevel _candidateLevel = MemoryUsageLevel.Normal;
@@ -51,7 +46,6 @@ internal sealed class MemoryIndicatorEffect : IDisposable
     private long _highBytes;
     private long _lastDispatchedMebibytes = -1;
     private MemoryUsageLevel _lastLevel = MemoryUsageLevel.Normal;
-    private EventLogId? _lastTerminalClose;
     private int _sampling;
     private bool _thresholdsReady;
 
@@ -113,56 +107,7 @@ internal sealed class MemoryIndicatorEffect : IDisposable
     [EffectMethod(typeof(CloseAllLogsAction))]
     public Task HandleCloseAllLogs(IDispatcher dispatcher)
     {
-        lock (_closeGate)
-        {
-            _pendingUserClosedLogs.Clear();
-            _lastTerminalClose = null;
-        }
-
         ScheduleCloseReclaim();
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod]
-    public Task HandleLogClosed(LogTableCloseLogAction action, IDispatcher dispatcher)
-    {
-        // The terminal close fires for both user closes and filter-driven reloads, and may arrive before OR after the
-        // matching LogClosedByUserAction (the user-close path dispatches them separately, and Fluxor can drain the
-        // terminal synchronously). Reclaim now if the user intent was already recorded; otherwise remember this
-        // terminal so a user marker arriving next can reclaim. A reload never emits LogClosedByUserAction, so its
-        // terminal is remembered but never acted on.
-        bool reclaim;
-
-        lock (_closeGate)
-        {
-            reclaim = _pendingUserClosedLogs.Remove(action.LogId);
-
-            if (!reclaim) { _lastTerminalClose = action.LogId; }
-        }
-
-        if (reclaim) { ScheduleCloseReclaim(); }
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod]
-    public Task HandleLogClosedByUser(LogClosedByUserAction action, IDispatcher dispatcher)
-    {
-        // If the terminal close already ran for this log the store is unrooted, so reclaim now; otherwise record the
-        // intent for the terminal close that follows. Either way the gen2 lands after the store is dropped.
-        bool reclaim;
-
-        lock (_closeGate)
-        {
-            // EventLogId is unique per open, so a matching remembered terminal is exactly this log's close.
-            reclaim = _lastTerminalClose == action.LogId;
-
-            if (reclaim) { _lastTerminalClose = null; }
-            else { _pendingUserClosedLogs.Add(action.LogId); }
-        }
-
-        if (reclaim) { ScheduleCloseReclaim(); }
 
         return Task.CompletedTask;
     }
@@ -171,6 +116,14 @@ internal sealed class MemoryIndicatorEffect : IDisposable
     public Task HandleStoreInitialized(IDispatcher dispatcher)
     {
         Arm(TimeSpan.Zero);
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod]
+    public Task HandleUserCloseCompleted(LogClosedByUserCompletedAction action, IDispatcher dispatcher)
+    {
+        ScheduleCloseReclaim();
 
         return Task.CompletedTask;
     }

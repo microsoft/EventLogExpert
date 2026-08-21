@@ -734,6 +734,18 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleCloseLog_WhenNotUserInitiated_DoesNotDispatchUserCloseCompleted()
+    {
+        var logId = EventLogId.Create();
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices();
+        var action = new CloseLogAction(logId, Constants.LogNameTestLog);
+
+        await effects.HandleCloseLog(action, mockDispatcher);
+
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<LogClosedByUserCompletedAction>());
+    }
+
+    [Fact]
     public async Task HandleCloseLog_WhenOtherLogsRemain_ShouldNotClearResolverCache()
     {
         var logData = new EventLogData(Constants.LogNameLog1, LogPathType.Channel);
@@ -748,6 +760,22 @@ public sealed class EffectsTests
         await effects.HandleCloseLog(action, mockDispatcher);
 
         mockResolverCache.DidNotReceive().ClearAll();
+    }
+
+    [Fact]
+    public async Task HandleCloseLog_WhenUserInitiated_DispatchesUserCloseCompletedAfterTerminal()
+    {
+        var logId = EventLogId.Create();
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices();
+        var action = new CloseLogAction(logId, Constants.LogNameTestLog, UserInitiated: true);
+
+        await effects.HandleCloseLog(action, mockDispatcher);
+
+        Received.InOrder(() =>
+        {
+            mockDispatcher.Dispatch(Arg.Is<Runtime.LogTable.CloseLogAction>(a => a != null && a.LogId == logId));
+            mockDispatcher.Dispatch(Arg.Is<LogClosedByUserCompletedAction>(a => a != null && a.LogId == logId));
+        });
     }
 
     [Fact]
