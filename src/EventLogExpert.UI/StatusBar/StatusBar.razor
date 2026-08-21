@@ -76,7 +76,9 @@
         </span>
         @* Always rendered so this live region is present from first paint - only its content changes, so a band
            transition is announced but the initial Normal content on mount is not. *@
-        <span aria-live="polite" class="status-bar-announce" role="status">@StatusBarFormatter.MemoryLevelAnnouncement(status.MemoryLevel)</span>
+        <span aria-live="polite" class="status-bar-announce status-bar-memory-announce" role="status">
+            @StatusBarFormatter.MemoryLevelAnnouncement(status.MemoryLevel)
+        </span>
 
         @if (loadingSummary is { } loading)
         {
@@ -101,6 +103,11 @@
             }
             else
             {
+                @if (status.NewEventBufferIsFull)
+                {
+                    <span class="status-bar-activity status-bar-warn">Buffer full</span>
+                }
+
                 <button aria-live="off"
                     class="status-bar-activity status-bar-newevents"
                     @onclick="LoadNewEvents"
@@ -108,11 +115,6 @@
                     type="button">
                     New Events: @status.NewEventBufferCount
                 </button>
-
-                @if (status.NewEventBufferIsFull)
-                {
-                    <span class="status-bar-activity status-bar-warn">Buffer full</span>
-                }
             }
         }
     </div>

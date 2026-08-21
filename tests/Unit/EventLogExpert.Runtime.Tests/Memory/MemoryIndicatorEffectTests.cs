@@ -8,7 +8,6 @@ using EventLogExpert.Runtime.Memory;
 using NSubstitute;
 using System.Diagnostics;
 using IDispatcher = Fluxor.IDispatcher;
-using LogTableCloseLogAction = EventLogExpert.Runtime.LogTable.CloseLogAction;
 
 namespace EventLogExpert.Runtime.Tests.Memory;
 
@@ -29,30 +28,6 @@ public sealed class MemoryIndicatorEffectTests
         effect.Tick();
 
         Assert.Empty(harness.Dispatched);
-    }
-
-    [Fact]
-    public void CloseHandshake_HasNoExpiryWindow_RegardlessOfOrderOrDelay()
-    {
-        var userFirst = new Harness();
-        using var userFirstEffect = userFirst.CreateEffect();
-        var logA = EventLogId.Create();
-        _ = userFirstEffect.HandleLogClosedByUser(new LogClosedByUserAction(logA, "A"), userFirst.Dispatcher);
-        userFirst.Advance(TimeSpan.FromSeconds(30)); // a slow unwind must not drop the pending intent
-        _ = userFirstEffect.HandleLogClosed(new LogTableCloseLogAction(logA), userFirst.Dispatcher);
-        userFirst.Advance(TimeSpan.FromSeconds(2));
-        userFirstEffect.Tick();
-        Assert.Equal(1, userFirst.Meter.ReclaimCount);
-
-        var terminalFirst = new Harness();
-        using var terminalFirstEffect = terminalFirst.CreateEffect();
-        var logB = EventLogId.Create();
-        _ = terminalFirstEffect.HandleLogClosed(new LogTableCloseLogAction(logB), terminalFirst.Dispatcher);
-        terminalFirst.Advance(TimeSpan.FromSeconds(30)); // a remembered terminal must not expire
-        _ = terminalFirstEffect.HandleLogClosedByUser(new LogClosedByUserAction(logB, "B"), terminalFirst.Dispatcher);
-        terminalFirst.Advance(TimeSpan.FromSeconds(2));
-        terminalFirstEffect.Tick();
-        Assert.Equal(1, terminalFirst.Meter.ReclaimCount);
     }
 
     [Fact]
@@ -233,37 +208,6 @@ public sealed class MemoryIndicatorEffectTests
     }
 
     [Fact]
-    public void TerminalClose_ThenUserClose_SchedulesReclaim()
-    {
-        var harness = new Harness();
-        using var effect = harness.CreateEffect();
-        var logId = EventLogId.Create();
-
-        // Production ordering for a loaded file log: the terminal close drains synchronously before the user marker is
-        // recorded. The handshake must reclaim regardless of order.
-        _ = effect.HandleLogClosed(new LogTableCloseLogAction(logId), harness.Dispatcher);
-        _ = effect.HandleLogClosedByUser(new LogClosedByUserAction(logId, "System"), harness.Dispatcher);
-        harness.Advance(TimeSpan.FromSeconds(2));
-        effect.Tick();
-
-        Assert.Equal(1, harness.Meter.ReclaimCount);
-    }
-
-    [Fact]
-    public void TerminalClose_WithoutAUserClose_DoesNotReclaim()
-    {
-        var harness = new Harness();
-        using var effect = harness.CreateEffect();
-
-        // A filter-driven XML reload dispatches the terminal close with no preceding LogClosedByUserAction.
-        _ = effect.HandleLogClosed(new LogTableCloseLogAction(EventLogId.Create()), harness.Dispatcher);
-        harness.Advance(TimeSpan.FromSeconds(2));
-        effect.Tick();
-
-        Assert.Equal(0, harness.Meter.ReclaimCount);
-    }
-
-    [Fact]
     public void Tick_QuantizesHeapToWholeMebibytes()
     {
         var harness = new Harness();
@@ -293,15 +237,15 @@ public sealed class MemoryIndicatorEffectTests
     }
 
     [Fact]
-    public void UserClose_ThenTerminalClose_SchedulesReclaim()
+    public void UserCloseCompleted_SchedulesReclaimOnce()
     {
         var harness = new Harness();
         using var effect = harness.CreateEffect();
-        var logId = EventLogId.Create();
 
-        _ = effect.HandleLogClosedByUser(new LogClosedByUserAction(logId, "System"), harness.Dispatcher);
-        _ = effect.HandleLogClosed(new LogTableCloseLogAction(logId), harness.Dispatcher);
+        _ = effect.HandleUserCloseCompleted(
+            new LogClosedByUserCompletedAction(EventLogId.Create()), harness.Dispatcher);
         harness.Advance(TimeSpan.FromSeconds(2)); // past the 1.5s deadline
+        effect.Tick();
         effect.Tick();
 
         Assert.Equal(1, harness.Meter.ReclaimCount);

@@ -123,6 +123,11 @@ internal sealed class OpenLogEffects(
 
             dispatcher.Dispatch(new LogTable.CloseLogAction(action.LogId));
 
+            if (action.UserInitiated)
+            {
+                dispatcher.Dispatch(new LogClosedByUserCompletedAction(action.LogId));
+            }
+
             if (_eventLogState.Value.OpenLogs.IsEmpty)
             {
                 _resolverCache.ClearAll();
