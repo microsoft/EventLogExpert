@@ -58,7 +58,7 @@ public sealed class EffectsTests
 
         pending.Enqueue(new IngestRawEventsAction(rawByLog, RawIngestMode.Prepend));
         pending.Enqueue(new NewEventBufferConsumedAction(snapshot));
-        pending.Enqueue(new AddEventAction(eventB));
+        pending.Enqueue(new AddEventAction(eventB, logData.Id));
 
         while (pending.Count > 0)
         {
@@ -91,7 +91,7 @@ public sealed class EffectsTests
 
         var newEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
 
-        await effects.HandleAddEvent(new AddEventAction(newEvent), mockDispatcher);
+        await effects.HandleAddEvent(new AddEventAction(newEvent, logData.Id), mockDispatcher);
 
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<object>());
     }
@@ -123,7 +123,7 @@ public sealed class EffectsTests
         var pending = CaptureDispatchQueue(mockDispatcher);
         var newEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
 
-        await effects.HandleAddEvent(new AddEventAction(newEvent), mockDispatcher);
+        await effects.HandleAddEvent(new AddEventAction(newEvent, logData.Id), mockDispatcher);
         await DrainDispatchQueueAsync(pending, effects, mockDispatcher, () => rawState, r => rawState = r);
 
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<NewEventBufferConsumedAction>());
@@ -143,7 +143,7 @@ public sealed class EffectsTests
 
         var newEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
 
-        await effects.HandleAddEvent(new AddEventAction(newEvent), mockDispatcher);
+        await effects.HandleAddEvent(new AddEventAction(newEvent, logData.Id), mockDispatcher);
 
         mockDispatcher.Received(1).Dispatch(Arg.Is<IngestRawEventsAction>(a => a != null &&
             a.Mode == RawIngestMode.Prepend && a.EventsByLog.ContainsKey(logData.Id)));
@@ -171,7 +171,7 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, _) = CreateEffectsWithMutableState(() => state, () => rawState);
 
         var newEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
-        var action = new AddEventAction(newEvent);
+        var action = new AddEventAction(newEvent, logData.Id);
 
         await effects.HandleAddEvent(action, mockDispatcher);
 
@@ -184,9 +184,38 @@ public sealed class EffectsTests
     {
         var (effects, mockDispatcher) = CreateEffects();
         var newEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
-        var action = new AddEventAction(newEvent);
+        var action = new AddEventAction(newEvent, EventLogId.Create());
 
         await effects.HandleAddEvent(action, mockDispatcher);
+
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<object>());
+    }
+
+    [Fact]
+    public async Task HandleAddEvent_WhenSourceLogIdMismatchesOpenLog_ShouldNotDispatch()
+    {
+        // A stale watcher's event (old id) must not be routed into a same-name log reopened under a new id.
+        var reopenedId = EventLogId.Create();
+
+        var state = new EventLogState
+        {
+            ContinuouslyUpdate = true,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
+                .Add(Constants.LogNameTestLog, new OpenLogInfo(reopenedId, LogPathType.Channel)),
+            NewEventBuffer = [],
+            AppliedFilter = new Filter(null, [])
+        };
+
+        var rawState = new RawEventStoreState
+        {
+            ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty.Add(reopenedId, EventColumnStore.Empty)
+        };
+
+        var (effects, mockDispatcher, _) = CreateEffectsWithMutableState(() => state, () => rawState);
+
+        var staleEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
+
+        await effects.HandleAddEvent(new AddEventAction(staleEvent, EventLogId.Create()), mockDispatcher);
 
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<object>());
     }

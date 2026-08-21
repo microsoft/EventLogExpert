@@ -30,8 +30,8 @@ public sealed class EventLogStoreTests
         };
 
         // Act: buffer two events additively (newest first).
-        state = Reducers.ReduceAddEvent(state, new AddEventAction(FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog)));
-        state = Reducers.ReduceAddEvent(state, new AddEventAction(FilterEventBuilder.CreateTestEvent(200, logName: Constants.LogNameTestLog)));
+        state = Reducers.ReduceAddEvent(state, new AddEventAction(FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog), logData.Id));
+        state = Reducers.ReduceAddEvent(state, new AddEventAction(FilterEventBuilder.CreateTestEvent(200, logName: Constants.LogNameTestLog), logData.Id));
 
         // Assert
         Assert.Equal(2, state.NewEventBuffer.Count);
@@ -276,8 +276,8 @@ public sealed class EventLogStoreTests
 
         // Act: each add composes against current state, so the second cannot clobber the first (the pre-fix whole-buffer
         // effect write could).
-        state = Reducers.ReduceAddEvent(state, new AddEventAction(first));
-        state = Reducers.ReduceAddEvent(state, new AddEventAction(second));
+        state = Reducers.ReduceAddEvent(state, new AddEventAction(first, logData.Id));
+        state = Reducers.ReduceAddEvent(state, new AddEventAction(second, logData.Id));
 
         // Assert
         Assert.Equal(2, state.NewEventBuffer.Count);
@@ -299,7 +299,7 @@ public sealed class EventLogStoreTests
 
         // Act
         var result = Reducers.ReduceAddEvent(
-            state, new AddEventAction(FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog)));
+            state, new AddEventAction(FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog), logData.Id));
 
         // Assert: buffering is the live-tail effect's job when continuously updating, not the reducer's.
         Assert.Same(state, result);
@@ -314,7 +314,7 @@ public sealed class EventLogStoreTests
 
         // Act
         var result = Reducers.ReduceAddEvent(
-            state, new AddEventAction(FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog)));
+            state, new AddEventAction(FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog), EventLogId.Create()));
 
         // Assert
         Assert.Same(state, result);
@@ -341,12 +341,34 @@ public sealed class EventLogStoreTests
         var newEvent = FilterEventBuilder.CreateTestEvent(9999, logName: Constants.LogNameTestLog);
 
         // Act
-        var result = Reducers.ReduceAddEvent(state, new AddEventAction(newEvent));
+        var result = Reducers.ReduceAddEvent(state, new AddEventAction(newEvent, logData.Id));
 
         // Assert: prepended (newest first) and the full flag recomputed.
         Assert.Equal(EventLogState.MaxNewEvents, result.NewEventBuffer.Count);
         Assert.Same(newEvent, result.NewEventBuffer[0]);
         Assert.True(result.NewEventBufferIsFull);
+    }
+
+    [Fact]
+    public void ReduceAddEvent_WhenSourceLogIdMismatchesOpenLog_DoesNotBuffer()
+    {
+        // A stale watcher's event (old id) must not be buffered into a same-name log reopened under a new id.
+        var reopenedId = EventLogId.Create();
+        var staleId = EventLogId.Create();
+
+        var state = new EventLogState
+        {
+            ContinuouslyUpdate = false,
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
+                .Add(Constants.LogNameTestLog, new OpenLogInfo(reopenedId, LogPathType.Channel))
+        };
+
+        var staleEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
+
+        var result = Reducers.ReduceAddEvent(state, new AddEventAction(staleEvent, staleId));
+
+        Assert.Same(state, result);
+        Assert.Empty(result.NewEventBuffer);
     }
 
     [Fact]
