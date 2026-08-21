@@ -258,7 +258,7 @@ public sealed class EffectsTests
         var mockFilterService = Substitute.For<IFilterService>();
         var mockLogWatcher = Substitute.For<ILogWatcherService>();
         var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
+        mockLogWatcher.RemoveLogAsync(Arg.Any<string>(), Arg.Any<EventLogId>()).Returns(watcherCompletion.Task);
         mockLogWatcher.RemoveAllAsync().Returns(Task.CompletedTask);
 
         var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
@@ -324,7 +324,7 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs, appliedFilter: XmlContainsFilter());
 
         var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
+        mockLogWatcher.RemoveLogAsync(Arg.Any<string>(), Arg.Any<EventLogId>()).Returns(watcherCompletion.Task);
 
         var closeTasks = new List<Task>();
 
@@ -418,7 +418,7 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs, appliedFilter: XmlContainsFilter());
 
         var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
+        mockLogWatcher.RemoveLogAsync(Arg.Any<string>(), Arg.Any<EventLogId>()).Returns(watcherCompletion.Task);
 
         var closeTasks = new List<Task>();
 
@@ -540,7 +540,7 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs, appliedFilter: XmlContainsFilter());
 
         var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
+        mockLogWatcher.RemoveLogAsync(Arg.Any<string>(), Arg.Any<EventLogId>()).Returns(watcherCompletion.Task);
 
         var closeTasks = new List<Task>();
 
@@ -648,7 +648,7 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices();
 
         var watcherTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherTcs.Task);
+        mockLogWatcher.RemoveLogAsync(Arg.Any<string>(), Arg.Any<EventLogId>()).Returns(watcherTcs.Task);
 
         var logId = EventLogId.Create();
         var action = new CloseLogAction(logId, Constants.LogNameTestLog);
@@ -714,7 +714,7 @@ public sealed class EffectsTests
 
         await effects.HandleCloseLog(action, mockDispatcher);
 
-        await mockLogWatcher.Received(1).RemoveLogAsync(Constants.LogNameTestLog);
+        await mockLogWatcher.Received(1).RemoveLogAsync(Constants.LogNameTestLog, logId);
 
         mockDispatcher.Received(1)
             .Dispatch(Arg.Is<Runtime.LogTable.CloseLogAction>(a => a != null &&
@@ -1049,11 +1049,12 @@ public sealed class EffectsTests
     {
         var fakeFactory = new FakeEventLogReaderFactory(new FakeEventLogReader([], newestBookmark: null));
 
-        var (openLog, dispatcher, watcher) = CreateEagerLoadEffects(fakeFactory);
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory);
 
         await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
 
-        watcher.Received(1).AddLog(Constants.LogNameApplication, null, Arg.Any<bool>());
+        dispatcher.Received(1).Dispatch(Arg.Is<RegisterLiveTailAction>(a => a != null &&
+            a.LogData.Name == Constants.LogNameApplication && a.Bookmark == null));
         Assert.Empty(SingleFinalEvents(dispatcher));
     }
 
@@ -1188,11 +1189,12 @@ public sealed class EffectsTests
         var fakeFactory = new FakeEventLogReaderFactory(
             new FakeEventLogReader(BuildReverseBatches(50, batchSize: 30), newestBookmark: "NEWEST_BOOKMARK"));
 
-        var (openLog, dispatcher, watcher) = CreateEagerLoadEffects(fakeFactory);
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory);
 
         await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
 
-        watcher.Received(1).AddLog(Constants.LogNameApplication, "NEWEST_BOOKMARK", Arg.Any<bool>());
+        dispatcher.Received(1).Dispatch(Arg.Is<RegisterLiveTailAction>(a => a != null &&
+            a.LogData.Name == Constants.LogNameApplication && a.Bookmark == "NEWEST_BOOKMARK"));
 
         Assert.True(fakeFactory.ReverseDirectionRequested);
     }
@@ -1247,7 +1249,8 @@ public sealed class EffectsTests
         dispatcher.Received().Dispatch(Arg.Is<SetResolverStatusAction>(a => a != null &&
             a.ResolverStatus.Contains("Error") && a.ResolverStatus.Contains(Constants.LogNameApplication)));
         Assert.Empty(dispatcher.ReceivedCalls().Select(call => call.GetArguments()[0]).OfType<LoadEventsAction>());
-        watcher.DidNotReceive().AddLog(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>());
+        watcher.DidNotReceive().AddLog(Arg.Any<string>(), Arg.Any<EventLogId>(), Arg.Any<string>(), Arg.Any<bool>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RegisterLiveTailAction>());
     }
 
     [Fact]
@@ -1348,6 +1351,50 @@ public sealed class EffectsTests
         dispatcher.Received(1).Dispatch(Arg.Any<ClearStatusAction>());
         dispatcher.Received().Dispatch(Arg.Any<CloseLogAction>());
         dispatcher.Received().Dispatch(Arg.Is<SetResolverStatusAction>(action => action != null && action.ResolverStatus.Contains("Error")));
+    }
+
+    [Fact]
+    public async Task HandleRegisterLiveTail_WhenLogClosed_DoesNotRegisterWatcher()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var (effects, _, watcher, _, _) = CreateEffectsWithServices();
+
+        await effects.OpenLog.HandleRegisterLiveTail(
+            new RegisterLiveTailAction(logData, "BOOKMARK", RenderXml: true),
+            Substitute.For<IDispatcher>());
+
+        watcher.DidNotReceive().AddLog(Arg.Any<string>(), Arg.Any<EventLogId>(), Arg.Any<string>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task HandleRegisterLiveTail_WhenLogReplacedByNewerId_DoesNotRegisterWatcher()
+    {
+        var openLogData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, openLogData);
+        var (effects, _, watcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var staleLogData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        Assert.NotEqual(openLogData.Id, staleLogData.Id);
+
+        await effects.OpenLog.HandleRegisterLiveTail(
+            new RegisterLiveTailAction(staleLogData, "BOOKMARK", RenderXml: true),
+            Substitute.For<IDispatcher>());
+
+        watcher.DidNotReceive().AddLog(Arg.Any<string>(), Arg.Any<EventLogId>(), Arg.Any<string>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task HandleRegisterLiveTail_WhenLogStillOpenWithSameId_RegistersWatcher()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+        var (effects, _, watcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        await effects.OpenLog.HandleRegisterLiveTail(
+            new RegisterLiveTailAction(logData, "BOOKMARK", RenderXml: true),
+            Substitute.For<IDispatcher>());
+
+        watcher.Received(1).AddLog(Constants.LogNameTestLog, logData.Id, "BOOKMARK", true);
     }
 
     [Fact]
@@ -1629,7 +1676,7 @@ public sealed class EffectsTests
         databaseService.InitialClassificationTask.Returns(Task.CompletedTask);
 
         var watcher = Substitute.For<ILogWatcherService>();
-        watcher.RemoveLogAsync(Arg.Any<string>()).Returns(Task.CompletedTask);
+        watcher.RemoveLogAsync(Arg.Any<string>(), Arg.Any<EventLogId>()).Returns(Task.CompletedTask);
         watcher.RemoveAllAsync().Returns(Task.CompletedTask);
 
         var dispatcher = Substitute.For<IDispatcher>();
@@ -1683,7 +1730,7 @@ public sealed class EffectsTests
 
         var mockLogger = Substitute.For<ITraceLogger>();
         var mockLogWatcherService = Substitute.For<ILogWatcherService>();
-        mockLogWatcherService.RemoveLogAsync(Arg.Any<string>()).Returns(Task.CompletedTask);
+        mockLogWatcherService.RemoveLogAsync(Arg.Any<string>(), Arg.Any<EventLogId>()).Returns(Task.CompletedTask);
         mockLogWatcherService.RemoveAllAsync().Returns(Task.CompletedTask);
         var mockResolverCache = Substitute.For<IEventResolverCache>();
 
@@ -1870,7 +1917,7 @@ public sealed class EffectsTests
 
         var mockLogger = Substitute.For<ITraceLogger>();
         var mockLogWatcherService = Substitute.For<ILogWatcherService>();
-        mockLogWatcherService.RemoveLogAsync(Arg.Any<string>()).Returns(Task.CompletedTask);
+        mockLogWatcherService.RemoveLogAsync(Arg.Any<string>(), Arg.Any<EventLogId>()).Returns(Task.CompletedTask);
         mockLogWatcherService.RemoveAllAsync().Returns(Task.CompletedTask);
         var mockResolverCache = Substitute.For<IEventResolverCache>();
 

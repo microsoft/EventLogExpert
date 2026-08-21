@@ -127,19 +127,6 @@ public sealed class EventLogLoadedLogNamesReducersTests
     }
 
     [Fact]
-    public void ReduceLoadEventsPartial_File_UnionsPerLogNames()
-    {
-        var state = Reducers.ReduceOpenLog(new EventLogState(), new OpenLogAction(FileA, LogPathType.File));
-        var logData = new EventLogData(FileA, LogPathType.File) { Id = state.OpenLogs[FileA].Id };
-
-        state = Reducers.ReduceLoadEvents(state, new LoadEventsAction(logData, EventsWithLogNames("Security")));
-        state = Reducers.ReduceLoadEventsPartial(state, new LoadEventsPartialAction(logData, EventsWithLogNames("Setup")));
-
-        Assert.Equal(["Security", "Setup"], state.NamesByLog[FileA].OrderBy(name => name, StringComparer.Ordinal));
-        Assert.Equal(["Security", "Setup"], state.LoadedLogNames.OrderBy(name => name, StringComparer.Ordinal));
-    }
-
-    [Fact]
     public void ReduceOpenLog_AfterClose_ReopensWithSeededNames()
     {
         var state = Reducers.ReduceOpenLog(new EventLogState(), new OpenLogAction(ChannelName, LogPathType.Channel));

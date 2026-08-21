@@ -112,9 +112,10 @@ internal sealed class OpenLogEffects(
                 }
             }
 
+            await _logWatcherService.RemoveLogAsync(action.LogName, action.LogId);
+
             if (!(_eventLogState.Value.OpenLogs.TryGetValue(action.LogName, out var activeLog) && activeLog.Id != action.LogId))
             {
-                await _logWatcherService.RemoveLogAsync(action.LogName);
                 _closeCoordinator.ClearPendingRestore(action.LogName);
                 _xmlResolver.ClearXmlCacheForLog(action.LogName);
             }
@@ -243,6 +244,19 @@ internal sealed class OpenLogEffects(
                 loadComplete.TrySetResult();
             }
         }
+    }
+
+    [EffectMethod]
+    public Task HandleRegisterLiveTail(RegisterLiveTailAction action, IDispatcher dispatcher)
+    {
+        // Register only if this exact log is still open, so a close that drained first is not undone by a late register.
+        if (_eventLogState.Value.OpenLogs.TryGetValue(action.LogData.Name, out var active) &&
+            active.Id == action.LogData.Id)
+        {
+            _logWatcherService.AddLog(action.LogData.Name, action.LogData.Id, action.Bookmark, action.RenderXml);
+        }
+
+        return Task.CompletedTask;
     }
 
     private static string DescribeLog(OpenLogAction action) =>
@@ -534,11 +548,16 @@ internal sealed class OpenLogEffects(
                 _concurrencyState.MarkLoadedWithXml(logData.Id);
             }
 
-            dispatcher.Dispatch(new LoadEventsAction(logData, events.AsReadOnly()));
+            // Offload the O(N) LoadEventsAction reducers (EventColumnStore.Build + counts) via Task.Run so they run
+            // off the UI thread instead of freezing it; a concurrent Fluxor drain can still strand them (guaranteed
+            // off-thread build deferred).
+            await Task.Run(() => dispatcher.Dispatch(new LoadEventsAction(logData, events.AsReadOnly())));
 
             if (action.LogPathType == LogPathType.Channel)
             {
-                _logWatcherService.AddLog(action.LogName, lastEvent, renderXml);
+                // Route via an action so HandleRegisterLiveTail re-checks OpenLogs; a concurrent close can't leave a
+                // watcher on a closed log.
+                dispatcher.Dispatch(new RegisterLiveTailAction(logData, lastEvent, renderXml));
             }
 
             dispatcher.Dispatch(new SetResolverStatusAction(string.Empty));

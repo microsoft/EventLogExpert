@@ -13,7 +13,6 @@ using System.Collections.Immutable;
 using ApplyFilterAction = EventLogExpert.Runtime.EventLog.ApplyFilterAction;
 using CloseLogAction = EventLogExpert.Runtime.LogTable.CloseLogAction;
 using LoadEventsAction = EventLogExpert.Runtime.EventLog.LoadEventsAction;
-using LoadEventsPartialAction = EventLogExpert.Runtime.EventLog.LoadEventsPartialAction;
 using Reducers = EventLogExpert.Runtime.LogTable.Reducers;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
@@ -175,40 +174,6 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
-    public void LogView_ComputerName_WhenAlreadyLatched_ShouldNotBeOverwrittenByRawLoad()
-    {
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var state = new LogTableState();
-        state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
-
-        state = Reducers.ReduceLoadEventsPartial(
-            state,
-            new LoadEventsPartialAction(
-                logData,
-                [
-                    new(Constants.LogNameTestLog, LogPathType.Channel)
-                    {
-                        Id = 10, RecordId = 1, ComputerName = FilterTestConstants.EventComputerServer01
-                    }
-                ]));
-
-        state = Reducers.ReduceLoadEvents(
-            state,
-            new LoadEventsAction(
-                logData,
-                [
-                    new(Constants.LogNameTestLog, LogPathType.Channel)
-                    {
-                        Id = 11, RecordId = 2, ComputerName = FilterTestConstants.EventComputerServer02
-                    }
-                ]));
-
-        Assert.Equal(
-            FilterTestConstants.EventComputerServer01,
-            state.EventTables.First(t => t.Id == logData.Id).ComputerName);
-    }
-
-    [Fact]
     public void LogView_ComputerName_WhenIngestTargetsCombinedTab_ShouldNotLatch()
     {
         var combinedId = EventLogId.Create();
@@ -257,6 +222,42 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
+    public void LogView_ComputerName_WhenLatchedByLiveTailIngest_ShouldNotBeOverwrittenByFinalLoad()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        var state = new LogTableState();
+        state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
+
+        var byLog = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
+        {
+            [logData.Id] =
+            [
+                new(Constants.LogNameTestLog, LogPathType.Channel)
+                {
+                    Id = 10, RecordId = 1, ComputerName = FilterTestConstants.EventComputerServer01
+                }
+            ]
+        };
+
+        state = Reducers.ReduceIngestRawEvents(state, new IngestRawEventsAction(byLog, RawIngestMode.Append));
+
+        state = Reducers.ReduceLoadEvents(
+            state,
+            new LoadEventsAction(
+                logData,
+                [
+                    new(Constants.LogNameTestLog, LogPathType.Channel)
+                    {
+                        Id = 11, RecordId = 2, ComputerName = FilterTestConstants.EventComputerServer02
+                    }
+                ]));
+
+        Assert.Equal(
+            FilterTestConstants.EventComputerServer01,
+            state.EventTables.First(t => t.Id == logData.Id).ComputerName);
+    }
+
+    [Fact]
     public void LogView_ComputerName_WhenLiveTailIngestArrives_ShouldLatch()
     {
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
@@ -289,28 +290,6 @@ public sealed class LogTableStoreTests
         var computerName = model.ComputerName;
 
         Assert.Equal(string.Empty, computerName);
-    }
-
-    [Fact]
-    public void LogView_ComputerName_WhenPartialRawLoadArrives_ShouldLatchBeforeFinalize()
-    {
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-        var state = new LogTableState();
-        state = Reducers.ReduceAddTable(state, new AddTableAction(logData));
-
-        var partial = new List<ResolvedEvent>
-        {
-            new(Constants.LogNameTestLog, LogPathType.Channel)
-            {
-                Id = 10, RecordId = 1, ComputerName = FilterTestConstants.EventComputerServer01
-            }
-        };
-
-        state = Reducers.ReduceLoadEventsPartial(state, new LoadEventsPartialAction(logData, partial));
-
-        Assert.Equal(
-            FilterTestConstants.EventComputerServer01,
-            state.EventTables.First(t => t.Id == logData.Id).ComputerName);
     }
 
     [Fact]
