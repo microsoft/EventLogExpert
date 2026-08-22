@@ -54,6 +54,10 @@ internal sealed class LogWatcherService : ILogWatcherService
     {
         using (_watchersLock.EnterScope())
         {
+            // Capture before DetachWatcher, which transiently empties _watchers during a same-name replace.
+            bool wasEmpty = _logsToWatch.Count == 0;
+            bool wasWatching = IsWatching();
+
             if (_watchedLogIds.TryGetValue(logName, out var existingId))
             {
                 if (existingId == logId) { return; }
@@ -70,7 +74,7 @@ internal sealed class LogWatcherService : ILogWatcherService
             _bookmarks[logName] = bookmark;
             _renderXmlByLog[logName] = renderXml;
 
-            if (_logsToWatch.Count == 1 || IsWatching())
+            if (wasEmpty || wasWatching)
             {
                 StartWatching(logName);
             }
