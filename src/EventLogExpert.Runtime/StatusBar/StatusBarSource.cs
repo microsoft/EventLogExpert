@@ -31,7 +31,7 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
     private (long UsedMebibytes, long WorkingSetBytes, MemoryUsageLevel Level) _memoryFacets;
     private bool _persistentFilterActive;
     private (int Total, ImmutableDictionary<EventLogId, ProviderResolutionCounts> ByLog) _rawCountFacets;
-    private (ImmutableDictionary<StatusActivityId, (int, int)> Loading, string Resolver) _statusFacets;
+    private (ImmutableDictionary<StatusActivityId, (int Loaded, int Failed, long? Total)> Loading, string Resolver) _statusFacets;
 
     public StatusBarSource(
         IState<EventLogState> eventLogState,
@@ -136,7 +136,7 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
             RawEventCountsByLog = rawCount.ByLog,
             LoadingActivities = statusBar.EventsLoading.ToImmutableDictionary(
                 pair => pair.Key,
-                pair => new LoadingProgress(pair.Value.Item1, pair.Value.Item2)),
+                pair => new LoadingProgress(pair.Value.Loaded, pair.Value.Failed, pair.Value.Total)),
             ResolverStatus = statusBar.ResolverStatus,
             Tabs = logTable.EventTables,
             Groups = logTable.Groups,
@@ -159,7 +159,7 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
     private static (int, ImmutableDictionary<EventLogId, ProviderResolutionCounts>) ProjectRawCount(RawEventCountState state) =>
         (state.Total, state.ByLog);
 
-    private static (ImmutableDictionary<StatusActivityId, (int, int)>, string) ProjectStatus(StatusBarState state) =>
+    private static (ImmutableDictionary<StatusActivityId, (int Loaded, int Failed, long? Total)>, string) ProjectStatus(StatusBarState state) =>
         (state.EventsLoading, state.ResolverStatus);
 
     private void OnEventLogChanged(object? sender, EventArgs e)

@@ -44,6 +44,8 @@ internal sealed class OpenLogEffects(
 
     private static readonly int s_maxGlobalConcurrency = ConcurrencyLimits.MaxBackgroundIoParallelism;
     private static readonly TimeSpan s_partialDispatchInterval = TimeSpan.FromSeconds(3);
+    private static readonly SemaphoreSlim s_recordCountProbeGate = new(s_maxGlobalConcurrency);
+    private static readonly TimeSpan s_recordCountProbeTimeout = TimeSpan.FromSeconds(30);
     private static readonly PrioritySemaphore s_resolutionGate = new(s_maxGlobalConcurrency);
 
     private readonly LogCloseCoordinator _closeCoordinator = closeCoordinator;
@@ -278,6 +280,41 @@ internal sealed class OpenLogEffects(
         return Task.CompletedTask;
     }
 
+    internal async Task RunRecordCountProbeAsync(
+        StatusActivityId activityId,
+        string logName,
+        LogPathType pathType,
+        IDispatcher dispatcher,
+        CancellationToken token)
+    {
+        try
+        {
+            if (!await s_recordCountProbeGate.WaitAsync(s_recordCountProbeTimeout, token).ConfigureAwait(false))
+            {
+                return;
+            }
+
+            try
+            {
+                var count = await Task.Run(() => _readerFactory.GetRecordCount(logName, pathType), token).ConfigureAwait(false);
+
+                if (count is > 0)
+                {
+                    dispatcher.Dispatch(new SetLoadingTotalAction(activityId, count.Value));
+                }
+            }
+            finally
+            {
+                s_recordCountProbeGate.Release();
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _logger.Trace($"Record count unavailable for {logName}: {ex.Message}");
+        }
+    }
+
     private static string DescribeLog(OpenLogAction action) =>
         action.LogPathType == LogPathType.File ?
             $"{Path.GetFileName(action.LogName)} ({action.LogName})" :
@@ -379,6 +416,8 @@ internal sealed class OpenLogEffects(
 
             if (reader is null) { return; }
 
+            _ = RunRecordCountProbeAsync(activityId, action.LogName, action.LogPathType, dispatcher, token);
+
             var producerTask = Task.Run(async () =>
             {
                 long sequence = 0;
@@ -473,6 +512,8 @@ internal sealed class OpenLogEffects(
                                     }
                                     catch (Exception ex)
                                     {
+                                        Interlocked.Increment(ref failed);
+
                                         _logger.Warning($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}");
                                     }
                                 }

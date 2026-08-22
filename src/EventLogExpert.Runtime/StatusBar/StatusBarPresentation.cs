@@ -9,7 +9,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.StatusBar;
 
-public readonly record struct LoadingProgress(int Loaded, int Failed);
+public readonly record struct LoadingProgress(int Loaded, int Failed, long? Total = null);
 
 public sealed record StatusBarPresentation
 {

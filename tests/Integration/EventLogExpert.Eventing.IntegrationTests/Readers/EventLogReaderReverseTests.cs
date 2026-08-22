@@ -35,6 +35,23 @@ public sealed class EventLogReaderReverseTests
         AssertStrictlyOrdered(ids, ascending: true);
     }
 
+    [Fact]
+    public void GetLogInformation_WhileReverseReaderOpen_ReturnsRecordCount()
+    {
+        // The loading-percentage probe fetches the record count via a second EvtOpenLog while the load's reverse
+        // EvtQuery handle on the same file is still live. Prove that concurrent-handle combination yields a usable
+        // count, so the % shows for the primary (large .evtx) scenario rather than silently degrading to count-only.
+        using var fixture = new SmallEvtxFixture();
+        using var reader = new EventLogReader(fixture.FilePath, LogPathType.File, reverseDirection: true);
+
+        Assert.True(reader.IsValid);
+
+        var information = EventLogSession.GlobalSession.GetLogInformation(fixture.FilePath, LogPathType.File);
+
+        Assert.NotNull(information.RecordCount);
+        Assert.True(information.RecordCount > 0);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

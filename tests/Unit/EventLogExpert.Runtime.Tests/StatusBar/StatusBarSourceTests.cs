@@ -54,7 +54,7 @@ public sealed class StatusBarSourceTests
         var harness = new Harness();
         harness.StatusBar = harness.StatusBar with
         {
-            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty.Add(Activity, (12, 3))
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty.Add(Activity, (12, 3, null))
         };
         harness.RaiseStatusBar();
         var raised = 0;
@@ -62,7 +62,7 @@ public sealed class StatusBarSourceTests
 
         harness.StatusBar = harness.StatusBar with
         {
-            EventsLoading = ImmutableDictionary.CreateRange([new KeyValuePair<StatusActivityId, (int, int)>(Activity, (12, 3))])
+            EventsLoading = ImmutableDictionary.CreateRange([new KeyValuePair<StatusActivityId, (int, int, long?)>(Activity, (12, 3, null))])
         };
         harness.RaiseStatusBar();
 
@@ -122,7 +122,7 @@ public sealed class StatusBarSourceTests
 
         harness.StatusBar = harness.StatusBar with
         {
-            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty.Add(Activity, (12, 3))
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty.Add(Activity, (12, 3, null))
         };
         harness.RaiseStatusBar();
 
@@ -144,6 +144,28 @@ public sealed class StatusBarSourceTests
 
         Assert.Equal(1, raised);
         Assert.Equal(LogA, harness.Source.Current.ActiveTabId);
+    }
+
+    [Fact]
+    public void Changed_Fires_WhenOnlyTotalChanges_AndProjectsTotal()
+    {
+        var harness = new Harness();
+        harness.StatusBar = harness.StatusBar with
+        {
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty.Add(Activity, (12, 3, null))
+        };
+        harness.RaiseStatusBar();
+        var raised = 0;
+        harness.Source.Changed += () => raised++;
+
+        harness.StatusBar = harness.StatusBar with
+        {
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty.Add(Activity, (12, 3, 10_000))
+        };
+        harness.RaiseStatusBar();
+
+        Assert.Equal(1, raised);
+        Assert.Equal(10_000, harness.Source.Current.LoadingActivities[Activity].Total);
     }
 
     [Fact]

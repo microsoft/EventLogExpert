@@ -96,6 +96,25 @@ public sealed class StatusBarFormatterTests
         Assert.Equal($"{1234:N0} events", StatusBarFormatter.FormatCounts(1234, 1234, isFiltered: false, selectedCount: 0));
 
     [Fact]
+    public void FormatLoading_FailureOnlyProgressRoundingToZero_StaysPending()
+    {
+        var summary = StatusBarFormatter.FormatLoading(Loading(new LoadingProgress(0, 3, 10_000)));
+
+        Assert.NotNull(summary);
+        Assert.Equal("Loading...", summary.Value.Text);
+    }
+
+    [Fact]
+    public void FormatLoading_FailureOnlyProgressWithTotal_ShowsPercentWithoutZeroCount()
+    {
+        var summary = StatusBarFormatter.FormatLoading(Loading(new LoadingProgress(0, 50_000, 100_000)));
+
+        Assert.NotNull(summary);
+        Assert.Equal("Loading... (50%)", summary.Value.Text);
+        Assert.DoesNotContain("Loading: 0", summary.Value.Text);
+    }
+
+    [Fact]
     public void FormatLoading_ManyActivities_GroupsLogCountAndSumsFailedEvents()
     {
         var progresses = Enumerable.Range(0, 1500)
@@ -112,6 +131,34 @@ public sealed class StatusBarFormatterTests
     [Fact]
     public void FormatLoading_NoActivities_ReturnsNull() =>
         Assert.Null(StatusBarFormatter.FormatLoading(Loading()));
+
+    [Fact]
+    public void FormatLoading_NonPositiveTotal_FallsBackToCountOnly()
+    {
+        var summary = StatusBarFormatter.FormatLoading(Loading(new LoadingProgress(4_500, 0, 0)));
+
+        Assert.NotNull(summary);
+        Assert.Equal($"Loading: {4500:N0}", summary.Value.Text);
+    }
+
+    [Fact]
+    public void FormatLoading_PercentClampsAtNinetyNineBeforeCompletion()
+    {
+        var summary = StatusBarFormatter.FormatLoading(Loading(new LoadingProgress(1_000_000, 0, 1_000_000)));
+
+        Assert.NotNull(summary);
+        Assert.Equal($"Loading: {1000000:N0} (99%)", summary.Value.Text);
+    }
+
+    [Fact]
+    public void FormatLoading_PercentUsesLoadedPlusFailed()
+    {
+        // 4000 loaded + 1000 failed = 5000 processed of 10000 = 50%; the displayed count stays the loaded tally.
+        var summary = StatusBarFormatter.FormatLoading(Loading(new LoadingProgress(4_000, 1_000, 10_000)));
+
+        Assert.NotNull(summary);
+        Assert.Equal($"Loading: {4000:N0} (50%)", summary.Value.Text);
+    }
 
     [Fact]
     public void FormatLoading_SingleActivityAtZero_ShowsPendingText()
@@ -133,6 +180,15 @@ public sealed class StatusBarFormatterTests
     }
 
     [Fact]
+    public void FormatLoading_SingleActivityWithTotal_AppendsPercent()
+    {
+        var summary = StatusBarFormatter.FormatLoading(Loading(new LoadingProgress(4_500, 0, 10_000)));
+
+        Assert.NotNull(summary);
+        Assert.Equal($"Loading: {4500:N0} (45%)", summary.Value.Text);
+    }
+
+    [Fact]
     public void FormatLoading_SingleFailedOnlyActivity_StaysPendingAndReportsFailures()
     {
         var summary = StatusBarFormatter.FormatLoading(Loading(new LoadingProgress(0, 3)));
@@ -140,6 +196,16 @@ public sealed class StatusBarFormatterTests
         Assert.NotNull(summary);
         Assert.Equal("Loading...", summary.Value.Text);
         Assert.Equal(3, summary.Value.FailedEvents);
+    }
+
+    [Fact]
+    public void FormatLoading_TinyCorruptDenominator_ClampsInsteadOfOverflowing()
+    {
+        // (long)50_000_000 * 100 / 2 = 2.5e9 (> int.MaxValue): clamping in long space yields 99, never a wrapped value.
+        var summary = StatusBarFormatter.FormatLoading(Loading(new LoadingProgress(50_000_000, 0, 2)));
+
+        Assert.NotNull(summary);
+        Assert.Equal($"Loading: {50000000:N0} (99%)", summary.Value.Text);
     }
 
     [Fact]

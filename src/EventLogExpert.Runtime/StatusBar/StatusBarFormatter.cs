@@ -72,16 +72,24 @@ public static class StatusBarFormatter
 
         var totalFailed = 0;
         var singleLoaded = 0;
+        var singleFailed = 0;
+        long? singleTotal = null;
 
         foreach (var progress in activities.Values)
         {
             totalFailed += progress.Failed;
             singleLoaded = progress.Loaded;
+            singleFailed = progress.Failed;
+            singleTotal = progress.Total;
         }
+
+        var percent = Percent(singleLoaded, singleFailed, singleTotal);
 
         var text = loadingCount switch
         {
+            1 when singleLoaded == 0 && percent is int failureOnlyPercent and > 0 => $"Loading... ({failureOnlyPercent}%)",
             1 when singleLoaded == 0 => "Loading...",
+            1 when percent is { } loadedPercent => $"Loading: {singleLoaded:N0} ({loadedPercent}%)",
             1 => $"Loading: {singleLoaded:N0}",
             _ => $"Loading {loadingCount:N0} logs..."
         };
@@ -186,4 +194,9 @@ public static class StatusBarFormatter
 
     private static string FormatMebibytes(long mebibytes) =>
         mebibytes >= 1024 ? $"{mebibytes / 1024.0:0.0} GB" : $"{mebibytes:N0} MB";
+
+    private static int? Percent(int loaded, int failed, long? total) =>
+        total is { } denominator and > 0 ?
+            (int)Math.Clamp(((long)loaded + failed) * 100 / denominator, 0L, 99L) :
+            null;
 }
