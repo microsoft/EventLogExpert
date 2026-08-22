@@ -34,21 +34,45 @@ public sealed class Reducers
     }
 
     [ReducerMethod]
+    public static StatusBarState ReduceSetLoadingTotal(StatusBarState state, SetLoadingTotalAction action)
+    {
+        // Only annotate an activity that is still loading; a probe that finishes after the load cleared must not
+        // resurrect a "Loading" entry. Preserving the same reference when unchanged suppresses a spurious StateChanged.
+        if (!state.EventsLoading.TryGetValue(action.ActivityId, out var existing) || existing.Total == action.Total)
+        {
+            return state;
+        }
+
+        return state with
+        {
+            EventsLoading = state.EventsLoading.SetItem(
+                action.ActivityId,
+                (existing.Loaded, existing.Failed, action.Total))
+        };
+    }
+
+    [ReducerMethod]
     public static StatusBarState
         ReduceSetResolverStatus(StatusBarState state, SetResolverStatusAction action) =>
         state with { ResolverStatus = action.ResolverStatus };
 
-    private static ImmutableDictionary<StatusActivityId, (int, int)> CommonLoadingReducer(
-        ImmutableDictionary<StatusActivityId, (int, int)> loadingEntries,
+    private static ImmutableDictionary<StatusActivityId, (int Loaded, int Failed, long? Total)> CommonLoadingReducer(
+        ImmutableDictionary<StatusActivityId, (int Loaded, int Failed, long? Total)> loadingEntries,
         StatusActivityId activityId,
         int count,
         int failedCount)
     {
-        if (loadingEntries.TryGetValue(activityId, out var existing) && existing == (count, failedCount))
+        if (loadingEntries.TryGetValue(activityId, out var existing))
         {
-            return loadingEntries;
+            if (existing.Loaded == count && existing.Failed == failedCount)
+            {
+                return loadingEntries;
+            }
+
+            // Preserve the probe-published Total when only the running counts change.
+            return loadingEntries.SetItem(activityId, (count, failedCount, existing.Total));
         }
 
-        return loadingEntries.SetItem(activityId, (count, failedCount));
+        return loadingEntries.SetItem(activityId, (count, failedCount, null));
     }
 }

@@ -517,6 +517,20 @@ public sealed class StatusBarTests : BunitContext
     }
 
     [Fact]
+    public void SingleLoadingActivityWithTotal_RendersPercent()
+    {
+        _status = new StatusBarPresentation
+        {
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(new StatusActivityId(Guid.NewGuid()), new LoadingProgress(4_500, 0, 10_000))
+        };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Contains($"Loading: {4500:N0} (45%)", cut.Markup);
+    }
+
+    [Fact]
     public void SingleLoadingActivity_GroupsLargeFailedCount()
     {
         _status = new StatusBarPresentation

@@ -14,4 +14,6 @@ internal interface IEventLogReaderFactory
         bool renderXml = false,
         bool reverseDirection = false,
         bool captureSelfDescribing = false);
+
+    long? GetRecordCount(string path, LogPathType pathType);
 }

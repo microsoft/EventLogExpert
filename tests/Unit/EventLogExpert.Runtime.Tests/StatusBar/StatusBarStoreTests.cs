@@ -88,7 +88,7 @@ public sealed class StatusBarReducerTests
 
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty.Add(activityId, (100, 5))
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty.Add(activityId, (100, 5, null))
         };
 
         var action = new ClearStatusAction(activityId);
@@ -106,7 +106,7 @@ public sealed class StatusBarReducerTests
 
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty.Add(existingActivityId, (100, 5))
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty.Add(existingActivityId, (100, 5, null))
         };
 
         var action = new ClearStatusAction(nonExistingActivityId);
@@ -122,9 +122,9 @@ public sealed class StatusBarReducerTests
     {
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty
-                .Add(StatusActivityId.Create(), (100, 5))
-                .Add(StatusActivityId.Create(), (200, 10)),
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty
+                .Add(StatusActivityId.Create(), (100, 5, null))
+                .Add(StatusActivityId.Create(), (200, 10, null)),
             ResolverStatus = "Processing..."
         };
 
@@ -135,13 +135,28 @@ public sealed class StatusBarReducerTests
     }
 
     [Fact]
+    public void ReduceSetEventsLoading_AfterTotalSet_PreservesTotal()
+    {
+        var activityId = StatusActivityId.Create();
+
+        var state = new StatusBarState
+        {
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty.Add(activityId, (50, 2, 10_000))
+        };
+
+        var result = Reducers.ReduceSetEventsLoading(state, new SetEventsLoadingAction(activityId, 100, 5));
+
+        Assert.Equal((100, 5, (long?)10_000), result.EventsLoading[activityId]);
+    }
+
+    [Fact]
     public void ReduceSetEventsLoading_WithExistingActivity_ShouldUpdateActivity()
     {
         var activityId = StatusActivityId.Create();
 
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty.Add(activityId, (50, 2))
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty.Add(activityId, (50, 2, null))
         };
 
         var action = new SetEventsLoadingAction(activityId, 100, 5);
@@ -149,7 +164,7 @@ public sealed class StatusBarReducerTests
         var result = Reducers.ReduceSetEventsLoading(state, action);
 
         Assert.Single(result.EventsLoading);
-        Assert.Equal((100, 5), result.EventsLoading[activityId]);
+        Assert.Equal((100, 5, (long?)null), result.EventsLoading[activityId]);
     }
 
     [Fact]
@@ -161,9 +176,9 @@ public sealed class StatusBarReducerTests
 
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty
-                .Add(activityId1, (100, 5))
-                .Add(activityId2, (200, 10))
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty
+                .Add(activityId1, (100, 5, null))
+                .Add(activityId2, (200, 10, null))
         };
 
         var action = new SetEventsLoadingAction(activityId3, 300, 15);
@@ -187,7 +202,7 @@ public sealed class StatusBarReducerTests
 
         Assert.Single(result.EventsLoading);
         Assert.True(result.EventsLoading.ContainsKey(activityId));
-        Assert.Equal((100, 5), result.EventsLoading[activityId]);
+        Assert.Equal((100, 5, (long?)null), result.EventsLoading[activityId]);
     }
 
     [Fact]
@@ -197,7 +212,7 @@ public sealed class StatusBarReducerTests
 
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty.Add(activityId, (100, 5))
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty.Add(activityId, (100, 5, null))
         };
 
         var action = new SetEventsLoadingAction(activityId, 100, 5);
@@ -219,7 +234,51 @@ public sealed class StatusBarReducerTests
         var result = Reducers.ReduceSetEventsLoading(state, action);
 
         Assert.Single(result.EventsLoading);
-        Assert.Equal((0, 0), result.EventsLoading[activityId]);
+        Assert.Equal((0, 0, (long?)null), result.EventsLoading[activityId]);
+    }
+
+    [Fact]
+    public void ReduceSetLoadingTotal_WithAbsentActivity_ReturnsSameState()
+    {
+        var state = new StatusBarState
+        {
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty.Add(StatusActivityId.Create(), (50, 2, null))
+        };
+
+        var result = Reducers.ReduceSetLoadingTotal(state, new SetLoadingTotalAction(StatusActivityId.Create(), 10_000));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void ReduceSetLoadingTotal_WithEqualTotal_ReturnsSameState()
+    {
+        var activityId = StatusActivityId.Create();
+
+        var state = new StatusBarState
+        {
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty.Add(activityId, (50, 2, 10_000))
+        };
+
+        var result = Reducers.ReduceSetLoadingTotal(state, new SetLoadingTotalAction(activityId, 10_000));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void ReduceSetLoadingTotal_WithPresentActivity_SetsTotalPreservingCounts()
+    {
+        var activityId = StatusActivityId.Create();
+
+        var state = new StatusBarState
+        {
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty.Add(activityId, (50, 2, null))
+        };
+
+        var result = Reducers.ReduceSetLoadingTotal(state, new SetLoadingTotalAction(activityId, 10_000));
+
+        Assert.Single(result.EventsLoading);
+        Assert.Equal((50, 2, (long?)10_000), result.EventsLoading[activityId]);
     }
 
     [Fact]
@@ -271,21 +330,21 @@ public sealed class StatusBarIntegrationTests
             new SetEventsLoadingAction(activityId, 100, 0));
 
         Assert.Single(state.EventsLoading);
-        Assert.Equal((100, 0), state.EventsLoading[activityId]);
+        Assert.Equal((100, 0, (long?)null), state.EventsLoading[activityId]);
 
         state = Reducers.ReduceSetEventsLoading(
             state,
             new SetEventsLoadingAction(activityId, 75, 2));
 
         Assert.Single(state.EventsLoading);
-        Assert.Equal((75, 2), state.EventsLoading[activityId]);
+        Assert.Equal((75, 2, (long?)null), state.EventsLoading[activityId]);
 
         state = Reducers.ReduceSetEventsLoading(
             state,
             new SetEventsLoadingAction(activityId, 50, 5));
 
         Assert.Single(state.EventsLoading);
-        Assert.Equal((50, 5), state.EventsLoading[activityId]);
+        Assert.Equal((50, 5, (long?)null), state.EventsLoading[activityId]);
 
         state = Reducers.ReduceClearStatus(
             state,
@@ -303,9 +362,9 @@ public sealed class StatusBarIntegrationTests
 
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty
-                .Add(activity1, (100, 5))
-                .Add(activity2, (200, 10))
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty
+                .Add(activity1, (100, 5, null))
+                .Add(activity2, (200, 10, null))
         };
 
         state = Reducers.ReduceClearStatus(state, new ClearStatusAction(nonExisting));
@@ -320,10 +379,10 @@ public sealed class StatusBarIntegrationTests
     {
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty
-                .Add(StatusActivityId.Create(), (100, 5))
-                .Add(StatusActivityId.Create(), (200, 10))
-                .Add(StatusActivityId.Create(), (300, 15)),
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty
+                .Add(StatusActivityId.Create(), (100, 5, null))
+                .Add(StatusActivityId.Create(), (200, 10, null))
+                .Add(StatusActivityId.Create(), (300, 15, null)),
             ResolverStatus = "Processing multiple activities..."
         };
 
@@ -384,7 +443,7 @@ public sealed class StatusBarIntegrationTests
             new SetEventsLoadingAction(activity1, 50, 0));
 
         Assert.Equal(2, state.EventsLoading.Count);
-        Assert.Equal((50, 0), state.EventsLoading[activity1]);
+        Assert.Equal((50, 0, (long?)null), state.EventsLoading[activity1]);
 
         state = Reducers.ReduceClearStatus(state, new ClearStatusAction(activity1));
         Assert.Single(state.EventsLoading);
@@ -412,9 +471,9 @@ public sealed class StatusBarIntegrationTests
             new SetEventsLoadingAction(activity3, 150, 5));
 
         Assert.Equal(3, state.EventsLoading.Count);
-        Assert.Equal((100, 0), state.EventsLoading[activity1]);
-        Assert.Equal((200, 10), state.EventsLoading[activity2]);
-        Assert.Equal((150, 5), state.EventsLoading[activity3]);
+        Assert.Equal((100, 0, (long?)null), state.EventsLoading[activity1]);
+        Assert.Equal((200, 10, (long?)null), state.EventsLoading[activity2]);
+        Assert.Equal((150, 5, (long?)null), state.EventsLoading[activity3]);
     }
 
     [Fact]
@@ -432,7 +491,7 @@ public sealed class StatusBarIntegrationTests
         state = Reducers.ReduceClearStatus(state, new ClearStatusAction(firstActivity));
 
         Assert.Single(state.EventsLoading);
-        Assert.Equal((50, 0), state.EventsLoading[secondActivity]);
+        Assert.Equal((50, 0, (long?)null), state.EventsLoading[secondActivity]);
         Assert.False(state.EventsLoading.ContainsKey(firstActivity));
     }
 

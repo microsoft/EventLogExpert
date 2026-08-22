@@ -1384,6 +1384,29 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleOpenLog_WhenRecordCountAvailable_DispatchesLoadingTotalFromProbe()
+    {
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(60, batchSize: 30), newestBookmark: "NEWEST"))
+        {
+            RecordCount = 10_000
+        };
+
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory);
+
+        // The probe is fire-and-forget; synchronize on the observable dispatch so the assertion is deterministic and
+        // this test fails (via WaitAsync timeout) if the effect ever stops invoking the probe.
+        var totalDispatched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        dispatcher.When(target => target.Dispatch(Arg.Any<SetLoadingTotalAction>()))
+            .Do(_ => totalDispatched.TrySetResult());
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+        await totalDispatched.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SetLoadingTotalAction>(action => action != null && action.Total == 10_000));
+    }
+
+    [Fact]
     public async Task HandleRegisterLiveTail_WhenLogClosed_DoesNotRegisterWatcher()
     {
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
@@ -1518,6 +1541,77 @@ public sealed class EffectsTests
         mockDispatcher.Received(1)
             .Dispatch(Arg.Is<OpenLogAction>(a => a != null &&
                 a.LogName == Constants.LogNameLog2 && a.LogPathType == LogPathType.File));
+    }
+
+    [Fact]
+    public async Task RunRecordCountProbe_WhenGetRecordCountThrows_SwallowsAndDoesNotDispatch()
+    {
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(0, batchSize: 30), newestBookmark: null))
+        {
+            ThrowOnGetRecordCount = true
+        };
+
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory);
+
+        await openLog.RunRecordCountProbeAsync(
+            StatusActivityId.Create(), Constants.LogNameApplication, LogPathType.Channel, dispatcher, CancellationToken.None);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<SetLoadingTotalAction>());
+    }
+
+    [Fact]
+    public async Task RunRecordCountProbe_WithNullCount_DoesNotDispatch()
+    {
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(0, batchSize: 30), newestBookmark: null))
+        {
+            RecordCount = null
+        };
+
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory);
+
+        await openLog.RunRecordCountProbeAsync(
+            StatusActivityId.Create(), Constants.LogNameApplication, LogPathType.Channel, dispatcher, CancellationToken.None);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<SetLoadingTotalAction>());
+    }
+
+    [Fact]
+    public async Task RunRecordCountProbe_WithPositiveCount_DispatchesLoadingTotal()
+    {
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(0, batchSize: 30), newestBookmark: null))
+        {
+            RecordCount = 10_000
+        };
+
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory);
+        var activityId = StatusActivityId.Create();
+
+        await openLog.RunRecordCountProbeAsync(
+            activityId, Constants.LogNameApplication, LogPathType.Channel, dispatcher, CancellationToken.None);
+
+        Assert.Equal(1, fakeFactory.GetRecordCountCallCount);
+        dispatcher.Received(1).Dispatch(
+            Arg.Is<SetLoadingTotalAction>(action => action != null && action.ActivityId == activityId && action.Total == 10_000));
+    }
+
+    [Fact]
+    public async Task RunRecordCountProbe_WithZeroCount_DoesNotDispatch()
+    {
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(0, batchSize: 30), newestBookmark: null))
+        {
+            RecordCount = 0
+        };
+
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory);
+
+        await openLog.RunRecordCountProbeAsync(
+            StatusActivityId.Create(), Constants.LogNameApplication, LogPathType.Channel, dispatcher, CancellationToken.None);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<SetLoadingTotalAction>());
     }
 
     private static List<LoadEventsPartialAction> AllPartialActions(IDispatcher dispatcher) =>
@@ -2112,7 +2206,13 @@ public sealed class EffectsTests
 
     private sealed class FakeEventLogReaderFactory(IEventLogReader reader) : IEventLogReaderFactory
     {
+        public int GetRecordCountCallCount { get; private set; }
+
+        public long? RecordCount { get; set; }
+
         public bool ReverseDirectionRequested { get; private set; }
+
+        public bool ThrowOnGetRecordCount { get; set; }
 
         public IEventLogReader CreateReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false, bool captureSelfDescribing = false)
         {
@@ -2120,11 +2220,25 @@ public sealed class EffectsTests
 
             return reader;
         }
+
+        public long? GetRecordCount(string path, LogPathType pathType)
+        {
+            GetRecordCountCallCount++;
+
+            if (ThrowOnGetRecordCount)
+            {
+                throw new UnauthorizedAccessException("Simulated record-count failure.");
+            }
+
+            return RecordCount;
+        }
     }
 
     private sealed class ThrowingReaderFactory : IEventLogReaderFactory
     {
         public IEventLogReader CreateReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false, bool captureSelfDescribing = false) =>
             throw new InvalidOperationException("Simulated reader creation failure.");
+
+        public long? GetRecordCount(string path, LogPathType pathType) => null;
     }
 }

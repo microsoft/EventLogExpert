@@ -15,4 +15,7 @@ internal sealed class EventLogReaderFactory : IEventLogReaderFactory
         bool reverseDirection = false,
         bool captureSelfDescribing = false) =>
         new EventLogReader(path, pathType, renderXml, reverseDirection, captureSelfDescribing);
+
+    public long? GetRecordCount(string path, LogPathType pathType) =>
+        EventLogSession.GlobalSession.GetLogInformation(path, pathType).RecordCount;
 }
