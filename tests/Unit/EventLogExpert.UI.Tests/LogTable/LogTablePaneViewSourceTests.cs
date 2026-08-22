@@ -75,6 +75,7 @@ public sealed class LogTablePaneViewSourceTests : BunitContext
             });
 
         Services.AddLogTablePaneDependencies();
+        Services.AddImmediateCpuWorkScheduler();
         Services.AddSingleton(_columnDefaults);
         Services.AddSingleton(_eventLogCommands);
         Services.AddSingleton(_filterPaneState);

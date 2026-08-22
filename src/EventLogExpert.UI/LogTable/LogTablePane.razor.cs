@@ -10,6 +10,7 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;
+using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
@@ -80,6 +81,8 @@ public sealed partial class LogTablePane
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
     [Inject] private ILogTableColumnDefaultsProvider ColumnDefaults { get; init; } = null!;
+
+    [Inject] private ICpuWorkScheduler CpuScheduler { get; init; } = null!;
 
     [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
 

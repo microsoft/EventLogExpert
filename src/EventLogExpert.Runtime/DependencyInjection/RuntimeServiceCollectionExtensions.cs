@@ -19,6 +19,7 @@ using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Versioning;
+using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
@@ -144,6 +145,8 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IFilterPaneQueries, FilterPaneQueries>();
 
             // Coordinators and concurrency
+            services.AddSingleton<ICpuWorkScheduler>(static _ =>
+                new CpuWorkScheduler(ConcurrencyLimits.MaxCpuParallelism, ConcurrencyLimits.CpuInteractiveReserve));
             services.AddSingleton<LogCloseCoordinator>();
             services.AddSingleton<EventLogConcurrencyState>();
             services.AddSingleton<XmlFilterMatchCache>();

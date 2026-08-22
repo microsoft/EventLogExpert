@@ -15,6 +15,7 @@ using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.StatusBar;
+using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
@@ -1579,6 +1580,7 @@ public sealed class EffectsTests
             new XmlFilterMatcher(),
             new XmlFilterMatchCache(),
             concurrencyState,
+            new ImmediateCpuWorkScheduler(),
             logger);
 
         var openLog = new OpenLogEffects(

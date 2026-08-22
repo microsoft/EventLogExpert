@@ -11,6 +11,7 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.LogTable.OrderedView;
 using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
+using EventLogExpert.Runtime.Tests.TestUtils;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Concurrent;
@@ -186,6 +187,7 @@ public sealed class XmlFilterWiringParityTests
                 Matcher,
                 MatchCache,
                 ConcurrencyState,
+                new ImmediateCpuWorkScheduler(),
                 logger);
 
             Bridge = new OrderedViewDispatchBridge(Dispatcher, Writer);

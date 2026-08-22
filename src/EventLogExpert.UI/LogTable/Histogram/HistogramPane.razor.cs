@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
@@ -72,6 +73,8 @@ public sealed partial class HistogramPane
     private long _windowStartTicks;
 
     [Inject] private IActiveEventLogSource ActiveEventLog { get; init; } = null!;
+
+    [Inject] private ICpuWorkScheduler CpuScheduler { get; init; } = null!;
 
     [Inject] private IHistogramDimensionRequestSource DimensionRequest { get; init; } = null!;
 
@@ -890,19 +893,19 @@ public sealed partial class HistogramPane
 
         try
         {
-            data = await Task.Run(() =>
+            data = await CpuScheduler.RunAsync(histogramToken =>
             {
-                token.ThrowIfCancellationRequested();
+                histogramToken.ThrowIfCancellationRequested();
 
                 if (useHighlightTie)
                 {
-                    byte[] highlightWinners = view.EnsureHighlightWinners(tieHighlightFilters, tiePlanKey, token);
+                    byte[] highlightWinners = view.EnsureHighlightWinners(tieHighlightFilters, tiePlanKey, histogramToken);
 
-                    return HistogramBuilder.BuildWithHighlightTie(view, dimension, HistogramConstants.MaxBuckets, highlightWinners, token);
+                    return HistogramBuilder.BuildWithHighlightTie(view, dimension, HistogramConstants.MaxBuckets, highlightWinners, histogramToken);
                 }
 
-                return HistogramBuilder.Build(view, dimension, HistogramConstants.MaxBuckets, token);
-            }, token);
+                return HistogramBuilder.Build(view, dimension, HistogramConstants.MaxBuckets, histogramToken);
+            }, CpuWorkPriority.Bulk, token);
         }
         catch (OperationCanceledException) { return; }
         catch (Exception e)

@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.TestUtils;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -293,7 +294,7 @@ public sealed class ActivityCorrelationServiceTests
     {
         var storeState = Substitute.For<IState<RawEventStoreState>>();
         storeState.Value.Returns(new RawEventStoreState());
-        var service = new ActivityCorrelationService(storeState);
+        var service = new ActivityCorrelationService(storeState, new ImmediateCpuWorkScheduler());
 
         var view = await service.BuildAsync(Locator(1, 0), Ct);
 
@@ -431,6 +432,6 @@ public sealed class ActivityCorrelationServiceTests
             ByLog = ImmutableDictionary<EventLogId, EventColumnStore>.Empty.Add(s_logId, store)
         });
 
-        return (new ActivityCorrelationService(storeState), storeState);
+        return (new ActivityCorrelationService(storeState, new ImmediateCpuWorkScheduler()), storeState);
     }
 }

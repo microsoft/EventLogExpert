@@ -8,6 +8,7 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.TestUtils;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -423,6 +424,7 @@ public sealed class FilteringEffectsXmlMatchTests
                 Matcher,
                 MatchCache,
                 ConcurrencyState,
+                new ImmediateCpuWorkScheduler(),
                 logger);
         }
 

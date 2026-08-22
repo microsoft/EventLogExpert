@@ -16,6 +16,7 @@ using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.LogTable.Find;
 using EventLogExpert.UI.LogTable.Histogram;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -70,6 +71,7 @@ public sealed class HistogramPaneTests : BunitContext
         _highlightSelector.ComputePredicatePlanKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(0);
         _settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
 
+        Services.AddImmediateCpuWorkScheduler();
         Services.AddSingleton(_activeEventLog);
         Services.AddSingleton(_viewSource);
         Services.AddSingleton(_dimensionRequest);
