@@ -64,6 +64,7 @@ public sealed class LogTablePaneFindTests : BunitContext
             .Do(_ => _selectionDispatched = true);
 
         Services.AddLogTablePaneDependencies();
+        Services.AddImmediateCpuWorkScheduler();
         Services.AddSingleton(_columnDefaults);
         Services.AddSingleton(_eventLogCommands);
         Services.AddSingleton(_filterPaneState);

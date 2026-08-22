@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.UI.LogTable.Find;
 using EventLogExpert.UI.LogTable.Grouping;
@@ -411,8 +412,8 @@ public sealed partial class LogTablePane
 
         try
         {
-            (matches, matchTicks) = await Task.Run(
-                () =>
+            (matches, matchTicks) = await CpuScheduler.RunAsync(
+                findToken =>
                 {
                     var found = new List<EventLocator>();
                     var foundTicks = new List<long>();
@@ -420,7 +421,7 @@ public sealed partial class LogTablePane
 
                     for (int start = 0; start < total; start += FindChunkSize)
                     {
-                        token.ThrowIfCancellationRequested();
+                        findToken.ThrowIfCancellationRequested();
 
                         int count = Math.Min(FindChunkSize, total - start);
                         IReadOnlyList<DisplayRow> slice = view.Slice(start, count);
@@ -437,6 +438,7 @@ public sealed partial class LogTablePane
 
                     return (found, foundTicks);
                 },
+                CpuWorkPriority.Interactive,
                 token);
         }
         catch (OperationCanceledException) { return; }

@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,10 +22,12 @@ internal sealed class FilteringEffects(
     IXmlFilterMatcher matcher,
     XmlFilterMatchCache matchCache,
     EventLogConcurrencyState concurrencyState,
+    ICpuWorkScheduler cpuScheduler,
     [FromKeyedServices(LogCategories.EventLog)] ITraceLogger logger)
 {
     private readonly Lock _computeGate = new();
     private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
+    private readonly ICpuWorkScheduler _cpuScheduler = cpuScheduler;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly LiveTailIngestCoordinator _liveTailCoordinator = liveTailCoordinator;
     private readonly ITraceLogger _logger = logger;
@@ -184,8 +187,12 @@ internal sealed class FilteringEffects(
 
                     IEventColumnReader reader = store.CreateReader(info.Id);
 
-                    matches[info.Id] = await Task.Run(
-                        () => _matcher.ComputeMatch(reader, filter, name, info.Type, computeCts.Token));
+                    // Bulk: this on-demand XML match is background analytics that must yield to interactive find. Passing
+                    // computeCts.Token now also drops a superseded queued match (OperationCanceledException, already treated as Superseded), unlike the prior token-less Task.Run.
+                    matches[info.Id] = await _cpuScheduler.RunAsync(
+                        matchToken => _matcher.ComputeMatch(reader, filter, name, info.Type, matchToken),
+                        CpuWorkPriority.Bulk,
+                        computeCts.Token);
 
                     recomputed = true;
                 }

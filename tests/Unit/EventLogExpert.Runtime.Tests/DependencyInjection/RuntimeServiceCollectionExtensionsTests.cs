@@ -16,6 +16,7 @@ using EventLogExpert.Runtime.Common.Identity;
 using EventLogExpert.Runtime.Common.Restart;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Common.Versioning;
+using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
@@ -157,6 +158,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     }
 
     [Theory]
+    [InlineData(typeof(ICpuWorkScheduler))]
     [InlineData(typeof(IEventLogCommands))]
     [InlineData(typeof(IFilterLibraryCommands))]
     [InlineData(typeof(IFilterPaneCommands))]

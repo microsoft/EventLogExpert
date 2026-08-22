@@ -54,6 +54,7 @@ public sealed class LogTablePaneIndicatorTests : BunitContext
         _selectedEvents.Current.Returns(ImmutableList<SelectionEntry>.Empty);
 
         Services.AddLogTablePaneDependencies();
+        Services.AddImmediateCpuWorkScheduler();
         Services.AddSingleton(_columnDefaults);
         Services.AddSingleton(_eventLogCommands);
         Services.AddSingleton(_filterPaneState);

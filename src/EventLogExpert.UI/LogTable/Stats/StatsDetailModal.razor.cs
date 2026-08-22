@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Stats;
@@ -31,6 +32,8 @@ public sealed partial class StatsDetailModal : ModalBase<bool>
 
     [EditorRequired]
     [Parameter] public IEventColumnView View { get; set; } = null!;
+
+    [Inject] private ICpuWorkScheduler CpuScheduler { get; init; } = null!;
 
     [Inject] private IFilterLensCommands FilterLensCommands { get; init; } = null!;
 
@@ -64,8 +67,10 @@ public sealed partial class StatsDetailModal : ModalBase<bool>
 
         try
         {
-            DimensionStats stats = await Task.Run(
-                () => StatsService.BuildDimension(View, Dimension, MaxRows, _cts.Token), _cts.Token);
+            // UserInitiated: user opened this modal and is watching its spinner. Do NOT add ConfigureAwait(false) - the
+            // continuation mutates state and the finally calls StateHasChanged() without InvokeAsync, so it must resume on the Blazor dispatcher.
+            DimensionStats stats = await CpuScheduler.RunAsync(
+                detailToken => StatsService.BuildDimension(View, Dimension, MaxRows, detailToken), CpuWorkPriority.UserInitiated, _cts.Token);
 
             _all = stats.Top;
             _distinct = stats.DistinctCount;

@@ -45,6 +45,7 @@ public sealed class ResolutionCoverageModalTests : BunitContext
         _presentation = PresentationWith(PresentationState.Current);
         _viewSource.Current.Returns(_ => _presentation);
 
+        Services.AddImmediateCpuWorkScheduler();
         Services.AddSingleton(_clipboard);
         Services.AddSingleton(_coverageService);
         Services.AddSingleton(_filterApplied);

@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.LogTable.OrderedView;
@@ -70,6 +71,8 @@ public sealed partial class StatsPane
     private DotNetObjectReference<StatsPane>? _selfRef;
     private SeverityStats? _severity;
     private ViewContentToken _severityToken = ViewContentToken.Empty;
+
+    [Inject] private ICpuWorkScheduler CpuScheduler { get; init; } = null!;
 
     [Inject] private IFilterLensCommands FilterLensCommands { get; init; } = null!;
 
@@ -363,7 +366,7 @@ public sealed partial class StatsPane
         try
         {
             SeverityStats severity =
-                await Task.Run(() => StatsService.BuildSeverity(view, cancellationToken), cancellationToken);
+                await CpuScheduler.RunAsync(scanToken => StatsService.BuildSeverity(view, scanToken), CpuWorkPriority.Bulk, cancellationToken);
 
             if (!await PublishAsync(scanVersion, tab, contentToken, () =>
                 {
@@ -377,8 +380,9 @@ public sealed partial class StatsPane
 
             foreach ((StatsDimension dimension, int topN) in requests)
             {
-                DimensionStats stats = await Task.Run(
-                    () => StatsService.BuildDimension(view, dimension, topN, cancellationToken),
+                DimensionStats stats = await CpuScheduler.RunAsync(
+                    scanToken => StatsService.BuildDimension(view, dimension, topN, scanToken),
+                    CpuWorkPriority.Bulk,
                     cancellationToken);
 
                 if (!await PublishAsync(scanVersion, tab, contentToken, () =>

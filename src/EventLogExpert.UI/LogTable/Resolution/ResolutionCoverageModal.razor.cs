@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
@@ -51,6 +52,8 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
     [Inject] private IResolutionCoverageService CoverageService { get; init; } = null!;
+
+    [Inject] private ICpuWorkScheduler CpuScheduler { get; init; } = null!;
 
     [Inject] private IFilterAppliedSource FilterApplied { get; init; } = null!;
 
@@ -115,7 +118,9 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
         try
         {
             IEventColumnView view = _view;
-            _report = await Task.Run(() => CoverageService.Build(view, _cts.Token), _cts.Token);
+            // UserInitiated: user opened this modal and is watching its spinner. Do NOT add ConfigureAwait(false) - the
+            // continuation mutates _report and calls StateHasChanged() without InvokeAsync, so it must resume on the Blazor dispatcher.
+            _report = await CpuScheduler.RunAsync(reportToken => CoverageService.Build(view, reportToken), CpuWorkPriority.UserInitiated, _cts.Token);
         }
         catch (OperationCanceledException) { }
         catch (Exception)
@@ -355,7 +360,9 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
 
         try
         {
-            detail = await Task.Run(() => CoverageService.BuildProviderDetail(view, provider, linked.Token), linked.Token);
+            // UserInitiated: user-driven provider expand. Do NOT add ConfigureAwait(false) - the continuation mutates
+            // detail state and renders without InvokeAsync, so it must resume on the Blazor dispatcher.
+            detail = await CpuScheduler.RunAsync(detailToken => CoverageService.BuildProviderDetail(view, provider, detailToken), CpuWorkPriority.UserInitiated, linked.Token);
         }
         catch (OperationCanceledException) { return; }
         catch (Exception) { failed = true; }

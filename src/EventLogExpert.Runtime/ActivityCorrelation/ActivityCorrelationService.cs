@@ -3,12 +3,13 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 
 namespace EventLogExpert.Runtime.ActivityCorrelation;
 
-internal sealed class ActivityCorrelationService(IState<RawEventStoreState> rawStore)
+internal sealed class ActivityCorrelationService(IState<RawEventStoreState> rawStore, ICpuWorkScheduler cpuScheduler)
     : IActivityCorrelationService, IActivityCorrelationCacheControl
 {
     private const int MaxEventsPerActivity = 200;
@@ -16,6 +17,7 @@ internal sealed class ActivityCorrelationService(IState<RawEventStoreState> rawS
     private const int SharedPreviewCap = 25;
 
     private readonly Lock _cacheGate = new();
+    private readonly ICpuWorkScheduler _cpuScheduler = cpuScheduler;
     private readonly IState<RawEventStoreState> _rawStore = rawStore;
 
     private CachedView? _cache;
@@ -46,7 +48,10 @@ internal sealed class ActivityCorrelationService(IState<RawEventStoreState> rawS
             }
         }
 
-        var view = await Task.Run(() => BuildCore(store, focusedEvent, token, cancellationToken), cancellationToken);
+        var view = await _cpuScheduler.RunAsync(
+            correlationToken => BuildCore(store, focusedEvent, token, correlationToken),
+            CpuWorkPriority.UserInitiated,
+            cancellationToken);
 
         // Cache only if the snapshot is still current: a close or content change during the build must not repopulate
         // the neighborhood of a log that is no longer open. TryGetContentToken reads the live store, and the check runs

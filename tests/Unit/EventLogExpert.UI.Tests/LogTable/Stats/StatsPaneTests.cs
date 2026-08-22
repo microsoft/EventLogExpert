@@ -11,6 +11,7 @@ using EventLogExpert.Runtime.LogTable.OrderedView;
 using EventLogExpert.Runtime.Stats;
 using EventLogExpert.UI.LogTable.Stats;
 using EventLogExpert.UI.Modal;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -43,6 +44,7 @@ public sealed class StatsPaneTests : BunitContext
         JSInterop.Mode = JSRuntimeMode.Loose;
         JSInterop.SetupModule("./_content/EventLogExpert.UI/LogTable/Stats/StatsPane.razor.js");
 
+        Services.AddImmediateCpuWorkScheduler();
         Services.AddSingleton(_lensCommands);
         Services.AddSingleton(_lensSource);
         Services.AddSingleton(_modalCoordinator);
