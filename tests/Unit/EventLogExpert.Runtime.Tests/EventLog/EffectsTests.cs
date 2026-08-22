@@ -1407,6 +1407,28 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleOpenLog_WhenResolveThrows_ExcludesThrownRecordFromLoadedViaTheFailedPath()
+    {
+        const int total = 60;
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(total, batchSize: 30), newestBookmark: "NEWEST"));
+
+        // One read record's resolver throws. A record that WAS read can only be dropped from the loaded set via the
+        // resolve-exception catch - which is exactly where it is counted as failed (loaded + failed is the loading
+        // percentage numerator, and failed drives the "Failed: N" badge). So its exclusion proves that path executed.
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory, throwOnResolve: recordId => recordId == 30);
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        var load = dispatcher.ReceivedCalls()
+            .Select(call => call.GetArguments()[0])
+            .OfType<LoadEventsAction>()
+            .Single();
+
+        Assert.Equal(total - 1, load.Events.Count);
+    }
+
+    [Fact]
     public async Task HandleRegisterLiveTail_WhenLogClosed_DoesNotRegisterWatcher()
     {
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
@@ -1759,7 +1781,8 @@ public sealed class EffectsTests
 
     private static (OpenLogEffects openLog, IDispatcher dispatcher, ILogWatcherService watcher) CreateEagerLoadEffects(
         IEventLogReaderFactory readerFactory,
-        Func<long?, int>? resolveDelayMs = null)
+        Func<long?, int>? resolveDelayMs = null,
+        Func<long?, bool>? throwOnResolve = null)
     {
         var logData = new EventLogData(Constants.LogNameApplication, LogPathType.Channel);
 
@@ -1777,6 +1800,11 @@ public sealed class EffectsTests
         resolver.ResolveEvent(Arg.Any<EventRecord>()).Returns(callInfo =>
         {
             var record = callInfo.ArgAt<EventRecord>(0);
+
+            if (throwOnResolve?.Invoke(record.RecordId) == true)
+            {
+                throw new InvalidOperationException($"Simulated resolve failure for record {record.RecordId}.");
+            }
 
             if (resolveDelayMs is not null)
             {
