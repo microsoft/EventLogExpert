@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Collections.Frozen;
 using System.Globalization;
 
 namespace EventLogExpert.UI.Globalization;
@@ -15,8 +16,8 @@ public static class ContentCulture
     ///     Cultures with a shipped translation; grows ONLY with a translation + the RTL prerequisite bundle (a
     ///     drift-guard test enforces alignment with the embedded satellites).
     /// </summary>
-    public static readonly IReadOnlySet<string> SupportedUiCultures =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "en" };
+    public static readonly FrozenSet<string> SupportedUiCultures =
+        new[] { "en" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The BCP-47 layout direction for <paramref name="culture" />: <c>"rtl"</c> or <c>"ltr"</c>.</summary>
     public static string DirectionOf(CultureInfo culture)
