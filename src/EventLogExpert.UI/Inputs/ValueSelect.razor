@@ -1,5 +1,9 @@
 @typeparam T
 @inherits InputComponent<T>
+@{
+    // Evaluate once per render; DisplayString runs the converter (and a string.Join for multi-select).
+    var displayString = DisplayString;
+}
 
 <div class="dropdown-input" @onkeydown="HandleKeyDown" @ref="_selectComponent">
     <input aria-activedescendant="@HighlightedItem?.ItemId"
@@ -20,8 +24,9 @@
         readonly="@(!IsInput || IsMultiSelect)"
         role="combobox"
         tabindex="0"
+        title="@displayString"
         type="text"
-        value="@DisplayString" />
+        value="@displayString" />
 
     <div aria-multiselectable="@(IsMultiSelect ? "true" : null)" class="dropdown-list" id="@_itemId" role="listbox" tabindex="-1">
         <CascadingValue Value="this">

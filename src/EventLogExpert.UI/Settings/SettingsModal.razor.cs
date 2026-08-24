@@ -7,6 +7,7 @@ using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.UI.Settings;
@@ -18,12 +19,16 @@ public sealed partial class SettingsModal : ModalBase<bool>
     private LogLevel _logLevel;
     private bool _showDisplayPaneOnSelectionChange;
     private Theme _theme;
+    private Dictionary<string, string> _timeZoneDisplay = new();
     private string _timeZoneId = string.Empty;
+    private IReadOnlyList<TimeZoneInfo> _timeZones = [];
     private bool _verboseResolution;
 
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
     [Inject] private IDetailsPanePreferencesProvider DetailsPanePreferences { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -35,6 +40,16 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
     protected override void OnInitialized()
     {
+        // One GetSystemTimeZones() snapshot drives both the ordered dropdown list and the id->DisplayName lookup;
+        // per-instance (not static) because DisplayName is culture-sensitive.
+        _timeZones = TimeZoneInfo.GetSystemTimeZones();
+        _timeZoneDisplay = new Dictionary<string, string>(_timeZones.Count);
+
+        foreach (var timeZone in _timeZones)
+        {
+            _timeZoneDisplay[timeZone.Id] = timeZone.DisplayName;
+        }
+
         LoadFromSettings();
         base.OnInitialized();
     }
@@ -43,10 +58,19 @@ public sealed partial class SettingsModal : ModalBase<bool>
     {
         SaveSettings();
 
-        AnnouncementService.Announce("Settings saved");
+        AnnouncementService.Announce(Localizer["Settings_SavedAnnouncement"]);
 
         await CompleteAsync(true);
     }
+
+    private string GetCopyFormatDisplay(EventCopyFormat value) => Localizer[$"Settings_CopyFormat_{value}"];
+
+    private string GetLogLevelDisplay(LogLevel value) => Localizer[$"Settings_LogLevel_{value}"];
+
+    private string GetThemeDisplay(Theme value) => Localizer[$"Settings_Theme_{value}"];
+
+    private string GetTimeZoneDisplay(string? id) =>
+        string.IsNullOrEmpty(id) ? string.Empty : (_timeZoneDisplay.TryGetValue(id, out var name) ? name : id);
 
     private void LoadFromSettings()
     {

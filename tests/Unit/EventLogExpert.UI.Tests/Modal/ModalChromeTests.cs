@@ -103,6 +103,87 @@ public sealed class ModalChromeTests : BunitContext
         Assert.False(cycleState.ModalContentDisplayed);
     }
 
+    [Theory]
+    [InlineData(FooterPreset.Dismiss)]
+    [InlineData(FooterPreset.AcceptCancel)]
+    public void ModalChrome_AcceptDefault_LocalizesToOk(FooterPreset footer)
+    {
+        var component = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Title, "Test")
+            .Add(p => p.Footer, footer)
+            .AddChildContent("<p>body</p>"));
+
+        var labels = component.FindAll(".footer-group button").Select(button => button.TextContent.Trim()).ToList();
+        Assert.Contains("OK", labels);
+    }
+
+    [Fact]
+    public void ModalChrome_CloseButton_AriaLabelDefaultsToLocalizedClose()
+    {
+        var component = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Title, "Test")
+            .Add(p => p.ShowCloseButton, true)
+            .AddChildContent("<p>body</p>"));
+
+        Assert.Equal("Close", component.Find(".dialog-close").GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void ModalChrome_ImportExportCloseDefaults_Localize()
+    {
+        var component = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Title, "Test")
+            .Add(p => p.Footer, FooterPreset.ImportExportClose)
+            .AddChildContent("<p>body</p>"));
+
+        var labels = component.FindAll(".footer-group button").Select(button => button.TextContent.Trim()).ToList();
+        Assert.Contains("Import", labels);
+        Assert.Contains("Export", labels);
+        Assert.Contains("Close", labels);
+    }
+
+    [Fact]
+    public void ModalChrome_InlineAlertWithoutTitle_AriaFallsBackToLocalizedAlert()
+    {
+        var alert = new InlineAlertRequest(
+            Title: "",
+            Message: "Something happened",
+            AcceptLabel: "OK",
+            CancelLabel: "Cancel",
+            IsPrompt: false,
+            PromptInitialValue: null);
+
+        var component = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Title, "Test")
+            .Add(p => p.InlineAlert, alert)
+            .AddChildContent("<p>body</p>"));
+
+        Assert.Equal("Alert", component.Find("section.inline-alert").GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void ModalChrome_NoTitleNoAriaLabel_DialogAriaFallsBackToLocalized()
+    {
+        var component = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Footer, FooterPreset.None)
+            .AddChildContent("<p>body</p>"));
+
+        Assert.Equal("Dialog", component.Find("dialog").GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void ModalChrome_SaveCancelDefaults_LocalizeToSaveAndCancel()
+    {
+        var component = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Title, "Test")
+            .Add(p => p.Footer, FooterPreset.SaveCancel)
+            .AddChildContent("<p>body</p>"));
+
+        var labels = component.FindAll(".footer-group button").Select(button => button.TextContent.Trim()).ToList();
+        Assert.Contains("Save", labels);
+        Assert.Contains("Cancel", labels);
+    }
+
     [Fact]
     public void Render_BannerHostWrapper_DoesNotHaveInertAttributeWhenNoInlineAlert()
     {
@@ -179,25 +260,6 @@ public sealed class ModalChromeTests : BunitContext
     }
 
     [Fact]
-    public void Render_InlineAlertWithoutSecondaryActionLabel_RendersNoSecondaryButton()
-    {
-        var alert = new InlineAlertRequest(
-            Title: "Confirm",
-            Message: "Are you sure?",
-            AcceptLabel: "Yes",
-            CancelLabel: "No",
-            IsPrompt: false,
-            PromptInitialValue: null);
-
-        var component = Render<ModalChrome>(parameters => parameters
-            .Add(p => p.Title, "Test")
-            .Add(p => p.InlineAlert, alert)
-            .AddChildContent("<p>body</p>"));
-
-        Assert.Equal(2, component.FindAll(".inline-alert-buttons button").Count);
-    }
-
-    [Fact]
     public void Render_InlineAlertWithSecondaryActionLabel_RendersSecondaryButton()
     {
         var alert = new InlineAlertRequest(
@@ -220,15 +282,22 @@ public sealed class ModalChromeTests : BunitContext
     }
 
     [Fact]
-    public void Render_WhenFooterPresetNone_RendersNoBuiltInButtons()
+    public void Render_InlineAlertWithoutSecondaryActionLabel_RendersNoSecondaryButton()
     {
+        var alert = new InlineAlertRequest(
+            Title: "Confirm",
+            Message: "Are you sure?",
+            AcceptLabel: "Yes",
+            CancelLabel: "No",
+            IsPrompt: false,
+            PromptInitialValue: null);
+
         var component = Render<ModalChrome>(parameters => parameters
             .Add(p => p.Title, "Test")
-            .Add(p => p.Footer, FooterPreset.None)
+            .Add(p => p.InlineAlert, alert)
             .AddChildContent("<p>body</p>"));
 
-        var footerGroup = component.Find(".footer-group");
-        Assert.Empty(footerGroup.QuerySelectorAll("button"));
+        Assert.Equal(2, component.FindAll(".inline-alert-buttons button").Count);
     }
 
     [Fact]
@@ -257,5 +326,17 @@ public sealed class ModalChromeTests : BunitContext
         var footerGroup = component.Find(".footer-group");
         var buttons = footerGroup.QuerySelectorAll("button");
         Assert.Equal(3, buttons.Length);
+    }
+
+    [Fact]
+    public void Render_WhenFooterPresetNone_RendersNoBuiltInButtons()
+    {
+        var component = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Title, "Test")
+            .Add(p => p.Footer, FooterPreset.None)
+            .AddChildContent("<p>body</p>"));
+
+        var footerGroup = component.Find(".footer-group");
+        Assert.Empty(footerGroup.QuerySelectorAll("button"));
     }
 }

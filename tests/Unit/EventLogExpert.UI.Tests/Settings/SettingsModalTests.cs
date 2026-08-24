@@ -3,12 +3,16 @@
 
 using Bunit;
 using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Tests.TestUtils;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Settings;
@@ -37,6 +41,29 @@ public sealed class SettingsModalTests : BunitContext
         Services.AddSingleton(_settings);
 
         JSInterop.Mode = JSRuntimeMode.Loose;
+    }
+
+    [Fact]
+    public void SettingsModal_EnumOptionKeys_AllResolveInResources()
+    {
+        var localizer = Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+
+        foreach (var value in Enum.GetValues<Theme>())
+        {
+            Assert.False(localizer[$"Settings_Theme_{value}"].ResourceNotFound, $"Missing Settings_Theme_{value}");
+        }
+
+        foreach (var value in Enum.GetValues<EventCopyFormat>())
+        {
+            Assert.False(localizer[$"Settings_CopyFormat_{value}"].ResourceNotFound, $"Missing Settings_CopyFormat_{value}");
+        }
+
+        foreach (var value in Enum.GetValues<LogLevel>())
+        {
+            Assert.False(localizer[$"Settings_LogLevel_{value}"].ResourceNotFound, $"Missing Settings_LogLevel_{value}");
+        }
+
+        Assert.Equal("Follow System", localizer[$"Settings_Theme_{Theme.System}"].Value);
     }
 
     [Fact]
@@ -80,6 +107,64 @@ public sealed class SettingsModalTests : BunitContext
     }
 
     [Fact]
+    public void SettingsModal_ResolvesAllResourceKeys_NoRawKeyLeaksIntoMarkup()
+    {
+        // A missing key makes IStringLocalizer echo the key name; ids/classes use hyphens (settings-timezone, modal-title),
+        // so a raw "Settings_" or "Modal_" in the markup is an unresolved-key leak on any label, aria, or dropdown option.
+        var component = Render<SettingsModal>();
+
+        Assert.DoesNotContain("Settings_", component.Markup);
+        Assert.DoesNotContain("Modal_", component.Markup);
+    }
+
+    [Fact]
+    public async Task SettingsModal_ThemeDropdown_ClosedDisplayIsLocalized_AndUpdatesOnSelection()
+    {
+        _settings.Theme.Returns(Theme.Light);
+        var component = Render<SettingsModal>();
+
+        Assert.Equal("Light", component.Find("#settings-theme").GetAttribute("value"));
+
+        // ValueSelectItem wires @onmousedown (not onclick), so Click() would be a no-op here.
+        var systemOption = component.FindAll("[role='option']")
+            .Single(option => option.TextContent.Trim() == "Follow System");
+        await systemOption.MouseDownAsync(new MouseEventArgs());
+
+        Assert.Equal("Follow System", component.Find("#settings-theme").GetAttribute("value"));
+    }
+
+    [Fact]
+    public void SettingsModal_TimeZoneClosedDisplay_EmptyIdRendersEmpty()
+    {
+        _settings.TimeZoneId.Returns(string.Empty);
+
+        var component = Render<SettingsModal>();
+
+        Assert.Equal(string.Empty, component.Find("#settings-timezone").GetAttribute("value"));
+    }
+
+    [Fact]
+    public void SettingsModal_TimeZoneClosedDisplay_FallsBackToRawIdForUnknownId()
+    {
+        _settings.TimeZoneId.Returns("Not A Real Time Zone Id");
+
+        var component = Render<SettingsModal>();
+
+        Assert.Equal("Not A Real Time Zone Id", component.Find("#settings-timezone").GetAttribute("value"));
+    }
+
+    [Fact]
+    public void SettingsModal_TimeZoneClosedDisplay_ShowsDisplayNameForKnownId()
+    {
+        var zone = TimeZoneInfo.GetSystemTimeZones()[0];
+        _settings.TimeZoneId.Returns(zone.Id);
+
+        var component = Render<SettingsModal>();
+
+        Assert.Equal(zone.DisplayName, component.Find("#settings-timezone").GetAttribute("value"));
+    }
+
+    [Fact]
     public void SettingsModal_TimeZoneInput_HasLabelForAssociation()
     {
         var component = Render<SettingsModal>();
@@ -88,6 +173,18 @@ public sealed class SettingsModalTests : BunitContext
         Assert.Equal("Time Zone:", label.TextContent.Trim());
         var input = component.Find("#settings-timezone");
         Assert.Equal("settings-timezone", input.Id);
+    }
+
+    [Fact]
+    public void SettingsModal_ToggleRows_UseBareAriaLabels_ButColonInVisibleText()
+    {
+        var component = Render<SettingsModal>();
+
+        Assert.Contains("Expand Display Pane On Selection Change:", component.Markup);
+        Assert.Single(component.FindAll("[aria-label='Expand Display Pane On Selection Change']"));
+
+        Assert.Contains("Pre-release Builds:", component.Markup);
+        Assert.Single(component.FindAll("[aria-label='Pre-release Builds']"));
     }
 
     [Fact]
