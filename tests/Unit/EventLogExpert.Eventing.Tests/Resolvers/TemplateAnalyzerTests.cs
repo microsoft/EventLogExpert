@@ -60,4 +60,47 @@ public sealed class TemplateAnalyzerTests
 
         Assert.Equal([""], metadata.AllMaps);
     }
+
+    [Fact]
+    public void EventHasNoPropertiesButTemplateHasSome_CountsVisibleNodesExcludingLengthProviders()
+    {
+        var analyzer = new TemplateAnalyzer();
+
+        // Len is a length-provider node EvtRender consumes, so the visible count is 1 (Payload only) - still > 0.
+        const string template =
+            "<template>" +
+            "<data name=\"Len\" inType=\"win:UInt32\"/>" +
+            "<data name=\"Payload\" length=\"Len\" inType=\"win:Binary\"/>" +
+            "</template>";
+
+        Assert.True(analyzer.EventHasNoPropertiesButTemplateHasSome(template, 0));
+        Assert.False(analyzer.EventHasNoPropertiesButTemplateHasSome(template, 1));
+    }
+
+    [Fact]
+    public void EventHasNoPropertiesButTemplateHasSome_EmptyTemplate_IsFalse()
+    {
+        var analyzer = new TemplateAnalyzer();
+
+        Assert.False(analyzer.EventHasNoPropertiesButTemplateHasSome("<template></template>", 0));
+    }
+
+    [Theory]
+    [InlineData(0, true)]  // A zero-insert record still matches its exact 3-field definition.
+    [InlineData(2, false)] // A partial (some-but-fewer) count stays conservative and is not accepted here.
+    [InlineData(3, false)] // The exact count is handled by the strict path, not this one.
+    [InlineData(4, false)] // More inserts than the template declares is a genuine shape mismatch.
+    public void EventHasNoPropertiesButTemplateHasSome_OnlyTrueForZeroInsertRecords(int eventPropertyCount, bool expected)
+    {
+        var analyzer = new TemplateAnalyzer();
+
+        const string template =
+            "<template>" +
+            "<data name=\"A\" inType=\"win:UnicodeString\"/>" +
+            "<data name=\"B\" inType=\"win:UnicodeString\"/>" +
+            "<data name=\"C\" inType=\"win:UInt32\"/>" +
+            "</template>";
+
+        Assert.Equal(expected, analyzer.EventHasNoPropertiesButTemplateHasSome(template, eventPropertyCount));
+    }
 }

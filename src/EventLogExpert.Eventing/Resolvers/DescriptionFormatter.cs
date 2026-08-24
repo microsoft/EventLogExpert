@@ -9,7 +9,9 @@ using EventLogExpert.Provider.Resolution;
 using System.Buffers;
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using System.Collections.ObjectModel;
 using System.Security.Principal;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.Resolvers;
@@ -33,6 +35,10 @@ internal sealed partial class DescriptionFormatter(
         "win:Win32Error"
     }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
+    // No value maps apply to a self-describing (TraceLogging) event, which has no manifest template.
+    private static readonly IReadOnlyDictionary<string, ValueMapDefinition> s_noValueMaps =
+        ReadOnlyDictionary<string, ValueMapDefinition>.Empty;
+
     private readonly IEventResolverCache? _cache = cache;
     private readonly ITraceLogger? _logger = logger;
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
@@ -50,6 +56,15 @@ internal sealed partial class DescriptionFormatter(
     {
         if (descriptionDetails is null)
         {
+            if (TrySynthesizeSelfDescribing(eventRecord,
+                GetFormattedProperties(default, eventRecord.Properties, s_noValueMaps),
+                out var selfDescribedNoProvider))
+            {
+                _logger?.Debug($"{nameof(Resolve)}: Synthesized self-describing description with no provider metadata - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
+
+                return new(selfDescribedNoProvider, EventResolutionStatus.Resolved);
+            }
+
             _logger?.Debug($"{nameof(Resolve)}: No provider details available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, RecordId={eventRecord.RecordId}");
 
             return new(DefaultNoProviderDescription, EventResolutionStatus.NoProvider);
@@ -65,6 +80,14 @@ internal sealed partial class DescriptionFormatter(
 
             return FormatDescription(properties, modernEvent.Description,
                 PickParameterSourceForDescription(modernEvent.Description, primaryDetails, descriptionFromSupplemental, ref supplemental, eventRecord));
+        }
+
+        if (string.IsNullOrEmpty(supplementalModernEvent?.Description) &&
+            TrySynthesizeSelfDescribing(eventRecord, properties, out var selfDescribed))
+        {
+            _logger?.Debug($"{nameof(Resolve)}: Synthesized self-describing description - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Fields={(eventRecord.SelfDescribingFieldNames.IsDefaultOrEmpty ? 0 : eventRecord.SelfDescribingFieldNames.Length)}");
+
+            return new(selfDescribed, EventResolutionStatus.Resolved);
         }
 
         var legacyMessages = ModernEventMatcher.GetCompatibleLegacyMessages(descriptionDetails, eventRecord);
@@ -377,6 +400,44 @@ internal sealed partial class DescriptionFormatter(
         source.CopyTo(newBuffer);
         ArrayPool<char>.Shared.Return(buffer);
         source = buffer = newBuffer;
+    }
+
+    private static bool TrySynthesizeSelfDescribing(EventRecord eventRecord, List<string> values, out string description)
+    {
+        description = string.Empty;
+
+        if (string.IsNullOrEmpty(eventRecord.SelfDescribingName)) { return false; }
+
+        if (values.Count == 0)
+        {
+            description = eventRecord.SelfDescribingName;
+
+            return true;
+        }
+
+        ImmutableArray<string> fieldNames = eventRecord.SelfDescribingFieldNames;
+        bool hasNames = !fieldNames.IsDefaultOrEmpty;
+
+        var builder = new StringBuilder(eventRecord.SelfDescribingName);
+        builder.Append("\r\n");
+
+        for (int i = 0; i < values.Count; i++)
+        {
+            builder.Append("\r\n");
+
+            // Names are index-aligned to the values (both in document order); a field past the captured names, or with
+            // no Name attribute, renders unlabeled.
+            if (hasNames && i < fieldNames.Length && fieldNames[i].Length > 0)
+            {
+                builder.Append(fieldNames[i]).Append(": ");
+            }
+
+            builder.Append(values[i]);
+        }
+
+        description = builder.ToString();
+
+        return true;
     }
 
     [GeneratedRegex("%+[0-9]+")]

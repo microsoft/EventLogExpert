@@ -2112,7 +2112,7 @@ public sealed class EffectsTests
     {
         public bool ReverseDirectionRequested { get; private set; }
 
-        public IEventLogReader CreateReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false)
+        public IEventLogReader CreateReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false, bool captureSelfDescribing = false)
         {
             ReverseDirectionRequested = reverseDirection;
 
@@ -2122,7 +2122,7 @@ public sealed class EffectsTests
 
     private sealed class ThrowingReaderFactory : IEventLogReaderFactory
     {
-        public IEventLogReader CreateReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false) =>
+        public IEventLogReader CreateReader(string path, LogPathType pathType, bool renderXml = false, bool reverseDirection = false, bool captureSelfDescribing = false) =>
             throw new InvalidOperationException("Simulated reader creation failure.");
     }
 }

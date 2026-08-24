@@ -11,12 +11,6 @@ namespace EventLogExpert.Eventing.Resolvers;
 ///     Matches an <see cref="EventRecord" /> to its <see cref="EventModel" /> in a provider's event table, and
 ///     disambiguates ambiguous legacy message tables by Qualifier / LogLink / severity.
 /// </summary>
-/// <remarks>
-///     The match procedure walks several fallback paths in order: exact Id+Version+LogName + strict
-///     template-property-count, then relaxed-template-count (handles version-mismatch optional fields), then Id+LogName
-///     ignoring Version, then full-RawId+Qualifiers (for Complus / WPDClassInstaller entries), then short-Id+Version
-///     ignoring LogName, then Id+Version ignoring LogName when exactly one candidate passes template validation.
-/// </remarks>
 internal sealed class ModernEventMatcher(TemplateAnalyzer templates, ITraceLogger? logger)
 {
     private readonly ITraceLogger? _logger = logger;
@@ -196,6 +190,21 @@ internal sealed class ModernEventMatcher(TemplateAnalyzer templates, ITraceLogge
         if (modernEvent is not null && _templates.ApproximatelyMatchesPropertyCount(modernEvent.Template, eventPropertyCount))
         {
             _logger?.Debug($"{nameof(Match)}: Exact match with relaxed template count - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}");
+
+            return modernEvent;
+        }
+
+        // An exact Id+Version+LogName hit is the manifest's own definition for this event. When the record carries no
+        // inserts at all (empty EventData) yet the template declares some, keep the match instead of rejecting on the
+        // count: the formatter leaves the absent %n as literal placeholders, mirroring Windows (EvtFormatMessage), which
+        // renders the matched message rather than reporting no match. A real message is required so an empty-description
+        // definition still yields to the legacy / supplemental fallbacks below. The partial (some-but-fewer) case stays
+        // conservative above, where a count mismatch can signal a wrong cross-version template.
+        if (modernEvent is not null &&
+            !string.IsNullOrEmpty(modernEvent.Description) &&
+            _templates.EventHasNoPropertiesButTemplateHasSome(modernEvent.Template, eventPropertyCount))
+        {
+            _logger?.Debug($"{nameof(Match)}: Exact match accepted for a zero-insert record - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}");
 
             return modernEvent;
         }

@@ -812,6 +812,17 @@ internal static partial class NativeMethods
     internal static unsafe string? RenderEventXml(EvtHandle eventHandle) =>
         RenderWhilePinned(EvtHandle.Zero, eventHandle, EvtRenderFlags.EventXml, &ProcessRenderedEventXml);
 
+    // Reads a self-describing (TraceLogging) event's inline event name (<EventData Name='...'>) via the one-path values
+    // render context, without materializing the full event XML. Returns null for a manifest event (its <EventData> has
+    // no Name attribute), so the reader only pays the XML cost - to recover the field names - for a genuine candidate.
+    internal static string? RenderSelfDescribingName(EvtHandle eventHandle)
+    {
+        ImmutableArray<EventProperty> values =
+            RenderEventValues(EventLogSession.GlobalSession.SelfDescribingNameContext, eventHandle);
+
+        return values.Length >= 1 ? values[0].Reference as string : null;
+    }
+
     internal static void ThrowEventLogException(int error)
     {
         var message = NativeErrorResolver.GetErrorMessage((uint)HResultConverter.HResultFromWin32(error));

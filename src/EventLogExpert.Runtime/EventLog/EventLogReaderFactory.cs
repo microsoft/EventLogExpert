@@ -12,6 +12,7 @@ internal sealed class EventLogReaderFactory : IEventLogReaderFactory
         string path,
         LogPathType pathType,
         bool renderXml = false,
-        bool reverseDirection = false) =>
-        new EventLogReader(path, pathType, renderXml, reverseDirection);
+        bool reverseDirection = false,
+        bool captureSelfDescribing = false) =>
+        new EventLogReader(path, pathType, renderXml, reverseDirection, captureSelfDescribing);
 }

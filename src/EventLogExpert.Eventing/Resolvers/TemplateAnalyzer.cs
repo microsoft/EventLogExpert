@@ -43,6 +43,19 @@ internal sealed class TemplateAnalyzer
         return templateCount - eventPropertyCount == 1;
     }
 
+    public bool EventHasNoPropertiesButTemplateHasSome(ReadOnlySpan<char> template, int eventPropertyCount)
+    {
+        if (template.IsEmpty || eventPropertyCount != 0) { return false; }
+
+        var metadata = Analyze(template);
+
+        int templateCount = metadata.VisiblePropertyCount != 0 ?
+            metadata.VisiblePropertyCount :
+            metadata.AllOutTypes.Length;
+
+        return templateCount > 0;
+    }
+
     public TemplateInfo GetTemplateInfo(ReadOnlySpan<char> template)
     {
         if (template.IsEmpty)

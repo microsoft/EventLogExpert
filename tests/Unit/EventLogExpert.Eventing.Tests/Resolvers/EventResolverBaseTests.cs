@@ -266,6 +266,122 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_ExactModernMatchWithEmptyDescriptionAndZeroInserts_StillFallsThroughToLegacy()
+    {
+        // Guard for the relaxed matcher: a zero-insert exact hit with NO message must not short-circuit the legacy /
+        // supplemental fallbacks. Here the single unambiguous legacy message is the correct resolution.
+        var details = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 320,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "",
+                    Keywords = [],
+                    Template =
+                        "<template>" +
+                        "<data name=\"A\" inType=\"win:UnicodeString\"/>" +
+                        "<data name=\"B\" inType=\"win:UnicodeString\"/>" +
+                        "</template>"
+                }
+            ],
+            Messages =
+            [
+                new MessageModel { ShortId = 320, RawId = 0x40000320, Text = "Legacy fallback text." }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([details]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 320,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal(EventResolutionStatus.Resolved, displayEvent.ResolutionStatus);
+        Assert.Contains("Legacy fallback text.", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_ExactModernMatchWithZeroInsertsButTemplateExpectsSome_UsesModernDescriptionOverAmbiguousLegacy()
+    {
+        // Regression: a real event (e.g. Microsoft-Windows-AppModel-Runtime 219) can be logged with empty EventData -
+        // no inserts at all - even though its manifest template declares some. The exact Id+Version+LogName modern
+        // definition is authoritative and carries the message, so it must win over the provider's ambiguous same-id
+        // legacy messages instead of falling through to "No matching message". This mirrors Windows (EvtFormatMessage),
+        // which renders the matched message with the absent inserts left as literal placeholders.
+        var details = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 219,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "PSMFlags for Desktop AppX process %1 with applicationID %2 is %3.",
+                    Keywords = [],
+                    Template =
+                        "<template>" +
+                        "<data name=\"ProcessName\" inType=\"win:UnicodeString\" outType=\"xs:string\"/>" +
+                        "<data name=\"ApplicationId\" inType=\"win:UnicodeString\" outType=\"xs:string\"/>" +
+                        "<data name=\"PsmFlags\" inType=\"win:UInt32\" outType=\"xs:unsignedInt\"/>" +
+                        "</template>"
+                }
+            ],
+            // Same short id, multiple unrelated legacy collisions that cannot be disambiguated.
+            Messages =
+            [
+                new MessageModel { ShortId = 219, RawId = 0xBC0000DB, Text = "Intel TXT prepared." },
+                new MessageModel { ShortId = 219, RawId = 0xBE0000DB, Text = "Unrelated collision." }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([details]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 219,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName
+
+            // No Properties: the record carries zero EventData inserts.
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal(EventResolutionStatus.Resolved, displayEvent.ResolutionStatus);
+        Assert.Contains("PSMFlags for Desktop AppX process", displayEvent.Description);
+        Assert.DoesNotContain("No matching message", displayEvent.Description);
+        Assert.DoesNotContain("Intel TXT", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_MSExchangeReplEvent_ShouldResolveCorrectly()
     {
         // Arrange
@@ -280,6 +396,56 @@ public sealed class EventResolverBaseTests
         Assert.NotNull(displayEvent);
         Assert.Equal(Constants.ExchangeFormattedDescription, displayEvent.Description);
         Assert.Equal("Service", displayEvent.TaskCategory);
+    }
+
+    [Fact]
+    public void ResolveEvent_ModernMessagePresentAndSelfDescribing_PrefersRealMessageOverSynthesis()
+    {
+        // A real manifest message always wins over synthesis: when the exact modern event carries a description, it is
+        // used even though the event also has an inline self-describing name.
+        var details = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 5,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Real manifest message: %1",
+                    Keywords = [],
+                    Template = "<template><data name=\"Val\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>"
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([details]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 5,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["payload"],
+            SelfDescribingName = "InlineName",
+            SelfDescribingFieldNames = ["Field"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal(EventResolutionStatus.Resolved, displayEvent.ResolutionStatus);
+        Assert.Contains("Real manifest message: payload", displayEvent.Description);
+        Assert.DoesNotContain("InlineName", displayEvent.Description);
     }
 
     [Fact]
@@ -439,6 +605,113 @@ public sealed class EventResolverBaseTests
 
         // Assert
         Assert.Equal(relatedActivityId, displayEvent.RelatedActivityId);
+    }
+
+    [Fact]
+    public void ResolveEvent_SelfDescribingEventWithMessagelessManifestAndLegacyCollision_SynthesizesOverLegacy()
+    {
+        // Regression for the legacy short-id collision (Microsoft-Windows-WER-PayloadHealth): the provider defines the
+        // event id with an EMPTY manifest message AND its message table carries a level-name string ("Error") whose
+        // message id collides on the event's low-16 id. The event is self-describing, so synthesis from the inline
+        // schema must win over the bogus legacy "Error" - resolving the event usefully where Windows shows nothing.
+        var details = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [new EventModel { Id = 2, Version = 0, Description = "", Keywords = [], Template = Constants.EmptyTemplate }],
+            Messages = [new MessageModel { ShortId = 2, RawId = 0x52000002, Text = "Error" }],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([details]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 2,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["s1event"],
+            SelfDescribingName = "WER_PAYLOAD_HEALTH_FAIL",
+            SelfDescribingFieldNames = ["Stage"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal(EventResolutionStatus.Resolved, displayEvent.ResolutionStatus);
+        Assert.Equal("WER_PAYLOAD_HEALTH_FAIL\r\n\r\nStage: s1event", displayEvent.Description);
+        Assert.DoesNotContain("Error", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_SelfDescribingEventWithNoManifestDefinition_SynthesizesDescriptionLikeWindows()
+    {
+        // Regression: a TraceLogging event (e.g. Microsoft-Windows-Perflib 0) carries its identity inline as
+        // <EventData Name='...'> with named <Data> fields and has no manifest event definition. Windows
+        // (EvtFormatMessage) synthesizes "Name<blank line>Field: value"; the resolver must do the same rather than
+        // reporting no message or a bare value tail.
+        var details = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            // Has other events, but none for id 0 - so this event is genuinely self-describing.
+            Events = [new EventModel { Id = 42, Version = 0, Keywords = [], Template = Constants.EmptyTemplate }],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([details]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 0,
+            Version = 0,
+            Level = 5,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["0"],
+            SelfDescribingName = "LoadPerfCounterTextStrings-End",
+            SelfDescribingFieldNames = ["Status"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal(EventResolutionStatus.Resolved, displayEvent.ResolutionStatus);
+        Assert.Equal("LoadPerfCounterTextStrings-End\r\n\r\nStatus: 0", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_SelfDescribingEventWithNoProviderMetadata_StillSynthesizes()
+    {
+        // A self-describing event needs no provider metadata at all: its name and fields are inline. With an unknown
+        // provider (null details) the resolver should still synthesize rather than reporting no provider.
+        var resolver = new TestEventResolver();
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = "Unknown-" + Guid.NewGuid(),
+            Id = 0,
+            Version = 0,
+            LogName = Constants.ApplicationLogName,
+            SelfDescribingName = "SomeTraceLoggingEvent",
+            SelfDescribingFieldNames = []
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal(EventResolutionStatus.Resolved, displayEvent.ResolutionStatus);
+        Assert.Equal("SomeTraceLoggingEvent", displayEvent.Description);
     }
 
     [Fact]

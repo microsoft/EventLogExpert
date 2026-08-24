@@ -13,6 +13,7 @@ public sealed class EventLogWatcher : IDisposable
 {
     private readonly string? _bookmark;
     private readonly ConcurrentDictionary<int, byte> _callbackThreadIds = new();
+    private readonly bool _captureSelfDescribing;
     private readonly Lock _lifecycleLock = new();
     private readonly AutoResetEvent _newEvents = new(false);
     private readonly string _path;
@@ -24,13 +25,14 @@ public sealed class EventLogWatcher : IDisposable
     private EvtHandle _subscriptionHandle = EvtHandle.Zero;
     private RegisteredWaitHandle? _waitHandle;
 
-    public EventLogWatcher(string path, string? bookmark, bool renderXml = false)
+    public EventLogWatcher(string path, string? bookmark, bool renderXml = false, bool captureSelfDescribing = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         _path = path;
         _bookmark = bookmark;
         _renderXml = renderXml;
+        _captureSelfDescribing = captureSelfDescribing;
 
         _queryHandle = NativeMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, LogPathType.Channel);
         int error = Marshal.GetLastWin32Error();
@@ -41,8 +43,8 @@ public sealed class EventLogWatcher : IDisposable
         NativeMethods.ThrowEventLogException(error);
     }
 
-    public EventLogWatcher(string path, bool renderXml = false)
-        : this(path, null, renderXml) { }
+    public EventLogWatcher(string path, bool renderXml = false, bool captureSelfDescribing = false)
+        : this(path, null, renderXml, captureSelfDescribing) { }
 
     ~EventLogWatcher()
     {
@@ -165,7 +167,11 @@ public sealed class EventLogWatcher : IDisposable
 
                         bool needsUserData = @event.Properties.Length == 0;
 
-                        if (_renderXml || needsUserData)
+                        string? selfDescribingName = _captureSelfDescribing ?
+                            NativeMethods.RenderSelfDescribingName(eventHandle) :
+                            null;
+
+                        if (_renderXml || needsUserData || selfDescribingName is not null)
                         {
                             var xml = NativeMethods.RenderEventXml(eventHandle);
 
@@ -176,6 +182,12 @@ public sealed class EventLogWatcher : IDisposable
                                 var (fields, incomplete) = UserDataValueExtractor.Extract(xml);
                                 @event.UserData = fields;
                                 @event.UserDataIncomplete = incomplete;
+                            }
+
+                            if (selfDescribingName is not null)
+                            {
+                                @event.SelfDescribingName = selfDescribingName;
+                                @event.SelfDescribingFieldNames = SelfDescribingFieldNameExtractor.Extract(xml);
                             }
                         }
                     }
