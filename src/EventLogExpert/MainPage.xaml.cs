@@ -164,7 +164,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
             _ => null,
         };
 
-        // dir/lang from the RESOLVED content culture (today en/ltr); one pre-document-created script (proven timing, null-guarded).
         var resolvedCulture = ContentCulture.Resolve(CultureInfo.CurrentUICulture, ContentCulture.SupportedUiCultures);
         var script = DocumentInitScript.Build(themeSettings, ContentCulture.DirectionOf(resolvedCulture), resolvedCulture.Name);
 
