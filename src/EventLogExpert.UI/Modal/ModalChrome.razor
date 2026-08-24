@@ -1,4 +1,4 @@
-<dialog aria-label="@(string.IsNullOrEmpty(Title) ? (string.IsNullOrEmpty(AriaLabel) ? "Dialog" : AriaLabel) : null)"
+<dialog aria-label="@(string.IsNullOrEmpty(Title) ? (string.IsNullOrEmpty(AriaLabel) ? Localizer["Modal_DialogAriaFallback"] : AriaLabel) : null)"
     aria-labelledby="@(string.IsNullOrEmpty(Title) ? null : _titleId)"
     aria-modal="true"
     class="@DialogClass"
@@ -22,7 +22,7 @@
 
                 @if (ShowCloseButton)
                 {
-                    <Button aria-label="@(string.IsNullOrEmpty(CloseButtonAriaLabel) ? "Close" : CloseButtonAriaLabel)"
+                    <Button aria-label="@EffectiveCloseButtonAriaLabel"
                         CssClass="dialog-close"
                         Disabled="@HasInlineAlert"
                         IconClass="bi bi-x"
@@ -49,7 +49,7 @@
                     <Button autofocus
                         Disabled="@(HasInlineAlert || FooterDisabled)"
                         OnClick="HandleCloseButtonAsync">
-                        @CloseLabel
+                        @EffectiveCloseLabel
                     </Button>
 
                     break;
@@ -58,11 +58,11 @@
                     <div class="button-group">
                         <PrimaryButton Disabled="@(HasInlineAlert || FooterDisabled)"
                             OnClick="HandleSaveAsync">
-                            @SaveLabel
+                            @EffectiveSaveLabel
                         </PrimaryButton>
                         <Button Disabled="@(HasInlineAlert || FooterDisabled)"
                             OnClick="HandleCancelButtonAsync">
-                            @CancelLabel
+                            @EffectiveCancelLabel
                         </Button>
                     </div>
                     break;
@@ -71,18 +71,18 @@
                     <div class="button-group">
                         <Button Disabled="@(HasInlineAlert || FooterDisabled)"
                             OnClick="HandleImportAsync">
-                            @ImportLabel
+                            @EffectiveImportLabel
                         </Button>
                         <Button Disabled="@(HasInlineAlert || FooterDisabled)"
                             OnClick="HandleExportAsync">
-                            @ExportLabel
+                            @EffectiveExportLabel
                         </Button>
                     </div>
 
                     <Button autofocus
                         Disabled="@(HasInlineAlert || FooterDisabled)"
                         OnClick="HandleCloseButtonAsync">
-                        @CloseLabel
+                        @EffectiveCloseLabel
                     </Button>
 
                     break;
@@ -91,7 +91,7 @@
                     <Button autofocus
                         Disabled="@(HasInlineAlert || FooterDisabled)"
                         OnClick="HandleAcceptAsync">
-                        @AcceptLabel
+                        @EffectiveAcceptLabel
                     </Button>
 
                     break;
@@ -100,12 +100,12 @@
                     <PrimaryButton autofocus
                         Disabled="@(HasInlineAlert || FooterDisabled || AcceptDisabled)"
                         OnClick="HandleAcceptAsync">
-                        @AcceptLabel
+                        @EffectiveAcceptLabel
                     </PrimaryButton>
 
                     <Button Disabled="@(HasInlineAlert || FooterDisabled)"
                         OnClick="HandleCancelButtonAsync">
-                        @CancelLabel
+                        @EffectiveCancelLabel
                     </Button>
 
                     break;
@@ -121,7 +121,7 @@
         <div aria-hidden="true" class="inline-alert-overlay"></div>
 
         <section aria-describedby="@_inlineAlertMessageId"
-            aria-label="@(string.IsNullOrEmpty(InlineAlert!.Title) ? "Alert" : null)"
+            aria-label="@(string.IsNullOrEmpty(InlineAlert!.Title) ? Localizer["Modal_AlertAriaFallback"].Value : null)"
             aria-labelledby="@(string.IsNullOrEmpty(InlineAlert!.Title) ? null : _inlineAlertTitleId)"
             aria-modal="true"
             class="inline-alert"

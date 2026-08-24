@@ -15,6 +15,8 @@ internal static class BannerHostDependenciesExtensions
     {
         public void AddBannerHostDependencies()
         {
+            services.AddEventLogLocalization();
+
             var attention = Substitute.For<IAttentionBannerService>();
             attention.AttentionEntries.Returns([]);
             attention.AttentionDismissed.Returns(false);

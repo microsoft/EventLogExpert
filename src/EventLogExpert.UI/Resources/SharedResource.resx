@@ -96,4 +96,127 @@
   <data name="FindBar_WrapToLast" xml:space="preserve">
     <value>Wrapped to last match</value>
   </data>
+  <!-- Settings modal. Field labels keep their trailing colon in the value (locale-controlled punctuation); the two toggle rows add a bare aria/title variant. -->
+  <data name="Settings_AriaLabel" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="Settings_TimeZoneLabel" xml:space="preserve">
+    <value>Time Zone:</value>
+  </data>
+  <data name="Settings_ThemeLabel" xml:space="preserve">
+    <value>Theme:</value>
+  </data>
+  <data name="Settings_KeyboardCopyLabel" xml:space="preserve">
+    <value>Keyboard Copy Behavior:</value>
+  </data>
+  <data name="Settings_LoggingLevelLabel" xml:space="preserve">
+    <value>Logging Level:</value>
+  </data>
+  <data name="Settings_VerboseResolutionLabel" xml:space="preserve">
+    <value>Verbose Event Resolution Logging:</value>
+  </data>
+  <data name="Settings_ExpandDisplayPaneLabel" xml:space="preserve">
+    <value>Expand Display Pane On Selection Change:</value>
+  </data>
+  <data name="Settings_ExpandDisplayPaneAriaLabel" xml:space="preserve">
+    <value>Expand Display Pane On Selection Change</value>
+    <comment>Toggle accessible name; the colon-suffixed visible label is Settings_ExpandDisplayPaneLabel.</comment>
+  </data>
+  <data name="Settings_PreReleaseLabel" xml:space="preserve">
+    <value>Pre-release Builds:</value>
+  </data>
+  <data name="Settings_PreReleaseAriaLabel" xml:space="preserve">
+    <value>Pre-release Builds</value>
+    <comment>Toggle accessible name; the colon-suffixed visible label is Settings_PreReleaseLabel.</comment>
+  </data>
+  <data name="Settings_SavedAnnouncement" xml:space="preserve">
+    <value>Settings saved</value>
+  </data>
+  <!-- Theme dropdown options. -->
+  <data name="Settings_Theme_System" xml:space="preserve">
+    <value>Follow System</value>
+  </data>
+  <data name="Settings_Theme_Light" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="Settings_Theme_Dark" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <!-- Keyboard-copy-format dropdown options (map to EventCopyFormat). Xml/Markdown are format proper nouns translators may leave as-is. -->
+  <data name="Settings_CopyFormat_Default" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="Settings_CopyFormat_Simple" xml:space="preserve">
+    <value>Simple</value>
+  </data>
+  <data name="Settings_CopyFormat_Xml" xml:space="preserve">
+    <value>Xml</value>
+    <comment>Format proper noun; typically not translated.</comment>
+  </data>
+  <data name="Settings_CopyFormat_Full" xml:space="preserve">
+    <value>Full</value>
+  </data>
+  <data name="Settings_CopyFormat_Markdown" xml:space="preserve">
+    <value>Markdown</value>
+    <comment>Format proper noun; typically not translated.</comment>
+  </data>
+  <!-- Logging-level dropdown options. These map 1:1 to Microsoft.Extensions.Logging.LogLevel members; translating them hurts log/support correlation. -->
+  <data name="Settings_LogLevel_Trace" xml:space="preserve">
+    <value>Trace</value>
+    <comment>Microsoft.Extensions.Logging.LogLevel member; may stay untranslated to preserve log correlation.</comment>
+  </data>
+  <data name="Settings_LogLevel_Debug" xml:space="preserve">
+    <value>Debug</value>
+    <comment>Microsoft.Extensions.Logging.LogLevel member; may stay untranslated to preserve log correlation.</comment>
+  </data>
+  <data name="Settings_LogLevel_Information" xml:space="preserve">
+    <value>Information</value>
+    <comment>Microsoft.Extensions.Logging.LogLevel member; may stay untranslated to preserve log correlation.</comment>
+  </data>
+  <data name="Settings_LogLevel_Warning" xml:space="preserve">
+    <value>Warning</value>
+    <comment>Microsoft.Extensions.Logging.LogLevel member; may stay untranslated to preserve log correlation.</comment>
+  </data>
+  <data name="Settings_LogLevel_Error" xml:space="preserve">
+    <value>Error</value>
+    <comment>Microsoft.Extensions.Logging.LogLevel member; may stay untranslated to preserve log correlation.</comment>
+  </data>
+  <data name="Settings_LogLevel_Critical" xml:space="preserve">
+    <value>Critical</value>
+    <comment>Microsoft.Extensions.Logging.LogLevel member; may stay untranslated to preserve log correlation.</comment>
+  </data>
+  <data name="Settings_LogLevel_None" xml:space="preserve">
+    <value>None</value>
+    <comment>Microsoft.Extensions.Logging.LogLevel member; may stay untranslated to preserve log correlation.</comment>
+  </data>
+  <!-- Shared modal-chrome default button labels + aria fallbacks. Used when a caller omits the label parameter. -->
+  <data name="Modal_Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Modal_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Modal_Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Modal_Import" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="Modal_Export" xml:space="preserve">
+    <value>Export</value>
+  </data>
+  <data name="Modal_Accept" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Modal_Exit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <data name="Modal_DialogAriaFallback" xml:space="preserve">
+    <value>Dialog</value>
+    <comment>Accessible name for a titleless dialog with no explicit AriaLabel.</comment>
+  </data>
+  <data name="Modal_AlertAriaFallback" xml:space="preserve">
+    <value>Alert</value>
+    <comment>Accessible name for a titleless inline alert.</comment>
+  </data>
 </root>

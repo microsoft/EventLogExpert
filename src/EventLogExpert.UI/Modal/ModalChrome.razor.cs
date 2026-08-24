@@ -7,6 +7,7 @@ using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Modal;
@@ -34,23 +35,23 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Parameter] public bool AcceptDisabled { get; set; }
 
-    [Parameter] public string AcceptLabel { get; set; } = "OK";
+    [Parameter] public string? AcceptLabel { get; set; }
 
     [Parameter] public string? AriaLabel { get; set; }
 
     [Parameter] public ModalBodyLayout BodyLayout { get; set; } = ModalBodyLayout.Content;
 
-    [Parameter] public string CancelLabel { get; set; } = "Cancel";
+    [Parameter] public string? CancelLabel { get; set; }
 
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
-    [Parameter] public string CloseButtonAriaLabel { get; set; } = "Close";
+    [Parameter] public string? CloseButtonAriaLabel { get; set; }
 
-    [Parameter] public string CloseLabel { get; set; } = "Close";
+    [Parameter] public string? CloseLabel { get; set; }
 
     [Parameter] public string? DialogClass { get; set; }
 
-    [Parameter] public string ExportLabel { get; set; } = "Export";
+    [Parameter] public string? ExportLabel { get; set; }
 
     [Parameter] public RenderFragment? ExtraFooterContent { get; set; }
 
@@ -60,7 +61,7 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Parameter] public string? Height { get; set; }
 
-    [Parameter] public string ImportLabel { get; set; } = "Import";
+    [Parameter] public string? ImportLabel { get; set; }
 
     [Parameter] public InlineAlertRequest? InlineAlert { get; set; }
 
@@ -84,7 +85,7 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Parameter] public EventCallback OnSave { get; set; }
 
-    [Parameter] public string SaveLabel { get; set; } = "Save";
+    [Parameter] public string? SaveLabel { get; set; }
 
     [Parameter] public bool ShowCloseButton { get; set; }
 
@@ -110,9 +111,26 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         }
     }
 
+    private string EffectiveAcceptLabel => string.IsNullOrEmpty(AcceptLabel) ? Localizer["Modal_Accept"] : AcceptLabel;
+
+    private string EffectiveCancelLabel => string.IsNullOrEmpty(CancelLabel) ? Localizer["Modal_Cancel"] : CancelLabel;
+
+    private string EffectiveCloseButtonAriaLabel =>
+        string.IsNullOrEmpty(CloseButtonAriaLabel) ? Localizer["Modal_Close"] : CloseButtonAriaLabel;
+
+    private string EffectiveCloseLabel => string.IsNullOrEmpty(CloseLabel) ? Localizer["Modal_Close"] : CloseLabel;
+
+    private string EffectiveExportLabel => string.IsNullOrEmpty(ExportLabel) ? Localizer["Modal_Export"] : ExportLabel;
+
+    private string EffectiveImportLabel => string.IsNullOrEmpty(ImportLabel) ? Localizer["Modal_Import"] : ImportLabel;
+
+    private string EffectiveSaveLabel => string.IsNullOrEmpty(SaveLabel) ? Localizer["Modal_Save"] : SaveLabel;
+
     private bool HasInlineAlert => InlineAlert is not null;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     private string? ValidationError
     {
