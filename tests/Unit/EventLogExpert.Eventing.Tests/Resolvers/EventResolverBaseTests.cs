@@ -266,6 +266,69 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_DisambiguablePrimaryLegacyAndSupplementalModern_PrefersSupplementalModern()
+    {
+        // A supplemental (local) provider's real modern message outranks a primary (database) legacy short-id match, even
+        // when that legacy disambiguates by severity, so a colliding legacy label cannot beat the actual modern message.
+        // Primary legacy would otherwise resolve to PrimaryMessageA (Informational) for this level-4 event.
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel { ShortId = 500, RawId = 0x40000500, Text = Constants.PrimaryMessageA, LogLink = null },
+                new MessageModel { ShortId = 500, RawId = 0x80000500, Text = Constants.PrimaryMessageB, LogLink = null }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 500,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Supplemental modern: %1",
+                    Keywords = [],
+                    Template = "<template><data name=\"Val\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>"
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 500,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["resolved"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Contains("Supplemental modern: resolved", displayEvent.Description);
+        Assert.DoesNotContain(Constants.PrimaryMessageA, displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_ExactModernMatchWithEmptyDescriptionAndZeroInserts_StillFallsThroughToLegacy()
     {
         // Guard for the relaxed matcher: a zero-insert exact hit with NO message must not short-circuit the legacy /
@@ -605,6 +668,39 @@ public sealed class EventResolverBaseTests
 
         // Assert
         Assert.Equal(relatedActivityId, displayEvent.RelatedActivityId);
+    }
+
+    [Fact]
+    public void ResolveEvent_SelfDescribingEventWithMappedManifestTemplate_SynthesizesRawValueNotMapLabel()
+    {
+        // A blank-description manifest entry that merely matches the id/property-count must not relabel a self-describing
+        // event's inline value through its value map: synthesis formats inline values raw, like the no-provider branch.
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            "",
+            """
+                <template>
+                  <data name="BusType" inType="win:UInt32" outType="xs:unsignedInt" map="BusTypeMap"/>
+                </template>
+                """,
+            [10u]);
+
+        details.Maps = new Dictionary<string, ValueMapDefinition>
+        {
+            ["BusTypeMap"] = new ValueMapDefinition(isBitMap: false, entries: [new ValueMapEntry(10, "SAS")])
+        };
+
+        eventRecord.SelfDescribingName = "StorageDeviceInfo";
+        eventRecord.SelfDescribingFieldNames = ["BusType"];
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal(EventResolutionStatus.Resolved, displayEvent.ResolutionStatus);
+        Assert.Equal("StorageDeviceInfo\r\n\r\nBusType: 10", displayEvent.Description);
+        Assert.DoesNotContain("SAS", displayEvent.Description);
     }
 
     [Fact]
@@ -4919,6 +5015,102 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Empty(displayEvent.Keywords);
+    }
+
+    [Fact]
+    public void ResolveEvent_ZeroInsertMatchMixingParameterAndInsertTokens_KeepsInsertTokensLiteral()
+    {
+        // A zero-insert record whose exact modern message mixes %%n parameter references with %n inserts must resolve
+        // the parameter while leaving the absent insert literal (as Windows does), not blank it. The %% forces the
+        // formatter off its verbatim fast path and through the substitution loop.
+        var details = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 10,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "value: %1, param: %%1001",
+                    Keywords = [],
+                    Template = "<template><data name=\"Val\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>"
+                }
+            ],
+            Messages = [],
+            Parameters = [new MessageModel { RawId = 1001, Text = "ParamText" }],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([details]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 10,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal(EventResolutionStatus.Resolved, displayEvent.ResolutionStatus);
+        Assert.Contains("value: %1", displayEvent.Description);
+        Assert.Contains("param: ParamText", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_ZeroInsertMatchWithTerminatorToken_ConsumesTerminatorAndKeepsInsertLiteral()
+    {
+        // A zero-insert exact message with no %%n parameter must not take the verbatim fast path when it carries a %0
+        // terminator: the terminator has to be consumed (as the formatter's other paths and Windows do) while the absent
+        // %1 insert still stays literal.
+        var details = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 11,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "value %1%0",
+                    Keywords = [],
+                    Template = "<template><data name=\"Val\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>"
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([details]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 11,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.Equal(EventResolutionStatus.Resolved, displayEvent.ResolutionStatus);
+        Assert.Contains("value %1", displayEvent.Description);
+        Assert.DoesNotContain("%0", displayEvent.Description);
     }
 
     private class SupplementalTestResolver : EventResolverBase, IEventResolver

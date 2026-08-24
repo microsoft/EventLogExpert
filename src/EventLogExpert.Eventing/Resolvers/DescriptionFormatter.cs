@@ -56,9 +56,12 @@ internal sealed partial class DescriptionFormatter(
     {
         if (descriptionDetails is null)
         {
-            if (TrySynthesizeSelfDescribing(eventRecord,
-                GetFormattedProperties(default, eventRecord.Properties, s_noValueMaps),
-                out var selfDescribedNoProvider))
+            // Check the inline name before formatting: a provider-less event without self-describing data must not
+            // allocate a synthesis property list only for TrySynthesizeSelfDescribing to reject it.
+            if (!string.IsNullOrEmpty(eventRecord.SelfDescribingName) &&
+                TrySynthesizeSelfDescribing(eventRecord,
+                    GetFormattedProperties(default, eventRecord.Properties, s_noValueMaps),
+                    out var selfDescribedNoProvider))
             {
                 _logger?.Debug($"{nameof(Resolve)}: Synthesized self-describing description with no provider metadata - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
 
@@ -82,8 +85,30 @@ internal sealed partial class DescriptionFormatter(
                 PickParameterSourceForDescription(modernEvent.Description, primaryDetails, descriptionFromSupplemental, ref supplemental, eventRecord));
         }
 
-        if (string.IsNullOrEmpty(supplementalModernEvent?.Description) &&
-            TrySynthesizeSelfDescribing(eventRecord, properties, out var selfDescribed))
+        // A supplemental provider's real modern message outranks synthesis and the primary legacy fallback below, so a
+        // colliding legacy short-id cannot beat it. A promoted-primary match already surfaced through modernEvent above.
+        if (!string.IsNullOrEmpty(supplementalModernEvent?.Description) &&
+            supplemental is not null &&
+            !ReferenceEquals(supplemental, descriptionDetails))
+        {
+            _logger?.Debug($"{nameof(Resolve)}: Using supplemental modern event description - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
+
+            var supplementalProperties = GetFormattedProperties(
+                _templates.GetTemplateInfo(supplementalModernEvent.Template).Metadata,
+                eventRecord.Properties,
+                supplemental.Maps);
+
+            return FormatDescription(supplementalProperties, supplementalModernEvent.Description,
+                PickParameterSourceForDescription(supplementalModernEvent.Description, primaryDetails, true, ref supplemental, eventRecord));
+        }
+
+        // Self-describing (TraceLogging) events render from their inline schema, outranking the collision-prone legacy
+        // table below. Values are formatted without manifest metadata or maps so a blank-description manifest entry that
+        // merely matches the id cannot relabel a raw inline value.
+        if (!string.IsNullOrEmpty(eventRecord.SelfDescribingName) &&
+            TrySynthesizeSelfDescribing(eventRecord,
+                GetFormattedProperties(default, eventRecord.Properties, s_noValueMaps),
+                out var selfDescribed))
         {
             _logger?.Debug($"{nameof(Resolve)}: Synthesized self-describing description - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Fields={(eventRecord.SelfDescribingFieldNames.IsDefaultOrEmpty ? 0 : eventRecord.SelfDescribingFieldNames.Length)}");
 
@@ -114,23 +139,10 @@ internal sealed partial class DescriptionFormatter(
 
             _logger?.Debug($"{nameof(Resolve)}: Multiple legacy messages found, could not disambiguate - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, MessageCount={legacyMessages.Count}");
 
-            // Ambiguous primary messages may resolve through preloaded supplemental metadata.
+            // Ambiguous primary messages may resolve through preloaded supplemental metadata. A supplemental modern
+            // description, when present, was already applied above; here only the supplemental legacy table remains.
             if (supplemental is not null && !ReferenceEquals(supplemental, descriptionDetails))
             {
-                if (!string.IsNullOrEmpty(supplementalModernEvent?.Description))
-                {
-                    _logger?.Debug($"{nameof(Resolve)}: Disambiguated via supplemental modern event - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
-
-                    var supplementalProperties = GetFormattedProperties(
-                        _templates.GetTemplateInfo(supplementalModernEvent.Template).Metadata,
-                        eventRecord.Properties,
-                        supplemental.Maps);
-
-                    // Supplemental descriptions resolve %%n against supplemental parameters first.
-                    return FormatDescription(supplementalProperties, supplementalModernEvent.Description,
-                        PickParameterSourceForDescription(supplementalModernEvent.Description, primaryDetails, true, ref supplemental, eventRecord));
-                }
-
                 var supplementalLegacy = ModernEventMatcher.GetCompatibleLegacyMessages(supplemental, eventRecord);
                 var supplementalBest = ModernEventMatcher.DisambiguateLegacyMessage(eventRecord, supplementalLegacy);
 
@@ -504,7 +516,10 @@ internal sealed partial class DescriptionFormatter(
 
         description = description[..length];
 
-        if (properties.Count <= 0 && description.IndexOf("%%".AsSpan()) < 0)
+        // Take the fast path only when the substitution loop would do nothing. A zero-insert record whose message still
+        // carries a %n insert or %0 terminator must run the loop so the terminator is consumed while the absent inserts
+        // stay literal; the fast path would emit both verbatim and leak the %0.
+        if (properties.Count <= 0 && !_sectionsToReplace.IsMatch(description))
         {
             returnDescription = description.ToString();
 
@@ -549,8 +564,9 @@ internal sealed partial class DescriptionFormatter(
                     {
                         _logger?.Debug($"{nameof(FormatDescription)}: Property index out of range - RequestedIndex={propIndex}, PropertyCount={properties.Count}, Template={descriptionTemplate}");
 
-                        // Missing optional/versioned properties substitute empty text so remaining positions stay aligned.
-                        propString = ReadOnlySpan<char>.Empty;
+                        // A zero-insert record keeps its %n tokens literal (matching Windows); a version-skew record that
+                        // supplies some inserts blanks the absent trailing ones so the present values stay aligned.
+                        if (properties.Count != 0) { propString = ReadOnlySpan<char>.Empty; }
                     }
                     else
                     {
