@@ -6,6 +6,7 @@ using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Dashboard;
@@ -49,6 +50,8 @@ public sealed partial class ScenarioBrowserPanel : IAsyncDisposable
     [Parameter] public ScenarioDefinition? Selected { get; set; }
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     public async ValueTask DisposeAsync()
     {

@@ -5,12 +5,17 @@ using Bunit;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Dashboard;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EventLogExpert.UI.Tests.Dashboard;
 
 public sealed class ScenarioBrowserPanelTests : BunitContext
 {
-    public ScenarioBrowserPanelTests() => JSInterop.Mode = JSRuntimeMode.Loose;
+    public ScenarioBrowserPanelTests()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddEventLogLocalization();
+    }
 
     [Fact]
     public void Click_SelectsOption()

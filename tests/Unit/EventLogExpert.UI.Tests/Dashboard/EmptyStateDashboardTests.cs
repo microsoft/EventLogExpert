@@ -16,6 +16,7 @@ using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Dashboard;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
 
@@ -67,6 +68,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         Services.AddSingleton(_scenarioQuery);
         Services.AddSingleton(_channelReadinessService);
         Services.AddSingleton(_channelEnable);
+        Services.AddEventLogLocalization();
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
@@ -128,6 +130,17 @@ public sealed class EmptyStateDashboardTests : BunitContext
         var cut = Render<EmptyStateDashboard>();
 
         Assert.Empty(cut.FindAll(".empty-dashboard__chip"));
+    }
+
+    [Fact]
+    public void Dashboard_DoesNotLeakResourceKeys()
+    {
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
+
+        Assert.DoesNotContain("Dashboard_", cut.Markup);
     }
 
     [Fact]
@@ -226,6 +239,23 @@ public sealed class EmptyStateDashboardTests : BunitContext
         Assert.Contains("not on this computer", offlineNote.TextContent, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData(1, "Opened Application crashes; 1 channel unavailable.")]
+    [InlineData(2, "Opened Application crashes; 2 channels unavailable.")]
+    public void DetailLaunch_WhenChannelsUnavailable_AnnouncesCountInclusivePlural(int failed, string expected)
+    {
+        _scenarioLaunch.LaunchAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>())
+            .Returns(new ScenarioLaunchResult(1, 0, failed));
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
+
+        cut.Find(ActiveDetailLaunch).Click();
+
+        cut.WaitForAssertion(() => _announcer.Received(1).Announce(expected));
+    }
+
     [Fact]
     public void DetailLaunch_WhenLaunchOpensNothing_AnnouncesFailure()
     {
@@ -313,6 +343,29 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.WaitForAssertion(() => _scenarioLaunch.Received(1).LaunchFromFolderAsync(
             Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), true, Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>()));
+    }
+
+    [Fact]
+    public void DetailOpenFromFolder_WhenCompletedWithMissingAndUnreadable_AnnouncesFullComposedSentence()
+    {
+        _scenarioLaunch.LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .Returns(new ScenarioFolderLaunchResult
+            {
+                Outcome = ScenarioFolderOutcome.Completed,
+                Opened = 2,
+                Matched = 3,
+                Unreadable = 1,
+                MissingChannels = ["Setup"]
+            });
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailOpenFolder)));
+
+        cut.Find(ActiveDetailOpenFolder).Click();
+
+        cut.WaitForAssertion(() => _announcer.Received(1).Announce(
+            "Opened 2 logs for Application crashes. Not found: Setup. 1 file could not be inspected."));
     }
 
     [Fact]
@@ -515,6 +568,94 @@ public sealed class EmptyStateDashboardTests : BunitContext
         RaiseFavoritesChanged(cut);
 
         cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(ActiveDetailStar).GetAttribute("aria-pressed")));
+    }
+
+    [Fact]
+    public void FolderScan_CancellingStatus_IsLocalized()
+    {
+        var release = new TaskCompletionSource<ScenarioFolderLaunchResult>();
+        _scenarioLaunch
+            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .Returns(async ci =>
+            {
+                await ci.Arg<Func<ScenarioFolderPhase, Task>>()!(ScenarioFolderPhase.Scanning);
+
+                return await release.Task;
+            });
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+        var localizer = Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailOpenFolder)));
+        cut.Find(ActiveDetailOpenFolder).Click();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".empty-dashboard__chip--scanning button")));
+        cut.Find(".empty-dashboard__chip--scanning button").Click();
+
+        cut.WaitForAssertion(() => Assert.Equal(
+            localizer["Dashboard_ScanStatus_CancellingLabeled", "Application crashes"].Value,
+            cut.Find(".empty-dashboard__chip--scanning .empty-dashboard__chip-text").TextContent.Trim()));
+
+        release.SetResult(ScenarioFolderLaunchResult.Cancelled);
+    }
+
+    [Fact]
+    public void FolderScan_OpeningStatus_IsLocalized()
+    {
+        var release = new TaskCompletionSource<ScenarioFolderLaunchResult>();
+        _scenarioLaunch
+            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .Returns(async ci =>
+            {
+                var onPhase = ci.Arg<Func<ScenarioFolderPhase, Task>>()!;
+                await onPhase(ScenarioFolderPhase.Scanning);
+                await onPhase(ScenarioFolderPhase.Opening);
+
+                return await release.Task;
+            });
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+        var localizer = Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailOpenFolder)));
+        cut.Find(ActiveDetailOpenFolder).Click();
+
+        cut.WaitForAssertion(() => Assert.Equal(
+            localizer["Dashboard_ScanStatus_OpeningLabeled", "Application crashes"].Value,
+            cut.Find(".empty-dashboard__chip--scanning .empty-dashboard__chip-text").TextContent.Trim()));
+
+        release.SetResult(new ScenarioFolderLaunchResult { Outcome = ScenarioFolderOutcome.Completed, Opened = 1, Matched = 1 });
+    }
+
+    [Fact]
+    public void FolderScan_ScanningStatusAndCancelAria_AreLocalized()
+    {
+        var release = new TaskCompletionSource<ScenarioFolderLaunchResult>();
+        _scenarioLaunch
+            .LaunchFromFolderAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<Func<ScenarioFolderPhase, Task>?>())
+            .Returns(async ci =>
+            {
+                await ci.Arg<Func<ScenarioFolderPhase, Task>>()!(ScenarioFolderPhase.Scanning);
+
+                return await release.Task;
+            });
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+        var localizer = Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+
+        var cut = Render<EmptyStateDashboard>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailOpenFolder)));
+        cut.Find(ActiveDetailOpenFolder).Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal(
+                localizer["Dashboard_ScanStatus_ScanningLabeled", "Application crashes"].Value,
+                cut.Find(".empty-dashboard__chip--scanning .empty-dashboard__chip-text").TextContent.Trim());
+            Assert.Equal(
+                localizer["Dashboard_ScanCancel_Labeled", "Application crashes"].Value,
+                cut.Find(".empty-dashboard__chip--scanning button").GetAttribute("aria-label"));
+        });
+
+        release.SetResult(ScenarioFolderLaunchResult.Cancelled);
     }
 
     [Fact]
@@ -862,6 +1003,22 @@ public sealed class EmptyStateDashboardTests : BunitContext
         FindLaunch(cut, "Open Log file...").Click();
 
         cut.WaitForAssertion(() => _actions.Received(1).OpenFileAsync(false));
+    }
+
+    [Fact]
+    public void QuickLaunch_RendersLocalizedLabelsAndArias()
+    {
+        _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
+
+        var cut = Render<EmptyStateDashboard>();
+
+        Assert.Contains("Quick Launch", cut.Markup);
+
+        var primary = cut.Find(".empty-dashboard__launch--primary");
+        Assert.Equal("Open Application + System (live)", primary.GetAttribute("aria-label"));
+        Assert.Equal("Application + System (live)", primary.QuerySelector("span")!.TextContent.Trim());
+
+        Assert.Contains("Manage databases...", cut.Markup);
     }
 
     [Fact]

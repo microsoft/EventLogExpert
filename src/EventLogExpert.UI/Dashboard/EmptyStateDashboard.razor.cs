@@ -17,6 +17,7 @@ using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 
@@ -81,6 +82,8 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
     [Inject] private IFilterAppliedSource FilterAppliedSource { get; init; } = null!;
 
     [Inject] private IFilterPaneCommands FilterCommands { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private IScenarioLaunchService ScenarioLaunch { get; init; } = null!;
 
@@ -189,78 +192,6 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
                 .SelectMany(static scenario => scenario.Channels.Concat(scenario.OptionalChannels))
                 .Distinct(StringComparer.OrdinalIgnoreCase);
 
-    private static string DescribeEnableFailure(string channel, ChannelEnableResult result) => result.Outcome switch
-    {
-        ChannelEnableOutcome.AccessDenied =>
-            $"Enabling \"{channel}\" was denied. Administrator rights are required, and the log's security settings must allow the change.",
-        ChannelEnableOutcome.NotFound => $"The \"{channel}\" log is not registered on this computer.",
-        ChannelEnableOutcome.NotElevated => $"Run EventLogExpert as administrator to enable \"{channel}\".",
-        _ => $"The \"{channel}\" log could not be enabled (error {result.Win32Error})."
-    };
-
-    private static string? DescribeFolderLaunch(ScenarioDefinition scenario, ScenarioFolderLaunchResult result)
-    {
-        var scanNote = result.Unreadable > 0 ? $" {FolderFilesWord(result.Unreadable)} could not be inspected." : string.Empty;
-
-        return result.Outcome switch
-        {
-            ScenarioFolderOutcome.Cancelled => null,
-            ScenarioFolderOutcome.Error => result.Message ?? "The selected folder could not be opened.",
-            ScenarioFolderOutcome.NoMatchingLogs => $"No {scenario.Name} logs were found in the selected folder.",
-            ScenarioFolderOutcome.NoLogsOpened =>
-                $"Matched {FolderLogsWord(result.Matched)} for {scenario.Name} but none could be loaded " +
-                $"({result.Empty} empty, {result.Failed} failed).{scanNote}",
-            ScenarioFolderOutcome.Completed =>
-                $"Opened {FolderLogsWord(result.Opened)} for {scenario.Name}.{FolderMissingNote(result.MissingChannels)}{scanNote}",
-            _ => null
-        };
-    }
-
-    private static string DescribeLaunch(ScenarioDefinition scenario, ScenarioLaunchResult result)
-    {
-        if (!result.ChannelOutcomes.IsDefaultOrEmpty)
-        {
-            var failedOutcomes = result.ChannelOutcomes
-                .Where(outcome => outcome.Outcome is ChannelLaunchOutcome.AccessDenied
-                    or ChannelLaunchOutcome.NotPresent
-                    or ChannelLaunchOutcome.Failed)
-                .Select(DescribeLaunchOutcome)
-                .ToList();
-
-            if (failedOutcomes.Count > 0)
-            {
-                return $"{scenario.Name} could not open every required channel. {string.Join(" ", failedOutcomes)}";
-            }
-        }
-
-        if (result.Opened == 0)
-        {
-            return $"No channels could be opened for {scenario.Name}.";
-        }
-
-        return result.Failed > 0
-            ? $"Opened {scenario.Name}; {result.Failed} {(result.Failed == 1 ? "channel" : "channels")} unavailable."
-            : $"Opened {scenario.Name}.";
-    }
-
-    private static string DescribeLaunchOutcome(ChannelOutcome outcome) => outcome.Outcome switch
-    {
-        ChannelLaunchOutcome.AccessDenied =>
-            $"{outcome.Channel}: access denied - needs elevation, or open from a saved .evtx.",
-        ChannelLaunchOutcome.NotPresent =>
-            $"{outcome.Channel}: not present on this computer - open from a saved .evtx.",
-        ChannelLaunchOutcome.Failed =>
-            $"{outcome.Channel}: failed to open - open from a saved .evtx.",
-        _ => $"{outcome.Channel}: {outcome.Outcome}."
-    };
-
-    private static string FolderFilesWord(int count) => count == 1 ? "1 file" : $"{count} files";
-
-    private static string FolderLogsWord(int count) => count == 1 ? "1 log" : $"{count} logs";
-
-    private static string FolderMissingNote(ImmutableArray<string> missing) =>
-        missing.IsDefaultOrEmpty ? string.Empty : $" Not found: {string.Join(", ", missing)}.";
-
     private static bool HasReactiveFolderFallback(ScenarioLaunchResult result) =>
         !result.ChannelOutcomes.IsDefaultOrEmpty &&
         result.ChannelOutcomes.Any(outcome => outcome.Outcome is ChannelLaunchOutcome.AccessDenied
@@ -287,13 +218,79 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
 
     private void ClearFilter() => FilterCommands.ClearAllFilters();
 
+    private string DescribeEnableFailure(string channel, ChannelEnableResult result) => result.Outcome switch
+    {
+        ChannelEnableOutcome.AccessDenied => Localizer["Dashboard_EnableFail_AccessDenied", channel],
+        ChannelEnableOutcome.NotFound => Localizer["Dashboard_EnableFail_NotFound", channel],
+        ChannelEnableOutcome.NotElevated => Localizer["Dashboard_EnableFail_NotElevated", channel],
+        _ => Localizer["Dashboard_EnableFail_Unknown", channel, result.Win32Error]
+    };
+
+    private string? DescribeFolderLaunch(ScenarioDefinition scenario, ScenarioFolderLaunchResult result)
+    {
+        var scanNote = result.Unreadable > 0
+            ? Localizer["Dashboard_ScanNote", FolderFilesWord(result.Unreadable)].Value
+            : string.Empty;
+
+        return result.Outcome switch
+        {
+            ScenarioFolderOutcome.Cancelled => null,
+            ScenarioFolderOutcome.Error => result.Message ?? Localizer["Dashboard_FolderError"].Value,
+            ScenarioFolderOutcome.NoMatchingLogs => Localizer["Dashboard_FolderNoMatching", scenario.Name].Value,
+            ScenarioFolderOutcome.NoLogsOpened =>
+                Localizer["Dashboard_FolderNoneLoaded", FolderLogsWord(result.Matched), scenario.Name, result.Empty, result.Failed].Value +
+                scanNote,
+            ScenarioFolderOutcome.Completed =>
+                Localizer["Dashboard_FolderCompleted", FolderLogsWord(result.Opened), scenario.Name].Value +
+                FolderMissingNote(result.MissingChannels) + scanNote,
+            _ => null
+        };
+    }
+
+    private string DescribeLaunch(ScenarioDefinition scenario, ScenarioLaunchResult result)
+    {
+        if (!result.ChannelOutcomes.IsDefaultOrEmpty)
+        {
+            var failedOutcomes = result.ChannelOutcomes
+                .Where(outcome => outcome.Outcome is ChannelLaunchOutcome.AccessDenied
+                    or ChannelLaunchOutcome.NotPresent
+                    or ChannelLaunchOutcome.Failed)
+                .Select(DescribeLaunchOutcome)
+                .ToList();
+
+            if (failedOutcomes.Count > 0)
+            {
+                return Localizer["Dashboard_Launch_CouldNotOpenAll", scenario.Name, string.Join(" ", failedOutcomes)];
+            }
+        }
+
+        if (result.Opened == 0)
+        {
+            return Localizer["Dashboard_Launch_NoneOpened", scenario.Name];
+        }
+
+        return result.Failed > 0 ?
+            Localizer["Dashboard_Launch_OpenedWithUnavailable",
+                scenario.Name,
+                Plural(result.Failed, "Dashboard_Channel_One", "Dashboard_Channel_Many")] :
+            Localizer["Dashboard_Launch_Opened", scenario.Name];
+    }
+
+    private string DescribeLaunchOutcome(ChannelOutcome outcome) => outcome.Outcome switch
+    {
+        ChannelLaunchOutcome.AccessDenied => Localizer["Dashboard_Outcome_AccessDenied", outcome.Channel],
+        ChannelLaunchOutcome.NotPresent => Localizer["Dashboard_Outcome_NotPresent", outcome.Channel],
+        ChannelLaunchOutcome.Failed => Localizer["Dashboard_Outcome_Failed", outcome.Channel],
+        _ => Localizer["Dashboard_Outcome_Other", outcome.Channel, outcome.Outcome]
+    };
+
     private Task EnableChannelAsync(string channel) =>
         RunGuardedAsync(async () =>
         {
             bool isAnalyticOrDebug = _readinessByChannel.TryGetValue(channel, out var current)
                 && current.Access == ChannelAccess.NotEvaluated;
 
-            if (!await EnableChannelConfirmation.ConfirmAsync(AlertDialogService, channel, isAnalyticOrDebug))
+            if (!await EnableChannelConfirmation.ConfirmAsync(AlertDialogService, Localizer, channel, isAnalyticOrDebug))
             {
                 return;
             }
@@ -302,7 +299,7 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
 
             if (result.Outcome is not (ChannelEnableOutcome.Enabled or ChannelEnableOutcome.AlreadyEnabled))
             {
-                await AlertDialogService.ShowErrorAlert("Enable log", DescribeEnableFailure(channel, result));
+                await AlertDialogService.ShowErrorAlert(Localizer["Dashboard_Alert_EnableLog"], DescribeEnableFailure(channel, result));
 
                 return;
             }
@@ -313,36 +310,48 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
                 || refreshed.Enablement != ChannelEnablement.Enabled)
             {
                 await AlertDialogService.ShowAlert(
-                    "Enable log",
-                    $"\"{channel}\" was enabled, but its status could not be confirmed. Refresh to re-check.",
-                    "OK");
+                    Localizer["Dashboard_Alert_EnableLog"],
+                    Localizer["Dashboard_EnabledUnconfirmed", channel],
+                    Localizer["Modal_Accept"]);
             }
         });
 
     private IEnumerable<ScenarioDefinition> FavoriteScenarios() =>
-        _splashScenarios is null
-            ? []
-            : _splashScenarios
-                .Where(IsFavored)
-                .OrderBy(scenario => scenario.Priority)
-                .ThenBy(scenario => scenario.Order);
+        _splashScenarios is null ? [] : _splashScenarios.Where(IsFavored)
+            .OrderBy(scenario => scenario.Priority)
+            .ThenBy(scenario => scenario.Order);
+
+    private string FolderFilesWord(int count) => Plural(count, "Dashboard_File_One", "Dashboard_File_Many");
+
+    private string FolderLogsWord(int count) => Plural(count, "Dashboard_Log_One", "Dashboard_Log_Many");
+
+    private string FolderMissingNote(ImmutableArray<string> missing) =>
+        missing.IsDefaultOrEmpty ? string.Empty : Localizer["Dashboard_MissingNote", string.Join(", ", missing)].Value;
 
     private string FolderScanCancelLabel() =>
-        _folderScanLabel is { } label ? $"Cancel folder scan for {label}" : "Cancel folder scan";
+        _folderScanLabel is { } label ?
+            Localizer["Dashboard_ScanCancel_Labeled", label].Value :
+            Localizer["Dashboard_ScanCancel"].Value;
 
     private string FolderScanStatusText()
     {
         if (_openingLogs)
         {
-            return _folderScanLabel is { } openingLabel ? $"Opening logs for {openingLabel}..." : "Opening logs...";
+            return _folderScanLabel is { } openingLabel ?
+                Localizer["Dashboard_ScanStatus_OpeningLabeled", openingLabel] :
+                Localizer["Dashboard_ScanStatus_Opening"];
         }
 
         if (_cancelRequested)
         {
-            return _folderScanLabel is { } cancellingLabel ? $"Cancelling folder scan for {cancellingLabel}..." : "Cancelling folder scan...";
+            return _folderScanLabel is { } cancellingLabel ?
+                Localizer["Dashboard_ScanStatus_CancellingLabeled", cancellingLabel] :
+                Localizer["Dashboard_ScanStatus_Cancelling"];
         }
 
-        return _folderScanLabel is { } scanningLabel ? $"Scanning {scanningLabel} folder for logs..." : "Scanning folder for logs...";
+        return _folderScanLabel is { } scanningLabel ?
+            Localizer["Dashboard_ScanStatus_ScanningLabeled", scanningLabel] :
+            Localizer["Dashboard_ScanStatus_Scanning"];
     }
 
     private IReadOnlyList<ChannelReadiness> GetChannelReadiness(ScenarioDefinition scenario) =>
@@ -370,9 +379,9 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
             if (HasReactiveFolderFallback(result))
             {
                 await AlertDialogService.ShowErrorAlert(
-                    "Launch scenario",
+                    Localizer["Dashboard_Alert_LaunchScenario"],
                     message,
-                    "Open from folder",
+                    Localizer["Dashboard_OpenFromFolder"],
                     () => LaunchScenarioFromFolderAsync(scenario, includeSubfolders: true));
             }
             else
@@ -429,10 +438,10 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
             case ScenarioFolderOutcome.Error:
                 if (scanStarted) { RestoreFocusAfterScan(); }
 
-                await AlertDialogService.ShowErrorAlert("Open from folder", message);
+                await AlertDialogService.ShowErrorAlert(Localizer["Dashboard_Alert_OpenFromFolder"], message);
                 break;
             default:
-                await AlertDialogService.ShowAlert("Open from folder", message, "OK");
+                await AlertDialogService.ShowAlert(Localizer["Dashboard_Alert_OpenFromFolder"], message, Localizer["Modal_Accept"]);
                 break;
         }
 
@@ -550,6 +559,11 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
 
     private Task OpenSystemAsync() => RunGuardedAsync(() => Actions.OpenLiveLogAsync(LogChannelNames.SystemLog, false));
 
+    // English 2-form pluralization (count picks singular). Correct for English only; locales with more than two plural
+    // categories, or a different singular boundary, need a CLDR/ICU provider (see the design "Known limitations").
+    private string Plural(int count, string oneKey, string manyKey) =>
+        count == 1 ? Localizer[oneKey, count] : Localizer[manyKey, count];
+
     private IReadOnlyList<ChannelReadiness> ReadinessFor(IEnumerable<string> channels) =>
     [
         .. channels.Select(channel =>
@@ -566,11 +580,11 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
         {
             List<ScenarioDefinition> favorites = [.. FavoriteScenarios()];
 
-            if (favorites.Count > 0) { categories.Add((SplashCategory.Favorites, "Favorites", favorites)); }
+            if (favorites.Count > 0) { categories.Add((SplashCategory.Favorites, Localizer["Dashboard_Category_Favorites"].Value, favorites)); }
 
             List<ScenarioDefinition> recommended = [.. StarterScenarios()];
 
-            if (recommended.Count > 0) { categories.Add((SplashCategory.Recommended, "Recommended", recommended)); }
+            if (recommended.Count > 0) { categories.Add((SplashCategory.Recommended, Localizer["Dashboard_Category_Recommended"].Value, recommended)); }
 
             foreach (ScenarioGroup group in Enum.GetValues<ScenarioGroup>())
             {
@@ -586,7 +600,7 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
 
                 if (groupScenarios.Count == 0) { continue; }
 
-                categories.Add((category, group.DisplayName(), groupScenarios));
+                categories.Add((category, ScenarioGroupLocalizer.GroupDisplay(Localizer, group), groupScenarios));
             }
         }
 

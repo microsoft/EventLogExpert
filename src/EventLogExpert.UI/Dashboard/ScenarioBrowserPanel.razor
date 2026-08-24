@@ -1,11 +1,11 @@
 <div class="scenario-browser" @ref="_scenarioBrowserRootRef">
     @if (Scenarios.Count == 0)
     {
-        <p class="scenario-browser__empty" role="status">No scenarios available in this category.</p>
+        <p class="scenario-browser__empty" role="status">@Localizer["Dashboard_NoScenariosInCategory"]</p>
     }
     else
     {
-        <ul aria-label="Scenarios" class="scenario-browser__list" @onkeydown="OnListKeyDownAsync" role="listbox">
+        <ul aria-label="@(Localizer["Dashboard_ScenariosListAria"])" class="scenario-browser__list" @onkeydown="OnListKeyDownAsync" role="listbox">
             @foreach (var scenario in Scenarios)
             {
                 <li aria-selected="@(IsSelected(scenario) ? "true" : "false")"

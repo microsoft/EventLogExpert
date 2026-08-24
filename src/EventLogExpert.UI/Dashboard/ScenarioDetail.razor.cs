@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Dashboard;
 
@@ -69,31 +70,19 @@ public sealed partial class ScenarioDetail
             {
                 if (!BasicFilterFormatter.TryFormat(row.Filter, out var text)) { continue; }
 
-                lines.Add(new FilterLine(row.IsExcluded ? $"Exclude {text}" : text, row.Color));
+                lines.Add(new FilterLine(row.IsExcluded ? Localizer["Dashboard_ExcludePrefix", text].Value : text, row.Color));
             }
 
             return lines;
         }
     }
 
-    private static string EnablementLabel(ChannelEnablement enablement) => enablement switch
-    {
-        ChannelEnablement.Enabled => "Enabled",
-        ChannelEnablement.Disabled => "Disabled",
-        _ => "Enablement unknown"
-    };
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     private static bool IsSystemChannel(string channel) =>
         string.Equals(channel, LogChannelNames.ApplicationLog, StringComparison.OrdinalIgnoreCase) ||
         string.Equals(channel, LogChannelNames.SystemLog, StringComparison.OrdinalIgnoreCase) ||
         string.Equals(channel, LogChannelNames.SecurityLog, StringComparison.OrdinalIgnoreCase);
-
-    private static string PresenceLabel(ChannelPresence presence) => presence switch
-    {
-        ChannelPresence.Present => "Present",
-        ChannelPresence.Absent => "Not present",
-        _ => "Presence unknown"
-    };
 
     // A disabled required channel can be enabled in place only when it is actually present and is not one of the classic
     // system logs (Application/System/Security), which Windows does not allow toggling.
@@ -101,6 +90,13 @@ public sealed partial class ScenarioDetail
         readiness.Presence == ChannelPresence.Present &&
         readiness.Enablement == ChannelEnablement.Disabled &&
         !IsSystemChannel(readiness.Channel);
+
+    private string EnablementLabel(ChannelEnablement enablement) => enablement switch
+    {
+        ChannelEnablement.Enabled => Localizer["Dashboard_Enablement_Enabled"],
+        ChannelEnablement.Disabled => Localizer["Dashboard_Enablement_Disabled"],
+        _ => Localizer["Dashboard_Enablement_Unknown"]
+    };
 
     private async Task LaunchAsync()
     {
@@ -115,6 +111,13 @@ public sealed partial class ScenarioDetail
 
         await OnLaunchFromFolder.InvokeAsync(_includeSubfolders);
     }
+
+    private string PresenceLabel(ChannelPresence presence) => presence switch
+    {
+        ChannelPresence.Present => Localizer["Dashboard_Presence_Present"],
+        ChannelPresence.Absent => Localizer["Dashboard_Presence_Absent"],
+        _ => Localizer["Dashboard_Presence_Unknown"]
+    };
 
     private readonly record struct FilterLine(string Text, HighlightColor Color);
 }

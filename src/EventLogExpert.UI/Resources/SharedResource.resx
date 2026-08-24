@@ -219,4 +219,363 @@
     <value>Alert</value>
     <comment>Accessible name for a titleless inline alert.</comment>
   </data>
+  <!-- Dashboard (empty-state welcome screen): masthead + Quick Launch. -->
+  <data name="Dashboard_Lead" xml:space="preserve">
+    <value>Open a log to get started, or jump straight into a common investigation.</value>
+  </data>
+  <data name="Dashboard_FilterStillApplied" xml:space="preserve">
+    <value>A filter is still applied and will affect your next open.</value>
+  </data>
+  <data name="Dashboard_ClearFilter" xml:space="preserve">
+    <value>Clear filter</value>
+  </data>
+  <data name="Dashboard_ManageDatabases" xml:space="preserve">
+    <value>Manage databases...</value>
+  </data>
+  <data name="Dashboard_QuickLaunch" xml:space="preserve">
+    <value>Quick Launch</value>
+  </data>
+  <data name="Dashboard_Open_ApplicationSystem" xml:space="preserve">
+    <value>Application + System (live)</value>
+    <comment>Quick-launch label. "Application"/"System" are Windows event-log channel names - keep verbatim; "(live)" is UI text.</comment>
+  </data>
+  <data name="Dashboard_Open_Application" xml:space="preserve">
+    <value>Application (live)</value>
+    <comment>Quick-launch label. "Application" is a Windows event-log channel name - keep verbatim; "(live)" is UI text.</comment>
+  </data>
+  <data name="Dashboard_Open_System" xml:space="preserve">
+    <value>System (live)</value>
+    <comment>Quick-launch label. "System" is a Windows event-log channel name - keep verbatim; "(live)" is UI text.</comment>
+  </data>
+  <data name="Dashboard_Open_Security" xml:space="preserve">
+    <value>Security (live)</value>
+    <comment>Quick-launch label. "Security" is a Windows event-log channel name - keep verbatim; "(live)" is UI text.</comment>
+  </data>
+  <data name="Dashboard_Open_LogFile" xml:space="preserve">
+    <value>Log file...</value>
+  </data>
+  <data name="Dashboard_Open_Folder" xml:space="preserve">
+    <value>Folder...</value>
+  </data>
+  <data name="Dashboard_OpenAria" xml:space="preserve">
+    <value>Open {0}</value>
+    <comment>Accessible name for a Quick Launch button; {0} is the button's visible label.</comment>
+  </data>
+  <data name="Dashboard_IncludeSubfolders" xml:space="preserve">
+    <value>Include subfolders</value>
+  </data>
+  <data name="Dashboard_LoadingScenarios" xml:space="preserve">
+    <value>Loading scenarios...</value>
+  </data>
+  <data name="Dashboard_NoScenarios" xml:space="preserve">
+    <value>No scenarios are available.</value>
+  </data>
+  <data name="Dashboard_ScenarioCategoriesAria" xml:space="preserve">
+    <value>Scenario categories</value>
+  </data>
+  <data name="Dashboard_AccessDeniedElevation" xml:space="preserve">
+    <value>Access denied (Needs elevation)</value>
+  </data>
+  <data name="Dashboard_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Visible label of the folder-scan chip button; its accessible name is Dashboard_ScanCancel/_Labeled.</comment>
+  </data>
+  <!-- Dashboard: scenario browser + detail. -->
+  <data name="Dashboard_NoScenariosInCategory" xml:space="preserve">
+    <value>No scenarios available in this category.</value>
+  </data>
+  <data name="Dashboard_ScenariosListAria" xml:space="preserve">
+    <value>Scenarios</value>
+  </data>
+  <data name="Dashboard_LogsLabel" xml:space="preserve">
+    <value>Logs</value>
+  </data>
+  <data name="Dashboard_EnableChannel" xml:space="preserve">
+    <value>Enable channel</value>
+  </data>
+  <data name="Dashboard_NotElevatedHint" xml:space="preserve">
+    <value>This instance is not elevated. Close it, start EventLogExpert as administrator, then return to enable this channel.</value>
+  </data>
+  <data name="Dashboard_AlsoIfPresent" xml:space="preserve">
+    <value>Also if present:</value>
+  </data>
+  <data name="Dashboard_FiltersLabel" xml:space="preserve">
+    <value>Filters</value>
+  </data>
+  <data name="Dashboard_LogsNotOnComputer" xml:space="preserve">
+    <value>One or more of these logs are not on this computer. Use Open from folder to analyze an exported copy.</value>
+  </data>
+  <data name="Dashboard_LiveAccessBlocked" xml:space="preserve">
+    <value>Live access to one or more of these logs is blocked. Use Open from folder to analyze an exported copy.</value>
+  </data>
+  <data name="Dashboard_AddFavoriteAria" xml:space="preserve">
+    <value>Add {0} to favorites</value>
+    <comment>Accessible name for the favorite toggle; {0} is the scenario name (catalog data, not translated).</comment>
+  </data>
+  <data name="Dashboard_RemoveFavoriteAria" xml:space="preserve">
+    <value>Remove {0} from favorites</value>
+    <comment>Accessible name for the favorite toggle; {0} is the scenario name (catalog data, not translated).</comment>
+  </data>
+  <data name="Dashboard_Launch" xml:space="preserve">
+    <value>Launch</value>
+  </data>
+  <data name="Dashboard_OpenFromFolder" xml:space="preserve">
+    <value>Open from folder</value>
+  </data>
+  <data name="Dashboard_OpenFromFolderAria" xml:space="preserve">
+    <value>Open {0} from a folder of exported logs</value>
+    <comment>Accessible name; {0} is the scenario name (catalog data, not translated).</comment>
+  </data>
+  <data name="Dashboard_Presence_Present" xml:space="preserve">
+    <value>Present</value>
+  </data>
+  <data name="Dashboard_Presence_Absent" xml:space="preserve">
+    <value>Not present</value>
+  </data>
+  <data name="Dashboard_Presence_Unknown" xml:space="preserve">
+    <value>Presence unknown</value>
+  </data>
+  <data name="Dashboard_Enablement_Enabled" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="Dashboard_Enablement_Disabled" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="Dashboard_Enablement_Unknown" xml:space="preserve">
+    <value>Enablement unknown</value>
+  </data>
+  <data name="Dashboard_ExcludePrefix" xml:space="preserve">
+    <value>Exclude {0}</value>
+    <comment>{0} is the formatted filter text (catalog data, not translated).</comment>
+  </data>
+  <!-- Dashboard: dynamic enable-failure messages. -->
+  <data name="Dashboard_EnableFail_AccessDenied" xml:space="preserve">
+    <value>Enabling "{0}" was denied. Administrator rights are required, and the log's security settings must allow the change.</value>
+    <comment>{0} is the channel name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_EnableFail_NotFound" xml:space="preserve">
+    <value>The "{0}" log is not registered on this computer.</value>
+    <comment>{0} is the channel name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_EnableFail_NotElevated" xml:space="preserve">
+    <value>Run EventLogExpert as administrator to enable "{0}".</value>
+    <comment>{0} is the channel name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_EnableFail_Unknown" xml:space="preserve">
+    <value>The "{0}" log could not be enabled (error {1}).</value>
+    <comment>{0} is the channel name (data); {1} is a raw Win32 error code (diagnostic, not translated).</comment>
+  </data>
+  <!-- Dashboard: folder-launch outcome messages (base sentence + appended note fragments). -->
+  <data name="Dashboard_FolderError" xml:space="preserve">
+    <value>The selected folder could not be opened.</value>
+  </data>
+  <data name="Dashboard_FolderNoMatching" xml:space="preserve">
+    <value>No {0} logs were found in the selected folder.</value>
+    <comment>{0} is the scenario name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_FolderNoneLoaded" xml:space="preserve">
+    <value>Matched {0} for {1} but none could be loaded ({2} empty, {3} failed).</value>
+    <comment>{0} is a log-count phrase (e.g. "3 logs"); {1} is the scenario name (data); {2},{3} are raw counts.</comment>
+  </data>
+  <data name="Dashboard_FolderCompleted" xml:space="preserve">
+    <value>Opened {0} for {1}.</value>
+    <comment>{0} is a log-count phrase (e.g. "3 logs"); {1} is the scenario name (data).</comment>
+  </data>
+  <data name="Dashboard_ScanNote" xml:space="preserve">
+    <value> {0} could not be inspected.</value>
+    <comment>Fragment appended after a folder-launch sentence; the leading space is intentional. {0} is a file-count phrase (e.g. "2 files").</comment>
+  </data>
+  <data name="Dashboard_MissingNote" xml:space="preserve">
+    <value> Not found: {0}.</value>
+    <comment>Fragment appended after a folder-launch sentence; the leading space is intentional. {0} is a comma-joined list of channel names (data, not translated).</comment>
+  </data>
+  <!-- Dashboard: live-launch outcome messages. -->
+  <data name="Dashboard_Launch_CouldNotOpenAll" xml:space="preserve">
+    <value>{0} could not open every required channel. {1}</value>
+    <comment>{0} is the scenario name (data); {1} is one or more space-joined per-channel outcome sentences.</comment>
+  </data>
+  <data name="Dashboard_Launch_NoneOpened" xml:space="preserve">
+    <value>No channels could be opened for {0}.</value>
+    <comment>{0} is the scenario name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_Launch_OpenedWithUnavailable" xml:space="preserve">
+    <value>Opened {0}; {1} unavailable.</value>
+    <comment>{0} is the scenario name (data); {1} is a channel-count phrase (e.g. "1 channel").</comment>
+  </data>
+  <data name="Dashboard_Launch_Opened" xml:space="preserve">
+    <value>Opened {0}.</value>
+    <comment>{0} is the scenario name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_Outcome_AccessDenied" xml:space="preserve">
+    <value>{0}: access denied - needs elevation, or open from a saved .evtx.</value>
+    <comment>{0} is the channel name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_Outcome_NotPresent" xml:space="preserve">
+    <value>{0}: not present on this computer - open from a saved .evtx.</value>
+    <comment>{0} is the channel name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_Outcome_Failed" xml:space="preserve">
+    <value>{0}: failed to open - open from a saved .evtx.</value>
+    <comment>{0} is the channel name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_Outcome_Other" xml:space="preserve">
+    <value>{0}: {1}.</value>
+    <comment>{0} is the channel name (data); {1} is a raw enum outcome identifier (diagnostic, not translated).</comment>
+  </data>
+  <!-- Dashboard: 2-form plural phrases (English count-picks-singular; see design "Known localization limitations"). -->
+  <data name="Dashboard_File_One" xml:space="preserve">
+    <value>1 file</value>
+  </data>
+  <data name="Dashboard_File_Many" xml:space="preserve">
+    <value>{0} files</value>
+    <comment>{0} is the count (2 or more).</comment>
+  </data>
+  <data name="Dashboard_Log_One" xml:space="preserve">
+    <value>1 log</value>
+  </data>
+  <data name="Dashboard_Log_Many" xml:space="preserve">
+    <value>{0} logs</value>
+    <comment>{0} is the count (2 or more).</comment>
+  </data>
+  <data name="Dashboard_Channel_One" xml:space="preserve">
+    <value>1 channel</value>
+  </data>
+  <data name="Dashboard_Channel_Many" xml:space="preserve">
+    <value>{0} channels</value>
+    <comment>{0} is the count (2 or more).</comment>
+  </data>
+  <!-- Dashboard: folder-scan chip status + cancel accessible names. -->
+  <data name="Dashboard_ScanCancel_Labeled" xml:space="preserve">
+    <value>Cancel folder scan for {0}</value>
+    <comment>{0} is the scenario name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_ScanCancel" xml:space="preserve">
+    <value>Cancel folder scan</value>
+  </data>
+  <data name="Dashboard_ScanStatus_OpeningLabeled" xml:space="preserve">
+    <value>Opening logs for {0}...</value>
+    <comment>{0} is the scenario name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_ScanStatus_Opening" xml:space="preserve">
+    <value>Opening logs...</value>
+  </data>
+  <data name="Dashboard_ScanStatus_CancellingLabeled" xml:space="preserve">
+    <value>Cancelling folder scan for {0}...</value>
+    <comment>{0} is the scenario name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_ScanStatus_Cancelling" xml:space="preserve">
+    <value>Cancelling folder scan...</value>
+  </data>
+  <data name="Dashboard_ScanStatus_ScanningLabeled" xml:space="preserve">
+    <value>Scanning {0} folder for logs...</value>
+    <comment>{0} is the scenario name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_ScanStatus_Scanning" xml:space="preserve">
+    <value>Scanning folder for logs...</value>
+  </data>
+  <!-- Dashboard: alert dialog titles + confirmation. -->
+  <data name="Dashboard_Alert_EnableLog" xml:space="preserve">
+    <value>Enable log</value>
+  </data>
+  <data name="Dashboard_Alert_LaunchScenario" xml:space="preserve">
+    <value>Launch scenario</value>
+  </data>
+  <data name="Dashboard_Alert_OpenFromFolder" xml:space="preserve">
+    <value>Open from folder</value>
+  </data>
+  <data name="Dashboard_EnabledUnconfirmed" xml:space="preserve">
+    <value>"{0}" was enabled, but its status could not be confirmed. Refresh to re-check.</value>
+    <comment>{0} is the channel name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_EnableButton" xml:space="preserve">
+    <value>Enable</value>
+  </data>
+  <data name="Dashboard_EnableConfirm_Prompt" xml:space="preserve">
+    <value>Enable the "{0}" log?</value>
+    <comment>{0} is the channel name (data, not translated).</comment>
+  </data>
+  <data name="Dashboard_EnableConfirm_Body" xml:space="preserve">
+    <value>This changes Windows event logging for the whole computer and stays in effect until it is disabled again. Only events generated after enabling are collected - events that occurred while the log was disabled cannot be recovered.</value>
+  </data>
+  <data name="Dashboard_EnableConfirm_AnalyticNote" xml:space="preserve">
+    <value>This is an analytic or debug log: enabling it can clear the records it already holds, and Windows may keep collecting to it while refusing to open it for live viewing until it is disabled again.</value>
+  </data>
+  <!-- Dashboard: category tab names. Favorites/Recommended are UI; the ScenarioGroup names below mirror ScenarioGroupDisplay.DisplayName() (a drift-guard test pins them equal). -->
+  <data name="Dashboard_Category_Favorites" xml:space="preserve">
+    <value>Favorites</value>
+  </data>
+  <data name="Dashboard_Category_Recommended" xml:space="preserve">
+    <value>Recommended</value>
+  </data>
+  <data name="Dashboard_Group_SystemHealth" xml:space="preserve">
+    <value>System Health</value>
+  </data>
+  <data name="Dashboard_Group_Applications" xml:space="preserve">
+    <value>Applications</value>
+  </data>
+  <data name="Dashboard_Group_Security" xml:space="preserve">
+    <value>Security</value>
+  </data>
+  <data name="Dashboard_Group_ThreatsAndIncidentResponse" xml:space="preserve">
+    <value>Threats and Incident Response</value>
+  </data>
+  <data name="Dashboard_Group_Network" xml:space="preserve">
+    <value>Network</value>
+  </data>
+  <data name="Dashboard_Group_Storage" xml:space="preserve">
+    <value>Storage</value>
+  </data>
+  <data name="Dashboard_Group_UpdatesAndPolicy" xml:space="preserve">
+    <value>Updates and Policy</value>
+  </data>
+  <data name="Dashboard_Group_ActiveDirectory" xml:space="preserve">
+    <value>Active Directory</value>
+    <comment>Active Directory is a product name; keep verbatim.</comment>
+  </data>
+  <data name="Dashboard_Group_DnsServer" xml:space="preserve">
+    <value>DNS Server</value>
+    <comment>DNS is a technology acronym; keep verbatim.</comment>
+  </data>
+  <data name="Dashboard_Group_DhcpServer" xml:space="preserve">
+    <value>DHCP Server</value>
+    <comment>DHCP is a technology acronym; keep verbatim.</comment>
+  </data>
+  <data name="Dashboard_Group_NpsAndRras" xml:space="preserve">
+    <value>NPS and RRAS</value>
+    <comment>NPS and RRAS are Windows role acronyms; keep verbatim.</comment>
+  </data>
+  <data name="Dashboard_Group_Wins" xml:space="preserve">
+    <value>WINS</value>
+    <comment>WINS is a Windows service acronym; keep verbatim.</comment>
+  </data>
+  <data name="Dashboard_Group_WebAndIis" xml:space="preserve">
+    <value>Web and IIS</value>
+    <comment>IIS is a product acronym; keep verbatim.</comment>
+  </data>
+  <data name="Dashboard_Group_VirtualizationAndClustering" xml:space="preserve">
+    <value>Virtualization and Clustering</value>
+  </data>
+  <data name="Dashboard_Group_FilePrintAndStorage" xml:space="preserve">
+    <value>File, Print, and Storage</value>
+  </data>
+  <data name="Dashboard_Group_SqlServer" xml:space="preserve">
+    <value>SQL Server</value>
+    <comment>SQL Server is a product name; keep verbatim.</comment>
+  </data>
+  <data name="Dashboard_Group_Exchange" xml:space="preserve">
+    <value>Exchange</value>
+    <comment>Exchange is a product name; keep verbatim.</comment>
+  </data>
+  <data name="Dashboard_Group_SharePoint" xml:space="preserve">
+    <value>SharePoint</value>
+    <comment>SharePoint is a product name; keep verbatim.</comment>
+  </data>
+  <data name="Dashboard_Group_DefenderForEndpoint" xml:space="preserve">
+    <value>Defender for Endpoint</value>
+    <comment>Defender for Endpoint is a product name; keep verbatim.</comment>
+  </data>
+  <data name="Dashboard_Group_Office" xml:space="preserve">
+    <value>Office</value>
+    <comment>Office is a product name; keep verbatim.</comment>
+  </data>
 </root>
