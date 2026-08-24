@@ -618,7 +618,7 @@ internal sealed class OpenLogEffects(
     {
         try
         {
-            return _readerFactory.CreateReader(action.LogName, action.LogPathType, renderXml, reverseDirection: true);
+            return _readerFactory.CreateReader(action.LogName, action.LogPathType, renderXml, reverseDirection: true, captureSelfDescribing: true);
         }
         catch (Exception ex)
         {

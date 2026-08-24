@@ -24,6 +24,8 @@ public sealed class EventLogSession
 
     internal EvtHandle Handle { get; } = EvtHandle.Zero;
 
+    internal EvtHandle SelfDescribingNameContext { get; } = CreateValuesRenderContext(["Event/EventData/@Name"]);
+
     internal EvtHandle SystemRenderContext { get; } = CreateRenderContext(EvtRenderContextFlags.System);
 
     internal EvtHandle UserRenderContext { get; } = CreateRenderContext(EvtRenderContextFlags.User);
@@ -90,6 +92,22 @@ public sealed class EventLogSession
     private static EvtHandle CreateRenderContext(EvtRenderContextFlags renderContextFlags)
     {
         EvtHandle renderContextHandle = NativeMethods.EvtCreateRenderContext(0, null, renderContextFlags);
+        int error = Marshal.GetLastWin32Error();
+
+        if (renderContextHandle.IsInvalid)
+        {
+            renderContextHandle.Dispose();
+
+            NativeMethods.ThrowEventLogException(error);
+        }
+
+        return renderContextHandle;
+    }
+
+    private static EvtHandle CreateValuesRenderContext(string[] valuePaths)
+    {
+        EvtHandle renderContextHandle =
+            NativeMethods.EvtCreateRenderContext(valuePaths.Length, valuePaths, EvtRenderContextFlags.Values);
         int error = Marshal.GetLastWin32Error();
 
         if (renderContextHandle.IsInvalid)

@@ -56,6 +56,10 @@ public sealed record EventRecord
 
     public bool UserDataIncomplete { get; set; }
 
+    internal string? SelfDescribingName { get; set; }
+
+    internal ImmutableArray<string> SelfDescribingFieldNames { get; set; }
+
     public string? Error { get; init; }
 
     public bool IsSuccess => string.IsNullOrEmpty(Error);

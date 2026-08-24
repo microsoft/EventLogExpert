@@ -210,8 +210,8 @@ internal sealed class LogWatcherService : ILogWatcherService
         bool renderXml = _renderXmlByLog.TryGetValue(logName, out var flag) && flag;
 
         EventLogWatcher watcher = _bookmarks[logName] != null ?
-            new EventLogWatcher(logName, _bookmarks[logName], renderXml) :
-            new EventLogWatcher(logName, renderXml);
+            new EventLogWatcher(logName, _bookmarks[logName], renderXml, captureSelfDescribing: true) :
+            new EventLogWatcher(logName, renderXml, captureSelfDescribing: true);
 
         _watchers.Add(logName, watcher);
 

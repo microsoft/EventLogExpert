@@ -12,5 +12,6 @@ internal interface IEventLogReaderFactory
         string path,
         LogPathType pathType,
         bool renderXml = false,
-        bool reverseDirection = false);
+        bool reverseDirection = false,
+        bool captureSelfDescribing = false);
 }

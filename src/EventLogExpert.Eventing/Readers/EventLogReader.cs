@@ -13,7 +13,8 @@ public sealed class EventLogReader(
     string path,
     LogPathType pathType,
     bool renderXml = false,
-    bool reverseDirection = false) : IEventLogReader
+    bool reverseDirection = false,
+    bool captureSelfDescribing = false) : IEventLogReader
 {
     private const int EvtQueryReverseDirection = 0x200;
 
@@ -141,7 +142,13 @@ public sealed class EventLogReader(
 
                     bool needsUserData = events[i].Properties.Length == 0;
 
-                    if (renderXml || needsUserData)
+                    // Cheap per-event detection: only an event with an inline EventData name is a self-describing
+                    // candidate whose field-name labels are then read from its XML (the values are reused from Properties).
+                    string? selfDescribingName = captureSelfDescribing ?
+                        NativeMethods.RenderSelfDescribingName(eventHandle) :
+                        null;
+
+                    if (renderXml || needsUserData || selfDescribingName is not null)
                     {
                         var xml = NativeMethods.RenderEventXml(eventHandle);
 
@@ -152,6 +159,12 @@ public sealed class EventLogReader(
                             var (fields, incomplete) = UserDataValueExtractor.Extract(xml);
                             events[i].UserData = fields;
                             events[i].UserDataIncomplete = incomplete;
+                        }
+
+                        if (selfDescribingName is not null)
+                        {
+                            events[i].SelfDescribingName = selfDescribingName;
+                            events[i].SelfDescribingFieldNames = SelfDescribingFieldNameExtractor.Extract(xml);
                         }
                     }
                 }
