@@ -13,19 +13,21 @@ public sealed class DocumentInitScriptTests
         var script = DocumentInitScript.Build(null, "ltr", "en");
 
         Assert.Equal(
-            "(function(){var root=document.documentElement;if(!root){return;}" +
-            "root.removeAttribute('data-theme');root.setAttribute('dir','ltr');root.setAttribute('lang','en');})();",
+            "(function(){function apply(){var root=document.documentElement;if(!root){return false;}" +
+            "root.removeAttribute('data-theme');root.setAttribute('dir','ltr');root.setAttribute('lang','en');" +
+            "return true;}if(!apply()){document.addEventListener('DOMContentLoaded',apply);}})();",
             script);
     }
 
     [Fact]
-    public void Build_WithTheme_SetsThemeDirAndLangBehindTheRootNullGuard()
+    public void Build_WithTheme_SetsThemeDirAndLang()
     {
         var script = DocumentInitScript.Build("dark", "rtl", "ar");
 
         Assert.Equal(
-            "(function(){var root=document.documentElement;if(!root){return;}" +
-            "root.setAttribute('data-theme','dark');root.setAttribute('dir','rtl');root.setAttribute('lang','ar');})();",
+            "(function(){function apply(){var root=document.documentElement;if(!root){return false;}" +
+            "root.setAttribute('data-theme','dark');root.setAttribute('dir','rtl');root.setAttribute('lang','ar');" +
+            "return true;}if(!apply()){document.addEventListener('DOMContentLoaded',apply);}})();",
             script);
     }
 }
