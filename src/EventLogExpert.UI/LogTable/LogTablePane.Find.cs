@@ -38,7 +38,7 @@ public sealed partial class LogTablePane
     private bool _findScanning;
     private bool _findScrollToCurrentOnRender;
     private bool _findWholeWord;
-    private string _findWrapAnnouncement = string.Empty;
+    private FindWrapState _findWrapAnnouncement;
 
     [Inject]
     private IFindCoordinator FindCoordinator { get; init; } = null!;
@@ -96,7 +96,7 @@ public sealed partial class LogTablePane
         _findCurrentKey = null;
         _findCurrentLocator = null;
         _findScanning = false;
-        _findWrapAnnouncement = string.Empty;
+        _findWrapAnnouncement = FindWrapState.None;
 
         FindMarkerSource.Clear();
     }
@@ -301,7 +301,7 @@ public sealed partial class LogTablePane
         _findMatches = matches;
         _findMatchSet = new HashSet<EventLocator>(matches);
         _findScanning = false;
-        _findWrapAnnouncement = string.Empty;
+        _findWrapAnnouncement = FindWrapState.None;
 
         ResolveCurrentMatchAfterScan(priorLocator);
         _findScrollToCurrentOnRender = _findCurrentIndex >= 0;
@@ -489,7 +489,7 @@ public sealed partial class LogTablePane
         }
 
         _findScanning = true;
-        _findWrapAnnouncement = string.Empty;
+        _findWrapAnnouncement = FindWrapState.None;
 
         var cts = new CancellationTokenSource();
         _findDebounceCts = cts;
@@ -586,9 +586,10 @@ public sealed partial class LogTablePane
         int previousIndex = _findCurrentIndex < 0 ? (direction > 0 ? -1 : 0) : _findCurrentIndex;
         int next = (previousIndex + direction + _findMatches.Count) % _findMatches.Count;
 
-        _findWrapAnnouncement = direction > 0 && next <= previousIndex ? "Wrapped to first match"
-            : direction < 0 && next >= previousIndex ? "Wrapped to last match"
-            : string.Empty;
+        _findWrapAnnouncement = direction > 0 && next <= previousIndex ?
+            FindWrapState.WrappedToFirst :
+                direction < 0 && next >= previousIndex ?
+                    FindWrapState.WrappedToLast : FindWrapState.None;
 
         SetCurrentMatchIndex(next);
         _findScrollToCurrentOnRender = true;

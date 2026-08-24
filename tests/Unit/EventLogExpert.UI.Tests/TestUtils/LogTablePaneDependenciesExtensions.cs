@@ -25,6 +25,8 @@ internal static class LogTablePaneDependenciesExtensions
     {
         public IServiceCollection AddLogTablePaneDependencies()
         {
+            services.AddEventLogLocalization();
+
             services.AddSingleton(Substitute.For<IAlertDialogService>());
             services.AddSingleton(Substitute.For<IClipboardService>());
             services.AddSingleton(Substitute.For<IFilterLensCommands>());

@@ -21,7 +21,8 @@ using System.Globalization;
 
 namespace EventLogExpert.UI.Tests.LogTable;
 
-public sealed class LogTablePaneIndicatorTests : BunitContext
+[Collection(CultureSensitiveCollection.Name)]
+public sealed class LogTablePaneIndicatorTests : CultureSensitiveBunitContext
 {
     private const string LogName = "Application";
 

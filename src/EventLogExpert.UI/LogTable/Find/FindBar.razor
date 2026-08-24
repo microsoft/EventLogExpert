@@ -3,18 +3,18 @@
 <div class="find-bar" @onkeydown="HandleRootKeyDown" role="search">
     <div class="find-main">
         <div class="find-inputbox">
-            <input aria-label="Find in events"
+            <input aria-label="@Localizer["FindBar_FindInEvents"]"
                 class="find-input"
                 @oninput="OnInput"
                 @onkeydown="HandleInputKeyDown"
-                placeholder="Find in events"
+                placeholder="@Localizer["FindBar_FindInEvents"]"
                 @ref="_input"
                 spellcheck="false"
                 type="text"
                 value="@Query" />
             <span class="find-inline">
                 <span aria-live="polite" class="find-count">@CountText</span>
-                <button aria-label="Previous match"
+                <button aria-label="@Localizer["FindBar_PreviousMatch"]"
                     class="find-nav"
                     disabled="@NavDisabled"
                     @onclick="OnPrevious"
@@ -22,7 +22,7 @@
                     type="button">
                     <i aria-hidden="true" class="bi bi-chevron-up"></i>
                 </button>
-                <button aria-label="Next match"
+                <button aria-label="@Localizer["FindBar_NextMatch"]"
                     class="find-nav"
                     disabled="@NavDisabled"
                     @onclick="OnNext"
@@ -32,16 +32,16 @@
                 </button>
             </span>
         </div>
-        <span aria-live="polite" class="find-wrap">@WrapAnnouncement</span>
+        <span aria-live="polite" class="find-wrap">@WrapText</span>
         <button aria-controls="@(_optionsOpen ? "find-options" : null)"
             aria-expanded="@(_optionsOpen ? "true" : "false")"
-            aria-label="Search options"
+            aria-label="@Localizer["FindBar_SearchOptions"]"
             class="find-options-toggle @(OptionsActive ? "is-active" : null)"
             @onclick="ToggleOptions"
             type="button">
             <i aria-hidden="true" class="bi bi-sliders"></i>
         </button>
-        <button aria-label="Close find"
+        <button aria-label="@Localizer["FindBar_Close"]"
             class="find-close"
             @onclick="OnClose"
             type="button">
@@ -52,11 +52,11 @@
     {
         <div class="find-options" id="find-options">
             <div class="flex-center-aligned-row">
-                <label for="find-opt-case">Match case</label>
+                <label for="find-opt-case">@Localizer["FindBar_MatchCase"]</label>
                 <Toggle Id="find-opt-case" Value="CaseSensitive" ValueChanged="OnCaseChanged" />
             </div>
             <div class="flex-center-aligned-row">
-                <label for="find-opt-word">Match whole word</label>
+                <label for="find-opt-word">@Localizer["FindBar_MatchWholeWord"]</label>
                 <Toggle Id="find-opt-word" Value="WholeWord" ValueChanged="OnWholeWordChanged" />
             </div>
         </div>
