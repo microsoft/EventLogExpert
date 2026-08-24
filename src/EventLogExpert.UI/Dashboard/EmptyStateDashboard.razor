@@ -6,7 +6,7 @@
             <span aria-hidden="true" class="empty-dashboard__brand-mark"><i class="bi bi-journal-text"></i></span>
             <div>
                 <h1 class="empty-dashboard__title" id="empty-dashboard-title">EventLogExpert</h1>
-                <p class="empty-dashboard__lead">Open a log to get started, or jump straight into a common investigation.</p>
+                <p class="empty-dashboard__lead">@Localizer["Dashboard_Lead"]</p>
             </div>
         </div>
         <div class="empty-dashboard__masthead-actions">
@@ -17,7 +17,7 @@
                     <span class="empty-dashboard__chip-text">@FolderScanStatusText()</span>
                     @if (!_openingLogs && !_cancelRequested)
                     {
-                        <Button OnClick="CancelFolderScan" aria-label="@FolderScanCancelLabel()" @ref="_cancelScanButton">Cancel</Button>
+                        <Button OnClick="CancelFolderScan" aria-label="@FolderScanCancelLabel()" @ref="_cancelScanButton">@Localizer["Dashboard_Cancel"]</Button>
                     }
                 </div>
             }
@@ -25,39 +25,47 @@
             {
                 <div class="empty-dashboard__chip" role="status">
                     <i aria-hidden="true" class="bi bi-funnel"></i>
-                    <span class="empty-dashboard__chip-text">A filter is still applied and will affect your next open.</span>
-                    <Button Disabled="@_isBusy" OnClick="ClearFilter">Clear filter</Button>
+                    <span class="empty-dashboard__chip-text">@Localizer["Dashboard_FilterStillApplied"]</span>
+                    <Button Disabled="@_isBusy" OnClick="ClearFilter">@Localizer["Dashboard_ClearFilter"]</Button>
                 </div>
             }
             <ChromelessButton CssClass="empty-dashboard__utility" Disabled="@_isBusy" IconClass="bi bi-database-gear" OnClick="OpenDatabaseToolsAsync">
-                <span>Manage databases...</span>
+                <span>@Localizer["Dashboard_ManageDatabases"]</span>
             </ChromelessButton>
         </div>
     </header>
 
     <section aria-labelledby="empty-dashboard-quickstart-heading" class="empty-dashboard__section">
-        <h2 class="empty-dashboard__heading" id="empty-dashboard-quickstart-heading">Quick Launch</h2>
+        <h2 class="empty-dashboard__heading" id="empty-dashboard-quickstart-heading">@Localizer["Dashboard_QuickLaunch"]</h2>
+        @{
+            var openApplicationSystemLabel = Localizer["Dashboard_Open_ApplicationSystem"];
+            var openApplicationLabel = Localizer["Dashboard_Open_Application"];
+            var openSystemLabel = Localizer["Dashboard_Open_System"];
+            var openSecurityLabel = Localizer["Dashboard_Open_Security"];
+            var openLogFileLabel = Localizer["Dashboard_Open_LogFile"];
+            var openFolderLabel = Localizer["Dashboard_Open_Folder"];
+        }
         <div class="empty-dashboard__launchbar">
             <ChromelessButton CssClass="empty-dashboard__launch empty-dashboard__launch--primary"
                 Disabled="@_isBusy"
                 IconClass="bi bi-collection"
                 OnClick="OpenApplicationAndSystemAsync"
-                aria-label="Open Application + System (live)">
-                <span>Application + System (live)</span>
+                aria-label="@(Localizer["Dashboard_OpenAria", openApplicationSystemLabel])">
+                <span>@openApplicationSystemLabel</span>
             </ChromelessButton>
             <ChromelessButton CssClass="empty-dashboard__launch"
                 Disabled="@_isBusy"
                 IconClass="bi bi-window"
                 OnClick="OpenApplicationAsync"
-                aria-label="Open Application (live)">
-                <span>Application (live)</span>
+                aria-label="@(Localizer["Dashboard_OpenAria", openApplicationLabel])">
+                <span>@openApplicationLabel</span>
             </ChromelessButton>
             <ChromelessButton CssClass="empty-dashboard__launch"
                 Disabled="@_isBusy"
                 IconClass="bi bi-pc-display"
                 OnClick="OpenSystemAsync"
-                aria-label="Open System (live)">
-                <span>System (live)</span>
+                aria-label="@(Localizer["Dashboard_OpenAria", openSystemLabel])">
+                <span>@openSystemLabel</span>
             </ChromelessButton>
             @if (!SecurityRequiresElevation)
             {
@@ -65,8 +73,8 @@
                     Disabled="@_isBusy"
                     IconClass="bi bi-shield-lock"
                     OnClick="OpenSecurityAsync"
-                    aria-label="Open Security (live)">
-                    <span>Security (live)</span>
+                    aria-label="@(Localizer["Dashboard_OpenAria", openSecurityLabel])">
+                    <span>@openSecurityLabel</span>
                 </ChromelessButton>
             }
             else
@@ -75,20 +83,20 @@
                     IconClass="bi bi-shield-lock"
                     aria-describedby="@ElevationReasonId"
                     aria-disabled="true"
-                    aria-label="Open Security (live)">
-                    <span>Security (live)</span>
+                    aria-label="@(Localizer["Dashboard_OpenAria", openSecurityLabel])">
+                    <span>@openSecurityLabel</span>
                 </ChromelessButton>
             }
             <span aria-hidden="true" class="empty-dashboard__launch-divider"></span>
-            <ChromelessButton CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-file-earmark-text" OnClick="OpenFileAsync" aria-label="Open Log file...">
-                <span>Log file...</span>
+            <ChromelessButton CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-file-earmark-text" OnClick="OpenFileAsync" aria-label="@(Localizer["Dashboard_OpenAria", openLogFileLabel])">
+                <span>@openLogFileLabel</span>
             </ChromelessButton>
-            <ChromelessButton CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-folder2-open" OnClick="OpenFolderAsync" aria-label="Open Folder...">
-                <span>Folder...</span>
+            <ChromelessButton CssClass="empty-dashboard__launch" Disabled="@_isBusy" IconClass="bi bi-folder2-open" OnClick="OpenFolderAsync" aria-label="@(Localizer["Dashboard_OpenAria", openFolderLabel])">
+                <span>@openFolderLabel</span>
             </ChromelessButton>
             <label class="empty-dashboard__subfolders">
-                <input type="checkbox" @bind="_includeSubfolders" disabled="@_isBusy" />
-                <span>Include subfolders</span>
+                <input @bind="_includeSubfolders" disabled="@_isBusy" type="checkbox" />
+                <span>@Localizer["Dashboard_IncludeSubfolders"]</span>
             </label>
         </div>
     </section>
@@ -96,15 +104,15 @@
     <div class="empty-dashboard__catalog">
         @if (_splashScenarios is null)
         {
-            <p class="empty-dashboard__loading">Loading scenarios...</p>
+            <p class="empty-dashboard__loading">@Localizer["Dashboard_LoadingScenarios"]</p>
         }
         else if (_categories.Count == 0)
         {
-            <p class="empty-dashboard__empty" role="status">No scenarios are available.</p>
+            <p class="empty-dashboard__empty" role="status">@Localizer["Dashboard_NoScenarios"]</p>
         }
         else
         {
-            <SidebarTabs TTab="SplashCategory" TablistAriaLabel="Scenario categories" Tabs="_tabs" @bind-ActiveTab="_activeCategory" @ref="_sidebarTabs">
+            <SidebarTabs TTab="SplashCategory" TablistAriaLabel="@Localizer["Dashboard_ScenarioCategoriesAria"].Value" Tabs="_tabs" @bind-ActiveTab="_activeCategory" @ref="_sidebarTabs">
                 <TabContent Context="category">
                     <ScenarioBrowserPanel CanEnableChannels="ChannelEnable.CanEnable"
                         GetChannelReadiness="GetChannelReadiness"
@@ -125,5 +133,5 @@
         }
     </div>
 
-    <span class="empty-dashboard__sr-only" id="@ElevationReasonId">Access denied (Needs elevation)</span>
+    <span class="empty-dashboard__sr-only" id="@ElevationReasonId">@Localizer["Dashboard_AccessDeniedElevation"]</span>
 </section>

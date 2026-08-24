@@ -1,6 +1,5 @@
 @using EventLogExpert.Eventing.Readers
 @using EventLogExpert.Runtime.Scenarios
-@using EventLogExpert.Scenarios.Catalog
 @{
     RenderFragment StatusTags(ChannelReadiness readiness) =>
         @<text>
@@ -11,20 +10,20 @@
              }
              @if (readiness.Access == ChannelAccess.RequiresElevation)
              {
-                 <span class="scenario-detail__status">Access denied (Needs elevation)</span>
+                 <span class="scenario-detail__status">@Localizer["Dashboard_AccessDeniedElevation"]</span>
              }
     </text>;
 }
 <div aria-labelledby="@_nameId" class="scenario-detail" role="region">
     <p class="scenario-detail__eyebrow">
         <i aria-hidden="true" class="bi @EmptyStateDashboard.ScenarioIcon(Scenario.Group)"></i>
-        <span>@Scenario.Group.DisplayName()</span>
+        <span>@ScenarioGroupLocalizer.GroupDisplay(Localizer, Scenario.Group)</span>
     </p>
     <h3 class="scenario-detail__name" id="@_nameId">@Scenario.Name</h3>
     <p class="scenario-detail__purpose">@Scenario.Purpose</p>
     <div class="scenario-detail__facts">
         <div class="scenario-detail__fact">
-            <span class="scenario-detail__fact-label">Logs</span>
+            <span class="scenario-detail__fact-label">@Localizer["Dashboard_LogsLabel"]</span>
             @foreach (var readiness in DisplayReadiness)
             {
                 <span class="scenario-detail__channel-readiness">
@@ -38,14 +37,14 @@
                                 disabled="@IsBusy"
                                 @onclick="() => OnEnableChannel.InvokeAsync(readiness.Channel)"
                                 type="button">
-                                Enable channel
+                                @Localizer["Dashboard_EnableChannel"]
                             </button>
                         }
                         else
                         {
                             <span class="scenario-detail__enable-hint">
                                 <i aria-hidden="true" class="bi bi-shield-lock"></i>
-                                This instance is not elevated. Close it, start EventLogExpert as administrator, then return to enable this channel.
+                                @Localizer["Dashboard_NotElevatedHint"]
                             </span>
                         }
                     }
@@ -53,7 +52,7 @@
             }
             @if (DisplayOptionalReadiness.Count > 0)
             {
-                <span class="scenario-detail__fact-muted">Also if present:</span>
+                <span class="scenario-detail__fact-muted">@Localizer["Dashboard_AlsoIfPresent"]</span>
 
                 @foreach (var readiness in DisplayOptionalReadiness)
                 {
@@ -67,7 +66,7 @@
         @if (FilterLines.Count > 0)
         {
             <div class="scenario-detail__fact">
-                <span class="scenario-detail__fact-label">Filters</span>
+                <span class="scenario-detail__fact-label">@Localizer["Dashboard_FiltersLabel"]</span>
                 @foreach (var line in FilterLines)
                 {
                     <span class="scenario-detail__filter">
@@ -84,20 +83,20 @@
     @if (IsDisabled && !IsLivePresent)
     {
         <p class="scenario-detail__unavailable" id="@_offlineId">
-            One or more of these logs are not on this computer. Use Open from folder to analyze an exported copy.
+            @Localizer["Dashboard_LogsNotOnComputer"]
         </p>
     }
     else if (IsDisabled)
     {
         <p class="scenario-detail__unavailable" id="@_offlineId">
-            Live access to one or more of these logs is blocked. Use Open from folder to analyze an exported copy.
+            @Localizer["Dashboard_LiveAccessBlocked"]
         </p>
     }
     <div class="scenario-detail__actions">
         <ChromelessButton CssClass="scenario-detail__star"
             IconClass="@(IsFavored ? "bi bi-star-fill" : "bi bi-star")"
             OnClick="OnToggleFavorite"
-            aria-label="@(IsFavored ? $"Remove {Scenario.Name} from favorites" : $"Add {Scenario.Name} to favorites")"
+            aria-label="@(IsFavored ? Localizer["Dashboard_RemoveFavoriteAria", Scenario.Name].Value : Localizer["Dashboard_AddFavoriteAria", Scenario.Name].Value)"
             aria-pressed="@(IsFavored ? "true" : "false")" />
         <ChromelessButton CssClass="scenario-detail__launch"
             Disabled="@IsBusy"
@@ -105,18 +104,18 @@
             OnClick="LaunchAsync"
             aria-describedby="@(IsDisabled ? _offlineId : null)"
             aria-disabled="@(IsDisabled ? "true" : "false")">
-            <span>Launch</span>
+            <span>@Localizer["Dashboard_Launch"]</span>
         </ChromelessButton>
         <ChromelessButton CssClass="scenario-detail__open-folder"
             Disabled="@IsBusy"
             IconClass="bi bi-folder2-open"
             OnClick="LaunchFromFolderAsync"
-            aria-label="@($"Open {Scenario.Name} from a folder of exported logs")">
-            <span>Open from folder</span>
+            aria-label="@(Localizer["Dashboard_OpenFromFolderAria", Scenario.Name].Value)">
+            <span>@Localizer["Dashboard_OpenFromFolder"]</span>
         </ChromelessButton>
         <label class="scenario-detail__subfolders">
-            <input type="checkbox" @bind="_includeSubfolders" disabled="@IsBusy" />
-            <span>Include subfolders</span>
+            <input @bind="_includeSubfolders" disabled="@IsBusy" type="checkbox" />
+            <span>@Localizer["Dashboard_IncludeSubfolders"]</span>
         </label>
     </div>
 </div>

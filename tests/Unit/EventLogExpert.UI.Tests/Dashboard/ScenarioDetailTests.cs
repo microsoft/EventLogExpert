@@ -9,12 +9,17 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Dashboard;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EventLogExpert.UI.Tests.Dashboard;
 
 public sealed class ScenarioDetailTests : BunitContext
 {
-    public ScenarioDetailTests() => JSInterop.Mode = JSRuntimeMode.Loose;
+    public ScenarioDetailTests()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddEventLogLocalization();
+    }
 
     [Fact]
     public void AdminBadge_WhenRequiresAdmin_IsAbsent()
