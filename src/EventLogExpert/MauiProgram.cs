@@ -96,6 +96,7 @@ public static class MauiProgram
         builder.Services.AddEventLogRuntime();
         builder.Services.AddElevatedDatabaseToolsRunner();
         builder.Services.AddEventLogUIServices();
+        builder.Services.AddEventLogLocalization();
 
         builder.Services.AddMauiPreferenceAdapters();
         builder.Services.AddMauiPlatformAdapters();

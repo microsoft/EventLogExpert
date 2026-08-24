@@ -9,10 +9,13 @@ using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Common.Interop;
+using EventLogExpert.UI.Globalization;
 using Fluxor;
 using Microsoft.AspNetCore.Components.WebView;
 using Microsoft.Web.WebView2.Core;
 using System.Collections.Immutable;
+using System.Globalization;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using DataPackageOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation;
@@ -60,10 +63,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         logTableCommands.LoadColumns();
         filterLibraryCommands.LoadLibrary();
 
-        // Eager subscription so cold-launch args buffered by ActivationBootstrap drain even when
-        // WebView2 is missing and BlazorWebViewInitialized never fires; the StartConsumingAsync
-        // call in BlazorWebViewInitialized is idempotent (guarded by Interlocked) so a second
-        // call from there is safe.
+        // Eager so ActivationBootstrap's buffered cold-launch args drain even if WebView2 is missing; StartConsumingAsync is Interlocked-idempotent, so the BlazorWebViewInitialized call is safe.
         _ = _activationDispatcher.StartConsumingAsync(
             _menuActionService.OpenLogsBatchAsync,
             _consumerCts.Token);
@@ -84,9 +84,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
     private void ApplyWebViewTheme(Theme theme)
     {
-        // Keep WebView2's prefers-color-scheme aligned with the user's choice so the "System" path
-        // (data-theme attribute removed) actually follows the OS, and so explicit Light/Dark stays
-        // consistent across the page.
+        // Align WebView2's prefers-color-scheme with the user's Theme so "System" follows the OS and explicit Light/Dark stays consistent.
         _coreWebView?.Profile.PreferredColorScheme = theme switch
         {
             Theme.Light => CoreWebView2PreferredColorScheme.Light,
@@ -159,16 +157,16 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         ApplyWebViewTheme(_settings.Theme);
 
-        var themeAttr = _settings.Theme switch
+        var themeSettings = _settings.Theme switch
         {
             Theme.Light => "light",
             Theme.Dark => "dark",
             _ => null,
         };
 
-        var script = themeAttr is null
-            ? "document.documentElement.removeAttribute('data-theme');"
-            : $"document.documentElement.setAttribute('data-theme','{themeAttr}');";
+        // dir/lang from the RESOLVED content culture (today en/ltr); one pre-document-created script (proven timing, null-guarded).
+        var resolvedCulture = ContentCulture.Resolve(CultureInfo.CurrentUICulture, ContentCulture.SupportedUiCultures);
+        var script = DocumentInitScript.Build(themeSettings, ContentCulture.DirectionOf(resolvedCulture), resolvedCulture.Name);
 
         _ = _coreWebView.AddScriptToExecuteOnDocumentCreatedAsync(script);
     }
@@ -188,7 +186,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
     }
 
     private void OnThemeChanged() =>
-        // ThemeChanged may be raised from non-UI threads; marshal to the UI thread before touching
-        // WebView2's profile.
+        // ThemeChanged may fire off the UI thread; marshal to the UI thread before touching WebView2's profile.
         MainThread.BeginInvokeOnMainThread(() => ApplyWebViewTheme(_settings.Theme));
 }

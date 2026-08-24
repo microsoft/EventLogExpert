@@ -4,7 +4,9 @@
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
+using System.Globalization;
 
 namespace EventLogExpert.UI.LogTable.Find;
 
@@ -56,20 +58,40 @@ public sealed partial class FindBar : IAsyncDisposable
     public EventCallback<bool> WholeWordChanged { get; set; }
 
     [Parameter]
-    public string WrapAnnouncement { get; set; } = string.Empty;
+    public FindWrapState WrapAnnouncement { get; set; }
 
-    private string CountText =>
-        Query.Length == 0 ? string.Empty :
-        IsScanning ? "Searching\u2026" :
-        MatchCount == 0 ? "No results" :
-        $"{CurrentOrdinal}/{MatchCount}";
+    private string CountText
+    {
+        get
+        {
+            if (Query.Length == 0) { return string.Empty; }
+            if (IsScanning) { return Localizer["FindBar_Searching"]; }
+            if (MatchCount == 0) { return Localizer["FindBar_NoResults"]; }
+
+            return string.Format(
+                CultureInfo.CurrentCulture,
+                Localizer["FindBar_CountFormat"],
+                CurrentOrdinal.ToString("N0", CultureInfo.CurrentCulture),
+                MatchCount.ToString("N0", CultureInfo.CurrentCulture));
+        }
+    }
 
     [Inject]
     private IJSRuntime JSRuntime { get; init; } = null!;
 
+    [Inject]
+    private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
+
     private bool NavDisabled => IsScanning || MatchCount == 0;
 
     private bool OptionsActive => CaseSensitive || WholeWord;
+
+    private string WrapText => WrapAnnouncement switch
+    {
+        FindWrapState.WrappedToFirst => Localizer["FindBar_WrapToFirst"],
+        FindWrapState.WrappedToLast => Localizer["FindBar_WrapToLast"],
+        _ => string.Empty,
+    };
 
     public async ValueTask DisposeAsync()
     {

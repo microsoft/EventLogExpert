@@ -2,12 +2,16 @@
 
   <PropertyGroup>
     <RootNamespace>EventLogExpert.UI</RootNamespace>
+    <!-- The SDK emits [assembly: NeutralResourcesLanguage("en")]; the neutral SharedResource.resx is embedded in this
+         assembly (not a satellite), so this is the authoritative "en" for the supported-culture drift-guard test. -->
+    <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- Blazor Web component + JSInterop references, formerly pulled in transitively through Fluxor.Blazor.Web. The UI no
          longer consumes Fluxor, so this is now a direct reference at the version the net10 MAUI head already runs. -->
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <PackageReference Include="Microsoft.Extensions.Localization" />
   </ItemGroup>
 
   <ItemGroup>

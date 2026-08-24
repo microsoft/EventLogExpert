@@ -4,6 +4,7 @@
 using Bunit;
 using EventLogExpert.UI.LogTable.Find;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EventLogExpert.UI.Tests.LogTable;
 
@@ -13,6 +14,7 @@ public sealed class FindBarTests : BunitContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JSInterop.SetupModule("./_content/EventLogExpert.UI/LogTable/Find/FindBar.razor.js");
+        Services.AddEventLogLocalization();
     }
 
     [Fact]
@@ -129,6 +131,20 @@ public sealed class FindBarTests : BunitContext
         cut.Find(".find-input").Input("error");
 
         Assert.Equal("error", typed);
+    }
+
+    [Fact]
+    public void LocalizedStrings_RenderFromResources()
+    {
+        var cut = Render<FindBar>(parameters => parameters.Add(component => component.Query, "x"));
+
+        Assert.Equal("Find in events", cut.Find(".find-input").GetAttribute("aria-label"));
+        Assert.Equal("Find in events", cut.Find(".find-input").GetAttribute("placeholder"));
+
+        cut.Find(".find-options-toggle").Click();
+
+        Assert.Equal("Match case", cut.Find("label[for=find-opt-case]").TextContent);
+        Assert.Equal("Match whole word", cut.Find("label[for=find-opt-word]").TextContent);
     }
 
     [Fact]

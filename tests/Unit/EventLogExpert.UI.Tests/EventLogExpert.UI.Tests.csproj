@@ -10,6 +10,8 @@
     <!-- The UI no longer references Fluxor. The Fluxor-boundary architecture test still names FluxorComponent / IState /
          IStateSelection / IActionSubscriber to assert their ABSENCE from the converted surfaces, so it needs Fluxor here. -->
     <PackageReference Include="Fluxor.Blazor.Web" />
+    <!-- Guard/canary localization tests resolve IStringLocalizer against the production RESX config. -->
+    <PackageReference Include="Microsoft.Extensions.Localization" />
   </ItemGroup>
 
   <!-- The independent array-of-structs display-view oracles (AosReferenceView / AosReferenceCombinedView) live in

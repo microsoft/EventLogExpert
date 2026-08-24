@@ -22,7 +22,8 @@ using System.Globalization;
 
 namespace EventLogExpert.UI.Tests.LogTable;
 
-public sealed class LogTablePaneViewSourceTests : BunitContext
+[Collection(CultureSensitiveCollection.Name)]
+public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
 {
     private const string LogName = "Application";
 
@@ -533,8 +534,7 @@ public sealed class LogTablePaneViewSourceTests : BunitContext
     [Fact]
     public void SelectionReveal_WhenTheTargetIsNotInTheView_DiscardsWithoutScrolling()
     {
-        // A one-shot (WaitForView=false) reveal whose target is filtered out of the current settled view is discarded
-        // rather than left pending - contrast with the reload reveal above, which lingers until the row appears.
+        // A one-shot (WaitForView=false) reveal whose target is filtered out of the settled view is discarded, not left pending (unlike the reload reveal above).
         var target = new EventLocator(_logId, 0, 2);
         SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"), Event(3, "Gamma"));
         _viewSource.Current.Returns(DisplayViewTestFactory.Presentation(_logId, [Event(1, "Alpha"), Event(2, "Beta")]));

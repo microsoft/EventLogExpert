@@ -23,7 +23,8 @@ using System.Reflection;
 
 namespace EventLogExpert.UI.Tests.LogTable;
 
-public sealed class LogTablePaneFindTests : BunitContext
+[Collection(CultureSensitiveCollection.Name)]
+public sealed class LogTablePaneFindTests : CultureSensitiveBunitContext
 {
     private const string LogName = "Application";
 
