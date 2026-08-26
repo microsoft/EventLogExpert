@@ -578,4 +578,183 @@
     <value>Office</value>
     <comment>Office is a product name; keep verbatim.</comment>
   </data>
+  <!-- Menu bar: top-level bars. -->
+  <data name="Menu_File" xml:space="preserve">
+    <value>File</value>
+  </data>
+  <data name="Menu_Edit" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="Menu_View" xml:space="preserve">
+    <value>View</value>
+  </data>
+  <data name="Menu_Tools" xml:space="preserve">
+    <value>Tools</value>
+  </data>
+  <data name="Menu_Help" xml:space="preserve">
+    <value>Help</value>
+  </data>
+  <!-- Menu bar: File menu. -->
+  <data name="Menu_File_Open" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="Menu_File_Combine" xml:space="preserve">
+    <value>Combine</value>
+  </data>
+  <data name="Menu_File_CloseAll" xml:space="preserve">
+    <value>Close All</value>
+  </data>
+  <data name="Menu_File_ExportCsv" xml:space="preserve">
+    <value>Export to CSV</value>
+    <comment>CSV is a file-format proper noun; keep verbatim.</comment>
+  </data>
+  <data name="Menu_File_ExportJson" xml:space="preserve">
+    <value>Export to JSON</value>
+    <comment>JSON is a file-format proper noun; keep verbatim.</comment>
+  </data>
+  <data name="Menu_File_Exit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <!-- Menu bar: File > Open / Combine submenu (shared by both). -->
+  <data name="Menu_Open_File" xml:space="preserve">
+    <value>File</value>
+  </data>
+  <data name="Menu_Open_Folder" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="Menu_Open_FolderTopLevel" xml:space="preserve">
+    <value>Folder (top level only)</value>
+    <comment>Opens logs in the selected folder only, without traversing subfolders.</comment>
+  </data>
+  <data name="Menu_Open_Live" xml:space="preserve">
+    <value>Live</value>
+  </data>
+  <data name="Menu_Open_OtherLogs" xml:space="preserve">
+    <value>Other Logs</value>
+  </data>
+  <!-- Menu bar: Edit menu. Copy formats are whole-string labels; the format names in parentheses are proper nouns. -->
+  <data name="Menu_Edit_CopySelected" xml:space="preserve">
+    <value>Copy Selected</value>
+  </data>
+  <data name="Menu_Edit_CopySelectedSimple" xml:space="preserve">
+    <value>Copy Selected (Simple)</value>
+  </data>
+  <data name="Menu_Edit_CopySelectedXml" xml:space="preserve">
+    <value>Copy Selected (XML)</value>
+    <comment>XML is a format proper noun; keep verbatim.</comment>
+  </data>
+  <data name="Menu_Edit_CopySelectedFull" xml:space="preserve">
+    <value>Copy Selected (Full)</value>
+  </data>
+  <data name="Menu_Edit_CopySelectedMarkdown" xml:space="preserve">
+    <value>Copy Selected (Markdown)</value>
+    <comment>Markdown is a format proper noun; keep verbatim.</comment>
+  </data>
+  <!-- Menu bar: View menu. -->
+  <data name="Menu_View_ShowAllEvents" xml:space="preserve">
+    <value>Show All Events</value>
+  </data>
+  <data name="Menu_View_LoadNewEvents" xml:space="preserve">
+    <value>Load New Events</value>
+  </data>
+  <data name="Menu_View_ContinuouslyUpdate" xml:space="preserve">
+    <value>Continuously Update</value>
+  </data>
+  <data name="Menu_View_GroupDescending" xml:space="preserve">
+    <value>Group Descending</value>
+  </data>
+  <data name="Menu_View_ExpandAllGroups" xml:space="preserve">
+    <value>Expand All Groups</value>
+  </data>
+  <data name="Menu_View_CollapseAllGroups" xml:space="preserve">
+    <value>Collapse All Groups</value>
+  </data>
+  <data name="Menu_View_Timeline" xml:space="preserve">
+    <value>Timeline</value>
+  </data>
+  <data name="Menu_View_ResolutionCoverage" xml:space="preserve">
+    <value>Resolution &amp; Coverage</value>
+    <comment>Also used as the Resolution &amp; Coverage modal title (ResolutionCoverageModal); keep consistent if that surface is localized later.</comment>
+  </data>
+  <!-- Menu bar: Tools menu. -->
+  <data name="Menu_Tools_Databases" xml:space="preserve">
+    <value>Databases...</value>
+  </data>
+  <data name="Menu_Tools_Settings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <!-- Menu bar: Help menu. -->
+  <data name="Menu_Help_Docs" xml:space="preserve">
+    <value>Docs</value>
+  </data>
+  <data name="Menu_Help_SubmitIssue" xml:space="preserve">
+    <value>Submit an Issue</value>
+  </data>
+  <data name="Menu_Help_CheckForUpdates" xml:space="preserve">
+    <value>Check for Updates</value>
+  </data>
+  <data name="Menu_Help_ReleaseNotes" xml:space="preserve">
+    <value>Release Notes</value>
+    <comment>Also used as the Release Notes modal accessible name (ReleaseNotesModal); keep consistent if that surface is localized later.</comment>
+  </data>
+  <data name="Menu_Help_ViewLogs" xml:space="preserve">
+    <value>View Logs</value>
+  </data>
+  <!-- Menu bar: live-log readiness status badges, appended after a channel/log name. -->
+  <data name="Menu_Status_Elevate" xml:space="preserve">
+    <value>(elevate)</value>
+    <comment>Status badge shown after a log/channel name; indicates the log requires administrator elevation to open.</comment>
+  </data>
+  <data name="Menu_Status_Disabled" xml:space="preserve">
+    <value>(disabled)</value>
+    <comment>Status badge shown after a log/channel name; indicates the log is currently disabled.</comment>
+  </data>
+  <!-- Menu bar: disabled-item reasons. -->
+  <data name="Menu_GroupDisabledReason" xml:space="preserve">
+    <value>Group events first (column header &gt; Group By)</value>
+    <comment>'&gt;' is a UI breadcrumb meaning 'then'; 'column header' and 'Group By' are UI navigation labels.</comment>
+  </data>
+  <data name="Menu_ResolutionCoverageDisabledReason" xml:space="preserve">
+    <value>Open a log to view resolution coverage.</value>
+  </data>
+  <!-- Menu bar: keyboard shortcut hints (display only; do not drive the binding). -->
+  <data name="Menu_Shortcut_Copy" xml:space="preserve">
+    <value>Ctrl+C</value>
+    <comment>Keyboard shortcut hint (display only; does not drive the binding). The letter C is the physical key - keep it; translate only the modifier word if your locale does (e.g. Strg).</comment>
+  </data>
+  <data name="Menu_Shortcut_Open" xml:space="preserve">
+    <value>Ctrl+O</value>
+    <comment>Keyboard shortcut hint (display only; does not drive the binding). The letter O is the physical key - keep it; translate only the modifier word if your locale does (e.g. Strg).</comment>
+  </data>
+  <data name="Menu_Shortcut_ShowAll" xml:space="preserve">
+    <value>Ctrl+H</value>
+    <comment>Keyboard shortcut hint (display only; does not drive the binding). The letter H is the physical key - keep it; translate only the modifier word if your locale does (e.g. Strg).</comment>
+  </data>
+  <!-- Menu bar: aria/chrome. -->
+  <data name="Menu_MainMenuAria" xml:space="preserve">
+    <value>Main menu</value>
+    <comment>Accessible name for the persistent top menu bar.</comment>
+  </data>
+  <data name="Menu_PopupAria" xml:space="preserve">
+    <value>Menu</value>
+    <comment>Accessible name for a transient dropdown menu popup (distinct from the persistent top menu bar).</comment>
+  </data>
+  <data name="Menu_LoadingAria" xml:space="preserve">
+    <value>Loading</value>
+    <comment>Accessible name for a submenu that is still loading its items.</comment>
+  </data>
+  <data name="Menu_Loading" xml:space="preserve">
+    <value>Loading...</value>
+    <comment>Placeholder text shown while an async submenu loads.</comment>
+  </data>
+  <!-- Shared close-all-logs confirmation dialog (used by the File menu and the log tab bar). -->
+  <data name="CloseAllLogs_Title" xml:space="preserve">
+    <value>Close all logs</value>
+  </data>
+  <data name="CloseAllLogs_Body" xml:space="preserve">
+    <value>Close all open logs? This cannot be undone.</value>
+  </data>
+  <data name="CloseAllLogs_Confirm" xml:space="preserve">
+    <value>Close all</value>
+  </data>
 </root>

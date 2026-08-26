@@ -80,7 +80,7 @@
                             @if (_resolvedChildren is null)
                             {
                                 <ul aria-busy="true"
-                                    aria-label="Loading"
+                                    aria-label="@Localizer["Menu_LoadingAria"]"
                                     aria-orientation="vertical"
                                     class="menu-list"
                                     role="menu">
@@ -89,7 +89,7 @@
                                         role="menuitem"
                                         tabindex="-1">
                                         <span class="menu-check"></span>
-                                        <span class="menu-label">Loading...</span>
+                                        <span class="menu-label">@Localizer["Menu_Loading"]</span>
                                     </li>
                                 </ul>
                             }

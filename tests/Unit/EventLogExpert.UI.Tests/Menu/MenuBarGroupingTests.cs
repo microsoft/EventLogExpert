@@ -48,6 +48,7 @@ public sealed class MenuBarGroupingTests : BunitContext
         Services.AddSingleton(_readinessService);
         Services.AddSingleton(_settings);
         Services.AddSingleton(_versionProvider);
+        Services.AddEventLogLocalization();
 
         JSInterop.Mode = JSRuntimeMode.Loose;
         JSInterop.SetupModule("./_content/EventLogExpert.UI/Menu/MenuAnchor.js")

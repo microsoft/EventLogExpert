@@ -12,6 +12,7 @@ using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.LogTable;
@@ -29,6 +30,8 @@ public sealed partial class LogTabBar
     [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private ILogTableCommands LogTableCommands { get; init; } = null!;
 
@@ -285,7 +288,7 @@ public sealed partial class LogTabBar
 
     private async Task ConfirmCloseAllLogsAsync()
     {
-        if (await CloseAllLogsConfirmation.ConfirmAsync(AlertDialogService))
+        if (await CloseAllLogsConfirmation.ConfirmAsync(AlertDialogService, Localizer))
         {
             EventLogCommands.CloseAllLogs();
         }

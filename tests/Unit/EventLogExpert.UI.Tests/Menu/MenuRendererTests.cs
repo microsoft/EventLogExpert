@@ -4,6 +4,8 @@
 using Bunit;
 using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Tests.Menu;
 
@@ -12,6 +14,29 @@ public sealed class MenuRendererTests : BunitContext
     public MenuRendererTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddEventLogLocalization();
+    }
+
+    [Fact]
+    public async Task AsyncSubmenu_WhileLoading_RendersLocalizedLoadingChrome()
+    {
+        var localizer = Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+        var gate = new TaskCompletionSource<IReadOnlyList<MenuItem>>();
+        var items = new[] { MenuItem.AsyncSubMenu("Parent", () => gate.Task) };
+
+        var component = Render<MenuRenderer>(parameters => parameters.Add(p => p.Items, items));
+
+        var activateTask = component.Find("li.menu-item").ClickAsync(new());
+
+        component.WaitForAssertion(() =>
+        {
+            var busy = component.Find("ul[aria-busy='true']");
+            Assert.Equal(localizer["Menu_LoadingAria"].Value, busy.GetAttribute("aria-label"));
+            Assert.Equal(localizer["Menu_Loading"].Value, busy.QuerySelector(".menu-label")!.TextContent);
+        });
+
+        gate.SetResult([]);
+        await activateTask;
     }
 
     [Fact]
