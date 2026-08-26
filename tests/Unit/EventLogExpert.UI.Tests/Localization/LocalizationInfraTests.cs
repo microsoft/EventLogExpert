@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.UI.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
@@ -107,15 +108,22 @@ public sealed class LocalizationInfraTests
         Assert.NotNull(neutralAttribute);
         var neutral = CultureInfo.GetCultureInfo(neutralAttribute.CultureName).Name;
 
-        var canary = CultureInfo.GetCultureInfo("qps-ploc").Name;
+        // Derive the satellite filename from the catalog assembly so this guard follows the resource assembly if it is ever relocated again.
+        var satelliteFileName = typeof(SharedResource).Assembly.GetName().Name + ".resources.dll";
         var satelliteCultures = Directory.GetDirectories(AppContext.BaseDirectory)
-            .Where(directory => File.Exists(Path.Combine(directory, "EventLogExpert.UI.resources.dll")))
+            .Where(directory => File.Exists(Path.Combine(directory, satelliteFileName)))
             .Select(directory => CultureInfo.GetCultureInfo(Path.GetFileName(directory)).Name)
-            .Where(name => !string.Equals(name, canary, StringComparison.OrdinalIgnoreCase))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        // Positive control: the qps-ploc canary satellite must be discovered, so a zero-satellite result (e.g. a renamed resource assembly) fails loudly here instead of passing this guard vacuously.
+        var canary = CultureInfo.GetCultureInfo("qps-ploc").Name;
+        Assert.True(
+            satelliteCultures.Contains(canary),
+            $"No '{canary}' satellite ('{satelliteFileName}') was discovered under '{AppContext.BaseDirectory}'. " +
+            "The satellite drift-guard cannot function without it; verify the resource assembly name and packaging.");
+
         var expected = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { neutral };
-        expected.UnionWith(satelliteCultures);
+        expected.UnionWith(satelliteCultures.Where(name => !string.Equals(name, canary, StringComparison.OrdinalIgnoreCase)));
 
         Assert.True(
             ContentCulture.SupportedUiCultures.SetEquals(expected),

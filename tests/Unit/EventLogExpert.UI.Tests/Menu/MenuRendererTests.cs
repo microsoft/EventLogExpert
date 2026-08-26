@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;

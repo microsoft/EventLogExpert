@@ -4,6 +4,7 @@
 using Bunit;
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;

@@ -4,6 +4,7 @@
 using Bunit;
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.EventLog;
@@ -359,7 +360,7 @@ public sealed class MenuLocalizationTests : BunitContext
         if (directory is null) { return (null, null); }
 
         var uiRoot = Path.Combine(directory, "src", "EventLogExpert.UI");
-        var resx = Path.Combine(uiRoot, "Resources", "SharedResource.resx");
+        var resx = Path.Combine(directory, "src", "EventLogExpert.Localization", "Resources", "SharedResource.resx");
 
         return (File.Exists(resx) ? resx : null, Directory.Exists(uiRoot) ? uiRoot : null);
     }

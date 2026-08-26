@@ -2,9 +2,6 @@
 
   <PropertyGroup>
     <RootNamespace>EventLogExpert.UI</RootNamespace>
-    <!-- The SDK emits [assembly: NeutralResourcesLanguage("en")]; the neutral SharedResource.resx is embedded in this
-         assembly (not a satellite), so this is the authoritative "en" for the supported-culture drift-guard test. -->
-    <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EventLogExpert.Eventing.OfflineImaging\EventLogExpert.Eventing.OfflineImaging.csproj" />
+    <ProjectReference Include="..\EventLogExpert.Localization\EventLogExpert.Localization.csproj" />
     <ProjectReference Include="..\EventLogExpert.Runtime\EventLogExpert.Runtime.csproj" />
   </ItemGroup>
 

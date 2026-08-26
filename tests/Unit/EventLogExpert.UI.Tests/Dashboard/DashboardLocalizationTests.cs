@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Dashboard;
@@ -178,7 +179,7 @@ public sealed class DashboardLocalizationTests : BunitContext
         if (directory is null) { return (null, null); }
 
         var uiRoot = Path.Combine(directory, "src", "EventLogExpert.UI");
-        var resx = Path.Combine(uiRoot, "Resources", "SharedResource.resx");
+        var resx = Path.Combine(directory, "src", "EventLogExpert.Localization", "Resources", "SharedResource.resx");
 
         return (File.Exists(resx) ? resx : null, Directory.Exists(uiRoot) ? uiRoot : null);
     }
