@@ -17,6 +17,7 @@
     <Project Path="src/EventLogExpert.Runtime/EventLogExpert.Runtime.csproj" />
     <Project Path="src/EventLogExpert.Eventing/EventLogExpert.Eventing.csproj" />
     <Project Path="src/EventLogExpert.Eventing.OfflineImaging/EventLogExpert.Eventing.OfflineImaging.csproj" />
+    <Project Path="src/EventLogExpert.Localization/EventLogExpert.Localization.csproj" />
     <Project Path="src/EventLogExpert.Logging/EventLogExpert.Logging.csproj" />
     <Project Path="src/EventLogExpert.Provider/EventLogExpert.Provider.csproj" />
     <Project Path="src/EventLogExpert.EventDbTool/EventLogExpert.EventDbTool.csproj" />

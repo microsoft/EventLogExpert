@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.Settings;
