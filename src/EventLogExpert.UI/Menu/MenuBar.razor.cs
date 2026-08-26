@@ -18,6 +18,7 @@ using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Text;
 
@@ -25,8 +26,6 @@ namespace EventLogExpert.UI.Menu;
 
 public sealed partial class MenuBar
 {
-    private const string GroupDisabledReason = "Group events first (column header > Group By)";
-
     private readonly List<TopLevel> _bars = [];
 
     private ChromelessButton?[] _barElements = [];
@@ -50,9 +49,13 @@ public sealed partial class MenuBar
 
     [Inject] private IFilterPaneQueries FilterPaneQueries { get; init; } = null!;
 
+    private string GroupDisabledReason => Localizer["Menu_GroupDisabledReason"];
+
     [Inject] private IHistogramVisibilitySource HistogramVisibility { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private ILogTableQueries LogTableQueries { get; init; } = null!;
 
@@ -96,7 +99,14 @@ public sealed partial class MenuBar
                 await _scrollSuppressorModule.InvokeVoidAsync(
                     "suppress",
                     _menuBarRootRef,
-                    new[] { new { selector = "[role='menuitem']", keys = new[] { "ArrowRight", "ArrowLeft", "Home", "End", "ArrowDown", "ArrowUp" } } });
+                    new[]
+                    {
+                        new
+                        {
+                            selector = "[role='menuitem']",
+                            keys = new[] { "ArrowRight", "ArrowLeft", "Home", "End", "ArrowDown", "ArrowUp" }
+                        }
+                    });
             }
             catch (JSDisconnectedException) { }
             catch (JSException) { }
@@ -119,32 +129,27 @@ public sealed partial class MenuBar
         base.OnInitialized();
     }
 
-    private static string? ReadinessStatusText(ChannelReadiness readiness) =>
-        readiness.Access == ChannelAccess.RequiresElevation
-            ? "(elevate)"
-            : readiness.Enablement == ChannelEnablement.Disabled ? "(disabled)" : null;
-
     private IReadOnlyList<MenuItem> BuildEdit()
     {
         var defaultCopyFormat = Settings.CopyFormat;
 
         return
         [
-            MenuItem.Item("Copy Selected",
+            MenuItem.Item(Localizer["Menu_Edit_CopySelected"],
                 () => Actions.CopySelectedAsync(EventCopyFormat.Default),
-                defaultCopyFormat == EventCopyFormat.Default ? "Ctrl+C" : null),
-            MenuItem.Item("Copy Selected (Simple)",
+                defaultCopyFormat == EventCopyFormat.Default ? Localizer["Menu_Shortcut_Copy"].Value : null),
+            MenuItem.Item(Localizer["Menu_Edit_CopySelectedSimple"],
                 () => Actions.CopySelectedAsync(EventCopyFormat.Simple),
-                defaultCopyFormat == EventCopyFormat.Simple ? "Ctrl+C" : null),
-            MenuItem.Item("Copy Selected (XML)",
+                defaultCopyFormat == EventCopyFormat.Simple ? Localizer["Menu_Shortcut_Copy"].Value : null),
+            MenuItem.Item(Localizer["Menu_Edit_CopySelectedXml"],
                 () => Actions.CopySelectedAsync(EventCopyFormat.Xml),
-                defaultCopyFormat == EventCopyFormat.Xml ? "Ctrl+C" : null),
-            MenuItem.Item("Copy Selected (Full)",
+                defaultCopyFormat == EventCopyFormat.Xml ? Localizer["Menu_Shortcut_Copy"].Value : null),
+            MenuItem.Item(Localizer["Menu_Edit_CopySelectedFull"],
                 () => Actions.CopySelectedAsync(EventCopyFormat.Full),
-                defaultCopyFormat == EventCopyFormat.Full ? "Ctrl+C" : null),
-            MenuItem.Item("Copy Selected (Markdown)",
+                defaultCopyFormat == EventCopyFormat.Full ? Localizer["Menu_Shortcut_Copy"].Value : null),
+            MenuItem.Item(Localizer["Menu_Edit_CopySelectedMarkdown"],
                 () => Actions.CopySelectedAsync(EventCopyFormat.Markdown),
-                defaultCopyFormat == EventCopyFormat.Markdown ? "Ctrl+C" : null),
+                defaultCopyFormat == EventCopyFormat.Markdown ? Localizer["Menu_Shortcut_Copy"].Value : null),
         ];
     }
 
@@ -154,34 +159,42 @@ public sealed partial class MenuBar
 
         return
         [
-            MenuItem.SubMenu("Open", BuildOpenSubMenu(false)),
-            MenuItem.SubMenu("Combine", BuildOpenSubMenu(true), hasActiveLogs),
+            MenuItem.SubMenu(Localizer["Menu_File_Open"], BuildOpenSubMenu(false)),
+            MenuItem.SubMenu(Localizer["Menu_File_Combine"], BuildOpenSubMenu(true), hasActiveLogs),
             MenuItem.Separator(),
-            MenuItem.Item("Close All", ConfirmCloseAllLogsAsync, isEnabled: hasActiveLogs),
+            MenuItem.Item(Localizer["Menu_File_CloseAll"], ConfirmCloseAllLogsAsync, isEnabled: hasActiveLogs),
             MenuItem.Separator(),
-            MenuItem.Item("Export to CSV", () => Actions.ExportEventsAsync(ExportFormat.Csv), isEnabled: hasActiveLogs),
-            MenuItem.Item("Export to JSON", () => Actions.ExportEventsAsync(ExportFormat.Json), isEnabled: hasActiveLogs),
-            MenuItem.Item("Exit", Actions.Exit),
+            MenuItem.Item(Localizer["Menu_File_ExportCsv"],
+                () => Actions.ExportEventsAsync(ExportFormat.Csv),
+                isEnabled: hasActiveLogs),
+            MenuItem.Item(Localizer["Menu_File_ExportJson"],
+                () => Actions.ExportEventsAsync(ExportFormat.Json),
+                isEnabled: hasActiveLogs),
+            MenuItem.Item(Localizer["Menu_File_Exit"], Actions.Exit),
         ];
     }
 
     private IReadOnlyList<MenuItem> BuildHelp() =>
     [
-        MenuItem.Item("Docs", () => Actions.OpenDocsAsync()),
-        MenuItem.Item("Submit an Issue", () => Actions.OpenIssueAsync()),
-        MenuItem.Item("Check for Updates", () => Actions.CheckForUpdatesAsync()),
-        MenuItem.Item("Release Notes", () => Actions.ShowReleaseNotesAsync()),
-        MenuItem.Item("View Logs", () => Actions.ShowDebugLogsAsync()),
+        MenuItem.Item(Localizer["Menu_Help_Docs"], () => Actions.OpenDocsAsync()),
+        MenuItem.Item(Localizer["Menu_Help_SubmitIssue"], () => Actions.OpenIssueAsync()),
+        MenuItem.Item(Localizer["Menu_Help_CheckForUpdates"], () => Actions.CheckForUpdatesAsync()),
+        MenuItem.Item(Localizer["Menu_Help_ReleaseNotes"], () => Actions.ShowReleaseNotesAsync()),
+        MenuItem.Item(Localizer["Menu_Help_ViewLogs"], () => Actions.ShowDebugLogsAsync()),
     ];
 
     private IReadOnlyList<MenuItem> BuildOpenSubMenu(bool combineLog)
     {
         return
         [
-            MenuItem.Item("File", () => Actions.OpenFileAsync(combineLog), combineLog ? null : "Ctrl+O"),
-            MenuItem.Item("Folder", () => Actions.OpenFolderAsync(combineLog, includeSubfolders: true)),
-            MenuItem.Item("Folder (top level only)", () => Actions.OpenFolderAsync(combineLog, includeSubfolders: false)),
-            MenuItem.SubMenu("Live",
+            MenuItem.Item(Localizer["Menu_Open_File"],
+                () => Actions.OpenFileAsync(combineLog),
+                combineLog ? null : Localizer["Menu_Shortcut_Open"].Value),
+            MenuItem.Item(Localizer["Menu_Open_Folder"],
+                () => Actions.OpenFolderAsync(combineLog, includeSubfolders: true)),
+            MenuItem.Item(Localizer["Menu_Open_FolderTopLevel"],
+                () => Actions.OpenFolderAsync(combineLog, includeSubfolders: false)),
+            MenuItem.SubMenu(Localizer["Menu_Open_Live"],
             [
                 MenuItem.Item(LogChannelNames.ApplicationLog,
                     () => Actions.OpenLiveLogAsync(LogChannelNames.ApplicationLog, combineLog),
@@ -193,7 +206,7 @@ public sealed partial class MenuBar
                     () => Actions.OpenLiveLogAsync(LogChannelNames.SecurityLog, combineLog),
                     statusText: ReadinessStatusText(LogChannelNames.SecurityLog)),
                 MenuItem.AsyncSubMenu(
-                    "Other Logs",
+                    Localizer["Menu_Open_OtherLogs"],
                     async () => BuildOtherLogsTree(await GetOtherLogReadinessAsync(), combineLog)),
             ]),
         ];
@@ -214,6 +227,7 @@ public sealed partial class MenuBar
             if (path.Count == 0) { continue; }
 
             var log = path[^1];
+
             var logMenuItem = MenuItem.Item(log,
                 () => Actions.OpenLiveLogAsync(logName, combineLog),
                 statusText: ReadinessStatusText(readiness));
@@ -253,18 +267,18 @@ public sealed partial class MenuBar
 
     private IReadOnlyList<MenuItem> BuildTools() =>
     [
-        MenuItem.Item("Databases...", () => Actions.OpenDatabaseToolsAsync()),
+        MenuItem.Item(Localizer["Menu_Tools_Databases"], () => Actions.OpenDatabaseToolsAsync()),
         MenuItem.Separator(),
-        MenuItem.Item("Settings", () => Actions.OpenSettingsAsync()),
+        MenuItem.Item(Localizer["Menu_Tools_Settings"], () => Actions.OpenSettingsAsync()),
     ];
 
     private List<TopLevel> BuildTopLevel() =>
     [
-        new("File", BuildFile),
-        new("Edit", BuildEdit),
-        new("View", BuildView),
-        new("Tools", BuildTools),
-        new("Help", BuildHelp),
+        new(Localizer["Menu_File"], BuildFile),
+        new(Localizer["Menu_Edit"], BuildEdit),
+        new(Localizer["Menu_View"], BuildView),
+        new(Localizer["Menu_Tools"], BuildTools),
+        new(Localizer["Menu_Help"], BuildHelp),
     ];
 
     private IReadOnlyList<MenuItem> BuildView()
@@ -279,48 +293,48 @@ public sealed partial class MenuBar
         return
         [
             MenuItem.Item(
-                "Show All Events",
+                Localizer["Menu_View_ShowAllEvents"],
                 Actions.ToggleShowAllEvents,
-                "Ctrl+H",
+                Localizer["Menu_Shortcut_ShowAll"],
                 !isFilterEnabled),
-            MenuItem.Item("Load New Events", Actions.LoadNewEvents),
+            MenuItem.Item(Localizer["Menu_View_LoadNewEvents"], Actions.LoadNewEvents),
             MenuItem.Item(
-                "Continuously Update",
+                Localizer["Menu_View_ContinuouslyUpdate"],
                 () => Actions.SetContinuouslyUpdate(!isContinuouslyUpdating),
                 isChecked: isContinuouslyUpdating),
             MenuItem.Separator(),
             MenuItem.Item(
-                "Group Descending",
+                Localizer["Menu_View_GroupDescending"],
                 Actions.ToggleGroupSortDirection,
                 isChecked: isGroupDescending,
                 isEnabled: isGrouping,
                 disabledReason: isGrouping ? null : GroupDisabledReason),
             MenuItem.Item(
-                "Expand All Groups",
+                Localizer["Menu_View_ExpandAllGroups"],
                 () => Actions.SetAllGroupsCollapsed(false),
                 isEnabled: isGrouping,
                 disabledReason: isGrouping ? null : GroupDisabledReason),
             MenuItem.Item(
-                "Collapse All Groups",
+                Localizer["Menu_View_CollapseAllGroups"],
                 () => Actions.SetAllGroupsCollapsed(true),
                 isEnabled: isGrouping,
                 disabledReason: isGrouping ? null : GroupDisabledReason),
             MenuItem.Separator(),
             MenuItem.Item(
-                "Timeline",
+                Localizer["Menu_View_Timeline"],
                 () => Actions.SetHistogramVisible(!isHistogramVisible),
                 isChecked: isHistogramVisible),
             MenuItem.Item(
-                "Resolution & Coverage",
+                Localizer["Menu_View_ResolutionCoverage"],
                 () => Actions.ShowResolutionCoverageAsync(),
                 isEnabled: hasActiveLogs,
-                disabledReason: hasActiveLogs ? null : "Open a log to view resolution coverage."),
+                disabledReason: hasActiveLogs ? null : Localizer["Menu_ResolutionCoverageDisabledReason"].Value),
         ];
     }
 
     private async Task ConfirmCloseAllLogsAsync()
     {
-        if (await CloseAllLogsConfirmation.ConfirmAsync(AlertDialogService))
+        if (await CloseAllLogsConfirmation.ConfirmAsync(AlertDialogService, Localizer))
         {
             await Actions.CloseAllLogsAsync();
         }
@@ -329,6 +343,7 @@ public sealed partial class MenuBar
     private async Task<IReadOnlyList<ChannelReadiness>> GetOtherLogReadinessAsync()
     {
         var snapshot = await ChannelReadinessService.GetReadinessAsync();
+
         var logNames = snapshot
             .Select(channel => channel.Channel)
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
@@ -339,13 +354,12 @@ public sealed partial class MenuBar
         var readinessByChannel = new Dictionary<string, ChannelReadiness>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var channel in snapshot) { readinessByChannel[channel.Channel] = channel; }
+
         foreach (var channel in readiness) { readinessByChannel[channel.Channel] = channel; }
 
         _readinessByChannel = readinessByChannel;
 
-        return readiness
-            .OrderBy(channel => channel.Channel, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        return [.. readiness.OrderBy(channel => channel.Channel, StringComparer.OrdinalIgnoreCase)];
     }
 
     private void InvalidatePendingOpen() => Interlocked.Increment(ref _openRequestId);
@@ -456,7 +470,8 @@ public sealed partial class MenuBar
         var requestId = Interlocked.Increment(ref _openRequestId);
 
         _menuAnchorModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
+            "import",
+            "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
 
         if (_barElements[index] is not { } barButton) { return; }
 
@@ -476,6 +491,7 @@ public sealed partial class MenuBar
         try
         {
             var readiness = await ChannelReadinessService.GetReadinessAsync();
+
             _readinessByChannel = readiness.ToDictionary(
                 channel => channel.Channel,
                 StringComparer.OrdinalIgnoreCase);
@@ -488,10 +504,13 @@ public sealed partial class MenuBar
         }
     }
 
+    private string? ReadinessStatusText(ChannelReadiness readiness) =>
+        readiness.Access == ChannelAccess.RequiresElevation ? Localizer["Menu_Status_Elevate"].Value :
+        readiness.Enablement == ChannelEnablement.Disabled ? Localizer["Menu_Status_Disabled"].Value : null;
+
     private string? ReadinessStatusText(string channel) =>
-        _readinessByChannel.TryGetValue(channel, out var readiness)
-            ? ReadinessStatusText(readiness)
-            : null;
+        _readinessByChannel.TryGetValue(channel, out var readiness) ?
+            ReadinessStatusText(readiness) : null;
 
     private sealed record TopLevel(string Label, Func<IReadOnlyList<MenuItem>> BuildItems);
 }

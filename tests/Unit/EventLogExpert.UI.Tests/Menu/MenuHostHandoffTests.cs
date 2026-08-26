@@ -6,6 +6,7 @@ using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using TestContext = Xunit.TestContext;
 
 namespace EventLogExpert.UI.Tests.Menu;
@@ -27,6 +28,21 @@ public sealed class MenuHostHandoffTests : BunitContext
         Services.AddBannerHostDependencies();
         Services.AddSingleton<IMenuService>(_menuService);
         Services.AddEventLogUIServices();
+    }
+
+    [Fact]
+    public async Task OpenMenu_PopupHasLocalizedAriaLabel()
+    {
+        var localizer = Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+
+        var modal = Render<ModalChrome>(parameters => parameters
+            .Add(p => p.Title, "host")
+            .AddChildContent("<p>1</p>"));
+
+        await modal.InvokeAsync(() => _menuService.Open(MakeItems()));
+
+        modal.WaitForAssertion(() =>
+            Assert.Equal(localizer["Menu_PopupAria"].Value, modal.Find("div.menu-host-popup").GetAttribute("aria-label")));
     }
 
     [Fact]

@@ -4,6 +4,7 @@
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Menu;
@@ -16,8 +17,9 @@ public sealed partial class MenuRenderer : IAsyncDisposable
     private static long s_rendererIdCounter;
 
     private readonly long _rendererId = Interlocked.Increment(ref s_rendererIdCounter);
-    private int _focusedIndex = -1;
+
     private bool _focusOnNextRender;
+    private int _focusedIndex = -1;
     private ElementReference[] _itemElements = [];
     private IJSObjectReference? _menuOverlayModule;
     private MenuItem? _openItem;
@@ -45,6 +47,8 @@ public sealed partial class MenuRenderer : IAsyncDisposable
     [Parameter] public bool SuppressInitialFocus { get; set; }
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     public async ValueTask DisposeAsync()
     {

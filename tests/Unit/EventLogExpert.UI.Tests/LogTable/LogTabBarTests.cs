@@ -81,6 +81,7 @@ public sealed class LogTabBarTests : BunitContext
         Services.AddSingleton(_queries);
         Services.AddSingleton(_source);
         Services.AddSingleton(_traceLogger);
+        Services.AddEventLogLocalization();
     }
 
     [Fact]

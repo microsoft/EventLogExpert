@@ -4,6 +4,7 @@
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Globalization;
 
@@ -20,6 +21,8 @@ public sealed partial class MenuHost : IAsyncDisposable
     private bool IsActive => ReferenceEquals(Registry.ActiveHost, this);
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private IMenuService MenuService { get; init; } = null!;
 

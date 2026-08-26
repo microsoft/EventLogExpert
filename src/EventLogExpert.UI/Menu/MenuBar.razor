@@ -1,6 +1,6 @@
 @inherits AppStateComponentBase
 
-<nav aria-label="Main menu" aria-orientation="horizontal" class="menu-bar" @ref="_menuBarRootRef" role="menubar">
+<nav aria-label="@Localizer["Menu_MainMenuAria"]" aria-orientation="horizontal" class="menu-bar" @ref="_menuBarRootRef" role="menubar">
     @for (int index = 0; index < _bars.Count; index++)
     {
         var bar = _bars[index];
@@ -8,16 +8,16 @@
         bool isActive = IsActive(bar);
         bool isFocused = capturedIndex == _focusedBarIndex;
 
-        <ChromelessButton aria-expanded="@isActive.ToString().ToLowerInvariant()"
-            aria-haspopup="menu"
-            CssClass="@($"menu-bar-item{(isActive ? " active" : string.Empty)}")"
-            @key="bar.Label"
+        <ChromelessButton CssClass="@($"menu-bar-item{(isActive ? " active" : string.Empty)}")"
             OnClick="@(async _ => await OnBarClick(bar, capturedIndex))"
             OnKeyDown="@(async args => await OnBarKeyDown(args, capturedIndex))"
             OnMouseEnter="@(async _ => await OnBarHover(bar, capturedIndex))"
+            StopPropagation="true"
+            aria-expanded="@isActive.ToString().ToLowerInvariant()"
+            aria-haspopup="menu"
+            @key="capturedIndex"
             @ref="_barElements[capturedIndex]"
             role="menuitem"
-            StopPropagation="true"
             tabindex="@(isFocused ? 0 : -1)">
             @bar.Label
         </ChromelessButton>
