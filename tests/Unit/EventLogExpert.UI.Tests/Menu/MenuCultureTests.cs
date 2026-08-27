@@ -31,18 +31,28 @@ public sealed class MenuCultureTests : BunitContext
 
         try
         {
-            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("qps-ploc");
+            CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
             var localizer = Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+            (string Key, string NeutralValue)[] neutralValues =
+            [
+                ("Menu_File", localizer["Menu_File"].Value),
+                ("Menu_View_ShowAllEvents", localizer["Menu_View_ShowAllEvents"].Value),
+                ("Menu_View_ResolutionCoverage", localizer["Menu_View_ResolutionCoverage"].Value),
+                ("CloseAllLogs_Title", localizer["CloseAllLogs_Title"].Value)
+            ];
+
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("qps-ploc");
 
             var canary = localizer["Canary_Probe1"];
             Assert.False(canary.ResourceNotFound);
             Assert.Equal("[qps-ploc] canary probe one", canary.Value);
 
-            // Real Menu keys are absent from the canary satellite -> neutral English (no pseudo Menu UI on a qps-Ploc machine).
-            Assert.Equal("File", localizer["Menu_File"].Value);
-            Assert.Equal("Show All Events", localizer["Menu_View_ShowAllEvents"].Value);
-            Assert.Equal("Resolution & Coverage", localizer["Menu_View_ResolutionCoverage"].Value);
-            Assert.Equal("Close all logs", localizer["CloseAllLogs_Title"].Value);
+            foreach (var (key, neutralValue) in neutralValues)
+            {
+                var localized = localizer[key];
+                Assert.False(localized.ResourceNotFound);
+                Assert.Equal(neutralValue, localized.Value);
+            }
         }
         finally
         {

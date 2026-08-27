@@ -47,17 +47,27 @@ public sealed class SettingsModalCultureTests : CultureSensitiveBunitContext
     }
 
     [Fact]
-    public void SettingsModal_UnderPseudoLocale_LoadsSatelliteButRendersEnglish()
+    public void SettingsModal_UnderPseudoLocale_LoadsSatelliteButRendersNeutralValues()
     {
+        CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
+        var localizer = Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+        var neutralTimeZoneLabel = localizer["Settings_TimeZoneLabel"].Value;
+        var neutralAriaLabel = localizer["Settings_AriaLabel"].Value;
+
         CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("qps-ploc");
 
-        // Positive control: the qps-Ploc satellite IS loaded, so "assert English" below is not vacuous.
-        var localizer = Services.GetRequiredService<IStringLocalizer<SharedResource>>();
-        Assert.Equal("[qps-ploc] canary probe one", localizer["Canary_Probe1"].Value);
+        var canary = localizer["Canary_Probe1"];
+        Assert.False(canary.ResourceNotFound);
+        Assert.Equal("[qps-ploc] canary probe one", canary.Value);
 
-        // Real Settings keys are absent from the canary satellite -> neutral English (a qps-Ploc machine never renders pseudo UI).
+        var timeZoneLabel = localizer["Settings_TimeZoneLabel"];
+        var ariaLabel = localizer["Settings_AriaLabel"];
+        Assert.False(timeZoneLabel.ResourceNotFound);
+        Assert.False(ariaLabel.ResourceNotFound);
+
         var component = Render<SettingsModal>();
-        Assert.Equal("Time Zone:", component.Find("label[for='settings-timezone']").TextContent.Trim());
-        Assert.Equal("Settings", component.Find("dialog").GetAttribute("aria-label"));
+        Assert.Equal(neutralTimeZoneLabel, component.Find("label[for='settings-timezone']").TextContent.Trim());
+        Assert.Equal(neutralAriaLabel, component.Find("dialog").GetAttribute("aria-label"));
     }
 }
+

@@ -3,6 +3,7 @@
 
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Globalization;
@@ -25,7 +26,7 @@ namespace EventLogExpert.UI.Tests.Localization;
 public sealed class LocalizationInfraTests
 {
     [Fact]
-    public void DynamicKeyFamilies_MatchEnumMembersExactly()
+    public void EnumMappedKeyFamilies_MatchEnumMembersExactly()
     {
         // Bidirectional per family: an authored key with no enum member is an orphan/typo; an enum member with no
         // key echoes its key name at runtime (Localizer[$"{stem}{member}"]). The two-rule orphan guard cannot see
@@ -35,7 +36,9 @@ public sealed class LocalizationInfraTests
             ("Settings_Theme_", typeof(Theme)),
             ("Settings_CopyFormat_", typeof(EventCopyFormat)),
             ("Settings_LogLevel_", typeof(LogLevel)),
-            ("Dashboard_Group_", typeof(ScenarioGroup))
+            ("Dashboard_Group_", typeof(ScenarioGroup)),
+            ("Dashboard_Presence_", typeof(ChannelPresence)),
+            ("Dashboard_Enablement_", typeof(ChannelEnablement))
         ];
 
         var resxKeys = ResxKeys();
@@ -54,6 +57,27 @@ public sealed class LocalizationInfraTests
 
             Assert.Equal(expected, actual);
         }
+    }
+
+    [Fact]
+    public void EveryProductionLiteralKeyReference_ExistsInNeutralResx()
+    {
+        var literalKeyReferencePattern = new Regex(
+            @"[Ll]ocalizer\[\s*""([A-Za-z0-9_]+)""\s*[,\]]|\.GetString\(\s*""([A-Za-z0-9_]+)""\s*[,)]",
+            RegexOptions.Compiled);
+
+        var referenced = LocalizationSourceScan.EnumerateProductionSource()
+            .SelectMany(path => literalKeyReferencePattern.Matches(File.ReadAllText(path)))
+            .Select(match => match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(key => key, StringComparer.Ordinal)
+            .ToList();
+
+        var authored = ResxKeys().ToHashSet(StringComparer.Ordinal);
+        var missing = referenced.Where(key => !authored.Contains(key)).ToList();
+
+        Assert.True(referenced.Count >= 150, $"Production literal localizer scan found only {referenced.Count} keys.");
+        Assert.True(missing.Count == 0, $"Production literal localizer keys missing from RESX: {string.Join(", ", missing)}");
     }
 
     [Fact]
@@ -79,12 +103,13 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
-    public void Localizer_KnownKey_ResolvesToNeutralValue()
+    public void Localizer_KnownKey_Resolves()
     {
-        var result = BuildLocalizer()["FindBar_NoResults"];
+        var key = "FindBar_NoResults";
+        var result = BuildLocalizer()[key];
 
         Assert.False(result.ResourceNotFound);
-        Assert.Equal("No results", result.Value);
+        Assert.NotEqual(key, result.Value);
     }
 
     [Fact]

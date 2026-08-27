@@ -29,26 +29,12 @@ public sealed class DashboardLocalizationTests : BunitContext
     private IStringLocalizer<SharedResource> Localizer =>
         Services.GetRequiredService<IStringLocalizer<SharedResource>>();
 
-    [Theory]
-    [InlineData("Dashboard_Presence_Present", "Present")]
-    [InlineData("Dashboard_Presence_Absent", "Not present")]
-    [InlineData("Dashboard_Presence_Unknown", "Presence unknown")]
-    [InlineData("Dashboard_Enablement_Enabled", "Enabled")]
-    [InlineData("Dashboard_Enablement_Disabled", "Disabled")]
-    [InlineData("Dashboard_Enablement_Unknown", "Enablement unknown")]
-    public void EnumLabelKeys_ResolveToEnglish(string key, string expected)
-    {
-        var localized = Localizer[key];
-
-        Assert.False(localized.ResourceNotFound, $"Missing RESX key {key}");
-        Assert.Equal(expected, localized.Value);
-    }
-
     [Fact]
     public void GroupDisplay_ForEveryScenarioGroup_ResolvesAndEqualsDisplayName()
     {
         var localizer = Localizer;
 
+        // Cross-source drift guard: FilterPane renders ScenarioGroup.DisplayName() unlocalized while Dashboard renders Dashboard_Group_*; editing a Dashboard_Group_* value is a 3-place co-edit with ScenarioGroupDisplay.cs and ScenarioGroupDisplayTests.cs.
         foreach (var group in Enum.GetValues<ScenarioGroup>())
         {
             var localized = localizer[$"Dashboard_Group_{group}"];
@@ -60,15 +46,16 @@ public sealed class DashboardLocalizationTests : BunitContext
     }
 
     [Theory]
-    [InlineData("Dashboard_File_One", "Dashboard_File_Many", "1 file", "2 files")]
-    [InlineData("Dashboard_Log_One", "Dashboard_Log_Many", "1 log", "2 logs")]
-    [InlineData("Dashboard_Channel_One", "Dashboard_Channel_Many", "1 channel", "2 channels")]
-    public void PluralKeys_AreCountInclusive(string oneKey, string manyKey, string singular, string plural)
+    [InlineData("Dashboard_File_One", "Dashboard_File_Many")]
+    [InlineData("Dashboard_Log_One", "Dashboard_Log_Many")]
+    [InlineData("Dashboard_Channel_One", "Dashboard_Channel_Many")]
+    public void PluralKeys_AreCountInclusive(string oneKey, string manyKey)
     {
         var localizer = Localizer;
 
-        Assert.Equal(singular, localizer[oneKey].Value);
-        Assert.Equal(plural, localizer[manyKey, 2].Value);
+        Assert.Contains("1", localizer[oneKey, 1].Value);
+        Assert.Contains("2", localizer[manyKey, 2].Value);
+        Assert.NotEqual(localizer[manyKey].Value, localizer[manyKey, 2].Value);
     }
 
     [Fact]
@@ -79,19 +66,7 @@ public sealed class DashboardLocalizationTests : BunitContext
 
         var markup = cut.Markup;
 
-        Assert.Contains("No scenarios available in this category.", markup);
         Assert.DoesNotContain("Dashboard_", markup);
-    }
-
-    [Fact]
-    public void ScenarioBrowserPanel_ListAria_IsLocalized()
-    {
-        var cut = Render<ScenarioBrowserPanel>(parameters => parameters
-            .Add(panel => panel.Scenarios, [Scenario()])
-            .Add(panel => panel.IsFavored, _ => false)
-            .Add(panel => panel.IsScenarioDisabled, _ => false));
-
-        Assert.Equal("Scenarios", cut.Find("ul[role='listbox']").GetAttribute("aria-label"));
     }
 
     [Fact]
@@ -112,9 +87,6 @@ public sealed class DashboardLocalizationTests : BunitContext
         Assert.Contains("Zzz Sentinel Scenario", markup);
         Assert.Contains("Zzz Sentinel Purpose", markup);
         Assert.Contains("Zzz-Sentinel-Channel", markup);
-
-        // The favorite aria composes the (data) scenario name into a localized "Add {0} to favorites" format.
-        Assert.Contains("Add Zzz Sentinel Scenario to favorites", markup);
     }
 
     [Fact]
@@ -125,11 +97,7 @@ public sealed class DashboardLocalizationTests : BunitContext
 
         var markup = cut.Markup;
 
-        Assert.Contains("System Health", markup); // ScenarioGroup.SystemHealth eyebrow
-        Assert.Contains("Logs", markup);
-        Assert.Contains("Launch", markup);
-        Assert.Contains("Open from folder", markup);
-        Assert.Contains("Include subfolders", markup);
+        Assert.Contains(Localizer["Dashboard_Group_SystemHealth"].Value, markup);
         Assert.DoesNotContain("Dashboard_", markup);
     }
 

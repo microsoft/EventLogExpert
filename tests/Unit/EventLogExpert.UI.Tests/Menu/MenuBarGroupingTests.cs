@@ -4,6 +4,7 @@
 using Bunit;
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
@@ -16,6 +17,7 @@ using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
 
@@ -23,8 +25,6 @@ namespace EventLogExpert.UI.Tests.Menu;
 
 public sealed class MenuBarGroupingTests : BunitContext
 {
-    private const string DisabledReason = "Group events first (column header > Group By)";
-
     private readonly IMenuActionService _actions = Substitute.For<IMenuActionService>();
     private readonly IAlertDialogService _alertDialogService = Substitute.For<IAlertDialogService>();
     private readonly IEventLogQueries _eventLogQueries = Substitute.For<IEventLogQueries>();
@@ -59,14 +59,17 @@ public sealed class MenuBarGroupingTests : BunitContext
             .Returns(call => ReadinessFor(call.Arg<IEnumerable<string>>()!));
     }
 
+    private IStringLocalizer<SharedResource> Localizer =>
+        Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+
     [Fact]
     public async Task File_CloseAll_ConfirmAccepted_InvokesCloseAllLogs()
     {
         _logTableQueries.HasActiveLogs().Returns(true);
-        _alertDialogService.ShowAlert("Close all logs", Arg.Any<string>(), "Close all", "Cancel").Returns(true);
-        var items = await OpenMenu("File");
+        _alertDialogService.ShowAlert(Localizer["CloseAllLogs_Title"].Value, Arg.Any<string>(), Localizer["CloseAllLogs_Confirm"].Value, Localizer["Modal_Cancel"].Value).Returns(true);
+        var items = await OpenMenu(Localizer["Menu_File"].Value);
 
-        await Item(items, "Close All").OnClickAsync!();
+        await Item(items, Localizer["Menu_File_CloseAll"].Value).OnClickAsync!();
 
         await _actions.Received(1).CloseAllLogsAsync();
     }
@@ -75,10 +78,10 @@ public sealed class MenuBarGroupingTests : BunitContext
     public async Task File_CloseAll_ConfirmCancelled_DoesNotInvokeCloseAllLogs()
     {
         _logTableQueries.HasActiveLogs().Returns(true);
-        _alertDialogService.ShowAlert("Close all logs", Arg.Any<string>(), "Close all", "Cancel").Returns(false);
-        var items = await OpenMenu("File");
+        _alertDialogService.ShowAlert(Localizer["CloseAllLogs_Title"].Value, Arg.Any<string>(), Localizer["CloseAllLogs_Confirm"].Value, Localizer["Modal_Cancel"].Value).Returns(false);
+        var items = await OpenMenu(Localizer["Menu_File"].Value);
 
-        await Item(items, "Close All").OnClickAsync!();
+        await Item(items, Localizer["Menu_File_CloseAll"].Value).OnClickAsync!();
 
         await _actions.DidNotReceive().CloseAllLogsAsync();
     }
@@ -92,11 +95,11 @@ public sealed class MenuBarGroupingTests : BunitContext
                 Access = ChannelAccess.RequiresElevation
             });
 
-        var live = LiveItems(await OpenMenu("File"));
+        var live = LiveItems(await OpenMenu(Localizer["Menu_File"].Value));
         var security = Item(live, LogChannelNames.SecurityLog);
 
         Assert.True(security.IsEnabled);
-        Assert.Equal("(elevate)", security.StatusText);
+        Assert.Equal(Localizer["Menu_Status_Elevate"].Value, security.StatusText);
     }
 
     [Fact]
@@ -104,15 +107,15 @@ public sealed class MenuBarGroupingTests : BunitContext
     {
         const string channel = "Microsoft-Windows-Test/Operational";
         SetReadiness(new ChannelReadiness(channel, ChannelPresence.Present, ChannelEnablement.Disabled));
-        var live = LiveItems(await OpenMenu("File"));
+        var live = LiveItems(await OpenMenu(Localizer["Menu_File"].Value));
 
-        var otherLogs = Item(live, "Other Logs");
+        var otherLogs = Item(live, Localizer["Menu_Open_OtherLogs"].Value);
         var children = await otherLogs.ChildrenLoader!();
         var testFolder = Item(Item(Item(children, "Microsoft").Children!, "Windows").Children!, "Test");
         var operational = Item(testFolder.Children!, "Operational");
 
         Assert.True(operational.IsEnabled);
-        Assert.Equal("(disabled)", operational.StatusText);
+        Assert.Equal(Localizer["Menu_Status_Disabled"].Value, operational.StatusText);
 
         await operational.OnClickAsync!();
 
@@ -127,12 +130,12 @@ public sealed class MenuBarGroupingTests : BunitContext
             {
                 Access = ChannelAccess.RequiresElevation
             });
-        var live = LiveItems(await OpenMenu("File"));
+        var live = LiveItems(await OpenMenu(Localizer["Menu_File"].Value));
 
-        var state = Item(await Item(live, "Other Logs").ChildrenLoader!(), LogChannelNames.StateLog);
+        var state = Item(await Item(live, Localizer["Menu_Open_OtherLogs"].Value).ChildrenLoader!(), LogChannelNames.StateLog);
 
         Assert.True(state.IsEnabled);
-        Assert.Equal("(elevate)", state.StatusText);
+        Assert.Equal(Localizer["Menu_Status_Elevate"].Value, state.StatusText);
     }
 
     [Fact]
@@ -140,12 +143,12 @@ public sealed class MenuBarGroupingTests : BunitContext
     {
         _logTableQueries.HasActiveLogs().Returns(true);
 
-        var items = await OpenMenu("File");
+        var items = await OpenMenu(Localizer["Menu_File"].Value);
 
-        Assert.True(Item(items, "Close All").IsEnabled);
-        Assert.True(Item(items, "Combine").IsEnabled);
-        Assert.True(Item(items, "Export to CSV").IsEnabled);
-        Assert.True(Item(items, "Export to JSON").IsEnabled);
+        Assert.True(Item(items, Localizer["Menu_File_CloseAll"].Value).IsEnabled);
+        Assert.True(Item(items, Localizer["Menu_File_Combine"].Value).IsEnabled);
+        Assert.True(Item(items, Localizer["Menu_File_ExportCsv"].Value).IsEnabled);
+        Assert.True(Item(items, Localizer["Menu_File_ExportJson"].Value).IsEnabled);
     }
 
     [Fact]
@@ -153,12 +156,12 @@ public sealed class MenuBarGroupingTests : BunitContext
     {
         _logTableQueries.HasActiveLogs().Returns(false);
 
-        var items = await OpenMenu("File");
+        var items = await OpenMenu(Localizer["Menu_File"].Value);
 
-        Assert.False(Item(items, "Close All").IsEnabled);
-        Assert.False(Item(items, "Combine").IsEnabled);
-        Assert.False(Item(items, "Export to CSV").IsEnabled);
-        Assert.False(Item(items, "Export to JSON").IsEnabled);
+        Assert.False(Item(items, Localizer["Menu_File_CloseAll"].Value).IsEnabled);
+        Assert.False(Item(items, Localizer["Menu_File_Combine"].Value).IsEnabled);
+        Assert.False(Item(items, Localizer["Menu_File_ExportCsv"].Value).IsEnabled);
+        Assert.False(Item(items, Localizer["Menu_File_ExportJson"].Value).IsEnabled);
     }
 
     [Fact]
@@ -176,7 +179,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     {
         _eventLogQueries.IsContinuouslyUpdating().Returns(continuouslyUpdating);
 
-        var item = Item(await OpenViewMenu(), "Continuously Update");
+        var item = Item(await OpenViewMenu(), Localizer["Menu_View_ContinuouslyUpdate"].Value);
 
         Assert.Equal(continuouslyUpdating, item.IsChecked);
     }
@@ -195,15 +198,15 @@ public sealed class MenuBarGroupingTests : BunitContext
 
         var cut = Render<MenuBar>();
 
-        await cut.FindAll("button.menu-bar-item").Single(button => button.TextContent.Trim() == "View")
+        await cut.FindAll("button.menu-bar-item").Single(button => button.TextContent.Trim() == Localizer["Menu_View"].Value)
             .ClickAsync(new MouseEventArgs());
-        Assert.False(Item(items!, "Continuously Update").IsChecked);
+        Assert.False(Item(items!, Localizer["Menu_View_ContinuouslyUpdate"].Value).IsChecked);
 
         _eventLogQueries.IsContinuouslyUpdating().Returns(true);
-        await cut.FindAll("button.menu-bar-item").Single(button => button.TextContent.Trim() == "View")
+        await cut.FindAll("button.menu-bar-item").Single(button => button.TextContent.Trim() == Localizer["Menu_View"].Value)
             .ClickAsync(new MouseEventArgs());
 
-        Assert.True(Item(items!, "Continuously Update").IsChecked);
+        Assert.True(Item(items!, Localizer["Menu_View_ContinuouslyUpdate"].Value).IsChecked);
     }
 
     [Theory]
@@ -213,7 +216,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     {
         _filterPaneQueries.IsEnabled().Returns(filterPaneEnabled);
 
-        var item = Item(await OpenViewMenu(), "Show All Events");
+        var item = Item(await OpenViewMenu(), Localizer["Menu_View_ShowAllEvents"].Value);
 
         Assert.True(item.IsEnabled);
         Assert.Equal(expectedChecked, item.IsChecked);
@@ -226,7 +229,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     {
         _histogramVisibility.IsVisible.Returns(visible);
 
-        var item = Item(await OpenViewMenu(), "Timeline");
+        var item = Item(await OpenViewMenu(), Localizer["Menu_View_Timeline"].Value);
 
         Assert.Equal(visible, item.IsChecked);
     }
@@ -237,7 +240,7 @@ public sealed class MenuBarGroupingTests : BunitContext
         _logTableQueries.IsGrouping().Returns(true);
         _logTableQueries.IsGroupDescending().Returns(false);
 
-        var descending = Item(await OpenViewMenu(), "Group Descending");
+        var descending = Item(await OpenViewMenu(), Localizer["Menu_View_GroupDescending"].Value);
 
         Assert.True(descending.IsEnabled);
         Assert.False(descending.IsChecked);
@@ -251,10 +254,10 @@ public sealed class MenuBarGroupingTests : BunitContext
 
         var items = await OpenViewMenu();
 
-        Assert.True(Item(items, "Expand All Groups").IsEnabled);
-        Assert.True(Item(items, "Collapse All Groups").IsEnabled);
+        Assert.True(Item(items, Localizer["Menu_View_ExpandAllGroups"].Value).IsEnabled);
+        Assert.True(Item(items, Localizer["Menu_View_CollapseAllGroups"].Value).IsEnabled);
 
-        var descending = Item(items, "Group Descending");
+        var descending = Item(items, Localizer["Menu_View_GroupDescending"].Value);
         Assert.True(descending.IsEnabled);
         Assert.True(descending.IsChecked);
     }
@@ -266,24 +269,24 @@ public sealed class MenuBarGroupingTests : BunitContext
 
         var items = await OpenViewMenu();
 
-        foreach (var label in new[] { "Expand All Groups", "Collapse All Groups", "Group Descending" })
+        foreach (var label in new[] { Localizer["Menu_View_ExpandAllGroups"].Value, Localizer["Menu_View_CollapseAllGroups"].Value, Localizer["Menu_View_GroupDescending"].Value })
         {
             var item = Item(items, label);
             Assert.False(item.IsEnabled);
-            Assert.Equal(DisabledReason, item.DisabledReason);
+            Assert.Equal(Localizer["Menu_GroupDisabledReason"].Value, item.DisabledReason);
         }
     }
 
     private static MenuItem Item(IReadOnlyList<MenuItem> items, string label) =>
         items.Single(item => item.Label == label);
 
-    private static IReadOnlyList<MenuItem> LiveItems(IReadOnlyList<MenuItem> fileItems) =>
-        Item(Item(fileItems, "Open").Children!, "Live").Children!;
-
     private static ImmutableArray<ChannelReadiness> ReadinessFor(IEnumerable<string> channels) =>
     [
         .. channels.Select(channel => new ChannelReadiness(channel, ChannelPresence.Present, ChannelEnablement.Unknown))
     ];
+
+    private IReadOnlyList<MenuItem> LiveItems(IReadOnlyList<MenuItem> fileItems) =>
+        Item(Item(fileItems, Localizer["Menu_File_Open"].Value).Children!, Localizer["Menu_Open_Live"].Value).Children!;
 
     private async Task<IReadOnlyList<MenuItem>> OpenMenu(string barLabel)
     {
@@ -304,7 +307,7 @@ public sealed class MenuBarGroupingTests : BunitContext
         return items!;
     }
 
-    private Task<IReadOnlyList<MenuItem>> OpenViewMenu() => OpenMenu("View");
+    private Task<IReadOnlyList<MenuItem>> OpenViewMenu() => OpenMenu(Localizer["Menu_View"].Value);
 
     private void SetReadiness(params ChannelReadiness[] readiness)
     {

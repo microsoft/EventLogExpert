@@ -15,21 +15,19 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Menu;
-using EventLogExpert.UI.Tests.Localization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
-using System.Xml.Linq;
 
 namespace EventLogExpert.UI.Tests.Menu;
 
 /// <summary>
-///     Localization coverage for the Menu bar: top-level + item labels resolve, the tree carries no leaked resource
-///     keys (items never reach the DOM in tests, so the guard walks the captured <see cref="MenuItem" /> tree), aria
-///     chrome + status badges + disabled reasons are localized, channel names stay verbatim data, and every authored
-///     Menu_*/CloseAllLogs_* key is referenced in source (orphan guard).
+///     Localization coverage for the Menu bar: top-level + item labels resolve through the real localizer, the tree
+///     carries no leaked resource keys (items never reach the DOM in tests, so the guard walks the captured
+///     <see cref="MenuItem" /> tree), aria chrome + status badges + disabled reasons are localized, and channel names stay
+///     verbatim data.
 /// </summary>
 public sealed class MenuLocalizationTests : BunitContext
 {
@@ -68,54 +66,6 @@ public sealed class MenuLocalizationTests : BunitContext
     private IStringLocalizer<SharedResource> Localizer =>
         Services.GetRequiredService<IStringLocalizer<SharedResource>>();
 
-    public static IEnumerable<object[]> AllMenuKeys() =>
-    [
-        ["Menu_File", "File"], ["Menu_Edit", "Edit"], ["Menu_View", "View"], ["Menu_Tools", "Tools"], ["Menu_Help", "Help"],
-        ["Menu_File_Open", "Open"], ["Menu_File_Combine", "Combine"], ["Menu_File_CloseAll", "Close All"],
-        ["Menu_File_ExportCsv", "Export to CSV"], ["Menu_File_ExportJson", "Export to JSON"], ["Menu_File_Exit", "Exit"],
-        ["Menu_Open_File", "File"], ["Menu_Open_Folder", "Folder"], ["Menu_Open_FolderTopLevel", "Folder (top level only)"],
-        ["Menu_Open_Live", "Live"], ["Menu_Open_OtherLogs", "Other Logs"],
-        ["Menu_Edit_CopySelected", "Copy Selected"], ["Menu_Edit_CopySelectedSimple", "Copy Selected (Simple)"],
-        ["Menu_Edit_CopySelectedXml", "Copy Selected (XML)"], ["Menu_Edit_CopySelectedFull", "Copy Selected (Full)"],
-        ["Menu_Edit_CopySelectedMarkdown", "Copy Selected (Markdown)"],
-        ["Menu_View_ShowAllEvents", "Show All Events"], ["Menu_View_LoadNewEvents", "Load New Events"],
-        ["Menu_View_ContinuouslyUpdate", "Continuously Update"], ["Menu_View_GroupDescending", "Group Descending"],
-        ["Menu_View_ExpandAllGroups", "Expand All Groups"], ["Menu_View_CollapseAllGroups", "Collapse All Groups"],
-        ["Menu_View_Timeline", "Timeline"], ["Menu_View_ResolutionCoverage", "Resolution & Coverage"],
-        ["Menu_Tools_Databases", "Databases..."], ["Menu_Tools_Settings", "Settings"],
-        ["Menu_Help_Docs", "Docs"], ["Menu_Help_SubmitIssue", "Submit an Issue"], ["Menu_Help_CheckForUpdates", "Check for Updates"],
-        ["Menu_Help_ReleaseNotes", "Release Notes"], ["Menu_Help_ViewLogs", "View Logs"],
-        ["Menu_Status_Elevate", "(elevate)"], ["Menu_Status_Disabled", "(disabled)"],
-        ["Menu_GroupDisabledReason", "Group events first (column header > Group By)"],
-        ["Menu_ResolutionCoverageDisabledReason", "Open a log to view resolution coverage."],
-        ["Menu_Shortcut_Copy", "Ctrl+C"], ["Menu_Shortcut_Open", "Ctrl+O"], ["Menu_Shortcut_ShowAll", "Ctrl+H"],
-        ["Menu_MainMenuAria", "Main menu"], ["Menu_PopupAria", "Menu"], ["Menu_LoadingAria", "Loading"], ["Menu_Loading", "Loading..."],
-        ["CloseAllLogs_Title", "Close all logs"], ["CloseAllLogs_Body", "Close all open logs? This cannot be undone."],
-        ["CloseAllLogs_Confirm", "Close all"],
-    ];
-
-    [Fact]
-    public void AllMenuKeys_TheoryData_CoversEveryMenuResourceKey()
-    {
-        var resxKeys = XDocument.Load(LocalizationSourceScan.ResxPath)
-            .Root!.Elements("data")
-            .Select(data => (string?)data.Attribute("name"))
-            .Where(name => name is not null &&
-                (name.StartsWith("Menu_", StringComparison.Ordinal) ||
-                 name.StartsWith("CloseAllLogs_", StringComparison.Ordinal)))
-            .Select(name => name!)
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToList();
-
-        var theoryKeys = AllMenuKeys()
-            .Select(row => (string)row[0])
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToList();
-
-        // Guards against value-pin coverage rot: a future Menu_*/CloseAllLogs_* key must be added to AllMenuKeys.
-        Assert.Equal(resxKeys, theoryKeys);
-    }
-
     [Fact]
     public async Task CloseAllConfirmation_UsesLocalizedStrings()
     {
@@ -132,7 +82,7 @@ public sealed class MenuLocalizationTests : BunitContext
     }
 
     [Fact]
-    public async Task CopyShortcutHint_IsLocalized_ByteIdentical()
+    public async Task CopyShortcutHint_IsLocalized()
     {
         _settings.CopyFormat.Returns(EventCopyFormat.Default);
 
@@ -140,13 +90,12 @@ public sealed class MenuLocalizationTests : BunitContext
         var copyDefault = editItems.Single(item => item.Label == Localizer["Menu_Edit_CopySelected"].Value);
 
         Assert.Equal(Localizer["Menu_Shortcut_Copy"].Value, copyDefault.Shortcut);
-        Assert.Equal("Ctrl+C", copyDefault.Shortcut);
     }
 
     [Fact]
     public async Task EveryMenuItem_DoesNotLeakResourceKeys()
     {
-        foreach (var bar in new[] { "File", "Edit", "View", "Tools", "Help" })
+        foreach (var bar in new[] { "File", "Edit", "View", "Tools", "Help" }) // Key fragments for Menu_{bar}, not copy.
         {
             var items = await OpenMenu(Localizer[$"Menu_{bar}"].Value);
             await AssertNoLeakedKeys(items);
@@ -232,7 +181,7 @@ public sealed class MenuLocalizationTests : BunitContext
     [Fact]
     public async Task RenderedMenuItems_DoNotLeakResourceKeysToTheDom()
     {
-        foreach (var bar in new[] { "File", "Edit", "View", "Tools", "Help" })
+        foreach (var bar in new[] { "File", "Edit", "View", "Tools", "Help" }) // Key fragments for Menu_{bar}, not copy.
         {
             var items = await OpenMenu(Localizer[$"Menu_{bar}"].Value);
             var rendered = Render<MenuRenderer>(parameters => parameters.Add(panel => panel.Items, items));
@@ -267,10 +216,13 @@ public sealed class MenuLocalizationTests : BunitContext
         Assert.Equal(Localizer["Menu_ResolutionCoverageDisabledReason"].Value, item.DisabledReason);
     }
 
+    // Shortcut resource values mirror physical key chords rather than translatable copy.
     [Theory]
-    [MemberData(nameof(AllMenuKeys))]
-    public void ResourceValue_IsByteIdenticalEnglish(string key, string expected) =>
-        Assert.Equal(expected, Localizer[key].Value);
+    [InlineData("Menu_Shortcut_Copy", "Ctrl+C")]
+    [InlineData("Menu_Shortcut_Open", "Ctrl+O")]
+    [InlineData("Menu_Shortcut_ShowAll", "Ctrl+H")]
+    public void ShortcutHints_MirrorPhysicalKeyChords(string key, string chord) =>
+        Assert.Equal(chord, Localizer[key].Value);
 
     [Fact]
     public void TopLevelBars_AreLocalized()
@@ -295,6 +247,8 @@ public sealed class MenuLocalizationTests : BunitContext
     private static void AssertFieldsClean(string? value)
     {
         if (value is null) { return; }
+
+        // Marker-localizer wiring tests prove key use; real-localizer tests only guard against raw-key leaks.
 
         Assert.DoesNotContain("Menu_", value);
         Assert.DoesNotContain("CloseAllLogs_", value);
