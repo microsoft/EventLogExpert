@@ -3,6 +3,7 @@
 
 using Bunit;
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.EventLog;
@@ -12,6 +13,7 @@ using EventLogExpert.UI.Menu;
 using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
 
@@ -84,6 +86,9 @@ public sealed class LogTabBarTests : BunitContext
         Services.AddEventLogLocalization();
     }
 
+    private IStringLocalizer<SharedResource> Localizer =>
+        Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+
     [Fact]
     public async Task ActiveTabChange_Rerenders()
     {
@@ -106,7 +111,7 @@ public sealed class LogTabBarTests : BunitContext
         var allLogsId = EventLogId.Create();
         var logId = EventLogId.Create();
         _logTableState.Value.Returns(AllLogsState(allLogsId, logId, "Alpha"));
-        _alertDialogService.ShowAlert("Close all logs", Arg.Any<string>(), "Close all", "Cancel").Returns(true);
+        _alertDialogService.ShowAlert(Localizer["CloseAllLogs_Title"].Value, Arg.Any<string>(), Localizer["CloseAllLogs_Confirm"].Value, Localizer["Modal_Cancel"].Value).Returns(true);
         var cut = Render<LogTabBar>();
         var menu = OpenContextMenu(cut, ".tab");
 
@@ -121,7 +126,7 @@ public sealed class LogTabBarTests : BunitContext
         var allLogsId = EventLogId.Create();
         var logId = EventLogId.Create();
         _logTableState.Value.Returns(AllLogsState(allLogsId, logId, "Alpha"));
-        _alertDialogService.ShowAlert("Close all logs", Arg.Any<string>(), "Close all", "Cancel").Returns(false);
+        _alertDialogService.ShowAlert(Localizer["CloseAllLogs_Title"].Value, Arg.Any<string>(), Localizer["CloseAllLogs_Confirm"].Value, Localizer["Modal_Cancel"].Value).Returns(false);
         var cut = Render<LogTabBar>();
         var menu = OpenContextMenu(cut, ".tab");
 

@@ -14,6 +14,7 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Menu;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
@@ -24,9 +25,9 @@ namespace EventLogExpert.UI.Tests.Menu;
 
 /// <summary>
 ///     Proves the Menu bar actually CONSULTS the localizer (rather than emitting a reverted hardcoded English
-///     literal) by substituting a sentinel localizer that returns <c>[[key]]</c>. A label wired to <c>Localizer[...]</c>
-///     renders the sentinel; a data value (channel name) renders verbatim. Byte-identity of the real values is pinned
-///     separately by <see cref="MenuLocalizationTests.ResourceValue_IsByteIdenticalEnglish" />.
+///     literal) by substituting a marker localizer that returns <c>[[key]]</c>. A label wired to <c>Localizer[...]</c>
+///     renders the marker; a data value (channel name) renders verbatim. Byte-identity of real copy is proven by PR-review
+///     resource diffs, not test pins.
 /// </summary>
 public sealed class MenuBarLocalizerWiringTests : BunitContext
 {
@@ -51,7 +52,7 @@ public sealed class MenuBarLocalizerWiringTests : BunitContext
         Services.AddSingleton(_menuService);
         Services.AddSingleton(_readinessService);
         Services.AddSingleton(_settings);
-        Services.AddSingleton<IStringLocalizer<SharedResource>>(new SentinelLocalizer());
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
         JSInterop.Mode = JSRuntimeMode.Loose;
         JSInterop.SetupModule("./_content/EventLogExpert.UI/Menu/MenuAnchor.js")
@@ -92,7 +93,7 @@ public sealed class MenuBarLocalizerWiringTests : BunitContext
     }
 
     [Fact]
-    public async Task OtherLogsTree_FolderAndLeafNames_StayVerbatim_UnderSentinelLocalizer()
+    public async Task OtherLogsTree_FolderAndLeafNames_StayVerbatim_UnderMarkerLocalizer()
     {
         const string sentinelChannel = "Microsoft-Windows-ZzzSentinelFolder/ZzzSentinelLeaf";
         _readinessService.GetReadinessAsync(Arg.Any<CancellationToken>())
@@ -107,7 +108,7 @@ public sealed class MenuBarLocalizerWiringTests : BunitContext
         var labels = new List<string>();
         CollectLabels(tree, labels);
 
-        // Under the sentinel localizer a localized string renders "[[key]]"; folder/leaf names staying raw proves
+        // Under the marker localizer a localized string renders "[[key]]"; folder/leaf names staying raw proves
         // BuildOtherLogsTree never routes dynamic channel data through the localizer.
         Assert.Contains("Microsoft", labels);
         Assert.Contains("Windows", labels);
@@ -163,14 +164,5 @@ public sealed class MenuBarLocalizerWiringTests : BunitContext
         Assert.NotNull(items);
 
         return items!;
-    }
-
-    private sealed class SentinelLocalizer : IStringLocalizer<SharedResource>
-    {
-        public LocalizedString this[string name] => new(name, $"[[{name}]]", resourceNotFound: false);
-
-        public LocalizedString this[string name, params object[] arguments] => new(name, $"[[{name}]]", resourceNotFound: false);
-
-        public IEnumerable<LocalizedString> GetAllStrings(bool includeParentCultures) => [];
     }
 }

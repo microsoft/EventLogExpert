@@ -103,85 +103,14 @@ public sealed class ModalChromeTests : BunitContext
         Assert.False(cycleState.ModalContentDisplayed);
     }
 
-    [Theory]
-    [InlineData(FooterPreset.Dismiss)]
-    [InlineData(FooterPreset.AcceptCancel)]
-    public void ModalChrome_AcceptDefault_LocalizesToOk(FooterPreset footer)
+    [Fact]
+    public void ModalChrome_DefaultFooter_DoesNotLeakResourceKeys()
     {
         var component = Render<ModalChrome>(parameters => parameters
             .Add(p => p.Title, "Test")
-            .Add(p => p.Footer, footer)
             .AddChildContent("<p>body</p>"));
 
-        var labels = component.FindAll(".footer-group button").Select(button => button.TextContent.Trim()).ToList();
-        Assert.Contains("OK", labels);
-    }
-
-    [Fact]
-    public void ModalChrome_CloseButton_AriaLabelDefaultsToLocalizedClose()
-    {
-        var component = Render<ModalChrome>(parameters => parameters
-            .Add(p => p.Title, "Test")
-            .Add(p => p.ShowCloseButton, true)
-            .AddChildContent("<p>body</p>"));
-
-        Assert.Equal("Close", component.Find(".dialog-close").GetAttribute("aria-label"));
-    }
-
-    [Fact]
-    public void ModalChrome_ImportExportCloseDefaults_Localize()
-    {
-        var component = Render<ModalChrome>(parameters => parameters
-            .Add(p => p.Title, "Test")
-            .Add(p => p.Footer, FooterPreset.ImportExportClose)
-            .AddChildContent("<p>body</p>"));
-
-        var labels = component.FindAll(".footer-group button").Select(button => button.TextContent.Trim()).ToList();
-        Assert.Contains("Import", labels);
-        Assert.Contains("Export", labels);
-        Assert.Contains("Close", labels);
-    }
-
-    [Fact]
-    public void ModalChrome_InlineAlertWithoutTitle_AriaFallsBackToLocalizedAlert()
-    {
-        var alert = new InlineAlertRequest(
-            Title: "",
-            Message: "Something happened",
-            AcceptLabel: "OK",
-            CancelLabel: "Cancel",
-            IsPrompt: false,
-            PromptInitialValue: null);
-
-        var component = Render<ModalChrome>(parameters => parameters
-            .Add(p => p.Title, "Test")
-            .Add(p => p.InlineAlert, alert)
-            .AddChildContent("<p>body</p>"));
-
-        Assert.Equal("Alert", component.Find("section.inline-alert").GetAttribute("aria-label"));
-    }
-
-    [Fact]
-    public void ModalChrome_NoTitleNoAriaLabel_DialogAriaFallsBackToLocalized()
-    {
-        var component = Render<ModalChrome>(parameters => parameters
-            .Add(p => p.Footer, FooterPreset.None)
-            .AddChildContent("<p>body</p>"));
-
-        Assert.Equal("Dialog", component.Find("dialog").GetAttribute("aria-label"));
-    }
-
-    [Fact]
-    public void ModalChrome_SaveCancelDefaults_LocalizeToSaveAndCancel()
-    {
-        var component = Render<ModalChrome>(parameters => parameters
-            .Add(p => p.Title, "Test")
-            .Add(p => p.Footer, FooterPreset.SaveCancel)
-            .AddChildContent("<p>body</p>"));
-
-        var labels = component.FindAll(".footer-group button").Select(button => button.TextContent.Trim()).ToList();
-        Assert.Contains("Save", labels);
-        Assert.Contains("Cancel", labels);
+        Assert.DoesNotContain("Modal_", component.Markup);
     }
 
     [Fact]

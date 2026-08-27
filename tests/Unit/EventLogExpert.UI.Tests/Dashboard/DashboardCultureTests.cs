@@ -31,18 +31,27 @@ public sealed class DashboardCultureTests : BunitContext
 
         try
         {
-            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("qps-ploc");
+            CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
             var localizer = Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+            (string Key, string NeutralValue)[] neutralValues =
+            [
+                ("Dashboard_QuickLaunch", localizer["Dashboard_QuickLaunch"].Value),
+                ("Dashboard_Launch", localizer["Dashboard_Launch"].Value),
+                ("Dashboard_Group_SystemHealth", localizer["Dashboard_Group_SystemHealth"].Value)
+            ];
+
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("qps-ploc");
 
             var canary = localizer["Canary_Probe1"];
             Assert.False(canary.ResourceNotFound);
             Assert.Equal("[qps-ploc] canary probe one", canary.Value);
 
-            // Real Dashboard keys are absent from the canary satellite -> neutral English, proving a qps-Ploc machine
-            // never renders pseudo Dashboard UI.
-            Assert.Equal("Quick Launch", localizer["Dashboard_QuickLaunch"].Value);
-            Assert.Equal("Launch", localizer["Dashboard_Launch"].Value);
-            Assert.Equal("System Health", localizer["Dashboard_Group_SystemHealth"].Value);
+            foreach (var (key, neutralValue) in neutralValues)
+            {
+                var localized = localizer[key];
+                Assert.False(localized.ResourceNotFound);
+                Assert.Equal(neutralValue, localized.Value);
+            }
         }
         finally
         {

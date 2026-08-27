@@ -32,15 +32,19 @@ public sealed class FindBarCultureTests : BunitContext
 
         try
         {
-            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("qps-ploc");
+            CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
             var localizer = Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+            var neutralNoResults = localizer["FindBar_NoResults"].Value;
+
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("qps-ploc");
 
             var canary = localizer["Canary_Probe1"];
             Assert.False(canary.ResourceNotFound);
             Assert.Equal("[qps-ploc] canary probe one", canary.Value);
 
-            // A real key is absent from the canary satellite -> neutral English, proving a qps-Ploc machine never renders pseudo UI.
-            Assert.Equal("No results", localizer["FindBar_NoResults"].Value);
+            var noResults = localizer["FindBar_NoResults"];
+            Assert.False(noResults.ResourceNotFound);
+            Assert.Equal(neutralNoResults, noResults.Value);
         }
         finally
         {
@@ -63,7 +67,10 @@ public sealed class FindBarCultureTests : BunitContext
                 .Add(component => component.MatchCount, 5678)
                 .Add(component => component.CurrentOrdinal, 1234));
 
-            Assert.Equal("1.234/5.678", cut.Find(".find-count").TextContent.Trim());
+            var localizer = Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+            Assert.Equal(
+                string.Format(CultureInfo.CurrentCulture, localizer["FindBar_CountFormat"].Value, "1.234", "5.678"),
+                cut.Find(".find-count").TextContent.Trim());
         }
         finally
         {

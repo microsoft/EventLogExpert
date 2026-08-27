@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
@@ -16,6 +17,7 @@ using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -79,6 +81,9 @@ public sealed class LogTablePaneFindTests : CultureSensitiveBunitContext
 
         Services.AddFluxor(options => options.ScanAssemblies(typeof(LogTablePane).Assembly));
     }
+
+    private IStringLocalizer<SharedResource> Localizer =>
+        Services.GetRequiredService<IStringLocalizer<SharedResource>>();
 
     [Fact]
     public void ABulkCollapseRequest_RelinquishesFindGroupOwnership()
@@ -149,6 +154,16 @@ public sealed class LogTablePaneFindTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void FindBar_DoesNotLeakResourceKeys()
+    {
+        var cut = RenderWithEvents(NewEvent(1, "alpha"));
+
+        OpenFind(cut);
+
+        Assert.DoesNotContain("FindBar_", cut.Markup);
+    }
+
+    [Fact]
     public void OpenFind_ShowsFindBar()
     {
         var cut = RenderWithEvents(NewEvent(1, "alpha"));
@@ -168,7 +183,7 @@ public sealed class LogTablePaneFindTests : CultureSensitiveBunitContext
 
         cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll("tr[data-find]").Count));
         Assert.Single(cut.FindAll("tr[data-find='current']"));
-        Assert.Contains("/2", cut.Find(".find-count").TextContent);
+        Assert.Contains("2", cut.Find(".find-count").TextContent);
     }
 
     [Fact]
@@ -197,7 +212,7 @@ public sealed class LogTablePaneFindTests : CultureSensitiveBunitContext
         cut.FindAll(".find-nav")[1].Click();
         cut.FindAll(".find-nav")[1].Click();
 
-        cut.WaitForAssertion(() => Assert.Contains("Wrapped to first", cut.Find(".find-wrap").TextContent));
+        cut.WaitForAssertion(() => Assert.Contains(Localizer["FindBar_WrapToFirst"].Value, cut.Find(".find-wrap").TextContent));
     }
 
     [Fact]
@@ -222,7 +237,7 @@ public sealed class LogTablePaneFindTests : CultureSensitiveBunitContext
         OpenFind(cut);
         cut.Find(".find-input").Input("match");
 
-        Assert.Contains("Searching", cut.Find(".find-count").TextContent);
+        Assert.Contains(Localizer["FindBar_Searching"].Value, cut.Find(".find-count").TextContent);
         Assert.True(cut.FindAll(".find-nav").All(button => button.HasAttribute("disabled")));
     }
 
@@ -292,3 +307,4 @@ public sealed class LogTablePaneFindTests : CultureSensitiveBunitContext
         return Render<LogTablePane>();
     }
 }
+

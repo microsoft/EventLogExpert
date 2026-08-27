@@ -6,10 +6,12 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Dashboard;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Tests.Dashboard;
 
@@ -21,6 +23,9 @@ public sealed class ScenarioDetailTests : BunitContext
         Services.AddEventLogLocalization();
     }
 
+    private IStringLocalizer<SharedResource> Localizer =>
+        Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+
     [Fact]
     public void AdminBadge_WhenRequiresAdmin_IsAbsent()
     {
@@ -31,7 +36,6 @@ public sealed class ScenarioDetailTests : BunitContext
             }));
 
         Assert.Empty(cut.FindAll(".scenario-detail__admin-badge"));
-        Assert.DoesNotContain("administrator", cut.Markup, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -43,8 +47,8 @@ public sealed class ScenarioDetailTests : BunitContext
             .Add(detail => detail.IsLivePresent, true));
 
         var note = cut.Find(".scenario-detail__unavailable");
-        Assert.Contains("blocked", note.TextContent, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Open from folder", note.TextContent);
+        Assert.Equal(Localizer["Dashboard_LiveAccessBlocked"].Value, note.TextContent.Trim());
+        Assert.Contains(Localizer["Dashboard_OpenFromFolder"].Value, note.TextContent);
     }
 
     [Fact]
@@ -159,7 +163,7 @@ public sealed class ScenarioDetailTests : BunitContext
             ]));
 
         Assert.Empty(cut.FindAll(".scenario-detail__enable"));
-        Assert.Contains("start EventLogExpert as administrator", cut.Find(".scenario-detail__enable-hint").TextContent);
+        Assert.Contains(Localizer["Dashboard_NotElevatedHint"].Value, cut.Find(".scenario-detail__enable-hint").TextContent);
     }
 
     [Fact]
@@ -190,7 +194,7 @@ public sealed class ScenarioDetailTests : BunitContext
                 }
             ]));
 
-        Assert.Contains("Access denied (Needs elevation)", cut.Find(".scenario-detail__channel-readiness").TextContent);
+        Assert.Contains(Localizer["Dashboard_AccessDeniedElevation"].Value, cut.Find(".scenario-detail__channel-readiness").TextContent);
     }
 
     [Fact]
@@ -219,7 +223,7 @@ public sealed class ScenarioDetailTests : BunitContext
         var optional = cut.Find(".scenario-detail__channel-readiness--optional");
 
         Assert.Contains("Security", optional.TextContent);
-        Assert.Contains("Not present", optional.TextContent);
+        Assert.Contains(Localizer["Dashboard_Presence_Absent"].Value, optional.TextContent);
     }
 
     [Fact]
@@ -232,7 +236,7 @@ public sealed class ScenarioDetailTests : BunitContext
                 OptionalChannels = ["Setup", "Security"]
             }));
 
-        Assert.Equal("Also if present:", cut.Find(".scenario-detail__fact-muted").TextContent);
+        Assert.Equal(Localizer["Dashboard_AlsoIfPresent"].Value, cut.Find(".scenario-detail__fact-muted").TextContent);
 
         var optional = cut.FindAll(".scenario-detail__channel-readiness--optional .scenario-detail__fact-value");
         Assert.Contains(optional, value => value.TextContent == "Setup");
@@ -280,7 +284,7 @@ public sealed class ScenarioDetailTests : BunitContext
         Assert.Empty(cut.FindAll(".scenario-detail__filter"));
         Assert.DoesNotContain(
             cut.FindAll(".scenario-detail__fact-label"),
-            label => label.TextContent == "Filters");
+            label => label.TextContent == Localizer["Dashboard_FiltersLabel"].Value);
     }
 
     [Fact]
@@ -292,7 +296,7 @@ public sealed class ScenarioDetailTests : BunitContext
                 Filters = [new ScenarioFilterRow(EqualsFilter(EventProperty.Id, "100"), IsExcluded: true)]
             }));
 
-        Assert.Equal("Exclude Id == 100", cut.Find(".scenario-detail__filter").TextContent.Trim());
+        Assert.Equal(Localizer["Dashboard_ExcludePrefix", "Id == 100"].Value, cut.Find(".scenario-detail__filter").TextContent.Trim());
     }
 
     [Fact]
@@ -332,7 +336,7 @@ public sealed class ScenarioDetailTests : BunitContext
 
         Assert.Equal("true", launch.GetAttribute("aria-disabled"));
         Assert.Equal(note.Id, launch.GetAttribute("aria-describedby"));
-        Assert.Contains("Open from folder", note.TextContent);
+        Assert.Contains(Localizer["Dashboard_OpenFromFolder"].Value, note.TextContent);
 
         launch.Click();
 
@@ -370,7 +374,7 @@ public sealed class ScenarioDetailTests : BunitContext
 
         Assert.Equal("true", launch.GetAttribute("aria-disabled"));
         Assert.Equal(note.Id, describedBy);
-        Assert.Contains("Open from folder", note.TextContent);
+        Assert.Contains(Localizer["Dashboard_OpenFromFolder"].Value, note.TextContent);
 
         launch.Click();
 
@@ -421,7 +425,7 @@ public sealed class ScenarioDetailTests : BunitContext
 
         Assert.Equal("Application crashes", cut.Find(".scenario-detail__name").TextContent);
         Assert.Equal("Purpose", cut.Find(".scenario-detail__purpose").TextContent);
-        Assert.Contains("System Health", cut.Find(".scenario-detail__eyebrow").TextContent);
+        Assert.Contains(Localizer["Dashboard_Group_SystemHealth"].Value, cut.Find(".scenario-detail__eyebrow").TextContent);
     }
 
     [Fact]

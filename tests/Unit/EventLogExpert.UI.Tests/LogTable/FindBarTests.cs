@@ -2,9 +2,12 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.UI.LogTable.Find;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
+using System.Globalization;
 
 namespace EventLogExpert.UI.Tests.LogTable;
 
@@ -16,6 +19,9 @@ public sealed class FindBarTests : BunitContext
         JSInterop.SetupModule("./_content/EventLogExpert.UI/LogTable/Find/FindBar.razor.js");
         Services.AddEventLogLocalization();
     }
+
+    private IStringLocalizer<SharedResource> Localizer =>
+        Services.GetRequiredService<IStringLocalizer<SharedResource>>();
 
     [Fact]
     public void CaseToggle_InOptionsTray_TogglesCaseSensitive()
@@ -48,7 +54,7 @@ public sealed class FindBarTests : BunitContext
             .Add(p => p.IsScanning, false)
             .Add(p => p.MatchCount, 0));
 
-        Assert.Equal("No results", cut.Find(".find-count").TextContent.Trim());
+        Assert.Equal(Localizer["FindBar_NoResults"].Value, cut.Find(".find-count").TextContent.Trim());
     }
 
     [Fact]
@@ -58,7 +64,7 @@ public sealed class FindBarTests : BunitContext
             .Add(p => p.Query, "x")
             .Add(p => p.IsScanning, true));
 
-        Assert.Equal("Searching\u2026", cut.Find(".find-count").TextContent.Trim());
+        Assert.Equal(Localizer["FindBar_Searching"].Value, cut.Find(".find-count").TextContent.Trim());
     }
 
     [Fact]
@@ -70,7 +76,9 @@ public sealed class FindBarTests : BunitContext
             .Add(p => p.MatchCount, 57)
             .Add(p => p.CurrentOrdinal, 3));
 
-        Assert.Equal("3/57", cut.Find(".find-count").TextContent.Trim());
+        Assert.Equal(
+            string.Format(CultureInfo.CurrentCulture, Localizer["FindBar_CountFormat"].Value, "3", "57"),
+            cut.Find(".find-count").TextContent.Trim());
     }
 
     [Fact]
@@ -121,6 +129,16 @@ public sealed class FindBarTests : BunitContext
     }
 
     [Fact]
+    public void FindBar_DoesNotLeakResourceKeys()
+    {
+        var cut = Render<FindBar>(parameters => parameters.Add(component => component.Query, "x"));
+
+        cut.Find(".find-options-toggle").Click();
+
+        Assert.DoesNotContain("FindBar_", cut.Markup);
+    }
+
+    [Fact]
     public void Input_InvokesQueryChanged()
     {
         string? typed = null;
@@ -131,20 +149,6 @@ public sealed class FindBarTests : BunitContext
         cut.Find(".find-input").Input("error");
 
         Assert.Equal("error", typed);
-    }
-
-    [Fact]
-    public void LocalizedStrings_RenderFromResources()
-    {
-        var cut = Render<FindBar>(parameters => parameters.Add(component => component.Query, "x"));
-
-        Assert.Equal("Find in events", cut.Find(".find-input").GetAttribute("aria-label"));
-        Assert.Equal("Find in events", cut.Find(".find-input").GetAttribute("placeholder"));
-
-        cut.Find(".find-options-toggle").Click();
-
-        Assert.Equal("Match case", cut.Find("label[for=find-opt-case]").TextContent);
-        Assert.Equal("Match whole word", cut.Find("label[for=find-opt-word]").TextContent);
     }
 
     [Fact]

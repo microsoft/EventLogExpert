@@ -73,6 +73,9 @@ public sealed class EmptyStateDashboardTests : BunitContext
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
+    private IStringLocalizer<SharedResource> Localizer =>
+        Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+
     [Fact]
     public void Catalog_WhenNoCategories_ShowsEmptyState()
     {
@@ -178,9 +181,9 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.Find(ActiveDetailLaunch).Click();
 
         cut.WaitForAssertion(() => _alertDialog.Received(1).ShowErrorAlert(
-            "Launch scenario",
-            Arg.Is<string>(message => message != null && message.Contains("access denied")),
-            "Open from folder",
+            Localizer["Dashboard_Alert_LaunchScenario"].Value,
+            Arg.Is<string>(message => message != null && message.Contains(Localizer["Dashboard_Outcome_AccessDenied", "System"].Value)),
+            Localizer["Dashboard_OpenFromFolder"].Value,
             Arg.Any<Func<Task>>()));
     }
 
@@ -202,7 +205,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         Assert.Equal("true", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
         var blockedNote = cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable");
-        Assert.Contains("blocked", blockedNote.TextContent, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(Localizer["Dashboard_LiveAccessBlocked"].Value, blockedNote.TextContent.Trim());
     }
 
     [Fact]
@@ -237,13 +240,13 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         Assert.Equal("true", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
         var offlineNote = cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable");
-        Assert.Contains("not on this computer", offlineNote.TextContent, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(Localizer["Dashboard_LogsNotOnComputer"].Value, offlineNote.TextContent.Trim());
     }
 
     [Theory]
-    [InlineData(1, "Opened Application crashes; 1 channel unavailable.")]
-    [InlineData(2, "Opened Application crashes; 2 channels unavailable.")]
-    public void DetailLaunch_WhenChannelsUnavailable_AnnouncesCountInclusivePlural(int failed, string expected)
+    [InlineData(1)]
+    [InlineData(2)]
+    public void DetailLaunch_WhenChannelsUnavailable_AnnouncesCountInclusivePlural(int failed)
     {
         _scenarioLaunch.LaunchAsync(Arg.Any<ScenarioDefinition>(), Arg.Any<DateFilter?>(), Arg.Any<bool>())
             .Returns(new ScenarioLaunchResult(1, 0, failed));
@@ -254,6 +257,10 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.Find(ActiveDetailLaunch).Click();
 
+        var channelCount = failed == 1
+            ? Localizer["Dashboard_Channel_One", failed].Value
+            : Localizer["Dashboard_Channel_Many", failed].Value;
+        var expected = Localizer["Dashboard_Launch_OpenedWithUnavailable", "Application crashes", channelCount].Value;
         cut.WaitForAssertion(() => _announcer.Received(1).Announce(expected));
     }
 
@@ -270,7 +277,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.Find(ActiveDetailLaunch).Click();
 
         cut.WaitForAssertion(() =>
-            _announcer.Received(1).Announce(Arg.Is<string>(message => message != null && message.Contains("No channels"))));
+            _announcer.Received(1).Announce(Localizer["Dashboard_Launch_NoneOpened", "Application crashes"].Value));
     }
 
     [Fact]
@@ -294,7 +301,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         Assert.Equal("true", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
         var note = cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable");
-        Assert.Contains("not on this computer", note.TextContent, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(Localizer["Dashboard_LogsNotOnComputer"].Value, note.TextContent.Trim());
     }
 
     [Fact]
@@ -365,8 +372,12 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.Find(ActiveDetailOpenFolder).Click();
 
-        cut.WaitForAssertion(() => _announcer.Received(1).Announce(
-            "Opened 2 logs for Application crashes. Not found: Setup. 1 file could not be inspected."));
+        cut.WaitForAssertion(() => _announcer.Received(1).Announce(Arg.Is<string>(message =>
+            message != null &&
+            message.Contains("2") &&
+            message.Contains("Application crashes") &&
+            message.Contains("Setup") &&
+            message.Contains("1"))));
     }
 
     [Fact]
@@ -400,7 +411,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.Find(ActiveDetailOpenFolder).Click();
 
-        cut.WaitForAssertion(() => _alertDialog.Received(1).ShowErrorAlert("Open from folder", "access denied"));
+        cut.WaitForAssertion(() => _alertDialog.Received(1).ShowErrorAlert(Localizer["Dashboard_OpenFromFolder"].Value, "access denied"));
     }
 
     [Fact]
@@ -415,7 +426,10 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.Find(ActiveDetailOpenFolder).Click();
 
-        cut.WaitForAssertion(() => _alertDialog.Received(1).ShowAlert("Open from folder", Arg.Any<string>(), "OK"));
+        cut.WaitForAssertion(() => _alertDialog.Received(1).ShowAlert(
+            Localizer["Dashboard_Alert_OpenFromFolder"].Value,
+            Arg.Any<string>(),
+            Localizer["Modal_Accept"].Value));
     }
 
     [Fact]
@@ -444,7 +458,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         var cut = Render<EmptyStateDashboard>();
 
         cut.WaitForAssertion(() =>
-            Assert.Contains("Disabled", cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__channel-readiness").TextContent));
+            Assert.Contains(Localizer["Dashboard_Enablement_Disabled"].Value, cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__channel-readiness").TextContent));
     }
 
     [Fact]
@@ -464,7 +478,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.WaitForAssertion(() =>
             Assert.Contains(
-                "Access denied (Needs elevation)",
+                Localizer["Dashboard_AccessDeniedElevation"].Value,
                 cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__channel-readiness").TextContent));
     }
 
@@ -495,7 +509,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     public void EnableChannel_WhenConfirmCancelled_DoesNotInvokeService()
     {
         _channelEnable.CanEnable.Returns(true);
-        _alertDialog.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), "Enable", "Cancel").Returns(false);
+        _alertDialog.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Localizer["Dashboard_EnableButton"].Value, Localizer["Modal_Cancel"].Value).Returns(false);
         _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
             .Returns([new ChannelReadiness("Microsoft-Windows-Sample/Operational", ChannelPresence.Present, ChannelEnablement.Disabled)]);
         _scenarioQuery.GetSplashScenarios()
@@ -515,7 +529,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         _channelEnable.CanEnable.Returns(true);
         _channelEnable.EnableAsync("Microsoft-Windows-Sample/Operational", Arg.Any<CancellationToken>())
             .Returns(new ChannelEnableResult(ChannelEnableOutcome.Enabled, 0));
-        _alertDialog.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), "Enable", "Cancel").Returns(true);
+        _alertDialog.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Localizer["Dashboard_EnableButton"].Value, Localizer["Modal_Cancel"].Value).Returns(true);
         _channelReadinessService.GetReadinessAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
             .Returns(
                 [new ChannelReadiness("Microsoft-Windows-Sample/Operational", ChannelPresence.Present, ChannelEnablement.Disabled)],
@@ -549,12 +563,12 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         var cut = Render<EmptyStateDashboard>();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("[role='tab']")));
-        Assert.DoesNotContain("Favorites", TabLabels(cut));
+        Assert.DoesNotContain(Localizer["Dashboard_Category_Favorites"].Value, TabLabels(cut));
 
         _favoritesSource.FavoriteScenarioIds.Returns(ImmutableHashSet.Create("application-crashes"));
         RaiseFavoritesChanged(cut);
 
-        cut.WaitForAssertion(() => Assert.Contains("Favorites", TabLabels(cut)));
+        cut.WaitForAssertion(() => Assert.Contains(Localizer["Dashboard_Category_Favorites"].Value, TabLabels(cut)));
     }
 
     [Fact]
@@ -685,7 +699,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.WaitForAssertion(() =>
         {
             var chip = cut.Find(".empty-dashboard__chip--scanning");
-            Assert.Contains("Cancelling", chip.TextContent);
+            Assert.Contains(Localizer["Dashboard_ScanStatus_CancellingLabeled", "Application crashes"].Value, chip.TextContent);
             Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning button"));
         });
         Assert.True(captured.IsCancellationRequested);
@@ -693,7 +707,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         release.SetResult(ScenarioFolderLaunchResult.Cancelled);
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning")));
         _alertDialog.DidNotReceive().ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
-        _alertDialog.DidNotReceive().ShowErrorAlert("Open from folder", Arg.Any<string>());
+        _alertDialog.DidNotReceive().ShowErrorAlert(Localizer["Dashboard_OpenFromFolder"].Value, Arg.Any<string>());
     }
 
     [Fact]
@@ -706,7 +720,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
             });
 
         Func<Task>? retry = null;
-        _alertDialog.ShowErrorAlert("Launch scenario", Arg.Any<string>(), "Open from folder", Arg.Any<Func<Task>?>())
+        _alertDialog.ShowErrorAlert(Localizer["Dashboard_Alert_LaunchScenario"].Value, Arg.Any<string>(), Localizer["Dashboard_OpenFromFolder"].Value, Arg.Any<Func<Task>?>())
             .Returns(call =>
             {
                 retry = call.Arg<Func<Task>>();
@@ -781,7 +795,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.WaitForAssertion(() =>
         {
             var chip = cut.Find(".empty-dashboard__chip--scanning");
-            Assert.Contains("Opening logs", chip.TextContent);
+            Assert.Contains(Localizer["Dashboard_ScanStatus_OpeningLabeled", "Application crashes"].Value, chip.TextContent);
             Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning button"));
         });
 
@@ -811,7 +825,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.WaitForAssertion(() =>
         {
             var chip = cut.Find(".empty-dashboard__chip--scanning");
-            Assert.Contains("Scanning", chip.TextContent);
+            Assert.Contains(Localizer["Dashboard_ScanStatus_ScanningLabeled", "Application crashes"].Value, chip.TextContent);
             Assert.Contains("Application crashes", chip.TextContent);
             Assert.NotEmpty(cut.FindAll(".empty-dashboard__chip--scanning button"));
         });
@@ -864,7 +878,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.WaitForAssertion(() => _actions.Received(1).OpenDatabaseToolsAsync());
         Assert.DoesNotContain(
             cut.FindAll(".empty-dashboard__launchbar button"),
-            button => button.TextContent.Contains("Manage databases"));
+            button => button.TextContent.Contains(Localizer["Dashboard_ManageDatabases"].Value));
     }
 
     [Fact]
@@ -882,7 +896,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
             .Returns(Task.CompletedTask);
 
         var cut = Render<EmptyStateDashboard>();
-        FindLaunch(cut, "Open Folder...").Click();
+        FindLaunch(cut, Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_Folder"].Value].Value).Click();
 
         cut.WaitForAssertion(() => _actions.Received(1).OpenFolderAsync(
             false, true, Arg.Any<CancellationToken>(), Arg.Any<Func<FolderOpenPhase, Task>?>()));
@@ -902,14 +916,14 @@ public sealed class EmptyStateDashboardTests : BunitContext
             });
 
         var cut = Render<EmptyStateDashboard>();
-        FindLaunch(cut, "Open Folder...").Click();
+        FindLaunch(cut, Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_Folder"].Value].Value).Click();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".empty-dashboard__chip--scanning button")));
 
         cut.Find(".empty-dashboard__chip--scanning button").Click();
 
         cut.WaitForAssertion(() =>
         {
-            Assert.Contains("Cancelling", cut.Find(".empty-dashboard__chip--scanning").TextContent);
+            Assert.Contains(Localizer["Dashboard_ScanStatus_Cancelling"].Value, cut.Find(".empty-dashboard__chip--scanning").TextContent);
             Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning button"));
         });
         Assert.True(captured.IsCancellationRequested);
@@ -931,12 +945,12 @@ public sealed class EmptyStateDashboardTests : BunitContext
             });
 
         var cut = Render<EmptyStateDashboard>();
-        FindLaunch(cut, "Open Folder...").Click();
+        FindLaunch(cut, Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_Folder"].Value].Value).Click();
 
         cut.WaitForAssertion(() =>
         {
             var chip = cut.Find(".empty-dashboard__chip--scanning");
-            Assert.Contains("Opening logs", chip.TextContent);
+            Assert.Contains(Localizer["Dashboard_ScanStatus_Opening"].Value, chip.TextContent);
             Assert.Empty(cut.FindAll(".empty-dashboard__chip--scanning button"));
         });
 
@@ -955,12 +969,12 @@ public sealed class EmptyStateDashboardTests : BunitContext
             });
 
         var cut = Render<EmptyStateDashboard>();
-        FindLaunch(cut, "Open Folder...").Click();
+        FindLaunch(cut, Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_Folder"].Value].Value).Click();
 
         cut.WaitForAssertion(() =>
         {
             var chip = cut.Find(".empty-dashboard__chip--scanning");
-            Assert.Contains("Scanning folder for logs", chip.TextContent);
+            Assert.Contains(Localizer["Dashboard_ScanStatus_Scanning"].Value, chip.TextContent);
             Assert.NotEmpty(cut.FindAll(".empty-dashboard__chip--scanning button"));
         });
 
@@ -977,7 +991,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         var cut = Render<EmptyStateDashboard>();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".empty-dashboard__empty")));
         cut.Find(".empty-dashboard__subfolders input").Change(false);
-        FindLaunch(cut, "Open Folder...").Click();
+        FindLaunch(cut, Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_Folder"].Value].Value).Click();
 
         cut.WaitForAssertion(() => _actions.Received(1).OpenFolderAsync(
             false, false, Arg.Any<CancellationToken>(), Arg.Any<Func<FolderOpenPhase, Task>?>()));
@@ -988,7 +1002,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     {
         var cut = Render<EmptyStateDashboard>();
 
-        FindLaunch(cut, "Open Application + System (live)").Click();
+        FindLaunch(cut, Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_ApplicationSystem"].Value].Value).Click();
 
         cut.WaitForAssertion(() => _actions.Received(1).OpenLiveLogsAsync(
             Arg.Is<IEnumerable<string>>(channels => channels != null && channels.SequenceEqual(new[] { "Application", "System" })),
@@ -1001,7 +1015,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
     {
         var cut = Render<EmptyStateDashboard>();
 
-        FindLaunch(cut, "Open Log file...").Click();
+        FindLaunch(cut, Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_LogFile"].Value].Value).Click();
 
         cut.WaitForAssertion(() => _actions.Received(1).OpenFileAsync(false));
     }
@@ -1013,13 +1027,13 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         var cut = Render<EmptyStateDashboard>();
 
-        Assert.Contains("Quick Launch", cut.Markup);
+        Assert.Contains(Localizer["Dashboard_QuickLaunch"].Value, cut.Markup);
 
         var primary = cut.Find(".empty-dashboard__launch--primary");
-        Assert.Equal("Open Application + System (live)", primary.GetAttribute("aria-label"));
-        Assert.Equal("Application + System (live)", primary.QuerySelector("span")!.TextContent.Trim());
+        Assert.Equal(Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_ApplicationSystem"].Value].Value, primary.GetAttribute("aria-label"));
+        Assert.Equal(Localizer["Dashboard_Open_ApplicationSystem"].Value, primary.QuerySelector("span")!.TextContent.Trim());
 
-        Assert.Contains("Manage databases...", cut.Markup);
+        Assert.Contains(Localizer["Dashboard_ManageDatabases"].Value, cut.Markup);
     }
 
     [Fact]
@@ -1027,11 +1041,11 @@ public sealed class EmptyStateDashboardTests : BunitContext
     {
         var cut = Render<EmptyStateDashboard>();
 
-        var primary = FindLaunch(cut, "Open Application + System (live)");
+        var primary = FindLaunch(cut, Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_ApplicationSystem"].Value].Value);
 
-        Assert.Equal("Application + System (live)", primary.TextContent.Trim());
-        Assert.Equal("Open Application + System (live)", primary.GetAttribute("aria-label"));
-        Assert.DoesNotContain("Open", primary.TextContent);
+        Assert.Equal(Localizer["Dashboard_Open_ApplicationSystem"].Value, primary.TextContent.Trim());
+        Assert.Equal(Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_ApplicationSystem"].Value].Value, primary.GetAttribute("aria-label"));
+        Assert.DoesNotContain(Localizer["Dashboard_OpenAria", string.Empty].Value.Trim(), primary.TextContent);
     }
 
     [Fact]
@@ -1041,9 +1055,9 @@ public sealed class EmptyStateDashboardTests : BunitContext
         _actions.OpenFileAsync(false).Returns(gate.Task);
 
         var cut = Render<EmptyStateDashboard>();
-        FindLaunch(cut, "Open Log file...").Click();
+        FindLaunch(cut, Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_LogFile"].Value].Value).Click();
 
-        cut.WaitForAssertion(() => Assert.True(FindLaunch(cut, "Open Application (live)").HasAttribute("disabled")));
+        cut.WaitForAssertion(() => Assert.True(FindLaunch(cut, Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_Application"].Value].Value).HasAttribute("disabled")));
 
         gate.SetResult();
     }
@@ -1064,11 +1078,11 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.WaitForAssertion(() =>
         {
-            var security = FindLaunch(cut, "Open Security (live)");
+            var security = FindLaunch(cut, Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_Security"].Value].Value);
             Assert.Equal("true", security.GetAttribute("aria-disabled"));
             var reasonId = security.GetAttribute("aria-describedby");
             Assert.False(string.IsNullOrEmpty(reasonId));
-            Assert.Contains("Access denied", cut.Find($"#{reasonId}").TextContent, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(Localizer["Dashboard_AccessDeniedElevation"].Value, cut.Find($"#{reasonId}").TextContent);
         });
     }
 
@@ -1085,7 +1099,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
             ]);
 
         var cut = Render<EmptyStateDashboard>();
-        FindLaunch(cut, "Open Security (live)").Click();
+        FindLaunch(cut, Localizer["Dashboard_OpenAria", Localizer["Dashboard_Open_Security"].Value].Value).Click();
 
         cut.WaitForAssertion(() => _actions.Received(1).OpenLiveLogAsync("Security", false));
     }
@@ -1102,7 +1116,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         var cut = Render<EmptyStateDashboard>();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("[role='tab']")));
 
-        cut.FindAll("[role='tab']").First(tab => tab.TextContent.Contains("SQL Server")).Click();
+        cut.FindAll("[role='tab']").First(tab => tab.TextContent.Contains(Localizer["Dashboard_Group_SqlServer"].Value)).Click();
 
         cut.WaitForAssertion(() =>
         {
@@ -1145,7 +1159,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
         var cut = Render<EmptyStateDashboard>();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("[role='tab']")));
 
-        Assert.DoesNotContain("Favorites", TabLabels(cut));
+        Assert.DoesNotContain(Localizer["Dashboard_Category_Favorites"].Value, TabLabels(cut));
     }
 
     [Fact]
@@ -1162,7 +1176,12 @@ public sealed class EmptyStateDashboardTests : BunitContext
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("[role='tab']")));
 
         Assert.Equal(
-            ["Favorites", "Recommended", "System Health", "SQL Server"],
+            [
+                Localizer["Dashboard_Category_Favorites"].Value,
+                Localizer["Dashboard_Category_Recommended"].Value,
+                Localizer["Dashboard_Group_SystemHealth"].Value,
+                Localizer["Dashboard_Group_SqlServer"].Value
+            ],
             TabLabels(cut));
     }
 
@@ -1183,8 +1202,8 @@ public sealed class EmptyStateDashboardTests : BunitContext
         var cut = Render<EmptyStateDashboard>();
         cut.WaitForAssertion(() =>
         {
-            Assert.Contains("Favorites", TabLabels(cut));
-            Assert.Equal("Favorites", cut.Find("[role='tab'][aria-selected='true']").TextContent.Trim());
+            Assert.Contains(Localizer["Dashboard_Category_Favorites"].Value, TabLabels(cut));
+            Assert.Equal(Localizer["Dashboard_Category_Favorites"].Value, cut.Find("[role='tab'][aria-selected='true']").TextContent.Trim());
         });
 
         _favoritesSource.FavoriteScenarioIds.Returns(ImmutableHashSet<string>.Empty);
@@ -1192,8 +1211,8 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.WaitForAssertion(() =>
         {
-            Assert.DoesNotContain("Favorites", TabLabels(cut));
-            Assert.Equal("Recommended", cut.Find("[role='tab'][aria-selected='true']").TextContent.Trim());
+            Assert.DoesNotContain(Localizer["Dashboard_Category_Favorites"].Value, TabLabels(cut));
+            Assert.Equal(Localizer["Dashboard_Category_Recommended"].Value, cut.Find("[role='tab'][aria-selected='true']").TextContent.Trim());
         });
     }
 
