@@ -15,12 +15,12 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Menu;
+using EventLogExpert.UI.Tests.Localization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 
 namespace EventLogExpert.UI.Tests.Menu;
@@ -97,11 +97,7 @@ public sealed class MenuLocalizationTests : BunitContext
     [Fact]
     public void AllMenuKeys_TheoryData_CoversEveryMenuResourceKey()
     {
-        var (resxPath, _) = LocateUiSource();
-
-        if (resxPath is null) { return; }
-
-        var resxKeys = XDocument.Load(resxPath)
+        var resxKeys = XDocument.Load(LocalizationSourceScan.ResxPath)
             .Root!.Elements("data")
             .Select(data => (string?)data.Attribute("name"))
             .Where(name => name is not null &&
@@ -155,35 +151,6 @@ public sealed class MenuLocalizationTests : BunitContext
             var items = await OpenMenu(Localizer[$"Menu_{bar}"].Value);
             await AssertNoLeakedKeys(items);
         }
-    }
-
-    [Fact]
-    public void EveryMenuResourceKey_IsReferencedInSource()
-    {
-        var (resxPath, uiSourceRoot) = LocateUiSource();
-
-        if (resxPath is null || uiSourceRoot is null) { return; }
-
-        var keys = XDocument.Load(resxPath)
-            .Root!.Elements("data")
-            .Select(data => (string?)data.Attribute("name"))
-            .Where(name => name is not null &&
-                (name.StartsWith("Menu_", StringComparison.Ordinal) ||
-                 name.StartsWith("CloseAllLogs_", StringComparison.Ordinal)))
-            .Select(name => name!)
-            .ToList();
-
-        var source = string.Join(
-            "\n",
-            Directory.EnumerateFiles(uiSourceRoot, "*.cs", SearchOption.AllDirectories)
-                .Concat(Directory.EnumerateFiles(uiSourceRoot, "*.razor", SearchOption.AllDirectories))
-                .Select(File.ReadAllText));
-
-        var orphans = keys
-            .Where(key => !source.Contains($"\"{key}\"", StringComparison.Ordinal))
-            .ToList();
-
-        Assert.True(orphans.Count == 0, $"Authored-but-unreferenced Menu_*/CloseAllLogs_* RESX keys: {string.Join(", ", orphans)}");
     }
 
     [Fact]
@@ -347,23 +314,6 @@ public sealed class MenuLocalizationTests : BunitContext
 
     private static MenuItem Item(IReadOnlyList<MenuItem> items, string label) =>
         items.Single(item => item.Label == label);
-
-    private static (string? ResxPath, string? UiSourceRoot) LocateUiSource([CallerFilePath] string testFilePath = "")
-    {
-        var directory = Path.GetDirectoryName(testFilePath);
-
-        while (directory is not null && !Directory.Exists(Path.Combine(directory, "src", "EventLogExpert.UI")))
-        {
-            directory = Path.GetDirectoryName(directory);
-        }
-
-        if (directory is null) { return (null, null); }
-
-        var uiRoot = Path.Combine(directory, "src", "EventLogExpert.UI");
-        var resx = Path.Combine(directory, "src", "EventLogExpert.Localization", "Resources", "SharedResource.resx");
-
-        return (File.Exists(resx) ? resx : null, Directory.Exists(uiRoot) ? uiRoot : null);
-    }
 
     private static ImmutableArray<ChannelReadiness> ReadinessFor(IEnumerable<string> channels) =>
     [

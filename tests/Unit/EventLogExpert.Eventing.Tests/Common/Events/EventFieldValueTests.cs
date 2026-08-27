@@ -3,12 +3,14 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Tests.TestUtils;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Tests.Common.Events;
 
+[Collection(CultureSensitiveCollection.Name)]
 public sealed class EventFieldValueTests
 {
     [Fact]

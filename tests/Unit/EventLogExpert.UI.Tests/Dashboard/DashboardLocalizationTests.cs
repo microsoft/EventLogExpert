@@ -8,8 +8,6 @@ using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Dashboard;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
-using System.Runtime.CompilerServices;
-using System.Xml.Linq;
 
 namespace EventLogExpert.UI.Tests.Dashboard;
 
@@ -44,38 +42,6 @@ public sealed class DashboardLocalizationTests : BunitContext
 
         Assert.False(localized.ResourceNotFound, $"Missing RESX key {key}");
         Assert.Equal(expected, localized.Value);
-    }
-
-    [Fact]
-    public void EveryDashboardResourceKey_IsReferencedInSource()
-    {
-        var (resxPath, uiSourceRoot) = LocateUiSource();
-
-        // No-op when the source tree is not alongside the test binary (e.g. a packaged run).
-        if (resxPath is null || uiSourceRoot is null) { return; }
-
-        var keys = XDocument.Load(resxPath)
-            .Root!.Elements("data")
-            .Select(data => (string?)data.Attribute("name"))
-            .Where(name => name is not null && name.StartsWith("Dashboard_", StringComparison.Ordinal))
-            .Select(name => name!)
-            .ToList();
-
-        var source = string.Join(
-            "\n",
-            Directory.EnumerateFiles(uiSourceRoot, "*.cs", SearchOption.AllDirectories)
-                .Concat(Directory.EnumerateFiles(uiSourceRoot, "*.razor", SearchOption.AllDirectories))
-                .Select(File.ReadAllText));
-
-        // Dashboard_Group_* are composed via $"Dashboard_Group_{group}" (and pinned by the drift-guard test above);
-        // every other Dashboard_* key must appear as a literal "key" reference in the component sources. This catches the
-        // authored-but-never-referenced failure the one-directional DoesNotContain("Dashboard_") guard cannot.
-        var orphans = keys
-            .Where(key => !key.StartsWith("Dashboard_Group_", StringComparison.Ordinal))
-            .Where(key => !source.Contains($"\"{key}\"", StringComparison.Ordinal))
-            .ToList();
-
-        Assert.True(orphans.Count == 0, $"Authored-but-unreferenced Dashboard_* RESX keys: {string.Join(", ", orphans)}");
     }
 
     [Fact]
@@ -165,23 +131,6 @@ public sealed class DashboardLocalizationTests : BunitContext
         Assert.Contains("Open from folder", markup);
         Assert.Contains("Include subfolders", markup);
         Assert.DoesNotContain("Dashboard_", markup);
-    }
-
-    private static (string? ResxPath, string? UiSourceRoot) LocateUiSource([CallerFilePath] string testFilePath = "")
-    {
-        var directory = Path.GetDirectoryName(testFilePath);
-
-        while (directory is not null && !Directory.Exists(Path.Combine(directory, "src", "EventLogExpert.UI")))
-        {
-            directory = Path.GetDirectoryName(directory);
-        }
-
-        if (directory is null) { return (null, null); }
-
-        var uiRoot = Path.Combine(directory, "src", "EventLogExpert.UI");
-        var resx = Path.Combine(directory, "src", "EventLogExpert.Localization", "Resources", "SharedResource.resx");
-
-        return (File.Exists(resx) ? resx : null, Directory.Exists(uiRoot) ? uiRoot : null);
     }
 
     private static ScenarioDefinition Scenario() =>
