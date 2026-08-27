@@ -45,7 +45,13 @@ public sealed class ResolutionCoverageModalTests : BunitContext
         _presentation = PresentationWith(PresentationState.Current);
         _viewSource.Current.Returns(_ => _presentation);
 
-        Services.AddImmediateCpuWorkScheduler();
+        // ResolutionCoverageModal offloads its report/detail builds via Task.Run; bUnit's synchronous .Click() does not
+        // await that thread-pool continuation, so an assertion right after a click can race a still-settling re-render and
+        // observe a dropped click (reproduced with the async scheduler in isolation, so it is inherent to this file, not a
+        // cross-test effect). Running inline completes the build within the render/click dispatch, removing the race.
+        // Trade-off: the _loading/_detailLoading render pass is collapsed and a stray ConfigureAwait(false) on the
+        // report/detail continuation is unobservable here (see ResolutionCoverageModal.razor.cs) - neither is asserted here.
+        Services.AddInlineCpuWorkScheduler();
         Services.AddSingleton(_clipboard);
         Services.AddSingleton(_coverageService);
         Services.AddSingleton(_filterApplied);

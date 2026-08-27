@@ -2,6 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Localization;
+using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Settings;
+using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
@@ -11,6 +14,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Resources;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace EventLogExpert.UI.Tests.Localization;
 
@@ -20,6 +24,60 @@ namespace EventLogExpert.UI.Tests.Localization;
 /// </summary>
 public sealed class LocalizationInfraTests
 {
+    [Fact]
+    public void DynamicKeyFamilies_MatchEnumMembersExactly()
+    {
+        // Bidirectional per family: an authored key with no enum member is an orphan/typo; an enum member with no
+        // key echoes its key name at runtime (Localizer[$"{stem}{member}"]). The two-rule orphan guard cannot see
+        // either case because the family's interpolation site keeps the whole stem "referenced".
+        (string Stem, Type EnumType)[] families =
+        [
+            ("Settings_Theme_", typeof(Theme)),
+            ("Settings_CopyFormat_", typeof(EventCopyFormat)),
+            ("Settings_LogLevel_", typeof(LogLevel)),
+            ("Dashboard_Group_", typeof(ScenarioGroup))
+        ];
+
+        var resxKeys = ResxKeys();
+
+        foreach (var (stem, enumType) in families)
+        {
+            var expected = Enum.GetNames(enumType)
+                .Select(name => stem + name)
+                .OrderBy(key => key, StringComparer.Ordinal)
+                .ToList();
+
+            var actual = resxKeys
+                .Where(key => key.StartsWith(stem, StringComparison.Ordinal))
+                .OrderBy(key => key, StringComparer.Ordinal)
+                .ToList();
+
+            Assert.Equal(expected, actual);
+        }
+    }
+
+    [Fact]
+    public void EveryResourceKey_IsReferencedInProductionSource()
+    {
+        // A key is referenced if its literal "{key}" appears in source, OR it belongs to a documented dynamic
+        // family whose interpolation site ($"{stem}...) is present - so deleting that site re-surfaces the whole
+        // family as orphaned. obj/bin are excluded (via LocalizationSourceScan) so a stale generated .g.cs can
+        // never keep a truly-orphaned key green. Individual dynamic-member orphans are caught by the enum cross-check below.
+        string[] dynamicStems = ["Dashboard_Group_", "Settings_CopyFormat_", "Settings_LogLevel_", "Settings_Theme_"];
+
+        var source = string.Join("\n", LocalizationSourceScan.EnumerateProductionSource().Select(File.ReadAllText));
+
+        var orphans = ResxKeys()
+            .Where(key =>
+                !source.Contains($"\"{key}\"", StringComparison.Ordinal) &&
+                !dynamicStems.Any(stem =>
+                    key.StartsWith(stem, StringComparison.Ordinal) &&
+                    source.Contains($"$\"{stem}", StringComparison.Ordinal)))
+            .ToList();
+
+        Assert.True(orphans.Count == 0, $"Authored-but-unreferenced RESX keys: {string.Join(", ", orphans)}");
+    }
+
     [Fact]
     public void Localizer_KnownKey_ResolvesToNeutralValue()
     {
@@ -41,19 +99,13 @@ public sealed class LocalizationInfraTests
     [Fact]
     public void ProductionSource_NeverPinsThreadCulture()
     {
-        var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
-
         // Matches pins (=, ??=; not ==/!=), not reads: only assignments would break OS-culture-following.
         var pinPattern = new Regex(
             @"(CurrentCulture|CurrentUICulture|DefaultThreadCurrentCulture|DefaultThreadCurrentUICulture)\s*(\?\?)?=(?!=)",
             RegexOptions.Compiled);
 
-        var offenders = Directory
-            .EnumerateFiles(sourceRoot, "*.*", SearchOption.AllDirectories)
-            .Where(path => (path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
-                path.EndsWith(".razor", StringComparison.OrdinalIgnoreCase)) &&
-                !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) &&
-                !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+        var sourceRoot = Path.Combine(LocalizationSourceScan.RepositoryRoot, "src");
+        var offenders = LocalizationSourceScan.EnumerateProductionSource()
             .Where(path => pinPattern.IsMatch(File.ReadAllText(path)))
             .Select(path => Path.GetRelativePath(sourceRoot, path))
             .ToList();
@@ -140,13 +192,11 @@ public sealed class LocalizationInfraTests
             .BuildServiceProvider()
             .GetRequiredService<IStringLocalizer<SharedResource>>();
 
-    private static string FindRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "EventLogExpert.slnx"))) { return directory.FullName; }
-        }
-
-        throw new InvalidOperationException("Could not locate the repository root (EventLogExpert.slnx) from the test output.");
-    }
+    private static IReadOnlyList<string> ResxKeys() =>
+        XDocument.Load(LocalizationSourceScan.ResxPath)
+            .Root!.Elements("data")
+            .Select(data => (string?)data.Attribute("name"))
+            .Where(name => name is not null)
+            .Select(name => name!)
+            .ToList();
 }
