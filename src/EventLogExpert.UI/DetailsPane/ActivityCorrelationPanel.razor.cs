@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.EventLog;
@@ -10,6 +11,7 @@ using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using System.Globalization;
 
 namespace EventLogExpert.UI.DetailsPane;
@@ -17,8 +19,8 @@ namespace EventLogExpert.UI.DetailsPane;
 public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
 {
     private const int SnippetMaxLength = 120;
-    private readonly Dictionary<EventLocator, EventDisplay> _eventCache = [];
 
+    private readonly Dictionary<EventLocator, EventDisplay> _eventCache = [];
     private readonly HashSet<Guid> _expanded = [];
 
     private CancellationTokenSource? _buildCts;
@@ -43,6 +45,8 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
     [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
 
     [Inject] private IFilterLensCommands FilterLensCommands { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -129,17 +133,6 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
         return text.Length > 8 ? text[..8] : text;
     }
 
-    private static string FormatEventCount(int count) => $"{count} event{(count == 1 ? "" : "s")}";
-
-    private static string RoleLabel(ActivityNodeRole role) =>
-        role switch
-        {
-            ActivityNodeRole.Focus => "This activity",
-            ActivityNodeRole.Parent => "Parent",
-            ActivityNodeRole.Child => "Child",
-            _ => string.Empty
-        };
-
     private static string SeverityIconClass(SeverityLevel? severity) => SeverityIcon.CssClass(severity);
 
     private async Task BuildAsync(EventLocator handle)
@@ -208,18 +201,25 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
         }
     }
 
+    private string FormatErrorCount(int count) =>
+        Localizer[count == 1 ? "Correlation_ErrorOne" : "Correlation_ErrorMany", count].Value;
+
+    private string FormatEventCount(int count) =>
+        Localizer[count == 1 ? "Correlation_EventOne" : "Correlation_EventMany", count].Value;
+
     private string FormatSpan(ActivityNode node)
     {
-        if (node.EventCount == 0) { return "not in this log"; }
-
         string start = FormatTime(node.MinTicks);
 
-        return node.MinTicks == node.MaxTicks ? start : $"{start} to {FormatTime(node.MaxTicks)}";
+        return node.MinTicks == node.MaxTicks ? start : Localizer["Correlation_SpanRange", start, FormatTime(node.MaxTicks)].Value;
     }
 
     private string FormatTime(long ticks) =>
         TimeZoneInfo.ConvertTimeFromUtc(new DateTime(ticks, DateTimeKind.Utc), Settings.TimeZoneInfo)
             .ToString("g", CultureInfo.CurrentCulture);
+
+    private string FormatWarningCount(int count) =>
+        Localizer[count == 1 ? "Correlation_WarningOne" : "Correlation_WarningMany", count].Value;
 
     private bool IsExpanded(ActivityNode node) => _expanded.Contains(node.ActivityId);
 
@@ -283,6 +283,15 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
 
         return display;
     }
+
+    private string RoleLabel(ActivityNodeRole role) =>
+        role switch
+        {
+            ActivityNodeRole.Focus => Localizer["Correlation_Role_Focus"].Value,
+            ActivityNodeRole.Parent => Localizer["Correlation_Role_Parent"].Value,
+            ActivityNodeRole.Child => Localizer["Correlation_Role_Child"].Value,
+            _ => string.Empty
+        };
 
     private void SeedExpansion(ActivityCorrelationView? view)
     {

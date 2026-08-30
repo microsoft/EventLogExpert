@@ -43,8 +43,11 @@ public sealed class DetailsReaderFormatterTests
 
         string copy = DetailsReaderFormatter.BuildEventCopyText(Model(@event));
 
-        Assert.Contains("LogonType: 3 (Network)", copy);
-        Assert.DoesNotContain("How the logon", copy);
+        // Exact copy LINE (not a substring or key-prefix check): the decoded label rides in copy while the glossary
+        // description is display-only. A GlossaryTerm leaking into copy would stringify to its member name "LogonType"
+        // (not "Explain_"), so an exact-line assert - not DoesNotContain("Explain_") - is what actually catches it.
+        Assert.Contains("LogonType: 3 (Network)", copy.Split(Environment.NewLine));
+        Assert.DoesNotContain("How the logon was initiated", copy);
     }
 
     [Fact]
@@ -102,6 +105,34 @@ public sealed class DetailsReaderFormatterTests
     }
 
     [Fact]
+    public void BuildEventCopyText_UsesInvariantLabelsNotEnumMemberNames()
+    {
+        // The copy builders render DetailsPropertyLabel through DetailsPropertyText.Invariant; without that routing the
+        // enum would stringify to its member name. Pins the divergent labels (member name != display) so a regression
+        // to "$"{property.Label}" is caught - the section-order test only exercises the non-divergent "Source".
+        ResolvedEvent @event = new ResolvedEvent("Security", LogPathType.Channel) with
+        {
+            Id = 4624,
+            Source = "Contoso",
+            LogName = "Security",
+            RecordId = 7,
+            UserId = new SecurityIdentifier("S-1-5-21-1-2-3-1105"),
+            UserDisplayName = @"CONTOSO\alice"
+        };
+
+        string copy = DetailsReaderFormatter.BuildEventCopyText(Model(@event));
+
+        Assert.Contains("Date and Time:", copy);
+        Assert.Contains("Log Name: Security", copy);
+        Assert.Contains("Record ID: 7", copy);
+        Assert.Contains("User SID: S-1-5-21-1-2-3-1105", copy);
+        Assert.DoesNotContain("DateTime:", copy);
+        Assert.DoesNotContain("LogName:", copy);
+        Assert.DoesNotContain("RecordId:", copy);
+        Assert.DoesNotContain("UserSid:", copy);
+    }
+
+    [Fact]
     public void BuildModel_CorrelationIds_RemainInSystemPropertiesAndCopyText()
     {
         var activityId = Guid.NewGuid();
@@ -109,7 +140,7 @@ public sealed class DetailsReaderFormatterTests
 
         DetailsReaderModel model = Model(@event);
 
-        Assert.Contains(model.SystemProperties, property => property.Label == "Activity ID" && property.Value == activityId.ToString());
+        Assert.Contains(model.SystemProperties, property => property.Label == DetailsPropertyLabel.ActivityId && property.Value == activityId.ToString());
         Assert.Contains(activityId.ToString(), DetailsReaderFormatter.BuildEventCopyText(model));
     }
 
@@ -120,10 +151,10 @@ public sealed class DetailsReaderFormatterTests
         // shown in the EventData section, so no "User SID" row is hoisted here.
         ResolvedEvent @event = new ResolvedEvent("TestLog", LogPathType.Channel) with { UserDisplayName = @"CONTOSO\alice" };
 
-        DetailsProperty user = Assert.Single(Model(@event).SystemProperties, property => property.Label == "User");
+        DetailsProperty user = Assert.Single(Model(@event).SystemProperties, property => property.Label == DetailsPropertyLabel.User);
 
         Assert.Equal(@"CONTOSO\alice", user.Value);
-        Assert.DoesNotContain(Model(@event).SystemProperties, property => property.Label == "User SID");
+        Assert.DoesNotContain(Model(@event).SystemProperties, property => property.Label == DetailsPropertyLabel.UserSid);
     }
 
     [Fact]
@@ -133,7 +164,46 @@ public sealed class DetailsReaderFormatterTests
 
         Assert.True(field.IsMuted);
         Assert.Equal("(empty)", Assert.Single(field.PreviewLines));
+        Assert.Equal(PlaceholderKind.Empty, field.Placeholder);
         Assert.Equal(string.Empty, field.CopyValue);
+    }
+
+    [Fact]
+    public void BuildModel_FullyPopulatedEvent_EmitsEveryPropertyLabelExactlyOnce()
+    {
+        // A fully populated event so every conditional row emits; pins the formatter's emissions to the full
+        // DetailsPropertyLabel set, so a new enum member with no emission (or an emission dropped from the formatter)
+        // fails here instead of escaping the localization guards.
+        ResolvedEvent @event = new ResolvedEvent("Security", LogPathType.Channel) with
+        {
+            Id = 4624,
+            Source = "Contoso",
+            TimeCreated = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            ComputerName = "PC-01",
+            LogName = "Security",
+            TaskCategory = "Logon",
+            Opcode = "Info",
+            ResolutionStatus = EventResolutionStatus.NoProvider,
+            Keywords = ["Audit Success"],
+            RecordId = 1,
+            ProcessId = 100,
+            ThreadId = 200,
+            ActivityId = Guid.NewGuid(),
+            RelatedActivityId = Guid.NewGuid(),
+            UserDisplayName = @"CONTOSO\alice",
+            UserId = new SecurityIdentifier("S-1-5-21-1-2-3-1105")
+        };
+
+        DetailsReaderModel model = Model(@event);
+        List<DetailsPropertyLabel> emitted = model.Header
+            .Concat(model.SystemProperties)
+            .Select(property => property.Label)
+            .ToList();
+
+        Assert.Equal(
+            Enum.GetValues<DetailsPropertyLabel>().OrderBy(label => label).ToList(),
+            emitted.OrderBy(label => label).ToList());
+        Assert.Equal(emitted.Count, emitted.Distinct().Count());
     }
 
     [Fact]
@@ -147,12 +217,16 @@ public sealed class DetailsReaderFormatterTests
     [Fact]
     public void BuildModel_HeaderExcludesEventIdAndLevel()
     {
+        // Event ID and Level are typed summary fields on the model (there is no DetailsPropertyLabel member for them),
+        // so the header grid carries only the always-present Date and Time row for this minimal event.
         ResolvedEvent @event = new ResolvedEvent("TestLog", LogPathType.Channel) with { Id = 4624, Level = "Warning" };
 
         DetailsReaderModel model = Model(@event);
 
-        Assert.DoesNotContain(model.Header, property => property.Label == "Event ID");
-        Assert.DoesNotContain(model.Header, property => property.Label == "Level");
+        Assert.Equal("4624", model.EventId);
+        Assert.Equal("Warning", model.Level);
+        DetailsProperty header = Assert.Single(model.Header);
+        Assert.Equal(DetailsPropertyLabel.DateTime, header.Label);
     }
 
     [Fact]
@@ -193,6 +267,7 @@ public sealed class DetailsReaderFormatterTests
 
         Assert.True(field.IsMuted);
         Assert.Equal("(none)", Assert.Single(field.PreviewLines));
+        Assert.Equal(PlaceholderKind.NullValue, field.Placeholder);
     }
 
     [Fact]
@@ -202,8 +277,30 @@ public sealed class DetailsReaderFormatterTests
 
         DetailsReaderModel model = Model(@event);
 
-        Assert.DoesNotContain(model.SystemProperties, property => property.Label == "Opcode");
-        Assert.Contains(model.SystemProperties, property => property.Label == "Process ID");
+        Assert.DoesNotContain(model.SystemProperties, property => property.Label == DetailsPropertyLabel.Opcode);
+        Assert.Contains(model.SystemProperties, property => property.Label == DetailsPropertyLabel.ProcessId);
+    }
+
+    [Fact]
+    public void BuildModel_ResolutionStatusRow_CarriesStatusValueWhileOtherRowsDoNot()
+    {
+        // StatusValue is a display-override hint set ONLY on the resolution-status row; its Value stays the invariant
+        // token that copy emits unconditionally. Every other row leaves StatusValue null (the iff), so nothing else
+        // can trigger the UI's localized-status branch.
+        ResolvedEvent @event = new ResolvedEvent("TestLog", LogPathType.Channel) with
+        {
+            Source = "Contoso",
+            ResolutionStatus = EventResolutionStatus.NoProvider
+        };
+
+        DetailsReaderModel model = Model(@event);
+        DetailsProperty statusRow = Assert.Single(model.SystemProperties, property => property.Label == DetailsPropertyLabel.ResolutionStatus);
+
+        Assert.Equal(EventResolutionStatus.NoProvider, statusRow.StatusValue);
+        Assert.Equal(ResolutionStatusTokens.Format(EventResolutionStatus.NoProvider), statusRow.Value);
+        Assert.All(
+            model.Header.Concat(model.SystemProperties).Where(property => property.Label != DetailsPropertyLabel.ResolutionStatus),
+            property => Assert.Null(property.StatusValue));
     }
 
     [Fact]
@@ -291,10 +388,10 @@ public sealed class DetailsReaderFormatterTests
         ResolvedEvent @event = new ResolvedEvent("TestLog", LogPathType.Channel)
             with { UserId = new SecurityIdentifier("S-1-5-21-1-2-3-1105"), UserDisplayName = "S-1-5-21-1-2-3-1105" };
 
-        DetailsProperty user = Assert.Single(Model(@event).SystemProperties, property => property.Label == "User");
+        DetailsProperty user = Assert.Single(Model(@event).SystemProperties, property => property.Label == DetailsPropertyLabel.User);
 
         Assert.Equal("S-1-5-21-1-2-3-1105", user.Value);
-        Assert.DoesNotContain(Model(@event).SystemProperties, property => property.Label == "User SID");
+        Assert.DoesNotContain(Model(@event).SystemProperties, property => property.Label == DetailsPropertyLabel.UserSid);
     }
 
     [Fact]
@@ -320,8 +417,9 @@ public sealed class DetailsReaderFormatterTests
         ResolvedEvent @event = new ResolvedEvent("TestLog", LogPathType.Channel)
             with { UserId = new SecurityIdentifier("S-1-5-18"), UserDisplayName = @"NT AUTHORITY\SYSTEM" };
 
-        DetailsProperty user = Assert.Single(Model(@event).SystemProperties, property => property.Label == "User");
-        DetailsProperty userSid = Assert.Single(Model(@event).SystemProperties, property => property.Label == "User SID");
+        DetailsProperty user = Assert.Single(Model(@event).SystemProperties, property => property.Label == DetailsPropertyLabel.User);
+
+        DetailsProperty userSid = Assert.Single(Model(@event).SystemProperties, property => property.Label == DetailsPropertyLabel.UserSid);
 
         Assert.Equal(@"NT AUTHORITY\SYSTEM", user.Value);
         Assert.Equal("S-1-5-18", userSid.Value);
@@ -334,7 +432,7 @@ public sealed class DetailsReaderFormatterTests
 
         DetailsField field = Assert.Single(Model(@event).EventData);
 
-        Assert.NotNull(field.Description);
+        Assert.Equal(GlossaryTerm.LogonType, field.Explanation);
         Assert.True(field.PreferFullWidth);
     }
 

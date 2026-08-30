@@ -27,21 +27,21 @@ public static class EventFieldExplainer
     private static readonly GlossaryEntry[] s_glossary =
     [
         // Provider + event scoped (most specific).
-        new(SecurityAuditing, 4624, "TargetUserName", "The account that was logged on."),
-        new(SecurityAuditing, 4624, "SubjectUserName", "The account that requested the logon."),
-        new(SecurityAuditing, 4625, "TargetUserName", "The account that failed to log on."),
+        new(SecurityAuditing, 4624, "TargetUserName", GlossaryTerm.TargetUserName4624),
+        new(SecurityAuditing, 4624, "SubjectUserName", GlossaryTerm.SubjectUserName4624),
+        new(SecurityAuditing, 4625, "TargetUserName", GlossaryTerm.TargetUserName4625),
 
         // Provider scoped (any event from this provider).
-        new(SecurityAuditing, null, "AuthenticationPackageName", "The authentication package (e.g. NTLM, Kerberos) that handled the logon."),
-        new(SecurityAuditing, null, "LogonProcessName", "The trusted process that submitted the logon request."),
+        new(SecurityAuditing, null, "AuthenticationPackageName", GlossaryTerm.AuthenticationPackageName),
+        new(SecurityAuditing, null, "LogonProcessName", GlossaryTerm.LogonProcessName),
 
         // Provider-agnostic allowlist (field names whose meaning is stable across providers).
-        new(null, null, "LogonType", "How the logon was initiated; see the decoded value for the specific type."),
-        new(null, null, "IpAddress", "The source network address associated with the event."),
-        new(null, null, "IpPort", "The source network port associated with the event."),
-        new(null, null, "ProcessName", "The full path of the process associated with the event."),
-        new(null, null, "CommandLine", "The command line used to start the process."),
-        new(null, null, "WorkstationName", "The name of the workstation from which the action originated.")
+        new(null, null, "LogonType", GlossaryTerm.LogonType),
+        new(null, null, "IpAddress", GlossaryTerm.IpAddress),
+        new(null, null, "IpPort", GlossaryTerm.IpPort),
+        new(null, null, "ProcessName", GlossaryTerm.ProcessName),
+        new(null, null, "CommandLine", GlossaryTerm.CommandLine),
+        new(null, null, "WorkstationName", GlossaryTerm.WorkstationName)
     ];
 
     /// <summary>
@@ -56,14 +56,14 @@ public static class EventFieldExplainer
         out EventFieldExplanation explanation)
     {
         string? decodedLabel = TryDecodeValue(fieldName, value);
-        string? description = ResolveDescription(providerName, eventId, fieldName);
+        GlossaryTerm? description = ResolveDescription(providerName, eventId, fieldName);
 
         explanation = new EventFieldExplanation(decodedLabel, description);
 
         return explanation.HasValue;
     }
 
-    private static string? ResolveDescription(string providerName, int eventId, string fieldName)
+    private static GlossaryTerm? ResolveDescription(string providerName, int eventId, string fieldName)
     {
         // Most specific: provider + event id + field.
         foreach (GlossaryEntry entry in s_glossary)
@@ -73,7 +73,7 @@ public static class EventFieldExplainer
                 && string.Equals(scopedProvider, providerName, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(entry.Field, fieldName, StringComparison.OrdinalIgnoreCase))
             {
-                return entry.Description;
+                return entry.Term;
             }
         }
 
@@ -85,7 +85,7 @@ public static class EventFieldExplainer
                 && string.Equals(scopedProvider, providerName, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(entry.Field, fieldName, StringComparison.OrdinalIgnoreCase))
             {
-                return entry.Description;
+                return entry.Term;
             }
         }
 
@@ -97,7 +97,7 @@ public static class EventFieldExplainer
             if (entry is { Provider: null, EventId: null }
                 && string.Equals(entry.Field, fieldName, StringComparison.OrdinalIgnoreCase))
             {
-                return entry.Description;
+                return entry.Term;
             }
         }
 
@@ -116,5 +116,5 @@ public static class EventFieldExplainer
         return value.TryGetWholeNumber(out long code) ? EventDataValueDecoder.TryDecodeLabel(fieldName, code) : null;
     }
 
-    private sealed record GlossaryEntry(string? Provider, int? EventId, string Field, string Description);
+    private sealed record GlossaryEntry(string? Provider, int? EventId, string Field, GlossaryTerm Term);
 }

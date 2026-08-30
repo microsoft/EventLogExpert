@@ -757,4 +757,315 @@
   <data name="CloseAllLogs_Confirm" xml:space="preserve">
     <value>Close all</value>
   </data>
-</root>
+  <!-- Details pane property labels. Neutral values mirror DetailsPropertyText.Invariant (a drift-guard test pins them equal); the Runtime formatter emits the typed DetailsPropertyLabel and the UI maps it to these keys. -->
+  <data name="Details_Property_Source" xml:space="preserve">
+    <value>Source</value>
+  </data>
+  <data name="Details_Property_DateTime" xml:space="preserve">
+    <value>Date and Time</value>
+  </data>
+  <data name="Details_Property_Computer" xml:space="preserve">
+    <value>Computer</value>
+  </data>
+  <data name="Details_Property_LogName" xml:space="preserve">
+    <value>Log Name</value>
+  </data>
+  <data name="Details_Property_TaskCategory" xml:space="preserve">
+    <value>Task Category</value>
+  </data>
+  <data name="Details_Property_Opcode" xml:space="preserve">
+    <value>Opcode</value>
+  </data>
+  <data name="Details_Property_ResolutionStatus" xml:space="preserve">
+    <value>Resolution Status</value>
+  </data>
+  <data name="Details_Property_Keywords" xml:space="preserve">
+    <value>Keywords</value>
+  </data>
+  <data name="Details_Property_RecordId" xml:space="preserve">
+    <value>Record ID</value>
+  </data>
+  <data name="Details_Property_ProcessId" xml:space="preserve">
+    <value>Process ID</value>
+  </data>
+  <data name="Details_Property_ThreadId" xml:space="preserve">
+    <value>Thread ID</value>
+  </data>
+  <data name="Details_Property_ActivityId" xml:space="preserve">
+    <value>Activity ID</value>
+    <comment>Windows Event Log identifier name; keep ID as the localized abbreviation used for identifiers.</comment>
+  </data>
+  <data name="Details_Property_RelatedActivityId" xml:space="preserve">
+    <value>Related Activity ID</value>
+    <comment>Windows Event Log identifier name; keep ID as the localized abbreviation used for identifiers.</comment>
+  </data>
+  <data name="Details_Property_User" xml:space="preserve">
+    <value>User</value>
+  </data>
+  <data name="Details_Property_UserSid" xml:space="preserve">
+    <value>User SID</value>
+    <comment>SID is the Windows security identifier abbreviation.</comment>
+  </data>
+  <data name="Details_Placeholder_Empty" xml:space="preserve">
+    <value>(empty)</value>
+  </data>
+  <data name="Details_Placeholder_NoValues" xml:space="preserve">
+    <value>(no values)</value>
+  </data>
+  <data name="Details_Placeholder_NullValue" xml:space="preserve">
+    <value>(none)</value>
+  </data>
+  <data name="Details_TablistAria" xml:space="preserve">
+    <value>Event detail views</value>
+  </data>
+  <data name="Details_TabLabel" xml:space="preserve">
+    <value>Details</value>
+  </data>
+  <data name="Details_XmlTabLabel" xml:space="preserve">
+    <value>XML</value>
+    <comment>XML is a format proper noun.</comment>
+  </data>
+  <data name="Details_CorrelationTabLabel" xml:space="preserve">
+    <value>Correlation</value>
+  </data>
+  <data name="Details_CopyEventAria" xml:space="preserve">
+    <value>Copy event to clipboard</value>
+  </data>
+  <data name="Details_CopyEventButtonLabel" xml:space="preserve">
+    <value>Copy event</value>
+  </data>
+  <data name="Details_CollapseAria" xml:space="preserve">
+    <value>Collapse details</value>
+  </data>
+  <data name="Details_ExpandAria" xml:space="preserve">
+    <value>Expand details</value>
+  </data>
+  <data name="Details_SeverityTitle" xml:space="preserve">
+    <value>Severity: {0}</value>
+    <comment>{0} is the invariant event level, such as Error or Warning.</comment>
+  </data>
+  <data name="Details_EventId" xml:space="preserve">
+    <value>Event ID {0}</value>
+    <comment>{0} is the numeric Windows Event Log event ID.</comment>
+  </data>
+  <data name="Details_CorrelationHeading" xml:space="preserve">
+    <value>Correlation</value>
+  </data>
+  <data name="Details_ShowRelatedEvents" xml:space="preserve">
+    <value>Show related events</value>
+  </data>
+  <data name="Details_ShowParentActivity" xml:space="preserve">
+    <value>Show parent activity</value>
+  </data>
+  <data name="Details_SystemDetailsHeading" xml:space="preserve">
+    <value>System details</value>
+  </data>
+  <data name="Details_CopySystemDetailsAria" xml:space="preserve">
+    <value>Copy system details to clipboard</value>
+  </data>
+  <data name="Details_MessageHeading" xml:space="preserve">
+    <value>Message</value>
+  </data>
+  <data name="Details_NoMessageText" xml:space="preserve">
+    <value>No provider-formatted message is available for this event.</value>
+  </data>
+  <data name="Details_EventDataHeading" xml:space="preserve">
+    <value>Event Data</value>
+  </data>
+  <data name="Details_CopyEventDataAria" xml:space="preserve">
+    <value>Copy event data to clipboard</value>
+  </data>
+  <data name="Details_NoNamedDataFieldsText" xml:space="preserve">
+    <value>This event has no named data fields. See the message above or the XML view.</value>
+    <comment>XML is a format proper noun.</comment>
+  </data>
+  <data name="Details_UserDataHeading" xml:space="preserve">
+    <value>User Data</value>
+  </data>
+  <data name="Details_CopyUserDataAria" xml:space="preserve">
+    <value>Copy user data to clipboard</value>
+  </data>
+  <data name="Details_UserDataIncompleteText" xml:space="preserve">
+    <value>Some user-data fields may be missing; extraction reached its limit. See the XML view for the full payload.</value>
+    <comment>XML is a format proper noun.</comment>
+  </data>
+  <data name="Details_ResolvingXmlText" xml:space="preserve">
+    <value>Resolving XML...</value>
+    <comment>XML is a format proper noun.</comment>
+  </data>
+  <data name="Details_NoXmlText" xml:space="preserve">
+    <value>No XML available for this event.</value>
+    <comment>XML is a format proper noun.</comment>
+  </data>
+  <data name="Details_ShowMore" xml:space="preserve">
+    <value>Show more</value>
+  </data>
+  <data name="Details_ShowLess" xml:space="preserve">
+    <value>Show less</value>
+  </data>
+  <data name="Details_CopyValueAria" xml:space="preserve">
+    <value>Copy value for {0}</value>
+    <comment>{0} is an invariant event field name from the event payload.</comment>
+  </data>
+  <!-- Details EventData glossary. -->
+  <data name="Explain_TargetUserName4624" xml:space="preserve">
+    <value>The account that was logged on.</value>
+  </data>
+  <data name="Explain_SubjectUserName4624" xml:space="preserve">
+    <value>The account that requested the logon.</value>
+  </data>
+  <data name="Explain_TargetUserName4625" xml:space="preserve">
+    <value>The account that failed to log on.</value>
+  </data>
+  <data name="Explain_AuthenticationPackageName" xml:space="preserve">
+    <value>The authentication package (e.g. NTLM, Kerberos) that handled the logon.</value>
+    <comment>NTLM and Kerberos are authentication protocol proper nouns.</comment>
+  </data>
+  <data name="Explain_LogonProcessName" xml:space="preserve">
+    <value>The trusted process that submitted the logon request.</value>
+  </data>
+  <data name="Explain_LogonType" xml:space="preserve">
+    <value>How the logon was initiated; see the decoded value for the specific type.</value>
+  </data>
+  <data name="Explain_IpAddress" xml:space="preserve">
+    <value>The source network address associated with the event.</value>
+  </data>
+  <data name="Explain_IpPort" xml:space="preserve">
+    <value>The source network port associated with the event.</value>
+  </data>
+  <data name="Explain_ProcessName" xml:space="preserve">
+    <value>The full path of the process associated with the event.</value>
+  </data>
+  <data name="Explain_CommandLine" xml:space="preserve">
+    <value>The command line used to start the process.</value>
+  </data>
+  <data name="Explain_WorkstationName" xml:space="preserve">
+    <value>The name of the workstation from which the action originated.</value>
+  </data>
+  <!-- Resolution status. Neutral values mirror ResolutionStatusTokens.Format (the invariant filter/storage token; a drift-guard test pins them equal); the UI maps the typed EventResolutionStatus to these keys. -->
+  <data name="ResolutionStatus_Resolved" xml:space="preserve">
+    <value>Resolved</value>
+  </data>
+  <data name="ResolutionStatus_NoProvider" xml:space="preserve">
+    <value>No provider metadata</value>
+  </data>
+  <data name="ResolutionStatus_NoMessage" xml:space="preserve">
+    <value>No message match</value>
+  </data>
+  <data name="ResolutionStatus_Failed" xml:space="preserve">
+    <value>Resolution error</value>
+  </data>
+  <!-- Activity correlation panel. -->
+  <data name="Correlation_Role_Focus" xml:space="preserve">
+    <value>This activity</value>
+  </data>
+  <data name="Correlation_Role_Parent" xml:space="preserve">
+    <value>Parent</value>
+  </data>
+  <data name="Correlation_Role_Child" xml:space="preserve">
+    <value>Child</value>
+  </data>
+  <data name="Correlation_EventOne" xml:space="preserve">
+    <value>{0} event</value>
+    <comment>{0} is a formatted count.</comment>
+  </data>
+  <data name="Correlation_EventMany" xml:space="preserve">
+    <value>{0} events</value>
+    <comment>{0} is a formatted count.</comment>
+  </data>
+  <data name="Correlation_ErrorOne" xml:space="preserve">
+    <value>{0} error</value>
+    <comment>{0} is a formatted count.</comment>
+  </data>
+  <data name="Correlation_ErrorMany" xml:space="preserve">
+    <value>{0} errors</value>
+    <comment>{0} is a formatted count.</comment>
+  </data>
+  <data name="Correlation_WarningOne" xml:space="preserve">
+    <value>{0} warning</value>
+    <comment>{0} is a formatted count.</comment>
+  </data>
+  <data name="Correlation_WarningMany" xml:space="preserve">
+    <value>{0} warnings</value>
+    <comment>{0} is a formatted count.</comment>
+  </data>
+  <data name="Correlation_NoMessage" xml:space="preserve">
+    <value>No message</value>
+  </data>
+  <data name="Correlation_NoActivityId" xml:space="preserve">
+    <value>The selected event has no Activity ID, so there is nothing to correlate.</value>
+    <comment>Activity ID is a Windows Event Log identifier name.</comment>
+  </data>
+  <data name="Correlation_Building" xml:space="preserve">
+    <value>Building correlation…</value>
+  </data>
+  <data name="Correlation_Unavailable" xml:space="preserve">
+    <value>Correlation is unavailable for the current selection.</value>
+  </data>
+  <data name="Correlation_NoRelatedEvents" xml:space="preserve">
+    <value>No related events were found for this activity in this log.</value>
+  </data>
+  <data name="Correlation_StaleMessage" xml:space="preserve">
+    <value>The log changed since this correlation was built, so it may be out of date.</value>
+  </data>
+  <data name="Correlation_Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Correlation_ErrorTooltip" xml:space="preserve">
+    <value>Critical and Error events (counts reflect events within this log only).</value>
+  </data>
+  <data name="Correlation_WarningTooltip" xml:space="preserve">
+    <value>Warning events (counts reflect events within this log only).</value>
+  </data>
+  <data name="Correlation_FilterTooltip" xml:space="preserve">
+    <value>Narrow the event table to this Activity ID (a filter lens; existing filters may still hide events).</value>
+    <comment>Activity ID is a Windows Event Log identifier name.</comment>
+  </data>
+  <data name="Correlation_FilterCompactTooltip" xml:space="preserve">
+    <value>Narrow the event table to this Activity ID.</value>
+    <comment>Activity ID is a Windows Event Log identifier name.</comment>
+  </data>
+  <data name="Correlation_FilterButton" xml:space="preserve">
+    <value>Filter table to this activity</value>
+  </data>
+  <data name="Correlation_SharedActivityTooltip" xml:space="preserve">
+    <value>This Activity ID is attached to an unusually large number of events and may span unrelated operations; showing the selected event and the most recent errors/events.</value>
+    <comment>Activity ID is a Windows Event Log identifier name.</comment>
+  </data>
+  <data name="Correlation_SharedActivityCompactTooltip" xml:space="preserve">
+    <value>Unusually large activity; may span unrelated operations.</value>
+  </data>
+  <data name="Correlation_SharedActivityBadge" xml:space="preserve">
+    <value>shared Activity ID</value>
+    <comment>Activity ID is a Windows Event Log identifier name.</comment>
+  </data>
+  <data name="Correlation_RelatedActivitiesHeading" xml:space="preserve">
+    <value>Related activities</value>
+  </data>
+  <data name="Correlation_CycleTooltip" xml:space="preserve">
+    <value>This activity both references and is referenced by the selected event's activity (a cycle).</value>
+  </data>
+  <data name="Correlation_CycleBadge" xml:space="preserve">
+    <value>cycle</value>
+  </data>
+  <data name="Correlation_MultipleParentsTooltip" xml:space="preserve">
+    <value>This activity is referenced by more than one parent activity.</value>
+  </data>
+  <data name="Correlation_MultipleParentsBadge" xml:space="preserve">
+    <value>multiple parents</value>
+  </data>
+  <data name="Correlation_NoEvents" xml:space="preserve">
+    <value>This activity is referenced but has no events in this log.</value>
+  </data>
+  <data name="Correlation_SpanRange" xml:space="preserve">
+    <value>{0} to {1}</value>
+    <comment>{0} is the localized start time; {1} is the localized end time.</comment>
+  </data>
+  <data name="Correlation_SharedTruncated" xml:space="preserve">
+    <value>Shared Activity ID: showing {0} of {1} events (the selected event and the most recent errors/events).</value>
+    <comment>{0} is the number of rendered events; {1} is the total event count. Activity ID is a Windows Event Log identifier name.</comment>
+  </data>
+  <data name="Correlation_Truncated" xml:space="preserve">
+    <value>Showing the newest {0} of {1} events (plus the selected event).</value>
+    <comment>{0} is the number of rendered events; {1} is the total event count.</comment>
+  </data></root>

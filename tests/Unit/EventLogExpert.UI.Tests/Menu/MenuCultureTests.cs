@@ -38,7 +38,9 @@ public sealed class MenuCultureTests : BunitContext
                 ("Menu_File", localizer["Menu_File"].Value),
                 ("Menu_View_ShowAllEvents", localizer["Menu_View_ShowAllEvents"].Value),
                 ("Menu_View_ResolutionCoverage", localizer["Menu_View_ResolutionCoverage"].Value),
-                ("CloseAllLogs_Title", localizer["CloseAllLogs_Title"].Value)
+                ("CloseAllLogs_Title", localizer["CloseAllLogs_Title"].Value),
+                ("Details_TabLabel", localizer["Details_TabLabel"].Value),
+                ("Correlation_FilterButton", localizer["Correlation_FilterButton"].Value)
             ];
 
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("qps-ploc");

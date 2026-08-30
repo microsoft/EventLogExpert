@@ -21,7 +21,9 @@ public sealed record DetailsField
 
     public string? DecodedLabel { get; init; }
 
-    public string? Description { get; init; }
+    public GlossaryTerm? Explanation { get; init; }
 
-    public bool PreferFullWidth => PreviewLines.Count > 1 || IsTruncated || Description is not null;
+    public PlaceholderKind? Placeholder { get; init; }
+
+    public bool PreferFullWidth => PreviewLines.Count > 1 || IsTruncated || Explanation is not null;
 }

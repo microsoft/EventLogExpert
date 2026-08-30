@@ -10,7 +10,7 @@
     <div class="details-headerbar">
         @if (_isExpanded && _model is not null)
         {
-            <div aria-label="Event detail views" class="details-tabs" role="tablist">
+            <div aria-label="@Localizer["Details_TablistAria"].Value" class="details-tabs" role="tablist">
                 <button aria-controls="details-tabpanel-reader"
                     aria-selected="@(_activeTab == DetailsTab.Reader ? "true" : "false")"
                     class="details-tab"
@@ -19,7 +19,7 @@
                     @onclick="() => SetTab(DetailsTab.Reader)"
                     role="tab"
                     type="button">
-                    Details
+                    @Localizer["Details_TabLabel"]
                 </button>
                 <button aria-controls="details-tabpanel-xml"
                     aria-selected="@(_activeTab == DetailsTab.Xml ? "true" : "false")"
@@ -29,7 +29,7 @@
                     @onclick="() => SetTab(DetailsTab.Xml)"
                     role="tab"
                     type="button">
-                    XML
+                    @Localizer["Details_XmlTabLabel"]
                 </button>
                 <button aria-controls="details-tabpanel-correlation"
                     aria-selected="@(_activeTab == DetailsTab.Correlation ? "true" : "false")"
@@ -39,21 +39,21 @@
                     @onclick="() => SetTab(DetailsTab.Correlation)"
                     role="tab"
                     type="button">
-                    Correlation
+                    @Localizer["Details_CorrelationTabLabel"]
                 </button>
             </div>
         }
         else
         {
-            <span class="details-headerbar-label">Details</span>
+            <span class="details-headerbar-label">@Localizer["Details_TabLabel"]</span>
         }
 
         <div class="details-headerbar-actions">
             @if (_isExpanded && showsLiveModel)
             {
-                <button aria-label="Copy event to clipboard" class="details-copy-event" @onclick="CopyEventAsync" type="button">
+                <button aria-label="@Localizer["Details_CopyEventAria"].Value" class="details-copy-event" @onclick="CopyEventAsync" type="button">
                     <i class="bi bi-clipboard"></i>
-                    <span class="details-copy-event-label">Copy event</span>
+                    <span class="details-copy-event-label">@Localizer["Details_CopyEventButtonLabel"]</span>
                 </button>
             }
             <Button CssClass="menu-toggle"
@@ -62,7 +62,7 @@
                 OnClick="ToggleMenu"
                 aria-controls="details-body"
                 aria-expanded="@IsExpanded"
-                aria-label="@(_isExpanded ? "Collapse details" : "Expand details")"
+                aria-label="@Localizer[_isExpanded ? "Details_CollapseAria" : "Details_ExpandAria"].Value"
                 data-rotate="@IsExpanded"
                 id="details-header" />
         </div>
@@ -81,13 +81,16 @@
                     <div class="details-reader-layout">
                         <div class="reader-rail">
                             <div class="details-summary">
-                                <span class="details-summary-id">Event ID @_model.EventId</span>
+                                <span class="details-summary-id">@Localizer["Details_EventId", _model.EventId]</span>
                                 @if (!string.IsNullOrEmpty(_model.Level))
                                 {
                                     <span class="details-summary-level">
                                         @if (SeverityIcon.CssClass(_model.Severity) is { Length: > 0 } levelIcon)
                                         {
-                                            <span aria-hidden="true" class="level-icon @levelIcon" title="@($"Severity: {_model.Level}")"></span>
+                                            <span aria-hidden="true"
+                                                class="level-icon @levelIcon"
+                                                title="@Localizer["Details_SeverityTitle", _model.Level].Value">
+                                            </span>
                                         }
                                         @_model.Level
                                     </span>
@@ -99,8 +102,8 @@
                                 <dl class="details-grid">
                                     @foreach (DetailsProperty property in _model.Header)
                                     {
-                                        <dt>@property.Label</dt>
-                                        <dd>@property.Value</dd>
+                                        <dt>@DetailsPropertyLocalizer.Label(Localizer, property.Label)</dt>
+                                        <dd>@(property.StatusValue is { } status ? ResolutionStatusLocalizer.Display(Localizer, status) : property.Value)</dd>
                                     }
                                 </dl>
                             }
@@ -108,14 +111,14 @@
                             @if (_selectedEvent is { } correlationEvent && (correlationEvent.ActivityId.HasValue || correlationEvent.RelatedActivityId.HasValue))
                             {
                                 <section class="details-correlation">
-                                    <h3>Correlation</h3>
+                                    <h3>@Localizer["Details_CorrelationHeading"]</h3>
                                     <div class="details-correlation-actions">
                                         @if (correlationEvent.ActivityId.HasValue)
                                         {
                                             <button class="button details-correlation-action"
                                                 @onclick="() => FilterLensCommands.ShowRelatedByActivityId(correlationEvent.ActivityId, correlationEvent.OwningLog)"
                                                 type="button">
-                                                Show related events
+                                                @Localizer["Details_ShowRelatedEvents"]
                                             </button>
                                         }
                                         @if (correlationEvent.RelatedActivityId.HasValue)
@@ -123,7 +126,7 @@
                                             <button class="button details-correlation-action"
                                                 @onclick="() => FilterLensCommands.ShowParentActivity(correlationEvent.RelatedActivityId, correlationEvent.OwningLog)"
                                                 type="button">
-                                                Show parent activity
+                                                @Localizer["Details_ShowParentActivity"]
                                             </button>
                                         }
                                     </div>
@@ -134,8 +137,8 @@
                             {
                                 <details class="details-section" open>
                                     <summary>
-                                        <span>System details</span>
-                                        <button aria-label="Copy system details to clipboard"
+                                        <span>@Localizer["Details_SystemDetailsHeading"]</span>
+                                        <button aria-label="@Localizer["Details_CopySystemDetailsAria"].Value"
                                             class="details-copy-section"
                                             @onclick="() => CopyPropertiesAsync(_model.SystemProperties)"
                                             @onclick:preventDefault="true"
@@ -147,8 +150,9 @@
                                     <dl class="details-grid">
                                         @foreach (DetailsProperty property in _model.SystemProperties)
                                         {
-                                            <dt>@property.Label</dt>
-                                            <dd>@property.Value</dd>
+                                            <dt>@DetailsPropertyLocalizer.Label(Localizer, property.Label)</dt>
+                                            <dd>@(property.StatusValue is { } status ?
+                                                ResolutionStatusLocalizer.Display(Localizer, status) : property.Value)</dd>
                                         }
                                     </dl>
                                 </details>
@@ -157,23 +161,23 @@
 
                         <div class="reader-payload">
                             <section class="details-section">
-                                <h3>Message</h3>
+                                <h3>@Localizer["Details_MessageHeading"]</h3>
                                 @if (_model.HasMessage)
                                 {
                                     <p class="details-message">@_model.Message</p>
                                 }
                                 else
                                 {
-                                    <p class="details-muted">No provider-formatted message is available for this event.</p>
+                                    <p class="details-muted">@Localizer["Details_NoMessageText"]</p>
                                 }
                             </section>
 
                             <section class="details-section">
                                 <div class="details-section-head">
-                                    <h3>Event Data</h3>
+                                    <h3>@Localizer["Details_EventDataHeading"]</h3>
                                     @if (_model.HasNamedEventData)
                                     {
-                                        <button aria-label="Copy event data to clipboard"
+                                        <button aria-label="@Localizer["Details_CopyEventDataAria"].Value"
                                             class="details-copy-section"
                                             @onclick="() => CopyFieldsAsync(_model.EventData)"
                                             type="button">
@@ -199,7 +203,7 @@
                                 }
                                 else
                                 {
-                                    <p class="details-muted">This event has no named data fields. See the message above or the XML view.</p>
+                                    <p class="details-muted">@Localizer["Details_NoNamedDataFieldsText"]</p>
                                 }
                             </section>
 
@@ -207,8 +211,8 @@
                             {
                                 <section class="details-section">
                                     <div class="details-section-head">
-                                        <h3>User Data</h3>
-                                        <button aria-label="Copy user data to clipboard"
+                                        <h3>@Localizer["Details_UserDataHeading"]</h3>
+                                        <button aria-label="@Localizer["Details_CopyUserDataAria"].Value"
                                             class="details-copy-section"
                                             @onclick="() => CopyFieldsAsync(_model.UserData)"
                                             type="button">
@@ -218,7 +222,7 @@
 
                                     @if (_model.UserDataIncomplete)
                                     {
-                                        <p class="details-warn">Some user-data fields may be missing; extraction reached its limit. See the XML view for the full payload.</p>
+                                        <p class="details-warn">@Localizer["Details_UserDataIncompleteText"]</p>
                                     }
 
                                     <div class="details-fields-userdata">
@@ -245,7 +249,7 @@
                 {
                     @if (_resolvedXml is null)
                     {
-                        <text>Resolving XML...</text>
+                        <text>@Localizer["Details_ResolvingXmlText"]</text>
                     }
                     else if (_resolvedXml.Length > 0)
                     {
@@ -253,7 +257,7 @@
                     }
                     else
                     {
-                        <text>No XML available for this event.</text>
+                        <text>@Localizer["Details_NoXmlText"]</text>
                     }
                 }
             </p>

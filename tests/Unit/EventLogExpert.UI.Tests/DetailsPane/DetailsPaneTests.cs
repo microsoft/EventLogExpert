@@ -9,6 +9,7 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Eventing.Structured;
 using EventLogExpert.Eventing.TestUtils;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.Common.Clipboard;
@@ -17,8 +18,10 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
 using DetailsPaneComponent = EventLogExpert.UI.DetailsPane.DetailsPane;
@@ -61,6 +64,7 @@ public sealed class DetailsPaneTests : BunitContext
         Services.AddSingleton(_correlationService);
         Services.AddSingleton(_correlationSource);
         Services.AddSingleton(_eventLogCommands);
+        Services.AddEventLogLocalization();
     }
 
     [Fact]
@@ -82,7 +86,7 @@ public sealed class DetailsPaneTests : BunitContext
         Assert.NotNull(cut.Find("#details-header"));
         Assert.Empty(cut.FindAll(".details-tabs"));
         Assert.Empty(cut.FindAll(".details-copy-event"));
-        Assert.Equal("Details", cut.Find(".details-headerbar-label").TextContent.Trim());
+        Assert.Equal(Localized("Details_TabLabel"), cut.Find(".details-headerbar-label").TextContent.Trim());
     }
 
     [Fact]
@@ -116,11 +120,50 @@ public sealed class DetailsPaneTests : BunitContext
     }
 
     [Fact]
+    public void CopyActions_UseInvariantTextUnderLocalizedDisplay()
+    {
+        // Render under the marker localizer so display text renders as [[key]]. The copy builders read the model's
+        // invariant labels, so any accidental rewiring of copy to the localizer surfaces as [[...]] in the captured text.
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
+
+        List<string> copied = [];
+        _clipboard.CopyTextAsync(Arg.Any<string>())
+            .Returns(Task.CompletedTask)
+            .AndDoes(call => copied.Add(call.Arg<string>()!));
+        ResolvedEvent @event = EventWithData(("LogonType", 3)) with
+        {
+            Source = "Contoso",
+            UserData = [new UserDataField("Config/Setting", ["u1"], false)]
+        };
+
+        var cut = SelectAndRender(@event);
+        cut.Find(".details-copy-event").Click();
+
+        foreach (IElement button in cut.FindAll(".details-copy-section"))
+        {
+            button.Click();
+        }
+
+        Assert.True(copied.Count >= 2, $"Expected the event copy plus at least one section copy, captured {copied.Count}.");
+
+        // The first capture is the whole-event copy (clicked first); it must carry the invariant identity and a label.
+        Assert.Contains("Event ID:", copied[0], StringComparison.Ordinal);
+        Assert.Contains("Source:", copied[0], StringComparison.Ordinal);
+
+        foreach (string text in copied)
+        {
+            Assert.DoesNotContain("[[", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("Details_", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("Explain_", text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void CopyEventButton_HasVisibleLabel()
     {
         var cut = SelectAndRender(EventWithData(("LogonType", 3)));
 
-        Assert.Contains("Copy event", cut.Find(".details-copy-event").TextContent);
+        Assert.Contains(Localized("Details_CopyEventButtonLabel"), cut.Find(".details-copy-event").TextContent);
     }
 
     [Fact]
@@ -175,7 +218,7 @@ public sealed class DetailsPaneTests : BunitContext
         var cut = SelectAndRender(@event);
         var button = Assert.Single(cut.FindAll(".details-correlation-action"));
 
-        Assert.Contains("Show related events", button.TextContent);
+        Assert.Contains(Localized("Details_ShowRelatedEvents"), button.TextContent);
     }
 
     [Fact]
@@ -186,7 +229,7 @@ public sealed class DetailsPaneTests : BunitContext
         var cut = SelectAndRender(@event);
         var button = Assert.Single(cut.FindAll(".details-correlation-action"));
 
-        Assert.Contains("Show parent activity", button.TextContent);
+        Assert.Contains(Localized("Details_ShowParentActivity"), button.TextContent);
     }
 
     [Fact]
@@ -197,7 +240,7 @@ public sealed class DetailsPaneTests : BunitContext
         var cut = SelectAndRender(@event);
         var button = Assert.Single(cut.FindAll(".details-correlation-action"));
 
-        Assert.Contains("Show related events", button.TextContent);
+        Assert.Contains(Localized("Details_ShowRelatedEvents"), button.TextContent);
     }
 
     [Fact]
@@ -217,7 +260,7 @@ public sealed class DetailsPaneTests : BunitContext
         CorrelationTab(cut).Click();
 
         cut.WaitForAssertion(() => Assert.Equal("true", CorrelationTab(cut).GetAttribute("aria-selected")));
-        Assert.Contains("no Activity ID", cut.Markup);
+        Assert.Contains(Localized("Correlation_NoActivityId"), cut.Markup);
     }
 
     [Fact]
@@ -225,7 +268,7 @@ public sealed class DetailsPaneTests : BunitContext
     {
         var cut = SelectAndRender(EventWithData(("LogonType", 3)));
 
-        Assert.Equal("Details", cut.FindAll(".details-tab")[0].TextContent.Trim());
+        Assert.Equal(Localized("Details_TabLabel"), cut.FindAll(".details-tab")[0].TextContent.Trim());
         Assert.Empty(cut.FindAll(".details-headerbar-label"));
     }
 
@@ -234,8 +277,17 @@ public sealed class DetailsPaneTests : BunitContext
     {
         var cut = SelectAndRender(BaseEvent());
 
-        Assert.Contains("no named data fields", cut.Markup);
+        Assert.Contains(Localized("Details_NoNamedDataFieldsText"), cut.Markup);
         Assert.Empty(cut.FindAll(".details-field"));
+    }
+
+    [Fact]
+    public void LocalizedDetailsPane_DoesNotLeakResourceKeys()
+    {
+        var cut = SelectAndRender(EventWithData(("LogonType", 3)));
+
+        Assert.DoesNotContain("Details_", cut.Markup);
+        Assert.DoesNotContain("Explain_", cut.Markup);
     }
 
     [Fact]
@@ -282,7 +334,7 @@ public sealed class DetailsPaneTests : BunitContext
 
         _eventFocus.Current.Returns(new SelectionEntry(handleA, handleA, null));
         var cut = Render<DetailsPaneComponent>();
-        cut.WaitForAssertion(() => Assert.Contains("Event ID 1001", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains(Localized("Details_EventId", "1001"), cut.Markup));
 
         _eventFocus.Current.Returns(new SelectionEntry(handleB, handleB, null));
 
@@ -290,11 +342,27 @@ public sealed class DetailsPaneTests : BunitContext
         _activeEventLog.Changed += Raise.Event<Action>();
         cut.WaitForState(() => cut.RenderCount > rendersBefore);
 
-        Assert.DoesNotContain("Event ID 1001", cut.Markup);
+        Assert.DoesNotContain(Localized("Details_EventId", "1001"), cut.Markup);
         Assert.False(cut.Find(".details-pane").HasAttribute("hidden"));
 
         _eventFocus.Changed += Raise.Event<Action>();
-        cut.WaitForAssertion(() => Assert.Contains("Event ID 1002", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains(Localized("Details_EventId", "1002"), cut.Markup));
+    }
+
+    [Fact]
+    public void ResolutionStatusValue_StaysInvariantInDisplayAndCopy()
+    {
+        List<string> copied = [];
+        _clipboard.CopyTextAsync(Arg.Any<string>())
+            .Returns(Task.CompletedTask)
+            .AndDoes(call => copied.Add(call.Arg<string>()!));
+        ResolvedEvent @event = BaseEvent() with { ResolutionStatus = EventResolutionStatus.NoProvider };
+
+        var cut = SelectAndRender(@event);
+        cut.Find(".details-copy-event").Click();
+
+        Assert.Contains(ResolutionStatusTokens.NoProvider, cut.Markup);
+        Assert.Contains(copied, text => text.Contains($"Resolution Status: {ResolutionStatusTokens.NoProvider}", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -328,7 +396,7 @@ public sealed class DetailsPaneTests : BunitContext
 
         Assert.Equal("true", ReaderTab(cut).GetAttribute("aria-selected"));
         Assert.NotNull(cut.Find(".details-reader"));
-        Assert.Contains("Event ID", cut.Markup);
+        Assert.Contains(Localized("Details_EventId", "4624"), cut.Markup);
         Assert.NotEmpty(cut.FindAll(".details-field"));
         Assert.Contains("Network", cut.Markup);
     }
@@ -439,7 +507,7 @@ public sealed class DetailsPaneTests : BunitContext
 
         var cut = Render<DetailsPaneComponent>();
         XmlTab(cut).Click();
-        cut.WaitForAssertion(() => Assert.Contains("Resolving XML", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains(Localized("Details_ResolvingXmlText"), cut.Markup));
 
         resolution.SetResult("<AsyncResolved/>");
 
@@ -463,7 +531,7 @@ public sealed class DetailsPaneTests : BunitContext
         _eventFocus.Current.Returns(new SelectionEntry(firstHandle, firstHandle, null));
         var cut = Render<DetailsPaneComponent>();
         XmlTab(cut).Click();
-        cut.WaitForAssertion(() => Assert.Contains("Resolving XML", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains(Localized("Details_ResolvingXmlText"), cut.Markup));
 
         _eventFocus.Current.Returns(new SelectionEntry(secondHandle, secondHandle, null));
         _eventFocus.Changed += Raise.Event<Action>();
@@ -491,7 +559,7 @@ public sealed class DetailsPaneTests : BunitContext
         _eventFocus.Current.Returns(new SelectionEntry(handle, handle, null));
         var cut = Render<DetailsPaneComponent>();
         XmlTab(cut).Click();
-        cut.WaitForAssertion(() => Assert.Contains("Resolving XML", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains(Localized("Details_ResolvingXmlText"), cut.Markup));
 
         _eventFocus.Current.Returns(new SelectionEntry(otherHandle, otherHandle, null));
 
@@ -522,6 +590,10 @@ public sealed class DetailsPaneTests : BunitContext
     private static IElement ReaderTab(IRenderedComponent<DetailsPaneComponent> cut) => cut.Find("#details-tab-reader");
 
     private static IElement XmlTab(IRenderedComponent<DetailsPaneComponent> cut) => cut.Find("#details-tab-xml");
+
+    private string Localized(string key) => Services.GetRequiredService<IStringLocalizer<SharedResource>>()[key].Value;
+
+    private string Localized(string key, params object[] arguments) => Services.GetRequiredService<IStringLocalizer<SharedResource>>()[key, arguments].Value;
 
     private void RaiseFocusChanged(ResolvedEvent @event)
     {
