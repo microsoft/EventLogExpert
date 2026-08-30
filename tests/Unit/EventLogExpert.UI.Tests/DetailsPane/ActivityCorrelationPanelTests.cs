@@ -5,6 +5,7 @@ using Bunit;
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.EventLog;
@@ -12,6 +13,7 @@ using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using PanelComponent = EventLogExpert.UI.DetailsPane.ActivityCorrelationPanel;
 
@@ -55,6 +57,7 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
         Services.AddSingleton(_lensCommands);
         Services.AddSingleton(_settings);
         Services.AddSingleton(_logger);
+        Services.AddEventLogLocalization();
     }
 
     [Fact]
@@ -71,7 +74,7 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
             });
 
         var cut = RenderActive();
-        cut.WaitForAssertion(() => Assert.Contains("Building correlation", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains(Localized("Correlation_Building"), cut.Markup));
 
         // Deactivating while the build is still in flight must cancel its token, not leave it running.
         cut.Render(parameters => parameters.Add(panel => panel.IsActive, false));
@@ -98,7 +101,7 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
         var cut = RenderActive();
 
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".correlation-row-message")));
-        Assert.Contains("No message", cut.Markup);
+        Assert.Contains(Localized("Correlation_NoMessage"), cut.Markup);
     }
 
     [Fact]
@@ -158,8 +161,8 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
 
         var cut = RenderActive();
 
-        cut.WaitForAssertion(() => Assert.Contains("2 errors", cut.Markup));
-        Assert.Contains("1 warning", cut.Markup);
+        cut.WaitForAssertion(() => Assert.Contains(Localized("Correlation_ErrorMany", 2), cut.Markup));
+        Assert.Contains(Localized("Correlation_WarningOne", 1), cut.Markup);
     }
 
     [Fact]
@@ -216,7 +219,7 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
             .Returns(Task.FromException<ActivityCorrelationView?>(new InvalidOperationException("boom")));
 
         var cut = RenderActive();
-        cut.WaitForAssertion(() => Assert.Contains("unavailable", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains(Localized("Correlation_Unavailable"), cut.Markup));
 
         // A faulted build must not strand the panel: returning to the tab retries.
         cut.Render(parameters => parameters.Add(panel => panel.IsActive, false));
@@ -232,7 +235,7 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
             .Returns(Task.FromResult<ActivityCorrelationView?>(null));
 
         var cut = RenderActive();
-        cut.WaitForAssertion(() => Assert.Contains("unavailable", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains(Localized("Correlation_Unavailable"), cut.Markup));
 
         // A null (unavailable) result is not a durable build: returning to the tab retries instead of sticking.
         cut.Render(parameters => parameters.Add(panel => panel.IsActive, false));
@@ -289,7 +292,7 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
             .Add(panel => panel.FocusedHandle, new EventLocator(_logId, 0, 0))
             .Add(panel => panel.IsActive, true));
 
-        Assert.Contains("no Activity ID", cut.Markup);
+        Assert.Contains(Localized("Correlation_NoActivityId"), cut.Markup);
         _service.DidNotReceive().BuildAsync(Arg.Any<EventLocator>(), Arg.Any<CancellationToken>());
     }
 
@@ -322,6 +325,10 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
         };
 
     private CorrelationContentToken FreshToken() => new(_logId, 0, 1, 1);
+
+    private string Localized(string key) => Services.GetRequiredService<IStringLocalizer<SharedResource>>()[key].Value;
+
+    private string Localized(string key, params object[] arguments) => Services.GetRequiredService<IStringLocalizer<SharedResource>>()[key, arguments].Value;
 
     private IRenderedComponent<PanelComponent> RenderActive() =>
         Render<PanelComponent>(parameters => parameters

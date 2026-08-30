@@ -1,14 +1,20 @@
 <div class="details-field @(Field.IsMuted ? "is-muted" : null) @(Field.PreferFullWidth ? "is-wide" : null)">
     <div class="details-field-name">
         <span>@Field.Label</span>
-        <button aria-label="@($"Copy value for {Field.Label}")" class="details-copy" @onclick="OnCopy" type="button">
+        <button aria-label="@Localizer["Details_CopyValueAria", Field.Label].Value" class="details-copy" @onclick="OnCopy" type="button">
             <i class="bi bi-clipboard"></i>
         </button>
     </div>
     <div class="details-field-value">
-        @if (Field.DecodedLabel is { } decoded)
+        @if (Field.Placeholder is { } kind)
         {
-            <div class="details-value-line @(Field.IsMonospace ? "is-mono" : null)">@Field.PreviewLines[0]<span class="details-decoded"> (@decoded)</span></div>
+            <div class="details-value-line @(Field.IsMonospace ? "is-mono" : null)">@Localizer[PlaceholderKey(kind)]</div>
+        }
+        else if (Field.DecodedLabel is { } decoded)
+        {
+            <div class="details-value-line @(Field.IsMonospace ? "is-mono" : null)">
+                @Field.PreviewLines[0]<span class="details-decoded"> (@decoded)</span>
+            </div>
         }
         else
         {
@@ -19,30 +25,18 @@
 
             @if (Field.IsTruncated)
             {
-                <button aria-expanded="@(IsExpanded ? "true" : "false")" class="details-show-more" @onclick="OnToggleExpand" type="button">
-                    @(IsExpanded ? "Show less" : "Show more")
+                <button aria-expanded="@(IsExpanded ? "true" : "false")"
+                    class="details-show-more"
+                    @onclick="OnToggleExpand"
+                    type="button">
+                    @Localizer[IsExpanded ? "Details_ShowLess" : "Details_ShowMore"]
                 </button>
             }
         }
 
-        @if (Field.Description is { } description)
+        @if (Field.Explanation is { } term)
         {
-            <div class="details-explain">@description</div>
+            <div class="details-explain">@GlossaryLocalizer.Description(Localizer, term)</div>
         }
     </div>
 </div>
-
-@code {
-    [Parameter]
-    [EditorRequired]
-    public DetailsField Field { get; set; } = null!;
-
-    [Parameter]
-    public bool IsExpanded { get; set; }
-
-    [Parameter]
-    public EventCallback OnCopy { get; set; }
-
-    [Parameter]
-    public EventCallback OnToggleExpand { get; set; }
-}

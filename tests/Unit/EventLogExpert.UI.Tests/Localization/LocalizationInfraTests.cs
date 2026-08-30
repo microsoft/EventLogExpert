@@ -1,8 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Localization;
+using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Scenarios.Catalog;
@@ -38,7 +41,12 @@ public sealed class LocalizationInfraTests
             ("Settings_LogLevel_", typeof(LogLevel)),
             ("Dashboard_Group_", typeof(ScenarioGroup)),
             ("Dashboard_Presence_", typeof(ChannelPresence)),
-            ("Dashboard_Enablement_", typeof(ChannelEnablement))
+            ("Dashboard_Enablement_", typeof(ChannelEnablement)),
+            ("Details_Placeholder_", typeof(PlaceholderKind)),
+            ("Details_Property_", typeof(DetailsPropertyLabel)),
+            ("Explain_", typeof(GlossaryTerm)),
+            ("ResolutionStatus_", typeof(EventResolutionStatus)),
+            ("Correlation_Role_", typeof(ActivityNodeRole))
         ];
 
         var resxKeys = ResxKeys();
@@ -62,13 +70,20 @@ public sealed class LocalizationInfraTests
     [Fact]
     public void EveryProductionLiteralKeyReference_ExistsInNeutralResx()
     {
-        var literalKeyReferencePattern = new Regex(
-            @"[Ll]ocalizer\[\s*""([A-Za-z0-9_]+)""\s*[,\]]|\.GetString\(\s*""([A-Za-z0-9_]+)""\s*[,)]",
+        // Extract every identifier-like string literal INSIDE a Localizer[...] indexer or a .GetString(...) call -
+        // including keys selected by a conditional such as Localizer[count == 1 ? "..._One" : "..._Many", count] and
+        // composite keys such as Localizer["...", arg] - so a key referenced only through a ternary cannot silently drift
+        // out of the RESX. Format arguments are variables or punctuation separators (", ", " "), never identifier-like
+        // literals, so scanning the whole call span never misreads an argument as a key.
+        var localizerCallPattern = new Regex(
+            @"[Ll]ocalizer\[([^\]]*)\]|\.GetString\(([^)]*)\)",
             RegexOptions.Compiled);
+        var keyLiteralPattern = new Regex(@"""([A-Za-z0-9_]+)""", RegexOptions.Compiled);
 
         var referenced = LocalizationSourceScan.EnumerateProductionSource()
-            .SelectMany(path => literalKeyReferencePattern.Matches(File.ReadAllText(path)))
-            .Select(match => match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value)
+            .SelectMany(path => localizerCallPattern.Matches(File.ReadAllText(path)))
+            .SelectMany(call => keyLiteralPattern.Matches(call.Groups[1].Value + call.Groups[2].Value))
+            .Select(match => match.Groups[1].Value)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(key => key, StringComparer.Ordinal)
             .ToList();
@@ -119,6 +134,39 @@ public sealed class LocalizationInfraTests
 
         Assert.True(result.ResourceNotFound);
         Assert.Equal("FindBar_ThisKeyDoesNotExist", result.Value);
+    }
+
+    [Fact]
+    public void NeutralPropertyLabelValues_MirrorInvariant()
+    {
+        // The formatter emits the typed DetailsPropertyLabel; copy renders it via DetailsPropertyText.Invariant. This
+        // pins each neutral Details_Property_* value equal to that invariant (read straight from the neutral RESX, so a
+        // shipped translation under an ambient culture cannot red it), mirroring the ScenarioGroup drift guard.
+        var neutralValues = ResxValues();
+
+        foreach (DetailsPropertyLabel label in Enum.GetValues<DetailsPropertyLabel>())
+        {
+            var key = $"Details_Property_{label}";
+
+            Assert.True(neutralValues.TryGetValue(key, out var neutral), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(DetailsPropertyText.Invariant(label), neutral);
+        }
+    }
+
+    [Fact]
+    public void NeutralResolutionStatusValues_MirrorTokens()
+    {
+        // The status display localizes EventResolutionStatus while copy/filter/storage use the invariant token. This
+        // pins each neutral ResolutionStatus_* value equal to ResolutionStatusTokens.Format so display and token agree.
+        var neutralValues = ResxValues();
+
+        foreach (EventResolutionStatus status in Enum.GetValues<EventResolutionStatus>())
+        {
+            var key = $"ResolutionStatus_{status}";
+
+            Assert.True(neutralValues.TryGetValue(key, out var neutral), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(ResolutionStatusTokens.Format(status), neutral);
+        }
     }
 
     [Fact]
@@ -224,4 +272,13 @@ public sealed class LocalizationInfraTests
             .Where(name => name is not null)
             .Select(name => name!)
             .ToList();
+
+    private static IReadOnlyDictionary<string, string> ResxValues() =>
+        XDocument.Load(LocalizationSourceScan.ResxPath)
+            .Root!.Elements("data")
+            .Where(data => data.Attribute("name") is not null)
+            .ToDictionary(
+                data => (string)data.Attribute("name")!,
+                data => data.Element("value")?.Value ?? string.Empty,
+                StringComparer.Ordinal);
 }

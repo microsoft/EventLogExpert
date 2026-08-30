@@ -19,10 +19,9 @@ namespace EventLogExpert.Runtime.Tests.DetailsPane;
 /// <remarks>
 ///     Scope is the CurrentCulture axis only. <see cref="DetailsReaderFormatter.BuildEventCopyText" /> is NOT
 ///     byte-invariant because its "Date and Time" VALUE is CurrentCulture-formatted by design (documented, deferred - see
-///     the <c>loc-copyexport-value-invariance</c> follow-up); only its labels are pinned. The UICulture
-///     localizer-independence invariant is deferred to the Details-pane localization increment, where these methods gain
-///     an <c>IStringLocalizer</c> and a sentinel localizer becomes injectable. Contrast culture is <c>fi-FI</c> (see
-///     <c>EventTableExporterCultureTests</c> for why not <c>de-DE</c>).
+///     the <c>loc-copyexport-value-invariance</c> follow-up); only its labels are pinned. Runtime remains independent of
+///     UI culture and localizer injection. Contrast culture is <c>fi-FI</c> (see <c>EventTableExporterCultureTests</c> for
+///     why not <c>de-DE</c>).
 /// </remarks>
 [Collection(CultureSensitiveCollection.Name)]
 public sealed class DetailsReaderFormatterCultureTests
@@ -51,6 +50,23 @@ public sealed class DetailsReaderFormatterCultureTests
         {
             Assert.Contains(label, copy, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public void BuildEventCopyText_EmitsEnglishStructuralLabels_UnderForeignUiCulture()
+    {
+        ResolvedEvent @event = EventDataTestFactory.CreateEventWithData(("LogonType", 3)) with
+        {
+            Id = 4624,
+            Level = "Warning",
+            Source = "Contoso",
+            TimeCreated = new DateTime(2026, 8, 26, 17, 57, 5, DateTimeKind.Utc)
+        };
+
+        string copy = RunUnderCultureAndUiCulture(CultureInfo.GetCultureInfo("de-DE"), () => DetailsReaderFormatter.BuildEventCopyText(Model(@event)));
+
+        Assert.Contains("Source:", copy, StringComparison.Ordinal);
+        Assert.Contains("Date and Time:", copy, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -100,6 +116,24 @@ public sealed class DetailsReaderFormatterCultureTests
         {
             CultureInfo.CurrentCulture = culture;
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en"); // isolate the regional axis from the localization axis
+            return build();
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = priorCulture;
+            CultureInfo.CurrentUICulture = priorUiCulture;
+        }
+    }
+
+    private static string RunUnderCultureAndUiCulture(CultureInfo culture, Func<string> build)
+    {
+        CultureInfo priorCulture = CultureInfo.CurrentCulture;
+        CultureInfo priorUiCulture = CultureInfo.CurrentUICulture;
+
+        try
+        {
+            CultureInfo.CurrentCulture = culture;
+            CultureInfo.CurrentUICulture = culture;
             return build();
         }
         finally

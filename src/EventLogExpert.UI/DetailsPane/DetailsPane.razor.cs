@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.DetailsPane;
@@ -12,6 +13,7 @@ using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Xml;
 using System.Xml.Linq;
@@ -40,6 +42,8 @@ public sealed partial class DetailsPane
         Xml,
         Correlation
     }
+
+    [Inject] public required IStringLocalizer<SharedResource> Localizer { get; init; }
 
     [Inject] private IActiveEventLogSource ActiveEventLog { get; init; } = null!;
 

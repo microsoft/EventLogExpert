@@ -36,12 +36,12 @@ public static class DetailsReaderFormatter
 
         foreach (DetailsProperty property in model.Header)
         {
-            builder.AppendLine($"{property.Label}: {property.Value}");
+            builder.AppendLine($"{DetailsPropertyText.Invariant(property.Label)}: {property.Value}");
         }
 
         foreach (DetailsProperty property in model.SystemProperties)
         {
-            builder.AppendLine($"{property.Label}: {property.Value}");
+            builder.AppendLine($"{DetailsPropertyText.Invariant(property.Label)}: {property.Value}");
         }
 
         if (model.HasMessage)
@@ -90,13 +90,13 @@ public static class DetailsReaderFormatter
 
         foreach (DetailsProperty property in properties)
         {
-            builder.AppendLine($"{property.Label}: {property.Value}");
+            builder.AppendLine($"{DetailsPropertyText.Invariant(property.Label)}: {property.Value}");
         }
 
         return builder.ToString().TrimEnd();
     }
 
-    private static void AddIfPresent(List<DetailsProperty> properties, string label, string value)
+    private static void AddIfPresent(List<DetailsProperty> properties, DetailsPropertyLabel label, string value)
     {
         if (!string.IsNullOrEmpty(value)) { properties.Add(new DetailsProperty(label, value)); }
     }
@@ -167,10 +167,14 @@ public static class DetailsReaderFormatter
         // they are intentionally not in this list; BuildEventCopyText re-emits them first to keep the clipboard order.
         List<DetailsProperty> properties = [];
 
-        AddIfPresent(properties, "Source", @event.Source);
-        properties.Add(new DetailsProperty("Date and Time", @event.TimeCreated.ConvertTimeZone(timeZone).ToString(CultureInfo.CurrentCulture)));
-        AddIfPresent(properties, "Computer", @event.ComputerName);
-        AddIfPresent(properties, "Log Name", @event.LogName);
+        AddIfPresent(properties, DetailsPropertyLabel.Source, @event.Source);
+
+        properties.Add(new DetailsProperty(
+            DetailsPropertyLabel.DateTime,
+            @event.TimeCreated.ConvertTimeZone(timeZone).ToString(CultureInfo.CurrentCulture)));
+
+        AddIfPresent(properties, DetailsPropertyLabel.Computer, @event.ComputerName);
+        AddIfPresent(properties, DetailsPropertyLabel.LogName, @event.LogName);
 
         return properties;
     }
@@ -179,33 +183,62 @@ public static class DetailsReaderFormatter
     {
         List<DetailsProperty> properties = [];
 
-        AddIfPresent(properties, "Task Category", @event.TaskCategory);
-        AddIfPresent(properties, "Opcode", @event.Opcode);
+        AddIfPresent(properties, DetailsPropertyLabel.TaskCategory, @event.TaskCategory);
+        AddIfPresent(properties, DetailsPropertyLabel.Opcode, @event.Opcode);
 
         if (@event.ResolutionStatus != EventResolutionStatus.Resolved)
         {
-            properties.Add(new DetailsProperty("Resolution Status", ResolutionStatusTokens.Format(@event.ResolutionStatus)));
+            properties.Add(new DetailsProperty(DetailsPropertyLabel.ResolutionStatus, ResolutionStatusTokens.Format(@event.ResolutionStatus))
+            {
+                StatusValue = @event.ResolutionStatus
+            });
         }
 
-        AddIfPresent(properties, "Keywords", @event.KeywordsDisplayName);
+        AddIfPresent(properties, DetailsPropertyLabel.Keywords, @event.KeywordsDisplayName);
 
-        if (@event.RecordId is { } recordId) { properties.Add(new DetailsProperty("Record ID", recordId.ToString(CultureInfo.InvariantCulture))); }
+        if (@event.RecordId is { } recordId)
+        {
+            properties.Add(new DetailsProperty(
+                DetailsPropertyLabel.RecordId,
+                recordId.ToString(CultureInfo.InvariantCulture)));
+        }
 
-        if (@event.ProcessId is { } processId) { properties.Add(new DetailsProperty("Process ID", processId.ToString(CultureInfo.InvariantCulture))); }
+        if (@event.ProcessId is { } processId)
+        {
+            properties.Add(new DetailsProperty(
+                DetailsPropertyLabel.ProcessId,
+                processId.ToString(CultureInfo.InvariantCulture)));
+        }
 
-        if (@event.ThreadId is { } threadId) { properties.Add(new DetailsProperty("Thread ID", threadId.ToString(CultureInfo.InvariantCulture))); }
+        if (@event.ThreadId is { } threadId)
+        {
+            properties.Add(new DetailsProperty(
+                DetailsPropertyLabel.ThreadId,
+                threadId.ToString(CultureInfo.InvariantCulture)));
+        }
 
-        if (@event.ActivityId is { } activityId) { properties.Add(new DetailsProperty("Activity ID", activityId.ToString())); }
+        if (@event.ActivityId is { } activityId)
+        {
+            properties.Add(new DetailsProperty(DetailsPropertyLabel.ActivityId, activityId.ToString()));
+        }
 
-        if (@event.RelatedActivityId is { } relatedActivityId) { properties.Add(new DetailsProperty("Related Activity ID", relatedActivityId.ToString())); }
+        if (@event.RelatedActivityId is { } relatedActivityId)
+        {
+            properties.Add(new DetailsProperty(
+                DetailsPropertyLabel.RelatedActivityId,
+                relatedActivityId.ToString()));
+        }
 
         // The best-available user identity (well-known-SID name or EventData Subject/Target account), resolved offline.
-        if (@event.UserDisplayName.Length > 0) { properties.Add(new DetailsProperty("User", @event.UserDisplayName)); }
+        if (@event.UserDisplayName.Length > 0)
+        {
+            properties.Add(new DetailsProperty(DetailsPropertyLabel.User, @event.UserDisplayName));
+        }
 
         // The raw System <Security UserID> SID, shown only when it adds information beyond the resolved name.
         if (@event.UserId is { } userId && !string.Equals(userId.Value, @event.UserDisplayName, StringComparison.Ordinal))
         {
-            properties.Add(new DetailsProperty("User SID", userId.Value));
+            properties.Add(new DetailsProperty(DetailsPropertyLabel.UserSid, userId.Value));
         }
 
         return properties;
@@ -241,28 +274,33 @@ public static class DetailsReaderFormatter
         return builder.ToString();
     }
 
-    private static RenderedValue Placeholder(string text)
+    private static RenderedValue Placeholder(PlaceholderKind kind, string text)
     {
         string[] lines = [text];
 
-        return new RenderedValue(lines, lines, string.Empty, IsTruncated: false, IsMuted: true);
+        return new RenderedValue(lines, lines, string.Empty, IsTruncated: false, IsMuted: true, Placeholder: kind);
     }
 
     private static RenderedValue RenderArray(string[] items) =>
         items.Length == 0 ?
-            Placeholder(EmptyArrayPlaceholder) :
+            Placeholder(PlaceholderKind.NoValues, EmptyArrayPlaceholder) :
             new RenderedValue(items, items, string.Join('\n', items), IsTruncated: false, IsMuted: false);
 
     private static RenderedValue RenderBytes(byte[] bytes)
     {
-        if (bytes.Length == 0) { return Placeholder(EmptyStringPlaceholder); }
+        if (bytes.Length == 0) { return Placeholder(PlaceholderKind.Empty, EmptyStringPlaceholder); }
 
         string copyValue = Convert.ToHexString(bytes);
         string full = GroupHex(bytes, bytes.Length);
 
         if (bytes.Length > BytesPreviewByteCount)
         {
-            return new RenderedValue([$"{GroupHex(bytes, BytesPreviewByteCount)} ..."], [full], copyValue, IsTruncated: true, IsMuted: false, IsMonospace: true);
+            return new RenderedValue([$"{GroupHex(bytes, BytesPreviewByteCount)} ..."],
+                [full],
+                copyValue,
+                IsTruncated: true,
+                IsMuted: false,
+                IsMonospace: true);
         }
 
         string[] lines = [full];
@@ -272,11 +310,15 @@ public static class DetailsReaderFormatter
 
     private static RenderedValue RenderScalarText(string text)
     {
-        if (text.Length == 0) { return Placeholder(EmptyStringPlaceholder); }
+        if (text.Length == 0) { return Placeholder(PlaceholderKind.Empty, EmptyStringPlaceholder); }
 
         if (text.Length > LongTextPreviewLength)
         {
-            return new RenderedValue([$"{text[..LongTextPreviewLength]}..."], [text], text, IsTruncated: true, IsMuted: false);
+            return new RenderedValue([$"{text[..LongTextPreviewLength]}..."],
+                [text],
+                text,
+                IsTruncated: true,
+                IsMuted: false);
         }
 
         string[] lines = [text];
@@ -297,14 +339,13 @@ public static class DetailsReaderFormatter
             return RenderScalarText(timestamp.ConvertTimeZone(timeZone).ToString(CultureInfo.CurrentCulture));
         }
 
-        if (value.Kind == EventFieldValueKind.Null) { return Placeholder(NullValuePlaceholder); }
+        if (value.Kind == EventFieldValueKind.Null) { return Placeholder(PlaceholderKind.NullValue, NullValuePlaceholder); }
 
         RenderedValue scalar = RenderScalarText(value.AsString());
 
         // GUIDs and SIDs scan better fixed-width; general strings and numbers keep the app's sans-serif.
-        return value.Kind is EventFieldValueKind.Guid or EventFieldValueKind.Sid
-            ? scalar with { IsMonospace = true }
-            : scalar;
+        return value.Kind is EventFieldValueKind.Guid or EventFieldValueKind.Sid ?
+            scalar with { IsMonospace = true } : scalar;
     }
 
     private static DetailsField ToField(string label, RenderedValue rendered, EventFieldExplanation explanation) =>
@@ -318,7 +359,8 @@ public static class DetailsReaderFormatter
             IsMuted = rendered.IsMuted,
             IsMonospace = rendered.IsMonospace,
             DecodedLabel = explanation.DecodedLabel,
-            Description = explanation.Description
+            Explanation = explanation.Description,
+            Placeholder = rendered.Placeholder
         };
 
     private static string[] ToStringItems(Array array)
@@ -339,5 +381,6 @@ public static class DetailsReaderFormatter
         string CopyValue,
         bool IsTruncated,
         bool IsMuted,
-        bool IsMonospace = false);
+        bool IsMonospace = false,
+        PlaceholderKind? Placeholder = null);
 }

@@ -40,14 +40,14 @@ public sealed class EventFieldExplainerTests
         Assert.True(EventFieldExplainer.TryExplain("Contoso-Provider", 1, "LogonType", ValueOf(3), out EventFieldExplanation explanation));
 
         Assert.Equal("Network", explanation.DecodedLabel);
-        Assert.NotNull(explanation.Description);
+        Assert.Equal(GlossaryTerm.LogonType, explanation.Description);
     }
 
     [Fact]
     public void Explain_GenericField_AppliesAcrossProviders()
     {
         Assert.True(EventFieldExplainer.TryExplain("Contoso-Provider", 42, "IpAddress", ValueOf("10.0.0.1"), out EventFieldExplanation explanation));
-        Assert.NotNull(explanation.Description);
+        Assert.Equal(GlossaryTerm.IpAddress, explanation.Description);
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class EventFieldExplainerTests
     public void Explain_ProviderScopedField_AppliesToAnyEvent()
     {
         Assert.True(EventFieldExplainer.TryExplain(SecurityAuditing, 9999, "AuthenticationPackageName", ValueOf("NTLM"), out EventFieldExplanation explanation));
-        Assert.NotNull(explanation.Description);
+        Assert.Equal(GlossaryTerm.AuthenticationPackageName, explanation.Description);
     }
 
     [Fact]
@@ -70,8 +70,8 @@ public sealed class EventFieldExplainerTests
         Assert.True(EventFieldExplainer.TryExplain(SecurityAuditing, 4624, "TargetUserName", ValueOf("SYSTEM"), out EventFieldExplanation logon));
         Assert.True(EventFieldExplainer.TryExplain(SecurityAuditing, 4625, "TargetUserName", ValueOf("SYSTEM"), out EventFieldExplanation failure));
 
-        Assert.NotNull(logon.Description);
-        Assert.NotNull(failure.Description);
+        Assert.Equal(GlossaryTerm.TargetUserName4624, logon.Description);
+        Assert.Equal(GlossaryTerm.TargetUserName4625, failure.Description);
         Assert.NotEqual(logon.Description, failure.Description);
     }
 
@@ -136,7 +136,38 @@ public sealed class EventFieldExplainerTests
         Assert.True(EventFieldExplainer.TryExplain("Contoso-Provider", 1, "LogonType", ValueOf(99), out EventFieldExplanation explanation));
 
         Assert.Null(explanation.DecodedLabel);
-        Assert.NotNull(explanation.Description);
+        Assert.Equal(GlossaryTerm.LogonType, explanation.Description);
+    }
+
+    [Fact]
+    public void TryExplain_MapsEveryGlossaryScopeToItsTerm()
+    {
+        // Pins each (provider, event, field) scope to its GlossaryTerm and asserts the resolvable set equals the full
+        // enum, so a new GlossaryTerm with no glossary entry (or a scope wired to the wrong term) fails here.
+        (string Provider, int EventId, string Field, GlossaryTerm Term)[] cases =
+        [
+            (SecurityAuditing, 4624, "TargetUserName", GlossaryTerm.TargetUserName4624),
+            (SecurityAuditing, 4624, "SubjectUserName", GlossaryTerm.SubjectUserName4624),
+            (SecurityAuditing, 4625, "TargetUserName", GlossaryTerm.TargetUserName4625),
+            (SecurityAuditing, 9999, "AuthenticationPackageName", GlossaryTerm.AuthenticationPackageName),
+            (SecurityAuditing, 9999, "LogonProcessName", GlossaryTerm.LogonProcessName),
+            ("Contoso-Provider", 1, "LogonType", GlossaryTerm.LogonType),
+            ("Contoso-Provider", 1, "IpAddress", GlossaryTerm.IpAddress),
+            ("Contoso-Provider", 1, "IpPort", GlossaryTerm.IpPort),
+            ("Contoso-Provider", 1, "ProcessName", GlossaryTerm.ProcessName),
+            ("Contoso-Provider", 1, "CommandLine", GlossaryTerm.CommandLine),
+            ("Contoso-Provider", 1, "WorkstationName", GlossaryTerm.WorkstationName)
+        ];
+
+        foreach (var (provider, eventId, field, term) in cases)
+        {
+            Assert.True(
+                EventFieldExplainer.TryExplain(provider, eventId, field, ValueOf("x"), out EventFieldExplanation explanation),
+                $"{field} ({provider}/{eventId}) did not resolve a glossary term.");
+            Assert.Equal(term, explanation.Description);
+        }
+
+        Assert.Equal(Enum.GetValues<GlossaryTerm>().ToHashSet(), cases.Select(scope => scope.Term).ToHashSet());
     }
 
     private static EventFieldValue ValueOf(object? raw)
