@@ -36,7 +36,7 @@ internal sealed class FilterLensCommands(IDispatcher dispatcher) : IFilterLensCo
     {
         if (relatedActivityId is { } id)
         {
-            PushLens(FilterLensFactory.ForActivityId(id, originLog, label: $"Parent Activity = {id}"));
+            PushLens(FilterLensFactory.ForParentActivity(id, originLog));
         }
     }
 

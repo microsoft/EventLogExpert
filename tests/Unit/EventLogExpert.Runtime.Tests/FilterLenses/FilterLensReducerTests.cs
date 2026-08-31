@@ -126,8 +126,8 @@ public sealed class FilterLensReducerTests
     }
 
     private static FilterLens Lens(string label) =>
-        new() { Label = label, Kind = LensKind.Property, ExcludeFilters = [] };
+        new() { Label = new FilterLensLabel.PropertyComparison(EventProperty.Source, IsEqual: true, label), Kind = LensKind.Property, ExcludeFilters = [] };
 
     private static FilterLens LensFromLog(string label, string originLog) =>
-        new() { Label = label, Kind = LensKind.Property, OriginLog = originLog };
+        new() { Label = new FilterLensLabel.PropertyComparison(EventProperty.Source, IsEqual: true, label), Kind = LensKind.Property, OriginLog = originLog };
 }

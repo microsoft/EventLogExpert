@@ -28,6 +28,7 @@ public sealed class FilterPredicateEditorAccessibilityTests : BunitContext
         Services.AddSingleton(eventLogQueries);
 
         Services.AddFluxor(options => options.ScanAssemblies(typeof(FilterComparisonEditor).Assembly));
+        Services.AddEventLogLocalization();
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }

@@ -16,7 +16,7 @@ public sealed record FilterLens
 {
     public FilterLensId Id { get; init; } = FilterLensId.Create();
 
-    public required string Label { get; init; }
+    public required FilterLensLabel Label { get; init; }
 
     public required LensKind Kind { get; init; }
 

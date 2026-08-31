@@ -1,10 +1,10 @@
 @namespace EventLogExpert.UI.FilterEditor.Comparison
 
-<ValueSelect AriaLabel="@(AriaLabelledBy is null ? AriaLabel ?? "Comparison" : null)"
+<ValueSelect AriaLabel="@(AriaLabelledBy is null ? AriaLabel ?? Localizer["FilterEditor_ComparisonLabel"].Value : null)"
     AriaLabelledBy="@AriaLabelledBy"
     CssClass="@CssClass"
     T="ComparisonKind"
-    ToStringFunc="@(KindLabel)"
+    ToStringFunc="@(kind => KindLabel(Localizer, kind))"
     Value="Current"
     ValueChanged="HandleKindChanged">
     <ValueSelectItem T="ComparisonKind" Value="ComparisonKind.Equals" />

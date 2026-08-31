@@ -70,7 +70,7 @@ internal sealed class Effects(
             return Task.CompletedTask;
         }
 
-        _announcementService.Announce($"Kept as filter: {lens.Label}");
+        _announcementService.AnnounceLensKept(lens.Label);
 
         dispatcher.Dispatch(new CommitPromotedLensAction(lens.Id, filters, lens.Window));
 

@@ -569,7 +569,7 @@ public sealed class StatusBarTests : BunitContext
     }
 
     private static ImmutableList<FilterLensSummary> LensSummaries(int count) =>
-        [.. Enumerable.Range(0, count).Select(index => new FilterLensSummary(FilterLensId.Create(), $"lens {index + 1}"))];
+        [.. Enumerable.Range(0, count).Select(_ => new FilterLensSummary(FilterLensId.Create(), new FilterLensLabel.ParentActivity(Guid.NewGuid())))];
 
     private static OrderedViewPresentation PresentationWithCount(int count, EventLogId tabId)
     {

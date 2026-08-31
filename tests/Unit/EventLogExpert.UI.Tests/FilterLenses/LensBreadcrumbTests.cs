@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.UI.FilterLenses;
 using Microsoft.AspNetCore.Components.Web;
@@ -23,6 +24,7 @@ public sealed class LensBreadcrumbTests : BunitContext
         _source.Lenses.Returns(ImmutableList<FilterLensSummary>.Empty);
         Services.AddSingleton(_commands);
         Services.AddSingleton(_source);
+        Services.AddEventLogLocalization();
     }
 
     [Fact]
@@ -31,7 +33,7 @@ public sealed class LensBreadcrumbTests : BunitContext
         var cut = Render<LensBreadcrumb>();
         Assert.Empty(cut.FindAll(".lens-breadcrumb"));
 
-        _source.Lenses.Returns(ImmutableList.Create(Summary("Activity ID = abc")));
+        _source.Lenses.Returns(ImmutableList.Create(Summary("abc")));
         _source.Changed += Raise.Event<Action>();
 
         cut.WaitForAssertion(() => Assert.Contains("Activity ID = abc", cut.Markup));
@@ -66,13 +68,13 @@ public sealed class LensBreadcrumbTests : BunitContext
     [Fact]
     public void KeepButton_DispatchesPromoteLens_AndHasAccessibleLabel()
     {
-        var lens = Summary("Activity ID = abc");
+        var lens = Summary("abc");
         _source.Lenses.Returns(ImmutableList.Create(lens));
 
         var cut = Render<LensBreadcrumb>();
 
         var keep = cut.Find(".lens-chip-keep");
-        Assert.Equal($"Keep lens as filter: {lens.Label}", keep.GetAttribute("aria-label"));
+        Assert.Equal("Keep lens as filter: Activity ID = abc", keep.GetAttribute("aria-label"));
 
         keep.Click();
 
@@ -92,7 +94,7 @@ public sealed class LensBreadcrumbTests : BunitContext
     [Fact]
     public void WithLens_RendersLabel_AndRemoveButtonDispatchesRemoveLens()
     {
-        var lens = Summary("Activity ID = abc");
+        var lens = Summary("abc");
         _source.Lenses.Returns(ImmutableList.Create(lens));
 
         var cut = Render<LensBreadcrumb>();
@@ -104,5 +106,6 @@ public sealed class LensBreadcrumbTests : BunitContext
         _commands.Received(1).RemoveLens(lens.Id);
     }
 
-    private static FilterLensSummary Summary(string label) => new(FilterLensId.Create(), label);
+    private static FilterLensSummary Summary(string value) =>
+        new(FilterLensId.Create(), new FilterLensLabel.PropertyComparison(EventProperty.ActivityId, IsEqual: true, value));
 }

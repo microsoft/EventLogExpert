@@ -1,12 +1,12 @@
-<ValueSelect AriaLabel="@(PropertyAriaLabelledBy is null ? "Property" : null)"
+<ValueSelect AriaLabel="@(PropertyAriaLabelledBy is null ? Localizer["FilterEditor_PropertyLabel"].Value : null)"
     AriaLabelledBy="@PropertyAriaLabelledBy"
     CssClass="input filter-dropdown"
     T="EventProperty"
-    ToStringFunc="x => x.ToFullString()"
+    ToStringFunc="@(x => FilterLensLabelFormatter.PropertyName(Localizer, x))"
     @bind-Value="PropertyBinding">
     @foreach (var item in Enum.GetValues<EventProperty>()
         .Where(p => p != EventProperty.UserId || Comparison.Property == EventProperty.UserId)
-        .OrderBy(p => p.ToFullString(), StringComparer.CurrentCulture))
+        .OrderBy(p => FilterLensLabelFormatter.PropertyName(Localizer, p), StringComparer.CurrentCulture))
     {
         <ValueSelectItem T="EventProperty" Value="item" />
     }
@@ -14,7 +14,7 @@
 
 @if (IsEventDataProperty)
 {
-    <label class="visually-hidden" id="@($"{Id}_FieldName")">Field name</label>
+    <label class="visually-hidden" id="@($"{Id}_FieldName")">@Localizer["FilterEditor_FieldNameLabel"]</label>
 
     <ValueSelect AriaLabelledBy="@($"{Id}_FieldName")"
         CssClass="input filter-value-dropdown"
@@ -31,7 +31,7 @@
 
 @if (IsUserDataProperty)
 {
-    <label class="visually-hidden" id="@($"{Id}_UserDataFieldName")">Field name</label>
+    <label class="visually-hidden" id="@($"{Id}_UserDataFieldName")">@Localizer["FilterEditor_FieldNameLabel"]</label>
 
     <ValueSelect AriaLabelledBy="@($"{Id}_UserDataFieldName")"
         CssClass="input filter-value-dropdown"
@@ -46,7 +46,7 @@
     </ValueSelect>
 }
 
-<label class="visually-hidden" id="@($"{Id}_Comparison")">Comparison</label>
+<label class="visually-hidden" id="@($"{Id}_Comparison")">@Localizer["FilterEditor_ComparisonLabel"]</label>
 <ComparisonOperatorSelect AriaLabelledBy="@($"{Id}_Comparison")"
     MatchMode="Comparison.MatchMode"
     OnChanged="HandleOperatorChanged"
@@ -55,7 +55,7 @@
     SupportsMany="!IsTextOnlyProperty(Comparison.Property)"
     SupportsNoneOfMany="FilterPropertyConstraints.SupportsNoneOfMany(Comparison.Property)" />
 
-<label class="visually-hidden" id="@($"{Id}_Value")">Value</label>
+<label class="visually-hidden" id="@($"{Id}_Value")">@Localizer["FilterEditor_ValueLabel"]</label>
 @if (IsTextOnlyProperty(Comparison.Property))
 {
     <TextInput AriaLabelledBy="@($"{Id}_Value")"
@@ -67,14 +67,29 @@ else if (Comparison.MatchMode == MatchMode.Many)
 {
     <ValueSelect AriaLabelledBy="@($"{Id}_Value")"
         CssClass="input filter-multiselect-dropdown"
-        EmptyText="All"
+        EmptyText="@Localizer["FilterEditor_AllValues"].Value"
         IsMultiSelect
         T="string"
-        ToStringFunc="@(x => string.IsNullOrEmpty(x) ? "(Empty)" : x)"
+        ToStringFunc="MultiSelectDisplay"
         Values="Comparison.Values"
         ValuesChanged="HandleValuesChanged">
-        <ValueSelectItem ClearItem T="string">All</ValueSelectItem>
+        <ValueSelectItem ClearItem T="string">@Localizer["FilterEditor_AllValues"]</ValueSelectItem>
         @foreach (var item in MultiSelectCandidates)
+        {
+            <ValueSelectItem T="string" Value="item" />
+        }
+    </ValueSelect>
+}
+else if (IsResolutionStatusEquality)
+{
+    <ValueSelect AriaLabelledBy="@($"{Id}_Value")"
+        CssClass="input filter-value-dropdown"
+        T="string"
+        ToStringFunc="ClosedSetDisplay"
+        Value="Comparison.Value"
+        ValueChanged="HandleValueChanged">
+        <ValueSelectItem ClearItem T="string">@Localizer["FilterEditor_AllValues"]</ValueSelectItem>
+        @foreach (var item in Items)
         {
             <ValueSelectItem T="string" Value="item" />
         }
@@ -88,7 +103,7 @@ else
         T="string"
         Value="Comparison.Value"
         ValueChanged="HandleValueChanged">
-        <ValueSelectItem ClearItem T="string">All</ValueSelectItem>
+        <ValueSelectItem ClearItem T="string">@Localizer["FilterEditor_AllValues"]</ValueSelectItem>
         @foreach (var item in FilteredItems)
         {
             <ValueSelectItem T="string" Value="item" />

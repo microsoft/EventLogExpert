@@ -6,26 +6,27 @@
 
 @if (!lenses.IsEmpty)
 {
-    <div aria-label="Active filter lenses"
+    <div aria-label="@Localizer["FilterLens_ActiveLensesAria"].Value"
         class="lens-breadcrumb"
         @onkeydown="HandleKeyDown"
         @onkeydown:stopPropagation="true"
         role="region"
         tabindex="0">
-        <span class="lens-breadcrumb-label">Lenses</span>
+        <span class="lens-breadcrumb-label">@Localizer["FilterLens_LensesLabel"]</span>
 
         @foreach (var lens in lenses)
         {
             var lensId = lens.Id;
+            var label = FilterLensLabelFormatter.Format(Localizer, lens.Label);
             <span class="lens-chip">
-                <span class="lens-chip-label" title="@lens.Label">@lens.Label</span>
-                <button aria-label="@($"Keep lens as filter: {lens.Label}")"
+                <span class="lens-chip-label" title="@label">@label</span>
+                <button aria-label="@Localizer["FilterLens_KeepAria", label].Value"
                     class="lens-chip-keep"
                     @onclick="@(() => Commands.PromoteLens(lensId))"
                     type="button">
                     <i aria-hidden="true" class="bi bi-pin-angle"></i>
                 </button>
-                <button aria-label="@($"Remove lens: {lens.Label}")"
+                <button aria-label="@Localizer["FilterLens_RemoveAria", label].Value"
                     class="lens-chip-remove"
                     @onclick="@(() => Commands.RemoveLens(lensId))"
                     type="button">
@@ -34,6 +35,6 @@
             </span>
         }
 
-        <button class="lens-clear" @onclick="Commands.ClearLenses" type="button">Clear all</button>
+        <button class="lens-clear" @onclick="Commands.ClearLenses" type="button">@Localizer["FilterLens_ClearAll"]</button>
     </div>
 }

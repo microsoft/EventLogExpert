@@ -5,6 +5,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Runtime.Announcement;
 using NSubstitute;
+using AnnouncementPayload = EventLogExpert.Runtime.Announcement.Announcement;
 
 namespace EventLogExpert.Runtime.Tests.Announcement;
 
@@ -18,22 +19,22 @@ public sealed class AnnouncementServiceTests
         var svc = new AnnouncementService(_traceLogger);
         svc.Announce("Settings saved");
 
-        Assert.StartsWith("Settings saved", svc.CurrentAnnouncement);
+        Assert.Equal(new AnnouncementPayload.Text("Settings saved"), svc.Current.Payload);
     }
 
     [Fact]
     public void Announce_DifferentMessages_BothReflectedInOrder()
     {
         var svc = new AnnouncementService(_traceLogger);
-        var states = new List<string>();
-        svc.StateChanged += () => states.Add(svc.CurrentAnnouncement);
+        var states = new List<AnnouncementPayload>();
+        svc.StateChanged += () => states.Add(svc.Current.Payload);
 
         svc.Announce("Settings saved");
         svc.Announce("Database imported");
 
         Assert.Equal(2, states.Count);
-        Assert.StartsWith("Settings saved", states[0]);
-        Assert.StartsWith("Database imported", states[1]);
+        Assert.Equal(new AnnouncementPayload.Text("Settings saved"), states[0]);
+        Assert.Equal(new AnnouncementPayload.Text("Database imported"), states[1]);
     }
 
     [Fact]
@@ -72,22 +73,20 @@ public sealed class AnnouncementServiceTests
     }
 
     [Fact]
-    public void Announce_TwoIdenticalMessages_DomTextMutatesForReannouncement()
+    public void Announce_TwoIdenticalMessages_SequenceIncrements_ForReannouncement()
     {
-        // SR live regions do not re-announce if the text node does not change. The seq-toggle
-        // appends \u200B (zero-width space) on odd-seq announcements so the DOM string differs even
-        // when the visible content matches the prior announcement. NVDA/JAWS/VoiceOver do not
-        // pronounce ZWS, so the difference is invisible to users.
+        // The service no longer bakes the re-announce \u200B toggle into the payload (that moved to AnnouncerHost).
+        // It instead advances a monotonic sequence so the host can mutate the rendered DOM text even when two
+        // consecutive announcements carry identical content. The payloads match; the sequence must differ.
         var svc = new AnnouncementService(_traceLogger);
         svc.Announce("Database imported");
-        var first = svc.CurrentAnnouncement;
+        var first = svc.Current;
 
         svc.Announce("Database imported");
-        var second = svc.CurrentAnnouncement;
+        var second = svc.Current;
 
-        Assert.NotEqual(first, second);
-        Assert.StartsWith("Database imported", first);
-        Assert.StartsWith("Database imported", second);
+        Assert.Equal(first.Payload, second.Payload);
+        Assert.NotEqual(first.Sequence, second.Sequence);
     }
 
     [Fact]

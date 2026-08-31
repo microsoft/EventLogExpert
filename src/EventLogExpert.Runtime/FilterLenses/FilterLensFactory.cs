@@ -14,8 +14,12 @@ internal static class FilterLensFactory
 {
     private static readonly TimeSpan s_maxTimeWindowRadius = TimeSpan.FromHours(1);
 
-    public static FilterLens? ForActivityId(Guid activityId, string? originLog = null, string? label = null) =>
-        BuildEqualityLens(EventProperty.ActivityId, activityId, label ?? $"Activity ID = {activityId}", originLog);
+    public static FilterLens? ForActivityId(Guid activityId, string? originLog = null) =>
+        BuildEqualityLens(
+            EventProperty.ActivityId,
+            activityId,
+            new FilterLensLabel.PropertyComparison(EventProperty.ActivityId, IsEqual: true, activityId.ToString()),
+            originLog);
 
     public static FilterLens? ForExcludedValue(EventProperty property, string value, string? originLog = null)
     {
@@ -33,7 +37,7 @@ internal static class FilterLensFactory
 
         return new FilterLens
         {
-            Label = $"{PropertyDisplayName(property)} \u2260 {value}",
+            Label = new FilterLensLabel.PropertyComparison(property, IsEqual: false, value),
             Kind = LensKind.Property,
             ExcludeFilters = [excluded],
             OriginLog = originLog
@@ -74,7 +78,7 @@ internal static class FilterLensFactory
 
         return new FilterLens
         {
-            Label = $"{PropertyDisplayName(property)} = {value}",
+            Label = new FilterLensLabel.PropertyComparison(property, IsEqual: true, value),
             Kind = LensKind.Property,
             ExcludeFilters = absentComplement is null ? [complement] : [complement, absentComplement],
             PromoteFilters = BuildKeepOnlyPromoteForm(property, value),
@@ -82,11 +86,18 @@ internal static class FilterLensFactory
         };
     }
 
+    public static FilterLens? ForParentActivity(Guid activityId, string? originLog = null) =>
+        BuildEqualityLens(
+            EventProperty.ActivityId,
+            activityId,
+            new FilterLensLabel.ParentActivity(activityId),
+            originLog);
+
     public static FilterLens? ForRelatedActivityId(Guid relatedActivityId, string? originLog = null) =>
         BuildEqualityLens(
             EventProperty.RelatedActivityId,
             relatedActivityId,
-            $"Related Activity ID = {relatedActivityId}",
+            new FilterLensLabel.PropertyComparison(EventProperty.RelatedActivityId, IsEqual: true, relatedActivityId.ToString()),
             originLog);
 
     public static FilterLens ForTimeRange(
@@ -101,9 +112,7 @@ internal static class FilterLensFactory
 
         return new FilterLens
         {
-            Label = afterLocal.Date == beforeLocal.Date
-                ? $"{afterLocal:T} - {beforeLocal:T}"
-                : $"{afterLocal:d} {afterLocal:T} - {beforeLocal:d} {beforeLocal:T}",
+            Label = new FilterLensLabel.TimeRange(afterLocal, beforeLocal, afterLocal.Date == beforeLocal.Date),
             Kind = LensKind.TimeWindow,
             Window = new DateFilter { After = after, Before = before, IsEnabled = true },
             OriginLog = originLog
@@ -129,14 +138,14 @@ internal static class FilterLensFactory
 
         return new FilterLens
         {
-            Label = $"Near {timeCreatedUtc.ConvertTimeZone(displayZone):T} \u00b1{FormatRadius(radius)}",
+            Label = new FilterLensLabel.TimeWindow(timeCreatedUtc.ConvertTimeZone(displayZone), radius),
             Kind = LensKind.TimeWindow,
             Window = new DateFilter { After = after, Before = before, IsEnabled = true },
             OriginLog = originLog
         };
     }
 
-    private static FilterLens? BuildEqualityLens(EventProperty property, Guid value, string label, string? originLog)
+    private static FilterLens? BuildEqualityLens(EventProperty property, Guid value, FilterLensLabel label, string? originLog)
     {
         if (!TryFormatNotEqual(property, value.ToString(), out var comparisonText))
         {
@@ -169,23 +178,6 @@ internal static class FilterLensFactory
 
         return include?.Compiled is null ? [] : [include];
     }
-
-    private static string FormatRadius(TimeSpan radius) => radius switch
-    {
-        { Minutes: 0, Seconds: 0, Milliseconds: 0 } => $"{radius.TotalHours:0}h",
-        { Seconds: 0, Milliseconds: 0 } => $"{radius.TotalMinutes:0}m",
-        _ => $"{radius.TotalSeconds:0}s"
-    };
-
-    private static string PropertyDisplayName(EventProperty property) => property switch
-    {
-        EventProperty.Source => "Source",
-        EventProperty.Id => "Event ID",
-        EventProperty.TaskCategory => "Task Category",
-        EventProperty.UserDisplayName => "User",
-        EventProperty.ResolutionStatus => "Resolution Status",
-        _ => property.ToString()
-    };
 
     private static bool TryFormatEqual(EventProperty property, string value, out string comparisonText)
     {

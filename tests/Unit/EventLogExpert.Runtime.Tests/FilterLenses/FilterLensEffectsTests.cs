@@ -68,20 +68,25 @@ public sealed class FilterLensEffectsTests
 
         await effects.HandlePromote(new PromoteFilterLensAction(FilterLensId.Create()), dispatcher);
 
-        announcer.DidNotReceive().Announce(Arg.Any<string>());
+        announcer.DidNotReceive().AnnounceLensKept(Arg.Any<FilterLensLabel>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<CommitPromotedLensAction>());
     }
 
     [Fact]
     public async Task HandlePromote_DegenerateLens_DoesNotAnnounceOrCommit()
     {
-        var lens = new FilterLens { Label = "empty", Kind = LensKind.Property, ExcludeFilters = [] };
+        var lens = new FilterLens
+        {
+            Label = new FilterLensLabel.PropertyComparison(EventProperty.Source, IsEqual: true, "empty"),
+            Kind = LensKind.Property,
+            ExcludeFilters = []
+        };
         var (effects, dispatcher, announcer) =
             CreateEffectsWithAnnouncer(new FilterLensState { Lenses = [lens] }, new FilterPaneState());
 
         await effects.HandlePromote(new PromoteFilterLensAction(lens.Id), dispatcher);
 
-        announcer.DidNotReceive().Announce(Arg.Any<string>());
+        announcer.DidNotReceive().AnnounceLensKept(Arg.Any<FilterLensLabel>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<CommitPromotedLensAction>());
     }
 
@@ -94,7 +99,7 @@ public sealed class FilterLensEffectsTests
 
         await effects.HandlePromote(new PromoteFilterLensAction(lens.Id), dispatcher);
 
-        announcer.Received(1).Announce(Arg.Any<string>());
+        announcer.Received(1).AnnounceLensKept(Arg.Any<FilterLensLabel>());
 
         // A hide lens has no positive promote form, so it falls back to its natural exclude.
         dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action =>
@@ -111,8 +116,7 @@ public sealed class FilterLensEffectsTests
 
         await effects.HandlePromote(new PromoteFilterLensAction(lens.Id), dispatcher);
 
-        announcer.Received(1).Announce(Arg.Is<string>(message =>
-            message != null && message.Contains(lens.Label, StringComparison.Ordinal)));
+        announcer.Received(1).AnnounceLensKept(lens.Label);
 
         // A keep-only lens promotes as a single POSITIVE INCLUDE (== value), not the transient exclude-of-complement.
         dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action =>
@@ -129,7 +133,7 @@ public sealed class FilterLensEffectsTests
 
         await effects.HandlePromote(new PromoteFilterLensAction(lens.Id), dispatcher);
 
-        announcer.Received(1).Announce(Arg.Any<string>());
+        announcer.Received(1).AnnounceLensKept(Arg.Any<FilterLensLabel>());
         dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action =>
             action != null && action.Id == lens.Id && action.Filters.IsEmpty &&
             action.Window != null && action.Window.IsEnabled));
