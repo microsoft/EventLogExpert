@@ -5,7 +5,7 @@
     <div class="histogram-toolbar">
         <div class="histogram-toolbar-controls">
             <div class="histogram-groupby">
-                <span class="histogram-groupby-label" id="histogram-groupby-label">Group by</span>
+                <span class="histogram-groupby-label" id="histogram-groupby-label">@Localizer["Histogram_GroupBy"]</span>
                 <ValueSelect AriaLabelledBy="histogram-groupby-label"
                     CssClass="input histogram-dimension-select"
                     T="HistogramDimension"
@@ -33,14 +33,18 @@
                         var info = legendData.Groups[group];
                         string key = info.Key;
                         bool shown = !_hiddenGroups.Contains(key);
+                        string label = FormatGroupLabel(info);
                         string highlightText = GroupHighlightText(group);
-                        string accessibleLabel = string.IsNullOrEmpty(highlightText) ? info.Label : $"{info.Label}, {highlightText}";
 
-                        <button aria-label="@(shown ? $"Hide {accessibleLabel}" : $"Show {accessibleLabel}")"
+                        string accessibleLabel = string.IsNullOrEmpty(highlightText)
+                            ? label
+                            : Localizer["Histogram_Legend_AccessibleLabel_Highlighted", label, highlightText].Value;
+
+                        <button aria-label="@(shown ? Localizer["Histogram_Legend_Hide", accessibleLabel].Value : Localizer["Histogram_Legend_Show", accessibleLabel].Value)"
                             aria-pressed="@(shown ? "true" : "false")"
                             class="histogram-legend-item@(shown ? "" : " histogram-legend-hidden")"
                             @onclick="() => ToggleGroup(key)"
-                            title="@(shown ? $"Hide {accessibleLabel}" : $"Show {accessibleLabel}")"
+                            title="@(shown ? Localizer["Histogram_Legend_Hide", accessibleLabel].Value : Localizer["Histogram_Legend_Show", accessibleLabel].Value)"
                             type="button">
                             <svg aria-hidden="true"
                                 class="histogram-swatch"
@@ -48,7 +52,7 @@
                                 height="9"
                                 width="9">
                                 <rect class="@GroupColorClass(group)" data-highlight="@GroupHighlightCssName(group)" data-stackpos="@group" height="9" width="9"></rect>
-                            </svg><span class="histogram-legend-label" title="@info.Label">@info.Label</span>
+                            </svg><span class="histogram-legend-label" title="@label">@label</span>
                         </button>
                     }
                 </div>
@@ -56,33 +60,33 @@
         </div>
         @if (_isZoomed)
         {
-            <span class="histogram-zoom-hint">Zoom is visual; use Scope to filter the table.</span>
+            <span class="histogram-zoom-hint">@Localizer["Histogram_ZoomHint"]</span>
         }
         <div class="histogram-buttons">
-            <button aria-label="Zoom out" class="histogram-button" @onclick="() => ZoomFromControl(ZoomOutFactor)" title="Zoom out" type="button">-</button>
-            <button aria-label="Zoom in" class="histogram-button" @onclick="() => ZoomFromControl(ZoomInFactor)" title="Zoom in" type="button">+</button>
-            <button aria-label="Undo zoom"
+            <button aria-label="@Localizer["Histogram_ZoomOut"]" class="histogram-button" @onclick="() => ZoomFromControl(ZoomOutFactor)" title="@Localizer["Histogram_ZoomOut"]" type="button">-</button>
+            <button aria-label="@Localizer["Histogram_ZoomIn"]" class="histogram-button" @onclick="() => ZoomFromControl(ZoomInFactor)" title="@Localizer["Histogram_ZoomIn"]" type="button">+</button>
+            <button aria-label="@Localizer["Histogram_UndoZoomAria"]"
                 class="histogram-button"
                 disabled="@(_windowHistory.Count == 0)"
                 @onclick="UndoZoom"
-                title="Undo zoom (or right-click the timeline)"
+                title="@Localizer["Histogram_UndoZoomTitle"]"
                 type="button">
-                Undo
+                @Localizer["Histogram_Undo"]
             </button>
-            <button aria-label="Fit all events" class="histogram-button" @onclick="Fit" title="Fit all events" type="button">Fit</button>
-            <button aria-label="Scope the table to the visible range"
+            <button aria-label="@Localizer["Histogram_FitAllEvents"]" class="histogram-button" @onclick="Fit" title="@Localizer["Histogram_FitAllEvents"]" type="button">@Localizer["Histogram_Fit"]</button>
+            <button aria-label="@Localizer["Histogram_ScopeVisibleRangeAria"]"
                 class="histogram-button@(_isZoomed ? " histogram-button-accent" : "")"
                 @onclick="ScopeToRange"
-                title="Filter the table to the visible range"
+                title="@Localizer["Histogram_ScopeVisibleRangeTitle"]"
                 type="button">
-                Scope
+                @Localizer["Histogram_Scope"]
             </button>
         </div>
     </div>
 
     <div aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home Enter Escape Shift+ArrowLeft Shift+ArrowRight"
         aria-label="@RegionAria()"
-        aria-roledescription="Timeline"
+        aria-roledescription="@Localizer["Histogram_TimelineRoleDescription"]"
         class="histogram-scroll"
         @onkeydown="HandleKeyDown"
         role="region"
@@ -241,15 +245,15 @@
         }
         else if (_chartState == HistogramChartState.Failed)
         {
-            <div class="histogram-empty">The timeline could not be built for these events.</div>
+            <div class="histogram-empty">@Localizer["Histogram_BuildFailed"]</div>
         }
         else if (_chartState == HistogramChartState.Pending)
         {
-            <div class="histogram-empty">Building the timeline...</div>
+            <div class="histogram-empty">@Localizer["Histogram_Building"]</div>
         }
         else
         {
-            <div class="histogram-empty">No events to chart in the current view.</div>
+            <div class="histogram-empty">@Localizer["Histogram_Empty_CurrentView"]</div>
         }
     </div>
 

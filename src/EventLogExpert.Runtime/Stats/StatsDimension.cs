@@ -28,15 +28,6 @@ public static class StatsDimensions
 
     extension(StatsDimension dimension)
     {
-        public string DisplayName() => dimension switch
-        {
-            StatsDimension.Source => "Source",
-            StatsDimension.EventId => "Event ID",
-            StatsDimension.TaskCategory => "Task Category",
-            StatsDimension.User => "User",
-            _ => dimension.ToString()
-        };
-
         /// <summary>The filter property a contributor row excludes on (verified filterable for all four dimensions).</summary>
         public EventProperty FilterProperty() => dimension switch
         {

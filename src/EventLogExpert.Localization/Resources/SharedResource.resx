@@ -1222,22 +1222,22 @@
     <value>{0}: {1}</value>
     <comment>{0} is the severity level name and {1} the unresolved count; the visible per-level twin renders the same count wrapped in &lt;strong&gt;.</comment>
   </data>
-  <data name="Coverage_SeverityLevel_Critical" xml:space="preserve">
+  <data name="Severity_Level_Critical" xml:space="preserve">
     <value>Critical</value>
   </data>
-  <data name="Coverage_SeverityLevel_Error" xml:space="preserve">
+  <data name="Severity_Level_Error" xml:space="preserve">
     <value>Error</value>
   </data>
-  <data name="Coverage_SeverityLevel_Warning" xml:space="preserve">
+  <data name="Severity_Level_Warning" xml:space="preserve">
     <value>Warning</value>
   </data>
-  <data name="Coverage_SeverityLevel_Information" xml:space="preserve">
+  <data name="Severity_Level_Information" xml:space="preserve">
     <value>Information</value>
   </data>
-  <data name="Coverage_SeverityLevel_Verbose" xml:space="preserve">
+  <data name="Severity_Level_Verbose" xml:space="preserve">
     <value>Verbose</value>
   </data>
-  <data name="Coverage_SeverityUnknown" xml:space="preserve">
+  <data name="Severity_Unknown" xml:space="preserve">
     <value>Unknown</value>
   </data>
   <data name="Coverage_UnresolvedEventIdsHeading" xml:space="preserve">
@@ -1438,4 +1438,183 @@
     <value>All</value>
     <comment>Filter value picker: the option that clears the value filter so events with any value match.</comment>
   </data>
-</root>
+  <!-- Stats pane + detail modal localization. Count arguments are pre-formatted in code unless noted. -->
+  <data name="Stats_AriaLabel" xml:space="preserve"><value>Statistics</value></data>
+  <data name="Stats_Title" xml:space="preserve"><value>Statistics</value></data>
+  <data name="Stats_ResolutionCoverage" xml:space="preserve"><value>Resolution &amp; Coverage</value></data>
+  <data name="Stats_ResolutionCoverageAria" xml:space="preserve"><value>Open Resolution and Coverage</value></data>
+  <data name="Stats_ResolutionCoverageTitle" xml:space="preserve"><value>Show unresolved events and provider coverage</value></data>
+  <data name="Stats_BuildFailed" xml:space="preserve"><value>Statistics could not be built for these events.</value></data>
+  <data name="Stats_SeverityBarLabel" xml:space="preserve"><value>Severity breakdown</value></data>
+  <data name="Stats_SeveritySegmentTooltip" xml:space="preserve"><value>{0}: {1} ({2})</value><comment>{0} is the localized severity label, {1} the formatted count, and {2} the formatted percentage.</comment></data>
+  <data name="Stats_Updating" xml:space="preserve"><value>Updating...</value></data>
+  <data name="Stats_NoValuesInCurrentView" xml:space="preserve"><value>No values in the current view.</value></data>
+  <data name="Stats_RowActionsAria" xml:space="preserve"><value>Filter actions</value></data>
+  <data name="Stats_Row_IncludeAria" xml:space="preserve"><value>Filter to {0} {1}</value><comment>{0} is the localized dimension label; {1} is a data value and must remain verbatim.</comment></data>
+  <data name="Stats_Row_ExcludeAria" xml:space="preserve"><value>Exclude {0} {1}</value><comment>{0} is the localized dimension label; {1} is a data value and must remain verbatim.</comment></data>
+  <data name="Stats_Row_IncludeTitle" xml:space="preserve"><value>Filter to only this value</value></data>
+  <data name="Stats_Row_ExcludeTitle" xml:space="preserve"><value>Exclude this value</value></data>
+  <data name="Stats_NoneValue" xml:space="preserve"><value>(none)</value></data>
+  <data name="Stats_ViewAll" xml:space="preserve"><value>View all</value></data>
+  <data name="Stats_Computing" xml:space="preserve"><value>Computing...</value></data>
+  <data name="Stats_Drawer_ResizeTitle" xml:space="preserve"><value>Drag to resize</value></data>
+  <data name="Stats_Detail_Title" xml:space="preserve"><value>All {0} values</value><comment>{0} is a localized statistics dimension label.</comment></data>
+  <data name="Stats_Detail_CloseLabel" xml:space="preserve"><value>Close</value></data>
+  <data name="Stats_Detail_FilterValuesAria" xml:space="preserve"><value>Filter values</value></data>
+  <data name="Stats_Detail_FilterValuesPlaceholder" xml:space="preserve"><value>Filter values...</value></data>
+  <data name="Stats_Detail_ComputeFailed" xml:space="preserve"><value>These values could not be computed.</value></data>
+  <data name="Stats_Detail_Truncated" xml:space="preserve"><value>Showing the top {0} of {1} values.</value><comment>{0} and {1} are pre-formatted counts.</comment></data>
+  <data name="Stats_Headline_Computing" xml:space="preserve"><value>Computing statistics...</value></data>
+  <data name="Stats_Headline_Empty" xml:space="preserve"><value>No events in the current view</value></data>
+  <data name="Stats_Headline_RemoveLens" xml:space="preserve"><value>0 events - remove a lens to continue</value></data>
+  <data name="Stats_Headline_Events_One" xml:space="preserve"><value>{0} event</value></data>
+  <data name="Stats_Headline_Events_Many" xml:space="preserve"><value>{0} events</value></data>
+  <data name="Stats_Headline_ErrorCritical_One" xml:space="preserve"><value> - {0} error/critical</value><comment>Same English for one/many by design (the count is the {0} tally, e.g. '1 error/critical'); split so gendered/plural locales can differ.</comment></data>
+  <data name="Stats_Headline_ErrorCritical_Many" xml:space="preserve"><value> - {0} error/critical</value><comment>Same English for one/many by design (the count is the {0} tally, e.g. '1 error/critical'); split so gendered/plural locales can differ.</comment></data>
+  <data name="Stats_Headline_TopSources_One" xml:space="preserve"><value> - top {0} source = {1}%</value></data>
+  <data name="Stats_Headline_TopSources_Many" xml:space="preserve"><value> - top {0} sources = {1}%</value></data>
+  <data name="Stats_Dimension_Source" xml:space="preserve"><value>Source</value></data>
+  <data name="Stats_Dimension_EventId" xml:space="preserve"><value>Event ID</value></data>
+  <data name="Stats_Dimension_TaskCategory" xml:space="preserve"><value>Task Category</value></data>
+  <data name="Stats_Dimension_User" xml:space="preserve"><value>User</value></data>
+  <data name="Stats_Coverage_All_Source_One" xml:space="preserve"><value>All {0} source - {1}% of events</value></data>
+  <data name="Stats_Coverage_All_Source_Many" xml:space="preserve"><value>All {0} sources - {1}% of events</value></data>
+  <data name="Stats_Coverage_Top_Source_One" xml:space="preserve"><value>Top {0} of {1} source - {2}% of events</value></data>
+  <data name="Stats_Coverage_Top_Source_Many" xml:space="preserve"><value>Top {0} of {1} sources - {2}% of events</value></data>
+  <data name="Stats_Coverage_All_EventId_One" xml:space="preserve"><value>All {0} event ID - {1}% of events</value></data>
+  <data name="Stats_Coverage_All_EventId_Many" xml:space="preserve"><value>All {0} event IDs - {1}% of events</value></data>
+  <data name="Stats_Coverage_Top_EventId_One" xml:space="preserve"><value>Top {0} of {1} event ID - {2}% of events</value></data>
+  <data name="Stats_Coverage_Top_EventId_Many" xml:space="preserve"><value>Top {0} of {1} event IDs - {2}% of events</value></data>
+  <data name="Stats_Coverage_All_TaskCategory_One" xml:space="preserve"><value>All {0} task category - {1}% of events</value></data>
+  <data name="Stats_Coverage_All_TaskCategory_Many" xml:space="preserve"><value>All {0} task categories - {1}% of events</value></data>
+  <data name="Stats_Coverage_Top_TaskCategory_One" xml:space="preserve"><value>Top {0} of {1} task category - {2}% of events</value></data>
+  <data name="Stats_Coverage_Top_TaskCategory_Many" xml:space="preserve"><value>Top {0} of {1} task categories - {2}% of events</value></data>
+  <data name="Stats_Coverage_All_User_One" xml:space="preserve"><value>All {0} user - {1}% of events</value></data>
+  <data name="Stats_Coverage_All_User_Many" xml:space="preserve"><value>All {0} users - {1}% of events</value></data>
+  <data name="Stats_Coverage_Top_User_One" xml:space="preserve"><value>Top {0} of {1} user - {2}% of events</value></data>
+  <data name="Stats_Coverage_Top_User_Many" xml:space="preserve"><value>Top {0} of {1} users - {2}% of events</value></data>
+  <!-- Histogram pane localization. Event/process/log values and decoded HRESULT symbols are data and remain verbatim in code. -->
+  <data name="Histogram_GroupBy" xml:space="preserve"><value>Group by</value></data>
+  <data name="Histogram_Legend_Hide" xml:space="preserve"><value>Hide {0}</value></data>
+  <data name="Histogram_Legend_Show" xml:space="preserve"><value>Show {0}</value></data>
+  <data name="Histogram_Legend_AccessibleLabel_Highlighted" xml:space="preserve"><value>{0}, {1}</value><comment>{0} is a group label; {1} is the localized highlight description.</comment></data>
+  <data name="Histogram_ZoomHint" xml:space="preserve"><value>Zoom is visual; use Scope to filter the table.</value></data>
+  <data name="Histogram_ZoomOut" xml:space="preserve"><value>Zoom out</value></data>
+  <data name="Histogram_ZoomIn" xml:space="preserve"><value>Zoom in</value></data>
+  <data name="Histogram_UndoZoomAria" xml:space="preserve"><value>Undo zoom</value></data>
+  <data name="Histogram_UndoZoomTitle" xml:space="preserve"><value>Undo zoom (or right-click the timeline)</value></data>
+  <data name="Histogram_Undo" xml:space="preserve"><value>Undo</value></data>
+  <data name="Histogram_FitAllEvents" xml:space="preserve"><value>Fit all events</value></data>
+  <data name="Histogram_Fit" xml:space="preserve"><value>Fit</value></data>
+  <data name="Histogram_ScopeVisibleRangeAria" xml:space="preserve"><value>Scope the table to the visible range</value></data>
+  <data name="Histogram_ScopeVisibleRangeTitle" xml:space="preserve"><value>Filter the table to the visible range</value></data>
+  <data name="Histogram_Scope" xml:space="preserve"><value>Scope</value></data>
+  <data name="Histogram_TimelineRoleDescription" xml:space="preserve"><value>Timeline</value></data>
+  <data name="Histogram_BuildFailed" xml:space="preserve"><value>The timeline could not be built for these events.</value></data>
+  <data name="Histogram_Building" xml:space="preserve"><value>Building the timeline...</value></data>
+  <data name="Histogram_Empty_CurrentView" xml:space="preserve"><value>No events to chart in the current view.</value></data>
+  <data name="Histogram_Dimension_Severity" xml:space="preserve"><value>Severity</value></data>
+  <data name="Histogram_Dimension_Source" xml:space="preserve"><value>Source</value></data>
+  <data name="Histogram_Dimension_EventId" xml:space="preserve"><value>Event ID</value></data>
+  <data name="Histogram_Dimension_TaskCategory" xml:space="preserve"><value>Task Category</value></data>
+  <data name="Histogram_Dimension_Opcode" xml:space="preserve"><value>Opcode</value><comment>Windows Event Log technical term.</comment></data>
+  <data name="Histogram_Dimension_Log" xml:space="preserve"><value>Log</value></data>
+  <data name="Histogram_Dimension_LogonType" xml:space="preserve"><value>Logon Type</value></data>
+  <data name="Histogram_Dimension_TicketEncryptionType" xml:space="preserve"><value>Ticket Encryption Type</value></data>
+  <data name="Histogram_Dimension_ErrorCode" xml:space="preserve"><value>Error Code</value></data>
+  <data name="Histogram_Dimension_ProcessImage" xml:space="preserve"><value>Process Image</value></data>
+  <data name="Histogram_Dimension_ParentProcessImage" xml:space="preserve"><value>Parent Process Image</value></data>
+  <data name="Histogram_Severity_Errors" xml:space="preserve"><value>Errors</value></data>
+  <data name="Histogram_Severity_Warnings" xml:space="preserve"><value>Warnings</value></data>
+  <data name="Histogram_Severity_Other" xml:space="preserve"><value>Other</value></data>
+  <data name="Histogram_Highlight_Mixed" xml:space="preserve"><value>Mixed highlights</value></data>
+  <data name="Histogram_Highlight_Uncolored" xml:space="preserve"><value>Uncolored</value></data>
+  <data name="Histogram_Highlight_Single" xml:space="preserve"><value>{0} highlight</value></data>
+  <data name="Histogram_HighlightColor_None" xml:space="preserve"><value>None</value><comment>HighlightColor.None is persisted vocabulary; this display is normally reached through Histogram_Highlight_Uncolored, but the key keeps the enum family total.</comment></data>
+  <data name="Histogram_HighlightColor_LightRed" xml:space="preserve"><value>Light red</value></data>
+  <data name="Histogram_HighlightColor_Red" xml:space="preserve"><value>Red</value></data>
+  <data name="Histogram_HighlightColor_DarkRed" xml:space="preserve"><value>Dark red</value></data>
+  <data name="Histogram_HighlightColor_LightOrange" xml:space="preserve"><value>Light orange</value></data>
+  <data name="Histogram_HighlightColor_Orange" xml:space="preserve"><value>Orange</value></data>
+  <data name="Histogram_HighlightColor_DarkOrange" xml:space="preserve"><value>Dark orange</value></data>
+  <data name="Histogram_HighlightColor_LightYellow" xml:space="preserve"><value>Light yellow</value></data>
+  <data name="Histogram_HighlightColor_Yellow" xml:space="preserve"><value>Yellow</value></data>
+  <data name="Histogram_HighlightColor_DarkYellow" xml:space="preserve"><value>Dark yellow</value></data>
+  <data name="Histogram_HighlightColor_LightGreen" xml:space="preserve"><value>Light green</value></data>
+  <data name="Histogram_HighlightColor_Green" xml:space="preserve"><value>Green</value></data>
+  <data name="Histogram_HighlightColor_DarkGreen" xml:space="preserve"><value>Dark green</value></data>
+  <data name="Histogram_HighlightColor_LightTeal" xml:space="preserve"><value>Light teal</value></data>
+  <data name="Histogram_HighlightColor_Teal" xml:space="preserve"><value>Teal</value></data>
+  <data name="Histogram_HighlightColor_DarkTeal" xml:space="preserve"><value>Dark teal</value></data>
+  <data name="Histogram_HighlightColor_LightBlue" xml:space="preserve"><value>Light blue</value></data>
+  <data name="Histogram_HighlightColor_Blue" xml:space="preserve"><value>Blue</value></data>
+  <data name="Histogram_HighlightColor_DarkBlue" xml:space="preserve"><value>Dark blue</value></data>
+  <data name="Histogram_HighlightColor_LightPurple" xml:space="preserve"><value>Light purple</value></data>
+  <data name="Histogram_HighlightColor_Purple" xml:space="preserve"><value>Purple</value></data>
+  <data name="Histogram_HighlightColor_DarkPurple" xml:space="preserve"><value>Dark purple</value></data>
+  <data name="Histogram_HighlightColor_LightMagenta" xml:space="preserve"><value>Light magenta</value></data>
+  <data name="Histogram_HighlightColor_Magenta" xml:space="preserve"><value>Magenta</value></data>
+  <data name="Histogram_HighlightColor_DarkMagenta" xml:space="preserve"><value>Dark magenta</value></data>
+  <data name="Histogram_HighlightColor_LightPink" xml:space="preserve"><value>Light pink</value></data>
+  <data name="Histogram_HighlightColor_Pink" xml:space="preserve"><value>Pink</value></data>
+  <data name="Histogram_HighlightColor_DarkPink" xml:space="preserve"><value>Dark pink</value></data>
+  <data name="Histogram_Overflow_Bare" xml:space="preserve"><value>Other</value></data>
+  <data name="Histogram_Overflow_EventId_One" xml:space="preserve"><value>Other (1 event ID)</value></data>
+  <data name="Histogram_Overflow_EventId_Many" xml:space="preserve"><value>Other ({0} event IDs)</value></data>
+  <data name="Histogram_Overflow_Source_One" xml:space="preserve"><value>Other (1 source)</value></data>
+  <data name="Histogram_Overflow_Source_Many" xml:space="preserve"><value>Other ({0} sources)</value></data>
+  <data name="Histogram_Overflow_TaskCategory_One" xml:space="preserve"><value>Other (1 task category)</value></data>
+  <data name="Histogram_Overflow_TaskCategory_Many" xml:space="preserve"><value>Other ({0} task categories)</value></data>
+  <data name="Histogram_Overflow_Opcode_One" xml:space="preserve"><value>Other (1 opcode)</value></data>
+  <data name="Histogram_Overflow_Opcode_Many" xml:space="preserve"><value>Other ({0} opcodes)</value></data>
+  <data name="Histogram_Overflow_Log_One" xml:space="preserve"><value>Other (1 log)</value></data>
+  <data name="Histogram_Overflow_Log_Many" xml:space="preserve"><value>Other ({0} logs)</value></data>
+  <data name="Histogram_Overflow_LogonType_One" xml:space="preserve"><value>Other (1 logon type)</value></data>
+  <data name="Histogram_Overflow_LogonType_Many" xml:space="preserve"><value>Other ({0} logon types)</value></data>
+  <data name="Histogram_Overflow_TicketEncryptionType_One" xml:space="preserve"><value>Other (1 ticket encryption type)</value></data>
+  <data name="Histogram_Overflow_TicketEncryptionType_Many" xml:space="preserve"><value>Other ({0} ticket encryption types)</value></data>
+  <data name="Histogram_Overflow_ErrorCode_One" xml:space="preserve"><value>Other (1 error code)</value></data>
+  <data name="Histogram_Overflow_ErrorCode_Many" xml:space="preserve"><value>Other ({0} error codes)</value></data>
+  <data name="Histogram_Overflow_ProcessImage_One" xml:space="preserve"><value>Other (1 process)</value></data>
+  <data name="Histogram_Overflow_ProcessImage_Many" xml:space="preserve"><value>Other ({0} processes)</value></data>
+  <data name="Histogram_Overflow_ParentProcessImage_One" xml:space="preserve"><value>Other (1 parent process)</value></data>
+  <data name="Histogram_Overflow_ParentProcessImage_Many" xml:space="preserve"><value>Other ({0} parent processes)</value></data>
+  <data name="Histogram_Empty_Severity_VisibleRange" xml:space="preserve"><value>No events to chart in the current view.</value></data>
+  <data name="Histogram_Empty_Severity_ThisView" xml:space="preserve"><value>No Severity values in this view.</value></data>
+  <data name="Histogram_Empty_Source_VisibleRange" xml:space="preserve"><value>No events to chart in the current view.</value></data>
+  <data name="Histogram_Empty_Source_ThisView" xml:space="preserve"><value>No Source values in this view.</value></data>
+  <data name="Histogram_Empty_EventId_VisibleRange" xml:space="preserve"><value>No events to chart in the current view.</value></data>
+  <data name="Histogram_Empty_EventId_ThisView" xml:space="preserve"><value>No Event ID values in this view.</value></data>
+  <data name="Histogram_Empty_TaskCategory_VisibleRange" xml:space="preserve"><value>No events to chart in the current view.</value></data>
+  <data name="Histogram_Empty_TaskCategory_ThisView" xml:space="preserve"><value>No Task Category values in this view.</value></data>
+  <data name="Histogram_Empty_Opcode_VisibleRange" xml:space="preserve"><value>No events to chart in the current view.</value></data>
+  <data name="Histogram_Empty_Opcode_ThisView" xml:space="preserve"><value>No Opcode values in this view.</value></data>
+  <data name="Histogram_Empty_Log_VisibleRange" xml:space="preserve"><value>No events to chart in the current view.</value></data>
+  <data name="Histogram_Empty_Log_ThisView" xml:space="preserve"><value>No Log values in this view.</value></data>
+  <data name="Histogram_Empty_LogonType_VisibleRange" xml:space="preserve"><value>No events to chart in the current view.</value></data>
+  <data name="Histogram_Empty_LogonType_ThisView" xml:space="preserve"><value>No Logon Type values in this view.</value></data>
+  <data name="Histogram_Empty_TicketEncryptionType_VisibleRange" xml:space="preserve"><value>No events to chart in the current view.</value></data>
+  <data name="Histogram_Empty_TicketEncryptionType_ThisView" xml:space="preserve"><value>No Ticket Encryption Type values in this view.</value></data>
+  <data name="Histogram_Empty_ErrorCode_VisibleRange" xml:space="preserve"><value>No update error codes in the visible range.</value></data>
+  <data name="Histogram_Empty_ErrorCode_ThisView" xml:space="preserve"><value>No update error codes in this view.</value></data>
+  <data name="Histogram_Empty_ProcessImage_VisibleRange" xml:space="preserve"><value>No process image names in the visible range.</value></data>
+  <data name="Histogram_Empty_ProcessImage_ThisView" xml:space="preserve"><value>No process image names in this view.</value></data>
+  <data name="Histogram_Empty_ParentProcessImage_VisibleRange" xml:space="preserve"><value>No parent process image names in the visible range.</value></data>
+  <data name="Histogram_Empty_ParentProcessImage_ThisView" xml:space="preserve"><value>No parent process image names in this view.</value></data>
+  <data name="Histogram_EventNoun_Events_One" xml:space="preserve"><value>events</value><comment>Neutral value is intentionally plural to preserve the existing "1 events" output (byte-identity); other locales may use a true singular here.</comment></data>
+  <data name="Histogram_EventNoun_Events_Many" xml:space="preserve"><value>events</value></data>
+  <data name="Histogram_EventNoun_ErrorCodeEvents_One" xml:space="preserve"><value>error-code events</value><comment>Neutral value is intentionally plural to preserve the existing "1 error-code events" output (byte-identity); other locales may use a true singular here.</comment></data>
+  <data name="Histogram_EventNoun_ErrorCodeEvents_Many" xml:space="preserve"><value>error-code events</value></data>
+  <data name="Histogram_BreakdownItem" xml:space="preserve"><value>{0} {1}</value><comment>Histogram breakdown item. {0} is a raw ungrouped count; {1} is a localized or verbatim group label.</comment></data>
+  <data name="Histogram_BreakdownItem_Highlighted" xml:space="preserve"><value>{0} {1}, {2}</value><comment>{0} is a raw ungrouped count; {1} is a group label; {2} is a highlight description.</comment></data>
+  <data name="Histogram_Breakdown_Separator" xml:space="preserve"><value>, </value></data>
+  <data name="Histogram_RegionAria" xml:space="preserve"><value>Timeline: {0} {1} from {2:g} to {3:g}.</value></data>
+  <data name="Histogram_RegionAria_Breakdown" xml:space="preserve"><value>Timeline: {0} {1} from {2:g} to {3:g}, {4}.</value></data>
+  <data name="Histogram_WindowAnnouncement" xml:space="preserve"><value>Showing {2:g} to {3:g}: {0} {1}.</value></data>
+  <data name="Histogram_WindowAnnouncement_Breakdown" xml:space="preserve"><value>Showing {2:g} to {3:g}: {0} {1}, {4}.</value></data>
+  <data name="Histogram_BarTooltip" xml:space="preserve"><value>{0} {1}, {2} - {3}</value></data>
+  <data name="Histogram_BarTooltip_Breakdown" xml:space="preserve"><value>{0} {1} ({4}), {2} - {3}</value></data>
+  <data name="Histogram_BinCursor" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3}.</value></data>
+  <data name="Histogram_BinCursor_Spike" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3}, spike.</value></data>
+  <data name="Histogram_BinCursor_Breakdown" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3} ({4}).</value></data>
+  <data name="Histogram_BinCursor_Spike_Breakdown" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3} ({4}), spike.</value></data></root>

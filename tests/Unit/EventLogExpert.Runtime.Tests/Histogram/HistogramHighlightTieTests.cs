@@ -142,7 +142,7 @@ public sealed class HistogramHighlightTieTests
             highlightWinners,
             TestContext.Current.CancellationToken)!;
 
-        int group = GroupIndex(data, "Errors");
+        int group = SeverityGroupIndex(data, HistogramSeverityBucket.Errors);
         Assert.Equal((1u << 1) | (1u << 2), data.GroupHighlightMasks![group]);
     }
 
@@ -256,9 +256,22 @@ public sealed class HistogramHighlightTieTests
     {
         for (int index = 0; index < data.Groups.Count; index++)
         {
-            if (data.Groups[index].Label == label) { return index; }
+            if (data.Groups[index].HasDataValue(label)) { return index; }
         }
 
         throw new InvalidOperationException($"Group '{label}' was not created.");
+    }
+
+    private static int SeverityGroupIndex(HistogramData data, HistogramSeverityBucket bucket)
+    {
+        for (int index = 0; index < data.Groups.Count; index++)
+        {
+            if (data.Groups[index].Label is HistogramGroupLabel.SeverityBucket severity && severity.Bucket == bucket)
+            {
+                return index;
+            }
+        }
+
+        throw new InvalidOperationException($"Severity group '{bucket}' was not created.");
     }
 }

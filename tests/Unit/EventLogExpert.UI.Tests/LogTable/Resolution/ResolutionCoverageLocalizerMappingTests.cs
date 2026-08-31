@@ -12,8 +12,8 @@ namespace EventLogExpert.UI.Tests.LogTable.Resolution;
 ///     Pins every coverage-modal localizer switch arm to its own resource key. <see cref="MarkerLocalizer" /> echoes
 ///     each key as <c>[[key]]</c>, so asserting an arm returns <c>[[{stem}{member}]]</c> proves the mapping is not just
 ///     present but correct - the enum-mapped guard (key set) and the neutral-drift guard (key values) both pass when two
-///     valid arms are transposed; these do not. The null severity slot maps to the standalone
-///     <c>Coverage_SeverityUnknown</c> chrome key rather than an enum member.
+///     valid arms are transposed; these do not. The null severity slot maps to the standalone <c>Severity_Unknown</c>
+///     chrome key rather than an enum member.
 /// </summary>
 public sealed class ResolutionCoverageLocalizerMappingTests
 {
@@ -33,13 +33,13 @@ public sealed class ResolutionCoverageLocalizerMappingTests
     {
         foreach (SeverityLevel level in Enum.GetValues<SeverityLevel>())
         {
-            Assert.Equal($"[[Coverage_SeverityLevel_{level}]]", SeverityLevelLocalizer.Label(_localizer, level));
+            Assert.Equal($"[[Severity_Level_{level}]]", SeverityLevelLocalizer.Label(_localizer, level));
         }
     }
 
     [Fact]
     public void SeverityLevelLocalizer_RoutesNullLevelToUnknownKey()
     {
-        Assert.Equal("[[Coverage_SeverityUnknown]]", SeverityLevelLocalizer.Label(_localizer, null));
+        Assert.Equal("[[Severity_Unknown]]", SeverityLevelLocalizer.Label(_localizer, null));
     }
 }

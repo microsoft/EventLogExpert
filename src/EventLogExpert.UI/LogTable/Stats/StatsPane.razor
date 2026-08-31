@@ -1,32 +1,32 @@
 @using EventLogExpert.Runtime.Stats
 @inherits PresentationViewComponentBase
 
-<div aria-label="Statistics" class="stats-pane" @ref="_paneElement" role="region">
+<div aria-label="@Localizer["Stats_AriaLabel"]" class="stats-pane" @ref="_paneElement" role="region">
     <div class="stats-header">
-        <span class="stats-title">Statistics</span>
+        <span class="stats-title">@Localizer["Stats_Title"]</span>
         <span class="stats-headline@(IsSeverityStale ? " stats-stale" : "")">@HeadlineText()</span>
-        <button aria-label="Open Resolution and Coverage"
+        <button aria-label="@Localizer["Stats_ResolutionCoverageAria"]"
             class="stats-coverage-link"
             @onclick="OpenCoverage"
-            title="Show unresolved events and provider coverage"
+            title="@Localizer["Stats_ResolutionCoverageTitle"]"
             type="button">
-            Resolution &amp; Coverage
+            @Localizer["Stats_ResolutionCoverage"]
         </button>
     </div>
 
     @if (_scanFailed)
     {
-        <div class="stats-empty">Statistics could not be built for these events.</div>
+        <div class="stats-empty">@Localizer["Stats_BuildFailed"]</div>
     }
     else if (_severity is { Total: > 0 })
     {
         <div class="stats-severity@(IsSeverityStale ? " stats-stale" : "")">
-            <div aria-label="@SeverityBarAria()" class="stats-severity-bar" role="img">
+            <div aria-label="@Localizer["Stats_SeverityBarLabel"]" class="stats-severity-bar" role="img">
                 @foreach (var segment in SeveritySegments())
                 {
                     <span class="stats-severity-seg @segment.CssClass"
                         style="flex-grow:@Css(segment.Percent)"
-                        title="@($"{segment.Label}: {FormatCount(segment.Count)} ({FormatPercent(segment.Percent)})")">
+                        title="@Localizer["Stats_SeveritySegmentTooltip", segment.Label, FormatCount(segment.Count), FormatPercent(segment.Percent)]">
                     </span>
                 }
             </div>
@@ -47,14 +47,14 @@
             {
                 <section class="stats-section@(IsSectionStale(section) ? " stats-stale" : "")">
                     <div class="stats-section-header">
-                        <span class="stats-section-title">@section.Dimension.DisplayName()</span>
+                        <span class="stats-section-title">@StatsDimensionLocalizer.Label(Localizer, section.Dimension)</span>
                         @if (section.Stats is { } headerStats)
                         {
                             <span class="stats-section-distinct">@FormatCount(headerStats.DistinctCount)</span>
                         }
                         @if (IsSectionStale(section))
                         {
-                            <span class="stats-updating">Updating...</span>
+                            <span class="stats-updating">@Localizer["Stats_Updating"]</span>
                         }
                     </div>
 
@@ -62,7 +62,7 @@
                     {
                         @if (stats.Top.Count == 0 && stats.MissingCount == 0)
                         {
-                            <div class="stats-section-empty">No values in the current view.</div>
+                            <div class="stats-section-empty">@Localizer["Stats_NoValuesInCurrentView"]</div>
                         }
                         else
                         {
@@ -76,20 +76,20 @@
                                         <span aria-hidden="true" class="stats-row-bar">
                                             <span class="stats-row-bar-fill" style="width:@Css(Share(contributor.Count, stats.Total))%"></span>
                                         </span>
-                                        <span aria-label="Filter actions" class="stats-row-actions" role="group">
-                                            <button aria-label="@($"Filter to {section.Dimension.DisplayName()} {contributor.Value}")"
+                                        <span aria-label="@Localizer["Stats_RowActionsAria"]" class="stats-row-actions" role="group">
+                                            <button aria-label="@Localizer["Stats_Row_IncludeAria", StatsDimensionLocalizer.Label(Localizer, section.Dimension), contributor.Value]"
                                                 class="stats-include"
                                                 disabled="@AreRowActionsDisabled(section)"
                                                 @onclick="() => IncludeContributor(section, contributor)"
-                                                title="Filter to only this value"
+                                                title="@Localizer["Stats_Row_IncludeTitle"]"
                                                 type="button">
                                                 <i aria-hidden="true" class="bi bi-plus-circle"></i>
                                             </button>
-                                            <button aria-label="@($"Exclude {section.Dimension.DisplayName()} {contributor.Value}")"
+                                            <button aria-label="@Localizer["Stats_Row_ExcludeAria", StatsDimensionLocalizer.Label(Localizer, section.Dimension), contributor.Value]"
                                                 class="stats-exclude"
                                                 disabled="@AreRowActionsDisabled(section)"
                                                 @onclick="() => ExcludeContributor(section, contributor)"
-                                                title="Exclude this value"
+                                                title="@Localizer["Stats_Row_ExcludeTitle"]"
                                                 type="button">
                                                 <i aria-hidden="true" class="bi bi-dash-circle"></i>
                                             </button>
@@ -101,7 +101,7 @@
                             @if (stats.MissingCount > 0 && section.Dimension != StatsDimension.EventId)
                             {
                                 <div class="stats-none-pinned stats-row stats-row-none">
-                                    <span class="stats-row-value">(none)</span>
+                                    <span class="stats-row-value">@Localizer["Stats_NoneValue"]</span>
                                     <span class="stats-row-count">@FormatCount(stats.MissingCount)</span>
                                     <span class="stats-row-percent">@FormatPercent(Share(stats.MissingCount, stats.Total))</span>
                                     <span aria-hidden="true" class="stats-row-bar">
@@ -119,7 +119,7 @@
                                         disabled="@IsSectionStale(section)"
                                         @onclick="() => OpenDetail(section.Dimension)"
                                         type="button">
-                                        View all
+                                        @Localizer["Stats_ViewAll"]
                                     </button>
                                 }
                             </div>
@@ -127,7 +127,7 @@
                     }
                     else
                     {
-                        <div class="stats-section-empty">Computing...</div>
+                        <div class="stats-section-empty">@Localizer["Stats_Computing"]</div>
                     }
                 </section>
             }

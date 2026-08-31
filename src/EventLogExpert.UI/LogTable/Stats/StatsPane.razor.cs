@@ -3,18 +3,20 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.LogTable.OrderedView;
 using EventLogExpert.Runtime.Stats;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Globalization;
-using System.Text;
 
 namespace EventLogExpert.UI.LogTable.Stats;
 
@@ -35,12 +37,12 @@ public sealed partial class StatsPane
     // SeverityLevel (0 = Unknown, 1-5 = Critical..Verbose), matching LevelSeverity.Slot.
     private static readonly SeveritySlot[] s_severityOrder =
     [
-        new((int)SeverityLevel.Critical, nameof(SeverityLevel.Critical), "stats-sev-critical"),
-        new((int)SeverityLevel.Error, nameof(SeverityLevel.Error), "stats-sev-error"),
-        new((int)SeverityLevel.Warning, nameof(SeverityLevel.Warning), "stats-sev-warning"),
-        new((int)SeverityLevel.Information, nameof(SeverityLevel.Information), "stats-sev-information"),
-        new((int)SeverityLevel.Verbose, nameof(SeverityLevel.Verbose), "stats-sev-verbose"),
-        new(0, "Unknown", "stats-sev-unknown")
+        new((int)SeverityLevel.Critical, SeverityLevel.Critical, "stats-sev-critical"),
+        new((int)SeverityLevel.Error, SeverityLevel.Error, "stats-sev-error"),
+        new((int)SeverityLevel.Warning, SeverityLevel.Warning, "stats-sev-warning"),
+        new((int)SeverityLevel.Information, SeverityLevel.Information, "stats-sev-information"),
+        new((int)SeverityLevel.Verbose, SeverityLevel.Verbose, "stats-sev-verbose"),
+        new(0, null, "stats-sev-unknown")
     ];
 
     private static int s_resizeSession;
@@ -81,6 +83,8 @@ public sealed partial class StatsPane
     private bool IsSeverityStale => _severityToken != _currentToken;
 
     [Inject] private IJSRuntime JsRuntime { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
 
@@ -203,32 +207,6 @@ public sealed partial class StatsPane
         ScheduleRecompute();
     }
 
-    private static string CoverageNoun(StatsDimension dimension, int count)
-    {
-        bool singular = count == 1;
-
-        return dimension switch
-        {
-            StatsDimension.Source => singular ? "source" : "sources",
-            StatsDimension.EventId => singular ? "event ID" : "event IDs",
-            StatsDimension.TaskCategory => singular ? "task category" : "task categories",
-            StatsDimension.User => singular ? "user" : "users",
-            _ => singular ? "value" : "values"
-        };
-    }
-
-    private static string CoverageText(DimensionStats stats)
-    {
-        string noun = CoverageNoun(stats.Dimension, stats.DistinctCount);
-        int coveredPercent = (int)Math.Round(Share(stats.ShownEventCount, stats.Total), MidpointRounding.AwayFromZero);
-
-        string scope = stats.Top.Count >= stats.DistinctCount
-            ? $"All {FormatCount(stats.DistinctCount)} {noun}"
-            : $"Top {stats.Top.Count} of {FormatCount(stats.DistinctCount)} {noun}";
-
-        return $"{scope} - {coveredPercent}% of events";
-    }
-
     private static string Css(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
 
     private static string FormatCount(int value) => value.ToString("N0", CultureInfo.CurrentCulture);
@@ -253,28 +231,74 @@ public sealed partial class StatsPane
 
     private bool AreRowActionsDisabled(DimensionSection section) => section.Stats is null || IsSectionStale(section);
 
+    private string CoverageText(DimensionStats stats)
+    {
+        int coveredPercent = (int)Math.Round(Share(stats.ShownEventCount, stats.Total), MidpointRounding.AwayFromZero);
+        bool all = stats.Top.Count >= stats.DistinctCount;
+
+        return stats.Dimension switch
+        {
+            StatsDimension.Source => all ?
+                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_All_Source_One" : "Stats_Coverage_All_Source_Many",
+                    FormatCount(stats.DistinctCount),
+                    coveredPercent] :
+                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_Top_Source_One" : "Stats_Coverage_Top_Source_Many",
+                    stats.Top.Count,
+                    FormatCount(stats.DistinctCount),
+                    coveredPercent],
+            StatsDimension.EventId => all ?
+                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_All_EventId_One" :
+                        "Stats_Coverage_All_EventId_Many",
+                    FormatCount(stats.DistinctCount),
+                    coveredPercent] :
+                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_Top_EventId_One" :
+                        "Stats_Coverage_Top_EventId_Many",
+                    stats.Top.Count,
+                    FormatCount(stats.DistinctCount),
+                    coveredPercent],
+            StatsDimension.TaskCategory => all ?
+                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_All_TaskCategory_One" :
+                        "Stats_Coverage_All_TaskCategory_Many",
+                    FormatCount(stats.DistinctCount),
+                    coveredPercent] :
+                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_Top_TaskCategory_One" :
+                        "Stats_Coverage_Top_TaskCategory_Many",
+                    stats.Top.Count,
+                    FormatCount(stats.DistinctCount),
+                    coveredPercent],
+            StatsDimension.User => all ?
+                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_All_User_One" : "Stats_Coverage_All_User_Many",
+                    FormatCount(stats.DistinctCount),
+                    coveredPercent] :
+                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_Top_User_One" : "Stats_Coverage_Top_User_Many",
+                    stats.Top.Count,
+                    FormatCount(stats.DistinctCount),
+                    coveredPercent],
+            _ => throw new ArgumentOutOfRangeException(nameof(stats), stats.Dimension, null)
+        };
+    }
+
     private void ExcludeContributor(DimensionSection section, StatsContributor contributor) =>
         ApplyRowLens(section, contributor, include: false);
 
     private string HeadlineText()
     {
-        if (_severity is not var (total, slots)) { return "Computing statistics..."; }
+        if (_severity is not var (total, slots)) { return Localizer["Stats_Headline_Computing"]; }
 
         if (total == 0)
         {
             return FilterLenses.Lenses.Count > 0 ?
-                "0 events - remove a lens to continue" :
-                "No events in the current view";
+                Localizer["Stats_Headline_RemoveLens"] :
+                Localizer["Stats_Headline_Empty"];
         }
 
-        var headline = new StringBuilder();
-        headline.Append(FormatCount(total)).Append(total == 1 ? " event" : " events");
+        string headline = Localizer[total == 1 ? "Stats_Headline_Events_One" : "Stats_Headline_Events_Many", FormatCount(total)];
 
         int errorCritical = slots[(int)SeverityLevel.Critical] + slots[(int)SeverityLevel.Error];
 
         if (errorCritical > 0)
         {
-            headline.Append(" - ").Append(FormatCount(errorCritical)).Append(" error/critical");
+            headline += Localizer[errorCritical == 1 ? "Stats_Headline_ErrorCritical_One" : "Stats_Headline_ErrorCritical_Many", FormatCount(errorCritical)].Value;
         }
 
         DimensionSection source = SectionFor(StatsDimension.Source);
@@ -288,14 +312,10 @@ public sealed partial class StatsPane
 
             int percent = (int)Math.Round(covered * 100.0 / total, MidpointRounding.AwayFromZero);
 
-            headline.Append(" - top ")
-                .Append(shown)
-                .Append(shown == 1 ? " source = " : " sources = ")
-                .Append(percent)
-                .Append('%');
+            headline += Localizer[shown == 1 ? "Stats_Headline_TopSources_One" : "Stats_Headline_TopSources_Many", shown, percent].Value;
         }
 
-        return headline.ToString();
+        return headline;
     }
 
     private void IncludeContributor(DimensionSection section, StatsContributor contributor) =>
@@ -419,10 +439,6 @@ public sealed partial class StatsPane
     private DimensionSection SectionFor(StatsDimension dimension) =>
         _sections.First(section => section.Dimension == dimension);
 
-    private string SeverityBarAria() =>
-        "Severity breakdown: " +
-        string.Join(", ", SeveritySegments().Select(segment => $"{FormatCount(segment.Count)} {segment.Label.ToLower(CultureInfo.CurrentCulture)}"));
-
     private IReadOnlyList<SeveritySegment> SeveritySegments()
     {
         if (_severity is not { Total: > 0 } severity) { return []; }
@@ -435,7 +451,11 @@ public sealed partial class StatsPane
 
             if (count == 0) { continue; }
 
-            segments.Add(new SeveritySegment(slot.Label, slot.CssClass, count, Share(count, severity.Total)));
+            segments.Add(new SeveritySegment(
+                SeverityLevelLocalizer.Label(Localizer, slot.Level),
+                slot.CssClass,
+                count,
+                Share(count, severity.Total)));
         }
 
         return segments;
@@ -490,7 +510,7 @@ public sealed partial class StatsPane
         public ViewContentToken StatsToken { get; set; } = ViewContentToken.Empty;
     }
 
-    private sealed record SeveritySlot(int Index, string Label, string CssClass);
+    private sealed record SeveritySlot(int Index, SeverityLevel? Level, string CssClass);
 
     private sealed record SeveritySegment(string Label, string CssClass, int Count, double Percent);
 }

@@ -64,8 +64,8 @@ public sealed class HistogramAggregatorTests
     [Fact]
     public void Aggregate_GroupByCategories_SumsEachCategorySlotAcrossBaseBins()
     {
-        // Two categories (slots 0, 1) plus Other (slot 2), 2 base bins. ForCategories orders groups Other, cat0, cat1.
-        var groups = HistogramGroups.ForCategories(["a", "b"]);
+        // Two categories (slots 0, 1) plus an unrendered overflow slot, 2 base bins.
+        var groups = HistogramGroups.ForCategories(["a", "b"], ["a", "b"], otherLabel: null);
         var slots = new int[2 * 3];
         slots[(0 * 3) + 0] = 3; // bin0 category a
         slots[(0 * 3) + 1] = 1; // bin0 category b
@@ -77,11 +77,10 @@ public sealed class HistogramAggregatorTests
         HistogramRender render = HistogramAggregator.Aggregate(data, 0, 19, targetBins: 1);
 
         var bin = Assert.Single(render.Bins);
-        Assert.Equal(4, bin.GroupCounts[0]); // Other
-        Assert.Equal(5, bin.GroupCounts[1]); // category a
-        Assert.Equal(1, bin.GroupCounts[2]); // category b
-        Assert.Equal(10, bin.Total);
-        Assert.Equal([4, 5, 1], render.WindowGroupTotals);
+        Assert.Equal(5, bin.GroupCounts[0]); // category a
+        Assert.Equal(1, bin.GroupCounts[1]); // category b
+        Assert.Equal(6, bin.Total);
+        Assert.Equal([5, 1], render.WindowGroupTotals);
     }
 
     [Fact]

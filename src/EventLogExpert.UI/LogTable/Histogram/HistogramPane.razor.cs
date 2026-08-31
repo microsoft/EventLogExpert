@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.EventLog;
@@ -12,10 +13,12 @@ using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.LogTable.OrderedView;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.LogTable.Find;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -89,6 +92,8 @@ public sealed partial class HistogramPane
     [Inject] private IHighlightSelector HighlightSelector { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -178,7 +183,7 @@ public sealed partial class HistogramPane
         ApplyZoom(zoomIn ? ZoomInFactor : ZoomOutFactor, Math.Clamp(cursorFraction, 0, 1));
     }
 
-    internal static (string? CssName, string Description) ResolveGroupHighlight(
+    internal static HistogramGroupHighlight ResolveGroupHighlight(
         uint mask,
         IReadOnlyList<SavedFilter> tieHighlightFilters)
     {
@@ -190,7 +195,7 @@ public sealed partial class HistogramPane
         {
             if ((mask & (1u << bit)) == 0) { continue; }
 
-            if (bit - 1 >= tieHighlightFilters.Count) { return (null, "Mixed highlights"); }
+            if (bit - 1 >= tieHighlightFilters.Count) { return new HistogramGroupHighlight(null, HistogramHighlightKind.Mixed, null); }
 
             HighlightColor color = tieHighlightFilters[bit - 1].Color;
 
@@ -213,15 +218,15 @@ public sealed partial class HistogramPane
             {
                 distinctColors++;
 
-                return (null, "Mixed highlights");
+                return new HistogramGroupHighlight(null, HistogramHighlightKind.Mixed, null);
             }
         }
 
-        if (hasUncolored && distinctColors > 0) { return (null, "Mixed highlights"); }
+        if (hasUncolored && distinctColors > 0) { return new HistogramGroupHighlight(null, HistogramHighlightKind.Mixed, null); }
 
-        return winner is { } highlight && distinctColors == 1
-            ? (highlight.ToCssName(), $"{HighlightColorDisplayName(highlight)} highlight")
-            : (null, "Uncolored");
+        return winner is { } highlight && distinctColors == 1 ?
+            new HistogramGroupHighlight(highlight.ToCssName(), HistogramHighlightKind.Single, highlight) :
+            new HistogramGroupHighlight(null, HistogramHighlightKind.Uncolored, null);
     }
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
@@ -312,62 +317,13 @@ public sealed partial class HistogramPane
         ScheduleRecompute();
     }
 
-    private static string DimensionLabel(HistogramDimension dimension) => dimension switch
-    {
-        HistogramDimension.EventId => "Event ID",
-        HistogramDimension.LogonType => "Logon Type",
-        HistogramDimension.TaskCategory => "Task Category",
-        HistogramDimension.TicketEncryptionType => "Ticket Encryption Type",
-        HistogramDimension.ErrorCode => "Error Code",
-        HistogramDimension.ProcessImage => "Process Image",
-        HistogramDimension.ParentProcessImage => "Parent Process Image",
-        _ => dimension.ToString()
-    };
-
-    private static string EmptyStateMessage(HistogramDimension dimension, bool visibleRange) => dimension switch
-    {
-        HistogramDimension.ErrorCode => visibleRange
-            ? "No update error codes in the visible range."
-            : "No update error codes in this view.",
-        HistogramDimension.ProcessImage => visibleRange
-            ? "No process image names in the visible range."
-            : "No process image names in this view.",
-        HistogramDimension.ParentProcessImage => visibleRange
-            ? "No parent process image names in the visible range."
-            : "No parent process image names in this view.",
-        _ => visibleRange
-            ? "No events to chart in the current view."
-            : $"No {DimensionLabel(dimension)} values in this view."
-    };
-
     private static string FindMarkerPoints(double centerX) =>
         $"{FormatCoordinate(centerX - 3)},0 {FormatCoordinate(centerX + 3)},0 {FormatCoordinate(centerX)},5";
 
     private static string FormatCoordinate(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
-    private static string HighlightColorDisplayName(HighlightColor color)
-    {
-        string name = color.ToString();
-        var parts = new List<string>();
-        int start = 0;
-
-        for (int index = 1; index < name.Length; index++)
-        {
-            if (!char.IsUpper(name[index])) { continue; }
-
-            parts.Add(name[start..index]);
-            start = index;
-        }
-
-        parts.Add(name[start..]);
-
-        string joined = string.Join(" ", parts).ToLowerInvariant();
-
-        return joined.Length == 0 ? joined : char.ToUpperInvariant(joined[0]) + joined[1..];
-    }
-
     private static bool IsCategoricalOther(HistogramData data, int group) =>
-        group < data.Groups.Count && data.Groups[group].ColorClass == "histogram-cat-other";
+        group < data.Groups.Count && data.Groups[group].Label is HistogramGroupLabel.CategoricalOther;
 
     private static bool ShouldArmTie(SavedFilter[] filters)
     {
@@ -420,7 +376,7 @@ public sealed partial class HistogramPane
             {
                 if (generation != _announceGeneration || _disposed || _render is not { } render || _baseData is not { } data) { return; }
 
-                _announcement = HistogramSummary.WindowAnnouncement(render, data.Groups, data.EventNoun, _timeZone);
+                _announcement = WindowAnnouncement(render, data);
                 StateHasChanged();
             });
         }
@@ -526,11 +482,19 @@ public sealed partial class HistogramPane
     {
         var start = ToDisplay(new DateTime(bin.StartTicks, DateTimeKind.Utc));
         var end = ToDisplay(new DateTime(Math.Max(bin.StartTicks, bin.EndTicks), DateTimeKind.Utc));
-        bool crossesDay = WindowCrossesDay();
-        string startText = crossesDay ? $"{start:d} {start:HH:mm:ss}" : $"{start:HH:mm:ss}";
-        string endText = crossesDay ? $"{end:d} {end:HH:mm:ss}" : $"{end:HH:mm:ss}";
+        var data = _baseData;
 
-        return $"{bin.Total} {_baseData?.EventNoun ?? "events"}{GroupBreakdown(bin)}, {startText} - {endText}";
+        IReadOnlyList<HistogramBreakdownItem> breakdownItems = data is null ? [] :
+            HistogramTextComposer.GroupBreakdownItems(bin.GroupCounts, data.Groups, GroupHighlightText);
+
+        return HistogramTextComposer.BarTooltip(
+            Localizer,
+            bin.Total,
+            data?.EventNoun ?? HistogramEventNoun.Events,
+            start,
+            end,
+            WindowCrossesDay(),
+            breakdownItems);
     }
 
     private int BarsAreaHeight() => Math.Max(0, _plotHeightPx - AxisReservePx);
@@ -539,9 +503,19 @@ public sealed partial class HistogramPane
     {
         var start = ToDisplay(new DateTime(bin.StartTicks, DateTimeKind.Utc));
         var end = ToDisplay(new DateTime(Math.Max(bin.StartTicks, bin.EndTicks), DateTimeKind.Utc));
-        string anomaly = bin.IsAnomaly ? ", spike" : string.Empty;
+        var data = _baseData;
+        IReadOnlyList<HistogramBreakdownItem> breakdownItems = data is null
+            ? []
+            : HistogramTextComposer.GroupBreakdownItems(bin.GroupCounts, data.Groups, GroupHighlightText);
 
-        return $"{start:g} to {end:g}: {bin.Total} {_baseData?.EventNoun ?? "events"}{GroupBreakdown(bin)}{anomaly}.";
+        return HistogramTextComposer.BinCursorAnnouncement(
+            Localizer,
+            bin.Total,
+            data?.EventNoun ?? HistogramEventNoun.Events,
+            start,
+            end,
+            bin.IsAnomaly,
+            breakdownItems);
     }
 
     private void ClearBinCursor()
@@ -601,6 +575,53 @@ public sealed partial class HistogramPane
         }
     }
 
+    private string DimensionLabel(HistogramDimension dimension) =>
+        HistogramDimensionLocalizer.Label(Localizer, dimension);
+
+    private string EmptyStateMessage(HistogramDimension dimension, bool visibleRange) =>
+        dimension switch
+        {
+            HistogramDimension.Severity => visibleRange ?
+                Localizer["Histogram_Empty_Severity_VisibleRange"] :
+                Localizer["Histogram_Empty_Severity_ThisView"],
+            HistogramDimension.Source => visibleRange ?
+                Localizer["Histogram_Empty_Source_VisibleRange"] :
+                Localizer["Histogram_Empty_Source_ThisView"],
+            HistogramDimension.EventId => visibleRange ?
+                Localizer["Histogram_Empty_EventId_VisibleRange"] :
+                Localizer["Histogram_Empty_EventId_ThisView"],
+            HistogramDimension.TaskCategory => visibleRange ?
+                Localizer["Histogram_Empty_TaskCategory_VisibleRange"] :
+                Localizer["Histogram_Empty_TaskCategory_ThisView"],
+            HistogramDimension.Opcode => visibleRange ?
+                Localizer["Histogram_Empty_Opcode_VisibleRange"] :
+                Localizer["Histogram_Empty_Opcode_ThisView"],
+            HistogramDimension.Log => visibleRange ?
+                Localizer["Histogram_Empty_Log_VisibleRange"] :
+                Localizer["Histogram_Empty_Log_ThisView"],
+            HistogramDimension.LogonType => visibleRange ?
+                Localizer["Histogram_Empty_LogonType_VisibleRange"] :
+                Localizer["Histogram_Empty_LogonType_ThisView"],
+            HistogramDimension.TicketEncryptionType => visibleRange ?
+                Localizer["Histogram_Empty_TicketEncryptionType_VisibleRange"] :
+                Localizer["Histogram_Empty_TicketEncryptionType_ThisView"],
+            HistogramDimension.ErrorCode => visibleRange ?
+                Localizer["Histogram_Empty_ErrorCode_VisibleRange"] :
+                Localizer["Histogram_Empty_ErrorCode_ThisView"],
+            HistogramDimension.ProcessImage => visibleRange ?
+                Localizer["Histogram_Empty_ProcessImage_VisibleRange"] :
+                Localizer["Histogram_Empty_ProcessImage_ThisView"],
+            HistogramDimension.ParentProcessImage => visibleRange ?
+                Localizer["Histogram_Empty_ParentProcessImage_VisibleRange"] :
+                Localizer["Histogram_Empty_ParentProcessImage_ThisView"],
+            _ => throw new ArgumentOutOfRangeException(nameof(dimension),
+                dimension,
+                null)
+        };
+
+    private string EventNoun(HistogramEventNoun eventNoun, int count) =>
+        HistogramTextComposer.EventNoun(Localizer, eventNoun, count);
+
     private void Fit()
     {
         if (_baseData is not { } data) { return; }
@@ -622,27 +643,8 @@ public sealed partial class HistogramPane
         return (double)(ticks - render.WindowStartTicks) / span * _viewportWidthPx;
     }
 
-    private string GroupBreakdown(HistogramRenderBin bin)
-    {
-        if (_baseData is not { } data) { return string.Empty; }
-
-        var parts = new List<string>();
-
-        for (int group = data.Groups.Count - 1; group >= 0; group--)
-        {
-            int count = bin.GroupCounts[group];
-
-            if (count > 0)
-            {
-                string highlight = GroupHighlightText(group);
-                parts.Add(string.IsNullOrEmpty(highlight)
-                    ? $"{count} {data.Groups[group].Label}"
-                    : $"{count} {data.Groups[group].Label}, {highlight}");
-            }
-        }
-
-        return parts.Count == 0 ? string.Empty : $" ({string.Join(", ", parts)})";
-    }
+    private string FormatGroupLabel(HistogramGroup group) =>
+        HistogramGroupLabelFormatter.Format(Localizer, group.Label);
 
     private string GroupColorClass(int group)
     {
@@ -655,16 +657,30 @@ public sealed partial class HistogramPane
 
     private string? GroupHighlightCssName(int group)
     {
-        if (_baseData is not { } data || IsCategoricalOther(data, group) || data.GroupHighlightMasks is not { } masks || group >= masks.Length) { return null; }
+        if (_baseData is not { } data ||
+            IsCategoricalOther(data, group) ||
+            data.GroupHighlightMasks is not { } masks ||
+            group >= masks.Length)
+        {
+            return null;
+        }
 
         return ResolveGroupHighlight(masks[group]).CssName;
     }
 
     private string GroupHighlightText(int group)
     {
-        if (_baseData is not { } data || IsCategoricalOther(data, group) || data.GroupHighlightMasks is not { } masks || group >= masks.Length) { return string.Empty; }
+        if (_baseData is not { } data ||
+            IsCategoricalOther(data, group) ||
+            data.GroupHighlightMasks is not { } masks ||
+            group >= masks.Length)
+        {
+            return string.Empty;
+        }
 
-        return ResolveGroupHighlight(masks[group]).Description;
+        HistogramGroupHighlight highlight = ResolveGroupHighlight(masks[group]);
+
+        return HistogramHighlightFormatter.Format(Localizer, highlight);
     }
 
     private void HandleKeyDown(KeyboardEventArgs args)
@@ -863,8 +879,17 @@ public sealed partial class HistogramPane
         StateHasChanged();
     }
 
+    private string RegionAria(HistogramData data)
+    {
+        var min = ToDisplay(data.MinUtc);
+        var max = ToDisplay(data.MaxUtc);
+        var breakdownItems = HistogramTextComposer.GroupBreakdownItems(data.GroupTotals(), data.Groups, groupHighlightText: null);
+
+        return HistogramTextComposer.RegionAria(Localizer, data.Total, data.EventNoun, min, max, breakdownItems);
+    }
+
     private string RegionAria() =>
-        _baseData is { } data ? HistogramSummary.RegionLabel(data, _timeZone) : "Timeline";
+        _baseData is { } data ? RegionAria(data) : Localizer["Histogram_TimelineRoleDescription"];
 
     private void ResolveFocusedTicks()
     {
@@ -876,7 +901,7 @@ public sealed partial class HistogramPane
             view.TryGetTimeTicks(handle, out long ticks) ? ticks : null;
     }
 
-    private (string? CssName, string Description) ResolveGroupHighlight(uint mask) =>
+    private HistogramGroupHighlight ResolveGroupHighlight(uint mask) =>
         ResolveGroupHighlight(mask, _tieHighlightFilters);
 
     private async Task RunScanAsync(
@@ -1152,6 +1177,15 @@ public sealed partial class HistogramPane
         }
 
         AggregateAndRender();
+    }
+
+    private string WindowAnnouncement(HistogramRender render, HistogramData data)
+    {
+        var start = ToDisplay(new DateTime(render.WindowStartTicks, DateTimeKind.Utc));
+        var end = ToDisplay(new DateTime(render.WindowEndTicks, DateTimeKind.Utc));
+        var breakdownItems = HistogramTextComposer.GroupBreakdownItems(render.WindowGroupTotals, data.Groups, groupHighlightText: null);
+
+        return HistogramTextComposer.WindowAnnouncement(Localizer, render.WindowTotal, data.EventNoun, start, end, breakdownItems);
     }
 
     private int WindowBinCount(HistogramData data)

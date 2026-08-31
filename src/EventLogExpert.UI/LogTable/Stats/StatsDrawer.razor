@@ -1,7 +1,7 @@
 @inherits AppStateComponentBase
 
 <div class="stats-drawer@(IsOpen ? " stats-drawer-open" : "")" id="stats-drawer">
-    <div aria-hidden="true" class="stats-drawer-resizer" title="Drag to resize"></div>
+    <div aria-hidden="true" class="stats-drawer-resizer" title="@Localizer["Stats_Drawer_ResizeTitle"]"></div>
     @if (IsOpen)
     {
         <StatsPane />

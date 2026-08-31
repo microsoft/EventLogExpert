@@ -13,6 +13,7 @@ using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.LogTable.OrderedView;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.LogTable.Find;
 using EventLogExpert.UI.LogTable.Histogram;
@@ -71,6 +72,7 @@ public sealed class HistogramPaneTests : BunitContext
         _highlightSelector.ComputePredicatePlanKey(Arg.Any<ImmutableList<SavedFilter>>()).Returns(0);
         _settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
 
+        Services.AddEventLogLocalization();
         Services.AddImmediateCpuWorkScheduler();
         Services.AddSingleton(_activeEventLog);
         Services.AddSingleton(_viewSource);
@@ -84,7 +86,7 @@ public sealed class HistogramPaneTests : BunitContext
         Services.AddSingleton(_traceLogger);
     }
 
-    public static TheoryData<uint, SavedFilter[], string?, string> GroupHighlightCases()
+    public static TheoryData<uint, SavedFilter[], string?, HistogramHighlightKind, HighlightColor?> GroupHighlightCases()
 
     {
         var lightRed = Filter(HighlightColor.LightRed);
@@ -92,16 +94,16 @@ public sealed class HistogramPaneTests : BunitContext
         var lightBlue = Filter(HighlightColor.LightBlue);
         var none = Filter(HighlightColor.None);
 
-        return new TheoryData<uint, SavedFilter[], string?, string>
+        return new TheoryData<uint, SavedFilter[], string?, HistogramHighlightKind, HighlightColor?>
         {
-            { (1u << 1) | (1u << 2), [lightRed, anotherLightRed], "lightred", "Light red highlight" },
-            { (1u << 1) | (1u << 2), [lightRed, lightBlue], null, "Mixed highlights" },
-            { 1u | (1u << 1), [lightRed], null, "Mixed highlights" },
-            { (1u << 1) | (1u << 2), [none, lightRed], null, "Mixed highlights" },
-            { 0u, [lightRed], null, "Uncolored" },
-            { 1u, [lightRed], null, "Uncolored" },
-            { 1u << 1, [none], null, "Uncolored" },
-            { 1u << 3, [lightRed], null, "Mixed highlights" }
+            { (1u << 1) | (1u << 2), [lightRed, anotherLightRed], "lightred", HistogramHighlightKind.Single, HighlightColor.LightRed },
+            { (1u << 1) | (1u << 2), [lightRed, lightBlue], null, HistogramHighlightKind.Mixed, null },
+            { 1u | (1u << 1), [lightRed], null, HistogramHighlightKind.Mixed, null },
+            { (1u << 1) | (1u << 2), [none, lightRed], null, HistogramHighlightKind.Mixed, null },
+            { 0u, [lightRed], null, HistogramHighlightKind.Uncolored, null },
+            { 1u, [lightRed], null, HistogramHighlightKind.Uncolored, null },
+            { 1u << 1, [none], null, HistogramHighlightKind.Uncolored, null },
+            { 1u << 3, [lightRed], null, HistogramHighlightKind.Mixed, null }
         };
     }
 
@@ -462,7 +464,10 @@ public sealed class HistogramPaneTests : BunitContext
     [Fact]
     public async Task Render_WhenTieModeIncludesCategoricalOther_RendersOtherAsRecessiveGray()
     {
-        IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories(["alpha"], ["Alpha"], "Other");
+        IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories(
+            ["alpha"],
+            ["Alpha"],
+            new HistogramGroupLabel.CategoricalOther(HistogramDimension.Source, 0));
         var data = new HistogramData(
             [1, 1],
             2,
@@ -490,12 +495,14 @@ public sealed class HistogramPaneTests : BunitContext
         uint mask,
         SavedFilter[] filters,
         string? expectedCssName,
-        string expectedDescription)
+        HistogramHighlightKind expectedKind,
+        HighlightColor? expectedColor)
     {
-        (string? cssName, string description) = HistogramPane.ResolveGroupHighlight(mask, filters);
+        HistogramGroupHighlight highlight = HistogramPane.ResolveGroupHighlight(mask, filters);
 
-        Assert.Equal(expectedCssName, cssName);
-        Assert.Equal(expectedDescription, description);
+        Assert.Equal(expectedCssName, highlight.CssName);
+        Assert.Equal(expectedKind, highlight.Kind);
+        Assert.Equal(expectedColor, highlight.Color);
     }
 
     [Fact]
@@ -629,7 +636,10 @@ public sealed class HistogramPaneTests : BunitContext
             new DateTime(2024, 1, 1, 1, 0, 0, DateTimeKind.Utc),
             2,
             TimeSpan.FromHours(1).Ticks,
-            HistogramGroups.ForCategories(["alpha"], ["Alpha"], "Other"),
+            HistogramGroups.ForCategories(
+                ["alpha"],
+                ["Alpha"],
+                new HistogramGroupLabel.CategoricalOther(HistogramDimension.Source, 0)),
             [1u << 1, 1u << 1]);
 
     private static SavedFilter Filter(HighlightColor color) =>

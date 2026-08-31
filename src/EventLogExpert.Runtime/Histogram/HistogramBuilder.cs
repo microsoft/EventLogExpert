@@ -10,7 +10,6 @@ namespace EventLogExpert.Runtime.Histogram;
 
 public static class HistogramBuilder
 {
-    private const string ErrorCodeEventNoun = "error-code events";
     // The ErrorCode dimension keys on the lowercase win:HexInt32 / win:UnicodeString errorCode field, scoped to the update
     // and servicing providers so a generic errorCode field on an unrelated provider does not pollute the failure view.
     private const string ErrorCodeFieldName = "errorCode";
@@ -69,7 +68,7 @@ public static class HistogramBuilder
                 bucketCount,
                 useHighlightTie,
                 highlightWinners,
-                DimensionOtherNoun(dimension),
+                dimension,
                 cancellationToken);
         }
 
@@ -88,7 +87,7 @@ public static class HistogramBuilder
                 bucketCount,
                 useHighlightTie,
                 highlightWinners,
-                DimensionOtherNoun(dimension),
+                dimension,
                 cancellationToken);
         }
 
@@ -104,7 +103,7 @@ public static class HistogramBuilder
                 bucketCount,
                 useHighlightTie,
                 highlightWinners,
-                DimensionOtherNoun(HistogramDimension.Log),
+                HistogramDimension.Log,
                 cancellationToken),
             _ => ScanByField(view,
                 ToFieldId(dimension),
@@ -114,7 +113,7 @@ public static class HistogramBuilder
                 bucketCount,
                 useHighlightTie,
                 highlightWinners,
-                DimensionOtherNoun(dimension),
+                dimension,
                 cancellationToken)
         };
 
@@ -157,17 +156,16 @@ public static class HistogramBuilder
             return new HistogramData([], 0, bucketCount, minUtc, maxUtc, 0, bucketSpanTicks, [])
             {
                 GroupingFieldAbsent = true,
-                EventNoun = ErrorCodeEventNoun
+                EventNoun = HistogramEventNoun.ErrorCodeEvents
             };
         }
 
         int keptCount = ResolveKeptCount(counts.Count, useHighlightTie);
-        long[] targetCodes = counts
+        long[] targetCodes = [.. counts
             .OrderByDescending(pair => pair.Value)
             .ThenBy(pair => pair.Key)
             .Take(keptCount)
-            .Select(pair => pair.Key)
-            .ToArray();
+            .Select(pair => pair.Key)];
 
         int slotCount = targetCodes.Length + 1;
         int[] slotCounts = new int[bucketCount * slotCount];
@@ -203,7 +201,13 @@ public static class HistogramBuilder
 
         foreach (int count in slotCounts) { total += count; }
 
-        string? otherLabel = ResolveOtherLabel(slotCounts, bucketCount, slotCount, counts.Count, keptCount, DimensionOtherNoun(HistogramDimension.ErrorCode));
+        HistogramGroupLabel.CategoricalOther? otherLabel = ResolveOtherLabel(
+            slotCounts,
+            bucketCount,
+            slotCount,
+            counts.Count,
+            keptCount,
+            HistogramDimension.ErrorCode);
 
         // Key = the raw invariant code (stable toggle key); Label = the 8-digit hex form plus its curated HRESULT symbol.
         string[] keys = Array.ConvertAll(targetCodes, code => code.ToString(CultureInfo.InvariantCulture));
@@ -221,7 +225,7 @@ public static class HistogramBuilder
             groups,
             FoldGroupMasks(slotColorMask, groups))
         {
-            EventNoun = ErrorCodeEventNoun
+            EventNoun = HistogramEventNoun.ErrorCodeEvents
         };
     }
 
@@ -234,7 +238,7 @@ public static class HistogramBuilder
         int bucketCount,
         bool useHighlightTie,
         byte[]? highlightWinners,
-        (string Singular, string Plural) otherNoun,
+        HistogramDimension dimension,
         CancellationToken cancellationToken)
     {
         var counts = new Dictionary<long, int>();
@@ -253,12 +257,11 @@ public static class HistogramBuilder
         }
 
         int keptCount = ResolveKeptCount(counts.Count, useHighlightTie);
-        long[] targetCodes = counts
+        long[] targetCodes = [.. counts
             .OrderByDescending(pair => pair.Value)
             .ThenBy(pair => pair.Key)
             .Take(keptCount)
-            .Select(pair => pair.Key)
-            .ToArray();
+            .Select(pair => pair.Key)];
 
         int slotCount = targetCodes.Length + 1;
         int[] slotCounts = new int[bucketCount * slotCount];
@@ -285,7 +288,13 @@ public static class HistogramBuilder
 
         foreach (int count in slotCounts) { total += count; }
 
-        string? otherLabel = ResolveOtherLabel(slotCounts, bucketCount, slotCount, counts.Count, keptCount, otherNoun);
+        HistogramGroupLabel.CategoricalOther? otherLabel = ResolveOtherLabel(
+            slotCounts,
+            bucketCount,
+            slotCount,
+            counts.Count,
+            keptCount,
+            dimension);
 
         // Key = the raw invariant code (stable toggle key); Label = the friendly decode, or the raw code when unrecognized.
         string[] keys = Array.ConvertAll(targetCodes, code => code.ToString(CultureInfo.InvariantCulture));
@@ -316,7 +325,7 @@ public static class HistogramBuilder
         int bucketCount,
         bool useHighlightTie,
         byte[]? highlightWinners,
-        (string Singular, string Plural) otherNoun,
+        HistogramDimension dimension,
         CancellationToken cancellationToken)
     {
         var rawCounts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -340,12 +349,11 @@ public static class HistogramBuilder
         }
 
         int keptCount = ResolveKeptCount(byShortName.Count, useHighlightTie);
-        string[] topShortNames = byShortName
+        string[] topShortNames = [.. byShortName
             .OrderByDescending(pair => pair.Value)
             .ThenBy(pair => pair.Key, StringComparer.Ordinal)
             .Take(keptCount)
-            .Select(pair => pair.Key)
-            .ToArray();
+            .Select(pair => pair.Key)];
 
         int slotCount = topShortNames.Length + 1;
         int otherSlot = topShortNames.Length;
@@ -391,26 +399,26 @@ public static class HistogramBuilder
         int total = 0;
         foreach (int count in slotCounts) { total += count; }
 
-        string? otherLabel = ResolveOtherLabel(slotCounts, bucketCount, slotCount, byShortName.Count, keptCount, otherNoun);
+        HistogramGroupLabel.CategoricalOther? otherLabel = ResolveOtherLabel(
+            slotCounts,
+            bucketCount,
+            slotCount,
+            byShortName.Count,
+            keptCount,
+            dimension);
         IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories(topShortNames, topShortNames, otherLabel);
 
-        return new HistogramData(slotCounts, slotCount, bucketCount, minUtc, maxUtc, total, bucketSpanTicks, groups, FoldGroupMasks(slotColorMask, groups));
+        return new HistogramData(
+            slotCounts,
+            slotCount,
+            bucketCount,
+            minUtc,
+            maxUtc,
+            total,
+            bucketSpanTicks,
+            groups,
+            FoldGroupMasks(slotColorMask, groups));
     }
-
-    private static (string Singular, string Plural) DimensionOtherNoun(HistogramDimension dimension) => dimension switch
-    {
-        HistogramDimension.EventId => ("event ID", "event IDs"),
-        HistogramDimension.Source => ("source", "sources"),
-        HistogramDimension.TaskCategory => ("task category", "task categories"),
-        HistogramDimension.Opcode => ("opcode", "opcodes"),
-        HistogramDimension.Log => ("log", "logs"),
-        HistogramDimension.LogonType => ("logon type", "logon types"),
-        HistogramDimension.TicketEncryptionType => ("ticket encryption type", "ticket encryption types"),
-        HistogramDimension.ErrorCode => ("error code", "error codes"),
-        HistogramDimension.ProcessImage => ("process", "processes"),
-        HistogramDimension.ParentProcessImage => ("parent process", "parent processes"),
-        _ => throw new ArgumentOutOfRangeException(nameof(dimension), dimension, "Dimension has no categorical Other noun.")
-    };
 
     private static uint[]? FoldGroupMasks(uint[]? slotColorMask, IReadOnlyList<HistogramGroup> groups)
     {
@@ -468,13 +476,13 @@ public static class HistogramBuilder
                 ? distinct
                 : HistogramConstants.MaxGroupByCategories;
 
-    private static string? ResolveOtherLabel(
+    private static HistogramGroupLabel.CategoricalOther? ResolveOtherLabel(
         int[] slotCounts,
         int bucketCount,
         int slotCount,
         int distinct,
         int keptCount,
-        (string Singular, string Plural) otherNoun)
+        HistogramDimension dimension)
     {
         int otherTotal = 0;
         int otherSlot = slotCount - 1;
@@ -489,9 +497,7 @@ public static class HistogramBuilder
         return (otherTotal, foldedDistinct) switch
         {
             (0, _) => null,
-            (_, 0) => "Other",
-            (_, 1) => $"Other (1 {otherNoun.Singular})",
-            _ => $"Other ({foldedDistinct} {otherNoun.Plural})"
+            _ => new HistogramGroupLabel.CategoricalOther(dimension, foldedDistinct)
         };
     }
 
@@ -508,12 +514,11 @@ public static class HistogramBuilder
         view.CountEventIds(counts, cancellationToken);
 
         int keptCount = ResolveKeptCount(counts.Count, useHighlightTie);
-        int[] targetIds = counts
+        int[] targetIds = [.. counts
             .OrderByDescending(pair => pair.Value)
             .ThenBy(pair => pair.Key)
             .Take(keptCount)
-            .Select(pair => pair.Key)
-            .ToArray();
+            .Select(pair => pair.Key)];
 
         int slotCount = targetIds.Length + 1;
         int[] slotCounts = new int[bucketCount * slotCount];
@@ -540,7 +545,13 @@ public static class HistogramBuilder
                 cancellationToken);
         }
 
-        string? otherLabel = ResolveOtherLabel(slotCounts, bucketCount, slotCount, counts.Count, keptCount, DimensionOtherNoun(HistogramDimension.EventId));
+        HistogramGroupLabel.CategoricalOther? otherLabel = ResolveOtherLabel(
+            slotCounts,
+            bucketCount,
+            slotCount,
+            counts.Count,
+            keptCount,
+            HistogramDimension.EventId);
         string[] keys = Array.ConvertAll(targetIds, id => id.ToString(CultureInfo.InvariantCulture));
         string[] labels = Array.ConvertAll(targetIds, id => id.ToString(CultureInfo.CurrentCulture));
         IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories(keys, labels, otherLabel);
@@ -557,19 +568,18 @@ public static class HistogramBuilder
         int bucketCount,
         bool useHighlightTie,
         byte[]? highlightWinners,
-        (string Singular, string Plural) otherNoun,
+        HistogramDimension dimension,
         CancellationToken cancellationToken)
     {
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         view.CountFieldValues(field, counts, cancellationToken);
 
         int keptCount = ResolveKeptCount(counts.Count, useHighlightTie);
-        string[] targetValues = counts
+        string[] targetValues = [.. counts
             .OrderByDescending(pair => pair.Value)
             .ThenBy(pair => pair.Key, StringComparer.Ordinal)
             .Take(keptCount)
-            .Select(pair => pair.Key)
-            .ToArray();
+            .Select(pair => pair.Key)];
 
         int slotCount = targetValues.Length + 1;
         int[] slotCounts = new int[bucketCount * slotCount];
@@ -598,7 +608,7 @@ public static class HistogramBuilder
                 cancellationToken);
         }
 
-        string? otherLabel = ResolveOtherLabel(slotCounts, bucketCount, slotCount, counts.Count, keptCount, otherNoun);
+        HistogramGroupLabel.CategoricalOther? otherLabel = ResolveOtherLabel(slotCounts, bucketCount, slotCount, counts.Count, keptCount, dimension);
         IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories(targetValues, labelMapper(targetValues), otherLabel);
 
         return (slotCounts, slotCount, groups, FoldGroupMasks(slotColorMask, groups));

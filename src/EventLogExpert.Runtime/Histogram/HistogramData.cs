@@ -20,7 +20,24 @@ public sealed record HistogramData(
     // pane shows an explicit empty-state rather than a single, meaningless "Other" band.
     public bool GroupingFieldAbsent { get; init; }
 
-    // The unit Total and the group / bin counts represent, for the accessible summaries. A subset dimension (ErrorCode
-    // charts only failure rows) sets a narrower noun so the announcements say "N error-code events", not the whole-view total.
-    public string EventNoun { get; init; } = "events";
+    // The unit Total and the group / bin counts represent, for accessible summaries. A subset dimension (ErrorCode)
+    // charts only failure rows, so the UI composes a narrower event noun than the whole-view total.
+    public HistogramEventNoun EventNoun { get; init; } = HistogramEventNoun.Events;
+
+    public int[] GroupTotals()
+    {
+        int[] totals = new int[Groups.Count];
+
+        for (int bin = 0; bin < BinCount; bin++)
+        {
+            int offset = bin * SlotCount;
+
+            for (int group = 0; group < Groups.Count; group++)
+            {
+                foreach (int slot in Groups[group].SlotIndices) { totals[group] += SlotCounts[offset + slot]; }
+            }
+        }
+
+        return totals;
+    }
 }
