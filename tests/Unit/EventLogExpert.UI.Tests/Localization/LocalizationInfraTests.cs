@@ -2,14 +2,17 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.ResolutionCoverage;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Scenarios.Catalog;
+using EventLogExpert.UI.FilterEditor.Comparison;
 using EventLogExpert.UI.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
@@ -49,7 +52,9 @@ public sealed class LocalizationInfraTests
             ("ResolutionStatus_", typeof(EventResolutionStatus)),
             ("Correlation_Role_", typeof(ActivityNodeRole)),
             ("Coverage_Status_", typeof(CoverageStatus)),
-            ("Coverage_SeverityLevel_", typeof(SeverityLevel))
+            ("Coverage_SeverityLevel_", typeof(SeverityLevel)),
+            ("FilterLens_Property_", typeof(EventProperty)),
+            ("FilterEditor_Comparison_", typeof(ComparisonOperatorSelect.ComparisonKind))
         ];
 
         var resxKeys = ResxKeys();
@@ -165,6 +170,24 @@ public sealed class LocalizationInfraTests
 
             Assert.True(neutralValues.TryGetValue(key, out var neutral), $"Missing neutral RESX value for {key}.");
             Assert.Equal(CoverageStatusText.Label(status), neutral);
+        }
+    }
+
+    [Fact]
+    public void NeutralFilterLensPropertyValues_MirrorToFullString()
+    {
+        // The UI FilterLensLabelFormatter localizes the FilterLensLabel.PropertyComparison property name; the invariant
+        // baseline (FilterLensLabelText.Invariant) and the filter value picker both render property.ToFullString(). This
+        // pins each neutral FilterLens_Property_* value equal to that canonical string (read straight from the neutral
+        // RESX) so the chip, the picker, and the invariant announcement never disagree.
+        var neutralValues = ResxValues();
+
+        foreach (EventProperty property in Enum.GetValues<EventProperty>())
+        {
+            var key = $"FilterLens_Property_{property}";
+
+            Assert.True(neutralValues.TryGetValue(key, out var neutral), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(property.ToFullString(), neutral);
         }
     }
 

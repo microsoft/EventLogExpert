@@ -17,4 +17,13 @@ internal static class ResolutionStatusLocalizer
         EventResolutionStatus.Failed => localizer["ResolutionStatus_Failed"],
         _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
     };
+
+    internal static string DisplayToken(IStringLocalizer<SharedResource> localizer, string token) => token switch
+    {
+        ResolutionStatusTokens.Resolved => Display(localizer, EventResolutionStatus.Resolved),
+        ResolutionStatusTokens.NoProvider => Display(localizer, EventResolutionStatus.NoProvider),
+        ResolutionStatusTokens.NoMessage => Display(localizer, EventResolutionStatus.NoMessage),
+        ResolutionStatusTokens.Failed => Display(localizer, EventResolutionStatus.Failed),
+        _ => token
+    };
 }

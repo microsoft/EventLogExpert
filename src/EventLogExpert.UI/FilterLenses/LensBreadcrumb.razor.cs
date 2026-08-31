@@ -1,9 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.FilterLenses;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.FilterLenses;
 
@@ -12,6 +14,8 @@ public sealed partial class LensBreadcrumb
     [Inject] private IFilterLensCommands Commands { get; init; } = null!;
 
     [Inject] private IFilterLensSource LensSource { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     protected override void OnInitialized()
     {

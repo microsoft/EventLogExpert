@@ -19,7 +19,7 @@ public sealed class EffectiveFilterBuilderTests
     {
         var disabledWindowLens = new FilterLens
         {
-            Label = "window",
+            Label = new FilterLensLabel.TimeWindow(At(14), TimeSpan.FromHours(2)),
             Kind = LensKind.TimeWindow,
             Window = new DateFilter { After = At(12), Before = At(16), IsEnabled = false }
         };
@@ -87,7 +87,7 @@ public sealed class EffectiveFilterBuilderTests
         var baseFilter = new Filter(new DateFilter { After = At(10), Before = At(14), IsEnabled = true }, []);
         var windowLens = new FilterLens
         {
-            Label = "window",
+            Label = new FilterLensLabel.TimeWindow(At(14), TimeSpan.FromHours(2)),
             Kind = LensKind.TimeWindow,
             Window = new DateFilter { After = At(12), Before = At(16), IsEnabled = true }
         };
@@ -108,7 +108,7 @@ public sealed class EffectiveFilterBuilderTests
     {
         var windowLens = new FilterLens
         {
-            Label = "window",
+            Label = new FilterLensLabel.TimeWindow(At(14), TimeSpan.FromHours(2)),
             Kind = LensKind.TimeWindow,
             Window = new DateFilter { After = At(12), Before = At(16), IsEnabled = true }
         };
@@ -190,7 +190,10 @@ public sealed class EffectiveFilterBuilderTests
 
         var lens = FilterLensFactory.ForExcludedValue(EventProperty.Source, "NoisySource");
         Assert.NotNull(lens);
-        Assert.Equal("Source \u2260 NoisySource", lens!.Label);
+        var excludeLabel = Assert.IsType<FilterLensLabel.PropertyComparison>(lens!.Label);
+        Assert.Equal(EventProperty.Source, excludeLabel.Property);
+        Assert.False(excludeLabel.IsEqual);
+        Assert.Equal("NoisySource", excludeLabel.Value);
 
         var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [lens]);
         var result = s_filterService.GetFilteredEvents([noisy1, noisy2, quiet], composed);
@@ -238,7 +241,10 @@ public sealed class EffectiveFilterBuilderTests
 
         var lens = FilterLensFactory.ForIncludedValue(EventProperty.Source, "TargetSource");
         Assert.NotNull(lens);
-        Assert.Equal("Source = TargetSource", lens!.Label);
+        var includeLabel = Assert.IsType<FilterLensLabel.PropertyComparison>(lens!.Label);
+        Assert.Equal(EventProperty.Source, includeLabel.Property);
+        Assert.True(includeLabel.IsEqual);
+        Assert.Equal("TargetSource", includeLabel.Value);
 
         var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [lens]);
         var result = s_filterService.GetFilteredEvents([keep1, keep2, other], composed);
@@ -273,7 +279,7 @@ public sealed class EffectiveFilterBuilderTests
         var child = FilterEventBuilder.CreateTestEvent(id: 2, activityId: s_other, relatedActivityId: s_target);
         var unrelated = FilterEventBuilder.CreateTestEvent(id: 3, activityId: s_other);
 
-        var parentLens = FilterLensFactory.ForActivityId(s_target, label: $"Parent Activity = {s_target}")!;
+        var parentLens = FilterLensFactory.ForParentActivity(s_target)!;
         var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [parentLens]);
 
         var result = s_filterService.GetFilteredEvents([parent, child, unrelated], composed);

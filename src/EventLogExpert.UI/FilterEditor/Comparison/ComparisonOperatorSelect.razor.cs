@@ -2,7 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Common.Filtering;
+using EventLogExpert.Localization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.FilterEditor.Comparison;
 
@@ -66,18 +68,20 @@ public sealed partial class ComparisonOperatorSelect
             _ => ComparisonKind.Equals
         };
 
-    private static string KindLabel(ComparisonKind kind) =>
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
+
+    internal static string KindLabel(IStringLocalizer<SharedResource> localizer, ComparisonKind kind) =>
         kind switch
         {
-            ComparisonKind.Equals => "Equals",
-            ComparisonKind.Contains => "Contains",
-            ComparisonKind.NotEqual => "Not Equal",
-            ComparisonKind.NotContains => "Not Contains",
-            ComparisonKind.MultiSelect => "Is Any Of",
-            ComparisonKind.MultiContains => "Contains Any",
-            ComparisonKind.MultiNotEqual => "Is None Of",
-            ComparisonKind.MultiNotContains => "Contains None",
-            _ => kind.ToString()
+            ComparisonKind.Equals => localizer["FilterEditor_Comparison_Equals"],
+            ComparisonKind.Contains => localizer["FilterEditor_Comparison_Contains"],
+            ComparisonKind.NotEqual => localizer["FilterEditor_Comparison_NotEqual"],
+            ComparisonKind.NotContains => localizer["FilterEditor_Comparison_NotContains"],
+            ComparisonKind.MultiSelect => localizer["FilterEditor_Comparison_MultiSelect"],
+            ComparisonKind.MultiContains => localizer["FilterEditor_Comparison_MultiContains"],
+            ComparisonKind.MultiNotEqual => localizer["FilterEditor_Comparison_MultiNotEqual"],
+            ComparisonKind.MultiNotContains => localizer["FilterEditor_Comparison_MultiNotContains"],
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
 
     private Task HandleKindChanged(ComparisonKind kind)

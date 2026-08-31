@@ -1307,4 +1307,135 @@
   </data>
   <data name="Coverage_RemediationFailed" xml:space="preserve">
     <value>Resolution hit an unexpected error for some of {0}'s events. Reopening the log, or inspecting the raw event XML, may help.</value>
-  </data></root>
+  </data>
+  <!-- Filter-lens chips: property names. Neutral FilterLens_Property_* values mirror EventProperty.ToFullString() (a drift-guard test pins them equal); the UI formatter localizes the typed FilterLensLabel.PropertyComparison and the value picker maps EventProperty to these keys. -->
+  <data name="FilterLens_Property_Id" xml:space="preserve">
+    <value>Event ID</value>
+    <comment>Event log field name: the numeric identifier of an event ("Event ID").</comment>
+  </data>
+  <data name="FilterLens_Property_ActivityId" xml:space="preserve">
+    <value>Activity ID</value>
+  </data>
+  <data name="FilterLens_Property_Level" xml:space="preserve">
+    <value>Level</value>
+  </data>
+  <data name="FilterLens_Property_Keywords" xml:space="preserve">
+    <value>Keywords</value>
+  </data>
+  <data name="FilterLens_Property_Source" xml:space="preserve">
+    <value>Source</value>
+  </data>
+  <data name="FilterLens_Property_TaskCategory" xml:space="preserve">
+    <value>Task Category</value>
+  </data>
+  <data name="FilterLens_Property_ProcessId" xml:space="preserve">
+    <value>Process ID</value>
+  </data>
+  <data name="FilterLens_Property_ThreadId" xml:space="preserve">
+    <value>Thread ID</value>
+  </data>
+  <data name="FilterLens_Property_UserId" xml:space="preserve">
+    <value>User ID</value>
+  </data>
+  <data name="FilterLens_Property_Description" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="FilterLens_Property_Xml" xml:space="preserve">
+    <value>Xml</value>
+    <comment>Event log field name: the raw XML of an event. "Xml" is a file-format acronym; keep as-is unless your locale localizes it.</comment>
+  </data>
+  <data name="FilterLens_Property_LogName" xml:space="preserve">
+    <value>Log Name</value>
+  </data>
+  <data name="FilterLens_Property_EventData" xml:space="preserve">
+    <value>Event Data</value>
+  </data>
+  <data name="FilterLens_Property_UserData" xml:space="preserve">
+    <value>User Data</value>
+  </data>
+  <data name="FilterLens_Property_Opcode" xml:space="preserve">
+    <value>Opcode</value>
+    <comment>Event log field name: the ETW operation code ("Opcode"). A Windows Event Log technical term; keep as-is unless your locale localizes it.</comment>
+  </data>
+  <data name="FilterLens_Property_RelatedActivityId" xml:space="preserve">
+    <value>Related Activity ID</value>
+  </data>
+  <data name="FilterLens_Property_UserDisplayName" xml:space="preserve">
+    <value>User</value>
+  </data>
+  <data name="FilterLens_Property_ResolutionStatus" xml:space="preserve">
+    <value>Resolution Status</value>
+  </data>
+  <!-- Filter-lens chip chrome + the "kept as filter" live-region announcement ({0} = the localized lens label). -->
+  <data name="FilterLens_Near" xml:space="preserve">
+    <value>Near {0} ±{1}</value>
+    <comment>Time-window filter chip. {0} = a formatted time of day (the window center); {1} = a radius such as "5m" or "2h". "Near" means "approximately at". Keep the plus-minus sign that frames the radius.</comment>
+  </data>
+  <data name="FilterLens_ParentActivity" xml:space="preserve">
+    <value>Parent Activity</value>
+  </data>
+  <data name="FilterLens_KeptAnnouncement" xml:space="preserve">
+    <value>Kept as filter: {0}</value>
+  </data>
+  <data name="FilterLens_LensesLabel" xml:space="preserve">
+    <value>Lenses</value>
+  </data>
+  <data name="FilterLens_ClearAll" xml:space="preserve">
+    <value>Clear all</value>
+  </data>
+  <data name="FilterLens_ActiveLensesAria" xml:space="preserve">
+    <value>Active filter lenses</value>
+  </data>
+  <data name="FilterLens_KeepAria" xml:space="preserve">
+    <value>Keep lens as filter: {0}</value>
+  </data>
+  <data name="FilterLens_RemoveAria" xml:space="preserve">
+    <value>Remove lens: {0}</value>
+  </data>
+  <!-- Filter comparison editor: operator dropdown (FilterEditor_Comparison_* map to ComparisonOperatorSelect.ComparisonKind) + value-picker visually-hidden labels and placeholders. -->
+  <data name="FilterEditor_Comparison_Equals" xml:space="preserve">
+    <value>Equals</value>
+  </data>
+  <data name="FilterEditor_Comparison_Contains" xml:space="preserve">
+    <value>Contains</value>
+  </data>
+  <data name="FilterEditor_Comparison_NotEqual" xml:space="preserve">
+    <value>Not Equal</value>
+  </data>
+  <data name="FilterEditor_Comparison_NotContains" xml:space="preserve">
+    <value>Not Contains</value>
+  </data>
+  <data name="FilterEditor_Comparison_MultiSelect" xml:space="preserve">
+    <value>Is Any Of</value>
+  </data>
+  <data name="FilterEditor_Comparison_MultiContains" xml:space="preserve">
+    <value>Contains Any</value>
+  </data>
+  <data name="FilterEditor_Comparison_MultiNotEqual" xml:space="preserve">
+    <value>Is None Of</value>
+  </data>
+  <data name="FilterEditor_Comparison_MultiNotContains" xml:space="preserve">
+    <value>Contains None</value>
+    <comment>Filter operator: matches events whose field contains none of the selected values (multi-select "not contains").</comment>
+  </data>
+  <data name="FilterEditor_ComparisonLabel" xml:space="preserve">
+    <value>Comparison</value>
+  </data>
+  <data name="FilterEditor_PropertyLabel" xml:space="preserve">
+    <value>Property</value>
+  </data>
+  <data name="FilterEditor_FieldNameLabel" xml:space="preserve">
+    <value>Field name</value>
+  </data>
+  <data name="FilterEditor_ValueLabel" xml:space="preserve">
+    <value>Value</value>
+  </data>
+  <data name="FilterEditor_EmptyValuePlaceholder" xml:space="preserve">
+    <value>(Empty)</value>
+    <comment>Filter value picker: shown for an event field whose value is empty/blank. Keep the surrounding parentheses.</comment>
+  </data>
+  <data name="FilterEditor_AllValues" xml:space="preserve">
+    <value>All</value>
+    <comment>Filter value picker: the option that clears the value filter so events with any value match.</comment>
+  </data>
+</root>

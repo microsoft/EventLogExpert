@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.Runtime.FilterLenses;
 
-public sealed record FilterLensSummary(FilterLensId Id, string Label);
+public sealed record FilterLensSummary(FilterLensId Id, FilterLensLabel Label);

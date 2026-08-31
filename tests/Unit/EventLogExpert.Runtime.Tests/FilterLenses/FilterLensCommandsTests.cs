@@ -109,7 +109,7 @@ public sealed class FilterLensCommandsTests
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
             action != null &&
-            action.Lens.Label.EndsWith(expectedSuffix, StringComparison.Ordinal)));
+            FilterLensLabelText.Invariant(action.Lens.Label).EndsWith(expectedSuffix, StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public sealed class FilterLensCommandsTests
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
             action != null &&
-            action.Lens.Label.EndsWith("\u00b190s", StringComparison.Ordinal)));
+            FilterLensLabelText.Invariant(action.Lens.Label).EndsWith("\u00b190s", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -149,12 +149,14 @@ public sealed class FilterLensCommandsTests
         var anchor = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
         var displayZone = TimeZoneInfo.CreateCustomTimeZone("test+5", TimeSpan.FromHours(5), "test+5", "test+5");
         var expectedAnchor = TimeZoneInfo.ConvertTimeFromUtc(anchor, displayZone);
+        var expectedLabel = FilterLensLabelText.Invariant(
+            new FilterLensLabel.TimeWindow(expectedAnchor, TimeSpan.FromMinutes(5)));
 
         new FilterLensCommands(dispatcher).ShowEventsNearTime(anchor, TimeSpan.FromMinutes(5), displayZone);
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
             action != null &&
-            action.Lens.Label == $"Near {expectedAnchor:T} \u00b15m"));
+            FilterLensLabelText.Invariant(action.Lens.Label) == expectedLabel));
     }
 
     [Fact]
@@ -230,7 +232,7 @@ public sealed class FilterLensCommandsTests
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
             action != null &&
-            action.Lens.Label == $"Parent Activity = {relatedActivityId}" &&
+            FilterLensLabelText.Invariant(action.Lens.Label) == $"Parent Activity = {relatedActivityId}" &&
             action.Lens.ExcludeFilters.Count == 1 &&
             action.Lens.ExcludeFilters[0].Compiled != null &&
             action.Lens.ExcludeFilters[0].ComparisonText!.Contains("ActivityId") &&
@@ -304,7 +306,7 @@ public sealed class FilterLensCommandsTests
 
         dispatcher.Received(1).Dispatch(Arg.Is<PushFilterLensAction>(action =>
             action != null &&
-            action.Lens.Label == $"Related Activity ID = {id}" &&
+            FilterLensLabelText.Invariant(action.Lens.Label) == $"Related Activity ID = {id}" &&
             action.Lens.ExcludeFilters.Count == 1 &&
             action.Lens.ExcludeFilters[0].IsExcluded &&
             action.Lens.ExcludeFilters[0].Compiled != null &&

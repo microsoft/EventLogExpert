@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.FilterLenses;
 
 namespace EventLogExpert.Runtime.Announcement;
 
@@ -10,8 +11,7 @@ public sealed class AnnouncementService : IAnnouncementService
     private readonly Lock _stateLock = new();
     private readonly ITraceLogger _traceLogger;
 
-    private string _currentAnnouncement = string.Empty;
-    private int _seq;
+    private CurrentAnnouncement _current = new(new Announcement.Text(string.Empty), 0);
 
     public AnnouncementService(ITraceLogger traceLogger)
     {
@@ -22,21 +22,32 @@ public sealed class AnnouncementService : IAnnouncementService
 
     public event Action? StateChanged;
 
-    public string CurrentAnnouncement
+    public CurrentAnnouncement Current
     {
-        get { lock (_stateLock) { return _currentAnnouncement; } }
+        get { lock (_stateLock) { return _current; } }
     }
 
     public void Announce(string message)
     {
         ArgumentNullException.ThrowIfNull(message);
 
+        Publish(new Announcement.Text(message));
+    }
+
+    public void AnnounceLensKept(FilterLensLabel label)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+
+        Publish(new Announcement.LensKept(label));
+    }
+
+    private void Publish(Announcement payload)
+    {
         lock (_stateLock)
         {
-            _seq++;
-            // ZWS toggle on odd seq guarantees DOM text mutation between consecutive identical
-            // announcements; SR live regions do not re-announce when the text node does not change.
-            _currentAnnouncement = (_seq % 2 == 0) ? message : message + "\u200B";
+            // Monotonic seq drives the host's re-announce toggle; the zero-width-space DOM mutation now lives in
+            // AnnouncerHost (after localization), keeping it transparent to every plain-string caller.
+            _current = new CurrentAnnouncement(payload, _current.Sequence + 1);
         }
 
         RaiseStateChangedSafely();

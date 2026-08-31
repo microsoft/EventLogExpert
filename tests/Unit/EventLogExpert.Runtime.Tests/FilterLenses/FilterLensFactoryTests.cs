@@ -9,6 +9,65 @@ namespace EventLogExpert.Runtime.Tests.FilterLenses;
 public sealed class FilterLensFactoryTests
 {
     [Fact]
+    public void ForActivityId_EmitsActivityIdEqualityDescriptor()
+    {
+        var activityId = Guid.NewGuid();
+
+        var lens = FilterLensFactory.ForActivityId(activityId)!;
+
+        var comparison = Assert.IsType<FilterLensLabel.PropertyComparison>(lens.Label);
+        Assert.Equal(EventProperty.ActivityId, comparison.Property);
+        Assert.True(comparison.IsEqual);
+        Assert.Equal(activityId.ToString(), comparison.Value);
+    }
+
+    [Fact]
+    public void ForExcludedValue_EmitsInequalityDescriptor()
+    {
+        var lens = FilterLensFactory.ForExcludedValue(EventProperty.Source, "Contoso")!;
+
+        var comparison = Assert.IsType<FilterLensLabel.PropertyComparison>(lens.Label);
+        Assert.Equal(EventProperty.Source, comparison.Property);
+        Assert.False(comparison.IsEqual);
+        Assert.Equal("Contoso", comparison.Value);
+    }
+
+    [Fact]
+    public void ForIncludedValue_EmitsEqualityDescriptor()
+    {
+        var lens = FilterLensFactory.ForIncludedValue(EventProperty.Source, "Contoso")!;
+
+        var comparison = Assert.IsType<FilterLensLabel.PropertyComparison>(lens.Label);
+        Assert.Equal(EventProperty.Source, comparison.Property);
+        Assert.True(comparison.IsEqual);
+        Assert.Equal("Contoso", comparison.Value);
+    }
+
+    [Fact]
+    public void ForParentActivity_EmitsParentActivityDescriptor()
+    {
+        var activityId = Guid.NewGuid();
+
+        var lens = FilterLensFactory.ForParentActivity(activityId)!;
+
+        var parent = Assert.IsType<FilterLensLabel.ParentActivity>(lens.Label);
+        Assert.Equal(activityId, parent.ActivityId);
+    }
+
+    [Fact]
+    public void ForRelatedActivityId_EmitsRelatedActivityIdEqualityDescriptor()
+    {
+        var relatedActivityId = Guid.NewGuid();
+
+        var lens = FilterLensFactory.ForRelatedActivityId(relatedActivityId)!;
+
+        var comparison = Assert.IsType<FilterLensLabel.PropertyComparison>(lens.Label);
+        Assert.Equal(EventProperty.RelatedActivityId, comparison.Property);
+        Assert.True(comparison.IsEqual);
+        Assert.Equal(relatedActivityId.ToString(), comparison.Value);
+    }
+
+    [Fact]
     public void ForTimeRange_CrossesDisplayedMidnight_LabelIncludesDates()
     {
         var after = new DateTime(2026, 7, 16, 23, 55, 0, DateTimeKind.Utc);
@@ -18,9 +77,10 @@ public sealed class FilterLensFactoryTests
 
         var afterLocal = after.ConvertTimeZone(TimeZoneInfo.Utc);
         var beforeLocal = before.ConvertTimeZone(TimeZoneInfo.Utc);
-        Assert.Equal(
-            $"{afterLocal:d} {afterLocal:T} - {beforeLocal:d} {beforeLocal:T}",
-            lens.Label);
+        var range = Assert.IsType<FilterLensLabel.TimeRange>(lens.Label);
+        Assert.Equal(afterLocal, range.AfterLocal);
+        Assert.Equal(beforeLocal, range.BeforeLocal);
+        Assert.False(range.SameDay);
     }
 
     [Fact]
@@ -36,9 +96,10 @@ public sealed class FilterLensFactoryTests
         var afterLocal = after.ConvertTimeZone(plusFive);
         var beforeLocal = before.ConvertTimeZone(plusFive);
         Assert.NotEqual(afterLocal.Date, beforeLocal.Date);
-        Assert.Equal(
-            $"{afterLocal:d} {afterLocal:T} - {beforeLocal:d} {beforeLocal:T}",
-            lens.Label);
+        var range = Assert.IsType<FilterLensLabel.TimeRange>(lens.Label);
+        Assert.Equal(afterLocal, range.AfterLocal);
+        Assert.Equal(beforeLocal, range.BeforeLocal);
+        Assert.False(range.SameDay);
     }
 
     [Fact]
@@ -49,8 +110,23 @@ public sealed class FilterLensFactoryTests
 
         var lens = FilterLensFactory.ForTimeRange(after, before, TimeZoneInfo.Utc);
 
-        Assert.Equal(
-            $"{after.ConvertTimeZone(TimeZoneInfo.Utc):T} - {before.ConvertTimeZone(TimeZoneInfo.Utc):T}",
-            lens.Label);
+        var range = Assert.IsType<FilterLensLabel.TimeRange>(lens.Label);
+        Assert.Equal(after.ConvertTimeZone(TimeZoneInfo.Utc), range.AfterLocal);
+        Assert.Equal(before.ConvertTimeZone(TimeZoneInfo.Utc), range.BeforeLocal);
+        Assert.True(range.SameDay);
+    }
+
+    [Fact]
+    public void ForTimeWindow_EmitsTimeWindowDescriptorInDisplayZone()
+    {
+        var timeCreated = new DateTime(2026, 7, 16, 18, 0, 0, DateTimeKind.Utc);
+        var radius = TimeSpan.FromMinutes(5);
+        var plusFive = TimeZoneInfo.CreateCustomTimeZone("t+5", TimeSpan.FromHours(5), "t+5", "t+5");
+
+        var lens = FilterLensFactory.ForTimeWindow(timeCreated, radius, plusFive);
+
+        var window = Assert.IsType<FilterLensLabel.TimeWindow>(lens.Label);
+        Assert.Equal(timeCreated.ConvertTimeZone(plusFive), window.CenterLocal);
+        Assert.Equal(radius, window.Radius);
     }
 }

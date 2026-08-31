@@ -57,7 +57,7 @@ public sealed class StatsPaneTests : BunitContext
     public void AllExcluded_HeadlineAsksToRemoveLens()
     {
         SetupSeverity(total: 0, Slots(critical: 0, error: 0, warning: 0, info: 0, verbose: 0, unknown: 0));
-        _lensSource.Lenses.Returns([new FilterLensSummary(new FilterLensId(Guid.NewGuid()), "Source excludes Alpha")]);
+        _lensSource.Lenses.Returns([new FilterLensSummary(new FilterLensId(Guid.NewGuid()), new FilterLensLabel.PropertyComparison(EventProperty.Source, IsEqual: false, "Alpha"))]);
 
         var cut = Render<StatsPane>();
 

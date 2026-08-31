@@ -49,7 +49,7 @@ public sealed class FilterLensSourceTests
 
         Assert.Equal(1, raised);
         Assert.Equal(2, harness.Source.Lenses.Count);
-        Assert.Equal(new FilterLensSummary(added.Id, "Second"), harness.Source.Lenses[^1]);
+        Assert.Equal(new FilterLensSummary(added.Id, PropertyLabel("Second")), harness.Source.Lenses[^1]);
     }
 
     [Fact]
@@ -87,11 +87,14 @@ public sealed class FilterLensSourceTests
         var lenses = harness.Source.Lenses;
 
         Assert.Equal(2, lenses.Count);
-        Assert.Equal(new FilterLensSummary(first.Id, "First"), lenses[0]);
-        Assert.Equal(new FilterLensSummary(second.Id, "Second"), lenses[1]);
+        Assert.Equal(new FilterLensSummary(first.Id, PropertyLabel("First")), lenses[0]);
+        Assert.Equal(new FilterLensSummary(second.Id, PropertyLabel("Second")), lenses[1]);
     }
 
-    private static FilterLens Lens(string label) => new() { Label = label, Kind = LensKind.Property };
+    private static FilterLens Lens(string value) => new() { Label = PropertyLabel(value), Kind = LensKind.Property };
+
+    private static FilterLensLabel PropertyLabel(string value) =>
+        new FilterLensLabel.PropertyComparison(EventProperty.ActivityId, IsEqual: true, value);
 
     private sealed class Harness
     {

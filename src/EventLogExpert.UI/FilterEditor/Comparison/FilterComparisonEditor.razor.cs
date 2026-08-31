@@ -3,9 +3,11 @@
 
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Drafts;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterEditor.Comparison;
@@ -33,6 +35,10 @@ public sealed partial class FilterComparisonEditor : ComponentBase
 
     [Inject] private IEventLogQueries EventLogQueries { get; init; } = null!;
 
+    private bool ExcludesEmptyMultiSelectValue =>
+        Comparison.Operator is ComparisonOperator.Contains or ComparisonOperator.NotContains ||
+            FilterPropertyConstraints.IsGuidValued(Comparison.Property);
+
     private List<string> FilteredItems
     {
         get
@@ -56,6 +62,9 @@ public sealed partial class FilterComparisonEditor : ComponentBase
 
     private bool IsEventDataProperty => Comparison.Property is EventProperty.EventData;
 
+    private bool IsResolutionStatusEquality =>
+        Comparison is { Property: EventProperty.ResolutionStatus, Operator: ComparisonOperator.Equals or ComparisonOperator.NotEqual };
+
     private bool IsUserDataProperty => Comparison.Property is EventProperty.UserData;
 
     private ImmutableArray<string> Items => Comparison.Property switch
@@ -65,9 +74,7 @@ public sealed partial class FilterComparisonEditor : ComponentBase
         _ => EventLogQueries.GetPropertyValues(Comparison.Property)
     };
 
-    private bool ExcludesEmptyMultiSelectValue =>
-        Comparison.Operator is ComparisonOperator.Contains or ComparisonOperator.NotContains
-            || FilterPropertyConstraints.IsGuidValued(Comparison.Property);
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     private IEnumerable<string> MultiSelectCandidates =>
         ExcludesEmptyMultiSelectValue ? Items.Where(item => !string.IsNullOrEmpty(item)) : Items;
@@ -108,6 +115,13 @@ public sealed partial class FilterComparisonEditor : ComponentBase
     private ImmutableArray<string> UserDataFieldNames => EventLogQueries.GetUserDataFieldNames();
 
     private static bool IsTextOnlyProperty(EventProperty property) => FilterPropertyConstraints.IsTextOnly(property);
+
+    private string ClosedSetDisplay(string? value) => value switch
+    {
+        null => Localizer["FilterEditor_AllValues"],
+        "" => Localizer["FilterEditor_EmptyValuePlaceholder"],
+        _ => ResolutionStatusLocalizer.DisplayToken(Localizer, value)
+    };
 
     private async Task HandleEventDataFieldNameChanged(string? fieldName)
     {
@@ -160,5 +174,13 @@ public sealed partial class FilterComparisonEditor : ComponentBase
             : values;
 
         await OnChanged.InvokeAsync();
+    }
+
+    private string MultiSelectDisplay(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) { return Localizer["FilterEditor_EmptyValuePlaceholder"]; }
+
+        return Comparison.Property == EventProperty.ResolutionStatus ?
+            ResolutionStatusLocalizer.DisplayToken(Localizer, value) : value;
     }
 }
