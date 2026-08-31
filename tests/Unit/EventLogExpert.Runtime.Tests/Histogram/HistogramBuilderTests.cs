@@ -57,7 +57,7 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data!.Groups.Count);
-        Assert.Equal("Other (5 sources)", data.Groups[0].Label);
+        data.Groups[0].AssertCategoricalOther(HistogramDimension.Source, expectedFoldedCount: 5);
         Assert.Equal(15, GroupTotal(data, 0));
     }
 
@@ -129,7 +129,7 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(combined, HistogramDimension.Source, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal("shared", data!.Groups[0].Label);
+        data!.Groups[0].AssertDataValue("shared");
         Assert.Equal(5, GroupTotal(data, 0));
         Assert.Equal(7, data.Total);
     }
@@ -190,7 +190,7 @@ public sealed class HistogramBuilderTests
         Assert.NotNull(data);
         Assert.False(data!.GroupingFieldAbsent);
         Assert.Equal(3, data.Total);
-        Assert.Contains(data.Groups, group => group.Label == "0x800F0823 CBS_E_NEW_SERVICING_STACK_REQUIRED");
+        Assert.Contains(data.Groups, group => group.HasDataValue("0x800F0823 CBS_E_NEW_SERVICING_STACK_REQUIRED"));
     }
 
     [Fact]
@@ -205,7 +205,7 @@ public sealed class HistogramBuilderTests
         Assert.True(data!.GroupingFieldAbsent);
         Assert.Empty(data.Groups);
         Assert.Equal(0, data.Total);
-        Assert.Equal("error-code events", data.EventNoun);
+        Assert.Equal(HistogramEventNoun.ErrorCodeEvents, data.EventNoun);
     }
 
     [Fact]
@@ -234,11 +234,11 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.False(data!.GroupingFieldAbsent);
-        Assert.Equal("error-code events", data.EventNoun);
-        Assert.Equal("0x800F081F CBS_E_SOURCE_MISSING", data.Groups[0].Label);
+        Assert.Equal(HistogramEventNoun.ErrorCodeEvents, data.EventNoun);
+        data.Groups[0].AssertDataValue("0x800F081F CBS_E_SOURCE_MISSING");
         Assert.Equal("cat:2148468767", data.Groups[0].Key);
         Assert.Equal(2, GroupTotal(data, 0));
-        Assert.Equal("0x800F0823 CBS_E_NEW_SERVICING_STACK_REQUIRED", data.Groups[1].Label);
+        data.Groups[1].AssertDataValue("0x800F0823 CBS_E_NEW_SERVICING_STACK_REQUIRED");
         Assert.Equal(1, GroupTotal(data, 1));
         Assert.Equal(3, data.Total);
     }
@@ -252,7 +252,7 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ErrorCode, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal("0x80070005", data!.Groups[0].Label);
+        data!.Groups[0].AssertDataValue("0x80070005");
     }
 
     [Fact]
@@ -264,9 +264,9 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.EventId, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal("1000", data!.Groups[0].Label);
-        Assert.Equal("2000", data.Groups[1].Label);
-        Assert.Equal("3000", data.Groups[2].Label);
+        data!.Groups[0].AssertDataValue("1000");
+        data.Groups[1].AssertDataValue("2000");
+        data.Groups[2].AssertDataValue("3000");
         Assert.Equal(3, GroupTotal(data, 0));
         Assert.Equal(6, data.Total);
     }
@@ -282,9 +282,9 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.Log, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal(@"C:\logs\Security.evtx", data!.Groups[0].Label);
-        Assert.Equal(@"D:\logs\Security.evtx", data.Groups[1].Label);
-        Assert.NotEqual(data.Groups[0].Label, data.Groups[1].Label);
+        data!.Groups[0].AssertDataValue(@"C:\logs\Security.evtx");
+        data.Groups[1].AssertDataValue(@"D:\logs\Security.evtx");
+        Assert.NotEqual(((HistogramGroupLabel.DataValue)data.Groups[0].Label).Text, ((HistogramGroupLabel.DataValue)data.Groups[1].Label).Text);
     }
 
     [Fact]
@@ -300,9 +300,9 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.Equal(3, data!.Groups.Count);
-        Assert.Equal("Security.evtx (logsA)", data.Groups[0].Label);
-        Assert.Equal("Security.evtx (logsB)", data.Groups[1].Label);
-        Assert.Equal("System", data.Groups[2].Label);
+        data.Groups[0].AssertDataValue("Security.evtx (logsA)");
+        data.Groups[1].AssertDataValue("Security.evtx (logsB)");
+        data.Groups[2].AssertDataValue("System");
         Assert.Equal(@"cat:C:\logsA\Security.evtx", data.Groups[0].Key);
         Assert.NotEqual(data.Groups[0].Key, data.Groups[1].Key);
         Assert.Equal(3, GroupTotal(data, 0));
@@ -333,7 +333,7 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.Equal(3, GroupTotal(data, 0));
-        Assert.Equal("Network", data!.Groups[1].Label);
+        data!.Groups[1].AssertDataValue("Network");
         Assert.Equal(2, GroupTotal(data, 1));
     }
 
@@ -346,10 +346,10 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.False(data!.GroupingFieldAbsent);
-        Assert.Equal("Network", data.Groups[0].Label);
+        data.Groups[0].AssertDataValue("Network");
         Assert.Equal("cat:3", data.Groups[0].Key);
         Assert.Equal(3, GroupTotal(data, 0));
-        Assert.Equal("RemoteInteractive", data.Groups[1].Label);
+        data.Groups[1].AssertDataValue("RemoteInteractive");
         Assert.Equal(2, GroupTotal(data, 1));
     }
 
@@ -361,7 +361,7 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.LogonType, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal("99", data!.Groups[0].Label);
+        data!.Groups[0].AssertDataValue("99");
         Assert.Equal("cat:99", data.Groups[0].Key);
     }
 
@@ -378,9 +378,9 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ParentProcessImage, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal("excel.exe", data.Groups[0].Label);
+        data.Groups[0].AssertDataValue("excel.exe");
         Assert.Equal("cat:excel.exe", data.Groups[0].Key);
-        Assert.Equal("winword.exe", data.Groups[1].Label);
+        data.Groups[1].AssertDataValue("winword.exe");
         Assert.Equal(2, data.Total);
     }
 
@@ -416,7 +416,7 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.Single(data.Groups);
-        Assert.Equal("rundll32.exe", data.Groups[0].Label);
+        data.Groups[0].AssertDataValue("rundll32.exe");
         Assert.Equal("cat:rundll32.exe", data.Groups[0].Key);
         Assert.Equal(2, GroupTotal(data, 0));
     }
@@ -435,8 +435,8 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ProcessImage, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Contains(data.Groups, group => group.Label == "cmd.exe");
-        Assert.Contains(data.Groups, group => group.Label == "powershell.exe");
+        Assert.Contains(data.Groups, group => group.HasDataValue("cmd.exe"));
+        Assert.Contains(data.Groups, group => group.HasDataValue("powershell.exe"));
         Assert.Equal(1, GroupTotal(data, 0));
         Assert.Equal(3, data.Total);
     }
@@ -454,7 +454,7 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.False(data.GroupingFieldAbsent);
-        Assert.Equal("notepad.exe", data.Groups[0].Label);
+        data.Groups[0].AssertDataValue("notepad.exe");
         Assert.Equal(1, data.Total);
     }
 
@@ -478,8 +478,8 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data.Groups.Count);
-        Assert.Equal("Other (1 process)", data.Groups[0].Label);
-        Assert.DoesNotContain(data.Groups, group => group.Label == "india.exe");
+        data.Groups[0].AssertCategoricalOther(HistogramDimension.ProcessImage, expectedFoldedCount: 1);
+        Assert.DoesNotContain(data.Groups, group => group.HasDataValue("india.exe"));
         Assert.Equal(1, GroupTotal(data, 0));
         Assert.Equal(19, data.Total);
     }
@@ -497,8 +497,8 @@ public sealed class HistogramBuilderTests
         HistogramData? data = HistogramBuilder.Build(view, HistogramDimension.ProcessImage, maxBuckets: 100, CancellationToken.None);
 
         Assert.NotNull(data);
-        Assert.Equal("Other", data!.Groups[0].Label);
-        Assert.Equal("cmd.exe", data.Groups[1].Label);
+        data!.Groups[0].AssertCategoricalOther(HistogramDimension.ProcessImage, expectedFoldedCount: 0);
+        data.Groups[1].AssertDataValue("cmd.exe");
         Assert.Equal(1, GroupTotal(data, 0));
         Assert.Equal(1, GroupTotal(data, 1));
         Assert.Equal(2, data.Total);
@@ -524,8 +524,8 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data!.Groups.Count);
-        Assert.Equal("Other (2 sources)", data.Groups[0].Label);
-        Assert.DoesNotContain(data.Groups, group => group.Label is "s09" or "s10");
+        data.Groups[0].AssertCategoricalOther(HistogramDimension.Source, expectedFoldedCount: 2);
+        Assert.DoesNotContain(data.Groups, group => group.HasDataValue("s09") || group.HasDataValue("s10"));
         Assert.Equal(2, GroupTotal(data, 0));
         Assert.Equal(46, data.Total);
     }
@@ -540,9 +540,9 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.Equal(3, data!.Groups.Count);
-        Assert.Equal("apache", data.Groups[0].Label);
-        Assert.Equal("nginx", data.Groups[1].Label);
-        Assert.Equal("caddy", data.Groups[2].Label);
+        data.Groups[0].AssertDataValue("apache");
+        data.Groups[1].AssertDataValue("nginx");
+        data.Groups[2].AssertDataValue("caddy");
         Assert.Equal(3, GroupTotal(data, 0));
         Assert.Equal(2, GroupTotal(data, 1));
         Assert.Equal(1, GroupTotal(data, 2));
@@ -573,8 +573,8 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data!.Groups.Count);
-        Assert.Equal("Other (1 source)", data.Groups[0].Label);
-        Assert.DoesNotContain(data.Groups, group => group.Label == "s09");
+        data.Groups[0].AssertCategoricalOther(HistogramDimension.Source, expectedFoldedCount: 1);
+        Assert.DoesNotContain(data.Groups, group => group.HasDataValue("s09"));
         Assert.Equal(1, GroupTotal(data, 0));
     }
 
@@ -601,7 +601,7 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data!.Groups.Count);
-        Assert.Equal("Other (5 sources)", data.Groups[0].Label);
+        data.Groups[0].AssertCategoricalOther(HistogramDimension.Source, expectedFoldedCount: 5);
         Assert.Equal(15, GroupTotal(data, 0));
     }
 
@@ -627,8 +627,8 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.Equal(HistogramConstants.MaxGroupByCategories + 1, data!.Groups.Count);
-        Assert.Equal("Other (4 sources)", data.Groups[0].Label);
-        Assert.DoesNotContain(data.Groups, group => group.Label is "s09" or "s10" or "s11" or "s12");
+        data.Groups[0].AssertCategoricalOther(HistogramDimension.Source, expectedFoldedCount: 4);
+        Assert.DoesNotContain(data.Groups, group => group.HasDataValue("s09") || group.HasDataValue("s10") || group.HasDataValue("s11") || group.HasDataValue("s12"));
         Assert.Equal(10, GroupTotal(data, 0));
     }
 
@@ -641,7 +641,7 @@ public sealed class HistogramBuilderTests
 
         Assert.NotNull(data);
         Assert.Single(data!.Groups);
-        Assert.Equal("RC4", data.Groups[0].Label);
+        data.Groups[0].AssertDataValue("RC4");
         Assert.Equal("cat:23", data.Groups[0].Key);
         Assert.Equal(3, GroupTotal(data, 0));
     }

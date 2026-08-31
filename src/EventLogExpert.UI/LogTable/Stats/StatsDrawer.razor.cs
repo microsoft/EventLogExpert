@@ -1,11 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Stats;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.LogTable.Stats;
@@ -21,6 +23,8 @@ public sealed partial class StatsDrawer : AppStateComponentBase
     private bool IsOpen => StatsVisibility.IsVisible && OpenLogsPresence.HasOpenLogs;
 
     [Inject] private IJSRuntime JsRuntime { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private IOpenLogsPresenceSource OpenLogsPresence { get; init; } = null!;
 

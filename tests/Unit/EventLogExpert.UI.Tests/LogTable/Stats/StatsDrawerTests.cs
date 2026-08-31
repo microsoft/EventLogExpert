@@ -20,6 +20,7 @@ public sealed class StatsDrawerTests : BunitContext
     public StatsDrawerTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddEventLogLocalization();
         JSInterop.SetupModule("./_content/EventLogExpert.UI/LogTable/Stats/StatsDrawer.razor.js");
 
         _openLogs.HasOpenLogs.Returns(true);

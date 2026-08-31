@@ -3,15 +3,19 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Common.Filtering;
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.DetailsPane;
+using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.Runtime.ResolutionCoverage;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.Runtime.Stats;
 using EventLogExpert.Scenarios.Catalog;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.FilterEditor.Comparison;
 using EventLogExpert.UI.Globalization;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,7 +56,11 @@ public sealed class LocalizationInfraTests
             ("ResolutionStatus_", typeof(EventResolutionStatus)),
             ("Correlation_Role_", typeof(ActivityNodeRole)),
             ("Coverage_Status_", typeof(CoverageStatus)),
-            ("Coverage_SeverityLevel_", typeof(SeverityLevel)),
+            ("Severity_Level_", typeof(SeverityLevel)),
+            ("Histogram_Dimension_", typeof(HistogramDimension)),
+            ("Histogram_HighlightColor_", typeof(HighlightColor)),
+            ("Histogram_Severity_", typeof(HistogramSeverityBucket)),
+            ("Stats_Dimension_", typeof(StatsDimension)),
             ("FilterLens_Property_", typeof(EventProperty)),
             ("FilterEditor_Comparison_", typeof(ComparisonOperatorSelect.ComparisonKind))
         ];
@@ -73,6 +81,8 @@ public sealed class LocalizationInfraTests
 
             Assert.Equal(expected, actual);
         }
+
+        Assert.Contains("Severity_Unknown", resxKeys);
     }
 
     [Fact]
@@ -192,6 +202,64 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
+    public void NeutralHistogramCountsRemainUngrouped()
+    {
+        IStringLocalizer<SharedResource> localizer = BuildLocalizer();
+
+        Assert.Equal(
+            "Other (1200 sources)",
+            HistogramGroupLabelFormatter.Format(localizer, new HistogramGroupLabel.CategoricalOther(HistogramDimension.Source, 1200)));
+    }
+
+    [Fact]
+    public void NeutralHistogramDimensionValues_MirrorPreviousDisplayText()
+    {
+        var neutralValues = ResxValues();
+        (HistogramDimension Dimension, string Text)[] expected =
+        [
+            (HistogramDimension.Severity, "Severity"),
+            (HistogramDimension.Source, "Source"),
+            (HistogramDimension.EventId, "Event ID"),
+            (HistogramDimension.TaskCategory, "Task Category"),
+            (HistogramDimension.Opcode, "Opcode"),
+            (HistogramDimension.Log, "Log"),
+            (HistogramDimension.LogonType, "Logon Type"),
+            (HistogramDimension.TicketEncryptionType, "Ticket Encryption Type"),
+            (HistogramDimension.ErrorCode, "Error Code"),
+            (HistogramDimension.ProcessImage, "Process Image"),
+            (HistogramDimension.ParentProcessImage, "Parent Process Image")
+        ];
+
+        foreach ((HistogramDimension dimension, string text) in expected)
+        {
+            Assert.Equal(text, neutralValues[$"Histogram_Dimension_{dimension}"]);
+        }
+    }
+
+    [Fact]
+    public void NeutralHistogramSpaceBearingValues_KeepExactWhitespace()
+    {
+        var neutralValues = ResxValues();
+
+        Assert.Equal(", ", neutralValues["Histogram_Breakdown_Separator"]);
+        Assert.Equal(" - {0} error/critical", neutralValues["Stats_Headline_ErrorCritical_One"]);
+        Assert.Equal(" - {0} error/critical", neutralValues["Stats_Headline_ErrorCritical_Many"]);
+        Assert.Equal(" - top {0} source = {1}%", neutralValues["Stats_Headline_TopSources_One"]);
+        Assert.Equal(" - top {0} sources = {1}%", neutralValues["Stats_Headline_TopSources_Many"]);
+    }
+
+    [Fact]
+    public void NeutralHistogramSummaryTemplates_KeepGeneralShortDateFormat()
+    {
+        var neutralValues = ResxValues();
+
+        Assert.Equal("Timeline: {0} {1} from {2:g} to {3:g}.", neutralValues["Histogram_RegionAria"]);
+        Assert.Equal("Timeline: {0} {1} from {2:g} to {3:g}, {4}.", neutralValues["Histogram_RegionAria_Breakdown"]);
+        Assert.Equal("Showing {2:g} to {3:g}: {0} {1}.", neutralValues["Histogram_WindowAnnouncement"]);
+        Assert.Equal("Showing {2:g} to {3:g}: {0} {1}, {4}.", neutralValues["Histogram_WindowAnnouncement_Breakdown"]);
+    }
+
+    [Fact]
     public void NeutralPropertyLabelValues_MirrorInvariant()
     {
         // The formatter emits the typed DetailsPropertyLabel; copy renders it via DetailsPropertyText.Invariant. This
@@ -221,6 +289,24 @@ public sealed class LocalizationInfraTests
 
             Assert.True(neutralValues.TryGetValue(key, out var neutral), $"Missing neutral RESX value for {key}.");
             Assert.Equal(ResolutionStatusTokens.Format(status), neutral);
+        }
+    }
+
+    [Fact]
+    public void NeutralStatsDimensionValues_MirrorPreviousDisplayText()
+    {
+        var neutralValues = ResxValues();
+        (StatsDimension Dimension, string Text)[] expected =
+        [
+            (StatsDimension.Source, "Source"),
+            (StatsDimension.EventId, "Event ID"),
+            (StatsDimension.TaskCategory, "Task Category"),
+            (StatsDimension.User, "User")
+        ];
+
+        foreach ((StatsDimension dimension, string text) in expected)
+        {
+            Assert.Equal(text, neutralValues[$"Stats_Dimension_{dimension}"]);
         }
     }
 

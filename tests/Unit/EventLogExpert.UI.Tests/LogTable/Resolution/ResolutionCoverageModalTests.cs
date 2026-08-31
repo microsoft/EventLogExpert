@@ -396,8 +396,8 @@ public sealed class ResolutionCoverageModalTests : BunitContext
         cut.WaitForState(() => cut.FindAll(".resolution-provider-toggle").Count > 0, s_wait);
         cut.Find(".resolution-provider-toggle").Click();
 
-        cut.WaitForAssertion(() => Assert.Contains("[[Coverage_SeverityLevel_Error]]", cut.Markup), s_wait);
-        Assert.Contains("[[Coverage_SeverityUnknown]]", cut.Markup);
+        cut.WaitForAssertion(() => Assert.Contains("[[Severity_Level_Error]]", cut.Markup), s_wait);
+        Assert.Contains("[[Severity_Unknown]]", cut.Markup);
     }
 
     [Fact]

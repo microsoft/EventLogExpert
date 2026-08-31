@@ -1,8 +1,7 @@
-@using EventLogExpert.Runtime.Stats
 @inherits ModalBase<bool>
 
-<ModalChrome AriaLabel="@($"All {Dimension.DisplayName()} values")"
-    CloseLabel="Close"
+<ModalChrome AriaLabel="@Localizer["Stats_Detail_Title", StatsDimensionLocalizer.Label(Localizer, Dimension)]"
+    CloseLabel="@Localizer["Stats_Detail_CloseLabel"]"
     Footer="FooterPreset.CloseOnly"
     Height="70%"
     InlineAlert="@CurrentInlineAlert"
@@ -11,30 +10,30 @@
     OnClose="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
-    Title="@($"All {Dimension.DisplayName()} values")"
+    Title="@Localizer["Stats_Detail_Title", StatsDimensionLocalizer.Label(Localizer, Dimension)]"
     @ref="ChromeRef">
     <ChildContent>
         <div class="stats-detail">
-            <input aria-label="Filter values"
+            <input aria-label="@Localizer["Stats_Detail_FilterValuesAria"]"
                 @bind="_search"
                 @bind:event="oninput"
                 class="input stats-detail-search"
-                placeholder="Filter values..."
+                placeholder="@Localizer["Stats_Detail_FilterValuesPlaceholder"]"
                 type="text" />
 
             @if (_loading)
             {
-                <div class="stats-detail-status">Computing...</div>
+                <div class="stats-detail-status">@Localizer["Stats_Computing"]</div>
             }
             else if (_failed)
             {
-                <div class="stats-detail-status">These values could not be computed.</div>
+                <div class="stats-detail-status">@Localizer["Stats_Detail_ComputeFailed"]</div>
             }
             else
             {
                 @if (_distinct > _all.Count)
                 {
-                    <div class="stats-detail-truncated">Showing the top @FormatCount(_all.Count) of @FormatCount(_distinct) values.</div>
+                    <div class="stats-detail-truncated">@Localizer["Stats_Detail_Truncated", FormatCount(_all.Count), FormatCount(_distinct)]</div>
                 }
 
                 <div class="stats-detail-list">
@@ -45,17 +44,17 @@
                             <span class="stats-detail-count">@FormatCount(row.Count)</span>
                             <span class="stats-detail-percent">@FormatShare(row.Count)</span>
                             <span class="stats-detail-actions">
-                                <button aria-label="@($"Filter to {Dimension.DisplayName()} {row.Value}")"
+                                <button aria-label="@Localizer["Stats_Row_IncludeAria", StatsDimensionLocalizer.Label(Localizer, Dimension), row.Value]"
                                     class="stats-detail-include"
                                     @onclick="() => Include(row)"
-                                    title="Filter to only this value"
+                                    title="@Localizer["Stats_Row_IncludeTitle"]"
                                     type="button">
                                     <i aria-hidden="true" class="bi bi-plus-circle"></i>
                                 </button>
-                                <button aria-label="@($"Exclude {Dimension.DisplayName()} {row.Value}")"
+                                <button aria-label="@Localizer["Stats_Row_ExcludeAria", StatsDimensionLocalizer.Label(Localizer, Dimension), row.Value]"
                                     class="stats-detail-exclude"
                                     @onclick="() => Exclude(row)"
-                                    title="Exclude this value"
+                                    title="@Localizer["Stats_Row_ExcludeTitle"]"
                                     type="button">
                                     <i aria-hidden="true" class="bi bi-dash-circle"></i>
                                 </button>

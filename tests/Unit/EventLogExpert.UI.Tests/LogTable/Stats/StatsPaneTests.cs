@@ -44,6 +44,7 @@ public sealed class StatsPaneTests : BunitContext
         JSInterop.Mode = JSRuntimeMode.Loose;
         JSInterop.SetupModule("./_content/EventLogExpert.UI/LogTable/Stats/StatsPane.razor.js");
 
+        Services.AddEventLogLocalization();
         Services.AddImmediateCpuWorkScheduler();
         Services.AddSingleton(_lensCommands);
         Services.AddSingleton(_lensSource);
