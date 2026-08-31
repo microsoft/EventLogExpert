@@ -5,6 +5,7 @@ using Bunit;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Common.Filtering;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
@@ -15,6 +16,7 @@ using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.LogTable.Resolution;
@@ -66,15 +68,41 @@ public sealed class ResolutionCoverageModalTests : BunitContext
     [Fact]
     public async Task CauseFilter_ClickingNoProvider_AppliesResolutionStatusLens()
     {
+        // Seam guard: the cause chip DISPLAY localizes through ResolutionStatus_* (MarkerLocalizer echoes it as
+        // [[ResolutionStatus_NoProvider]]), but the lens it applies must still carry the INVARIANT ResolutionStatusTokens
+        // value - so a translated UI never rewrites the filter/storage vocabulary.
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
         SetReport(Report(Row("A", total: 5, noProvider: 5, status: CoverageStatus.None)));
 
         var cut = Render<ResolutionCoverageModal>();
         cut.WaitForState(() => cut.FindAll(".resolution-cause-filter").Count > 0, s_wait);
 
-        // Only the non-zero cause (No provider metadata) renders as a button.
-        await cut.Find(".resolution-cause-filter").ClickAsync(new MouseEventArgs());
+        // Only the non-zero cause (No provider metadata) renders as a button; its label routes through the localizer.
+        var causeButton = cut.Find(".resolution-cause-filter");
+        Assert.Contains("[[ResolutionStatus_NoProvider]]", causeButton.TextContent, StringComparison.Ordinal);
+
+        await causeButton.ClickAsync(new MouseEventArgs());
 
         _lensCommands.Received(1).IncludeValue(EventProperty.ResolutionStatus, ResolutionStatusTokens.NoProvider, Arg.Any<string?>());
+    }
+
+    [Fact]
+    public void ChromeStatusAndHeaders_AreDrivenByTheLocalizer()
+    {
+        // Component-wiring guard: the razor must ROUTE chrome, column headers, and the status pill through the
+        // localizer. The enum/orphan/drift guards only prove key<->RESX correspondence, so a razor regression to a
+        // hardcoded/invariant label would pass them all - only rendering under MarkerLocalizer and asserting the
+        // echoed [[key]] reds on that.
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
+        SetReport(Report(Row("A", total: 5, noProvider: 5, status: CoverageStatus.None)));
+
+        var cut = Render<ResolutionCoverageModal>();
+        cut.WaitForState(() => cut.FindAll(".resolution-coverage-row").Count > 0, s_wait);
+
+        Assert.Contains("[[Coverage_Title]]", cut.Markup);
+        Assert.Contains("[[Coverage_CopyTable]]", cut.Markup);
+        Assert.Contains("[[Coverage_Header_Provider]]", cut.Markup);
+        Assert.Contains("[[Coverage_Status_None]]", cut.Markup);
     }
 
     [Fact]
@@ -105,6 +133,31 @@ public sealed class ResolutionCoverageModalTests : BunitContext
         await cut.Find(".resolution-coverage-copy").ClickAsync(new MouseEventArgs());
 
         await _clipboard.Received(1).CopyTextAsync(Arg.Is<string>(text => text != null && text.Contains("Alpha", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task CopyButton_UnderMarkerLocalizer_CopiesInvariantTable()
+    {
+        // The copied TSV is the invariant export seam: even when every visible string is localized (MarkerLocalizer wraps
+        // each key as [[...]]), the clipboard payload keeps its invariant headers and carries no localized marker. Driving
+        // it through the LIVE copy path (not a direct CoverageTableFormatter.Format call, which a pure static could not
+        // observe the marker through) proves the modal copies the invariant table, never the rendered chrome.
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
+        SetReport(Report(Row("Alpha", total: 5, noProvider: 5, status: CoverageStatus.None)));
+
+        var cut = Render<ResolutionCoverageModal>();
+        cut.WaitForState(() => cut.FindAll(".resolution-coverage-copy").Count > 0, s_wait);
+
+        await cut.Find(".resolution-coverage-copy").ClickAsync(new MouseEventArgs());
+
+        // Self-contained proof the marker localizer is actually active in this render, so a no-"[[" payload means the
+        // TSV genuinely does not localize (not that the marker silently lost the DI registration race).
+        Assert.Contains("[[", cut.Markup, StringComparison.Ordinal);
+
+        await _clipboard.Received(1).CopyTextAsync(Arg.Is<string>(payload =>
+            payload != null &&
+            payload.Contains("Provider\tEvents", StringComparison.Ordinal) &&
+            !payload.Contains("[[", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -287,6 +340,19 @@ public sealed class ResolutionCoverageModalTests : BunitContext
     }
 
     [Fact]
+    public void RealLocalizer_ResolvesEveryReferencedCoverageKey()
+    {
+        // Under the real localizer no authored Coverage_* key echoes into the DOM - every referenced key resolves, so
+        // a mistyped key reference (which the reverse guard also catches statically) cannot ship a raw key on screen.
+        SetReport(Report(Row("A", total: 5, noProvider: 5, status: CoverageStatus.None)));
+
+        var cut = Render<ResolutionCoverageModal>();
+        cut.WaitForState(() => cut.FindAll(".resolution-coverage-row").Count > 0, s_wait);
+
+        Assert.DoesNotContain("Coverage_", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RetryDetail_AfterFailure_RerunsScan_AndRecovers()
     {
         SetReport(Report(Row("A", total: 5, noProvider: 5, status: CoverageStatus.None)));
@@ -311,6 +377,27 @@ public sealed class ResolutionCoverageModalTests : BunitContext
         // Retry re-scans (and here recovers) rather than collapsing: the second scan's Event-ID table appears, which is
         // impossible if Retry had taken ToggleExpandAsync's collapse branch.
         cut.WaitForAssertion(() => Assert.Contains("4624", cut.Find(".resolution-detail-idtable").TextContent), s_wait);
+    }
+
+    [Fact]
+    public void SeverityDetail_LabelsAreDrivenByTheLocalizer()
+    {
+        // Wiring guard for the severity breakdown: both a real level (Error) and the null Unknown slot must route
+        // through SeverityLevelLocalizer, so the razor cannot regress to SeverityDisplay-style invariant names.
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
+        SetReport(Report(Row("A", total: 5, noProvider: 5, status: CoverageStatus.None)));
+        SetProviderDetail(Detail(levels:
+        [
+            new LevelCoverageRow(SeverityLevel.Error, new ProviderResolutionCounts(3, 0, 3, 0, 0)),
+            new LevelCoverageRow(null, new ProviderResolutionCounts(2, 0, 2, 0, 0))
+        ]));
+
+        var cut = Render<ResolutionCoverageModal>();
+        cut.WaitForState(() => cut.FindAll(".resolution-provider-toggle").Count > 0, s_wait);
+        cut.Find(".resolution-provider-toggle").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("[[Coverage_SeverityLevel_Error]]", cut.Markup), s_wait);
+        Assert.Contains("[[Coverage_SeverityUnknown]]", cut.Markup);
     }
 
     [Fact]

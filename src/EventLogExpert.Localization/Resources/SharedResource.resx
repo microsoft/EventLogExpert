@@ -1068,4 +1068,243 @@
   <data name="Correlation_Truncated" xml:space="preserve">
     <value>Showing the newest {0} of {1} events (plus the selected event).</value>
     <comment>{0} is the number of rendered events; {1} is the total event count.</comment>
+  </data>
+  <!-- Resolution coverage modal (step 2 localization). -->
+  <data name="Coverage_AriaLabel" xml:space="preserve">
+    <value>Resolution and coverage</value>
+  </data>
+  <data name="Coverage_CloseLabel" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Coverage_Title" xml:space="preserve">
+    <value>Resolution &amp; Coverage</value>
+  </data>
+  <data name="Coverage_Computing" xml:space="preserve">
+    <value>Computing...</value>
+  </data>
+  <data name="Coverage_ViewUpdating" xml:space="preserve">
+    <value>The view is still updating - reopen to see coverage.</value>
+  </data>
+  <data name="Coverage_UnavailableWithCause" xml:space="preserve">
+    <value>Coverage is unavailable. {0}</value>
+  </data>
+  <data name="Coverage_ComputeFailed" xml:space="preserve">
+    <value>Coverage could not be computed.</value>
+  </data>
+  <data name="Coverage_NoEventsFiltered" xml:space="preserve">
+    <value>No events match the current filter.</value>
+  </data>
+  <data name="Coverage_NoEvents" xml:space="preserve">
+    <value>No events to analyze.</value>
+  </data>
+  <data name="Coverage_TotalEvents_One" xml:space="preserve">
+    <value>1 event in the current view</value>
+    <comment>Singular form; the count is exactly 1 so there is no placeholder.</comment>
+  </data>
+  <data name="Coverage_TotalEvents_Many" xml:space="preserve">
+    <value>{0} events in the current view</value>
+    <comment>Plural form (count 2 or more). {0} is the event count, already formatted with the current-culture group separator.</comment>
+  </data>
+  <data name="Coverage_FilteredViewTooltip" xml:space="preserve">
+    <value>Coverage reflects the current filtered view, not all loaded events.</value>
+  </data>
+  <data name="Coverage_FilteredView" xml:space="preserve">
+    <value>Filtered view</value>
+  </data>
+  <data name="Coverage_ResolvedTallyLabel" xml:space="preserve">
+    <value>Resolved:</value>
+  </data>
+  <data name="Coverage_UnresolvedTallyLabel" xml:space="preserve">
+    <value>Unresolved:</value>
+  </data>
+  <data name="Coverage_FilterByCauseTooltip" xml:space="preserve">
+    <value>Filter the view to {0} events</value>
+  </data>
+  <data name="Coverage_ProportionAriaLabel" xml:space="preserve">
+    <value>Resolution mix: {0} resolved, {1} no provider metadata, {2} no message match, {3} resolution error.</value>
+    <comment>Screen-reader summary of the resolution proportion bar. {0}-{3} are pre-formatted percentage shares (resolved, no-provider, no-message, error).</comment>
+  </data>
+  <data name="Coverage_FilterProvidersAria" xml:space="preserve">
+    <value>Filter providers</value>
+  </data>
+  <data name="Coverage_FilterProvidersPlaceholder" xml:space="preserve">
+    <value>Filter providers...</value>
+  </data>
+  <data name="Coverage_ProvidersTruncated" xml:space="preserve">
+    <value>Showing the top {0} of {1} providers.</value>
+  </data>
+  <data name="Coverage_Header_Provider" xml:space="preserve">
+    <value>Provider</value>
+  </data>
+  <data name="Coverage_Header_Events" xml:space="preserve">
+    <value>Events</value>
+  </data>
+  <data name="Coverage_Header_Resolved" xml:space="preserve">
+    <value>Resolved</value>
+  </data>
+  <data name="Coverage_Header_NoProvider" xml:space="preserve">
+    <value>No provider</value>
+    <comment>Width-constrained column header; the full status name ("No provider metadata") is the column tooltip. Keep short.</comment>
+  </data>
+  <data name="Coverage_Header_NoMessage" xml:space="preserve">
+    <value>No message</value>
+    <comment>Width-constrained column header; the full status name ("No message match") is the column tooltip. Keep short.</comment>
+  </data>
+  <data name="Coverage_Header_Error" xml:space="preserve">
+    <value>Error</value>
+    <comment>Width-constrained column header; the full status name ("Resolution error") is the column tooltip. Keep short.</comment>
+  </data>
+  <data name="Coverage_Header_Coverage" xml:space="preserve">
+    <value>Coverage</value>
+  </data>
+  <data name="Coverage_Header_EventId" xml:space="preserve">
+    <value>Event ID</value>
+  </data>
+  <data name="Coverage_Header_Total" xml:space="preserve">
+    <value>Total</value>
+  </data>
+  <data name="Coverage_Header_Unresolved" xml:space="preserve">
+    <value>Unresolved</value>
+  </data>
+  <data name="Coverage_Header_Cause" xml:space="preserve">
+    <value>Cause</value>
+  </data>
+  <data name="Coverage_Status_Full" xml:space="preserve">
+    <value>Full</value>
+  </data>
+  <data name="Coverage_Status_Partial" xml:space="preserve">
+    <value>Partial</value>
+  </data>
+  <data name="Coverage_Status_None" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="Coverage_FilterProviderAria" xml:space="preserve">
+    <value>Filter to {0}</value>
+  </data>
+  <data name="Coverage_FilterProviderTooltip" xml:space="preserve">
+    <value>Filter to only this provider</value>
+  </data>
+  <data name="Coverage_ExcludeProviderAria" xml:space="preserve">
+    <value>Exclude {0}</value>
+  </data>
+  <data name="Coverage_ExcludeProviderTooltip" xml:space="preserve">
+    <value>Exclude this provider</value>
+  </data>
+  <data name="Coverage_FilterProviderUnresolvedAria" xml:space="preserve">
+    <value>Filter to {0}'s unresolved events</value>
+  </data>
+  <data name="Coverage_FilterProviderUnresolvedTooltip" xml:space="preserve">
+    <value>Filter the view to this provider's unresolved events</value>
+  </data>
+  <data name="Coverage_OpenDatabaseToolsAria" xml:space="preserve">
+    <value>Open Database Tools for {0}</value>
+  </data>
+  <data name="Coverage_DetailsForProviderAria" xml:space="preserve">
+    <value>Coverage details for {0}</value>
+  </data>
+  <data name="Coverage_AnalyzingProvider" xml:space="preserve">
+    <value>Analyzing {0}...</value>
+  </data>
+  <data name="Coverage_ProviderAnalyzeFailed" xml:space="preserve">
+    <value>Could not analyze this provider.</value>
+  </data>
+  <data name="Coverage_Retry" xml:space="preserve">
+    <value>Retry</value>
+  </data>
+  <data name="Coverage_UnresolvedBySeverityHeading" xml:space="preserve">
+    <value>Unresolved by severity</value>
+  </data>
+  <data name="Coverage_SeverityBarLabel" xml:space="preserve">
+    <value>Unresolved by severity</value>
+    <comment>Accessible name for the severity proportion bar (role=img); intentionally the same text as Coverage_UnresolvedBySeverityHeading. Per-level values are read from the visible count list, not this label.</comment>
+  </data>
+  <data name="Coverage_SeveritySegmentTooltip" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>{0} is the severity level name and {1} the unresolved count; the visible per-level twin renders the same count wrapped in &lt;strong&gt;.</comment>
+  </data>
+  <data name="Coverage_SeverityLevel_Critical" xml:space="preserve">
+    <value>Critical</value>
+  </data>
+  <data name="Coverage_SeverityLevel_Error" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="Coverage_SeverityLevel_Warning" xml:space="preserve">
+    <value>Warning</value>
+  </data>
+  <data name="Coverage_SeverityLevel_Information" xml:space="preserve">
+    <value>Information</value>
+  </data>
+  <data name="Coverage_SeverityLevel_Verbose" xml:space="preserve">
+    <value>Verbose</value>
+  </data>
+  <data name="Coverage_SeverityUnknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="Coverage_UnresolvedEventIdsHeading" xml:space="preserve">
+    <value>Unresolved event IDs</value>
+  </data>
+  <data name="Coverage_EventIdsTruncated" xml:space="preserve">
+    <value>top {0} of {1}</value>
+  </data>
+  <data name="Coverage_FilterEventIdUnresolvedAria" xml:space="preserve">
+    <value>Filter to event ID {0} unresolved events for {1}</value>
+  </data>
+  <data name="Coverage_FilterEventIdUnresolvedTooltip" xml:space="preserve">
+    <value>Filter the view to this event ID's unresolved events</value>
+  </data>
+  <data name="Coverage_ShowOnlyUnresolvedTooltip" xml:space="preserve">
+    <value>Filter the view to only unresolved events</value>
+  </data>
+  <data name="Coverage_ShowOnlyUnresolved" xml:space="preserve">
+    <value>Show only unresolved events</value>
+  </data>
+  <data name="Coverage_CopyTableTooltip" xml:space="preserve">
+    <value>Copy the coverage table as TSV</value>
+  </data>
+  <data name="Coverage_CopyTable" xml:space="preserve">
+    <value>Copy table</value>
+  </data>
+  <data name="Coverage_Copied" xml:space="preserve">
+    <value>Copied</value>
+  </data>
+  <data name="Coverage_TooltipNone" xml:space="preserve">
+    <value>No provider metadata for any of this provider's events - readable fallback text may still be shown.</value>
+  </data>
+  <data name="Coverage_TooltipPartial" xml:space="preserve">
+    <value>Some events could not be fully resolved: {0}.</value>
+  </data>
+  <data name="Coverage_CauseFragment_NoProvider" xml:space="preserve">
+    <value>no provider metadata</value>
+    <comment>Lowercase mid-sentence fragment substituted into Coverage_CauseList_Two/Three and shown after the colon in Coverage_TooltipPartial. Keep lowercase, no trailing punctuation.</comment>
+  </data>
+  <data name="Coverage_CauseFragment_NoMessage" xml:space="preserve">
+    <value>no message match</value>
+    <comment>Lowercase mid-sentence fragment substituted into Coverage_CauseList_Two/Three and shown after the colon in Coverage_TooltipPartial. Keep lowercase, no trailing punctuation.</comment>
+  </data>
+  <data name="Coverage_CauseFragment_Failed" xml:space="preserve">
+    <value>a resolution error</value>
+    <comment>Lowercase mid-sentence fragment substituted into Coverage_CauseList_Two/Three and shown after the colon in Coverage_TooltipPartial. Keep lowercase, no trailing punctuation.</comment>
+  </data>
+  <data name="Coverage_CauseList_Two" xml:space="preserve">
+    <value>{0} and {1}</value>
+    <comment>Joins exactly two Coverage_CauseFragment_* values into a clause. {0}/{1} are those fragments; adjust the conjunction and order for the target language.</comment>
+  </data>
+  <data name="Coverage_CauseList_Three" xml:space="preserve">
+    <value>{0}, {1}, and {2}</value>
+    <comment>Joins exactly three Coverage_CauseFragment_* values. {0}/{1}/{2} are those fragments; adjust separators and conjunction for the target language.</comment>
+  </data>
+  <data name="Coverage_DatabaseActionProviderMetadataTooltip" xml:space="preserve">
+    <value>Loading a provider database may add descriptions for {0}.</value>
+  </data>
+  <data name="Coverage_DatabaseActionMessageDefinitionsTooltip" xml:space="preserve">
+    <value>Loading a newer provider database may add message definitions for {0}.</value>
+  </data>
+  <data name="Coverage_RemediationNoProvider" xml:space="preserve">
+    <value>No provider metadata is installed for {0} on this machine. Import a provider database from Database Tools, or open this log where the source software is installed.</value>
+  </data>
+  <data name="Coverage_RemediationNoMessage" xml:space="preserve">
+    <value>{0} has provider metadata but no message definition for these event IDs. A newer provider database may add them.</value>
+  </data>
+  <data name="Coverage_RemediationFailed" xml:space="preserve">
+    <value>Resolution hit an unexpected error for some of {0}'s events. Reopening the log, or inspecting the raw event XML, may help.</value>
   </data></root>
