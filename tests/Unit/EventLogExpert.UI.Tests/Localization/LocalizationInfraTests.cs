@@ -6,6 +6,7 @@ using EventLogExpert.Localization;
 using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.DetailsPane;
+using EventLogExpert.Runtime.ResolutionCoverage;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Scenarios.Catalog;
@@ -46,7 +47,9 @@ public sealed class LocalizationInfraTests
             ("Details_Property_", typeof(DetailsPropertyLabel)),
             ("Explain_", typeof(GlossaryTerm)),
             ("ResolutionStatus_", typeof(EventResolutionStatus)),
-            ("Correlation_Role_", typeof(ActivityNodeRole))
+            ("Correlation_Role_", typeof(ActivityNodeRole)),
+            ("Coverage_Status_", typeof(CoverageStatus)),
+            ("Coverage_SeverityLevel_", typeof(SeverityLevel))
         ];
 
         var resxKeys = ResxKeys();
@@ -74,16 +77,28 @@ public sealed class LocalizationInfraTests
         // including keys selected by a conditional such as Localizer[count == 1 ? "..._One" : "..._Many", count] and
         // composite keys such as Localizer["...", arg] - so a key referenced only through a ternary cannot silently drift
         // out of the RESX. Format arguments are variables or punctuation separators (", ", " "), never identifier-like
-        // literals, so scanning the whole call span never misreads an argument as a key.
+        // literals, so scanning the whole call span never misreads an argument as a key. LocalizedCount.OneOrMany picks
+        // its key by count at runtime, so its singular/plural pair never lands inside a Localizer[...] indexer; a second
+        // pattern anchored on the trailing quoted pair recovers both keys (a parenthesis in the count arg cannot truncate it).
         var localizerCallPattern = new Regex(
             @"[Ll]ocalizer\[([^\]]*)\]|\.GetString\(([^)]*)\)",
             RegexOptions.Compiled);
         var keyLiteralPattern = new Regex(@"""([A-Za-z0-9_]+)""", RegexOptions.Compiled);
+        var oneOrManyPattern = new Regex(
+            @"OneOrMany\([^;{}]*?""([A-Za-z0-9_]+)""\s*,\s*""([A-Za-z0-9_]+)""\s*\)",
+            RegexOptions.Compiled);
 
-        var referenced = LocalizationSourceScan.EnumerateProductionSource()
-            .SelectMany(path => localizerCallPattern.Matches(File.ReadAllText(path)))
+        var sources = LocalizationSourceScan.EnumerateProductionSource()
+            .Select(File.ReadAllText)
+            .ToList();
+
+        var referenced = sources
+            .SelectMany(source => localizerCallPattern.Matches(source))
             .SelectMany(call => keyLiteralPattern.Matches(call.Groups[1].Value + call.Groups[2].Value))
             .Select(match => match.Groups[1].Value)
+            .Concat(sources
+                .SelectMany(source => oneOrManyPattern.Matches(source))
+                .SelectMany(call => new[] { call.Groups[1].Value, call.Groups[2].Value }))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(key => key, StringComparer.Ordinal)
             .ToList();
@@ -134,6 +149,23 @@ public sealed class LocalizationInfraTests
 
         Assert.True(result.ResourceNotFound);
         Assert.Equal("FindBar_ThisKeyDoesNotExist", result.Value);
+    }
+
+    [Fact]
+    public void NeutralCoverageStatusValues_MirrorLabels()
+    {
+        // The status cell localizes CoverageStatus while the TSV/copy path renders CoverageStatusText.Label. This pins
+        // each neutral Coverage_Status_* value equal to that invariant label so the on-screen pill and the copied table
+        // never disagree. (No severity counterpart: SeverityLevel has no invariant twin consumer.)
+        var neutralValues = ResxValues();
+
+        foreach (CoverageStatus status in Enum.GetValues<CoverageStatus>())
+        {
+            var key = $"Coverage_Status_{status}";
+
+            Assert.True(neutralValues.TryGetValue(key, out var neutral), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(CoverageStatusText.Label(status), neutral);
+        }
     }
 
     [Fact]

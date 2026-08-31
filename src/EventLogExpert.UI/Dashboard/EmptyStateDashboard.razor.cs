@@ -273,7 +273,7 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
         return result.Failed > 0 ?
             Localizer["Dashboard_Launch_OpenedWithUnavailable",
                 scenario.Name,
-                Plural(result.Failed, "Dashboard_Channel_One", "Dashboard_Channel_Many")] :
+                LocalizedCount.OneOrMany(Localizer, result.Failed, "Dashboard_Channel_One", "Dashboard_Channel_Many")] :
             Localizer["Dashboard_Launch_Opened", scenario.Name];
     }
 
@@ -322,9 +322,9 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
             .OrderBy(scenario => scenario.Priority)
             .ThenBy(scenario => scenario.Order);
 
-    private string FolderFilesWord(int count) => Plural(count, "Dashboard_File_One", "Dashboard_File_Many");
+    private string FolderFilesWord(int count) => LocalizedCount.OneOrMany(Localizer, count, "Dashboard_File_One", "Dashboard_File_Many");
 
-    private string FolderLogsWord(int count) => Plural(count, "Dashboard_Log_One", "Dashboard_Log_Many");
+    private string FolderLogsWord(int count) => LocalizedCount.OneOrMany(Localizer, count, "Dashboard_Log_One", "Dashboard_Log_Many");
 
     private string FolderMissingNote(ImmutableArray<string> missing) =>
         missing.IsDefaultOrEmpty ? string.Empty : Localizer["Dashboard_MissingNote", string.Join(", ", missing)].Value;
@@ -559,11 +559,6 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
     private Task OpenSecurityAsync() => RunGuardedAsync(() => Actions.OpenLiveLogAsync(LogChannelNames.SecurityLog, false));
 
     private Task OpenSystemAsync() => RunGuardedAsync(() => Actions.OpenLiveLogAsync(LogChannelNames.SystemLog, false));
-
-    // English 2-form pluralization (count picks singular). Correct for English only; locales with more than two plural
-    // categories, or a different singular boundary, need a CLDR/ICU provider (see the design "Known limitations").
-    private string Plural(int count, string oneKey, string manyKey) =>
-        count == 1 ? Localizer[oneKey, count] : Localizer[manyKey, count];
 
     private IReadOnlyList<ChannelReadiness> ReadinessFor(IEnumerable<string> channels) =>
     [

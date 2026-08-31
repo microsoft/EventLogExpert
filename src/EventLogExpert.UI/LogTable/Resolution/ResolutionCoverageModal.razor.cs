@@ -3,14 +3,17 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Common.Filtering;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.ResolutionCoverage;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.LogTable.Resolution;
 
@@ -63,6 +66,8 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
     // sense once a non-empty report is shown (mirrors the body's terminal branch), so they stay hidden while the modal
     // is loading, updating, faulted, or empty.
     private bool HasReport => !_loading && !_updating && !_failed && _report is { Summary.Total: > 0 };
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     private int Unresolved => _report?.Summary.Unresolved ?? 0;
 
@@ -144,28 +149,6 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
         _ => "coverage-pill coverage-partial"
     };
 
-    private static string? CoverageTooltip(ProviderCoverageRow row)
-    {
-        if (row.Status == CoverageStatus.Full) { return null; }
-
-        if (row.Status == CoverageStatus.None)
-        {
-            return "No provider metadata for any of this provider's events - readable fallback text may still be shown.";
-        }
-
-        var causes = new List<string>(3);
-
-        if (row.Counts.NoProvider > 0) { causes.Add("no provider metadata"); }
-        if (row.Counts.NoMessage > 0) { causes.Add("no message match"); }
-        if (row.Counts.Failed > 0) { causes.Add("a resolution error"); }
-
-        return $"Some events could not be fully resolved: {string.Join(", ", causes)}.";
-    }
-
-    private static string DatabaseActionTooltip(ProviderCoverageRow row) => row.Counts.NoProvider > 0 ?
-        $"Loading a provider database may add descriptions for {row.Provider}." :
-        $"Loading a newer provider database may add message definitions for {row.Provider}.";
-
     private static string DetailId(int index) => $"coverage-detail-{index}";
 
     private static ResolutionCause DominantCause(ProviderResolutionCounts counts)
@@ -176,20 +159,9 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
         return counts.NoMessage >= counts.Failed ? ResolutionCause.NoMessage : ResolutionCause.Failed;
     }
 
-    private static string DominantCauseLabel(ProviderResolutionCounts counts) => DominantCause(counts) switch
-    {
-        ResolutionCause.NoProvider => ResolutionStatusTokens.NoProvider,
-        ResolutionCause.NoMessage => ResolutionStatusTokens.NoMessage,
-        _ => ResolutionStatusTokens.Failed
-    };
-
     private static string FormatCount(int value) => TallyFormatter.Count(value);
 
     private static string SegmentWidth(double percent) => FormattableString.Invariant($"width:{percent:0.###}%;");
-
-    private static string SeverityBarLabel(ProviderCoverageDetail detail) =>
-        "Unresolved by severity: " +
-        string.Join(", ", detail.Levels.Select(level => $"{SeverityDisplay.Label(level.Level)} {level.Counts.Unresolved}"));
 
     private static IEnumerable<(SeverityLevel? Level, int Unresolved, double Percent)> SeveritySegments(ProviderCoverageDetail detail)
     {
@@ -206,6 +178,15 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
     private static bool ShowDatabaseAction(ProviderCoverageRow row) =>
         row.Counts.NoProvider > 0 || row.Counts.NoMessage > 0;
 
+    // Bridges the private cause enum onto the shared resolution-status vocabulary so a cause DISPLAY reuses the
+    // ResolutionStatus_* keys instead of a duplicate Coverage_Cause_* family.
+    private static EventResolutionStatus ToResolutionStatus(ResolutionCause cause) => cause switch
+    {
+        ResolutionCause.NoProvider => EventResolutionStatus.NoProvider,
+        ResolutionCause.NoMessage => EventResolutionStatus.NoMessage,
+        _ => EventResolutionStatus.Failed
+    };
+
     private string AriaSort(CoverageSortColumn column) =>
         _sortColumn != column ? "none" : _sortDescending ? "descending" : "ascending";
 
@@ -217,13 +198,15 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
         scan?.Dispose();
     }
 
-    private IEnumerable<(string Token, int Count)> CauseBreakdown()
+    private IEnumerable<(EventResolutionStatus Status, int Count)> CauseBreakdown()
     {
         if (_report is null) { yield break; }
 
-        yield return (ResolutionStatusTokens.NoProvider, _report.Summary.NoProvider);
-        yield return (ResolutionStatusTokens.NoMessage, _report.Summary.NoMessage);
-        yield return (ResolutionStatusTokens.Failed, _report.Summary.Failed);
+        yield return (EventResolutionStatus.NoProvider, _report.Summary.NoProvider);
+
+        yield return (EventResolutionStatus.NoMessage, _report.Summary.NoMessage);
+        
+        yield return (EventResolutionStatus.Failed, _report.Summary.Failed);
     }
 
     private void CollapseDetail()
@@ -264,15 +247,49 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
         }
     }
 
+    private string? CoverageTooltip(ProviderCoverageRow row)
+    {
+        if (row.Status == CoverageStatus.Full) { return null; }
+
+        if (row.Status == CoverageStatus.None)
+        {
+            return Localizer["Coverage_TooltipNone"];
+        }
+
+        var causes = new List<string>(3);
+
+        if (row.Counts.NoProvider > 0) { causes.Add(Localizer["Coverage_CauseFragment_NoProvider"]); }
+        if (row.Counts.NoMessage > 0) { causes.Add(Localizer["Coverage_CauseFragment_NoMessage"]); }
+        if (row.Counts.Failed > 0) { causes.Add(Localizer["Coverage_CauseFragment_Failed"]); }
+
+        // A Partial row always has at least one unresolved cause (1-3 items), so a fixed-slot template stays
+        // Criterion-14-clean without a concatenated separator.
+        string causeList = causes.Count switch
+        {
+            1 => causes[0],
+            2 => Localizer["Coverage_CauseList_Two", causes[0], causes[1]],
+            _ => Localizer["Coverage_CauseList_Three", causes[0], causes[1], causes[2]]
+        };
+
+        return Localizer["Coverage_TooltipPartial", causeList];
+    }
+
+    private string DatabaseActionTooltip(ProviderCoverageRow row) => row.Counts.NoProvider > 0 ?
+        Localizer["Coverage_DatabaseActionProviderMetadataTooltip", row.Provider] :
+        Localizer["Coverage_DatabaseActionMessageDefinitionsTooltip", row.Provider];
+
+    private string DominantCauseLabel(ProviderResolutionCounts counts) =>
+        ResolutionStatusLocalizer.Display(Localizer, ToResolutionStatus(DominantCause(counts)));
+
     private async Task ExcludeProviderAsync(ProviderCoverageRow row)
     {
         FilterLensCommands.ExcludeValue(EventProperty.Source, row.Provider, _originLog);
         await CompleteAsync(true);
     }
 
-    private async Task FilterByCauseAsync(string token)
+    private async Task FilterByCauseAsync(EventResolutionStatus status)
     {
-        FilterLensCommands.IncludeValue(EventProperty.ResolutionStatus, token, _originLog);
+        FilterLensCommands.IncludeValue(EventProperty.ResolutionStatus, ResolutionStatusTokens.Format(status), _originLog);
         await CompleteAsync(true);
     }
 
@@ -397,10 +414,11 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
 
         ProviderResolutionCounts summary = _report.Summary;
 
-        return $"Resolution mix: {FormatShare(summary.Resolved)} resolved, " +
-            $"{FormatShare(summary.NoProvider)} no provider metadata, " +
-            $"{FormatShare(summary.NoMessage)} no message match, " +
-            $"{FormatShare(summary.Failed)} resolution error.";
+        return Localizer["Coverage_ProportionAriaLabel",
+            FormatShare(summary.Resolved),
+            FormatShare(summary.NoProvider),
+            FormatShare(summary.NoMessage),
+            FormatShare(summary.Failed)];
     }
 
     private IEnumerable<(string Label, string CssClass, double Percent)> ProportionSegments()
@@ -410,20 +428,36 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
         ProviderResolutionCounts summary = _report.Summary;
         double total = summary.Total;
 
-        if (summary.Resolved > 0) { yield return ("Resolved", "coverage-seg-resolved", summary.Resolved * 100.0 / total); }
-        if (summary.NoProvider > 0) { yield return (ResolutionStatusTokens.NoProvider, "coverage-seg-noprovider", summary.NoProvider * 100.0 / total); }
-        if (summary.NoMessage > 0) { yield return (ResolutionStatusTokens.NoMessage, "coverage-seg-nomessage", summary.NoMessage * 100.0 / total); }
-        if (summary.Failed > 0) { yield return (ResolutionStatusTokens.Failed, "coverage-seg-failed", summary.Failed * 100.0 / total); }
+        if (summary.Resolved > 0)
+        {
+            yield return (ResolutionStatusLocalizer.Display(Localizer, EventResolutionStatus.Resolved),
+                "coverage-seg-resolved", summary.Resolved * 100.0 / total);
+        }
+
+        if (summary.NoProvider > 0)
+        {
+            yield return (ResolutionStatusLocalizer.Display(Localizer, EventResolutionStatus.NoProvider),
+                "coverage-seg-noprovider", summary.NoProvider * 100.0 / total);
+        }
+
+        if (summary.NoMessage > 0)
+        {
+            yield return (ResolutionStatusLocalizer.Display(Localizer, EventResolutionStatus.NoMessage),
+                "coverage-seg-nomessage", summary.NoMessage * 100.0 / total);
+        }
+
+        if (summary.Failed > 0)
+        {
+            yield return (ResolutionStatusLocalizer.Display(Localizer, EventResolutionStatus.Failed),
+                "coverage-seg-failed", summary.Failed * 100.0 / total);
+        }
     }
 
     private string RemediationHint(ProviderCoverageRow row) => DominantCause(row.Counts) switch
     {
-        ResolutionCause.NoProvider =>
-            $"No provider metadata is installed for {row.Provider} on this machine. Import a provider database from Database Tools, or open this log where the source software is installed.",
-        ResolutionCause.NoMessage =>
-            $"{row.Provider} has provider metadata but no message definition for these event IDs. A newer provider database may add them.",
-        _ =>
-            $"Resolution hit an unexpected error for some of {row.Provider}'s events. Reopening the log, or inspecting the raw event XML, may help."
+        ResolutionCause.NoProvider => Localizer["Coverage_RemediationNoProvider", row.Provider],
+        ResolutionCause.NoMessage => Localizer["Coverage_RemediationNoMessage", row.Provider],
+        _ => Localizer["Coverage_RemediationFailed", row.Provider]
     };
 
     // Re-runs the scan for the already-expanded provider (the failure-state Retry) without collapsing first, so Retry
