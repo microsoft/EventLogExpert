@@ -19,10 +19,10 @@ internal static class StatusBarTextComposer
         bool isLoading,
         bool bufferFull,
         bool continuouslyUpdating,
-        string resolverStatus,
+        ResolverStatus resolver,
         DisplayIndicatorKind displayIndicator = DisplayIndicatorKind.None)
     {
-        if (!string.IsNullOrEmpty(resolverStatus)) { return resolverStatus; }
+        if (resolver.Reason != ResolverStatusReason.None) { return ResolverStatusLocalizer.Describe(localizer, resolver); }
 
         if (displayIndicator == DisplayIndicatorKind.Fault) { return localizer["StatusBar_Activity_Fault"]; }
 

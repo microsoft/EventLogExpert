@@ -3,4 +3,13 @@
 
 namespace EventLogExpert.Runtime.StatusBar;
 
-public sealed record SetResolverStatusAction(ResolverStatus Status);
+public enum ResolverStatusReason
+{
+    None = 0,
+
+    FailedToOpen,
+
+    NoResolver,
+
+    FailedToLoad
+}

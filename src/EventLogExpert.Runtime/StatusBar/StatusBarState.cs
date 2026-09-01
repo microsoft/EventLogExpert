@@ -12,5 +12,5 @@ public sealed record StatusBarState
     public ImmutableDictionary<StatusActivityId, (int Loaded, int Failed, long? Total)> EventsLoading { get; init; } =
         ImmutableDictionary<StatusActivityId, (int Loaded, int Failed, long? Total)>.Empty;
 
-    public string ResolverStatus { get; init; } = string.Empty;
+    public ResolverStatus ResolverStatus { get; init; } = ResolverStatus.None;
 }

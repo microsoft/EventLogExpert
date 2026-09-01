@@ -174,7 +174,7 @@ internal sealed class OpenLogEffects(
         {
             _logger.Warning($"Open '{action.LogName}' aborted: log not found in OpenLogs (no prior AddLog dispatch).");
 
-            dispatcher.Dispatch(new SetResolverStatusAction($"Error: Failed to open {DescribeLog(action)}"));
+            dispatcher.Dispatch(new SetResolverStatusAction(ResolverStatus.FailedToOpen(DescribeLog(action))));
 
             return;
         }
@@ -246,7 +246,7 @@ internal sealed class OpenLogEffects(
             {
                 _logger.Warning($"Open '{action.LogName}' aborted: no IEventResolver registered.");
 
-                dispatcher.Dispatch(new SetResolverStatusAction("Error: No event resolver available"));
+                dispatcher.Dispatch(new SetResolverStatusAction(ResolverStatus.NoResolver));
 
                 return;
             }
@@ -585,7 +585,7 @@ internal sealed class OpenLogEffects(
                         dispatcher.Dispatch(new CloseLogAction(logData.Id, logData.Name));
                     }
 
-                    dispatcher.Dispatch(new SetResolverStatusAction($"Error: Failed to load {DescribeLog(action)}"));
+                    dispatcher.Dispatch(new SetResolverStatusAction(ResolverStatus.FailedToLoad(DescribeLog(action))));
 
                     return;
                 }
@@ -620,7 +620,7 @@ internal sealed class OpenLogEffects(
                 dispatcher.Dispatch(new RegisterLiveTailAction(logData, lastEvent, renderXml));
             }
 
-            dispatcher.Dispatch(new SetResolverStatusAction(string.Empty));
+            dispatcher.Dispatch(new SetResolverStatusAction(ResolverStatus.None));
 
             _logger.Debug($"Loaded '{action.LogName}': {events.Count} events ({failed} failed) in {stopwatch.ElapsedMilliseconds}ms.");
         }
@@ -673,7 +673,7 @@ internal sealed class OpenLogEffects(
                 dispatcher.Dispatch(new CloseLogAction(logData.Id, logData.Name));
             }
 
-            dispatcher.Dispatch(new SetResolverStatusAction($"Error: Failed to load {DescribeLog(action)}"));
+            dispatcher.Dispatch(new SetResolverStatusAction(ResolverStatus.FailedToLoad(DescribeLog(action))));
 
             return null;
         }

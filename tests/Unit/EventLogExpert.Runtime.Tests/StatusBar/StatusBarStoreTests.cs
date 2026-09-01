@@ -22,7 +22,7 @@ public sealed class StatusBarStateTests
     {
         var state = new StatusBarState();
 
-        Assert.Equal(string.Empty, state.ResolverStatus);
+        StatusBarAssertions.AssertResolverStatus(ResolverStatusReason.None, null, state.ResolverStatus);
     }
 }
 
@@ -61,10 +61,10 @@ public sealed class StatusBarActionTests
     [Fact]
     public void SetResolverStatusAction_ShouldCreateAction()
     {
-        var status = "Resolving events...";
+        var status = ResolverStatus.FailedToLoad("System");
         var action = new SetResolverStatusAction(status);
 
-        Assert.Equal(status, action.ResolverStatus);
+        StatusBarAssertions.AssertResolverStatus(ResolverStatusReason.FailedToLoad, "System", action.Status);
     }
 }
 
@@ -125,13 +125,13 @@ public sealed class StatusBarReducerTests
             EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty
                 .Add(StatusActivityId.Create(), (100, 5, null))
                 .Add(StatusActivityId.Create(), (200, 10, null)),
-            ResolverStatus = "Processing..."
+            ResolverStatus = ResolverStatus.FailedToLoad("System")
         };
 
         var result = Reducers.ReduceCloseAll(state);
 
         Assert.Empty(result.EventsLoading);
-        Assert.Equal(string.Empty, result.ResolverStatus);
+        StatusBarAssertions.AssertResolverStatus(ResolverStatusReason.None, null, result.ResolverStatus);
     }
 
     [Fact]
@@ -284,36 +284,48 @@ public sealed class StatusBarReducerTests
     [Fact]
     public void ReduceSetResolverStatus_ShouldReplaceExistingStatus()
     {
-        var state = new StatusBarState { ResolverStatus = "Old status" };
-        var newStatus = "New status";
+        var state = new StatusBarState { ResolverStatus = ResolverStatus.FailedToLoad("Old") };
+        var newStatus = ResolverStatus.FailedToLoad("New");
         var action = new SetResolverStatusAction(newStatus);
 
         var result = Reducers.ReduceSetResolverStatus(state, action);
 
-        Assert.Equal(newStatus, result.ResolverStatus);
+        StatusBarAssertions.AssertResolverStatus(ResolverStatusReason.FailedToLoad, "New", result.ResolverStatus);
     }
 
     [Fact]
     public void ReduceSetResolverStatus_ShouldSetStatus()
     {
         var state = new StatusBarState();
-        var status = "Resolving 50 events...";
+        var status = ResolverStatus.NoResolver;
         var action = new SetResolverStatusAction(status);
 
         var result = Reducers.ReduceSetResolverStatus(state, action);
 
-        Assert.Equal(status, result.ResolverStatus);
+        StatusBarAssertions.AssertResolverStatus(ResolverStatusReason.NoResolver, null, result.ResolverStatus);
     }
 
     [Fact]
-    public void ReduceSetResolverStatus_WithEmptyString_ShouldClearStatus()
+    public void ReduceSetResolverStatus_WithNone_ShouldClearStatus()
     {
-        var state = new StatusBarState { ResolverStatus = "Processing..." };
-        var action = new SetResolverStatusAction(string.Empty);
+        var state = new StatusBarState { ResolverStatus = ResolverStatus.FailedToLoad("System") };
+        var action = new SetResolverStatusAction(ResolverStatus.None);
 
         var result = Reducers.ReduceSetResolverStatus(state, action);
 
-        Assert.Equal(string.Empty, result.ResolverStatus);
+        StatusBarAssertions.AssertResolverStatus(ResolverStatusReason.None, null, result.ResolverStatus);
+    }
+
+    [Fact]
+    public void ReduceSetResolverStatus_WithSameStatus_ShouldReturnSameState()
+    {
+        var status = ResolverStatus.FailedToLoad("System");
+        var state = new StatusBarState { ResolverStatus = status };
+        var action = new SetResolverStatusAction(status);
+
+        var result = Reducers.ReduceSetResolverStatus(state, action);
+
+        Assert.Same(state, result);
     }
 }
 
@@ -383,13 +395,13 @@ public sealed class StatusBarIntegrationTests
                 .Add(StatusActivityId.Create(), (100, 5, null))
                 .Add(StatusActivityId.Create(), (200, 10, null))
                 .Add(StatusActivityId.Create(), (300, 15, null)),
-            ResolverStatus = "Processing multiple activities..."
+            ResolverStatus = ResolverStatus.FailedToLoad("System")
         };
 
         state = Reducers.ReduceCloseAll(state);
 
         Assert.Empty(state.EventsLoading);
-        Assert.Equal(string.Empty, state.ResolverStatus);
+        StatusBarAssertions.AssertResolverStatus(ResolverStatusReason.None, null, state.ResolverStatus);
     }
 
     [Fact]
@@ -406,9 +418,9 @@ public sealed class StatusBarIntegrationTests
 
         state = Reducers.ReduceSetResolverStatus(
             state,
-            new SetResolverStatusAction("Resolving events..."));
+            new SetResolverStatusAction(ResolverStatus.FailedToLoad("System")));
 
-        Assert.Equal("Resolving events...", state.ResolverStatus);
+        StatusBarAssertions.AssertResolverStatus(ResolverStatusReason.FailedToLoad, "System", state.ResolverStatus);
         Assert.Single(state.EventsLoading);
 
         state = Reducers.ReduceClearStatus(
@@ -416,7 +428,7 @@ public sealed class StatusBarIntegrationTests
             new ClearStatusAction(activityId));
 
         Assert.Empty(state.EventsLoading);
-        Assert.Equal("Resolving events...", state.ResolverStatus);
+        StatusBarAssertions.AssertResolverStatus(ResolverStatusReason.FailedToLoad, "System", state.ResolverStatus);
     }
 
     [Fact]
@@ -503,23 +515,32 @@ public sealed class StatusBarIntegrationTests
 
         state = Reducers.ReduceSetResolverStatus(
             state,
-            new SetResolverStatusAction("Starting resolution..."));
+            new SetResolverStatusAction(ResolverStatus.FailedToLoad("Starting resolution")));
 
-        Assert.Equal("Starting resolution...", state.ResolverStatus);
+        StatusBarAssertions.AssertResolverStatus(ResolverStatusReason.FailedToLoad, "Starting resolution", state.ResolverStatus);
         Assert.Empty(state.EventsLoading);
 
         state = Reducers.ReduceSetEventsLoading(
             state,
             new SetEventsLoadingAction(activityId, 100, 0));
 
-        Assert.Equal("Starting resolution...", state.ResolverStatus);
+        StatusBarAssertions.AssertResolverStatus(ResolverStatusReason.FailedToLoad, "Starting resolution", state.ResolverStatus);
         Assert.Single(state.EventsLoading);
 
         state = Reducers.ReduceSetResolverStatus(
             state,
-            new SetResolverStatusAction("Resolution in progress..."));
+            new SetResolverStatusAction(ResolverStatus.FailedToLoad("Resolution in progress")));
 
-        Assert.Equal("Resolution in progress...", state.ResolverStatus);
+        StatusBarAssertions.AssertResolverStatus(ResolverStatusReason.FailedToLoad, "Resolution in progress", state.ResolverStatus);
         Assert.Single(state.EventsLoading);
+    }
+}
+
+internal static class StatusBarAssertions
+{
+    internal static void AssertResolverStatus(ResolverStatusReason expectedReason, string? expectedLogDescription, ResolverStatus actual)
+    {
+        Assert.Equal(expectedReason, actual.Reason);
+        Assert.Equal(expectedLogDescription, actual.LogDescription);
     }
 }

@@ -1546,6 +1546,17 @@
   <data name="StatusBar_Activity_ContinuouslyUpdating" xml:space="preserve">
     <value>Continuously updating</value>
   </data>
+  <data name="StatusBar_Resolver_FailedToOpen" xml:space="preserve">
+    <value>Error: Failed to open {0}</value>
+    <comment>{0} is the log name or file being opened (verbatim, not localized).</comment>
+  </data>
+  <data name="StatusBar_Resolver_NoResolver" xml:space="preserve">
+    <value>Error: No event resolver available</value>
+  </data>
+  <data name="StatusBar_Resolver_FailedToLoad" xml:space="preserve">
+    <value>Error: Failed to load {0}</value>
+    <comment>{0} is the log name or file being loaded (verbatim, not localized).</comment>
+  </data>
   <data name="StatusBar_Filter_Chip" xml:space="preserve">
     <value>Filtered</value>
   </data>

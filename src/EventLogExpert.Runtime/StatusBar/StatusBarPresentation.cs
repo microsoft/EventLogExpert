@@ -31,7 +31,7 @@ public sealed record StatusBarPresentation
     public ImmutableDictionary<StatusActivityId, LoadingProgress> LoadingActivities { get; init; } =
         ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty;
 
-    public string ResolverStatus { get; init; } = string.Empty;
+    public ResolverStatus ResolverStatus { get; init; } = ResolverStatus.None;
 
     public ImmutableList<LogView> Tabs { get; init; } = [];
 

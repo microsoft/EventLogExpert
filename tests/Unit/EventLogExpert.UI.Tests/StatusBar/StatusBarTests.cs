@@ -484,12 +484,14 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     [Fact]
     public void ResolverError_RendersInATruncatingSpanWithFullTitle()
     {
-        _status = new StatusBarPresentation { ResolverStatus = "Error: Failed to load Security.evtx" };
+        _status = new StatusBarPresentation { ResolverStatus = ResolverStatus.FailedToLoad("Security.evtx") };
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
         var resolver = cut.Find(".status-bar-resolver");
-        Assert.Equal("Error: Failed to load Security.evtx", resolver.GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Resolver_FailedToLoad(Security.evtx)]]", resolver.GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Resolver_FailedToLoad(Security.evtx)]]", resolver.TextContent);
+        Assert.DoesNotContain("[[Security.evtx]]", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
