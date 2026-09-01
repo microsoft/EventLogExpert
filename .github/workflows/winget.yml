@@ -31,6 +31,59 @@ jobs:
     if: ${{ github.event_name != 'release' || github.event.release.prerelease != true }}
     runs-on: windows-2022 # pinned like the repo's other workflows; wingetcreate runs on Windows only
     steps:
+      - name: Fast-forward winget-pkgs fork with upstream
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # wingetcreate (next step) submits from a fork of microsoft/winget-pkgs owned by the
+          # WINGET_TOKEN account. Between releases that fork's default branch drifts thousands of
+          # commits behind upstream, and wingetcreate aborts when the fork is too stale to auto-sync
+          # ("The forked repository could not be synced with the upstream commits. Sync your fork
+          # manually and try again."). Fast-forward the fork here so the submit step starts in sync.
+          #
+          # Fast-forward ONLY: sync solely when the fork has no commits of its own ahead of upstream,
+          # so this never creates a merge commit or rewrites the fork's history. A missing fork
+          # (first-ever run), a diverged fork, or any API error is left for wingetcreate to handle,
+          # so this step never regresses the previous behavior.
+          if (-not $env:WINGET_CREATE_GITHUB_TOKEN) {
+            Write-Host 'WINGET_TOKEN is not set; skipping fork pre-sync (the submit step reports the missing secret).'
+          }
+          else {
+            $headers = @{
+              'User-Agent'    = 'eventlogexpert-winget'
+              'Authorization' = "Bearer $env:WINGET_CREATE_GITHUB_TOKEN"
+              'Accept'        = 'application/vnd.github+json'
+            }
+            try {
+              $forkOwner = (Invoke-RestMethod -Headers $headers 'https://api.github.com/user').login
+              $fork = Invoke-RestMethod -Headers $headers "https://api.github.com/repos/$forkOwner/winget-pkgs"
+              $upstreamRepo = $fork.parent.full_name
+              $branch = $fork.default_branch
+              $ref = "heads/$branch"
+
+              # Fast-forward the fork's branch to upstream's current head in a single atomic ref
+              # update with force=$false: GitHub applies it only when the fork's branch can be
+              # fast-forwarded to that commit and rejects it (HTTP 422) otherwise, so a fork that
+              # carries its own commits is left untouched for wingetcreate. Updating the ref
+              # directly, rather than compare-then-merge-upstream, both avoids a merge commit and
+              # closes the race where a fork-only commit could land between a separate check and sync.
+              $upstreamSha = (Invoke-RestMethod -Headers $headers "https://api.github.com/repos/$upstreamRepo/git/ref/$ref").object.sha
+              $forkSha = (Invoke-RestMethod -Headers $headers "https://api.github.com/repos/$forkOwner/winget-pkgs/git/ref/$ref").object.sha
+              if ($forkSha -eq $upstreamSha) {
+                Write-Host "$forkOwner/winget-pkgs ($branch) is already in sync with $upstreamRepo."
+              }
+              else {
+                $body = @{ sha = $upstreamSha; force = $false } | ConvertTo-Json
+                Invoke-RestMethod -Method Patch -Headers $headers -ContentType 'application/json' -Body $body "https://api.github.com/repos/$forkOwner/winget-pkgs/git/refs/$ref" | Out-Null
+                Write-Host "Fast-forwarded $forkOwner/winget-pkgs ($branch) to $($upstreamSha.Substring(0, 7)) from $upstreamRepo before submitting."
+              }
+            }
+            catch {
+              Write-Warning "Fork pre-sync skipped; wingetcreate will attempt its own sync. Detail: $($_.Exception.Message)"
+            }
+          }
+
       - name: Submit updated manifest
         shell: pwsh
         env:
