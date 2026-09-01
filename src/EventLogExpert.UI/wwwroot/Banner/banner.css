@@ -14,6 +14,22 @@
     box-shadow: var(--shadow-modal);
 }
 
+/* Focus rings on banner controls use the banner variant's own AA-contrasted foreground token, so they
+   stay visible even on controls (e.g. plain buttons) that set their own text color - currentColor would
+   otherwise pick up the control's accent, which is too low-contrast on the fill. */
+.banner-error :focus-visible,
+.banner-critical :focus-visible,
+.banner-warning :focus-visible,
+.banner-attention :focus-visible {
+    outline-color: var(--clr-on-status-fill);
+}
+
+.banner-info :focus-visible,
+.banner-upgrade-progress :focus-visible,
+.banner-export-progress :focus-visible {
+    outline-color: var(--text-on-statusbar);
+}
+
 .banner-error,
 .banner-critical {
     background-color: var(--clr-red);

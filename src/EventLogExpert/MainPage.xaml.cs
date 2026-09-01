@@ -87,8 +87,8 @@ public sealed partial class MainPage : ContentPage, IDisposable
         // Align WebView2's prefers-color-scheme with the user's Theme so "System" follows the OS and explicit Light/Dark stays consistent.
         _coreWebView?.Profile.PreferredColorScheme = theme switch
         {
-            Theme.Light => CoreWebView2PreferredColorScheme.Light,
-            Theme.Dark => CoreWebView2PreferredColorScheme.Dark,
+            Theme.Light or Theme.ModernLight => CoreWebView2PreferredColorScheme.Light,
+            Theme.Dark or Theme.ModernDark => CoreWebView2PreferredColorScheme.Dark,
             _ => CoreWebView2PreferredColorScheme.Auto,
         };
     }
@@ -157,12 +157,13 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         ApplyWebViewTheme(_settings.Theme);
 
-        var themeSettings = _settings.Theme switch
-        {
-            Theme.Light => "light",
-            Theme.Dark => "dark",
-            _ => null,
-        };
+        // Match MainLayout.razor.js: the data-theme attribute is the lowercased enum name for every
+        // explicit theme (e.g. "modernlight"), and absent for System so the CSS prefers-color-scheme
+        // rules take over. Keeping this derived (rather than a per-value switch) avoids drift as themes
+        // are added.
+        var themeSettings = _settings.Theme == Theme.System ?
+            null :
+            _settings.Theme.ToString().ToLowerInvariant();
 
         var resolvedCulture = ContentCulture.Resolve(CultureInfo.CurrentUICulture, ContentCulture.SupportedUiCultures);
         var script = DocumentInitScript.Build(themeSettings, ContentCulture.DirectionOf(resolvedCulture), resolvedCulture.Name);

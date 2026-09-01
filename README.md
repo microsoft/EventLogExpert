@@ -14,7 +14,7 @@ A Windows Event Log viewer for tech support and IT professionals.
 * Live event channels with auto-discovery (admin-only channels disabled when not elevated), `Continuously Update`, and a `Load New Events` buffered mode.
 * Provider Databases — load `.db` files captured on another machine so its `.evtx` files resolve descriptions and task categories correctly.
 * In-line description previews in the table; on-demand event XML in the Details pane.
-* Configurable Ctrl+C copy mode (`Default`, `Simple`, `XML`, `Full`); System / Light / Dark theme.
+* Configurable Ctrl+C copy mode (`Default`, `Simple`, `XML`, `Full`); System / Light / Dark themes (neutral Event Viewer-style) plus opt-in Modern Light / Modern Dark (blue-accent) themes.
 * In-app Release Notes and Debug Log viewer; opt-in pre-release update channel.
 
 For more information, check our [docs](docs/Home.md).

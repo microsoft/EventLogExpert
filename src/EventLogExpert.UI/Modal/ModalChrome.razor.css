@@ -4,7 +4,7 @@ dialog {
     max-width: var(--modal-max-width, none);
     overflow: hidden;
 
-    color: var(--clr-lightblue);
+    color: var(--text-primary);
     border-color: var(--clr-statusbar);
     background-color: var(--background-dark);
 }
@@ -44,7 +44,7 @@ dialog:not(:modal) {
     white-space: nowrap;
     text-overflow: ellipsis;
     font-size: var(--font-size-lg);
-    color: var(--clr-lightblue);
+    color: var(--text-primary);
 }
 
 .dialog-header ::deep .dialog-close {
@@ -97,7 +97,7 @@ dialog[data-body-layout="content"] .dialog-body {
     max-height: calc(100vh - 2rem);
     padding: 1.25rem 1.5rem;
 
-    color: var(--clr-lightblue);
+    color: var(--text-primary);
     background-color: var(--background-dark);
     border: 1px solid var(--clr-statusbar);
     border-radius: .25rem;
@@ -112,7 +112,7 @@ dialog[data-body-layout="content"] .dialog-body {
     white-space: nowrap;
     text-overflow: ellipsis;
     font-size: var(--font-size-lg);
-    color: var(--clr-lightblue);
+    color: var(--text-primary);
 }
 
 .inline-alert-message {

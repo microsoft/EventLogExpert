@@ -11,4 +11,6 @@
     text-decoration: none;
 
     &:focus { top: 0; }
+
+    &:focus-visible { outline-color: var(--focus-on-statusbar); }
 }
