@@ -15,6 +15,7 @@ using System.Globalization;
 
 namespace EventLogExpert.UI.Tests.StatusBar;
 
+[Collection(CultureSensitiveCollection.Name)]
 public sealed class StatusBarTextComposerTests : IDisposable
 {
     private readonly IStringLocalizer<SharedResource> _localizer;

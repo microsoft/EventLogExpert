@@ -5,6 +5,7 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Histogram;
 using EventLogExpert.UI.Common;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
@@ -13,6 +14,7 @@ using System.Globalization;
 
 namespace EventLogExpert.UI.Tests.Localization;
 
+[Collection(CultureSensitiveCollection.Name)]
 public sealed class HistogramTextComposerTests : IDisposable
 {
     private readonly IStringLocalizer<SharedResource> _localizer;

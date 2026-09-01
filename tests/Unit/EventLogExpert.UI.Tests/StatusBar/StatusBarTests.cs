@@ -24,6 +24,7 @@ using System.Globalization;
 
 namespace EventLogExpert.UI.Tests.StatusBar;
 
+[Collection(CultureSensitiveCollection.Name)]
 public sealed class StatusBarTests : CultureSensitiveBunitContext
 {
     private readonly IEventLogCommands _eventLogCommands = Substitute.For<IEventLogCommands>();
