@@ -1,4 +1,5 @@
 @using EventLogExpert.Eventing.Common.Channels
+@using EventLogExpert.UI.Common
 @using EventLogExpert.Runtime.StatusBar
 @inherits PresentationViewComponentBase
 
@@ -10,12 +11,13 @@
     var isFiltered = FilterApplied.IsFilteringEnabled;
     var isLoading = !status.LoadingActivities.IsEmpty;
 
-    var loadingSummary = StatusBarFormatter.FormatLoading(status.LoadingActivities);
+    var loadingSummary = StatusBarTextComposer.Loading(Localizer, status.LoadingActivities);
 
-    var source = StatusBarFormatter.FormatSource(activeTable, status.Tabs, status.Groups);
-    var filterTooltip = StatusBarFormatter.FilterIndicatorTooltip(status.IsPersistentFilterActive, LensSource.Lenses.Count);
+    var source = StatusBarTextComposer.Source(Localizer, activeTable, status.Tabs, status.Groups);
+    var filterTooltip = StatusBarTextComposer.FilterIndicatorTooltip(Localizer, status.IsPersistentFilterActive, LensSource.Lenses.Count);
 
-    var announcement = StatusBarFormatter.FormatActivityAnnouncement(
+    var announcement = StatusBarTextComposer.ActivityAnnouncement(
+        Localizer,
         isLoading,
         hasChannel && status.NewEventBufferIsFull,
         hasChannel && status.ContinuouslyUpdate,
@@ -41,43 +43,43 @@
                 aria-expanded="@(StatsVisibility.IsVisible ? "true" : "false")"
                 class="status-bar-stats"
                 @onclick="ToggleStats"
-                title="@(StatsVisibility.IsVisible ? "Hide statistics for these events" : "Show statistics for these events")"
+                title="@(StatsVisibility.IsVisible ? Localizer["StatusBar_Stats_Hide"] : Localizer["StatusBar_Stats_Show"])"
                 type="button">
                 <span class="status-bar-counts">
-                    @StatusBarFormatter.FormatCounts(scoped.Total, shown, isFiltered && describesActiveTab, status.SelectionCount)
+                    @StatusBarTextComposer.Counts(Localizer, scoped.Total, shown, isFiltered && describesActiveTab, status.SelectionCount)
                 </span>
                 <i aria-hidden="true" class="bi bi-caret-@(StatsVisibility.IsVisible ? "down" : "up")"></i>
             </button>
 
             <span aria-hidden="true" class="status-bar-sep">|</span>
-            <button aria-label="@($"Resolution and coverage: {StatusBarFormatter.FormatCoverageChip(scoped.Unresolved)}. Open for details.")"
+            <button aria-label="@StatusBarTextComposer.CoverageAriaLabel(Localizer, scoped.Unresolved)"
                 class="status-bar-coverage status-bar-stats"
                 @onclick="OpenCoverage"
-                title="@StatusBarFormatter.CoverageChipTooltip(scoped.Unresolved, scoped.Total)"
+                title="@StatusBarTextComposer.CoverageTooltip(Localizer, scoped.Unresolved, scoped.Total)"
                 type="button">
                 <i aria-hidden="true" class="bi bi-patch-question"></i>
-                <span class="status-bar-counts">@StatusBarFormatter.FormatCoverageChip(scoped.Unresolved)</span>
+                <span class="status-bar-counts">@StatusBarTextComposer.CoverageChip(Localizer, scoped.Unresolved)</span>
             </button>
         }
 
         @if (isFiltered)
         {
             <span aria-hidden="true" class="status-bar-sep">|</span>
-            <span class="status-bar-filter" title="@filterTooltip">Filtered</span>
+            <span class="status-bar-filter" title="@filterTooltip">@Localizer["StatusBar_Filter_Chip"]</span>
         }
     </div>
 
     <div class="status-bar-right">
         <span aria-atomic="true" aria-live="polite" class="status-bar-announce" role="status">@announcement</span>
 
-        <span class="status-bar-activity status-bar-memory @StatusBarFormatter.MemoryLevelClass(status.MemoryLevel)"
-            title="@StatusBarFormatter.MemoryTooltip(status.MemoryUsedMebibytes, status.MemoryWorkingSetBytes, status.MemoryLevel)">
-            @StatusBarFormatter.FormatMemory(status.MemoryUsedMebibytes, status.MemoryLevel)
+        <span class="status-bar-activity status-bar-memory @StatusBarTextComposer.MemoryLevelClass(status.MemoryLevel)"
+            title="@StatusBarTextComposer.MemoryTooltip(Localizer, status.MemoryUsedMebibytes, status.MemoryWorkingSetBytes, status.MemoryLevel)">
+            @StatusBarTextComposer.MemoryValue(Localizer, status.MemoryUsedMebibytes, status.MemoryLevel)
         </span>
         @* Always rendered so this live region is present from first paint - only its content changes, so a band
            transition is announced but the initial Normal content on mount is not. *@
         <span aria-live="polite" class="status-bar-announce status-bar-memory-announce" role="status">
-            @StatusBarFormatter.MemoryLevelAnnouncement(status.MemoryLevel)
+            @MemoryUsageLevelLocalizer.Announcement(Localizer, status.MemoryLevel)
         </span>
 
         @if (loadingSummary is { } loading)
@@ -86,7 +88,7 @@
 
             @if (loading.FailedEvents > 0)
             {
-                <span class="status-bar-activity status-bar-warn">Failed: @(loading.FailedEvents.ToString("N0"))</span>
+                <span class="status-bar-activity status-bar-warn">@StatusBarTextComposer.LoadingFailedText(Localizer, loading.FailedEvents)</span>
             }
         }
 
@@ -99,21 +101,21 @@
         {
             @if (status.ContinuouslyUpdate)
             {
-                <span class="status-bar-activity status-bar-live">Continuously updating</span>
+                <span class="status-bar-activity status-bar-live">@Localizer["StatusBar_Activity_ContinuouslyUpdating"]</span>
             }
             else
             {
                 @if (status.NewEventBufferIsFull)
                 {
-                    <span class="status-bar-activity status-bar-warn">Buffer full</span>
+                    <span class="status-bar-activity status-bar-warn">@Localizer["StatusBar_Activity_BufferFull"]</span>
                 }
 
                 <button aria-live="off"
                     class="status-bar-activity status-bar-newevents"
                     @onclick="LoadNewEvents"
-                    title="@(status.NewEventBufferCount == 0 ? "No new events to load" : "Load new events into the view")"
+                    title="@(status.NewEventBufferCount == 0 ? Localizer["StatusBar_NewEvents_None"] : Localizer["StatusBar_NewEvents_Load"])"
                     type="button">
-                    New Events: @status.NewEventBufferCount
+                    @StatusBarTextComposer.NewEventsLabel(Localizer, status.NewEventBufferCount)
                 </button>
             }
         }

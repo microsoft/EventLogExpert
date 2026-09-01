@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
@@ -14,13 +15,16 @@ using EventLogExpert.Runtime.Stats;
 using EventLogExpert.Runtime.StatusBar;
 using EventLogExpert.UI.LogTable.Resolution;
 using EventLogExpert.UI.Modal;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
+using System.Globalization;
 
 namespace EventLogExpert.UI.Tests.StatusBar;
 
-public sealed class StatusBarTests : BunitContext
+public sealed class StatusBarTests : CultureSensitiveBunitContext
 {
     private readonly IEventLogCommands _eventLogCommands = Substitute.For<IEventLogCommands>();
     private readonly IFilterAppliedSource _filterApplied = Substitute.For<IFilterAppliedSource>();
@@ -38,6 +42,9 @@ public sealed class StatusBarTests : BunitContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
 
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
+
         Services.AddSingleton(_eventLogCommands);
         Services.AddSingleton(_filterApplied);
         Services.AddSingleton(_lensSource);
@@ -47,6 +54,7 @@ public sealed class StatusBarTests : BunitContext
         Services.AddSingleton(_statusBarSource);
         Services.AddSingleton(_viewSource);
 
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
         Services.AddSingleton(provider => new DisplayIndicatorGate(provider.GetRequiredService<IOrderedViewSource>()));
 
         _statusBarSource.Current.Returns(_ => _status);
@@ -69,7 +77,7 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains($"0 of {1500:N0} shown", cut.Markup);
+        Assert.Contains("[[StatusBar_Counts_ShownOfTotal(0|1,500)]]", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -82,8 +90,8 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.DoesNotContain("0 of", cut.Markup);
-        Assert.Contains($"{1500:N0} events", cut.Markup);
+        Assert.DoesNotContain("[[StatusBar_Counts_ShownOfTotal(0|1,500)]]", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("[[StatusBar_Counts_Total_Many(1,500)]]", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -109,12 +117,12 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.DoesNotContain("Loading events", cut.Find(".status-bar-announce").TextContent);
+        Assert.DoesNotContain("[[StatusBar_Activity_LoadingEvents]]", cut.Find(".status-bar-announce").TextContent, StringComparison.Ordinal);
 
         delay.Elapse();
 
         cut.WaitForAssertion(() =>
-            Assert.Contains("Loading events", cut.Find(".status-bar-announce").TextContent));
+            Assert.Contains("[[StatusBar_Activity_LoadingEvents]]", cut.Find(".status-bar-announce").TextContent, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -125,12 +133,12 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Equal("2 lenses", cut.Find(".status-bar-filter").GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Filter_Lens_Many(2)]]", cut.Find(".status-bar-filter").GetAttribute("title"));
 
         _lensSource.Lenses.Returns(LensSummaries(3));
         cut.InvokeAsync(() => _lensSource.Changed += Raise.Event<Action>());
 
-        cut.WaitForAssertion(() => Assert.Equal("3 lenses", cut.Find(".status-bar-filter").GetAttribute("title")));
+        cut.WaitForAssertion(() => Assert.Equal("[[StatusBar_Filter_Lens_Many(3)]]", cut.Find(".status-bar-filter").GetAttribute("title")));
     }
 
     [Fact]
@@ -148,7 +156,7 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        var newEvents = cut.FindAll(".status-bar-activity").Single(node => node.TextContent.Contains("New Events"));
+        var newEvents = cut.FindAll(".status-bar-activity").Single(node => node.TextContent.Contains("[[StatusBar_NewEvents_Label(42)]]", StringComparison.Ordinal));
         Assert.Equal("off", newEvents.GetAttribute("aria-live"));
     }
 
@@ -160,7 +168,7 @@ public sealed class StatusBarTests : BunitContext
         var cut = Render<UI.StatusBar.StatusBar>();
 
         Assert.Empty(cut.FindAll("button.status-bar-newevents"));
-        Assert.Contains("Continuously updating", cut.Find(".status-bar-live").TextContent);
+        Assert.Contains("[[StatusBar_Activity_ContinuouslyUpdating]]", cut.Find(".status-bar-live").TextContent, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -213,10 +221,10 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains($"{200:N0} of {1500:N0} shown", cut.Markup);
+        Assert.Contains("[[StatusBar_Counts_ShownOfTotal(200|1,500)]]", cut.Markup, StringComparison.Ordinal);
 
         var indicator = cut.Find(".status-bar-filter");
-        Assert.Equal("Filter active", indicator.GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Filter_Active]]", indicator.GetAttribute("title"));
     }
 
     [Fact]
@@ -227,8 +235,8 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains($"{300:N0} of {1500:N0} shown", cut.Markup);
-        Assert.Equal("2 lenses", cut.Find(".status-bar-filter").GetAttribute("title"));
+        Assert.Contains("[[StatusBar_Counts_ShownOfTotal(300|1,500)]]", cut.Markup, StringComparison.Ordinal);
+        Assert.Equal("[[StatusBar_Filter_Lens_Many(2)]]", cut.Find(".status-bar-filter").GetAttribute("title"));
     }
 
     [Fact]
@@ -242,8 +250,8 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains("Loading: 12", cut.Markup);
-        Assert.Contains("Failed: 3", cut.Markup);
+        Assert.Contains("[[StatusBar_Loading_Count(12)]]", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("[[StatusBar_Loading_Failed(3)]]", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -255,8 +263,8 @@ public sealed class StatusBarTests : BunitContext
 
         var chip = cut.Find(".status-bar-memory");
         Assert.Contains("status-bar-memory-elevated", chip.ClassList);
-        Assert.Contains("Elevated", chip.TextContent);
-        Assert.Equal("Memory usage elevated", cut.Find(".status-bar-memory-announce").TextContent);
+        Assert.Contains("[[StatusBar_Memory_Value_Elevated(100 MB)]]", chip.TextContent, StringComparison.Ordinal);
+        Assert.Equal("[[StatusBar_Memory_Announce_Elevated]]", cut.Find(".status-bar-memory-announce").TextContent);
     }
 
     [Fact]
@@ -268,8 +276,8 @@ public sealed class StatusBarTests : BunitContext
 
         var chip = cut.Find(".status-bar-memory");
         Assert.Contains("status-bar-memory-high", chip.ClassList);
-        Assert.Contains("High", chip.TextContent);
-        Assert.Equal("Memory usage high", cut.Find(".status-bar-memory-announce").TextContent);
+        Assert.Contains("[[StatusBar_Memory_Value_High(100 MB)]]", chip.TextContent, StringComparison.Ordinal);
+        Assert.Equal("[[StatusBar_Memory_Announce_High]]", cut.Find(".status-bar-memory-announce").TextContent);
     }
 
     [Fact]
@@ -280,10 +288,10 @@ public sealed class StatusBarTests : BunitContext
         var cut = Render<UI.StatusBar.StatusBar>();
 
         var chip = cut.Find(".status-bar-memory");
-        Assert.Contains("Memory: 100 MB", chip.TextContent);
+        Assert.Contains("[[StatusBar_Memory_Value_Normal(100 MB)]]", chip.TextContent, StringComparison.Ordinal);
         Assert.DoesNotContain("status-bar-memory-elevated", chip.ClassList);
         Assert.DoesNotContain("status-bar-memory-high", chip.ClassList);
-        Assert.Equal("Memory usage normal", cut.Find(".status-bar-memory-announce").TextContent);
+        Assert.Equal("[[StatusBar_Memory_Announce_Normal]]", cut.Find(".status-bar-memory-announce").TextContent);
     }
 
     [Fact]
@@ -299,8 +307,7 @@ public sealed class StatusBarTests : BunitContext
         var cut = Render<UI.StatusBar.StatusBar>();
 
         var tooltip = cut.Find(".status-bar-memory").GetAttribute("title");
-        Assert.Contains("Managed heap", tooltip);
-        Assert.Contains("Process working set", tooltip);
+        Assert.Equal("[[StatusBar_Memory_Tooltip_Normal(100 MB|256 MB)]]", tooltip);
     }
 
     [Fact]
@@ -318,7 +325,7 @@ public sealed class StatusBarTests : BunitContext
         cut.WaitForAssertion(() =>
         {
             Assert.Contains("status-bar-memory-high", cut.Find(".status-bar-memory").ClassList);
-            Assert.Equal("Memory usage high", cut.Find(".status-bar-memory-announce").TextContent);
+            Assert.Equal("[[StatusBar_Memory_Announce_High]]", cut.Find(".status-bar-memory-announce").TextContent);
         });
     }
 
@@ -326,10 +333,10 @@ public sealed class StatusBarTests : BunitContext
     public void MultiSelect_ShowsSelectedSuffix_SingleSelectDoesNot()
     {
         SetActiveLog(total: 500, shown: 500, filter: Unfiltered, selected: 3);
-        Assert.Contains("3 selected", Render<UI.StatusBar.StatusBar>().Markup);
+        Assert.Contains("[[StatusBar_Counts_TotalSelected(500|3)]]", Render<UI.StatusBar.StatusBar>().Markup, StringComparison.Ordinal);
 
         _status = _status with { SelectionCount = 1 };
-        Assert.DoesNotContain("selected", Render<UI.StatusBar.StatusBar>().Markup);
+        Assert.DoesNotContain("[[StatusBar_Counts_TotalSelected", Render<UI.StatusBar.StatusBar>().Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -344,10 +351,10 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains("Loading 2 logs...", cut.Markup);
-        Assert.DoesNotContain("Loading: 100", cut.Markup);
-        Assert.DoesNotContain("Loading: 50", cut.Markup);
-        Assert.Contains("Failed: 2", cut.Markup);
+        Assert.Contains("[[StatusBar_Loading_ManyLogs(2)]]", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("[[StatusBar_Loading_Count(100)]]", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("[[StatusBar_Loading_Count(50)]]", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("[[StatusBar_Loading_Failed(2)]]", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -358,7 +365,7 @@ public sealed class StatusBarTests : BunitContext
         var cut = Render<UI.StatusBar.StatusBar>();
         var button = cut.Find("button.status-bar-newevents");
         Assert.False(button.HasAttribute("disabled"));
-        Assert.Contains(cut.FindAll(".status-bar-warn"), node => node.TextContent.Contains("Buffer full"));
+        Assert.Contains(cut.FindAll(".status-bar-warn"), node => node.TextContent.Contains("[[StatusBar_Activity_BufferFull]]", StringComparison.Ordinal));
 
         button.Click();
 
@@ -371,9 +378,9 @@ public sealed class StatusBarTests : BunitContext
         SetChannelStatus(newEventCount: 42);
 
         var button = Render<UI.StatusBar.StatusBar>().Find("button.status-bar-newevents");
-        Assert.Contains("New Events: 42", button.TextContent);
+        Assert.Contains("[[StatusBar_NewEvents_Label(42)]]", button.TextContent, StringComparison.Ordinal);
         Assert.False(button.HasAttribute("aria-label"));
-        Assert.Equal("Load new events into the view", button.GetAttribute("title"));
+        Assert.Equal("[[StatusBar_NewEvents_Load]]", button.GetAttribute("title"));
 
         button.Click();
 
@@ -406,8 +413,8 @@ public sealed class StatusBarTests : BunitContext
         var button = Render<UI.StatusBar.StatusBar>().Find("button.status-bar-newevents");
 
         Assert.False(button.HasAttribute("disabled"));
-        Assert.Contains("New Events: 0", button.TextContent);
-        Assert.Equal("No new events to load", button.GetAttribute("title"));
+        Assert.Contains("[[StatusBar_NewEvents_Label(0)]]", button.TextContent, StringComparison.Ordinal);
+        Assert.Equal("[[StatusBar_NewEvents_None]]", button.GetAttribute("title"));
     }
 
     [Fact]
@@ -427,8 +434,8 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains("Loading: 500", cut.Markup);
-        Assert.Contains("New Events: 42", cut.Markup);
+        Assert.Contains("[[StatusBar_Loading_Count(500)]]", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("[[StatusBar_NewEvents_Label(42)]]", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -436,7 +443,7 @@ public sealed class StatusBarTests : BunitContext
     {
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains("No log open", cut.Markup);
+        Assert.Contains("[[StatusBar_Source_None]]", cut.Markup, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll(".status-bar-counts"));
     }
 
@@ -451,10 +458,10 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.DoesNotContain($"{200:N0} of {1500:N0} shown", cut.Markup);
-        Assert.DoesNotContain("shown", cut.Markup);
+        Assert.DoesNotContain("[[StatusBar_Counts_ShownOfTotal(200|1,500)]]", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("[[StatusBar_Counts_ShownOfTotal", cut.Markup, StringComparison.Ordinal);
 
-        Assert.Contains($"{1500:N0} events", cut.Markup);
+        Assert.Contains("[[StatusBar_Counts_Total_Many(1,500)]]", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -464,14 +471,14 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains($"{200:N0} of {1500:N0} shown", cut.Markup);
+        Assert.Contains("[[StatusBar_Counts_ShownOfTotal(200|1,500)]]", cut.Markup, StringComparison.Ordinal);
 
         var grown = PresentationWithCount(275, _activeLogId);
 
         _viewSource.Current.Returns(grown);
         _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(grown);
 
-        cut.WaitForAssertion(() => Assert.Contains($"{275:N0} of {1500:N0} shown", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("[[StatusBar_Counts_ShownOfTotal(275|1,500)]]", cut.Markup, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -512,8 +519,8 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains("Loading...", cut.Markup);
-        Assert.DoesNotContain("Loading: 0", cut.Markup);
+        Assert.Contains("[[StatusBar_Loading_Pending]]", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("[[StatusBar_Loading_Count(0)]]", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -527,7 +534,7 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains($"Loading: {4500:N0} (45%)", cut.Markup);
+        Assert.Contains("[[StatusBar_Loading_CountPercent(4,500|45)]]", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -541,7 +548,20 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains($"Failed: {1500:N0}", cut.Markup);
+        Assert.Contains("[[StatusBar_Loading_Failed(1,500)]]", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false, "[[StatusBar_Stats_Show]]")]
+    [InlineData(true, "[[StatusBar_Stats_Hide]]")]
+    public void StatsChip_Title_RoutesShowOrHideKeyByVisibility(bool isVisible, string expected)
+    {
+        SetActiveLog(total: 100, shown: 100, filter: Unfiltered, selected: 0);
+        _statsVisibility.IsVisible.Returns(isVisible);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Equal(expected, cut.Find("button.status-bar-stats:not(.status-bar-coverage)").GetAttribute("title"));
     }
 
     [Fact]
@@ -563,8 +583,8 @@ public sealed class StatusBarTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains($"{1500:N0} events", cut.Markup);
-        Assert.DoesNotContain("shown", cut.Markup);
+        Assert.Contains("[[StatusBar_Counts_Total_Many(1,500)]]", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("[[StatusBar_Counts_ShownOfTotal", cut.Markup, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll(".status-bar-filter"));
     }
 

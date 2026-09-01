@@ -1438,6 +1438,147 @@
     <value>All</value>
     <comment>Filter value picker: the option that clears the value filter so events with any value match.</comment>
   </data>
+  <!-- Status bar chrome. Resolver-status messages remain verbatim until that pipeline is retyped. -->
+  <data name="StatusBar_Source_None" xml:space="preserve">
+    <value>No log open</value>
+  </data>
+  <data name="StatusBar_Source_AllLogs" xml:space="preserve">
+    <value>All logs ({0})</value>
+  </data>
+  <data name="StatusBar_Source_Combined" xml:space="preserve">
+    <value>Combined</value>
+  </data>
+  <data name="StatusBar_Source_CombinedCount_One" xml:space="preserve">
+    <value>Combined ({0} logs)</value>
+    <comment>Neutral value intentionally keeps the previous naive plural "logs" for count 1; full plural rules are deferred to the Humanizer roadmap.</comment>
+  </data>
+  <data name="StatusBar_Source_CombinedCount_Many" xml:space="preserve">
+    <value>Combined ({0} logs)</value>
+  </data>
+  <data name="StatusBar_Counts_Total_One" xml:space="preserve">
+    <value>{0} events</value>
+    <comment>Neutral value intentionally keeps the previous naive plural "events" for count 1; full plural rules are deferred to the Humanizer roadmap.</comment>
+  </data>
+  <data name="StatusBar_Counts_Total_Many" xml:space="preserve">
+    <value>{0} events</value>
+  </data>
+  <data name="StatusBar_Counts_TotalSelected" xml:space="preserve">
+    <value>{0} events · {1} selected</value>
+  </data>
+  <data name="StatusBar_Counts_ShownOfTotal" xml:space="preserve">
+    <value>{0} of {1} shown</value>
+  </data>
+  <data name="StatusBar_Counts_ShownOfTotalSelected" xml:space="preserve">
+    <value>{0} of {1} shown · {2} selected</value>
+  </data>
+  <data name="StatusBar_Coverage_Chip" xml:space="preserve">
+    <value>{0} unresolved</value>
+    <comment>Coverage adjective agreement and full plural handling are deferred to the Humanizer roadmap.</comment>
+  </data>
+  <data name="StatusBar_Coverage_AriaLabel" xml:space="preserve">
+    <value>Resolution and coverage: {0} unresolved. Open for details.</value>
+    <comment>Coverage adjective agreement and full plural handling are deferred to the Humanizer roadmap.</comment>
+  </data>
+  <data name="StatusBar_Coverage_Tooltip" xml:space="preserve">
+    <value>{0} unresolved of {1} events loaded in this tab/group. Filters are not applied - open Coverage for the current view's breakdown.</value>
+    <comment>Coverage adjective agreement and full plural handling are deferred to the Humanizer roadmap.</comment>
+  </data>
+  <data name="StatusBar_Loading_Pending" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="StatusBar_Loading_PendingPercent" xml:space="preserve">
+    <value>Loading... ({0}%)</value>
+  </data>
+  <data name="StatusBar_Loading_Count" xml:space="preserve">
+    <value>Loading: {0}</value>
+  </data>
+  <data name="StatusBar_Loading_CountPercent" xml:space="preserve">
+    <value>Loading: {0} ({1}%)</value>
+  </data>
+  <data name="StatusBar_Loading_ManyLogs" xml:space="preserve">
+    <value>Loading {0} logs...</value>
+  </data>
+  <data name="StatusBar_Loading_Failed" xml:space="preserve">
+    <value>Failed: {0}</value>
+  </data>
+  <data name="StatusBar_Memory_Value_Normal" xml:space="preserve">
+    <value>Memory: {0}</value>
+  </data>
+  <data name="StatusBar_Memory_Value_Elevated" xml:space="preserve">
+    <value>Memory: {0} · Elevated</value>
+  </data>
+  <data name="StatusBar_Memory_Value_High" xml:space="preserve">
+    <value>Memory: {0} · High</value>
+  </data>
+  <data name="StatusBar_Memory_Announce_Normal" xml:space="preserve">
+    <value>Memory usage normal</value>
+  </data>
+  <data name="StatusBar_Memory_Announce_Elevated" xml:space="preserve">
+    <value>Memory usage elevated</value>
+  </data>
+  <data name="StatusBar_Memory_Announce_High" xml:space="preserve">
+    <value>Memory usage high</value>
+  </data>
+  <data name="StatusBar_Memory_Tooltip_Normal" xml:space="preserve">
+    <value>Managed heap (app data): {0} - drops as logs close. Process working set: {1} - the OS may release this later.</value>
+  </data>
+  <data name="StatusBar_Memory_Tooltip_Elevated" xml:space="preserve">
+    <value>Managed heap (app data): {0} - drops as logs close. Process working set: {1} - the OS may release this later. Level: elevated.</value>
+  </data>
+  <data name="StatusBar_Memory_Tooltip_High" xml:space="preserve">
+    <value>Managed heap (app data): {0} - drops as logs close. Process working set: {1} - the OS may release this later. Level: high.</value>
+  </data>
+  <data name="StatusBar_Activity_Fault" xml:space="preserve">
+    <value>These events could not be prepared</value>
+  </data>
+  <data name="StatusBar_Activity_BufferFull" xml:space="preserve">
+    <value>Buffer full</value>
+  </data>
+  <data name="StatusBar_Activity_Loading" xml:space="preserve">
+    <value>Loading</value>
+  </data>
+  <data name="StatusBar_Activity_LoadingEvents" xml:space="preserve">
+    <value>Loading events</value>
+  </data>
+  <data name="StatusBar_Activity_Reordering" xml:space="preserve">
+    <value>Reordering events</value>
+  </data>
+  <data name="StatusBar_Activity_ContinuouslyUpdating" xml:space="preserve">
+    <value>Continuously updating</value>
+  </data>
+  <data name="StatusBar_Filter_Chip" xml:space="preserve">
+    <value>Filtered</value>
+  </data>
+  <data name="StatusBar_Filter_Active" xml:space="preserve">
+    <value>Filter active</value>
+  </data>
+  <data name="StatusBar_Filter_Lens_One" xml:space="preserve">
+    <value>1 lens</value>
+  </data>
+  <data name="StatusBar_Filter_Lens_Many" xml:space="preserve">
+    <value>{0} lenses</value>
+  </data>
+  <data name="StatusBar_Filter_ActiveLens_One" xml:space="preserve">
+    <value>Filter + 1 lens</value>
+  </data>
+  <data name="StatusBar_Filter_ActiveLens_Many" xml:space="preserve">
+    <value>Filter + {0} lenses</value>
+  </data>
+  <data name="StatusBar_Stats_Show" xml:space="preserve">
+    <value>Show statistics for these events</value>
+  </data>
+  <data name="StatusBar_Stats_Hide" xml:space="preserve">
+    <value>Hide statistics for these events</value>
+  </data>
+  <data name="StatusBar_NewEvents_Label" xml:space="preserve">
+    <value>New Events: {0}</value>
+  </data>
+  <data name="StatusBar_NewEvents_None" xml:space="preserve">
+    <value>No new events to load</value>
+  </data>
+  <data name="StatusBar_NewEvents_Load" xml:space="preserve">
+    <value>Load new events into the view</value>
+  </data>
   <!-- Stats pane + detail modal localization. Count arguments are pre-formatted in code unless noted. -->
   <data name="Stats_AriaLabel" xml:space="preserve"><value>Statistics</value></data>
   <data name="Stats_Title" xml:space="preserve"><value>Statistics</value></data>
