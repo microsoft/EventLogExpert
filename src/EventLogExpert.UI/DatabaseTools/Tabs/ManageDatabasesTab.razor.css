@@ -136,6 +136,27 @@
     font-size: .9rem;
 }
 
+/* Buttons on the statusbar-colored save/bulk strips: white on-bar text + the white --focus-on-statusbar
+   ring so they clear WCAG AA on the navy/steel (and Modern blue) bars, where their accent/semantic text
+   and an accent focus ring would be too low-contrast. */
+.manage-databases-save-strip ::deep .button,
+.manage-databases-bulk-strip ::deep .button {
+    color: var(--text-on-statusbar);
+}
+
+.manage-databases-save-strip ::deep .button:focus-visible,
+.manage-databases-bulk-strip ::deep .button:focus-visible {
+    outline-color: var(--focus-on-statusbar);
+}
+
+/* Override the global brightness:hover (which dims the white text below AA on the dark bars) with a
+   darkening overlay, so the text stays full white. */
+.manage-databases-save-strip ::deep .button:hover,
+.manage-databases-bulk-strip ::deep .button:hover {
+    filter: none;
+    background-color: color-mix(in srgb, var(--clr-black) 20%, transparent);
+}
+
 @keyframes manage-databases-bulk-strip-fade-in {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }

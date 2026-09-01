@@ -41,7 +41,7 @@ When `True`, the Details pane re-expands every time the selection changes, even 
 
 ### Theme
 
-`Follow System` (default), `Light`, or `Dark`. `Follow System` tracks the current Windows app-mode preference and switches with it.
+`Follow System` (default), `Light`, `Dark`, `Modern Light`, or `Modern Dark`. `Follow System` tracks the current Windows app-mode preference and switches with it. The default `Light`/`Dark` themes use a clean, neutral Microsoft Management Console / Windows Event Viewer-style palette — neutral gray chrome, black/gray body text, and blue selection. The `Modern` themes are an opt-in alternative that render the app's original blue-accent identity (accent-colored body text and brighter blue bars).
 
 ### Keyboard Copy Behavior
 

@@ -596,6 +596,8 @@ public sealed class SettingsServiceTests
     [InlineData(Theme.System)]
     [InlineData(Theme.Light)]
     [InlineData(Theme.Dark)]
+    [InlineData(Theme.ModernLight)]
+    [InlineData(Theme.ModernDark)]
     public void Theme_WhenSetToEachValue_ShouldPersistCorrectly(Theme theme)
     {
         // Arrange

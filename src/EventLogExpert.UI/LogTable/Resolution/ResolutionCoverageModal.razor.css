@@ -125,7 +125,7 @@
     position: sticky;
     top: 0;
     font-weight: 600;
-    background: var(--background-color, #1e1e1e);
+    background: var(--background-darkgray);
     border-bottom: 1px solid var(--border-color, rgba(128, 128, 128, 0.3));
 }
 
@@ -362,7 +362,7 @@
     position: sticky;
     top: 0;
     font-weight: 600;
-    background: var(--background-color, #1e1e1e);
+    background: var(--background-darkgray);
 }
 
 .resolution-detail-idrow button {

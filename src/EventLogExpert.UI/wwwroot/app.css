@@ -10,14 +10,14 @@
 
     /* Theme-aware palette. light-dark(lightValue, darkValue) resolves based on
        the element's used color-scheme. */
-    --clr-lightblue:    light-dark(#155A9E, #9CDCFE);
+    --clr-lightblue:    light-dark(#0A4C8C, #6FB2F5);
     --clr-lightgray:    light-dark(#4A4A4A, #A4B9C0);
-    --clr-red:          light-dark(#C0392B, #EF523B);
+    --clr-red:          light-dark(#A02020, #FF7059);
     --text-error:       light-dark(#A02020, var(--clr-red));
-    --clr-green:        light-dark(#1E7E34, #5AC358);
-    --clr-yellow:       light-dark(#8A6D00, #F8C84B);
+    --clr-green:        light-dark(#14622A, #5AC358);
+    --clr-yellow:       light-dark(#6A5300, #F8C84B);
     --clr-placeholder:  light-dark(#6B6B6B, #A3A1A1);
-    --clr-statusbar:    light-dark(#2E50C0, #3C64E7);
+    --clr-statusbar:    light-dark(#0A246A, #4472C4);
 
     /* Find highlight: highlighter-yellow background fill for the current match's inline marks; #1A1A1A text clears WCAG AA on both themes. */
     --clr-find:    light-dark(#FFE066, #F8C84B);
@@ -30,19 +30,16 @@
     --clr-status-fill-high:     light-dark(#C0392B, #EF523B);
     --clr-on-status-high:       light-dark(#FFF, #1A1A1A);
 
-    --background-dark:     light-dark(#E0E0E0, #222222);
-    --background-darkgray: light-dark(#CECECE, #353535);
+    --background-dark:     light-dark(#F0F0F0, #222222);
+    --background-darkgray: light-dark(#E1E1E1, #353535);
 
-    /* Shared accent for Toggle + OptionSelect. Light is darkened from --clr-lightblue
-       so the on-state hits WCAG 1.4.3 AA against --background-darkgray (#14599D on
-       #CECECE = 4.53:1; dark #9CDCFE on #353535 = 8.23:1). */
-    --toggle-accent: light-dark(#14599D, var(--clr-lightblue));
+    --toggle-accent: light-dark(#0A4C8C, #6FB2F5);
 
     /* Recessed surface used for content wells (e.g. the trash strip exposed
        behind a database row when it slides aside). Always darker than
        --background-dark in both schemes so the well reads as cut into the
        surrounding chrome rather than lifted on top of it. */
-    --surface-inset:       light-dark(#C8C8C8, #161616);
+    --surface-inset:       light-dark(#D0D0D0, #161616);
 
     /* Shared menu metrics. The menu bar height drives the MenuHost overlay offset so
        the bar strip stays clickable while a menu is open. */
@@ -61,19 +58,22 @@
        (--highlight-light* colors). */
     --clr-on-light-highlight: light-dark(#1A1A1A, var(--background-darkgray));
     /* Always-dark text used on the dark-mode branch of the Mid+Dark highlight
-       tiers. The re-toned dark-mode hexes sit at L_rel >= 0.22 where #353535
-       (--clr-on-light-highlight dark branch) only reaches ~3.2:1; #1A1A1A
-       clears 4.5:1 from the WCAG floor up. */
+       tiers. */
     --clr-on-dark-highlight: #1A1A1A;
-    /* Default body text color. Component CSS should reference this rather than
-       hardcoding white/black. */
-    --text-primary: var(--clr-lightblue);
+    /* Default body text color, decoupled from the accent so the default (neutral)
+       themes read as black/gray while selection and links stay blue. Component CSS
+       should reference this rather than hardcoding white/black. */
+    --text-primary: light-dark(#1A1A1A, #DCDCDC);
     /* Inverted text for badges / scrollbar thumbs that always appear on the
        statusbar (blue) background. */
     --text-on-statusbar: var(--clr-white);
     --clr-on-status-fill: light-dark(var(--clr-white), #1A1A1A);
+    /* Focus-ring color for controls that sit ON the statusbar-colored bars (e.g. the menu bar).
+       White in every theme: an accent ring is too low-contrast on the Modern themes' blue bars
+       (~1.01:1), so those themes intentionally inherit this rather than override it. */
+    --focus-on-statusbar: var(--clr-white);
     /* Muted/secondary text (disabled menu items, shortcut hints, etc.). */
-    --text-secondary: light-dark(#555, var(--clr-lightgray));
+    --text-secondary: light-dark(#454545, #B0B0B0);
 
     /* Surface chrome tokens. Shadow color components are extracted so the
        light/dark variant can swap while the geometry stays in one place. */
@@ -112,20 +112,35 @@
 
 :root[data-theme="dark"]  { color-scheme: dark; }
 
-/* -----------------------------------------------------------------------------
-   Highlight palette.
-   Adding or removing a color requires only updating this block (and the
-   matching enum / serialization). All consumers (table rows, color box,
-   color dropdown items) read --hl-bg / --hl-fg from these declarations.
+/* Modern Light: blue body text on medium gray, royal-blue bars. */
+:root[data-theme="modernlight"] {
+    color-scheme: light;
 
-   Light-tier rules use a single hex (passes WCAG AA in both themes with
-   --clr-on-light-highlight). Mid+Dark tier rules use light-dark() so each
-   theme gets a hex that clears 4.5:1 with its mode-appropriate text color
-   (white in light, --clr-on-dark-highlight in dark). Dark-mode hexes are
-   re-toned to L_rel >= 0.22 (WCAG SC 1.4.11 floor vs odd row #353535) using
-   a hue-locked white/black-mix derivation that preserves original hue within
-   +/-8 deg.
-   -------------------------------------------------------------------------- */
+    --background-dark: #E0E0E0;
+    --background-darkgray: #CECECE;
+    --surface-inset: #C8C8C8;
+
+    --clr-lightblue: #14599D;
+    --clr-statusbar: #2E50C0;
+    --toggle-accent: #14599D;
+
+    --text-primary: var(--clr-lightblue);
+    --text-secondary: #555;
+}
+
+/* Modern Dark: backgrounds already match the neutral base dark, so only the blue
+   chrome + accent-colored text are restored. */
+:root[data-theme="moderndark"] {
+    color-scheme: dark;
+
+    --clr-lightblue: #9CDCFE;
+    --clr-statusbar: #3C64E7;
+    --toggle-accent: var(--clr-lightblue);
+
+    --text-primary: var(--clr-lightblue);
+    --text-secondary: var(--clr-lightgray);
+}
+
 [data-highlight="lightred"]     { --hl-bg: #EE8F86; --hl-fg: var(--clr-on-light-highlight); }
 [data-highlight="red"]          { --hl-bg: light-dark(#D03B2D, #FF6769); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
 [data-highlight="darkred"]      { --hl-bg: light-dark(#73190E, #FF1A09); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
@@ -356,13 +371,14 @@ input[type="text"].input.dialog-input { padding: .25rem 0; }
     .input.filter-datetime::-webkit-calendar-picker-indicator { filter: invert(1); }
 
 /* In light mode the page is bright, so the icon is naturally dark - don't
-   re-invert it. Applies to explicit light and system-light only. */
-:root[data-theme="light"] .input.filter-datetime::-webkit-calendar-picker-indicator {
+   re-invert it. Applies to explicit light / modern-light and system-light only. */
+:root[data-theme="light"] .input.filter-datetime::-webkit-calendar-picker-indicator,
+:root[data-theme="modernlight"] .input.filter-datetime::-webkit-calendar-picker-indicator {
     filter: none;
 }
 
 @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]):not([data-theme="light"]) .input.filter-datetime::-webkit-calendar-picker-indicator {
+    :root:not([data-theme="dark"]):not([data-theme="light"]):not([data-theme="moderndark"]):not([data-theme="modernlight"]) .input.filter-datetime::-webkit-calendar-picker-indicator {
         filter: none;
     }
 }
@@ -432,7 +448,6 @@ input[type="text"].input.dialog-input { padding: .25rem 0; }
     background: color-mix(in srgb, var(--clr-statusbar) 10%, transparent);
 }
 
-/* Compact icon-only buttons. Maintain WCAG 2.5.5 AA 24x24 hit target. */
 .button.icon-button {
     display: inline-flex;
     align-items: center;
