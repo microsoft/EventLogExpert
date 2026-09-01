@@ -85,6 +85,21 @@ public sealed class StatusBarSourceTests
     }
 
     [Fact]
+    public void Changed_DoesNotFire_WhenResolverStatusIsEquivalent()
+    {
+        var harness = new Harness();
+        harness.StatusBar = harness.StatusBar with { ResolverStatus = ResolverStatus.FailedToLoad("A") };
+        harness.RaiseStatusBar();
+        var raised = 0;
+        harness.Source.Changed += () => raised++;
+
+        harness.StatusBar = harness.StatusBar with { ResolverStatus = ResolverStatus.FailedToLoad("A") };
+        harness.RaiseStatusBar();
+
+        Assert.Equal(0, raised);
+    }
+
+    [Fact]
     public void Changed_DoesNotFire_WhenTheMemoryFacetIsEquivalent()
     {
         var harness = new Harness();
@@ -224,17 +239,35 @@ public sealed class StatusBarSourceTests
     }
 
     [Fact]
+    public void Changed_Fires_WhenResolverStatusDescriptionChangesWithSameReason()
+    {
+        var harness = new Harness();
+        harness.StatusBar = harness.StatusBar with { ResolverStatus = ResolverStatus.FailedToLoad("A") };
+        harness.RaiseStatusBar();
+        var raised = 0;
+        harness.Source.Changed += () => raised++;
+
+        harness.StatusBar = harness.StatusBar with { ResolverStatus = ResolverStatus.FailedToLoad("B") };
+        harness.RaiseStatusBar();
+
+        Assert.Equal(1, raised);
+        Assert.Equal(ResolverStatusReason.FailedToLoad, harness.Source.Current.ResolverStatus.Reason);
+        Assert.Equal("B", harness.Source.Current.ResolverStatus.LogDescription);
+    }
+
+    [Fact]
     public void Changed_Fires_WhenStatusActivityChanges()
     {
         var harness = new Harness();
         var raised = 0;
         harness.Source.Changed += () => raised++;
 
-        harness.StatusBar = harness.StatusBar with { ResolverStatus = "Providers unavailable" };
+        harness.StatusBar = harness.StatusBar with { ResolverStatus = ResolverStatus.NoResolver };
         harness.RaiseStatusBar();
 
         Assert.Equal(1, raised);
-        Assert.Equal("Providers unavailable", harness.Source.Current.ResolverStatus);
+        Assert.Equal(ResolverStatusReason.NoResolver, harness.Source.Current.ResolverStatus.Reason);
+        Assert.Null(harness.Source.Current.ResolverStatus.LogDescription);
     }
 
     [Fact]
@@ -269,7 +302,7 @@ public sealed class StatusBarSourceTests
     [Fact]
     public void Construction_ReconcilesAStatusChangeBetweenSeedAndSubscribe_SoALaterUnchangedNotificationDoesNotRaise()
     {
-        var late = new StatusBarState { ResolverStatus = "Late" };
+        var late = new StatusBarState { ResolverStatus = ResolverStatus.FailedToLoad("Late") };
         var statusBar = Substitute.For<IState<StatusBarState>>();
         statusBar.Value.Returns(new StatusBarState(), late);
         using var source = NewSource(statusBar: statusBar);
@@ -279,7 +312,8 @@ public sealed class StatusBarSourceTests
         statusBar.StateChanged += Raise.Event<EventHandler>(statusBar, EventArgs.Empty);
 
         Assert.Equal(0, raised);
-        Assert.Equal("Late", source.Current.ResolverStatus);
+        Assert.Equal(ResolverStatusReason.FailedToLoad, source.Current.ResolverStatus.Reason);
+        Assert.Equal("Late", source.Current.ResolverStatus.LogDescription);
     }
 
     [Fact]
@@ -325,9 +359,10 @@ public sealed class StatusBarSourceTests
     {
         var harness = new Harness();
 
-        harness.StatusBar = harness.StatusBar with { ResolverStatus = "Fresh" };
+        harness.StatusBar = harness.StatusBar with { ResolverStatus = ResolverStatus.FailedToLoad("Fresh") };
 
-        Assert.Equal("Fresh", harness.Source.Current.ResolverStatus);
+        Assert.Equal(ResolverStatusReason.FailedToLoad, harness.Source.Current.ResolverStatus.Reason);
+        Assert.Equal("Fresh", harness.Source.Current.ResolverStatus.LogDescription);
     }
 
     [Fact]
@@ -364,7 +399,7 @@ public sealed class StatusBarSourceTests
         var raised = 0;
         harness.Source.Changed += () => raised++;
 
-        harness.StatusBar = harness.StatusBar with { ResolverStatus = "Would-be-leaked" };
+        harness.StatusBar = harness.StatusBar with { ResolverStatus = ResolverStatus.FailedToLoad("Would-be-leaked") };
         harness.RaiseRawCount();
 
         Assert.Equal(0, raised);

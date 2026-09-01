@@ -1248,6 +1248,29 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleOpenLog_ReverseEagerLoad_SuccessfulLoad_ClearsResolverStatusToNone()
+    {
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(60, batchSize: 30), newestBookmark: "NEWEST"));
+
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory);
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SetResolverStatusAction>(action => action != null &&
+            action.Status.Reason == ResolverStatusReason.None &&
+            action.Status.LogDescription == null));
+
+        var dispatched = dispatcher.ReceivedCalls().Select(call => call.GetArguments()[0]).ToList();
+        var resolverResetIndex = dispatched.FindLastIndex(action =>
+            action is SetResolverStatusAction resolverStatus &&
+            resolverStatus.Status.Reason == ResolverStatusReason.None);
+        var clearIndex = dispatched.FindLastIndex(action => action is ClearStatusAction);
+        Assert.True(resolverResetIndex >= 0 && resolverResetIndex < clearIndex,
+            "Successful load must reset ResolverStatus to None before the terminal ClearStatusAction.");
+    }
+
+    [Fact]
     public async Task HandleOpenLog_ReverseEagerLoad_WhenReadStopsOnError_SurfacesLoadFailureNotFinalLoad()
     {
         const int total = 60;
@@ -1262,7 +1285,8 @@ public sealed class EffectsTests
         await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
 
         dispatcher.Received().Dispatch(Arg.Is<SetResolverStatusAction>(a => a != null &&
-            a.ResolverStatus.Contains("Error") && a.ResolverStatus.Contains(Constants.LogNameApplication)));
+            a.Status.Reason == ResolverStatusReason.FailedToLoad &&
+            a.Status.LogDescription == Constants.LogNameApplication));
         Assert.Empty(dispatcher.ReceivedCalls().Select(call => call.GetArguments()[0]).OfType<LoadEventsAction>());
     }
 
@@ -1277,7 +1301,8 @@ public sealed class EffectsTests
         await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
 
         dispatcher.Received().Dispatch(Arg.Is<SetResolverStatusAction>(a => a != null &&
-            a.ResolverStatus.Contains("Error") && a.ResolverStatus.Contains(Constants.LogNameApplication)));
+            a.Status.Reason == ResolverStatusReason.FailedToLoad &&
+            a.Status.LogDescription == Constants.LogNameApplication));
         Assert.Empty(dispatcher.ReceivedCalls().Select(call => call.GetArguments()[0]).OfType<LoadEventsAction>());
         watcher.DidNotReceive().AddLog(Arg.Any<string>(), Arg.Any<EventLogId>(), Arg.Any<string>(), Arg.Any<bool>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<RegisterLiveTailAction>());
@@ -1335,8 +1360,8 @@ public sealed class EffectsTests
 
         mockDispatcher.Received(1)
             .Dispatch(Arg.Is<SetResolverStatusAction>(a => a != null &&
-                a.ResolverStatus.StartsWith("Error: Failed to open Security.evtx") &&
-                a.ResolverStatus.Contains(@"C:\logs\Security.evtx")));
+                a.Status.Reason == ResolverStatusReason.FailedToOpen &&
+                a.Status.LogDescription == @"Security.evtx (C:\logs\Security.evtx)"));
     }
 
     [Fact]
@@ -1349,7 +1374,8 @@ public sealed class EffectsTests
 
         mockDispatcher.Received(1)
             .Dispatch(Arg.Is<SetResolverStatusAction>(a => a != null &&
-                a.ResolverStatus.Contains("Error") && a.ResolverStatus.Contains(Constants.LogNameTestLog)));
+                a.Status.Reason == ResolverStatusReason.FailedToOpen &&
+                a.Status.LogDescription == Constants.LogNameTestLog));
     }
 
     [Fact]
@@ -1368,7 +1394,8 @@ public sealed class EffectsTests
 
         mockDispatcher.Received(1)
             .Dispatch(Arg.Is<SetResolverStatusAction>(a => a != null &&
-                a.ResolverStatus.Contains("Error")));
+                a.Status.Reason == ResolverStatusReason.NoResolver &&
+                a.Status.LogDescription == null));
     }
 
     [Fact]
@@ -1380,7 +1407,9 @@ public sealed class EffectsTests
 
         dispatcher.Received(1).Dispatch(Arg.Any<ClearStatusAction>());
         dispatcher.Received().Dispatch(Arg.Any<CloseLogAction>());
-        dispatcher.Received().Dispatch(Arg.Is<SetResolverStatusAction>(action => action != null && action.ResolverStatus.Contains("Error")));
+        dispatcher.Received().Dispatch(Arg.Is<SetResolverStatusAction>(action => action != null &&
+            action.Status.Reason == ResolverStatusReason.FailedToLoad &&
+            action.Status.LogDescription == Constants.LogNameApplication));
     }
 
     [Fact]

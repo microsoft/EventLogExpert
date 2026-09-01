@@ -61,49 +61,49 @@ public sealed class StatusBarTextComposerTests : IDisposable
         Assert.Equal("[[StatusBar_Filter_Active]]", StatusBarTextComposer.FilterIndicatorTooltip(Localizer, persistentActive: true, lensCount: 0));
 
     [Theory]
-    [InlineData(DisplayIndicatorKind.Fault, true, true, true, "Error: No resolver", "Error: No resolver")]
-    [InlineData(DisplayIndicatorKind.Fault, true, true, true, "", "[[StatusBar_Activity_Fault]]")]
-    [InlineData(DisplayIndicatorKind.EmptyPending, true, false, false, "", "[[StatusBar_Activity_Loading]]")]
-    [InlineData(DisplayIndicatorKind.EmptyPending, false, false, false, "", "[[StatusBar_Activity_LoadingEvents]]")]
-    [InlineData(DisplayIndicatorKind.ReorderPending, false, false, false, "", "[[StatusBar_Activity_Reordering]]")]
-    [InlineData(DisplayIndicatorKind.ReorderPending, false, false, true, "", "[[StatusBar_Activity_Reordering]]")]
-    [InlineData(DisplayIndicatorKind.None, false, false, true, "", "[[StatusBar_Activity_ContinuouslyUpdating]]")]
-    [InlineData(DisplayIndicatorKind.None, false, false, false, "", "")]
+    [InlineData(DisplayIndicatorKind.Fault, true, true, true, ResolverStatusReason.FailedToLoad, "System", "[[StatusBar_Resolver_FailedToLoad(System)]]")]
+    [InlineData(DisplayIndicatorKind.Fault, true, true, true, ResolverStatusReason.None, null, "[[StatusBar_Activity_Fault]]")]
+    [InlineData(DisplayIndicatorKind.EmptyPending, true, false, false, ResolverStatusReason.None, null, "[[StatusBar_Activity_Loading]]")]
+    [InlineData(DisplayIndicatorKind.EmptyPending, false, false, false, ResolverStatusReason.None, null, "[[StatusBar_Activity_LoadingEvents]]")]
+    [InlineData(DisplayIndicatorKind.ReorderPending, false, false, false, ResolverStatusReason.None, null, "[[StatusBar_Activity_Reordering]]")]
+    [InlineData(DisplayIndicatorKind.ReorderPending, false, false, true, ResolverStatusReason.None, null, "[[StatusBar_Activity_Reordering]]")]
+    [InlineData(DisplayIndicatorKind.None, false, false, true, ResolverStatusReason.None, null, "[[StatusBar_Activity_ContinuouslyUpdating]]")]
+    [InlineData(DisplayIndicatorKind.None, false, false, false, ResolverStatusReason.None, null, "")]
     public void FormatActivityAnnouncement_RanksTheDisplaysOwnNewsAgainstTheLogs(
         DisplayIndicatorKind indicator,
         bool isLoading,
         bool bufferFull,
         bool continuouslyUpdating,
-        string resolverStatus,
+        ResolverStatusReason resolverReason,
+        string? logDescription,
         string expected)
     {
+        ResolverStatus resolver = CreateResolverStatus(resolverReason, logDescription);
         string actual = StatusBarTextComposer.ActivityAnnouncement(Localizer,
-            isLoading, bufferFull, continuouslyUpdating, resolverStatus, indicator);
+            isLoading, bufferFull, continuouslyUpdating, resolver, indicator);
 
         Assert.Equal(expected, actual);
-        if (!string.IsNullOrEmpty(resolverStatus))
-        {
-            Assert.DoesNotContain("[[", actual, StringComparison.Ordinal);
-        }
     }
 
     [Theory]
-    [InlineData(true, false, false, "Error: Failed to load System", "Error: Failed to load System")]
-    [InlineData(true, false, false, "", "[[StatusBar_Activity_Loading]]")]
-    [InlineData(false, true, false, "", "[[StatusBar_Activity_BufferFull]]")]
-    [InlineData(false, false, true, "", "[[StatusBar_Activity_ContinuouslyUpdating]]")]
-    [InlineData(false, false, false, "Error: No resolver", "Error: No resolver")]
-    [InlineData(false, false, false, "", "")]
+    [InlineData(true, false, false, ResolverStatusReason.FailedToLoad, "System", "[[StatusBar_Resolver_FailedToLoad(System)]]")]
+    [InlineData(true, false, false, ResolverStatusReason.None, null, "[[StatusBar_Activity_Loading]]")]
+    [InlineData(false, true, false, ResolverStatusReason.None, null, "[[StatusBar_Activity_BufferFull]]")]
+    [InlineData(false, false, true, ResolverStatusReason.None, null, "[[StatusBar_Activity_ContinuouslyUpdating]]")]
+    [InlineData(false, false, false, ResolverStatusReason.NoResolver, null, "[[StatusBar_Resolver_NoResolver]]")]
+    [InlineData(false, false, false, ResolverStatusReason.None, null, "")]
     public void FormatActivityAnnouncement_SurfacesErrorOverLoading(
-        bool isLoading, bool bufferFull, bool continuouslyUpdating, string resolverStatus, string expected)
+        bool isLoading,
+        bool bufferFull,
+        bool continuouslyUpdating,
+        ResolverStatusReason resolverReason,
+        string? logDescription,
+        string expected)
     {
-        string actual = StatusBarTextComposer.ActivityAnnouncement(Localizer, isLoading, bufferFull, continuouslyUpdating, resolverStatus);
+        ResolverStatus resolver = CreateResolverStatus(resolverReason, logDescription);
+        string actual = StatusBarTextComposer.ActivityAnnouncement(Localizer, isLoading, bufferFull, continuouslyUpdating, resolver);
 
         Assert.Equal(expected, actual);
-        if (!string.IsNullOrEmpty(resolverStatus))
-        {
-            Assert.DoesNotContain("[[", actual, StringComparison.Ordinal);
-        }
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public sealed class StatusBarTextComposerTests : IDisposable
         Assert.Equal(
             "[[StatusBar_Activity_Loading]]",
             StatusBarTextComposer.ActivityAnnouncement(Localizer,
-                isLoading: true, bufferFull: false, continuouslyUpdating: false, resolverStatus: ""));
+                isLoading: true, bufferFull: false, continuouslyUpdating: false, resolver: ResolverStatus.None));
 
     [Fact]
     public void FormatCounts_Filtered_ShowsShownOfTotal() =>
@@ -363,6 +363,16 @@ public sealed class StatusBarTextComposerTests : IDisposable
 
     private static LogView Combined(LogTabGroupId groupId) =>
         new(EventLogId.Create()) { GroupId = groupId };
+
+    private static ResolverStatus CreateResolverStatus(ResolverStatusReason reason, string? logDescription) =>
+        reason switch
+        {
+            ResolverStatusReason.None => ResolverStatus.None,
+            ResolverStatusReason.FailedToOpen => ResolverStatus.FailedToOpen(logDescription!),
+            ResolverStatusReason.NoResolver => ResolverStatus.NoResolver,
+            ResolverStatusReason.FailedToLoad => ResolverStatus.FailedToLoad(logDescription!),
+            _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null)
+        };
 
     private static LogView File(string path) =>
         new(EventLogId.Create()) { FileName = path, LogPathType = LogPathType.File };

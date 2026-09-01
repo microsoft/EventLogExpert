@@ -92,9 +92,10 @@
             }
         }
 
-        @if (!string.IsNullOrEmpty(status.ResolverStatus))
+        @if (status.ResolverStatus.Reason != ResolverStatusReason.None)
         {
-            <span class="status-bar-activity status-bar-resolver" title="@status.ResolverStatus">@status.ResolverStatus</span>
+            var resolverText = ResolverStatusLocalizer.Describe(Localizer, status.ResolverStatus);
+            <span class="status-bar-activity status-bar-resolver" title="@resolverText">@resolverText</span>
         }
 
         @if (hasChannel)

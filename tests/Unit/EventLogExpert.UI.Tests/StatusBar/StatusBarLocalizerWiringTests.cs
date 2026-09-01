@@ -169,12 +169,23 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
     }
 
     [Fact]
-    public void ResolverStatus_StaysVerbatimAndPreemptsLocalizedIndicatorAnnouncement()
+    public void ResolverStatus_None_HidesResolverChip()
+    {
+        SetActiveChannel(total: 100, shown: 100, unresolved: 0, selected: 0);
+        _status = _status with { ResolverStatus = ResolverStatus.None };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Empty(cut.FindAll(".status-bar-resolver"));
+    }
+
+    [Fact]
+    public void ResolverStatus_RoutesThroughTheLocalizerAndPreemptsLocalizedIndicatorAnnouncement()
     {
         SetActiveChannel(total: 100, shown: 100, unresolved: 0, selected: 0);
         _status = _status with
         {
-            ResolverStatus = "Error: No resolver",
+            ResolverStatus = ResolverStatus.FailedToLoad("Security.evtx"),
             NewEventBufferIsFull = true,
             LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
                 .Add(StatusActivityId.Create(), new LoadingProgress(12, 0))
@@ -182,9 +193,11 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Equal("Error: No resolver", cut.Find(".status-bar-announce").TextContent);
-        Assert.Equal("Error: No resolver", cut.Find(".status-bar-resolver").GetAttribute("title"));
-        Assert.DoesNotContain("[[Error: No resolver]]", cut.Markup, StringComparison.Ordinal);
+        Assert.Equal("[[StatusBar_Resolver_FailedToLoad(Security.evtx)]]", cut.Find(".status-bar-announce").TextContent);
+        var resolver = cut.Find(".status-bar-resolver");
+        Assert.Equal("[[StatusBar_Resolver_FailedToLoad(Security.evtx)]]", resolver.GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Resolver_FailedToLoad(Security.evtx)]]", resolver.TextContent);
+        Assert.DoesNotContain("[[Security.evtx]]", cut.Markup, StringComparison.Ordinal);
     }
 
     [Theory]

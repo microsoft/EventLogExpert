@@ -54,7 +54,7 @@ public sealed class Reducers
     [ReducerMethod]
     public static StatusBarState
         ReduceSetResolverStatus(StatusBarState state, SetResolverStatusAction action) =>
-        state with { ResolverStatus = action.ResolverStatus };
+        action.Status == state.ResolverStatus ? state : state with { ResolverStatus = action.Status };
 
     private static ImmutableDictionary<StatusActivityId, (int Loaded, int Failed, long? Total)> CommonLoadingReducer(
         ImmutableDictionary<StatusActivityId, (int Loaded, int Failed, long? Total)> loadingEntries,
