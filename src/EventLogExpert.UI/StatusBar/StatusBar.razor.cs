@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
@@ -8,6 +9,7 @@ using EventLogExpert.Runtime.Stats;
 using EventLogExpert.Runtime.StatusBar;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.StatusBar;
 
@@ -22,6 +24,8 @@ public sealed partial class StatusBar
     [Inject] private DisplayIndicatorGate IndicatorGate { get; init; } = null!;
 
     [Inject] private IFilterLensSource LensSource { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
 

@@ -1,6 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using Bunit;
+using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Persistence;
@@ -9,19 +12,27 @@ using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.DetailsPane;
+using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.Histogram;
+using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Memory;
 using EventLogExpert.Runtime.ResolutionCoverage;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Stats;
+using EventLogExpert.Runtime.StatusBar;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.FilterEditor.Comparison;
 using EventLogExpert.UI.Globalization;
+using EventLogExpert.UI.Modal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Resources;
@@ -61,6 +72,9 @@ public sealed class LocalizationInfraTests
             ("Histogram_HighlightColor_", typeof(HighlightColor)),
             ("Histogram_Severity_", typeof(HistogramSeverityBucket)),
             ("Stats_Dimension_", typeof(StatsDimension)),
+            ("StatusBar_Memory_Value_", typeof(MemoryUsageLevel)),
+            ("StatusBar_Memory_Announce_", typeof(MemoryUsageLevel)),
+            ("StatusBar_Memory_Tooltip_", typeof(MemoryUsageLevel)),
             ("FilterLens_Property_", typeof(EventProperty)),
             ("FilterEditor_Comparison_", typeof(ComparisonOperatorSelect.ComparisonKind))
         ];
@@ -311,6 +325,94 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
+    public void NeutralStatusBarSpaceBearingValues_KeepXmlSpaceAndExactWhitespace()
+    {
+        XNamespace xmlNamespace = XNamespace.Xml;
+        var data = XDocument.Load(LocalizationSourceScan.ResxPath)
+            .Root!
+            .Elements("data")
+            .Where(element => ((string?)element.Attribute("name"))?.StartsWith("StatusBar_", StringComparison.Ordinal) == true)
+            .ToDictionary(element => (string)element.Attribute("name")!, StringComparer.Ordinal);
+
+        string[] spaceBearingKeys =
+        [
+            "StatusBar_Counts_TotalSelected",
+            "StatusBar_Counts_ShownOfTotalSelected",
+            "StatusBar_Memory_Value_Elevated",
+            "StatusBar_Memory_Value_High"
+        ];
+
+        foreach (string key in spaceBearingKeys)
+        {
+            Assert.Equal("preserve", data[key].Attribute(xmlNamespace + "space")?.Value);
+        }
+    }
+
+    [Fact]
+    public void NeutralStatusBarValues_KeepByteIdenticalEnglish()
+    {
+        var neutralValues = ResxValues();
+        (string Key, string Value)[] expected =
+        [
+            ("StatusBar_Source_None", "No log open"),
+            ("StatusBar_Source_AllLogs", "All logs ({0})"),
+            ("StatusBar_Source_Combined", "Combined"),
+            ("StatusBar_Source_CombinedCount_One", "Combined ({0} logs)"),
+            ("StatusBar_Source_CombinedCount_Many", "Combined ({0} logs)"),
+            ("StatusBar_Counts_Total_One", "{0} events"),
+            ("StatusBar_Counts_Total_Many", "{0} events"),
+            ("StatusBar_Counts_TotalSelected", "{0} events · {1} selected"),
+            ("StatusBar_Counts_ShownOfTotal", "{0} of {1} shown"),
+            ("StatusBar_Counts_ShownOfTotalSelected", "{0} of {1} shown · {2} selected"),
+            ("StatusBar_Coverage_Chip", "{0} unresolved"),
+            ("StatusBar_Coverage_AriaLabel", "Resolution and coverage: {0} unresolved. Open for details."),
+            ("StatusBar_Coverage_Tooltip", "{0} unresolved of {1} events loaded in this tab/group. Filters are not applied - open Coverage for the current view's breakdown."),
+            ("StatusBar_Loading_Pending", "Loading..."),
+            ("StatusBar_Loading_PendingPercent", "Loading... ({0}%)"),
+            ("StatusBar_Loading_Count", "Loading: {0}"),
+            ("StatusBar_Loading_CountPercent", "Loading: {0} ({1}%)"),
+            ("StatusBar_Loading_ManyLogs", "Loading {0} logs..."),
+            ("StatusBar_Loading_Failed", "Failed: {0}"),
+            ("StatusBar_Memory_Value_Normal", "Memory: {0}"),
+            ("StatusBar_Memory_Value_Elevated", "Memory: {0} · Elevated"),
+            ("StatusBar_Memory_Value_High", "Memory: {0} · High"),
+            ("StatusBar_Memory_Announce_Normal", "Memory usage normal"),
+            ("StatusBar_Memory_Announce_Elevated", "Memory usage elevated"),
+            ("StatusBar_Memory_Announce_High", "Memory usage high"),
+            ("StatusBar_Memory_Tooltip_Normal", "Managed heap (app data): {0} - drops as logs close. Process working set: {1} - the OS may release this later."),
+            ("StatusBar_Memory_Tooltip_Elevated", "Managed heap (app data): {0} - drops as logs close. Process working set: {1} - the OS may release this later. Level: elevated."),
+            ("StatusBar_Memory_Tooltip_High", "Managed heap (app data): {0} - drops as logs close. Process working set: {1} - the OS may release this later. Level: high."),
+            ("StatusBar_Activity_Fault", "These events could not be prepared"),
+            ("StatusBar_Activity_BufferFull", "Buffer full"),
+            ("StatusBar_Activity_Loading", "Loading"),
+            ("StatusBar_Activity_LoadingEvents", "Loading events"),
+            ("StatusBar_Activity_Reordering", "Reordering events"),
+            ("StatusBar_Activity_ContinuouslyUpdating", "Continuously updating"),
+            ("StatusBar_Filter_Chip", "Filtered"),
+            ("StatusBar_Filter_Active", "Filter active"),
+            ("StatusBar_Filter_Lens_One", "1 lens"),
+            ("StatusBar_Filter_Lens_Many", "{0} lenses"),
+            ("StatusBar_Filter_ActiveLens_One", "Filter + 1 lens"),
+            ("StatusBar_Filter_ActiveLens_Many", "Filter + {0} lenses"),
+            ("StatusBar_Stats_Show", "Show statistics for these events"),
+            ("StatusBar_Stats_Hide", "Hide statistics for these events"),
+            ("StatusBar_NewEvents_Label", "New Events: {0}"),
+            ("StatusBar_NewEvents_None", "No new events to load"),
+            ("StatusBar_NewEvents_Load", "Load new events into the view")
+        ];
+
+        foreach ((string key, string value) in expected)
+        {
+            Assert.True(neutralValues.TryGetValue(key, out string? actual), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(value, actual);
+        }
+
+        Assert.Equal(
+            expected.Select(entry => entry.Key).OrderBy(key => key, StringComparer.Ordinal),
+            neutralValues.Keys.Where(key => key.StartsWith("StatusBar_", StringComparison.Ordinal)).OrderBy(key => key, StringComparer.Ordinal));
+    }
+
+    [Fact]
     public void ProductionSource_NeverPinsThreadCulture()
     {
         // Matches pins (=, ??=; not ==/!=), not reads: only assignments would break OS-culture-following.
@@ -364,6 +466,48 @@ public sealed class LocalizationInfraTests
 
         Assert.Equal(expectedName, resolved.Name);
         Assert.Equal(expectedDir, ContentCulture.DirectionOf(resolved));
+    }
+
+    [Fact]
+    public void StatusBarMemorySizes_UseCurrentCultureDecimalSeparator()
+    {
+        CultureInfo priorCulture = CultureInfo.CurrentCulture;
+        CultureInfo priorUiCulture = CultureInfo.CurrentUICulture;
+
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("de-DE");
+
+            string value = StatusBarTextComposer.MemoryValue(BuildLocalizer(), 1536, MemoryUsageLevel.Normal);
+
+            Assert.Contains("1,5", value, StringComparison.Ordinal);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = priorCulture;
+            CultureInfo.CurrentUICulture = priorUiCulture;
+        }
+    }
+
+    [Fact]
+    public void StatusBarNumberFormatting_MixesGroupedLoadingAndRawNewEvents()
+    {
+        IStringLocalizer<SharedResource> localizer = BuildLocalizer();
+        var loading = StatusBarTextComposer.Loading(
+            localizer,
+            ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty.Add(
+                StatusActivityId.Create(),
+                new LoadingProgress(1500, 0)));
+
+        Assert.NotNull(loading);
+        Assert.Contains(1500.ToString("N0", CultureInfo.CurrentCulture), loading.Value.Text, StringComparison.Ordinal);
+
+        using var context = new StatusBarRenderContext(newEventCount: 1000);
+
+        var cut = context.Render<UI.StatusBar.StatusBar>();
+
+        Assert.Contains("1000", cut.Find("button.status-bar-newevents").TextContent, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -422,4 +566,48 @@ public sealed class LocalizationInfraTests
                 data => (string)data.Attribute("name")!,
                 data => data.Element("value")?.Value ?? string.Empty,
                 StringComparer.Ordinal);
+
+    private sealed class StatusBarRenderContext : BunitContext
+    {
+        public StatusBarRenderContext(int newEventCount)
+        {
+            JSInterop.Mode = JSRuntimeMode.Loose;
+
+            var eventLogCommands = Substitute.For<IEventLogCommands>();
+            var filterApplied = Substitute.For<IFilterAppliedSource>();
+            var lensSource = Substitute.For<IFilterLensSource>();
+            var modalCoordinator = Substitute.For<IModalCoordinator>();
+            var statsCommands = Substitute.For<IStatsCommands>();
+            var statsVisibility = Substitute.For<IStatsVisibilitySource>();
+            var statusBarSource = Substitute.For<IStatusBarSource>();
+            var viewSource = Substitute.For<IOrderedViewSource>();
+
+            var eventLogId = EventLogId.Create();
+            var view = Substitute.For<IEventColumnView>();
+            view.Count.Returns(0);
+
+            viewSource.Current.Returns(_ => new OrderedViewPresentation(view, eventLogId, default, PresentationState.Current, Revision: 1));
+            filterApplied.IsFilteringEnabled.Returns(false);
+            lensSource.Lenses.Returns(ImmutableList<FilterLensSummary>.Empty);
+            statusBarSource.Current.Returns(new StatusBarPresentation
+            {
+                Tabs = ImmutableList.Create(new LogView(eventLogId) { LogName = "Application", LogPathType = LogPathType.Channel }),
+                ActiveTabId = eventLogId,
+                RawEventCountsByLog = ImmutableDictionary<EventLogId, ProviderResolutionCounts>.Empty.Add(eventLogId, default),
+                NewEventBufferCount = newEventCount
+            });
+
+            Services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
+            Services.AddEventLogLocalization();
+            Services.AddSingleton(eventLogCommands);
+            Services.AddSingleton(filterApplied);
+            Services.AddSingleton(lensSource);
+            Services.AddSingleton(modalCoordinator);
+            Services.AddSingleton(statsCommands);
+            Services.AddSingleton(statsVisibility);
+            Services.AddSingleton(statusBarSource);
+            Services.AddSingleton(viewSource);
+            Services.AddSingleton(provider => new DisplayIndicatorGate(provider.GetRequiredService<IOrderedViewSource>()));
+        }
+    }
 }
