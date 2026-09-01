@@ -1438,7 +1438,7 @@
     <value>All</value>
     <comment>Filter value picker: the option that clears the value filter so events with any value match.</comment>
   </data>
-  <!-- Status bar chrome. Resolver-status messages remain verbatim until that pipeline is retyped. -->
+  <!-- Status bar chrome. -->
   <data name="StatusBar_Source_None" xml:space="preserve">
     <value>No log open</value>
   </data>

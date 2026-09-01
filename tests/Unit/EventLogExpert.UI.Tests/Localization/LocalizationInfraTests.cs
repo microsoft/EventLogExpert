@@ -27,6 +27,7 @@ using EventLogExpert.UI.Common;
 using EventLogExpert.UI.FilterEditor.Comparison;
 using EventLogExpert.UI.Globalization;
 using EventLogExpert.UI.Modal;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
@@ -41,10 +42,7 @@ using System.Xml.Linq;
 
 namespace EventLogExpert.UI.Tests.Localization;
 
-/// <summary>
-///     Culture-agnostic localization-infra tests (config guard, resolver, drift guard, no-pin guard);
-///     culture-MUTATING tests live in <c>FindBarCultureTests</c>.
-/// </summary>
+[Collection(CultureSensitiveCollection.Name)]
 public sealed class LocalizationInfraTests
 {
     [Fact]
