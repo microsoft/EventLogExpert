@@ -9,114 +9,114 @@
                 IconClass="bi bi-plus-circle"
                 OnClick="AddBasicFilter"
                 @ref="_addFilterButton"
-                title="Add Basic filter (use chevron for Advanced or Recent)">
-                Add Filter
+                title="@Localizer["FilterPane_AddBasicTitle"]">
+                @Localizer["FilterPane_Action_AddFilter"]
             </Button>
-            <Button aria-controls="menu-host-popup"
-                aria-expanded="@(IsAddFilterMenuOpen ? "true" : "false")"
-                aria-haspopup="menu"
-                aria-label="Choose filter mode"
-                CssClass="split-button-chevron"
+            <Button CssClass="split-button-chevron"
                 IconClass="bi bi-caret-down-fill"
                 OnClick="OpenAddFilterMenuAsync"
+                aria-controls="menu-host-popup"
+                aria-expanded="@(IsAddFilterMenuOpen ? "true" : "false")"
+                aria-haspopup="menu"
+                aria-label="@Localizer["FilterPane_AddMenuAria"]"
                 @onkeydown="HandleAddFilterChevronKeyDownAsync"
                 @ref="_addFilterChevron" />
         </div>
 
         <Button IconClass="bi bi-plus-circle" OnClick="AddExclusion">
-            Add Exclusion
+            @Localizer["FilterPane_Action_AddExclusion"]
         </Button>
 
         @if (!IsDateFilterVisible)
         {
             <Button IconClass="bi bi-plus-circle" OnClick="AddDateFilter">
-                Add Date Filter
+                @Localizer["FilterPane_Action_AddDateFilter"]
             </Button>
         }
 
         <Button IconClass="bi bi-plus-circle" OnClick="OpenFilterSetPicker">
-            Apply Filter Set
+            @Localizer["FilterPane_Action_ApplyFilterSet"]
         </Button>
 
         @if (OpenLogsPresence.HasOpenLogs)
         {
-            <Button aria-controls="scenario-picker"
-                aria-expanded="@(IsScenarioPickerVisible ? "true" : "false")"
-                IconClass="bi bi-plus-circle"
-                OnClick="OpenScenarioPicker">
-                Apply Scenario
+            <Button IconClass="bi bi-plus-circle"
+                OnClick="OpenScenarioPicker"
+                aria-controls="scenario-picker"
+                aria-expanded="@(IsScenarioPickerVisible ? "true" : "false")">
+                @Localizer["FilterPane_Action_ApplyScenario"]
             </Button>
         }
     </div>
 
     @if (HasFilters && GetActiveFilters() > 0)
     {
-        <span class="filter-header-status">[Active Filters: @GetActiveFilters()]</span>
+        <span class="filter-header-status">@Localizer["FilterPane_ActiveFilters", GetActiveFilters()]</span>
     }
 
     <div class="filter-header-secondary">
-        <Button aria-describedby="@(HasSavableFilters ? null : "save-filters-empty-hint")"
-            aria-label="Save as Filter Set"
-            Disabled="@(!HasSavableFilters)"
+        <Button Disabled="@(!HasSavableFilters)"
             IconClass="bi bi-bookmark-plus"
             IconOnly
             OnClick="SaveFiltersAsFilterSetAsync"
-            title="@(HasSavableFilters ? "Save as Filter Set..." : "No filters to save")" />
+            aria-describedby="@(HasSavableFilters ? null : "save-filters-empty-hint")"
+            aria-label="@Localizer["FilterPane_SaveAsFilterSet_Aria"]"
+            title="@(HasSavableFilters ? Localizer["FilterPane_SaveAsFilterSet_TitleEnabled"] : Localizer["FilterPane_SaveAsFilterSet_TitleDisabled"])" />
 
-        <Button aria-describedby="@(HasClearableFilters ? null : "clear-filters-empty-hint")"
-            aria-label="Clear All Filters"
-            Disabled="@(!HasClearableFilters)"
+        <Button Disabled="@(!HasClearableFilters)"
             IconClass="bi bi-trash"
             IconOnly
             OnClick="ClearAllFiltersAsync"
-            title="@(HasClearableFilters ? "Clear All Filters..." : "No filters to clear")" />
+            aria-describedby="@(HasClearableFilters ? null : "clear-filters-empty-hint")"
+            aria-label="@Localizer["FilterPane_ClearAll_Aria"]"
+            title="@(HasClearableFilters ? Localizer["FilterPane_ClearAll_TitleEnabled"] : Localizer["FilterPane_ClearAll_TitleDisabled"])" />
 
-        <Button aria-label="Open Filter Library"
-            IconClass="bi bi-bookmarks"
+        <Button IconClass="bi bi-bookmarks"
             IconOnly
             OnClick="OpenFilterLibraryAsync"
-            title="Open Filter Library" />
+            aria-label="@Localizer["FilterPane_OpenLibrary_Aria"]"
+            title="@Localizer["FilterPane_OpenLibrary_Title"]" />
 
         @if (ScenarioAuthoringEnabled)
         {
             var hasEnabledFilters = HasEnabledFilters;
 
-            <Button aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
-                aria-label="Copy scenario JSON"
-                Disabled="@(!hasEnabledFilters)"
+            <Button Disabled="@(!hasEnabledFilters)"
                 IconClass="bi bi-clipboard-data"
                 IconOnly
                 OnClick="CopyScenarioJsonAsync"
-                title="Copy current filter rows as scenario-catalog JSON" />
+                aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
+                aria-label="@Localizer["FilterPane_CopyScenarioJson_Aria"]"
+                title="@Localizer["FilterPane_CopyScenarioJson_Title"]" />
 
-            <Button aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
-                aria-label="Save scenario JSON"
-                Disabled="@(!hasEnabledFilters)"
+            <Button Disabled="@(!hasEnabledFilters)"
                 IconClass="bi bi-filetype-json"
                 IconOnly
                 OnClick="SaveScenarioJsonAsync"
-                title="Save current filter rows as scenario-catalog JSON..." />
+                aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
+                aria-label="@Localizer["FilterPane_SaveScenarioJson_Aria"]"
+                title="@Localizer["FilterPane_SaveScenarioJson_Title"]" />
 
             <span class="visually-hidden" id="scenario-export-empty-hint">
-                Enable a filter before exporting as a scenario.
+                @Localizer["FilterPane_ScenarioExport_HintDisabled"]
             </span>
         }
 
         <span class="visually-hidden" id="save-filters-empty-hint">
-            Add a filter before saving as a Filter Set.
+            @Localizer["FilterPane_SaveFilterSet_HintDisabled"]
         </span>
         <span class="visually-hidden" id="clear-filters-empty-hint">
-            There are no filters to clear.
+            @Localizer["FilterPane_ClearFilters_HintDisabled"]
         </span>
 
         @if (HasFilters)
         {
-            <Button aria-label="@(_isFilterListVisible ? "Filters Expanded" : "Filters Collapsed")"
-                CssClass="menu-toggle"
-                data-rotate="@MenuState"
+            <Button CssClass="menu-toggle"
                 IconClass="bi bi-caret-up"
                 IconOnly
-                OnClick="ToggleMenu" />
+                OnClick="ToggleMenu"
+                aria-label="@(_isFilterListVisible ? Localizer["FilterPane_FilterList_ExpandedAria"] : Localizer["FilterPane_FilterList_CollapsedAria"])"
+                data-rotate="@MenuState" />
         }
     </div>
 </div>
@@ -124,51 +124,51 @@
 <div class="filter-set" data-toggle="@MenuState">
     @if (IsDateFilterVisible)
     {
-        <EditForm class="filter-form flex-row" EditContext="_editContext">
+        <EditForm EditContext="_editContext" class="filter-form flex-row">
             <span>
-                After:
-                <InputDate aria-label="After" @bind-Value="ModelAfter" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
+                @Localizer["FilterPane_Date_AfterLabel"]
+                <InputDate Type="InputDateType.DateTimeLocal" aria-label="@Localizer["FilterPane_Date_AfterAria"]" @bind-Value="ModelAfter" class="filter-datetime input" disabled="@(!_canEditDate)" />
             </span>
             <span>
-                Before:
-                <InputDate aria-label="Before" @bind-Value="ModelBefore" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
+                @Localizer["FilterPane_Date_BeforeLabel"]
+                <InputDate Type="InputDateType.DateTimeLocal" aria-label="@Localizer["FilterPane_Date_BeforeAria"]" @bind-Value="ModelBefore" class="filter-datetime input" disabled="@(!_canEditDate)" />
             </span>
 
             @if (_canEditDate)
             {
                 <span>
-                    Quick range:
-                    <DateRangeQuickPick AriaLabel="Quick date range" CssClass="input filter-datetime" OnRangeSelected="SetQuickDateRange" />
+                    @Localizer["FilterPane_Date_QuickRangeLabel"]
+                    <DateRangeQuickPick AriaLabel="@Localizer["FilterPane_Date_QuickRangeAria"]" CssClass="input filter-datetime" OnRangeSelected="SetQuickDateRange" />
                 </span>
 
                 <PrimaryButton IconClass="bi bi-check-circle" OnClick="ApplyDateFilter">
-                    Apply
+                    @Localizer["FilterPane_Action_Apply"]
                 </PrimaryButton>
 
                 <DangerButton IconClass="bi bi-dash-circle" OnClick="RemoveDateFilter">
-                    Remove
+                    @Localizer["FilterPane_Action_Remove"]
                 </DangerButton>
             }
             else
             {
                 <Button IconClass="bi bi-funnel" OnClick="EditDateFilter">
-                    Edit
+                    @Localizer["FilterPane_Action_Edit"]
                 </Button>
 
                 <DangerButton IconClass="bi bi-dash-circle" OnClick="RemoveDateFilter">
-                    Remove
+                    @Localizer["FilterPane_Action_Remove"]
                 </DangerButton>
 
                 @if (FilteredDateRange.Current?.IsEnabled is true)
                 {
                     <DangerButton IconClass="bi bi-dash-circle" OnClick="ToggleDateFilter">
-                        Disable
+                        @Localizer["FilterPane_Action_Disable"]
                     </DangerButton>
                 }
                 else
                 {
                     <PrimaryButton IconClass="bi bi-plus-circle" OnClick="ToggleDateFilter">
-                        Enable
+                        @Localizer["FilterPane_Action_Enable"]
                     </PrimaryButton>
                 }
             }
@@ -183,15 +183,15 @@
                 @if (AvailableFilterSetTags is { Count: > 0 } setTags)
                 {
                     <span>
-                        Tags:
-                        <ValueSelect AriaLabel="Narrow filter sets by tag"
+                        @Localizer["FilterPane_FilterSet_TagsLabel"]
+                        <ValueSelect AriaLabel="@Localizer["FilterPane_FilterSet_TagSelectAria"]"
                             CssClass="input filter-multiselect-dropdown"
-                            EmptyText="All tags"
+                            EmptyText="@Localizer["FilterPane_FilterSet_AllTags"]"
                             IsMultiSelect="true"
                             T="string"
                             Values="_filterSetTags"
                             ValuesChanged="OnFilterSetTagsChanged">
-                            <ValueSelectItem ClearItem T="string">All tags</ValueSelectItem>
+                            <ValueSelectItem ClearItem T="string">@Localizer["FilterPane_FilterSet_AllTags"]</ValueSelectItem>
                             @foreach (var tag in setTags)
                             {
                                 <ValueSelectItem T="string" Value="@tag">@tag</ValueSelectItem>
@@ -201,8 +201,8 @@
                 }
 
                 <span>
-                    Filter Set:
-                    <ValueSelect AriaLabel="Filter Set"
+                    @Localizer["FilterPane_FilterSet_Label"]
+                    <ValueSelect AriaLabel="@Localizer["FilterPane_FilterSet_SelectAria"]"
                         CssClass="input filter-set-dropdown"
                         T="LibraryEntryId"
                         ToStringFunc="@(GetFilterSetName)"
@@ -213,7 +213,7 @@
                             <ValueSelectItem T="LibraryEntryId" Value="filterSet.Id">
                                 <span class="filter-set-option-row" title="@FormatFilterSetLabel(filterSet)">
                                     <span class="filter-set-option-name">@filterSet.Name</span>
-                                    <span class="filter-set-option-meta">(@FormatFilterSetDetail(filterSet))</span>
+                                    <span class="filter-set-option-meta">@Localizer["FilterPane_FilterSetOptionMeta", FormatFilterSetDetail(filterSet)]</span>
                                 </span>
                             </ValueSelectItem>
                         }
@@ -221,34 +221,25 @@
                 </span>
 
                 <PrimaryButton Disabled="@(SelectedFilterSetId == default)" IconClass="bi bi-check-circle" OnClick="ApplyFilterSetSelection">
-                    Apply
+                    @Localizer["FilterPane_Action_Apply"]
                 </PrimaryButton>
 
-                <Button aria-label="Replace filters with selected filter set"
-                    Disabled="@(SelectedFilterSetId == default)"
+                <Button Disabled="@(SelectedFilterSetId == default)"
                     IconClass="bi bi-arrow-repeat"
-                    OnClick="ReplaceFilterSetSelection">
-                    Replace
+                    OnClick="ReplaceFilterSetSelection"
+                    aria-label="@Localizer["FilterPane_FilterSet_ReplaceAria"]">
+                    @Localizer["FilterPane_Action_Replace"]
                 </Button>
             }
             else
             {
                 <span class="filter-empty-state">
-                    @if (HasSavableFilters)
-                    {
-                        @:No saved filter sets yet - use <strong>Save as Filter Set</strong> on the right
-                        @:to create one from the current pane.
-                    }
-                    else
-                    {
-                        @:No saved filter sets yet. Add and apply filters first, then use
-                        @:<strong>Save as Filter Set</strong> on the right to create one.
-                    }
+                    @FilterSetEmptyState()
                 </span>
             }
 
             <DangerButton IconClass="bi bi-dash-circle" OnClick="CancelFilterSetPicker">
-                Cancel
+                @Localizer["FilterPane_Action_Cancel"]
             </DangerButton>
         </div>
     }
@@ -261,24 +252,24 @@
                 @if (ScenarioMatchGroups.Count > 1)
                 {
                     <span>
-                        Category:
-                        <ValueSelect AriaLabel="Category"
+                        @Localizer["FilterPane_Scenario_CategoryLabel"]
+                        <ValueSelect AriaLabel="@Localizer["FilterPane_Scenario_CategoryAria"]"
                             CssClass="input scenario-category-dropdown"
                             T="ScenarioGroup?"
-                            ToStringFunc="@(group => group?.DisplayName() ?? string.Empty)"
+                            ToStringFunc="FormatScenarioGroup"
                             Value="EffectiveScenarioGroup"
                             ValueChanged="OnScenarioGroupChanged">
                             @foreach (var match in ScenarioMatchGroups)
                             {
-                                <ValueSelectItem T="ScenarioGroup?" Value="match.Key">@match.Key.DisplayName()</ValueSelectItem>
+                                <ValueSelectItem T="ScenarioGroup?" Value="match.Key">@ScenarioGroupLocalizer.GroupDisplay(Localizer, match.Key)</ValueSelectItem>
                             }
                         </ValueSelect>
                     </span>
                 }
 
                 <span>
-                    Scenario:
-                    <ValueSelect AriaLabel="Scenario"
+                    @Localizer["FilterPane_Scenario_Label"]
+                    <ValueSelect AriaLabel="@Localizer["FilterPane_Scenario_SelectAria"]"
                         CssClass="input scenario-item-dropdown"
                         T="string"
                         ToStringFunc="@(GetScenarioName)"
@@ -287,7 +278,7 @@
                         @foreach (var scenario in VisibleScenarioMatches)
                         {
                             <ValueSelectItem T="string" Value="scenario.Id">
-                                <span class="filter-set-option-row" title="@($"{scenario.Group.DisplayName()} - {scenario.Purpose}")">
+                                <span class="filter-set-option-row" title="@Localizer["FilterPane_Scenario_OptionTitle", ScenarioGroupLocalizer.GroupDisplay(Localizer, scenario.Group), scenario.Purpose]">
                                     <span class="filter-set-option-name">@scenario.Name</span>
                                 </span>
                             </ValueSelectItem>
@@ -296,23 +287,23 @@
                 </span>
 
                 <PrimaryButton Disabled="@(ResolvedScenario is null)" IconClass="bi bi-check-circle" OnClick="ApplyScenarioSelection">
-                    Apply
+                    @Localizer["FilterPane_Action_Apply"]
                 </PrimaryButton>
 
-                <Button aria-label="Replace filters with selected scenario"
-                    Disabled="@(ResolvedScenario is null)"
+                <Button Disabled="@(ResolvedScenario is null)"
                     IconClass="bi bi-arrow-repeat"
-                    OnClick="ReplaceScenarioSelection">
-                    Replace
+                    OnClick="ReplaceScenarioSelection"
+                    aria-label="@Localizer["FilterPane_Scenario_ReplaceAria"]">
+                    @Localizer["FilterPane_Action_Replace"]
                 </Button>
             }
             else
             {
-                <span class="filter-empty-state" role="status">No scenarios match the loaded logs.</span>
+                <span class="filter-empty-state" role="status">@Localizer["FilterPane_Scenario_EmptyNoMatches"]</span>
             }
 
             <DangerButton IconClass="bi bi-dash-circle" OnClick="CancelScenarioPicker">
-                Cancel
+                @Localizer["FilterPane_Action_Cancel"]
             </DangerButton>
         </div>
     }
@@ -321,20 +312,20 @@
         @foreach (var item in ActiveFilters.Current)
         {
             <FilterRow Id="@ComponentId.For(item.Id, ComponentIdScope.PaneFilter).Value"
-                @key="item.Id"
                 OnDisposed="@OnRowDisposed"
                 OnRemoved="HandleRemovedFilter"
-                @ref="_rowRefs[item.Id]"
-                Value="item" />
+                Value="item"
+                @key="item.Id"
+                @ref="_rowRefs[item.Id]" />
         }
 
         @foreach (var draft in _pendingDrafts)
         {
             <FilterRow Id="@ComponentId.For(draft.Id, ComponentIdScope.PanePendingFilter).Value"
-                @key="draft.Id"
                 OnPendingDiscard="() => HandlePendingDiscard(draft)"
                 OnPendingSave="filter => HandlePendingSave(draft, filter)"
-                PendingDraft="draft" />
+                PendingDraft="draft"
+                @key="draft.Id" />
         }
     </CascadingValue>
 </div>

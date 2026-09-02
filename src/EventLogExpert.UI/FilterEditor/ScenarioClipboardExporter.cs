@@ -1,40 +1,44 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Scenarios.Catalog;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.FilterEditor;
 
 internal sealed class ScenarioClipboardExporter
 {
-    private const string ChannelsGuidance = "Fill in channels[] before adding to the catalog.";
-
     private readonly IAlertDialogService _alertDialogService;
     private readonly IAnnouncementService _announcementService;
     private readonly IClipboardService _clipboardService;
+    private readonly IStringLocalizer<SharedResource> _localizer;
 
     public ScenarioClipboardExporter(
         IAnnouncementService announcementService,
         IAlertDialogService alertDialogService,
-        IClipboardService clipboardService)
+        IClipboardService clipboardService,
+        IStringLocalizer<SharedResource> localizer)
     {
         ArgumentNullException.ThrowIfNull(announcementService);
         ArgumentNullException.ThrowIfNull(alertDialogService);
         ArgumentNullException.ThrowIfNull(clipboardService);
+        ArgumentNullException.ThrowIfNull(localizer);
 
         _announcementService = announcementService;
         _alertDialogService = alertDialogService;
         _clipboardService = clipboardService;
+        _localizer = localizer;
     }
 
     public async Task AnnounceAsync(string success, IReadOnlyList<string> warnings)
     {
-        var message = warnings.Contains(ScenarioExporter.NoLiveChannelsWarning)
-            ? $"{success} {ChannelsGuidance}"
-            : success;
+        var message = warnings.Contains(ScenarioExporter.NoLiveChannelsWarning) ?
+            _localizer["ScenarioExport_WithChannelsGuidance", success, _localizer["ScenarioExport_ChannelsGuidance"]] :
+            success;
 
         var substantive = SubstantiveWarnings(warnings);
 
@@ -46,32 +50,48 @@ internal sealed class ScenarioClipboardExporter
         }
 
         await _alertDialogService.ShowAlert(
-            "Scenario JSON exported with warnings",
-            message + Environment.NewLine + string.Join(Environment.NewLine, substantive),
-            "OK");
+            _localizer["ScenarioExport_WarningsTitle"],
+            _localizer["ScenarioExport_WarningsBody", message, Environment.NewLine, string.Join(Environment.NewLine, substantive)],
+            _localizer["Modal_Accept"]);
     }
 
-    public async Task CopyAsync(ScenarioExportResult export, string success, string emptyNoun)
+    public async Task CopyAsync(ScenarioExportResult export, string success, ScenarioExportSubject subject)
     {
-        if (NotExportable(export, emptyNoun)) { return; }
+        if (NotExportable(export, subject)) { return; }
 
         await _clipboardService.CopyTextAsync(export.Json);
         await AnnounceAsync(success, export.Warnings);
     }
 
-    public bool NotExportable(ScenarioExportResult export, string emptyNoun)
+    public bool NotExportable(ScenarioExportResult export, ScenarioExportSubject subject)
     {
         if (export.EmittedRowCount > 0) { return false; }
 
         var detail = SubstantiveWarnings(export.Warnings);
 
-        _announcementService.Announce(detail.Count > 0
-            ? $"Could not export {emptyNoun}: {string.Join(" ", detail)}"
-            : $"Could not export {emptyNoun}: only Basic filters can be exported as scenarios.");
+        _announcementService.Announce(NotExportableMessage(subject, detail));
 
         return true;
     }
 
     private static IReadOnlyList<string> SubstantiveWarnings(IReadOnlyList<string> warnings) =>
         [.. warnings.Where(warning => warning != ScenarioExporter.NoLiveChannelsWarning)];
+
+    private string NotExportableMessage(ScenarioExportSubject subject, IReadOnlyList<string> detail) =>
+        (subject, detail.Count > 0) switch
+        {
+            (ScenarioExportSubject.SingleFilter, true) =>
+                _localizer["ScenarioExport_NotExportable_SingleFilter_WithDetail", string.Join(" ", detail)],
+            (ScenarioExportSubject.SingleFilter, false) =>
+                _localizer["ScenarioExport_NotExportable_SingleFilter_BasicOnly"],
+            (ScenarioExportSubject.CurrentFilters, true) =>
+                _localizer["ScenarioExport_NotExportable_CurrentFilters_WithDetail", string.Join(" ", detail)],
+            (ScenarioExportSubject.CurrentFilters, false) =>
+                _localizer["ScenarioExport_NotExportable_CurrentFilters_BasicOnly"],
+            (ScenarioExportSubject.FilterSet, true) =>
+                _localizer["ScenarioExport_NotExportable_FilterSet_WithDetail", string.Join(" ", detail)],
+            (ScenarioExportSubject.FilterSet, false) =>
+                _localizer["ScenarioExport_NotExportable_FilterSet_BasicOnly"],
+            _ => throw new ArgumentOutOfRangeException(nameof(subject), subject, null),
+        };
 }

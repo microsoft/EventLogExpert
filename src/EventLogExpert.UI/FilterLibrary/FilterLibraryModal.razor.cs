@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Common.Clipboard;
@@ -14,6 +15,7 @@ using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Localization;
 using System.Collections.Immutable;
 using System.Security;
 
@@ -115,6 +117,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     [Inject] private ILibraryEntriesSource LibraryEntries { get; init; } = null!;
 
     [Inject] private ILibraryLoadStatusSource LibraryLoadStatus { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     private EventCallback<LibraryEntryId> OnCopyScenarioCallback =>
         ScenarioAuthoringOptions.Enabled ?
@@ -479,7 +483,11 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             FilterLibraryCommands.LoadLibrary();
         }
 
-        _clipboardExporter = new ScenarioClipboardExporter(AnnouncementService, AlertDialogService, ClipboardService);
+        _clipboardExporter = new ScenarioClipboardExporter(
+            AnnouncementService,
+            AlertDialogService,
+            ClipboardService,
+            Localizer);
 
         _authoringContext = ScenarioAuthoringOptions.Enabled
             ? new ScenarioAuthoringRowContext(Enabled: true, CopyLibraryRowAsync)
@@ -548,7 +556,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         _clipboardExporter.CopyAsync(
             ScenarioAuthoringService.ExportRows([filter], []),
             "Filter copied to the clipboard as scenario JSON.",
-            "this filter");
+            ScenarioExportSubject.SingleFilter);
 
     private LibraryEntryFilterSet? FindFilterSet(LibraryEntryId entryId) =>
         LibraryEntries.Current.FirstOrDefault(e => e.Id.Equals(entryId)) as LibraryEntryFilterSet;
@@ -607,7 +615,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         await _clipboardExporter.CopyAsync(
             ScenarioAuthoringService.ExportRows([.. filterSet.Filters], []),
             $"'{filterSet.Name}' copied to the clipboard as scenario JSON.",
-            "this filter set");
+            ScenarioExportSubject.FilterSet);
     }
 
     private void HandleDelete(LibraryEntryId id) => FilterLibraryCommands.DeleteEntry(id);
@@ -663,7 +671,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
         var export = ScenarioAuthoringService.ExportRows([.. filterSet.Filters], []);
 
-        if (_clipboardExporter.NotExportable(export, "this filter set")) { return; }
+        if (_clipboardExporter.NotExportable(export, ScenarioExportSubject.FilterSet)) { return; }
 
         var suggested = $"{SanitizeForFileName(filterSet.Name)}-scenario-{DateTimeOffset.Now:yyyyMMdd}.json";
         var path = await FilePickerService.PickSaveAsync("Export scenario JSON", [".json"], suggestedFileName: suggested);

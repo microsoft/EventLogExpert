@@ -3,6 +3,7 @@
 
 using Bunit;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Common.Clipboard;
@@ -10,12 +11,14 @@ using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Scenarios;
+using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.FilterLibrary;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
 using System.Reflection;
@@ -31,6 +34,7 @@ public sealed class FilterLibraryModalTests : BunitContext
     private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
     private readonly ModalId _modalId = new(1L);
     private readonly IModalService _modalService = Substitute.For<IModalService>();
+    private readonly IScenarioAuthoringService _scenarioAuthoring = Substitute.For<IScenarioAuthoringService>();
 
     public FilterLibraryModalTests()
     {
@@ -58,7 +62,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         Services.AddSingleton(Substitute.For<ITagBulkUpdateFailedNotifier>());
 
         Services.AddSingleton(Substitute.For<IAlertDialogService>());
-        Services.AddSingleton(Substitute.For<IScenarioAuthoringService>());
+        Services.AddSingleton(_scenarioAuthoring);
         Services.AddSingleton(Substitute.For<IClipboardService>());
         Services.AddSingleton(new ScenarioAuthoringOptions(false));
 
@@ -632,6 +636,55 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public async Task ScenarioExportCopyFilterSet_WhenNotExportable_RoutesFilterSetDetailSubject()
+    {
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
+        Services.AddSingleton(new ScenarioAuthoringOptions(true));
+        const string warning = "3 row(s) skipped: not expressible as a Basic filter.";
+        _scenarioAuthoring.ExportRows(Arg.Any<IReadOnlyList<SavedFilter>>(), Arg.Any<IReadOnlyList<string>>())
+            .Returns(new ScenarioExportResult(string.Empty, [warning], EmittedRowCount: 0));
+        var filterSet = BuildFilterSet("Scenario Set");
+        SetState(new FilterLibraryState { Entries = [filterSet], IsLoaded = true });
+        var component = Render<FilterLibraryModal>();
+
+        await InvokePrivateTask(component.Instance, "HandleCopyScenarioAsync", filterSet.Id);
+
+        _announcements.Received(1).Announce(
+            "[[ScenarioExport_NotExportable_FilterSet_WithDetail(3 row(s) skipped: not expressible as a Basic filter.)]]");
+    }
+
+    [Fact]
+    public async Task ScenarioExportCopyLibraryRow_WhenNotExportable_RoutesSingleFilterSubject()
+    {
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
+        Services.AddSingleton(new ScenarioAuthoringOptions(true));
+        _scenarioAuthoring.ExportRows(Arg.Any<IReadOnlyList<SavedFilter>>(), Arg.Any<IReadOnlyList<string>>())
+            .Returns(new ScenarioExportResult(string.Empty, ImmutableList<string>.Empty, EmittedRowCount: 0));
+        SetState(new FilterLibraryState { Entries = [], IsLoaded = true });
+        var component = Render<FilterLibraryModal>();
+
+        await InvokePrivateTask(component.Instance, "CopyLibraryRowAsync", SavedFilter.TryCreate("Level == 4")!);
+
+        _announcements.Received(1).Announce("[[ScenarioExport_NotExportable_SingleFilter_BasicOnly]]");
+    }
+
+    [Fact]
+    public async Task ScenarioExportSaveFilterSet_WhenNotExportable_RoutesFilterSetBasicOnlySubject()
+    {
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
+        Services.AddSingleton(new ScenarioAuthoringOptions(true));
+        _scenarioAuthoring.ExportRows(Arg.Any<IReadOnlyList<SavedFilter>>(), Arg.Any<IReadOnlyList<string>>())
+            .Returns(new ScenarioExportResult(string.Empty, ImmutableList<string>.Empty, EmittedRowCount: 0));
+        var filterSet = BuildFilterSet("Scenario Set");
+        SetState(new FilterLibraryState { Entries = [filterSet], IsLoaded = true });
+        var component = Render<FilterLibraryModal>();
+
+        await InvokePrivateTask(component.Instance, "HandleSaveScenarioAsync", filterSet.Id);
+
+        _announcements.Received(1).Announce("[[ScenarioExport_NotExportable_FilterSet_BasicOnly]]");
+    }
+
+    [Fact]
     public async Task TabClick_SwitchesActiveTab()
     {
         SetState(new FilterLibraryState { IsLoaded = true });
@@ -1005,6 +1058,14 @@ public sealed class FilterLibraryModalTests : BunitContext
         };
     }
 
+    private static LibraryEntryFilterSet BuildFilterSet(string name) =>
+        new()
+        {
+            Name = name,
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = [SavedFilter.TryCreate("Level == 4")!],
+        };
+
     private static LibraryEntrySavedFilter BuildSavedFilter(string name) =>
         BuildFilterEntry(name) with { Origin = LibraryEntryOrigin.UserSaved };
 
@@ -1016,6 +1077,16 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         Assert.NotNull(dict);
         return dict[tab];
+    }
+
+    private static async Task InvokePrivateTask(FilterLibraryModal modal, string methodName, params object[] arguments)
+    {
+        var task = (Task?)typeof(FilterLibraryModal)
+            .GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)
+            ?.Invoke(modal, arguments);
+
+        Assert.NotNull(task);
+        await task;
     }
 
     private void SetState(FilterLibraryState state)

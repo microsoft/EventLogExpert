@@ -7,6 +7,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Common.Clipboard;
@@ -25,6 +26,7 @@ using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
 using System.Reflection;
@@ -120,6 +122,9 @@ public sealed class FilterPaneTests : BunitContext
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
+    private IStringLocalizer<SharedResource> Localizer =>
+        Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+
     [Fact]
     public void AddDateFilter_PreFillsModelFromEventLogQueriesRange()
     {
@@ -157,7 +162,7 @@ public sealed class FilterPaneTests : BunitContext
 
         component.Instance.ApplyFilterSetSelection();
 
-        _announcements.Received(1).Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal);
+        _announcements.Received(1).Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal(Localizer));
         _filterLibraryCommands.DidNotReceiveWithAnyArgs().ApplyEntry(default);
     }
 
@@ -176,7 +181,7 @@ public sealed class FilterPaneTests : BunitContext
 
         component.Instance.ApplyFilterSetSelection();
 
-        _announcements.Received(1).Announce(FilterPaneAnnouncements.SelectedFilterSetMissing);
+        _announcements.Received(1).Announce(FilterPaneAnnouncements.SelectedFilterSetMissing(Localizer));
         Assert.Equal(filterSetA.Id, component.Instance.SelectedFilterSetId);
         _filterLibraryCommands.DidNotReceiveWithAnyArgs().ApplyEntry(default);
     }
@@ -195,7 +200,7 @@ public sealed class FilterPaneTests : BunitContext
 
         component.Instance.ApplyFilterSetSelection();
 
-        _announcements.Received(1).Announce(FilterPaneAnnouncements.LoadingTryAgain);
+        _announcements.Received(1).Announce(FilterPaneAnnouncements.LoadingTryAgain(Localizer));
         _filterLibraryCommands.DidNotReceiveWithAnyArgs().ApplyEntry(default);
     }
 
@@ -275,7 +280,7 @@ public sealed class FilterPaneTests : BunitContext
 
         component.Instance.ApplyScenarioSelection();
 
-        _announcements.Received(1).Announce(FilterPaneAnnouncements.SelectedScenarioMissing);
+        _announcements.Received(1).Announce(FilterPaneAnnouncements.SelectedScenarioMissing(Localizer));
         _scenarioApply.DidNotReceiveWithAnyArgs().ApplyInApp(null!, false);
     }
 
@@ -356,7 +361,7 @@ public sealed class FilterPaneTests : BunitContext
 
         var component = Render<UI.FilterPane.FilterPane>();
         var copyButton = component.FindAll("button")
-            .First(button => button.GetAttribute("aria-label") == "Copy scenario JSON");
+            .First(button => button.GetAttribute("aria-label") == Localizer["FilterPane_CopyScenarioJson_Aria"]);
 
         await copyButton.ClickAsync(new MouseEventArgs());
 
@@ -435,13 +440,13 @@ public sealed class FilterPaneTests : BunitContext
         component.Instance.OpenFilterSetPicker();
         component.Render();
 
-        var replace = component.Find("button[aria-label='Replace filters with selected filter set']");
+        var replace = component.Find($"button[aria-label='{Localizer["FilterPane_FilterSet_ReplaceAria"]}']");
         Assert.False(replace.HasAttribute("disabled"));
 
         component.Instance.SelectedFilterSetId = default;
         component.Render();
 
-        Assert.True(component.Find("button[aria-label='Replace filters with selected filter set']").HasAttribute("disabled"));
+        Assert.True(component.Find($"button[aria-label='{Localizer["FilterPane_FilterSet_ReplaceAria"]}']").HasAttribute("disabled"));
     }
 
     [Fact]
@@ -491,7 +496,7 @@ public sealed class FilterPaneTests : BunitContext
 
         var reason = component.Instance.GetRecentDisabledReason();
 
-        Assert.Equal(FilterPaneAnnouncements.RecentNoneAvailable, reason);
+        Assert.Equal(FilterPaneAnnouncements.RecentNoneAvailable(Localizer), reason);
     }
 
     [Fact]
@@ -526,12 +531,13 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Theory]
-    [InlineData(true, false, true, "Filter library failed to load. Open Filter Library to retry.")]
-    [InlineData(false, false, false, "Filter library is still loading. Please try again.")]
-    [InlineData(true, true, true, "Filter library failed to load. Open Filter Library to retry.")]
+    [InlineData(true, false, true, "[[FilterPane_Announcement_LoadFailedRetryViaModal]]")]
+    [InlineData(false, false, false, "[[FilterPane_Announcement_LoadingTryAgain]]")]
+    [InlineData(true, true, true, "[[FilterPane_Announcement_LoadFailedRetryViaModal]]")]
     public void GetRecentDisabledReason_WhenLoadErrorOrLoading_ReturnsContextSpecificMessage(
         bool isLoaded, bool hasEntries, bool loadError, string expectedReason)
     {
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
         var entries = hasEntries
             ? ImmutableList.Create<LibraryEntry>(BuildSavedFilter("X", isFavorite: true))
             : ImmutableList<LibraryEntry>.Empty;
@@ -625,7 +631,7 @@ public sealed class FilterPaneTests : BunitContext
 
         component.Instance.OpenFilterSetPicker();
 
-        _announcements.Received(1).Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal);
+        _announcements.Received(1).Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal(Localizer));
     }
 
     [Fact]
@@ -653,7 +659,7 @@ public sealed class FilterPaneTests : BunitContext
 
         component.Instance.OpenFilterSetPicker();
 
-        _announcements.Received(1).Announce(FilterPaneAnnouncements.LoadingTryAgain);
+        _announcements.Received(1).Announce(FilterPaneAnnouncements.LoadingTryAgain(Localizer));
     }
 
     [Fact]
@@ -709,7 +715,7 @@ public sealed class FilterPaneTests : BunitContext
         var component = Render<UI.FilterPane.FilterPane>();
         await FindApplyScenarioButton(component)!.ClickAsync(new MouseEventArgs());
 
-        Assert.Contains("Category:", component.Find("#scenario-picker").TextContent);
+        Assert.NotNull(component.Find("#scenario-picker .scenario-category-dropdown"));
     }
 
     [Fact]
@@ -741,7 +747,7 @@ public sealed class FilterPaneTests : BunitContext
         var component = Render<UI.FilterPane.FilterPane>();
         await FindApplyScenarioButton(component)!.ClickAsync(new MouseEventArgs());
 
-        Assert.DoesNotContain("Category:", component.Find("#scenario-picker").TextContent);
+        Assert.Empty(component.FindAll("#scenario-picker .scenario-category-dropdown"));
     }
 
     [Fact]
@@ -756,7 +762,7 @@ public sealed class FilterPaneTests : BunitContext
         await FindApplyScenarioButton(component)!.ClickAsync(new MouseEventArgs());
 
         var status = component.Find("[role='status']");
-        Assert.Equal("No scenarios match the loaded logs.", status.TextContent);
+        Assert.Equal(Localizer["FilterPane_Scenario_EmptyNoMatches"], status.TextContent);
     }
 
     [Fact]
@@ -951,7 +957,7 @@ public sealed class FilterPaneTests : BunitContext
 
         component.Instance.ReplaceFilterSetSelection();
 
-        _announcements.Received(1).Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal);
+        _announcements.Received(1).Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal(Localizer));
         _filterLibraryCommands.DidNotReceiveWithAnyArgs().ReplaceWithEntry(default);
     }
 
@@ -969,7 +975,7 @@ public sealed class FilterPaneTests : BunitContext
 
         component.Instance.ReplaceFilterSetSelection();
 
-        _announcements.Received(1).Announce(FilterPaneAnnouncements.LoadingTryAgain);
+        _announcements.Received(1).Announce(FilterPaneAnnouncements.LoadingTryAgain(Localizer));
         _filterLibraryCommands.DidNotReceiveWithAnyArgs().ReplaceWithEntry(default);
     }
 
@@ -996,8 +1002,8 @@ public sealed class FilterPaneTests : BunitContext
     {
         var component = Render<UI.FilterPane.FilterPane>();
 
-        Assert.True(component.Find("button[aria-label='Save as Filter Set']").HasAttribute("disabled"));
-        Assert.True(component.Find("button[aria-label='Clear All Filters']").HasAttribute("disabled"));
+        Assert.True(component.Find($"button[aria-label='{Localizer["FilterPane_SaveAsFilterSet_Aria"]}']").HasAttribute("disabled"));
+        Assert.True(component.Find($"button[aria-label='{Localizer["FilterPane_ClearAll_Aria"]}']").HasAttribute("disabled"));
     }
 
     [Fact]
@@ -1019,11 +1025,11 @@ public sealed class FilterPaneTests : BunitContext
 
         var component = Render<UI.FilterPane.FilterPane>();
         var saveButton = component.FindAll("button")
-            .First(button => button.GetAttribute("aria-label") == "Save scenario JSON");
+            .First(button => button.GetAttribute("aria-label") == Localizer["FilterPane_SaveScenarioJson_Aria"]);
 
         await saveButton.ClickAsync(new MouseEventArgs());
 
-        await alertDialog.Received(1).ShowAlert("Export failed", Arg.Any<string>(), "OK");
+        await alertDialog.Received(1).ShowAlert(Localizer["FilterPane_ExportFailed_Title"], Arg.Any<string>(), Localizer["Modal_Accept"]);
     }
 
     [Fact]
@@ -1052,8 +1058,8 @@ public sealed class FilterPaneTests : BunitContext
 
         var component = Render<UI.FilterPane.FilterPane>();
 
-        Assert.True(component.Find("button[aria-label='Copy scenario JSON']").HasAttribute("disabled"));
-        Assert.True(component.Find("button[aria-label='Save scenario JSON']").HasAttribute("disabled"));
+        Assert.True(component.Find($"button[aria-label='{Localizer["FilterPane_CopyScenarioJson_Aria"]}']").HasAttribute("disabled"));
+        Assert.True(component.Find($"button[aria-label='{Localizer["FilterPane_SaveScenarioJson_Aria"]}']").HasAttribute("disabled"));
     }
 
     [Fact]
@@ -1105,8 +1111,8 @@ public sealed class FilterPaneTests : BunitContext
         });
         component.Render();
 
-        Assert.Contains("2024-06-08", component.Find("input[aria-label='After']").GetAttribute("value"));
-        Assert.Contains("2024-06-15", component.Find("input[aria-label='Before']").GetAttribute("value"));
+        Assert.Contains("2024-06-08", component.Find($"input[aria-label='{Localizer["FilterPane_Date_AfterAria"]}']").GetAttribute("value"));
+        Assert.Contains("2024-06-15", component.Find($"input[aria-label='{Localizer["FilterPane_Date_BeforeAria"]}']").GetAttribute("value"));
         _filterPaneCommands.DidNotReceiveWithAnyArgs().SetFilterDateRange(null);
     }
 
@@ -1138,7 +1144,7 @@ public sealed class FilterPaneTests : BunitContext
         new("file", LogPathType.File) { LogName = logName };
 
     private static IElement? FindApplyScenarioButton(IRenderedComponent<UI.FilterPane.FilterPane> component) =>
-        component.FindAll("button").FirstOrDefault(button => button.TextContent.Contains("Apply Scenario"));
+        component.FindAll("button").FirstOrDefault(button => button.GetAttribute("aria-controls") == "scenario-picker");
 
     private static bool GetCanEditDate(IRenderedComponent<UI.FilterPane.FilterPane> component) =>
         (bool)typeof(UI.FilterPane.FilterPane)
