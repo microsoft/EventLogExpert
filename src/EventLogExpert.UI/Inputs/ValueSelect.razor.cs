@@ -226,6 +226,23 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
     private async Task HandleKeyDown(KeyboardEventArgs args)
     {
+        // A collapsed combobox opens on the first Enter / Space / Arrow press; item navigation and
+        // value changes only happen once the listbox is visible, so arrows never move the selection
+        // while the dropdown is closed.
+        if (!_isOpen)
+        {
+            switch (args.Code)
+            {
+                case "Enter":
+                case "ArrowUp":
+                case "ArrowDown":
+                case "Space" when !IsInput:
+                    await OpenDropDown();
+
+                    return;
+            }
+        }
+
         switch (args.Code)
         {
             case "Space":
@@ -233,12 +250,10 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
                 return;
             case "ArrowUp":
-                await OpenDropDown();
                 await SelectAdjacentItem(-1);
 
                 return;
             case "ArrowDown":
-                await OpenDropDown();
                 await SelectAdjacentItem(+1);
 
                 return;
