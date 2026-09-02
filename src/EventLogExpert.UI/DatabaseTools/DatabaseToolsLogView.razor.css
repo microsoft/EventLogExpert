@@ -124,7 +124,6 @@
 
 .log-trace .log-message {
     color: var(--text-secondary);
-    opacity: 0.7;
 }
 
 .log-debug .log-message {

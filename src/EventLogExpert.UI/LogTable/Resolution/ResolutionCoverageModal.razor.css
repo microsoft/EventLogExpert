@@ -9,7 +9,7 @@
 .resolution-coverage-status {
     padding: 1rem;
     text-align: center;
-    opacity: 0.7;
+    color: var(--text-secondary);
 }
 
 .resolution-coverage-summary {
@@ -24,7 +24,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    opacity: 0.7;
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
 }
 
@@ -55,7 +55,7 @@
 
 .resolution-coverage-truncated {
     font-size: var(--font-size-sm);
-    opacity: 0.7;
+    color: var(--text-secondary);
 }
 
 .resolution-coverage-table {
@@ -166,12 +166,19 @@
     padding: 0.1rem;
 }
 
+.resolution-actions button:hover,
+.resolution-detail-idrow button:hover {
+    background: color-mix(in srgb, currentColor 14%, transparent);
+    border-radius: 3px;
+}
+
 .resolution-coverage-bar {
     display: flex;
+    gap: 1px;
     height: 0.5rem;
     border-radius: 0.25rem;
     overflow: hidden;
-    background: rgba(128, 128, 128, 0.15);
+    background: var(--background-dark);
 }
 
 .resolution-coverage-seg {
@@ -180,19 +187,19 @@
 }
 
 .coverage-seg-resolved {
-    background: rgba(40, 167, 69, 0.7);
+    background: var(--clr-green);
 }
 
 .coverage-seg-noprovider {
-    background: rgba(220, 53, 69, 0.7);
+    background: var(--clr-red);
 }
 
 .coverage-seg-nomessage {
-    background: rgba(255, 193, 7, 0.7);
+    background: var(--clr-yellow);
 }
 
 .coverage-seg-failed {
-    background: rgba(108, 117, 125, 0.7);
+    background: var(--text-secondary);
 }
 
 .resolution-coverage-footer {
@@ -224,7 +231,7 @@
 }
 
 .resolution-cause-empty {
-    opacity: 0.55;
+    color: var(--text-secondary);
 }
 
 .resolution-provider-toggle {
@@ -266,7 +273,7 @@
 
 .resolution-detail-status {
     font-size: var(--font-size-sm);
-    opacity: 0.8;
+    color: var(--text-secondary);
 }
 
 .resolution-detail-hint {
@@ -291,16 +298,17 @@
 .resolution-detail-note {
     font-weight: 400;
     font-size: var(--font-size-sm);
-    opacity: 0.7;
+    color: var(--text-secondary);
 }
 
 .resolution-detail-sevbar {
     display: flex;
+    gap: 1px;
     height: 0.5rem;
     max-width: 24rem;
     border-radius: 0.25rem;
     overflow: hidden;
-    background: rgba(128, 128, 128, 0.15);
+    background: var(--background-dark);
 }
 
 .resolution-detail-sevseg {
@@ -327,17 +335,17 @@
     border-radius: 50%;
 }
 
-.coverage-sev-critical { background: rgba(220, 53, 69, 0.85); }
+.coverage-sev-critical { background: var(--clr-red); }
 
-.coverage-sev-error { background: rgba(240, 108, 0, 0.85); }
+.coverage-sev-error { background: light-dark(#A85400, #F06900); }
 
-.coverage-sev-warning { background: rgba(255, 193, 7, 0.85); }
+.coverage-sev-warning { background: var(--clr-yellow); }
 
-.coverage-sev-information { background: rgba(13, 110, 253, 0.7); }
+.coverage-sev-information { background: var(--clr-lightblue); }
 
-.coverage-sev-verbose { background: rgba(108, 117, 125, 0.7); }
+.coverage-sev-verbose { background: var(--text-secondary); }
 
-.coverage-sev-unknown { background: rgba(128, 128, 128, 0.5); }
+.coverage-sev-unknown { background: light-dark(#707070, #909090); }
 
 .resolution-detail-idtable {
     display: flex;

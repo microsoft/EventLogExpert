@@ -74,7 +74,7 @@
 
 .scenario-detail__fact-muted {
     font-size: 0.85rem;
-    color: color-mix(in srgb, var(--text-secondary) 78%, transparent);
+    color: var(--text-secondary);
 }
 
 .scenario-detail__channel-readiness {

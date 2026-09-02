@@ -81,8 +81,14 @@
 }
 
 .histogram-legend-hidden {
-    opacity: 0.5;
+    color: var(--text-secondary);
     text-decoration: line-through;
+}
+
+@media (forced-colors: active) {
+    .histogram-legend-hidden {
+        color: GrayText;
+    }
 }
 
 .histogram-swatch {

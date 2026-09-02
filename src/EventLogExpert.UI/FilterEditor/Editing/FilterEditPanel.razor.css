@@ -90,8 +90,9 @@
     display: inline-flex;
 }
 
-.color-picker-wrapper[data-filter-excluded="true"] {
-    opacity: 0.5;
+.color-picker-wrapper[data-filter-excluded="true"] ::deep input.color-dropdown {
+    border-style: dashed;
+    border-color: var(--text-secondary);
 }
 
 .color-picker-wrapper[data-filter-excluded="true"] ::deep input.color-dropdown:focus-visible {
@@ -100,8 +101,9 @@
 }
 
 @media (forced-colors: active) {
-    .color-picker-wrapper[data-filter-excluded="true"] {
-        opacity: 1;
+    .color-picker-wrapper[data-filter-excluded="true"] ::deep input.color-dropdown {
+        border-style: dashed;
+        border-color: GrayText;
     }
 }
 

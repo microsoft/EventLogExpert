@@ -16,7 +16,7 @@
     --text-error:       light-dark(#A02020, var(--clr-red));
     --clr-green:        light-dark(#14622A, #5AC358);
     --clr-yellow:       light-dark(#6A5300, #F8C84B);
-    --clr-placeholder:  light-dark(#6B6B6B, #A3A1A1);
+    --clr-placeholder:  light-dark(#606060, #A3A1A1);
     --clr-statusbar:    light-dark(#0A246A, #4472C4);
 
     /* Find highlight: highlighter-yellow background fill for the current match's inline marks; #1A1A1A text clears WCAG AA on both themes. */
@@ -125,7 +125,7 @@
     --toggle-accent: #14599D;
 
     --text-primary: var(--clr-lightblue);
-    --text-secondary: #555;
+    --text-secondary: #4A4A4A;
 }
 
 /* Modern Dark: backgrounds already match the neutral base dark, so only the blue
@@ -420,9 +420,12 @@ input[type="text"].input.dialog-input { padding: .25rem 0; }
     --btn-color: var(--clr-lightblue);
     color: var(--btn-color);
     border: none;
+    border-radius: .25rem;
     background: none;
 
-    &:hover { filter: brightness(0.9); }
+    &:hover:not(:disabled) {
+        background: color-mix(in srgb, currentColor 12%, transparent);
+    }
 }
 
 .button.button-red    { --btn-color: var(--clr-red); }
@@ -483,11 +486,24 @@ input[type="text"].input.dialog-input { padding: .25rem 0; }
     align-items: stretch;
 }
 
-.split-button .split-button-primary { padding-right: 0.25rem; }
+.split-button .split-button-primary {
+    padding-right: 0.25rem;
+    border-radius: .25rem 0 0 .25rem;
+}
 
 .split-button .split-button-chevron {
     padding-left: 0.25rem;
     padding-right: 0.25rem;
+    border-radius: 0 .25rem .25rem 0;
+}
+
+.split-button:hover .split-button-primary,
+.split-button:hover .split-button-chevron {
+    background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.split-button .split-button-chevron:hover {
+    background: color-mix(in srgb, currentColor 20%, transparent);
 }
 
 .split-button .split-button-chevron .bi { font-size: 0.75em; }

@@ -105,12 +105,10 @@
     border-radius: 4px;
     color: var(--text-secondary);
     background: none;
-    opacity: 0.5;
     cursor: pointer;
 }
 
 .details-field:hover .details-copy,
 .details-copy:focus-visible {
     color: var(--text-primary);
-    opacity: 1;
 }

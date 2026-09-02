@@ -20,9 +20,10 @@
     transition: color 0.1s ease-in-out;
 }
 
-/* A disabled filter stays visible (and its enable toggle stays clickable) but is greyed to show it is inactive. */
+/* A disabled filter stays visible (and its enable toggle stays clickable) but its
+   summary text is muted to show it is inactive; the operable controls keep full contrast. */
 .debug-log-filter-chip[data-disabled="true"] {
-    opacity: 0.55;
+    color: var(--text-secondary);
 }
 
 .debug-log-filter-chip ::deep .debug-log-filter-chip-edit,

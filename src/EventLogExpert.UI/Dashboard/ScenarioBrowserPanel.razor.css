@@ -45,9 +45,12 @@
     cursor: default;
 }
 
-.scenario-browser__option--disabled .scenario-browser__option-icon,
-.scenario-browser__option--disabled .scenario-browser__option-body {
+.scenario-browser__option--disabled .scenario-browser__option-icon {
     opacity: 0.55;
+}
+
+.scenario-browser__option--disabled .scenario-browser__option-name {
+    color: var(--text-secondary);
 }
 
 .scenario-browser__option:focus-visible {

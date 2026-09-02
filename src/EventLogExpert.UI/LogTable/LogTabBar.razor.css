@@ -1,4 +1,4 @@
-.log-tab-bar {
+sws.log-tab-bar {
     flex: 0 0 auto;
     margin: 0 5px;
     height: 33px;
@@ -48,22 +48,22 @@
         border: 1px solid transparent;
         border-radius: 3px;
 
-        opacity: 0.35;
+        color: var(--text-secondary);
 
         &:hover {
             border-color: var(--clr-lightblue);
-            opacity: 1;
+            color: var(--clr-lightblue);
         }
 
         &:focus-visible {
             border-color: var(--clr-lightblue);
-            opacity: 1;
+            color: var(--clr-lightblue);
         }
     }
 
     &:hover > i,
     &.active > i {
-        opacity: 1;
+        color: var(--clr-lightblue);
     }
 }
 
