@@ -1,4 +1,7 @@
-﻿.table-container {
+/* The event grid is a 2D data table: WCAG 1.4.10 exempts it from single-direction reflow, and
+   1.4.4 permits horizontal scroll (rather than row reflow) at zoom - so this container scrolls
+   both axes. */
+.table-container {
     flex: 1 1 0;
     min-height: 0;
     overflow: auto;

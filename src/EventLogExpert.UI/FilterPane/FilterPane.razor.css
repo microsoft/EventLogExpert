@@ -93,7 +93,6 @@
 .filter-set-option-meta {
     flex: 0 1 auto;
     color: currentColor;
-    opacity: 0.75;
     font-size: 0.8rem;
     overflow: hidden;
     text-overflow: ellipsis;

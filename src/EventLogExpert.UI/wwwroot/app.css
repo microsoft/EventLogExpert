@@ -431,8 +431,10 @@ input[type="text"].input.dialog-input { padding: .25rem 0; }
     border-radius: .25rem;
     background: none;
 
+    /* Opaque light/dark tint of the button's own color keeps text >=4.5:1 on any surface;
+       a transparent tint would reduce contrast on darker toolbar backgrounds. */
     &:hover:not(:disabled) {
-        background: color-mix(in srgb, currentColor 12%, transparent);
+        background: light-dark(color-mix(in srgb, currentColor 20%, white), color-mix(in srgb, currentColor 20%, black));
     }
 }
 
@@ -507,11 +509,11 @@ input[type="text"].input.dialog-input { padding: .25rem 0; }
 
 .split-button:hover .split-button-primary,
 .split-button:hover .split-button-chevron {
-    background: color-mix(in srgb, currentColor 12%, transparent);
+    background: light-dark(color-mix(in srgb, currentColor 20%, white), color-mix(in srgb, currentColor 20%, black));
 }
 
 .split-button .split-button-chevron:hover {
-    background: color-mix(in srgb, currentColor 20%, transparent);
+    background: light-dark(color-mix(in srgb, currentColor 26%, white), color-mix(in srgb, currentColor 26%, black));
 }
 
 .split-button .split-button-chevron .bi { font-size: 0.75em; }

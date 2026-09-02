@@ -330,9 +330,6 @@
     font-size: 0.85em;
 }
 
-/* Recomputing: prior rows stay visible but read as provisional while the scan is in flight. */
-.stats-stale { opacity: 0.6; }
-
 @media (forced-colors: active) {
     .stats-severity-seg,
     .stats-legend-swatch {
