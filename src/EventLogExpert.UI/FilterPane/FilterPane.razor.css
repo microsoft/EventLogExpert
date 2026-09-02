@@ -5,8 +5,9 @@
 
     margin: 0 5px;
 
-    max-height: 25%;
-    overflow: hidden;
+    max-height: 30%;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 .filter-header {

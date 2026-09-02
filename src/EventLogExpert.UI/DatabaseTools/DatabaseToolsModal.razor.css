@@ -30,7 +30,7 @@
 
 .db-tabs-container ::deep .db-tab-form {
     display: grid;
-    grid-template-columns: 12rem minmax(0, 1fr);
+    grid-template-columns: 12rem minmax(8rem, 1fr);
     column-gap: .5rem;
     row-gap: .5rem;
     align-items: center;

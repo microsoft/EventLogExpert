@@ -4,6 +4,7 @@
     flex-direction: column;
     flex: 0 0 auto;
     height: 170px;
+    min-height: min(12rem, 30vh);
     margin: 0 5px;
     border-bottom: solid var(--background-darkgray);
     overflow: hidden;

@@ -156,7 +156,7 @@ tr {
     display: flex;
     flex-direction: column;
     flex: 1 1 0;
-    min-height: 0;
+    min-height: min(8rem, 30vh);
     position: relative;
 }
 
