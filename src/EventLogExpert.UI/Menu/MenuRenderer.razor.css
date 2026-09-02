@@ -22,7 +22,10 @@
         background-color: var(--background-darkgray);
     }
 
-    &:focus-visible:not(.disabled) {
+    /* Items are focused programmatically via roving tabindex in a render cycle, and
+       focusable-but-disabled items (those carrying a DisabledReason) must still show
+       focus - :focus-visible skips both cases, so the ring goes on :focus. */
+    &:focus {
         background-color: var(--background-darkgray);
         outline: 2px solid var(--clr-lightblue);
         outline-offset: -2px;

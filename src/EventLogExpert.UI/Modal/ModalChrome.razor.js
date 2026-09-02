@@ -4,6 +4,16 @@
 // Capture the previously focused element on open and restore it on close so closing a modal
 // (Esc, native cancel, footer buttons) returns keyboard focus to the trigger that opened it,
 // matching native dialog accessibility expectations (WAI-ARIA Authoring Practices: Dialog).
+// Sequentially-focusable controls, used to move initial focus onto the modal's content.
+const focusableInBody =
+    'a[href]:not([tabindex="-1"]),' +
+    'button:not([disabled]):not([tabindex="-1"]),' +
+    'input:not([disabled]):not([tabindex="-1"]),' +
+    'select:not([disabled]):not([tabindex="-1"]),' +
+    'textarea:not([disabled]):not([tabindex="-1"]),' +
+    'details > summary:not([tabindex="-1"]),' +
+    '[tabindex]:not([tabindex="-1"])';
+
 export function showModal(ref) {
     if (ref == null || ref.open) { return; }
 
@@ -15,6 +25,23 @@ export function showModal(ref) {
         : null;
 
     ref.showModal();
+
+    // Content modals drop their footer autofocus, so the native dialog may land focus on the
+    // header/footer close button instead of the content. When focus lands outside the body and
+    // was not placed by an explicit autofocus (confirm/alert footers keep theirs), redirect it to
+    // the first body control, or to the body region itself for text-only modals.
+    const body = ref.querySelector(":scope > .dialog-group > .dialog-body");
+    const focused = document.activeElement;
+    if (body instanceof HTMLElement && focused instanceof HTMLElement
+        && !body.contains(focused) && !focused.hasAttribute("autofocus")) {
+        const firstControl = body.querySelector(focusableInBody);
+        if (firstControl instanceof HTMLElement) {
+            firstControl.focus();
+        } else {
+            body.tabIndex = -1;
+            body.focus();
+        }
+    }
 }
 
 export function closeModal(ref) {
