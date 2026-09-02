@@ -1,7 +1,11 @@
 <div class="details-field @(Field.IsMuted ? "is-muted" : null) @(Field.PreferFullWidth ? "is-wide" : null)">
     <div class="details-field-name">
         <span>@Field.Label</span>
-        <button aria-label="@Localizer["Details_CopyValueAria", Field.Label].Value" class="details-copy" @onclick="OnCopy" type="button">
+        <button aria-label="@Localizer["Details_CopyValueAria", Field.Label].Value"
+            class="details-copy"
+            @onclick="OnCopy"
+            title="@Localizer["Details_CopyValueAria", Field.Label].Value"
+            type="button">
             <i class="bi bi-clipboard"></i>
         </button>
     </div>

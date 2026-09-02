@@ -51,7 +51,11 @@
         <div class="details-headerbar-actions">
             @if (_isExpanded && showsLiveModel)
             {
-                <button aria-label="@Localizer["Details_CopyEventAria"].Value" class="details-copy-event" @onclick="CopyEventAsync" type="button">
+                <button aria-label="@Localizer["Details_CopyEventAria"].Value"
+                    class="details-copy-event"
+                    @onclick="CopyEventAsync"
+                    title="@Localizer["Details_CopyEventAria"].Value"
+                    type="button">
                     <i class="bi bi-clipboard"></i>
                     <span class="details-copy-event-label">@Localizer["Details_CopyEventButtonLabel"]</span>
                 </button>
@@ -64,7 +68,8 @@
                 aria-expanded="@IsExpanded"
                 aria-label="@Localizer[_isExpanded ? "Details_CollapseAria" : "Details_ExpandAria"].Value"
                 data-rotate="@IsExpanded"
-                id="details-header" />
+                id="details-header"
+                title="@Localizer[_isExpanded ? "Details_CollapseAria" : "Details_ExpandAria"].Value" />
         </div>
     </div>
 
@@ -143,6 +148,7 @@
                                             @onclick="() => CopyPropertiesAsync(_model.SystemProperties)"
                                             @onclick:preventDefault="true"
                                             @onclick:stopPropagation="true"
+                                            title="@Localizer["Details_CopySystemDetailsAria"].Value"
                                             type="button">
                                             <i class="bi bi-clipboard"></i>
                                         </button>
@@ -151,8 +157,10 @@
                                         @foreach (DetailsProperty property in _model.SystemProperties)
                                         {
                                             <dt>@DetailsPropertyLocalizer.Label(Localizer, property.Label)</dt>
-                                            <dd>@(property.StatusValue is { } status ?
-                                                ResolutionStatusLocalizer.Display(Localizer, status) : property.Value)</dd>
+                                            <dd>
+                                                @(property.StatusValue is { } status ?
+                                                    ResolutionStatusLocalizer.Display(Localizer, status) : property.Value)
+                                            </dd>
                                         }
                                     </dl>
                                 </details>
@@ -180,6 +188,7 @@
                                         <button aria-label="@Localizer["Details_CopyEventDataAria"].Value"
                                             class="details-copy-section"
                                             @onclick="() => CopyFieldsAsync(_model.EventData)"
+                                            title="@Localizer["Details_CopyEventDataAria"].Value"
                                             type="button">
                                             <i class="bi bi-clipboard"></i>
                                         </button>
@@ -215,6 +224,7 @@
                                         <button aria-label="@Localizer["Details_CopyUserDataAria"].Value"
                                             class="details-copy-section"
                                             @onclick="() => CopyFieldsAsync(_model.UserData)"
+                                            title="@Localizer["Details_CopyUserDataAria"].Value"
                                             type="button">
                                             <i class="bi bi-clipboard"></i>
                                         </button>
